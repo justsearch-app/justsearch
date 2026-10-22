@@ -21,7 +21,7 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import './Button.js';
 import { ModalController } from '../primitives/modalController.js';
-import { deepActiveElement, isTypingTarget } from '../utils/keyboardHandler.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 import { icon } from './Icon.js';
 
 type Variant = 'danger' | 'warning' | 'info';
@@ -118,6 +118,7 @@ export class ConfirmDialog extends JfElement {
       margin-left: auto;
     }
     .message {
+      overflow-wrap: anywhere;
       margin: 0 0 1rem 0;
       font-size: var(--font-size-sm);
       line-height: 1.5;
@@ -201,14 +202,11 @@ export class ConfirmDialog extends JfElement {
     if (!this.open) return;
     // Escape is handled natively by <dialog> (the @cancel handler in render); here only Enter.
     if (e.key !== 'Enter' || this.confirmDisabled()) return;
-    // 864 — this listener is on `document`, so an event from inside the shadow root arrives with
-    // `e.target` RETARGETED to the <jf-confirm-dialog> host: the old `target.tagName !== 'INPUT'`
-    // test could never see the typed-confirm input, and the guard its comment promised did not
-    // exist. Ask where focus IS instead, descending through shadow roots (857's shared predicate —
-    // not a fifth hand-rolled copy). While the reader is typing, the input's own @keydown owns
-    // Enter and is match-gated by confirmDisabled(), so this document-level path must stand down
-    // rather than fire a second `confirm`.
-    if (isTypingTarget(deepActiveElement())) return;
+    // Focus can be several shadow roots deep. Focused controls own Enter (including the
+    // native Confirm button and the typed input); only the dialog itself uses this shortcut.
+    const active = deepActiveElement();
+    if (active && active !== document.body && active !== this &&
+        active !== this.shadowRoot?.querySelector('dialog')) return;
     e.preventDefault();
     this.confirm();
   }

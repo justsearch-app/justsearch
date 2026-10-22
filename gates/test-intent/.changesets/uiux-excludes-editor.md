@@ -938,6 +938,87 @@ The before-state is ae50fbc4e. New repair checks run unchanged against it. Exist
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ov1-ui-preservation.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "CE1 repaired keyboard ownership: document-level Enter neither confirms nor prevents native activation from focused Cancel, Close or another non-Confirm control. Native cancel actions remain wired. Real headless Chromium separately checks native Enter/Space activation, preservation on Confirm, and 240-character message reflow at 360 px in light/dark.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S321",
+          "quote": "Apply asks for the typed confirmation the operation requires, and after confirming it runs; cancelling the confirmation removes nothing and changes no saved list beyond what the user explicitly saved (decision 2).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S327",
+          "quote": "Editor, Save, Preview, Apply, the confirmation and the result are operable by keyboard and screen reader (busy and result announced once), in both themes, High Contrast and narrow width.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and the shared confirmation dialog",
+          "choice": "Clarification CE1 (agent-adopted, orchestrator 2026-10-23, under the user's delegation \"you dont need to wait for my opinion regarding the designs, i agree with you on them\"; origin: verifier-5 F2 and F1)\n\nEnter in a confirmation dialog does what the focused control does. Applies to the shared confirmation dialog, so to every dialog that uses it.\n\n| Case | Expected |\n|---|---|\n| Apply confirmation, phrase typed, Cancel focused, Enter | Cancels; no Apply request; every indexed file stays searchable |\n| Same, Space on Cancel | Cancels (as today) |\n| Phrase typed, focus in the phrase field, Enter | Confirms (as today) |\n| Phrase typed, Confirm focused, Enter | Confirms (as today) |\n| Dialog without a typed phrase, Cancel or close button focused, Enter | Cancels or closes; no confirm |\n| Dialog without a typed phrase, focus on the dialog itself or Confirm, Enter | Confirms (as today) |\n| Phrase not typed, any focus, Enter | No confirm (as today) |\n| Confirmation listing a long unbroken pattern (240 characters) at 360 px wide, light and dark | The full pattern wraps inside the dialog; no horizontal scroll, nothing clipped |",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ce1-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Cancel to native activation (typed=true)",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Cancel to native activation (typed=false)",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Close to native activation",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on another focused control (a)"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "CE1 preservation: selecting controls retains native Enter; dialog-focused Enter and matching-phrase Enter confirm exactly once; unmatched phrases cannot confirm from input, dialog or action buttons. Browser preservation also checks native Confirm Enter and Space cancellation.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S321",
+          "quote": "Apply asks for the typed confirmation the operation requires, and after confirming it runs; cancelling the confirmation removes nothing and changes no saved list beyond what the user explicitly saved (decision 2).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S327",
+          "quote": "Editor, Save, Preview, Apply, the confirmation and the result are operable by keyboard and screen reader (busy and result announced once), in both themes, High Contrast and narrow width.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and the shared confirmation dialog",
+          "choice": "Clarification CE1 (agent-adopted, orchestrator 2026-10-23, under the user's delegation \"you dont need to wait for my opinion regarding the designs, i agree with you on them\"; origin: verifier-5 F2 and F1)\n\nEnter in a confirmation dialog does what the focused control does. Applies to the shared confirmation dialog, so to every dialog that uses it.\n\n| Case | Expected |\n|---|---|\n| Apply confirmation, phrase typed, Cancel focused, Enter | Cancels; no Apply request; every indexed file stays searchable |\n| Same, Space on Cancel | Cancels (as today) |\n| Phrase typed, focus in the phrase field, Enter | Confirms (as today) |\n| Phrase typed, Confirm focused, Enter | Confirms (as today) |\n| Dialog without a typed phrase, Cancel or close button focused, Enter | Cancels or closes; no confirm |\n| Dialog without a typed phrase, focus on the dialog itself or Confirm, Enter | Confirms (as today) |\n| Phrase not typed, any focus, Enter | No confirm (as today) |\n| Confirmation listing a long unbroken pattern (240 characters) at 360 px wide, light and dark | The full pattern wraps inside the dialog; no horizontal scroll, nothing clipped |",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ce1-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on another focused control (select)",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves Enter confirmation on the dialog itself",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves exactly one Enter confirmation in the matching phrase field",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with cancel focused",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with close focused",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with confirm focused",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with input focused",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with dialog focused"
+      ]
     }
   ]
 }
@@ -948,6 +1029,8 @@ XA1 repair entries appended by builder session b0s1b46m on 2026-10-22; earlier e
 EX1 preservation follow-up (baseline 4a7f96624): the existing Worker/index/queue assertions remain unchanged. The evidence producer compares the adapted check on both trees. A `passed` fail-before classification makes the producer exit 1 because it requires an assertion failure whenever `--before` is supplied; passing on both trees is preservation evidence for this signature Adaptation, not evidence of repaired product behavior. The unchanged-fake failure and original known-good comparison are retained in `tmp/wp32-third-repair/`.
 
 OV1 repair entries appended by builder session 8acrycvp on 2026-10-22; all earlier entries and acceptance records are retained. The official producer used default dependency-link mode with baseline 052c08961. Preservation evidence intentionally exits 1 because its before checks pass; all candidate checks pass.
+
+CE1 entries appended by builder session 8b7469qf. Official evidence uses default dependency-link mode and baseline bdb952543. Repair evidence exits 0; preservation evidence exits 1 because all eight before checks pass, with all candidate checks passing. No acceptance record authored. Shared-dialog native keyboard/reflow comparison and private Engine checks are retained under `tmp/wp32-ce1/`.
 
 ## Acceptance records
 
