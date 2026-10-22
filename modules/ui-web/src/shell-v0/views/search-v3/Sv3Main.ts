@@ -2711,6 +2711,7 @@ export class Sv3Main extends JfElement {
       .retrievalMode=${turn.evidence.retrievalMode}
       .groundingIncomplete=${turn.evidence.groundingIncomplete ?? false}
       .sourceCoverage=${[...(turn.evidence.sourceCoverage ?? [])]}
+      .groupByCoverage=${turn.kind === 'ask'}
       @citation-select=${this.onCitationSelect}
     ></jf-citations-panel>`;
   }

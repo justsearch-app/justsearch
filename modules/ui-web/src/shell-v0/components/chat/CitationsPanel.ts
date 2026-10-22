@@ -69,6 +69,7 @@ export class CitationsPanel extends JfElement {
     citations: { type: Array, attribute: false },
     sources: { type: Array, attribute: false },
     sourceCoverage: { type: Array, attribute: false },
+    groupByCoverage: { type: Boolean, attribute: false },
     groundingIncomplete: { type: Boolean, attribute: false },
     retrievalMode: { type: String, attribute: false },
     showWeak: { state: true },
@@ -84,6 +85,10 @@ export class CitationsPanel extends JfElement {
    * established two-state behaviour for every consumer whose run reports no coverage.
    */
   declare sourceCoverage: SourceCoverage[];
+  /** Examination facts can select grouping without matches, including with keyword retrieval.
+   * Delegate hosts disable this to keep their established flat/tiered choice (WP4.2a D1).
+   */
+  declare groupByCoverage: boolean;
   /**
    * Tempdoc 865 §7.3 — the run reported that its grounding pass did not complete, so an empty
    * {@link citations} list is a MISSING verdict, not a negative one. `false` (the default) is the
@@ -118,6 +123,7 @@ export class CitationsPanel extends JfElement {
     this.citations = [];
     this.sources = [];
     this.sourceCoverage = [];
+    this.groupByCoverage = true;
     this.groundingIncomplete = false;
     this.retrievalMode = '';
     this.showWeak = false;
@@ -575,9 +581,11 @@ export class CitationsPanel extends JfElement {
       // nothing about why there is no grounding, which is fine when nothing is known and wrong when
       // the run reported that its grounding pass did not complete — that is a fact the reader can act
       // on. The `!hasCitations` proxy stays the rule for every run that says nothing.
-      return this.retrievalMode === 'FULLTEXT_FALLBACK' ||
-        (!hasCitations && !this.groundingIncomplete &&
-          !this.sourceCoverage.some((c) => c.windowsScored === 0))
+      // Ask's reported examination gaps are facts even for keyword retrieval. This override is
+      // Ask-only: a Delegate's structurally unexaminable source must not change its neutral panel.
+      const coverageGroups = this.groupByCoverage && this.sourceCoverage.some((c) => c.windowsScored === 0);
+      return !coverageGroups && (this.retrievalMode === 'FULLTEXT_FALLBACK' ||
+        (!hasCitations && !this.groundingIncomplete))
         ? this.renderFlatSources()
         : this.renderTieredSources();
     }

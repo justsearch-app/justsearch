@@ -164,6 +164,44 @@ The builder has not authored an acceptance record.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN3 HN5 keep refused turns without Ask coverage notes",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN3 HN5 keep failed turns without Ask coverage notes"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage-repairs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Repair F1: Ask FULLTEXT_FALLBACK sources with reported examination gaps show not examined, live and cold, with and without admitted matches; a partially examined cited source keeps its grade. Repair F3: mixed document-level/chunk Delegate sources with cosine provenance retain both neutral cards, without examination or not-cited groups, on live and saved projections. Existing accepted checks and evidence are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "HC5",
+          "quote": "In an Ask turn's sources panel, a source the check never examined shows as not examined, never as not cited; a partly examined source keeps its grade. Live and after cold reload.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "HN3",
+          "quote": "Delegate turns' frame, receipt and evidence are unchanged (A4 E deferred).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Implement the agreed designs; orchestrator D1 divides WP4.2 into frontend coverage WP4.2a and the other packages.",
+          "choice": "Decision D1: four packages; WP4.2a is coverage only, frontend only. S10.7 (unfinished check) belongs to WP4.3. Order after pass 2: 4.5 and 4.2a first, then 4.2b, then 4.3.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-coverage-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage-repairs.test.ts#HC5 shows unexamined FULLTEXT_FALLBACK sources with matches present=true live and cold",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage-repairs.test.ts#HC5 shows unexamined FULLTEXT_FALLBACK sources with matches present=false live and cold",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage-repairs.test.ts#HN3 keeps the mixed-source Delegate panel neutral live and cold"
+      ],
+      "repaired": true
     }
   ]
 }
