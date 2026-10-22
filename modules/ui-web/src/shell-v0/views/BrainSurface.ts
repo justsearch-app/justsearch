@@ -31,7 +31,7 @@ import '../components/OpButton.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
 import '../components/OperationOutcomeDetail.js';
-import type { OpSuccessEventDetail } from '../components/OpButton.js';
+import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import { OperationClient, OperationError, getOperationClient } from '../operations/OperationClient.js';
 import { getOperation } from '../../api/registry/OperationCatalogClient.js';
 import { isTauriRuntime } from '../../utils/tauriRuntime.js';
@@ -578,6 +578,7 @@ export class BrainSurface extends JfElement {
     expanded: { state: true },
     runtimeError: { state: true },
     bulkOutcomeKey: { state: true },
+    bulkError: { state: true },
     busy: { state: true },
     refreshing: { state: true },
     // Tempdoc 518 Appendix F W3.2 — mode-transition timeline.
@@ -615,6 +616,7 @@ export class BrainSurface extends JfElement {
   declare expanded: Record<string, boolean>;
   declare runtimeError: string | null;
   declare bulkOutcomeKey: string;
+  declare bulkError: OpErrorEventDetail | null;
   declare busy: Record<string, boolean>;
   declare refreshing: boolean;
   /** Active composition tab id: 'runtime' (own body) or a member surface id. */
@@ -662,6 +664,7 @@ export class BrainSurface extends JfElement {
     // unless install is in flight.
     this.expanded = { runtime: true };
     this.bulkOutcomeKey = '';
+    this.bulkError = null;
     this.runtimeError = null;
     this.busy = {};
     this.refreshing = false;
@@ -1528,9 +1531,18 @@ export class BrainSurface extends JfElement {
   private async activateInstalledModels(): Promise<void> {
     await this.withBusy('install-activation', async () => {
       this.runtimeError = null;
-      const data = await this.invokeOp('core.activate-installed-models', {
-        source: 'installer_model_activation',
-      });
+      this.bulkError = null;
+      this.bulkOutcomeKey = '';
+      let data: unknown;
+      try {
+        data = await this.invokeOp('core.activate-installed-models', {
+          source: 'installer_model_activation',
+        });
+      } catch (error) {
+        if (!(error instanceof OperationError)) throw error;
+        this.showBulkError(error);
+        return;
+      }
       if (data && typeof data === 'object' && 'operationKey' in data) {
         this.bulkOutcomeKey = String(data.operationKey ?? '');
       }
@@ -1674,11 +1686,20 @@ export class BrainSurface extends JfElement {
 
   // ---------- Render: alerts + header ----------
 
+  private showBulkError(error: OpErrorEventDetail): void {
+    this.bulkOutcomeKey = '';
+    this.bulkError = error;
+  }
+
   private renderAlerts(): TemplateResult | typeof nothing {
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
-    if (!this.runtimeError && !downloadsDisabled && !onlineDisabled && !this.bulkOutcomeKey) return nothing;
+    if (!this.runtimeError && !downloadsDisabled && !onlineDisabled && !this.bulkOutcomeKey && !this.bulkError) return nothing;
     return html`
+      ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
+        ${this.bulkError.message}
+        ${this.bulkError.errorCode ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
+      </jf-error-alert>` : nothing}
       ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
         operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}
       ${this.runtimeError
@@ -2437,9 +2458,11 @@ export class BrainSurface extends JfElement {
           operation-id="core.rebuild-index"
           api-base=${this.apiBase}
           @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
+            this.bulkError = null;
             this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? '');
             void this.refreshAll();
           }}
+          @op-error=${(event: CustomEvent<OpErrorEventDetail>) => this.showBulkError(event.detail)}
           style="width: 100%; margin-top: 0.75rem"
         ></jf-operation>
       </div>
