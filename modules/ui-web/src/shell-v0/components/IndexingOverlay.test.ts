@@ -152,6 +152,7 @@ describe('IndexingOverlayHost — numbers come from the one projection (813)', (
       // below would read 999/999.
       index: { embeddingQueueSize: known(999), vduQueueSize: known(999) },
       snapshotLive: true,
+      indexingStatusLive: true,
       status,
       // 813 §20 — see above: both store memories are part of the shape this fixture claims to be.
       episodeMaxPendingJobs: 0,
@@ -159,6 +160,13 @@ describe('IndexingOverlayHost — numbers come from the one projection (813)', (
     } as unknown as AiState;
     return el;
   };
+
+  it('does not present retry waiting as active work in a blocking overlay', () => {
+    expect(host({ worker: {
+      core: { indexState: 'WAITING', pendingJobs: 8, pendingVduCount: 7 },
+      enrichment: { embeddingEnabled: true, embeddingDocCount: 100, embeddingPendingCount: 12 },
+    } }).render()).toBe(nothing);
+  });
 
   it('renders the status-poll pending counts, not the inference-poll queue residue', () => {
     const out = host({

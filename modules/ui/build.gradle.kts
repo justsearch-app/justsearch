@@ -112,21 +112,6 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
       }
-      targets {
-        all {
-          testTask.configure {
-            // The launcher regression test reads these files outside the Java source sets.
-            inputs.files(
-              rootProject.file("packaging/headless/justsearch-headless.cmd"),
-              rootProject.file("packaging/headless/justsearch-headless.ps1"),
-            ).withPathSensitivity(PathSensitivity.RELATIVE)
-            jvmArgs(
-              // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
-              "-Dnet.bytebuddy.experimental=true"
-            )
-          }
-        }
-      }
     }
     register<JvmTestSuite>("integrationTest") {
       useJUnitJupiter()
@@ -152,6 +137,19 @@ testing {
 sourceSets.named("integrationTest").configure {
   compileClasspath += sourceSets["test"].output
   runtimeClasspath += sourceSets["test"].output
+}
+
+// Keep the complete local suite and its hosted class shards on the same unit configuration.
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  // The launcher regression test reads these files outside the Java source sets.
+  inputs.files(
+    rootProject.file("packaging/headless/justsearch-headless.cmd"),
+    rootProject.file("packaging/headless/justsearch-headless.ps1"),
+  ).withPathSensitivity(PathSensitivity.RELATIVE)
+  jvmArgs(
+    // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
+    "-Dnet.bytebuddy.experimental=true"
+  )
 }
 
 tasks.withType<Test>().configureEach {

@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from jseval import ui_perf
+from jseval import readiness, ui_perf
 from jseval.ui_perf import (
     SLO_CLICK_MS,
     SLO_KEYSTROKE_MS,
@@ -120,3 +120,51 @@ class TestFormatConsole:
         }
         output = format_console(result)
         assert "no data" in output
+
+
+@pytest.mark.parametrize("state", ["WAITING", "INDEXING", "FAILED"])
+def test_setup_refuses_an_unsettled_queue_before_measuring(monkeypatch, tmp_path, state):
+    _run_setup_queue(monkeypatch, tmp_path, [state], must_settle=False)
+
+
+def test_setup_waits_through_retry_and_processing_before_measuring(monkeypatch, tmp_path):
+    _run_setup_queue(monkeypatch, tmp_path, ["WAITING", "INDEXING", "IDLE"], must_settle=True)
+
+
+def _run_setup_queue(monkeypatch, tmp_path, states, *, must_settle):
+    clock = [0.0]
+    observed = []
+    searched = []
+
+    def handle(request):
+        if request.url.path == "/api/debug/effective-config":
+            return httpx.Response(200, json={"justsearch.data.dir": str(tmp_path)})
+        if request.url.path == "/api/knowledge/ingest":
+            return httpx.Response(200, json={"success": True, "structuredData": {"operationKey": "perf"}})
+        if request.url.path == "/api/status":
+            state = states[min(len(observed), len(states) - 1)]
+            observed.append(state)
+            pending = 0 if state == "IDLE" else 2
+            return httpx.Response(200, json={"worker": {
+                "core": {"indexState": state, "pendingJobs": pending, "indexedDocuments": 2},
+                "migration": {"pendingBackoffJobsCount": pending if state == "WAITING" else 0},
+            }})
+        assert request.url.path == "/api/knowledge/search"
+        searched.append(clock[0])
+        return httpx.Response(200, json={"totalHits": 2})
+
+    client = httpx.Client
+    monkeypatch.setattr(ui_perf.httpx, "Client", lambda **kwargs: client(
+        **kwargs, transport=httpx.MockTransport(handle),
+    ))
+    monkeypatch.setattr(readiness.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(readiness.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    if must_settle:
+        ui_perf._setup_test_corpus("http://127.0.0.1:12345")
+        assert observed[:3] == states
+        assert observed.count("IDLE") >= 2
+        assert len(searched) == 1 and searched[0] < 10, "nested status must settle without exhausting the budget"
+    else:
+        with pytest.raises(RuntimeError, match="indexing did not settle"):
+            ui_perf._setup_test_corpus("http://127.0.0.1:12345")
+        assert not searched, "unfinished indexing must not enter performance measurement"

@@ -1,0 +1,43 @@
+18:43:03.860 [main] INFO com.tngtech.archunit.ArchConfiguration -- Reading ArchUnit properties from file:/home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/modules/app-services/build/resources/test/archunit.properties
+password publication step 1: start-to-pause=16329 ms
+password publication step 2: start-to-pause=16275 ms
+18:43:37.492 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-1602352805539150196/encryption/keystore.replica.json
+password publication step 3: start-to-pause=16223 ms
+18:43:54.425 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-1602352805539150196/encryption/keystore.replica.json
+password publication step 4: start-to-pause=16241 ms
+recovery publication step 1: start-to-pause=16075 ms
+recovery publication step 2: start-to-pause=16103 ms
+18:44:44.474 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-1602352805539150196/encryption/keystore.replica.json
+recovery publication step 3: start-to-pause=16070 ms
+18:45:00.800 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-1602352805539150196/encryption/keystore.replica.json
+recovery publication step 4: not paused; elapsed=2949 ms
+Child output: 
+
+Test run finished after 120066 ms
+[         3 containers found      ]
+[         0 containers skipped    ]
+[         3 containers started    ]
+[         0 containers aborted    ]
+[         3 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         0 tests successful      ]
+[         1 tests failed          ]
+
+
+Failures (1):
+  JUnit Jupiter:KeystoreDurabilityTest:processKillAtEachPublicationStepRetainsUnlockableData()
+    MethodSource [className = 'io.justsearch.app.services.encryption.KeystoreDurabilityTest', methodName = 'processKillAtEachPublicationStepRetainsUnlockableData', methodParameterTypes = '']
+    => java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 120 seconds
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       Suppressed: java.lang.InterruptedException: sleep interrupted
+         java.base/java.lang.Thread.sleepNanos0(Native Method)
+         java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+         java.base/java.lang.Thread.sleep(Thread.java:540)
+         io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:272)
+         java.base/java.lang.reflect.Method.invoke(Method.java:565)
+         [...]

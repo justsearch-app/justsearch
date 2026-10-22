@@ -1,0 +1,310 @@
+Supplemental script-check transcript for the corrected E4/E17 policy.
+This is not D4 evidence; product-check D4 evidence remains in the script-generated JSON files.
+Candidate: 89c6581d5bd1e8209b53cd6c24965bc83a5a2332 plus uncommitted correction.
+ec3902a320f01dca28e7b40a755892bb6516491f4a01df3a453f9f90c5f4d4b3  scripts/dev/dev-runner.cjs
+1456df1f1c797333f76551ac271c1981c74f32a85ea8258a7dc75bf3ed381a36  scripts/dev/lib/engine-supervisor.cjs
+e09c8e0ba5069786d99161978455fe2fba3783421b0cecb40d3117a969459bdc  scripts/dev/test-engine-recovery.mjs
+254c0b75ad0de5824dfdc8528f25702e91bb70ab47a30dda16fb71fa3b110335  scripts/supervisor-conformance/recovery-scenario.mjs
+94bd667731bb9f2460b870561c5fa67a950d3fe15296de080ada5b37e4ede549  governance/supervision-contract.v1.json
+
+$ 89c6581d5 shared-clone before; node --test --test-name-pattern="default supervisor retries after exhaustion" scripts/dev/test-engine-recovery.mjs
+✖ E4/E17: the default supervisor retries after exhaustion without any healthy incarnation (9.116824ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48.796754
+
+✖ failing tests:
+
+test at scripts/dev/test-engine-recovery.mjs:73:1
+✖ E4/E17: the default supervisor retries after exhaustion without any healthy incarnation (9.116824ms)
+  AssertionError [ERR_ASSERTION]: default supervision must publish a retry deadline even before first readiness
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/initial-policy-parity/before/scripts/dev/test-engine-recovery.mjs:79:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+$ 89c6581d5 shared-clone before; node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case recovery-never-healthy-delayed-retry
+supervisor-conformance: NARROWED to `recovery-never-healthy-delayed-retry` — 49 case(s) not run.
+FAIL  adapter:dev-runner :: recovery-never-healthy-delayed-retry
+        AssertionError [ERR_ASSERTION]: default supervision must retry even without a healthy incarnation
+    at runNeverHealthyCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/initial-policy-parity/before/scripts/supervisor-conformance/recovery-scenario.mjs:233:12)
+    at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/initial-policy-parity/before/scripts/supervisor-conformance/run.mjs:511:23)
+    at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/initial-policy-parity/before/scripts/supervisor-conformance/run.mjs:532:5)
+    at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/initial-policy-parity/before/scripts/supervisor-conformance/run.mjs:542:1
+
+
+supervisor-conformance: 0/1 checks passed
+failed: recovery-never-healthy-delayed-retry
+
+$ 876fec015 shared-clone known-good; node --test --test-name-pattern="default supervisor retries after exhaustion" scripts/dev/test-engine-recovery.mjs
+✔ E4/E17: the default supervisor retries after exhaustion without any healthy incarnation (5.343044ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42.290041
+
+$ node --test scripts/dev/test-engine-recovery.mjs
+✔ E6: a first spawn failure retains the actual missing-Java obstacle (5.724055ms)
+✔ dev-runner admission policy ends initial discovery instead of scheduling a delayed generation (13.033277ms)
+✔ E4/E17: the default supervisor retries after exhaustion without any healthy incarnation (4.609012ms)
+✔ E3/E5: terminal manual restart has one owner and quit wins before admission (1.522422ms)
+✔ E5: an update hold refuses terminal restart and initial quit admits no process (0.840388ms)
+✔ E5: quit before the first admission starts no Engine (0.3752ms)
+✔ E3: restarting a terminal actor reaches a different binding without another supervisor (3.756952ms)
+✔ E18: headless restart instructions exclude locked profiles and describe shell-independent quarantine (1.714606ms)
+✔ E4: the 30-minute retry delay is overridable only by a flagged harness (0.481494ms)
+✔ E19: the exhausting hang remains visible even when its ordered close is not charged again (30.005724ms)
+✔ E4: a delayed generation passes a numeric requested port to the real spawn boundary (9.660367ms)
+✔ E1: JS spawn preparation retains the oldest and newest heap dumps and all fatal logs (19.688239ms)
+✔ E3: manual restart after exhaustion and a refused delayed spawn starts one fresh generation (3.808526ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 216.294071
+
+$ node scripts/dev/test-dev-runner-initial-exit.mjs (five consecutive executions)
+Run 1/5
+PASS initial Engine exit: actual child status retained before run registration
+Run 2/5
+PASS initial Engine exit: actual child status retained before run registration
+Run 3/5
+PASS initial Engine exit: actual child status retained before run registration
+Run 4/5
+PASS initial Engine exit: actual child status retained before run registration
+Run 5/5
+PASS initial Engine exit: actual child status retained before run registration
+
+$ node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case recovery-never-healthy-delayed-retry
+supervisor-conformance: NARROWED to `recovery-never-healthy-delayed-retry` — 49 case(s) not run.
+PASS  adapter:dev-runner :: recovery-never-healthy-delayed-retry
+
+supervisor-conformance: 1/1 checks passed
+
+$ node scripts/supervisor-conformance/run.mjs --adapter tauri --case recovery-never-healthy-delayed-retry (rebuilt Rust harness)
+supervisor-conformance: NARROWED to `recovery-never-healthy-delayed-retry` — 59 case(s) not run.
+PASS  adapter:tauri :: recovery-never-healthy-delayed-retry
+
+supervisor-conformance: 1/1 checks passed
+
+$ node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+PASS  adapter:dev-runner :: recovery-never-healthy-delayed-retry
+PASS  adapter:dev-runner :: recovery-manual-retry-races-deadline-and-quit
+PASS  adapter:dev-runner :: recovery-first-spawn-failure-reason
+PASS  adapter:dev-runner :: recovery-replacement-spawn-failure-reason
+PASS  adapter:dev-runner :: recovery-status-failure-and-resume
+PASS  adapter:dev-runner :: recovery-delayed-retry
+PASS  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+PASS  adapter:dev-runner :: recovery-quit-during-delayed-retry
+PASS  adapter:dev-runner :: recovery-update-hold-blocks-delayed-retry
+PASS  adapter:dev-runner :: recovery-index-never-ready
+PASS  adapter:dev-runner :: recovery-long-loop-remains-visible
+PASS  adapter:dev-runner :: escalated-restart
+PASS  adapter:dev-runner :: fileless-clean-local-restart-is-not-counted
+PASS  adapter:dev-runner :: local-handoff-bounds-responsive-close-with-churn
+PASS  adapter:dev-runner :: completed-local-handoff-still-bounds-native-exit
+PASS  adapter:dev-runner :: local-handoff-fatal-exit-remains-counted
+PASS  adapter:dev-runner :: stale-local-handoff-cannot-arm-close
+PASS  adapter:dev-runner :: clean-exit-0-stops
+PASS  adapter:dev-runner :: crash-1-restarts-under-budget
+PASS  adapter:dev-runner :: oom-3-restarts-under-budget
+PASS  adapter:dev-runner :: non-transient-2-exhausts-at-once
+PASS  adapter:dev-runner :: requested-restart-is-not-counted
+PASS  adapter:dev-runner :: requested-restart-completion-failure-is-counted
+PASS  adapter:dev-runner :: requested-upgrade-stops
+PASS  adapter:dev-runner :: hang-soft-recovered-through-the-request-file
+PASS  adapter:dev-runner :: hang-hard-recovered-by-forced-kill
+PASS  adapter:dev-runner :: budget-exhausted-after-max-attempts
+PASS  adapter:dev-runner :: live-503-and-continuous-essential-stability
+PASS  adapter:dev-runner :: start-deadline-stops-a-partial-boot
+PASS  adapter:dev-runner :: start-death-before-manifest-is-one-exit-path
+PASS  adapter:dev-runner :: start-death-after-manifest-before-http
+PASS  adapter:dev-runner :: readiness-death-uses-the-death-path
+PASS  adapter:dev-runner :: port-phase-exit-keeps-requested-reason
+PASS  adapter:dev-runner :: start-deadline-stops-and-records
+PASS  adapter:dev-runner :: hang-forced-kill-is-distinctive
+PASS  adapter:dev-runner :: owner-died-recorded-after-supervisor-kill
+PASS  adapter:dev-runner :: engine-self-restart-is-requested
+PASS  adapter:dev-runner :: hang-close-the-engine-runs-is-the-supervisors-timeout
+PASS  adapter:dev-runner :: a-crash-during-the-requested-close-stays-unexpected
+PASS  adapter:dev-runner :: quit-cooperative-records-requested-quit
+PASS  adapter:dev-runner :: one-exit-record-per-incarnation
+PASS  adapter:dev-runner :: quit-past-deadline-is-forced-and-distinct
+PASS  adapter:dev-runner :: quit-crash-stays-unexpected
+PASS  adapter:dev-runner :: quit-during-cooldown-spawns-nothing
+PASS  adapter:dev-runner :: quit-during-start
+PASS  adapter:dev-runner :: quit-deadline-is-the-contract-value
+PASS  adapter:dev-runner :: stale-request-file-is-not-honoured
+PASS  adapter:dev-runner :: data-dir-locked-after-own-predecessor-waits-once
+PASS  adapter:dev-runner :: suspend-gap-is-not-a-hang
+PASS  adapter:dev-runner :: misses-after-resume-grace-still-hang
+
+supervisor-conformance: 50/50 checks passed
+
+$ node scripts/supervisor-conformance/run.mjs --adapter tauri
+PASS  adapter:tauri :: recovery-never-healthy-delayed-retry
+PASS  adapter:tauri :: recovery-manual-retry-races-deadline-and-quit
+PASS  adapter:tauri :: recovery-first-spawn-failure-reason
+PASS  adapter:tauri :: recovery-replacement-spawn-failure-reason
+PASS  adapter:tauri :: recovery-status-failure-and-resume
+PASS  adapter:tauri :: recovery-delayed-retry
+PASS  adapter:tauri :: recovery-manual-restart-and-update-hold
+PASS  adapter:tauri :: recovery-quit-during-delayed-retry
+PASS  adapter:tauri :: recovery-update-hold-blocks-delayed-retry
+PASS  adapter:tauri :: recovery-index-never-ready
+PASS  adapter:tauri :: recovery-long-loop-remains-visible
+PASS  adapter:tauri :: escalated-restart
+PASS  adapter:tauri :: fileless-clean-local-restart-is-not-counted
+PASS  adapter:tauri :: local-handoff-bounds-responsive-close-with-churn
+PASS  adapter:tauri :: completed-local-handoff-still-bounds-native-exit
+PASS  adapter:tauri :: local-handoff-fatal-exit-remains-counted
+PASS  adapter:tauri :: stale-local-handoff-cannot-arm-close
+PASS  adapter:tauri :: clean-exit-0-stops
+PASS  adapter:tauri :: crash-1-restarts-under-budget
+PASS  adapter:tauri :: oom-3-restarts-under-budget
+PASS  adapter:tauri :: non-transient-2-exhausts-at-once
+PASS  adapter:tauri :: requested-restart-is-not-counted
+PASS  adapter:tauri :: requested-restart-completion-failure-is-counted
+PASS  adapter:tauri :: requested-upgrade-stops
+PASS  adapter:tauri :: hang-soft-recovered-through-the-request-file
+PASS  adapter:tauri :: hang-hard-recovered-by-forced-kill
+PASS  adapter:tauri :: budget-exhausted-after-max-attempts
+PASS  adapter:tauri :: live-503-and-continuous-essential-stability
+PASS  adapter:tauri :: start-deadline-stops-a-partial-boot
+PASS  adapter:tauri :: start-death-before-manifest-is-one-exit-path
+PASS  adapter:tauri :: start-death-after-manifest-before-http
+PASS  adapter:tauri :: readiness-death-uses-the-death-path
+PASS  adapter:tauri :: port-phase-exit-keeps-requested-reason
+PASS  adapter:tauri :: start-deadline-stops-and-records
+PASS  adapter:tauri :: hang-forced-kill-is-distinctive
+PASS  adapter:tauri :: owner-died-recorded-after-supervisor-kill
+PASS  adapter:tauri :: engine-self-restart-is-requested
+PASS  adapter:tauri :: hang-close-the-engine-runs-is-the-supervisors-timeout
+PASS  adapter:tauri :: a-crash-during-the-requested-close-stays-unexpected
+PASS  adapter:tauri :: engine-exit-ends-its-helpers
+PASS  adapter:tauri :: supervisor-killed-ends-engine-and-helpers
+PASS  adapter:tauri :: quit-cooperative-records-requested-quit
+PASS  adapter:tauri :: one-exit-record-per-incarnation
+PASS  adapter:tauri :: quit-past-deadline-is-forced-and-distinct
+PASS  adapter:tauri :: quit-crash-stays-unexpected
+PASS  adapter:tauri :: quit-during-cooldown-spawns-nothing
+PASS  adapter:tauri :: quit-during-start
+PASS  adapter:tauri :: quit-deadline-is-the-contract-value
+PASS  adapter:tauri :: stale-request-file-is-not-honoured
+PASS  adapter:tauri :: data-dir-locked-after-own-predecessor-waits-once
+PASS  adapter:tauri :: suspend-gap-is-not-a-hang
+PASS  adapter:tauri :: misses-after-resume-grace-still-hang
+PASS  adapter:tauri :: quit-with-stream-and-extraction
+PASS  adapter:tauri :: session-end-begins-at-query
+PASS  adapter:tauri :: updater-hold-returns-at-once-and-stays-supervised
+PASS  adapter:tauri :: updater-actor-records-upgrade-before-empty-handoff
+PASS  adapter:tauri :: updater-held-exit-is-unexpected-without-restart
+PASS  adapter:tauri :: updater-quit-while-held-refuses-upgrade-and-stays-staged
+PASS  adapter:tauri :: updater-failed-prepare-releases-the-same-actor
+PASS  adapter:tauri :: updater-nonempty-job-never-launches-installer
+
+supervisor-conformance: 60/60 checks passed
+
+$ node scripts/supervisor-conformance/run.mjs --self-test
+PASS  manifest handoff :: requires admitted identity and known shutdown state/reason
+PASS  contract :: the register exit table agrees with EngineExit.java
+PASS  contract :: every declared case is well-formed and the live fault modes are driven
+PASS  decision :: escalated-restart
+PASS  decision :: fileless-clean-local-restart-is-not-counted
+PASS  decision :: clean-exit-0-stops
+PASS  decision :: crash-1-restarts-under-budget
+PASS  decision :: oom-3-restarts-under-budget
+PASS  decision :: non-transient-2-exhausts-at-once
+PASS  decision :: requested-restart-is-not-counted
+PASS  decision :: requested-restart-completion-failure-is-counted
+PASS  decision :: requested-upgrade-stops
+PASS  decision :: hang-soft-recovered-through-the-request-file
+PASS  decision :: hang-hard-recovered-by-forced-kill
+PASS  decision :: budget-exhausted-after-max-attempts
+PASS  decision :: unknown-exit-code-fails-open-to-transient
+PASS  decision :: cooldown-ramps-linearly
+PASS  decision :: cooldown-ceiling-binds-when-budget-raised
+PASS  decision :: ready-starts-the-stability-window
+PASS  decision :: stability-elapsed-resets-the-budget
+PASS  decision :: hang-misses-below-the-threshold-do-nothing
+PASS  decision :: hang-detection-is-suspended-while-starting
+PASS  decision :: hang-detection-is-suspended-while-stopping
+PASS  decision :: start-deadline-stops-a-partial-boot
+PASS  decision :: the register declares decision cases at all
+PASS  policy :: per-run overrides are inert without the harness flag
+PASS  fake-engine :: mode clean-exit exits 0
+PASS  fake-engine :: mode crash exits 1
+PASS  fake-engine :: mode oom exits 3
+PASS  fake-engine :: mode boot-fail exits 2
+PASS  fake-engine :: honour publishes a real manifest and answers health
+PASS  fake-engine :: honour exits 0 on a shutdown request
+PASS  fake-engine :: hang-soft stops answering and honours the request file
+PASS  fake-engine :: hang-hard stops answering and ignores the request file
+PASS  fake-engine :: slow-start withholds the manifest past a short start deadline
+
+supervisor-conformance: 35/35 checks passed
+
+$ node scripts/dev/test-dev-runner-supervisor.mjs
+test-dev-runner-supervisor: bounded liveness and essential readiness — PASS
+test-dev-runner-supervisor: the state record names the policy it ran under — PASS
+test-dev-runner-supervisor: overlapping transitions publish in order — PASS
+SKIP Windows FILE_SHARE_DELETE rename refusal; Linux atomic publication is covered by testOverlappingStatePublicationsStayInTransitionOrder
+test-dev-runner-supervisor: permanent rename failure preserves error and destination — PASS
+test-dev-runner-supervisor: the terminal state is mirrored, non-terminal is not — PASS
+test-dev-runner-supervisor: host writer shape and current-instance handoff admission — PASS
+test-dev-runner-supervisor: the cooldown floor waits for a live process — PASS
+test-dev-runner-supervisor: each incarnation keeps its own engine.log — PASS
+test-dev-runner-supervisor: the stop report is per-incarnation only when supervised — PASS
+test-dev-runner-supervisor: a supervised restart is not an abandoned stack — PASS
+test-dev-runner-supervisor: terminal cleanup is identity-safe — PASS
+test-dev-runner-supervisor: the owner's intent outranks the Engine's own — PASS
+test-dev-runner-supervisor: ALL PASS
+
+$ node scripts/dev/test-dev-runner-quit.mjs
+✔ Q2: the Rust host installs the incarnation before Engine boot (1.199268ms)
+✔ Q2: the shared Rust request writer carries the same incarnation and fresh nonce (0.347009ms)
+✔ Q2: Rust caller lib.rs uses the shared addressed writer (0.628931ms)
+✔ Q2: Rust caller bin/supervisor_conformance.rs uses the shared addressed writer (0.303209ms)
+✔ Spec F §4.3: the contract declares the quit deadline and force margin the actuator uses (0.110609ms)
+✔ Spec F §4.3: a host quit posts its deadline and is forced at the policy deadline minus the margin (5.552068ms)
+✔ Spec F §4.3: the request file and the POST name the incarnation they address, with a request nonce (2.332266ms)
+✔ Spec F §4.3: the lifecycle POST body carries the deadline and the incarnation on the wire (9.869566ms)
+✔ Spec F §3.5 (P9-P2): with no suspend the suspend-aware clock is the monotonic clock (0.201975ms)
+✔ Spec F §3.5 (S11): health misses in the grace after a suspend are not a hang (1.73684ms)
+✔ Spec F §3.5 (P9-P2): misses after the resume grace still end in the hang path (4.692797ms)
+✔ P9: without a suspend the hang path fires after the threshold of misses, as before (4.086283ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 34.723395
+
+$ node scripts/governance/gates/test-intent/run-evidence.mjs (six Rust check ids; see engine-recovery-rust.json for exact child commands)
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots: passed
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::unavailable_crash_folder_reports_the_real_obstacle: passed
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces: passed
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch: passed
+modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation: passed
+modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child: passed
+evidence written: gates/test-intent/evidence/engine-recovery-rust.json

@@ -393,7 +393,7 @@ export function projectLoad(record, load, calls, values) {
   const valid = windowValidity(load);
   record.clauses['indexing-window-valid'] = valid;
   if (valid !== true) record.gaps['indexing-window-valid'] = valid === false
-    ? 'INVALID: indexing completed before the fixed load window ended'
+    ? 'INVALID: bulk indexing/enrichment was inactive during the fixed load window'
     : 'Missing, stale, discontinuous, or incomplete fixed-window samples';
   record.metrics.searchP95 = load.searchP95 ?? {};
   record.metrics.loadWindow = { startedAtMs: load.startedAtMs, endedAtMs: load.endedAtMs,

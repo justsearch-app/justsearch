@@ -1,0 +1,150 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T13:07:00.903Z",
+  "revision": "75853ca8448ecb5a2cbf08ca56fd32e60f52b192",
+  "tree": "fec1b9fa223b212ea953d2e3f6709143f0a6542c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::shell_linked_runtime_keeps_all_writers_working\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2261
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.encryption.EncryptionKeystorePermissionsTest.interruptedReplacementPreservesPassphraseAndRecoveryMaterial\" --tests \"io.justsearch.app.services.encryption.EncryptionKeystorePermissionsTest.linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4172
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeDirectoryPermissionsTest.linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2512
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#interruptedReplacementPreservesPassphraseAndRecoveryMaterial",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c39876d6f812c5656315883255c0d37c8e1dabf268c8f82e3aadc806c4e3454",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedReplacementPreservesPassphraseAndRecoveryMaterial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c39876d6f812c5656315883255c0d37c8e1dabf268c8f82e3aadc806c4e3454",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::shell_linked_runtime_keeps_all_writers_working",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:a37ab48723e7fd7e98e09fe61bcf50512d8f58860db466cea94e49229a0b68a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::shell_linked_runtime_keeps_all_writers_working",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java#linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:43ce96d81b1814faf7eb17cc6326f3468474d35e0e32a3fbeabfeb5b55219850",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4f595453517bbf430bf907117f2c60303b7357ba",
+    "revision": "4f595453517bbf430bf907117f2c60303b7357ba",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::shell_linked_runtime_keeps_all_writers_working\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 8872
+      },
+      {
+        "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.encryption.EncryptionKeystorePermissionsTest.interruptedReplacementPreservesPassphraseAndRecoveryMaterial\" --tests \"io.justsearch.app.services.encryption.EncryptionKeystorePermissionsTest.linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6711
+      },
+      {
+        "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeDirectoryPermissionsTest.linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5383
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#interruptedReplacementPreservesPassphraseAndRecoveryMaterial",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::shell_linked_runtime_keeps_all_writers_working",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java#linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:a8e1a713ae8d09f3e63e5d5f2ab64d2c1107600ac30616ff1dc0b0894ee14e9b"
+}

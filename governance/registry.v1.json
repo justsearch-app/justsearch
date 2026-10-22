@@ -477,7 +477,7 @@
         "rulesDoc": "docs/reference/testing/test-intent.md",
         "evidenceDir": "gates/test-intent/evidence",
         "auditEvery": 5,
-        "baseResolution": "the gate's own, not the runner's: pull_request merge-base(origin/$GITHUB_BASE_REF, HEAD), merge_group base_sha, push HEAD^1, local merge-base(origin/main, HEAD); a shallow clone fails closed"
+        "baseResolution": "the gate's own, not the runner's: pull_request merge-base(origin/$GITHUB_BASE_REF, HEAD), push HEAD^1, local merge-base(origin/main, HEAD); a shallow clone fails closed"
       },
       "selfTestFixturesDir": "scripts/governance/_fixtures/test-intent"
     }

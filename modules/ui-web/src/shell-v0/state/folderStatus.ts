@@ -34,6 +34,7 @@ import { ENRICHMENT_BLOCKED_CAVEAT, ENRICHMENT_CATCHING_UP_CAVEAT } from './enri
 export type FolderState =
   | 'scanning' // walk in progress — files not yet fully enqueued
   | 'indexing' // in-flight jobs > 0
+  | 'waiting' // the shared index observation confirms retry-only waiting
   | 'enriching' // 809 finding 1 / 813 §4 — drained + keyword-searchable, enrichment still catching up
   | 'keyword-only' // round-15 F1b — drained + keyword-searchable, semantic enrichment CANNOT run
   | 'ready' // scanned, drained, no failures — fully searchable (or coverage unknowable)
@@ -63,6 +64,8 @@ export interface FolderStatus {
 }
 
 export interface FolderStatusContext {
+  /** All pending jobs wait for retry, as reported by the shared index-wide projection. */
+  readonly retryWaiting?: boolean;
   /** Pre-formatted relative time of the last walk (host util), or '' if never. */
   readonly relativeTime: string;
   /**
@@ -303,9 +306,9 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     // truthful ("Indexing · N remaining" — that IS what the queue is doing) and the carried count is
     // flagged as last-known so the chip can say so rather than assert it as a present fact.
     return {
-      state: 'indexing',
+      state: ctx.retryWaiting ? 'waiting' : 'indexing',
       glyph: 'pending',
-      metaText: `${collection} · Indexing · ${inFlight.toLocaleString()} remaining`,
+      metaText: `${collection} · ${ctx.retryWaiting ? 'Waiting to retry' : 'Indexing'} · ${inFlight.toLocaleString()} remaining`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,

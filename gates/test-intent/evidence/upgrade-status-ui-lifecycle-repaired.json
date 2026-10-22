@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ad6a79c6598c774d738564f4beda504b23434af3173ac1586b35e96892e6f1f"
+  },
+  "createdAt": "2026-10-21T19:25:59.273Z",
+  "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+  "tree": "a89334e46b63c97e587b1d6419164678ba58a12c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/indexingWaiting.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-2999319-1792610754003.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1935
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#shows retry waiting with the backlog and deadline then follows the worker lifecycle",
+      "file": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c6325b2cb4ad113a6fdaecf92b7e07a964de7f1f54b464acf965ea4179634aaf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shows retry waiting with the backlog and deadline then follows the worker lifecycle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#terminal job failures stay errors instead of becoming a completion claim",
+      "file": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c6325b2cb4ad113a6fdaecf92b7e07a964de7f1f54b464acf965ea4179634aaf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal job failures stay errors instead of becoming a completion claim",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#keeps retry waiting visible without showing progress or a ready claim",
+      "file": "modules/ui-web/src/shell-v0/components/TaskList.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5c790596aa0401e2c5a2e7b6415224435195f54986a0397623fe1e87c2927843",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps retry waiting visible without showing progress or a ready claim",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#terminal failures withdraw the completion window and remain visible as errors",
+      "file": "modules/ui-web/src/shell-v0/components/TaskList.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5c790596aa0401e2c5a2e7b6415224435195f54986a0397623fe1e87c2927843",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal failures withdraw the completion window and remain visible as errors",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+    "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/indexingWaiting.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-2999319-1792610757579.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1537,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-2999319-1792610757579.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#shows retry waiting with the backlog and deadline then follows the worker lifecycle",
+        "classification": "assertion",
+        "detail": "shows retry waiting with the backlog and deadline then follows the worker lifecycle:  AssertionError: expected 'unknown' to be 'waiting' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-tFOPoA/modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts:15:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#terminal job failures stay errors instead of becoming a completion claim",
+        "classification": "assertion",
+        "detail": "terminal job failures stay errors instead of becoming a completion claim:  AssertionError: expected 'ready' to be 'error' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-tFOPoA/modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts:52:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/upg"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#keeps retry waiting visible without showing progress or a ready claim",
+        "classification": "assertion",
+        "detail": "keeps retry waiting visible without showing progress or a ready claim:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-tFOPoA/modules/ui-web/src/shell-v0/components/TaskList.test.ts:675:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/upgrade-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#terminal failures withdraw the completion window and remain visible as errors",
+        "classification": "assertion",
+        "detail": "terminal failures withdraw the completion window and remain visible as errors:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-tFOPoA/modules/ui-web/src/shell-v0/components/TaskList.test.ts:702:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/upgrade-s"
+      }
+    ]
+  },
+  "digest": "sha256:9107566400f20d415e24e2b57ccc86a07a317f221df2055ab8faf6bfbdb0693d"
+}

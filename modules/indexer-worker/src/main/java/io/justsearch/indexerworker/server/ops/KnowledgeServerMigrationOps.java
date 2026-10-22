@@ -20,6 +20,7 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.indexerworker.services.ProjectionDocumentMapper;
@@ -34,6 +35,7 @@ import io.justsearch.ipc.SyncDirectoryRequest;
 import io.justsearch.ipc.SyncDirectoryResponse;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -78,6 +80,12 @@ public final class KnowledgeServerMigrationOps {
     default boolean resumeAcceptedGapBuild() throws IOException, InterruptedException { return false; }
 
     default void transition(String point) throws IOException, InterruptedException {}
+
+    /**
+     * Writes FAILED, before any queue or enumeration wait, for a candidate that can never
+     * certify. Returns true when it did; its obligations stay for the refusal cleanup.
+     */
+    default boolean refuseUncertifiable() { return false; }
   }
 
   public record CutoverContext(
@@ -245,6 +253,14 @@ public final class KnowledgeServerMigrationOps {
             Thread.sleep(1_000);
           }
           continue;
+        }
+
+        // A candidate that can never certify gains nothing from waiting for its enumeration or
+        // queue: that wait grows with the corpus. Refuse it now; pending rows stay durable work.
+        if ((ms == IndexGenerationManager.MigrationState.MIGRATING
+                || ms == IndexGenerationManager.MigrationState.SWITCHING)
+            && context.liveCutover().refuseUncertifiable()) {
+          return;
         }
 
         if (!context.migrationEnumeratorDoneSupplier().getAsBoolean()) {
@@ -540,8 +556,15 @@ public final class KnowledgeServerMigrationOps {
    * abandonment once exact journal versions are committed and verified on A.
    */
   public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context) {
+    return drainRefusedCandidateOnSource(context, () -> {});
+  }
+
+  /** As above, with a harness cut after A's commit and verification, before the journal ack. */
+  public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context,
+      Runnable sourceCommittedBeforeAck) {
     if (context.replayGeneration() == null || context.replayGeneration().isBlank()) return false;
-    return drainSwitchBuffer(context, true, true, false, () -> {}, true).applied();
+    return drainSwitchBuffer(context, true, true, false,
+        Objects.requireNonNull(sourceCommittedBeforeAck, "sourceCommittedBeforeAck"), true).applied();
   }
 
   /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
@@ -631,6 +654,13 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         effects.set(i, observeCommittedProjection(active, effects.get(i)));
       }
+      for (var op : selected) {
+        if ("DELETE".equals(op.op())) {
+          var deletion = SwitchBufferDelete.decode(op.payload());
+          if (deletion.origin() != SwitchBufferDelete.Origin.EXPLICIT
+              && !settleConditionalNativeDelete(queue, active, deletion)) return false;
+        }
+      }
       Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
       List<Integer> deleteIndexes = new ArrayList<>();
       for (int i = 0; i < effects.size(); i++) {
@@ -698,8 +728,10 @@ public final class KnowledgeServerMigrationOps {
         expectedKey = "path:" + id;
       }
       case "DELETE" -> {
-        id = op.payload();
-        expectedKey = "path:" + id;
+        var deletion = SwitchBufferDelete.decode(op.payload());
+        // Conditional filesystem receipts cannot authorise another admission's removal.
+        id = deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT ? deletion.path() : null;
+        expectedKey = "path:" + deletion.path();
       }
       case "DELETE_PREFIX" -> expectedKey = "prefix:" + op.payload();
       case "DELETE_COLLECTION" -> {
@@ -763,7 +795,7 @@ public final class KnowledgeServerMigrationOps {
   private static boolean nativeDeleteMatches(CommittedNativeEffect deletion,
       CommittedNativeEffect document) {
     return switch (deletion.op().op()) {
-      case "DELETE" -> deletion.id().equals(document.id());
+      case "DELETE" -> deletion.id() != null && deletion.id().equals(document.id());
       case "PROJECTION" -> !deletion.upsert() && deletion.id().equals(document.id());
       case "DELETE_PREFIX" -> document.path() != null && document.path().startsWith(
           io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(deletion.op().payload()));
@@ -840,6 +872,20 @@ public final class KnowledgeServerMigrationOps {
         && active.indexCountOps().countCollectionExcludingAcceptedSurvivorsStrict(scope, files, projections) == 0;
   }
 
+  private static boolean settleConditionalNativeDelete(JobQueue queue, RunningRuntime active,
+      SwitchBufferDelete deletion) {
+    Path indexPath = active.openedIndexPath();
+    if (indexPath == null || indexPath.getParent() == null
+        || indexPath.getParent().getParent() == null) return false;
+    var authority = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+        indexPath.getParent().getParent(), indexPath, active, null, null, 0L);
+    // A path that cannot be confirmed beneath a vouching root keeps its receipt, as an
+    // unproved root does.
+    if (uncertainBeneathItsRoot(authority, deletion)) return false;
+    return authority.replayBufferedFileDelete(active, deletion)
+        == WorkerIngestService.BufferedDeleteReplay.SETTLED;
+  }
+
   private static boolean settleCommittedNativeFiles(JobQueue queue, RunningRuntime active,
       String generation, Logger log, List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
     if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
@@ -863,24 +909,32 @@ public final class KnowledgeServerMigrationOps {
               || upsert.sourceSha256() == null
               || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
                   upsert.sourceSha256(), indexed)) return false;
-        } else if (!op.key().equals("path:" + op.payload())) {
+        } else if (!op.key().equals("path:" + SwitchBufferDelete.decode(op.payload()).path())) {
           return false;
         }
       }
       boolean deleted = false;
       for (var op : selected) {
         if ("DELETE".equals(op.op())) {
-          active.indexingCoordinator().deleteByIdAndChunks(op.payload());
-          if (queue.deleteByExactPath(op.payload()) < 0) return false;
-          deleted = true;
+          var deletion = SwitchBufferDelete.decode(op.payload());
+          if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
+            active.indexingCoordinator().deleteByIdAndChunks(deletion.path());
+            if (queue.deleteByExactPath(deletion.path()) < 0) return false;
+            deleted = true;
+          } else {
+            if (!settleConditionalNativeDelete(queue, active, deletion)) return false;
+          }
         }
       }
       if (deleted) {
         active.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
         active.commitOps().maybeRefreshBlocking();
         for (var op : selected) {
-          if ("DELETE".equals(op.op()) && active.indexCountOps()
-              .countByIdAndChunksStrict(op.payload()) != 0) return false;
+          if ("DELETE".equals(op.op())) {
+            var deletion = SwitchBufferDelete.decode(op.payload());
+            if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT
+                && active.indexCountOps().countByIdAndChunksStrict(deletion.path()) != 0) return false;
+          }
         }
       }
       if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
@@ -994,8 +1048,9 @@ public final class KnowledgeServerMigrationOps {
       // that a later DELETE_PREFIX removed.
       if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
         if (!enqueueBufferedUpserts(context, toEnqueue)
-            || (exactRead && (!awaitQueuedUpserts(context)
-                || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false)))) {
+            || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery)
+                || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false,
+                    refusedSourceRecovery)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
           return new ReplayOutcome(false, List.of());
         }
@@ -1107,9 +1162,40 @@ public final class KnowledgeServerMigrationOps {
         case "DELETE" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(payload);
-              mutatedLucene = true;
-              context.jobQueue().deleteByExactPath(payload);
+              var deletion = SwitchBufferDelete.decode(payload);
+              if (!op.key().equals("path:" + deletion.path())) {
+                throw new IllegalArgumentException("Buffered DELETE key mismatch");
+              }
+              if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
+                context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(deletion.path());
+                if (context.jobQueue().deleteByExactPath(deletion.path()) < 0) {
+                  throw new IllegalStateException("Buffered exact queue deletion failed");
+                }
+                mutatedLucene = true;
+              } else {
+                WorkerIngestService authority = context.publisher() != null
+                    ? context.publisher() : replayService(context);
+                if (uncertainBeneathItsRoot(authority, deletion)) {
+                  // The root vouches, but the path's own state cannot be confirmed (a folder on
+                  // the way cannot be listed): nothing is admitted or removed on the target, and
+                  // the receipt stays until the path can be judged.
+                  allApplied = false;
+                  context.log().warn("Buffered DELETE kept: its path cannot be confirmed "
+                      + "beneath its root: key={}", op.key());
+                } else {
+                  var replayed =
+                      authority.replayBufferedFileDelete(context.ingestLifecycle(), deletion);
+                  if (replayed == WorkerIngestService.BufferedDeleteReplay.UNCERTAIN
+                      && refusedSourceRecovery) {
+                    // Nothing was changed on surviving A. Its own root reconciliation removes the
+                    // file's rows once the root returns and proves the file absent.
+                    context.log().info("Refused candidate leaves an unproved DELETE to root "
+                        + "reconciliation on the surviving generation: key={}", op.key());
+                  } else if (replayed != WorkerIngestService.BufferedDeleteReplay.SETTLED) {
+                    allApplied = false;
+                  }
+                }
+              }
             } catch (Exception e) {
               allApplied = false;
               context
@@ -1356,7 +1442,7 @@ public final class KnowledgeServerMigrationOps {
                 // Enumeration may enqueue a file that the Green loop has already claimed. A
                 // subsequent direct DELETE_PREFIX must wait for that writer, not merely remove its
                 // queue row while it can still publish a late Lucene write.
-                if (exactRead && !awaitQueuedUpserts(context)) {
+                if (exactRead && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1409,7 +1495,8 @@ public final class KnowledgeServerMigrationOps {
                     .info("Replayed buffered PRUNE_PREFIX: prefix={} pruned={}", payload, pruned);
                 // A removed file found present again was queued; a later direct delete must wait
                 // for its writer, as after a replayed SYNC_ROOT.
-                if (exactRead && replayed.requeued() > 0 && !awaitQueuedUpserts(context)) {
+                if (exactRead && replayed.requeued() > 0
+                    && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1443,10 +1530,12 @@ public final class KnowledgeServerMigrationOps {
 
     if (!toEnqueue.isEmpty()) {
       allApplied &= enqueueBufferedUpserts(context, toEnqueue)
-          && (!exactRead || awaitQueuedUpserts(context));
+          && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery));
     }
 
-    if (mutatedLucene && context.ingestLifecycle() != null) {
+    // Refused recovery also judges file admissions by A's writer, whose batches A's reader sees
+    // before they are durable: commit A so the journal is acknowledged only for committed effects.
+    if ((mutatedLucene || refusedSourceRecovery) && context.ingestLifecycle() != null) {
       try {
         // Tempdoc 912 item 2: this used to call the low-level CommitOps.commit(), which skips the
         // per-reason counter, the pendingDocs reset, the commit telemetry and the
@@ -1466,7 +1555,8 @@ public final class KnowledgeServerMigrationOps {
     if (allApplied && exactRead) {
       allApplied = verifyBufferedUpserts(context, ops.stream()
           .filter(op -> "UPSERT".equalsIgnoreCase(op.op())
-              && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true);
+              && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true,
+          refusedSourceRecovery);
     }
     if (allApplied) {
       allApplied = verifyBufferedProjections(context, ops, deleteOrder);
@@ -1478,6 +1568,11 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Serving generation changed during VDU replay; retaining snapshot for retry");
     }
     boolean removed = false;
+    if (allApplied && removeAfterReplay && refusedSourceRecovery) {
+      // Refused recovery never takes the candidate projection cut above; its runnable is the
+      // harness cut between A's committed, verified replay and the journal acknowledgement.
+      firstCandidateProjectionApplied.run();
+    }
     if (allApplied && removeAfterReplay) {
       try {
         int cleared = sbq.removeReplayedSwitchBufferOps(ops);
@@ -1540,13 +1635,18 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
-  private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context) {
+  private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context,
+      boolean refusedSourceRecovery) {
     // All replay barriers consume the same SWITCHING budget. Returning early would re-enqueue
     // retained UPSERT versions on the next attempt, possibly resetting a claimed write.
     long deadline = context.deadlineNanos();
     try {
       while (true) {
         JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
+        // Refused-candidate recovery runs with its writer paused and proved idle, so pending rows
+        // cannot move here; they stay durable queue work that surviving A's writer runs between
+        // attempts. Only a claimed row could still publish a late write.
+        if (refusedSourceRecovery) return counts.processingCount() == 0;
         if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
         if (System.nanoTime() >= deadline) return false;
         Thread.sleep(50);
@@ -1588,7 +1688,7 @@ public final class KnowledgeServerMigrationOps {
   private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> upserts,
       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder,
-      boolean finalEffects) {
+      boolean finalEffects, boolean refusedSourceRecovery) {
     if (upserts.isEmpty()) return true;
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
@@ -1598,6 +1698,8 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Buffered UPSERT reader could not refresh", unavailable);
       return false;
     }
+    int awaited = 0;
+    String firstAwaited = null;
     try {
       for (var op : upserts) {
         var upsert = SwitchBufferUpsert.decode(op.payload());
@@ -1614,6 +1716,13 @@ public final class KnowledgeServerMigrationOps {
         }
         String indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
+        if (refusedSourceRecovery) {
+          // Judge every admission, so each one A lacks gets its A job in this attempt.
+          if (!sourceHoldsAdmission(context, queue, upsert, indexed)) {
+            if (awaited++ == 0) firstAwaited = upsert.path();
+          }
+          continue;
+        }
         boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
         if (!settled) {
@@ -1621,9 +1730,219 @@ public final class KnowledgeServerMigrationOps {
           return false;
         }
       }
+      if (awaited != 0) {
+        context.log().warn("Refused candidate awaits A's effect on {} accepted file(s), first: {}",
+            awaited, firstAwaited);
+        return false;
+      }
       return !finalEffects || certifyReplayFileDeleteScopes(context, orderedOps, deleteOrder);
     } catch (IOException | RuntimeException unavailable) {
       context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
+      return false;
+    }
+  }
+
+  /** {@link #currentSource} of a path that is not on disk. */
+  private static final String SOURCE_GONE = "gone";
+
+  /** The file's SHA-256 now, {@link #SOURCE_GONE} when it is absent, or null when unreadable. */
+  private static String currentSource(String path) {
+    try {
+      return io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path));
+    } catch (NoSuchFileException absent) {
+      return SOURCE_GONE;
+    } catch (IOException | RuntimeException unreadable) {
+      return null;
+    }
+  }
+
+  /**
+   * Refusal cleanup only: whether A's committed effect settles an accepted admission, judged
+   * from A's index against the path as {@link #observeForCleanup} confirms it now, never from a
+   * queue row about earlier bytes. A regular file settles when A holds its current bytes, or when
+   * the cleanup's own admission of this file state ended by A's normal policy (excluded, too
+   * large). Unreadable bytes settle nothing. A path confirmed to be no longer a regular file
+   * (gone, a folder, a link) settles once A no longer holds it: A's normal policy retires such a
+   * source's text, and its retirement reaches A while a candidate exists. An uncertain path
+   * settles nothing and admits nothing. A pending or claimed A job only waits.
+   *
+   * <p>Otherwise the Engine may have retired the admission's row unwritten, so nothing would ever
+   * bring A to the path: queue one ordinary A job for it, once per file state. The job's unit
+   * revision names the state, so the queue row itself records the admission and a restart keeps
+   * the same job and its retry deadline. A path that changes may admit it again; the same state
+   * is not admitted twice while its row stands. A failed row (terminal, or retrying after a
+   * back-off) is the outcome for the state its writer ran on, so it never holds back the
+   * admission of a state this cleanup has not admitted.
+   */
+  private static boolean sourceHoldsAdmission(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed) throws IOException {
+    CleanupPathState now = observeForCleanup(context.publisher(), Path.of(upsert.path()),
+        upsert.ingestionRoot());
+    switch (now.kind()) {
+      case UNCERTAIN -> {
+        return false; // Fail-closed: Green and the journal stay until the path can be judged.
+      }
+      case ABSENT, NON_REGULAR -> {
+        if (indexed == null
+            && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
+          return true; // A shows the retirement.
+        }
+      }
+      case REGULAR -> {
+        if (now.sha256() != null && now.sha256().equals(indexed)) return true;
+      }
+    }
+    String admission = cleanupAdmission(context.replayGeneration(), upsert.path(), now.fileState());
+    var work = queue.sourceFileWork(upsert.path(), indexed);
+    boolean admittedNow = queue.holdsRefusalCleanupAdmission(upsert.path(), admission);
+    // The policy outcome must be the writer's answer to this file state, which only an
+    // admission of that state that it finished proves.
+    if (now.kind() == CleanupPathKind.REGULAR && now.sha256() != null
+        && work == SwitchBufferCapableQueue.SourceFileWork.POLICY && admittedNow) {
+      return true;
+    }
+    if (work == SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING || admittedNow) return false;
+    Path file = Path.of(upsert.path());
+    var entry = new JobQueue.EnqueueEntry(file, JobQueue.EnqueueEntry.stat(file).sizeBytes(),
+        upsert.provenance(), null, upsert.ingestionRoot());
+    if (queue.enqueueRefusalCleanupAdmission(entry, upsert.collection(), admission) == 1) {
+      context.log().info("Refused candidate queued its unapplied admission on the source: {}",
+          upsert.path());
+    }
+    return false;
+  }
+
+  /** The unit revision refusal cleanup gives its admission of one file state of a path. */
+  static String cleanupAdmission(String generation, String path, String fileState) {
+    try {
+      byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(
+          (generation + '\u0000' + path + '\u0000' + fileState)
+              .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      return java.util.HexFormat.of().formatHex(digest, 0, 16);
+    } catch (java.security.NoSuchAlgorithmException unavailable) {
+      throw new IllegalStateException("SHA-256 is unavailable", unavailable);
+    }
+  }
+
+  /** What refusal cleanup may say about an accepted path now. */
+  enum CleanupPathKind {
+    /** A regular file; its bytes when they could be read. */
+    REGULAR,
+    /** Something other than a regular file: a folder, a link or a special file. */
+    NON_REGULAR,
+    /** Confirmed absent. */
+    ABSENT,
+    /** Nothing can be confirmed: settle nothing, admit nothing. */
+    UNCERTAIN
+  }
+
+  /**
+   * A path's state for refusal cleanup: its kind, a string naming the state (kind, size, modified
+   * time, file key and bytes), and the SHA-256 of a regular file's bytes, null when unreadable.
+   */
+  record CleanupPathState(CleanupPathKind kind, String fileState, String sha256) {
+    static final CleanupPathState UNCERTAIN =
+        new CleanupPathState(CleanupPathKind.UNCERTAIN, null, null);
+  }
+
+  /**
+   * The one answer refusal cleanup acts on about an accepted path's current state; only a
+   * confirmed answer can settle, acknowledge or let Green go. An answer is confirmed only while
+   * the folder that answers for the path (its watched root, or an explicit file's own folder)
+   * vouches through the live Worker's root authority: present, listable, and the same folder on
+   * its recorded volume. Every folder from it down to the path must also be listable, and the
+   * path must look the same before and after those checks. Anything else, including no root
+   * authority at all, is {@link CleanupPathKind#UNCERTAIN}.
+   */
+  static CleanupPathState observeForCleanup(WorkerIngestService publisher, Path path, Path root) {
+    if (publisher == null || path == null) return CleanupPathState.UNCERTAIN;
+    var rootCheck = publisher.rootCheck();
+    if (rootCheck == null) return CleanupPathState.UNCERTAIN;
+    Path file = path.toAbsolutePath().normalize();
+    String before = observedKind(file);
+    if (before == null) return CleanupPathState.UNCERTAIN;
+    boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
+    Path folder = asRoot ? root.toAbsolutePath().normalize() : file.getParent();
+    if (folder == null
+        || !(asRoot ? rootCheck.vouches(folder) : rootCheck.vouchesForFile(folder))) {
+      return CleanupPathState.UNCERTAIN;
+    }
+    for (Path dir = file.getParent(); dir != null && !dir.equals(folder) && dir.startsWith(folder);
+        dir = dir.getParent()) {
+      var presence = io.justsearch.adapters.lucene.runtime.PathPresence.probe(dir);
+      if (presence == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN
+          || (presence == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
+              && !listableFolder(dir))) {
+        return CleanupPathState.UNCERTAIN;
+      }
+    }
+    if (SOURCE_GONE.equals(before)) {
+      // Not found, re-probed beneath its vouching folder: the deletion authority's own answer.
+      return io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, rootCheck)
+              == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT
+          ? new CleanupPathState(CleanupPathKind.ABSENT, SOURCE_GONE, null)
+          : CleanupPathState.UNCERTAIN;
+    }
+    if (!before.startsWith("file/")) {
+      return before.equals(observedKind(file))
+          ? new CleanupPathState(CleanupPathKind.NON_REGULAR, before, null)
+          : CleanupPathState.UNCERTAIN;
+    }
+    String sha = currentSource(file.toString());
+    if (SOURCE_GONE.equals(sha) || !before.equals(observedKind(file))) {
+      return CleanupPathState.UNCERTAIN; // It changed while it was being read.
+    }
+    return new CleanupPathState(CleanupPathKind.REGULAR,
+        before + '/' + (sha == null ? "unreadable" : sha), sha);
+  }
+
+  /**
+   * Whether a conditional (watcher or legacy) DELETE's path is {@link CleanupPathKind#UNCERTAIN}
+   * to {@link #observeForCleanup} while the folder that answers for it, the root its replay judges
+   * it under, still vouches through {@code authority}. Every replay route then keeps the receipt
+   * and touches nothing. A withdrawn or uncertain root is not this case: its replay keeps its own
+   * handling. The path can still change between this check and the replay; a filesystem is not
+   * fenced.
+   */
+  private static boolean uncertainBeneathItsRoot(WorkerIngestService authority,
+      SwitchBufferDelete deletion) {
+    if (authority == null || authority.rootCheck() == null) return false;
+    Path file = Path.of(deletion.path()).toAbsolutePath().normalize();
+    Path root = authority.bufferedDeleteRoot(deletion);
+    if (observeForCleanup(authority, file, root).kind() != CleanupPathKind.UNCERTAIN) return false;
+    boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
+    Path folder = asRoot ? root.toAbsolutePath().normalize() : file.getParent();
+    return folder != null && (asRoot ? authority.rootCheck().vouches(folder)
+        : authority.rootCheck().vouchesForFile(folder));
+  }
+
+  /**
+   * The path's kind, size, modified time and file key without following links: {@link
+   * #SOURCE_GONE} when not found, null when it cannot be observed.
+   */
+  private static String observedKind(Path file) {
+    BasicFileAttributes attributes;
+    try {
+      attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    } catch (NoSuchFileException absent) {
+      return SOURCE_GONE;
+    } catch (IOException | RuntimeException unknown) {
+      return null;
+    }
+    String kind = attributes.isRegularFile() ? "file" : attributes.isSymbolicLink() ? "link"
+        : attributes.isDirectory() ? "directory" : "other";
+    return kind + '/' + attributes.size() + '/' + attributes.lastModifiedTime().toMillis() + '/'
+        + attributes.fileKey();
+  }
+
+  /** A folder on the way to the path whose entries can be listed (it is traversed as the OS does). */
+  private static boolean listableFolder(Path dir) {
+    if (!Files.isDirectory(dir)) return false;
+    try (var entries = Files.newDirectoryStream(dir)) {
+      // Reading the first entry is what proves the folder can be listed; empty is fine.
+      boolean firstEntryRead = entries.iterator().hasNext();
+      return firstEntryRead || Files.isDirectory(dir);
+    } catch (IOException | RuntimeException unreadable) {
       return false;
     }
   }
@@ -1866,7 +2185,11 @@ public final class KnowledgeServerMigrationOps {
           }
           if ("DELETE".equals(op.op())) {
             String generation = op.generation() == null ? "" : op.generation();
-            exactDeletes.computeIfAbsent(generation, ignored -> new HashMap<>()).put(op.payload(), index);
+            var deletion = SwitchBufferDelete.decode(op.payload());
+            if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
+              exactDeletes.computeIfAbsent(generation, ignored -> new HashMap<>())
+                  .put(deletion.path(), index);
+            }
           } else {
             deletes.put(op, index);
           }
@@ -1930,7 +2253,7 @@ public final class KnowledgeServerMigrationOps {
       content = Files.readString(rootsFile);
     } catch (NoSuchFileException absent) {
       // A missing registry is valid only when the path itself is absent, not a dangling link.
-      if (!Files.notExists(rootsFile, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw absent;
+      if (!Files.notExists(rootsFile, LinkOption.NOFOLLOW_LINKS)) throw absent;
       content = null;
     }
     if (content != null) {
@@ -1974,7 +2297,7 @@ public final class KnowledgeServerMigrationOps {
 
   private static void requireMigrationRoot(Path root) throws IOException {
     if (root == null) throw new IOException("Null migration root");
-    BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     if ((!attributes.isDirectory() && !attributes.isRegularFile()) || !Files.isReadable(root)) {
       throw new IOException("Unreadable migration root: " + root);
     }
@@ -2046,7 +2369,7 @@ public final class KnowledgeServerMigrationOps {
         while (iterator.hasNext()) {
           Path path = iterator.next();
           requireEnumerationRunning(context);
-          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
           if (attributes.isDirectory()) continue;
           if (help && !path.toString().endsWith(".md")) continue;
           if (!attributes.isRegularFile() || !Files.isReadable(path)) {

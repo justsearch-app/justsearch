@@ -1,0 +1,3 @@
+PASS modules/shell/src-tauri/src/engine_probe.rs#cfg(test): baseline and candidate test items are identical after rustfmt
+PASS modules/shell/src-tauri/src/lib.rs#cfg(test): baseline and candidate test items are identical after rustfmt
+PASS modules/shell/src-tauri/src/shell_actuator.rs#cfg(test): baseline and candidate test items are identical after rustfmt

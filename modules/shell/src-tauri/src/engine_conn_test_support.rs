@@ -100,7 +100,10 @@ server=socket.socket()
 server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
 server.bind(('127.0.0.1',int(sys.argv[2])))
 server.listen()
-pathlib.Path(sys.argv[1]).write_text(str(server.getsockname()[1]))
+port_file=pathlib.Path(sys.argv[1])
+pending=port_file.with_name(port_file.name+'.tmp')
+pending.write_text(str(server.getsockname()[1]))
+os.replace(pending,port_file)
 while True:
  conn,_=server.accept()
  with conn:
@@ -131,8 +134,11 @@ while True:
         let pid = self.host.admit(PreparedCommand { command }).unwrap().pid;
         let deadline = Instant::now() + Duration::from_secs(3);
         let port = loop {
-            if let Ok(port) = std::fs::read_to_string(&port_file) {
-                break port.parse().unwrap();
+            if let Some(port) = std::fs::read_to_string(&port_file)
+                .ok()
+                .and_then(|port| port.parse::<u16>().ok())
+            {
+                break port;
             }
             assert!(Instant::now() < deadline, "fixture server failed to start");
             std::thread::sleep(Duration::from_millis(2));

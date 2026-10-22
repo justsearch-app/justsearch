@@ -194,6 +194,7 @@ pub struct ExitCodeRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
     pub max_restart_attempts: u32,
+    pub exhausted_retry_delay_ms: u64,
     pub cooldown_increment_ms: u64,
     pub max_cooldown_ms: u64,
     pub stability_window_ms: u64,
@@ -232,6 +233,10 @@ fn engine_row() -> serde_json::Value {
 /// The restart BUDGET is deliberately absent: a harness that could widen it could hide a
 /// supervisor that never reaches `exhausted`.
 const OVERRIDES: &[(&str, &str)] = &[
+    (
+        "exhaustedRetryDelayMs",
+        "JUSTSEARCH_SUPERVISOR_EXHAUSTED_RETRY_DELAY_MS",
+    ),
     ("quitDeadlineMs", "JUSTSEARCH_SUPERVISOR_QUIT_DEADLINE_MS"),
     (
         "dataDirLockedWaitMs",
@@ -280,6 +285,7 @@ fn load_policy_from(env: impl Fn(&str) -> Option<String>) -> Policy {
     };
     let mut policy = Policy {
         max_restart_attempts: num("maxRestartAttempts") as u32,
+        exhausted_retry_delay_ms: num("exhaustedRetryDelayMs"),
         cooldown_increment_ms: num("cooldownIncrementMs"),
         max_cooldown_ms: num("maxCooldownMs"),
         stability_window_ms: num("stabilityWindowMs"),
@@ -314,6 +320,7 @@ fn load_policy_from(env: impl Fn(&str) -> Option<String>) -> Policy {
             continue;
         };
         match *key {
+            "exhaustedRetryDelayMs" => policy.exhausted_retry_delay_ms = value,
             "quitDeadlineMs" => policy.quit_deadline_ms = value,
             "dataDirLockedWaitMs" => policy.data_dir_locked_wait_ms = value,
             "stabilityWindowMs" => policy.stability_window_ms = value,
@@ -510,6 +517,18 @@ pub fn decide(observation: &Observation, policy: &Policy) -> Decision {
 /// for the reason the whole file exists: the Engine is down when it matters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateRecord {
+    #[serde(default, rename = "retryAt", skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<String>,
+    #[serde(default, rename = "notReady", skip_serializing_if = "Option::is_none")]
+    pub not_ready: Option<String>,
+    #[serde(
+        default,
+        rename = "recentExits",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub recent_exits: Option<serde_json::Value>,
+    #[serde(default, rename = "crashFile", skip_serializing_if = "Option::is_none")]
+    pub crash_file: Option<serde_json::Value>,
     #[serde(rename = "schemaVersion")]
     pub schema_version: u32,
     pub kind: String,
@@ -578,6 +597,12 @@ pub enum Outcome {
 /// prove a supervisor production does not run, which is the `static-green != live-working` trap
 /// wearing a Rust hat.
 pub trait Actuator {
+    fn take_manual_restart(&mut self) -> bool {
+        false
+    }
+    fn not_ready_reason(&mut self) -> String {
+        "Index readiness is unavailable".into()
+    }
     fn discovery(&mut self) -> Option<Ready> {
         None
     }
@@ -765,6 +790,10 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
     let mut waiting_for_holder = false;
     let mut incarnation_running = false;
     let mut host_stop: Option<String> = None;
+    let mut exhausted_until: Option<u64> = None;
+    let mut retry_at: Option<String> = None;
+    let mut not_ready: Option<String> = None;
+    let mut not_ready_since: Option<u64> = None;
     macro_rules! publish {
         ($reason:expr) => {{
             let mut record = supervisor.record(
@@ -774,7 +803,11 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 $reason,
                 epoch_ms_to_iso(actuator.epoch_ms()),
             );
-            if record.state == "starting" { record.phase = Some(start_phase.into()); }
+            if record.state == "starting" {
+                record.phase = Some(start_phase.into());
+            }
+            record.retry_at = retry_at.clone();
+            record.not_ready = not_ready.clone();
             actuator.publish_state(&record);
         }};
     }
@@ -788,6 +821,15 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
     match actuator.start_initial() {
         Ok(pid) => current.pid = (pid != 0).then_some(pid),
         Err(error) => {
+            if let Some(quit) = actuator
+                .take_host_quit()
+                .filter(|request| matches!(request.reason.as_str(), "quit" | "upgrade"))
+            {
+                supervisor.state = State::Stopped;
+                supervisor.requested_reason = Some(quit.reason.clone());
+                publish!(Some(quit.reason));
+                finish!(Outcome::NoEngine);
+            }
             supervisor.state = State::Exhausted;
             let reason = format!("ENGINE_RESTART_EXHAUSTED:spawn_failed:{error}");
             publish!(Some(reason.clone()));
@@ -855,11 +897,28 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 }
                 Action::Exhausted => {
                     let reason = format!("ENGINE_RESTART_EXHAUSTED:{reason}");
-                    publish!(Some(reason.clone()));
-                    finish!(Outcome::Exhausted {
-                        reason,
-                        exit_code: code
-                    });
+                    if decision.exit_class.as_deref() == Some("TRANSIENT") {
+                        actuator.wait_for_handle_release();
+                        exhausted_until = Some(
+                            actuator.monotonic_ms() + supervisor.policy.exhausted_retry_delay_ms,
+                        );
+                        retry_at = Some(epoch_ms_to_iso(
+                            actuator.epoch_ms() + supervisor.policy.exhausted_retry_delay_ms,
+                        ));
+                        current.api_port = None;
+                        current.instance_id = None;
+                        ready_at = None;
+                        ready_epoch = None;
+                        not_ready = None;
+                        not_ready_since = None;
+                        publish!(Some(reason));
+                    } else {
+                        publish!(Some(reason.clone()));
+                        finish!(Outcome::Exhausted {
+                            reason,
+                            exit_code: code
+                        });
+                    }
                 }
                 Action::Restart => {
                     publish!(Some(reason));
@@ -894,7 +953,8 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                     host_stop = Some(quit.reason.clone());
                 }
                 supervisor.requested_reason = Some(quit.reason.clone());
-                if supervisor.state == State::Restarting {
+                if matches!(supervisor.state, State::Restarting | State::Exhausted) {
+                    retry_at = None;
                     supervisor.state = State::Stopped;
                     publish!(Some(quit.reason));
                     finish!(Outcome::NoEngine);
@@ -926,6 +986,21 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 publish!(Some(quit.reason));
             }
         }
+        let manual_restart = actuator.take_manual_restart();
+        if supervisor.state == State::Exhausted
+            && !actuator.replacement_held()
+            && host_stop.is_none()
+            && (manual_restart || exhausted_until.is_some_and(|at| now >= at))
+        {
+            supervisor.restart_count = 0;
+            supervisor.state = State::Restarting;
+            supervisor.requested_reason = None;
+            exhausted_until = None;
+            retry_at = None;
+            cooldown_until = Some(now);
+            locked_retry = false;
+            publish!(None);
+        }
         if actuator.resumed() {
             supervisor.consecutive_misses = 0;
             ready_at = None;
@@ -955,6 +1030,8 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
             supervisor.entered_starting();
             current = Ready::default();
             incarnation_running = false;
+            not_ready = None;
+            not_ready_since = None;
             match actuator.spawn_engine() {
                 Ok(pid) => current.pid = Some(pid),
                 Err(_error) if actuator.replacement_held() => {
@@ -964,6 +1041,15 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                     continue;
                 }
                 Err(error) => {
+                    if let Some(quit) = actuator
+                        .take_host_quit()
+                        .filter(|request| matches!(request.reason.as_str(), "quit" | "upgrade"))
+                    {
+                        supervisor.state = State::Stopped;
+                        supervisor.requested_reason = Some(quit.reason.clone());
+                        publish!(Some(quit.reason));
+                        finish!(Outcome::NoEngine);
+                    }
                     supervisor.state = State::Exhausted;
                     let reason = format!("ENGINE_RESTART_EXHAUSTED:restart_failed:{error}");
                     publish!(Some(reason.clone()));
@@ -997,6 +1083,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 publish!(None);
                 supervisor.observe(Event::Ready, None);
                 incarnation_running = true;
+                not_ready_since = Some(actuator.monotonic_ms());
                 next_health_poll =
                     actuator.monotonic_ms() + supervisor.policy.hang_poll_interval_ms;
                 publish!(None);
@@ -1036,6 +1123,10 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
             if actuator.probe_health() {
                 supervisor.consecutive_misses = 0;
                 if let Some(epoch) = actuator.probe_essential_ready() {
+                    not_ready_since = None;
+                    if not_ready.take().is_some() {
+                        publish!(None);
+                    }
                     if ready_epoch.as_ref() != Some(&epoch) {
                         ready_epoch = Some(epoch);
                         ready_at = Some(now);
@@ -1050,6 +1141,14 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 } else {
                     ready_at = None;
                     ready_epoch = None;
+                    let since = *not_ready_since.get_or_insert(now);
+                    if now.saturating_sub(since) >= supervisor.policy.start_deadline_ms {
+                        let reason = actuator.not_ready_reason();
+                        if not_ready.as_ref() != Some(&reason) {
+                            not_ready = Some(reason);
+                            publish!(None);
+                        }
+                    }
                 }
             } else {
                 ready_at = None;
@@ -1216,6 +1315,10 @@ impl Supervisor {
         updated_at: String,
     ) -> StateRecord {
         StateRecord {
+            retry_at: None,
+            not_ready: None,
+            recent_exits: None,
+            crash_file: None,
             schema_version: 1,
             kind: "engine-supervisor-state.v1".to_string(),
             supervisor: "tauri".to_string(),
