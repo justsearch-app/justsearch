@@ -128,7 +128,8 @@ final class PlacementStage {
     // every output is complete, and a local failure remains repairable from the kept verified ZIP.
     if (dl.extract()) {
       try {
-        ArchiveExtractor.apply(targetFile, targetFile.getParent(), dl.sha256());
+        ArchiveExtractor.apply(
+            targetFile, targetFile.getParent(), dl.sha256(), dl.destinationArchives());
       } catch (IOException e) {
         return "Failed to extract " + targetFile.getFileName() + ": " + e.getMessage();
       }

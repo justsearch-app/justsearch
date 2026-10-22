@@ -77,6 +77,10 @@ public record InstallPlan(
    *     needs the answer at its own granularity, and each one deriving it separately is how the
    *     headline total came to disagree with the rows beneath it. Zero everywhere nothing is staged.
    * @param extractionOnly true when a kept archive needs applying; contributes no transfer bytes
+   * @param destinationArchives for an archive, the file names of every archive the current registry
+   *     extracts into its directory. Receipts there of other archives are retired when it applies, so
+   *     a renamed pack does not conflict with the one it replaced. Null when unknown: every receipt
+   *     takes part in the overlap rule.
    */
   public record PlannedDownload(
       String packageId,
@@ -88,10 +92,20 @@ public record InstallPlan(
       boolean extract,
       boolean required,
       long stagedBytes,
-      boolean extractionOnly) {
+      boolean extractionOnly,
+      List<String> destinationArchives) {
 
     public PlannedDownload {
       if (stagedBytes < 0) stagedBytes = 0;
+      if (destinationArchives != null) destinationArchives = List.copyOf(destinationArchives);
+    }
+
+    /** Compatibility constructor: every receipt in the destination takes part in the overlap rule. */
+    public PlannedDownload(String packageId, String url, String targetPath, String sha256,
+        long sizeBytes, boolean isModelVariant, boolean extract, boolean required, long stagedBytes,
+        boolean extractionOnly) {
+      this(packageId, url, targetPath, sha256, sizeBytes, isModelVariant, extract, required,
+          stagedBytes, extractionOnly, null);
     }
 
     /** Compatibility constructor for ordinary acquisition. */

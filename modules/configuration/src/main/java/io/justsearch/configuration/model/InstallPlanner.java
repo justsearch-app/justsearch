@@ -10,9 +10,11 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -188,6 +190,18 @@ public final class InstallPlanner {
     List<String> alreadyInstalled = new ArrayList<>();
     long totalBytes = 0;
     long resumableBytes = 0;
+    // Every archive the registry extracts into each directory, planned or not: an apply retires the
+    // receipts of archives no longer listed there (a renamed pack), and only those.
+    Map<Path, List<String>> archivesByDir = new HashMap<>();
+    for (ModelPackage pkg : registry.packages()) {
+      Path dir = installBaseDir(pkg, pkg.selectVariant(profile), modelsDir, homeDir);
+      for (SupportingFile sf : pkg.supportingFiles()) {
+        if (!sf.extract()) continue;
+        Path archive = dir.resolve(sf.filename());
+        archivesByDir.computeIfAbsent(archive.getParent(), k -> new ArrayList<>())
+            .add(archive.getFileName().toString());
+      }
+    }
 
     for (ModelPackage pkg : registry.packages()) {
       // Dev-only gate (tempdoc 842): a package flagged devOnly is never part of ANY user install
@@ -300,9 +314,7 @@ public final class InstallPlanner {
       ModelVariant variant = pkg.selectVariant(profile);
       String effectiveTargetDir = effectiveTargetDir(pkg, variant);
       boolean candidateOwned = isOnnxVariant(variant);
-      Path installBaseDir = pkg.installRoot() != null && !pkg.installRoot().isBlank()
-          ? homeDir.resolve(pkg.installRoot()).resolve(effectiveTargetDir)
-          : modelsDir.resolve(effectiveTargetDir);
+      Path installBaseDir = installBaseDir(pkg, variant, modelsDir, homeDir);
       boolean useAbsoluteTargetPath = pkg.installRoot() != null && !pkg.installRoot().isBlank();
 
       boolean packageFullyInstalled = true;
@@ -352,7 +364,8 @@ public final class InstallPlanner {
                 sf.extract(),
                 sf.required(),
                 staged,
-                extractionOnly));
+                extractionOnly,
+                sf.extract() ? archivesByDir.get(targetFile.getParent()) : null));
         if (!extractionOnly) {
           totalBytes += sf.sizeBytes();
           resumableBytes += staged;
@@ -367,6 +380,15 @@ public final class InstallPlanner {
 
     return new InstallPlan(
         profile, downloads, skipped, totalBytes, alreadyInstalled, resumableBytes);
+  }
+
+  /** The directory a package's selected variant and supporting files install into. */
+  private static Path installBaseDir(
+      ModelPackage pkg, ModelVariant variant, Path modelsDir, Path homeDir) {
+    String effectiveTargetDir = effectiveTargetDir(pkg, variant);
+    return pkg.installRoot() != null && !pkg.installRoot().isBlank()
+        ? homeDir.resolve(pkg.installRoot()).resolve(effectiveTargetDir)
+        : modelsDir.resolve(effectiveTargetDir);
   }
 
   /**

@@ -494,6 +494,47 @@ class ArchiveInstallRepairTest {
     assertEquals(2, transfers.get());
   }
 
+  @Test void registryRenamedArchiveReplacesTheOneItSupersedesWithoutOverlapFailure() throws Exception {
+    var cudnn = source("cudnn-9-runtime-12.4.zip", Map.of("cudnn.dll", "cudnn"));
+    var old = source("ort-native-cuda12-v1.24.3.zip",
+        Map.of("onnxruntime.dll", "ort 1.24.3", "ort-native-version.txt", "1.24.3"));
+    assertEquals(0, run(plan(registry(cudnn, old))).failed());
+    assertTrue(Files.isRegularFile(receipt(old.filename())));
+    var next = source("ort-native-cuda12-v1.25.0.zip",
+        Map.of("onnxruntime.dll", "ort 1.25.0 build", "ort-native-version.txt", "1.25.0"));
+    var update = installRunPlan(registry(cudnn, next));
+    assertEquals(1, update.downloads().size());
+    assertEquals(0, run(update).failed(), "a renamed pack is an update, not an overlap");
+    assertEquals("ort 1.25.0 build", Files.readString(runtime().resolve("onnxruntime.dll")));
+    assertEquals("1.25.0", Files.readString(runtime().resolve("ort-native-version.txt")));
+    assertTrue(Files.isRegularFile(receipt(next.filename())));
+    assertFalse(Files.exists(receipt(old.filename())), "the superseded archive's receipt is retired");
+    assertTrue(Files.isRegularFile(receipt(cudnn.filename())), "receipts the registry still lists stay");
+    assertTrue(installRunPlan(registry(cudnn, next)).downloads().isEmpty());
+    assertEquals(3, transfers.get());
+  }
+
+  @Test void receiptOfArchiveNoLongerListedTakesNoPartAndOnlyItIsDeleted() throws Exception {
+    var archive = source("pack.zip", Map.of("payload.dll", "new"));
+    Path receipts = runtime().resolve(".archive-receipts");
+    Files.createDirectories(receipts);
+    // Claims payload.dll with other content: taking part in the overlap rule would fail the apply.
+    Files.writeString(receipt("retired.zip"),
+        "{\"sha256\":\"00\",\"entries\":[{\"name\":\"payload.dll\",\"size\":3,\"crc\":1}]}");
+    Files.writeString(receipts.resolve("retired.zip.json.pending"), "pending");
+    Files.writeString(kept("retired.zip"), "old zip");
+    Files.writeString(runtime().resolve("retired.dll"), "retired output");
+    Files.writeString(runtime().resolve("retired.zip.json"), "not a receipt");
+    assertEquals(0, run(plan(registry(archive))).failed());
+    assertEquals("new", Files.readString(runtime().resolve("payload.dll")));
+    assertFalse(Files.exists(receipt("retired.zip")));
+    assertTrue(Files.isRegularFile(receipt("pack.zip")));
+    assertEquals("pending", Files.readString(receipts.resolve("retired.zip.json.pending")));
+    assertEquals("old zip", Files.readString(kept("retired.zip")));
+    assertEquals("retired output", Files.readString(runtime().resolve("retired.dll")));
+    assertEquals("not a receipt", Files.readString(runtime().resolve("retired.zip.json")));
+  }
+
   @EnabledOnOs(OS.LINUX)
   @ParameterizedTest @ValueSource(strings = {"partial", "receipt"})
   void replacementRejectsSymlinkRedirection(String kind) throws Exception {

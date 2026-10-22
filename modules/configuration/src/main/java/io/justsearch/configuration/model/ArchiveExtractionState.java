@@ -8,6 +8,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -145,9 +146,12 @@ public final class ArchiveExtractionState {
 
   /**
    * Fails when another archive's receipt in this destination lists one of {@code entries}' outputs
-   * with a different CRC, so two archives cannot overwrite each other on alternate runs.
+   * with a different CRC, so two archives cannot overwrite each other on alternate runs. With
+   * {@code listed} given, the receipt of an archive it does not name (one a registry update
+   * renamed) claims nothing and is deleted; its outputs stay.
    */
-  public static void requireNoOverlap(Path archive, Path target, List<Entry> entries)
+  public static void requireNoOverlap(
+      Path archive, Path target, List<Entry> entries, Collection<String> listed)
       throws IOException {
     Path receipts = receiptPath(archive).getParent();
     requireContained(archive.getParent(), receipts);
@@ -162,6 +166,13 @@ public final class ArchiveExtractionState {
     }
     for (Path other : others) {
       requireContained(archive.getParent(), other);
+      String otherArchive = other.getFileName().toString().replaceFirst("\\.json$", "");
+      if (listed != null && !listed.contains(otherArchive)) {
+        if (Files.isRegularFile(other, LinkOption.NOFOLLOW_LINKS)) {
+          try { Files.deleteIfExists(other); } catch (IOException heldOpen) { /* next apply */ }
+        }
+        continue;
+      }
       Receipt recorded;
       try {
         recorded = JSON.readValue(Files.readAllBytes(other), Receipt.class);
@@ -169,7 +180,6 @@ public final class ArchiveExtractionState {
         continue; // an unreadable receipt claims nothing
       }
       if (recorded == null || recorded.entries() == null) continue;
-      String otherArchive = other.getFileName().toString().replaceFirst("\\.json$", "");
       for (Entry theirs : recorded.entries()) {
         Entry mine;
         try {

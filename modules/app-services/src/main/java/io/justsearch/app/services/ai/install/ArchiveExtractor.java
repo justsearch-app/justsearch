@@ -11,6 +11,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
@@ -31,10 +32,16 @@ final class ArchiveExtractor {
     } catch (Exception failure) {
       throw new IOException("Cannot hash archive", failure);
     }
-    apply(archive, target, sha);
+    apply(archive, target, sha, null);
   }
 
-  static void apply(Path archive, Path target, String verifiedSha256) throws IOException {
+  /**
+   * @param listedArchives file names of the archives the current registry extracts into this
+   *     destination; receipts of others are retired. Null keeps every receipt in the overlap rule.
+   */
+  static void apply(
+      Path archive, Path target, String verifiedSha256, Collection<String> listedArchives)
+      throws IOException {
     // Containment is checked against real paths resolved once here: links above either directory
     // are followed, links at or below them are refused.
     Path archiveRoot = ArchiveExtractionState.destination(archive.toAbsolutePath().normalize().getParent());
@@ -48,7 +55,7 @@ final class ArchiveExtractor {
     try (ZipFile zip = new ZipFile(archive.toFile())) {
       inventory = ArchiveExtractionState.entries(zip, root, archive);
       ArchiveExtractionState.begin(archive);
-      ArchiveExtractionState.requireNoOverlap(archive, root, inventory);
+      ArchiveExtractionState.requireNoOverlap(archive, root, inventory, listedArchives);
       List<ZipEntry> changed = new ArrayList<>();
       List<ZipEntry> markers = new ArrayList<>();
       for (var item : inventory) {
