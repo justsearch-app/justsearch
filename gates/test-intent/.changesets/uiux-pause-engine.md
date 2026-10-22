@@ -692,3 +692,14 @@ WP3.6. Dotted agreed scenario IDs are preserved in agreedScenario; the gate IDs 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "3xyrdqne-verifier-1",
+  "verdict": "reject",
+  "digest": "sha256:aa1120d450fbcb35cacc4284721393f34b739a3fdacd70c0907dca660a87990a",
+  "note": "Fresh execution on 5905ccc40 fails StatusIndexingPauseTest waitingForResume at line 47; current execution evidence does not support acceptance."
+}
+```
