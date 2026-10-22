@@ -75,25 +75,33 @@ public final class AgentRunReconciler {
         if (store.isLive(sessionId)) {
           continue;
         }
-        Map<String, Object> run = store.readSnapshot(sessionId);
-        if (run == null) {
-          continue;
+        Map<String, Object> run;
+        io.justsearch.agent.api.conversation.ConversationWork.Lease writing;
+        // Read ownership and acquire exclusion against the same monitor as run deletion. A stale
+        // listing must never let recovery recreate a run that deletion has already removed.
+        synchronized (store) {
+          run = store.readSnapshot(sessionId);
+          if (run == null) continue;
+          writing = store.conversationWork().start(
+              run.get("conversationId") instanceof String id && !id.isBlank() ? id : null);
         }
-        LifecycleState state = LifecycleState.parse(run.get("state"));
-        if (state.isTerminal()) {
-          // Finished before the process died — no marker. The run's last write, its termination
-          // reason, follows the outcomes of its directions; without it, finishing was cut short.
-          if (run.get("terminationReason") == null) {
-            reportUnappliedDirections(sessionId, notAppliedReason(state));
+        try (writing) {
+          LifecycleState state = LifecycleState.parse(run.get("state"));
+          if (state.isTerminal()) {
+            // Finished before the process died — no marker. The run's last write, its termination
+            // reason, follows the outcomes of its directions; without it, finishing was cut short.
+            if (run.get("terminationReason") == null) {
+              reportUnappliedDirections(sessionId, notAppliedReason(state));
+            }
+            continue;
           }
-          continue;
-        }
-        // Report before stamping, and also for a run an earlier pass stamped: the process can die
-        // between the two writes, and the stamp alone does not say the directions were reported.
-        reportUnappliedDirections(
-            sessionId, AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED);
-        if (store.markInterrupted(sessionId, at)) {
-          stamped++;
+          // Report before stamping, and also for a run an earlier pass stamped: the process can die
+          // between the two writes, and the stamp alone does not say the directions were reported.
+          reportUnappliedDirections(
+              sessionId, AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED);
+          if (store.markInterrupted(sessionId, at)) {
+            stamped++;
+          }
         }
       } catch (RuntimeException e) {
         LOG.warn("Could not mark run {} interrupted", sessionId, e);

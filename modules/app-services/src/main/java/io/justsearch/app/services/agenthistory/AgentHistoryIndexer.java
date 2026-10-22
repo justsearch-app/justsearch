@@ -90,6 +90,48 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   private final java.util.concurrent.atomic.AtomicBoolean reconciliationQueued = new java.util.concurrent.atomic.AtomicBoolean();
   private volatile Runnable reconciliation;
   private volatile boolean closed;
+  private final java.util.Set<String> suppressed = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /** Serialize a deletion behind every admitted history write and reconciliation. */
+  public <T> T afterWrites(java.util.concurrent.Callable<T> deletion, Runnable rejected) {
+    java.util.concurrent.Future<T> future;
+    try { future = executor.submit(deletion); }
+    catch (RuntimeException failure) { rejected.run(); throw failure; }
+    try { return future.get(30, java.util.concurrent.TimeUnit.SECONDS); }
+    catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Deletion is still pending. Retry deleting this conversation.", interrupted);
+    } catch (java.util.concurrent.TimeoutException pending) {
+      // The queued task still owns exclusion, including if the caller times out. It closes its
+      // lease on actual exit; releasing it here would let a late writer race the pending delete.
+      throw new IllegalStateException("Deletion is still pending. Retry deleting this conversation.", pending);
+    } catch (java.util.concurrent.ExecutionException failed) {
+      if (failed.getCause() instanceof Error error) throw error;
+      if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
+      throw new IllegalStateException("Conversation deletion is incomplete. Retry deleting it.", failed.getCause());
+    }
+  }
+
+  public void suppress(List<String> runIds) { runIds.forEach(StoreIds::requireValid); suppressed.addAll(runIds); }
+  public void unsuppress(List<String> runIds) { suppressed.removeAll(runIds); }
+
+  /** Caller runs on the history executor, after earlier writes; a false RPC reply is a failure. */
+  public void deleteTranscript(String runId) {
+    StoreIds.requireValid(runId);
+    try {
+      Files.deleteIfExists(transcriptPath(runId));
+      Files.deleteIfExists(transcriptPath(runId).resolveSibling(runId + ".md.tmp"));
+      Files.deleteIfExists(pendingMarkerPath(runId));
+      KnowledgeClient client = clientSupplier.get();
+      if (client == null) throw new IllegalStateException("Search is unavailable; conversation deletion is incomplete. Retry when search is available.");
+      var response = client.deleteHistoryTranscript(transcriptPath(runId), ENGINE_CONTEXT);
+      if (response == null || !response.getSuccess() || !response.getError().isEmpty()) {
+        throw new IllegalStateException("Could not delete agent history from search. Retry deleting this conversation.");
+      }
+    } catch (IOException e) {
+      throw new java.io.UncheckedIOException("Could not remove agent history; retry deleting the conversation", e);
+    }
+  }
 
   /**
    * Wire a terminal-run transcript indexer onto a {@code RunEventStore} listener registrar (the
@@ -271,6 +313,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
     int resubmitted = 0;
     for (String sessionId : ids) {
       StoreIds.requireValid(sessionId);
+      if (suppressed.contains(sessionId)) continue;
       if (isReadableTranscript(transcriptPath(sessionId))) {
         // Tempdoc 909 §E item 1: healthy bytes are not evidence of a healthy INDEX. A transcript
         // written while the knowledge client was null never reached submitBatch, and every later
@@ -386,6 +429,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   }
 
   private void writeAndIndex(String sessionId, Map<String, Object> payload, boolean errored) {
+    if (suppressed.contains(sessionId)) return;
     Path target = transcriptPath(sessionId);
     try {
       Files.createDirectories(historyDir);

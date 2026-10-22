@@ -478,7 +478,10 @@ required names report, including intentional skips. Unknown inputs run every lan
 off, so an older green base needs no update push. There is no merge queue.
 
 After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
-suite, including Integration tests, Windows stop-census, supervisor conformance and Measured axe.
+suite, including both integration tiers (system-tests and module), Windows stop-census, supervisor
+conformance and Measured axe. The module tier runs app-api, app-services, indexing, reranker and ui
+integration tests on Linux. Both integration tiers run only on main pushes and manual dispatch;
+neither is a required PR check.
 Its running CI is never cancelled; only the newest pending commit runs, and the wait command
 follows a newer run that covers the requested commit. If main fails in your change's area, open
 a fix or revert PR at once through the normal path. Report a failure in a test listed in

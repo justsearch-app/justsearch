@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T03:14:36.836Z",
+  "revision": "c1cd13378d6a79a9aad776beeee28071e1c1c4a3",
+  "tree": "3da18acc97b12484209fd8be18e1f470fc59ab4d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4143801-1792638864537.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5550
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#confirms missing held server rows individually after markers are lost",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "confirms missing held server rows individually after markers are lost",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#server content without a listed row also qualifies for the missing-id read",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "server content without a listed row also qualifies for the missing-id read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#server thread content qualifies even when no history row was ever listed",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "server thread content qualifies even when no history row was ever listed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#one unanswered identity read cannot hold back another confirmed deletion",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "one unanswered identity read cannot hold back another confirmed deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears cached content after restart when the missing server row is confirmed absent",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b456f55307a6132d2639bac8f5ac28f2f25fb184ae41c8f3efd65c5722433f7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "clears cached content after restart when the missing server row is confirmed absent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets cached turns after restart when the missing server row is confirmed absent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a73e686a1cdec90abd6f187e47acb71f79df99cbeabfa1c95d501b980f8ea249",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "forgets cached turns after restart when the missing server row is confirmed absent",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4cab228fe",
+    "revision": "4cab228fe2900c07aff0941f58973296bd04b75d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4143801-1792638871274.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5331,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4143801-1792638871274.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#confirms missing held server rows individually after markers are lost",
+        "classification": "assertion",
+        "detail": "confirms missing held server rows individually after markers are lost:  AssertionError: expected [] to deeply equal [ 'gone' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-2WfWDx/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:73:49\n    at file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#server content without a listed row also qualifies for the missing-id read",
+        "classification": "assertion",
+        "detail": "server content without a listed row also qualifies for the missing-id read:  AssertionError: expected [] to include 'content-only'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#server thread content qualifies even when no history row was ever listed",
+        "classification": "assertion",
+        "detail": "server thread content qualifies even when no history row was ever listed:  AssertionError: expected [] to include 'run-only'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#one unanswered identity read cannot hold back another confirmed deletion",
+        "classification": "assertion",
+        "detail": "one unanswered identity read cannot hold back another confirmed deletion:  AssertionError: expected [] to include 'gone'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-co"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears cached content after restart when the missing server row is confirmed absent",
+        "classification": "assertion",
+        "detail": "clears cached content after restart when the missing server row is confirmed absent:  AssertionError: expected [ { role: 'user', …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-2WfWDx/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:105:21\n    at file:///home/elias/dev/j"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets cached turns after restart when the missing server row is confirmed absent",
+        "classification": "assertion",
+        "detail": "forgets cached turns after restart when the missing server row is confirmed absent:  AssertionError: expected [ 'uc-branch' ] to not include 'uc-branch'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.cl"
+      }
+    ]
+  },
+  "digest": "sha256:3973124ba7c5a5ba940d5a55b5008d57e318fa52363b5ad1a08a50b363f76bbd"
+}

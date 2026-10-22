@@ -46,6 +46,7 @@ class SavedStoreIdsHttpTest {
     Path root = tmp.resolve("conversations");
     var store = new FileConversationStore(root);
     for (String id : List.of("branch", "missing-parent-branch")) {
+      store.createSession(id, "core.free-chat");
       store.appendMessage(id, "core.free-chat", Map.of("id", "own-turn", "role", "user", "content", "keep",
           "ts", "2026-10-20T00:00:00Z"));
     }
@@ -91,6 +92,7 @@ class SavedStoreIdsHttpTest {
   @Test
   void conversationListIgnoresSavedRunsWithInvalidConversationIdsOverHttp() throws Exception {
     var store = new FileConversationStore(tmp.resolve("conversations"));
+    store.createSession("valid", "core.free-chat");
     store.appendMessage("valid", "core.free-chat", Map.of("role", "user", "content", "keep"));
     var runs = new AgentRunStore(tmp.resolve("runs"));
     for (String id : List.of("a.", "CON", "x:y", " ")) {

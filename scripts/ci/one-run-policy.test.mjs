@@ -52,9 +52,10 @@ test('main keeps the running run and runs all slow tiers without masking failure
   assert.match(workflow.concurrency.group, /github.event_name == 'push'.*refs\/heads\/main.*'main'/);
   assert.equal(workflow.concurrency['cancel-in-progress'], "${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}");
   const mainOnly = "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')";
-  for (const id of ['integration-tests']) {
+  for (const id of ['integration-tests', 'module-integration-tests']) {
     assert.equal(workflow.jobs[id].if, mainOnly);
     assert.notEqual(workflow.jobs[id]['continue-on-error'], true);
+    assert.ok(!required.includes(workflow.jobs[id].name), `${id}: main-only checks must not be required`);
   }
   const axe = workflow.jobs['measured-axe'];
   assert.equal(axe.needs, 'changes');
@@ -74,6 +75,31 @@ test('main keeps the running run and runs all slow tiers without masking failure
   }
   const runner = read('scripts/dev/run-dev-runner-tests.mjs');
   assert.match(runner, /JUSTSEARCH_PR_CI === 'true'.*test-dev-runner-stop-census\.mjs/);
+});
+test('module integration tier runs all five tasks together and preserves failure reports', () => {
+  const job = workflow.jobs['module-integration-tests'];
+  assert.ok(job, 'module integration tier must be scheduled');
+  assert.equal(job.name, 'Integration tests (module tier)');
+  assert.equal(job['runs-on'], 'ubuntu-latest');
+  assert.equal(job['timeout-minutes'], 20);
+  assert.equal(job.needs, undefined, 'main-only tier must not depend on PR classification');
+  const setup = job.steps.filter(step => /^(Checkout|Setup Java|Setup Gradle)$/.test(step.name));
+  assert.deepEqual(setup, workflow.jobs.build.steps.filter(step => /^(Checkout|Setup Java|Setup Gradle)$/.test(step.name)));
+  const modules = ['app-api', 'app-services', 'indexing', 'reranker', 'ui'];
+  const runs = job.steps.filter(step => step.run?.includes(':integrationTest'));
+  assert.equal(runs.length, 1);
+  const step = runs[0];
+  assert.equal(step.if, undefined);
+  assert.notEqual(step['continue-on-error'], true);
+  assert.equal(step.run.trim().split('\n').at(-1), `./gradlew ${modules.map(module => `:modules:${module}:integrationTest`).join(' ')} --continue -PskipWebBuild=true --console=plain`);
+  const upload = job.steps.find(step => step.name === 'Upload module integration-test results');
+  assert.equal(upload?.uses, 'actions/upload-artifact@v7');
+  assert.equal(upload.if, 'always()');
+  assert.deepEqual(upload.with.path.trim().split('\n'), modules.flatMap(module => [
+    `modules/${module}/build/test-results/integrationTest/TEST-*.xml`,
+    `modules/${module}/build/reports/tests/integrationTest/**`,
+  ]));
+  assert.ok(workflow.jobs['ci-walltime'].needs.includes('module-integration-tests'));
 });
 test('the synchronize guard cannot execute PR code and has only its required permissions', () => {
   const guard = load(read('.github/workflows/auto-merge-guard.yml'));

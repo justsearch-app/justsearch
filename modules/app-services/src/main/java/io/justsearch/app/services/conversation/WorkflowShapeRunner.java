@@ -172,7 +172,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
           if ("done".equals(ev.name()) || "error".equals(ev.name())) {
             runMeta.put("state", "error".equals(ev.name()) ? "ERROR" : "DONE");
             runMeta.put("updatedAt", java.time.Instant.now().toString());
-            runEvents.writeRunMeta(sessionId, runMeta);
+            runEvents.updateRunMeta(sessionId, runMeta);
           }
         };
     Throwable executionFailure = null;
@@ -271,7 +271,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
         runMeta.put("state", "ERROR");
         runMeta.put("updatedAt", java.time.Instant.now().toString());
         try {
-          runEvents.writeRunMeta(sessionId, runMeta);
+          runEvents.updateRunMeta(sessionId, runMeta);
         } catch (RuntimeException | Error cleanupFailure) {
           if (executionFailure == null) throw cleanupFailure;
           executionFailure.addSuppressed(cleanupFailure);

@@ -77,6 +77,8 @@ public record InstallCompleteness(
     MISSING_CONTRACTED,
     /** Missing from disk, and the contract never claimed it — a registry addition. */
     MISSING_UNCONTRACTED,
+    /** A kept archive still needs applying, independently of historical contract claims. */
+    INCOMPLETE_ARCHIVE,
     /**
      * Absent because the user declined the package (tempdoc 840 Phase 2). Not a gap of any kind: a
      * deliberate decline must never read as an incomplete install nor raise a Repair prompt.
@@ -89,7 +91,7 @@ public record InstallCompleteness(
      * user's own choice would turn into "a required component is missing".
      */
     boolean isMissingGap() {
-      return this == MISSING_CONTRACTED || this == MISSING_UNCONTRACTED;
+      return this == MISSING_CONTRACTED || this == MISSING_UNCONTRACTED || this == INCOMPLETE_ARCHIVE;
     }
   }
 
@@ -177,7 +179,8 @@ public record InstallCompleteness(
             new FileState(
                 dl.packageId(),
                 fileName,
-                claimed ? Classification.MISSING_CONTRACTED : Classification.MISSING_UNCONTRACTED,
+                dl.extractionOnly() ? Classification.INCOMPLETE_ARCHIVE
+                    : claimed ? Classification.MISSING_CONTRACTED : Classification.MISSING_UNCONTRACTED,
                 dl.required()));
       }
       for (InstallPlan.SkippedPackage sk : plan.skipped()) {
@@ -238,7 +241,8 @@ public record InstallCompleteness(
     if (!anyPackageInstalled) return false;
     if (missing().isEmpty()) return true;
     if (!contractPresent) return false;
-    return missing().stream().noneMatch(f -> f.classification() == Classification.MISSING_CONTRACTED);
+    return missing().stream().noneMatch(f -> f.classification() == Classification.MISSING_CONTRACTED
+        || f.classification() == Classification.INCOMPLETE_ARCHIVE);
   }
 
   /**

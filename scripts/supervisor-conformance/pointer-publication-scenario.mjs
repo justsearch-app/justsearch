@@ -88,57 +88,15 @@ export async function exercisePointerPublication(c) {
         : await post(manifest.head.apiPort, endpoint, body);
     } catch { return null; }
   };
-  let refusal = null;
+  let outcome = null;
   if (operationKey) {
     const candidate = `g-${operationKey}`;
-    // Judged by the pointer the cut recorded, not by the case name. Only a cut whose pointer
-    // already serves B is past promotion, and it completes forward. A cut before promotion (A
-    // serving, B building) ends in the agreed clean refusal: A kept, B retired (M2, M5, M8).
-    if (cut.state.active_generation === candidate) {
-      await waitFor('recovered migration completes forward', 120000, async () => {
-        const response = await currentRequest(`/api/operation-history/${operationKey}`);
-        if (response?.status !== 200) return false;
-        const outcome = JSON.parse(response.text);
-        check(!['failed', 'cancelled', 'expired', 'unknown'].includes(outcome.state),
-          `promoted migration did not complete forward: ${response.text}`);
-        return outcome.state === 'complete';
-      });
-    } else {
-      check(cut.state.migration_state === 'MIGRATING' && cut.state.building_generation === candidate,
-        'a pre-promotion cut must record B building beside the serving A');
-      refusal = await waitFor('pre-promotion cut ends in the clean refusal', 180000, () => {
-        const generation = readJson(path.join(indexBase, 'state.json'));
-        if (generation?.migration_state !== 'IDLE'
-            || generation.active_generation !== cut.state.active_generation
-            || generation.building_generation || generation.previous_generation
-            || fs.existsSync(path.join(indexBase, 'indices', candidate))) return null;
-        const operations = new DatabaseSync(path.join(data, 'operations.db'), { readOnly: true });
-        const jobs = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
-        try {
-          const rows = operations.prepare(
-            'SELECT operation_key, state, failure_reason FROM operations').all();
-          const operation = rows.find(row => row.operation_key === operationKey);
-          check(operation?.state !== 'COMPLETE', `a pre-promotion cut completed forward: ${JSON.stringify(operation)}`);
-          const journal = jobs.prepare('SELECT COUNT(*) AS n FROM switch_buffer').get().n;
-          if (operation?.state !== 'FAILED' || rows.some(row => row.state === 'RUNNING')
-              || journal !== 0) return null;
-          return { generation, operation: { ...operation }, journal };
-        } finally { jobs.close(); operations.close(); }
-      });
-      check(refusal.operation.failure_reason === 'BULK_GENERATION_REFUSED',
-        `pre-promotion cut did not end in the clean refusal: ${JSON.stringify(refusal.operation)}`);
-      await waitFor('the current Engine reports the terminal refusal', 60000, async () => {
-        const response = await currentRequest(`/api/operation-history/${operationKey}`);
-        return response?.status === 200 && JSON.parse(response.text).state === 'failed';
-      });
-      const probe = path.resolve(work, 'pointer-corpus', 'probe.txt').toLowerCase();
-      await waitFor('A keeps serving its content', 60000, async () => {
-        const response = await currentRequest('/api/knowledge/search',
-          { query: 'pointerdurabilitymarker', mode: 'text', limit: 5 });
-        return response?.status === 200 && JSON.parse(response.text).results?.some(hit =>
-          path.resolve(String(hit?.fields?.path ?? '')).toLowerCase() === probe);
-      });
-    }
+    const source = cut.state.active_generation;
+    check(cut.state.migration_state === 'MIGRATING' && cut.state.building_generation === candidate
+        && source && source !== candidate,
+      'the replacement cut must identify A serving and B building');
+    outcome = await settleReplacement({ indexBase, data, work, operationKey, source, candidate,
+      currentRequest, readJson });
     recovered.generation = readJson(path.join(indexBase, 'state.json'));
   }
   const permitted = [cut.state.active_generation, cut.state.building_generation].filter(Boolean);
@@ -154,7 +112,83 @@ export async function exercisePointerPublication(c) {
   const exit = initialExit ?? (writerReport
     ? { ...writerReport, exitCode: writerReport.backendExitCode } : recovered.supervisor.lastExit);
   check(exit?.exitCode === 73 || exit?.code === 73, 'the recorded writer did not die at the requested cut');
-  const proof = { mode, point, cut, first, recovered, exit, operationKey, refusal };
+  const proof = { mode, point, cut, first, recovered, exit, operationKey, outcome };
   fs.writeFileSync(path.join(work, 'pointer-publication-proof.json'), JSON.stringify(proof, null, 2));
   console.log('POINTER_PUBLICATION_PASS', JSON.stringify(proof));
+}
+
+/**
+ * Judges a replacement cut by the state after the restart, not by the pointer the cut recorded:
+ * resuming forward before promotion is correct (as bulk-state-before-binding requires). Exactly
+ * one clean terminal outcome must hold with every one of its conditions: (a) B promoted and the
+ * operation COMPLETE, or (b) the clean refusal with A kept. Anything else fails, naming the
+ * conditions that did not hold.
+ */
+async function settleReplacement({ indexBase, data, work, operationKey, source, candidate,
+  currentRequest, readJson }) {
+  const probe = path.resolve(work, 'pointer-corpus', 'probe.txt').toLowerCase();
+  const deadline = Date.now() + 180000;
+  let last;
+  while (true) {
+    last = await observeReplacement();
+    if (last.failed.length === 0) return last;
+    if (last.terminalMismatch || Date.now() >= deadline) break;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  throw new Error(`replacement cut reached neither clean outcome (${last.branch}); failed: `
+    + `${last.failed.join('; ')}; observed: ${JSON.stringify(last.observed)}`);
+
+  async function observeReplacement() {
+    const generation = readJson(path.join(indexBase, 'state.json'));
+    const operations = new DatabaseSync(path.join(data, 'operations.db'), { readOnly: true });
+    const jobs = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
+    let rows;
+    let journal;
+    try {
+      rows = operations.prepare('SELECT operation_key, state, failure_reason FROM operations').all()
+        .map(row => ({ ...row }));
+      journal = jobs.prepare('SELECT COUNT(*) AS n FROM switch_buffer').get().n;
+    } finally { jobs.close(); operations.close(); }
+    const operation = rows.find(row => row.operation_key === operationKey);
+    const history = await currentRequest(`/api/operation-history/${operationKey}`);
+    const historyState = history?.status === 200 ? JSON.parse(history.text).state : null;
+    const search = await currentRequest('/api/knowledge/search',
+      { query: 'pointerdurabilitymarker', mode: 'text', limit: 5 });
+    const found = search?.status === 200 && JSON.parse(search.text).results?.some(hit =>
+      path.resolve(String(hit?.fields?.path ?? '')).toLowerCase() === probe);
+    const exists = generationId => fs.existsSync(path.join(indexBase, 'indices', generationId));
+    const promoted = generation?.active_generation === candidate;
+    const kept = generation?.active_generation === source;
+    const branch = promoted ? '(a) B promoted' : kept ? '(b) clean refusal' : 'pointer on neither A nor B';
+    const conditions = [
+      ['pointer names A or B', promoted || kept],
+      ['pointer IDLE', generation?.migration_state === 'IDLE'],
+      ['no building generation', !generation?.building_generation],
+      ['no previous generation', !generation?.previous_generation],
+      ['nothing RUNNING', !rows.some(row => row.state === 'RUNNING')],
+      ['journal empty', journal === 0],
+      ...(promoted ? [
+        ['operation COMPLETE', operation?.state === 'COMPLETE'],
+        ['current Engine reports complete', historyState === 'complete'],
+        ["A's directory retired", !exists(source)],
+        ['file findable through B', found],
+      ] : [
+        ['operation FAILED with BULK_GENERATION_REFUSED', operation?.state === 'FAILED'
+          && operation.failure_reason === 'BULK_GENERATION_REFUSED'],
+        ['current Engine reports failed', historyState === 'failed'],
+        ["B's directory gone", !exists(candidate)],
+        ['A still finds the file', found],
+      ]),
+    ];
+    const failed = conditions.filter(([, holds]) => !holds).map(([name]) => name);
+    // A terminal operation never changes its outcome: once the pointer settled IDLE, an operation
+    // state the branch forbids cannot become right by waiting.
+    const terminalMismatch = generation?.migration_state === 'IDLE' && (promoted || kept)
+      && operation != null && operation.state !== 'RUNNING'
+      && failed.some(name => name.startsWith('operation '));
+    return { branch, failed, terminalMismatch, outcome: promoted ? 'promoted' : 'refused',
+      observed: { generation, operation, running: rows.filter(row => row.state === 'RUNNING'),
+        journal, historyState, found, sourceDirectory: exists(source),
+        candidateDirectory: exists(candidate) } };
+  }
 }

@@ -1,0 +1,42 @@
+--- a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationStore.java
++++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationStore.java
+@@ -75,6 +75,12 @@
+    * if it doesn't exist (first append = session creation).
+    */
+   void appendMessage(String sessionId, String shapeId, Map<String, Object> message);
++
++  default void createSession(String sessionId, String shapeId) {}
++
++  default ConversationWork conversationWork() { return new ConversationWork(); }
++
++  default void useConversationWork(ConversationWork work) {}
+ 
+   /**
+    * Tempdoc 734 round-14 F4 — TRUE when the store cannot be read or written right now (encrypted at
+--- a/modules/app-agent/src/main/java/io/justsearch/agent/AgentRunStore.java
++++ b/modules/app-agent/src/main/java/io/justsearch/agent/AgentRunStore.java
+@@ -32,6 +32,9 @@
+ 
+ /** Durable, append-only run store for agent session checkpoints and event replay. */
+ public final class AgentRunStore {
++  public io.justsearch.agent.api.conversation.ConversationWork conversationWork() {
++    return new io.justsearch.agent.api.conversation.ConversationWork();
++  }
+   private static final Logger LOG = LoggerFactory.getLogger(AgentRunStore.class);
+   private static final ObjectMapper MAPPER = new ObjectMapper();
+   private static final TypeReference<Map<String, Object>> MAP_REF = new TypeReference<>() {};
+--- /dev/null
++++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationWork.java
+@@ -0,0 +1,12 @@
++package io.justsearch.agent.api.conversation;
++
++/** Before-state signatures only; no coordination, reservation, or deletion repair. */
++public final class ConversationWork {
++  public interface Lease extends AutoCloseable { @Override void close(); }
++  public static final class Refused extends IllegalStateException {
++    public String code() { return ""; }
++  }
++  public Lease start(String id) { return () -> {}; }
++  public void markIncomplete(String id) {}
++  public void completed(String id) {}
++}
