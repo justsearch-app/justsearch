@@ -1,0 +1,93 @@
+diff --git a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java
+index c8bc857f6..abf4a22f2 100644
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java
+@@ -1376,19 +1376,19 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
+     try {
+       ensureOpen();
+       try (PreparedStatement query = connection.prepareStatement(
+-          "SELECT state, unit_revision, planned_source_sha256, content_hash FROM jobs WHERE path = ?")) {
++          "SELECT state, content_hash FROM jobs WHERE path = ?")) {
+         query.setString(1, path);
+         try (ResultSet row = query.executeQuery()) {
+           if (!row.next()) return false;
+           if (STATE_PENDING.equals(row.getString("state"))) return true;
+-          String revision = row.getString("unit_revision");
+-          String planned = row.getString("planned_source_sha256");
++          // Only a write records content_hash, and every admission clears it, so a hash here
++          // was written by this admission or a later one; a retired, refused or skipped row has
++          // none. A later admission's bytes supersede the accepted ones even when they differ
++          // from its captured plan, because the file legitimately changed again.
+           String committed = row.getString("content_hash");
+           return STATE_DONE.equals(row.getString("state"))
+-              && revision != null && !unitRevision.equals(revision)
+-              && JobQueue.IngestionLedgerTransition.isSha256(indexedSourceSha256)
+-              && indexedSourceSha256.equals(planned)
+-              && (committed == null || indexedSourceSha256.equals(committed));
++              && JobQueue.IngestionLedgerTransition.isSha256(committed)
++              && committed.equals(indexedSourceSha256);
+         }
+       }
+     } catch (SQLException unavailable) {
+diff --git a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java
+index f8d69e42c..a3c0fdf33 100644
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java
+@@ -1648,14 +1648,21 @@ public final class KnowledgeServerMigrationOps {
+         }
+         String indexed = context.ingestLifecycle().documentFieldOps()
+             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
++        // A refused candidate hands its admission to A only by A's committed effect: a pending
++        // row that A's writer runs after the restart, or A holding the bytes this admission or
++        // a later one wrote.
+         if (refusedSourceRecovery
+             && queue.sourceOwnsFileAdmission(upsert.path(), upsert.unitRevision(), indexed)) {
+-          // Judged by A's committed effect: A already holds a later admission's exact bytes, or
+-          // a pending row will produce the file on A when its writer runs after the restart.
+           continue;
+         }
+         boolean settled = queue.matchesAcceptedFileProjection(
+             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
++        if (settled && refusedSourceRecovery && upsert.sourceSha256().equals(indexed)) {
++          // The exact projection also accepts a row that wrote nothing (retired or refused)
++          // while A holds the witness. A captured witness names the plan's bytes, not the bytes
++          // a later watcher update admitted, so A must hold the file's current bytes as well.
++          settled = sourceHoldsCurrentFile(upsert.path(), indexed);
++        }
+         if (!settled) {
+           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
+           return false;
+@@ -1668,6 +1675,17 @@ public final class KnowledgeServerMigrationOps {
+     }
+   }
+ 
++  /** A's committed source witness equals the file's bytes now: nothing can bring A further. */
++  private static boolean sourceHoldsCurrentFile(String path, String indexedSourceSha256) {
++    if (!JobQueue.IngestionLedgerTransition.isSha256(indexedSourceSha256)) return false;
++    try {
++      return indexedSourceSha256.equals(
++          io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path)));
++    } catch (IOException | RuntimeException unreadable) {
++      return false;
++    }
++  }
++
+   /** A broad receipt used to supersede a file witness must prove its complete final scope. */
+   private static boolean certifyReplayFileDeleteScopes(DrainSwitchBufferContext context,
+       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder) throws IOException {
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/SwitchBufferCapableQueue.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/SwitchBufferCapableQueue.java
+index f352ee399..9e8fe7770 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/SwitchBufferCapableQueue.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/SwitchBufferCapableQueue.java
+@@ -141,8 +141,9 @@ public interface SwitchBufferCapableQueue extends JobQueue {
+   /**
+    * True when the generation whose committed source witness is {@code indexedSourceSha256}
+    * holds this admission's effect or a later one, or will: the path's row is pending (its
+-   * writer has not run yet), or a later admission replaced {@code unitRevision} and finished
+-   * with exactly the bytes that generation committed. A finished row alone never proves it.
++   * writer has not run yet), or the writer of this admission or of a later one that replaced
++   * {@code unitRevision} committed exactly the bytes that generation holds. A finished row alone
++   * never proves it: a retired, refused or skipped row wrote nothing.
+    */
+   default boolean sourceOwnsFileAdmission(
+       String path, String unitRevision, String indexedSourceSha256) {

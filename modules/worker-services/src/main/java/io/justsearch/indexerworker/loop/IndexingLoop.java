@@ -380,7 +380,11 @@ public class IndexingLoop implements Closeable {
         ingestionOutcomeCatalog == null
             ? IngestionOutcomeMetricCatalog.noop().outcomeWriteFailuresTotal
             : ingestionOutcomeCatalog.outcomeWriteFailuresTotal;
-    this.staleSourceHandler = new StaleSourceHandler(indexingCoordinator, this.documentIdentityStore);
+    this.staleSourceHandler = new StaleSourceHandler(indexingCoordinator, this.documentIdentityStore,
+        () -> {
+          RunningRuntime source = activeLexicalSource.get();
+          return source == null ? null : source.indexingCoordinator();
+        });
     this.journal =
         new IngestionOutcomeJournal(
             jobQueue, metrics, outcomeWriteFailureCounter, () -> detailedTracing);
