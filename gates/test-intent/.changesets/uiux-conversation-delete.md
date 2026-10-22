@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: wp52-cd3-auwty66r
+author-session: wp52-cd4-au04h3xz
 ---
 
 # WP5.2 conversation deletion
@@ -926,12 +926,313 @@ All checks are durable. Compatibility patch adds signatures only to the before-s
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ConversationRestoreAfterDeleteTest.java#explicitBackupImportCanRestoreAndExtendADeletedConversation"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "CD4 F1: both windows forget missing held server conversations after explicit two-store absence, including when Engine restart loses markers. Server content counts even without a listed row.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD4: F1, CD3's \"learns only from a refreshed server list\" after an Engine restart (deletion markers lost): when a refreshed list lacks a conversation that the window had previously seen on the server (it had a server row or server content), the window asks the Engine about that one id with a read that tells \"does not exist\" apart from \"exists\" and from \"could not answer\". \"Does not exist\" removes it like a deletion (row, cached turns, open view, last-viewed pointer). \"Could not answer\" keeps it. A conversation that exists only locally (no first write yet) is never removed this way, and a conversation merely beyond the list's limit stays. Bounded to the conversations the window holds; no full-history scan. F3: every route that refuses a late write to a deleted conversation uses the same typed reason (CONVERSATION_DELETED), as a client error (an HTTP 4xx, or the same code in a stream's error event), never a 500 or a generic BAD_REQUEST/INVALID_STATE. F4: the deletion markers carried in the list are bounded (a fixed maximum, newest kept, or since a client cursor; choose the cheapest and say why). A window that missed more than the bound is covered by the F1 rule. Choose the newest 100 wire markers, keeping all process-lifetime write refusals internally. Reuse the history route with existsOnly=true for an exact two-store identity read, under the key lifecycle monitor in the production deletion owner. Track only identities already observed by the window, including server history and unified thread content.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd4-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#confirms missing held server rows individually after markers are lost",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#server content without a listed row also qualifies for the missing-id read",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#server thread content qualifies even when no history row was ever listed",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#one unanswered identity read cannot hold back another confirmed deletion",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears cached content after restart when the missing server row is confirmed absent",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets cached turns after restart when the missing server row is confirmed absent"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "CD4 F1 preservation: local first-write identities are never probed or discarded; locked, unavailable, failed and malformed existence answers retain the held conversation; stale absence replies cannot override a newer restored list.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD4: F1, CD3's \"learns only from a refreshed server list\" after an Engine restart (deletion markers lost): when a refreshed list lacks a conversation that the window had previously seen on the server (it had a server row or server content), the window asks the Engine about that one id with a read that tells \"does not exist\" apart from \"exists\" and from \"could not answer\". \"Does not exist\" removes it like a deletion (row, cached turns, open view, last-viewed pointer). \"Could not answer\" keeps it. A conversation that exists only locally (no first write yet) is never removed this way, and a conversation merely beyond the list's limit stays. Bounded to the conversations the window holds; no full-history scan. F3: every route that refuses a late write to a deleted conversation uses the same typed reason (CONVERSATION_DELETED), as a client error (an HTTP 4xx, or the same code in a stream's error event), never a 500 or a generic BAD_REQUEST/INVALID_STATE. F4: the deletion markers carried in the list are bounded (a fixed maximum, newest kept, or since a client cursor; choose the cheapest and say why). A window that missed more than the bound is covered by the F1 rule. Choose the newest 100 wire markers, keeping all process-lifetime write refusals internally. Reuse the history route with existsOnly=true for an exact two-store identity read, under the key lifecycle monitor in the production deletion owner. Track only identities already observed by the window, including server history and unified thread content.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd4-preservation-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#keeps local first-write identities and inconclusive existence answers",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#an existence response superseded by a newer restored list cannot delete the restored row"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "CD4 F2: capture only the target thread GET and wait until it reaches fetch before replacing the fetch stub for DELETE. Inputs, fault injection, expected events and pointer assertions remain unchanged. The behavioral assertion fails on 5a71c91bf and passes after; gates/test-intent/evidence/uiux-conversation-delete-cd4-harness.json records this execution. All earlier per-file evidence was regenerated without changing its accepted checks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD4: F1, CD3's \"learns only from a refreshed server list\" after an Engine restart (deletion markers lost): when a refreshed list lacks a conversation that the window had previously seen on the server (it had a server row or server content), the window asks the Engine about that one id with a read that tells \"does not exist\" apart from \"exists\" and from \"could not answer\". \"Does not exist\" removes it like a deletion (row, cached turns, open view, last-viewed pointer). \"Could not answer\" keeps it. A conversation that exists only locally (no first write yet) is never removed this way, and a conversation merely beyond the list's limit stays. Bounded to the conversations the window holds; no full-history scan. F3: every route that refuses a late write to a deleted conversation uses the same typed reason (CONVERSATION_DELETED), as a client error (an HTTP 4xx, or the same code in a stream's error event), never a 500 or a generic BAD_REQUEST/INVALID_STATE. F4: the deletion markers carried in the list are bounded (a fixed maximum, newest kept, or since a client cursor; choose the cheapest and say why). A window that missed more than the bound is covered by the F1 rule. Choose the newest 100 wire markers, keeping all process-lifetime write refusals internally. Reuse the history route with existsOnly=true for an exact two-store identity read, under the key lifecycle monitor in the production deletion owner. Track only identities already observed by the window, including server history and unified thread content.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "CD4 F1/F3/F4: exact history identity reads distinguish empty, older and run-only conversations from absent ones, refusing locked reads; all late controls and agent streams use CONVERSATION_DELETED client errors; list markers retain only the newest 100 and older markers still refuse writes. HTTP fixtures use private stores and servers. The inaccessible-metadata check uses POSIX permissions and runs only on filesystems that support them; no Windows pass is claimed for that check.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD4: F1, CD3's \"learns only from a refreshed server list\" after an Engine restart (deletion markers lost): when a refreshed list lacks a conversation that the window had previously seen on the server (it had a server row or server content), the window asks the Engine about that one id with a read that tells \"does not exist\" apart from \"exists\" and from \"could not answer\". \"Does not exist\" removes it like a deletion (row, cached turns, open view, last-viewed pointer). \"Could not answer\" keeps it. A conversation that exists only locally (no first write yet) is never removed this way, and a conversation merely beyond the list's limit stays. Bounded to the conversations the window holds; no full-history scan. F3: every route that refuses a late write to a deleted conversation uses the same typed reason (CONVERSATION_DELETED), as a client error (an HTTP 4xx, or the same code in a stream's error event), never a 500 or a generic BAD_REQUEST/INVALID_STATE. F4: the deletion markers carried in the list are bounded (a fixed maximum, newest kept, or since a client cursor; choose the cheapest and say why). A window that missed more than the bound is covered by the F1 rule. Choose the newest 100 wire markers, keeping all process-lifetime write refusals internally. Reuse the history route with existsOnly=true for an exact two-store identity read, under the key lifecycle monitor in the production deletion owner. Track only identities already observed by the window, including server history and unified thread content.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd4-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java#everyLateControlWriteHasTheDeletedClientError",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java#lateAgentStreamHasTheDeletedReason",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java#deletionMarkersKeepOnlyTheNewestBoundedWireWindow",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java#missingIdentityReadDistinguishesAbsentFromEmptyAndOlderConversations",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java#missingIdentityReadRecognizesRunOnlyAndRefusesLockedStores",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationDeleteCd4HttpTest.java#inaccessibleMetadataIsNotReportedAsAnAbsentConversation"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "CD4 F1: real server content from modern streamed chunks or final answers, Search v3 streams, legacy agent streams and HTTP replay reads, and confirmed branch/title/history writes establishes server ownership before a list row arrives. A later exact absence clears the held identity; local exported replay never establishes Engine ownership.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD4: F1, CD3's \"learns only from a refreshed server list\" after an Engine restart (deletion markers lost): when a refreshed list lacks a conversation that the window had previously seen on the server (it had a server row or server content), the window asks the Engine about that one id with a read that tells \"does not exist\" apart from \"exists\" and from \"could not answer\". \"Does not exist\" removes it like a deletion (row, cached turns, open view, last-viewed pointer). \"Could not answer\" keeps it. A conversation that exists only locally (no first write yet) is never removed this way, and a conversation merely beyond the list's limit stays. Bounded to the conversations the window holds; no full-history scan. F3: every route that refuses a late write to a deleted conversation uses the same typed reason (CONVERSATION_DELETED), as a client error (an HTTP 4xx, or the same code in a stream's error event), never a 500 or a generic BAD_REQUEST/INVALID_STATE. F4: the deletion markers carried in the list are bounded (a fixed maximum, newest kept, or since a client cursor; choose the cheapest and say why). A window that missed more than the bound is covered by the F1 rule. Choose the newest 100 wire markers, keeping all process-lifetime write refusals internally. Reuse the history route with existsOnly=true for an exact two-store identity read, under the key lifecycle monitor in the production deletion owner. Track only identities already observed by the window, including server history and unified thread content.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd4-server-sources.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts#server chunk content counts before any list or history read returns it",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts#server done content counts before any list or history read returns it",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#a streamed answer counts as server content before any list or record read returns it",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#legacy agent stream content confirms a server conversation before any record read",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a one-shot agent answer confirms server content without any chunk frames",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a server replay read confirms content without a conversation list row (pinned=true)",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a server replay read confirms content without a conversation list row (pinned=false)",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a created branch is server-owned even before its first listed row or message",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a successful title write confirms a server conversation before its first list reply",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a message-id refresh counts as server content without a preceding list or resume"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "CD4 F1 preservation: a bare modern or legacy run identity, a local exported replay, an empty history read, or an unaccepted pending title does not turn an unwritten local conversation into a server-owned identity.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD4: F1, CD3's \"learns only from a refreshed server list\" after an Engine restart (deletion markers lost): when a refreshed list lacks a conversation that the window had previously seen on the server (it had a server row or server content), the window asks the Engine about that one id with a read that tells \"does not exist\" apart from \"exists\" and from \"could not answer\". \"Does not exist\" removes it like a deletion (row, cached turns, open view, last-viewed pointer). \"Could not answer\" keeps it. A conversation that exists only locally (no first write yet) is never removed this way, and a conversation merely beyond the list's limit stays. Bounded to the conversations the window holds; no full-history scan. F3: every route that refuses a late write to a deleted conversation uses the same typed reason (CONVERSATION_DELETED), as a client error (an HTTP 4xx, or the same code in a stream's error event), never a 500 or a generic BAD_REQUEST/INVALID_STATE. F4: the deletion markers carried in the list are bounded (a fixed maximum, newest kept, or since a client cursor; choose the cheapest and say why). A window that missed more than the bound is covered by the F1 rule. Choose the newest 100 wire markers, keeping all process-lifetime write refusals internally. Reuse the history route with existsOnly=true for an exact two-store identity read, under the key lifecycle monitor in the production deletion owner. Track only identities already observed by the window, including server history and unified thread content.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd4-server-sources-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a run identity alone does not assert that a local first write has landed",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a legacy run identity alone does not assert that a local first write has landed",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#an exported replay alone never asserts that a local conversation exists on the Engine",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#an empty history read does not assert that a local first write happened",
+        "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a title still waiting for the first write never turns a local id into server ownership"
+      ]
     }
   ]
 }
 ```
 
 All CD3 checks are durable. CD3 compatibility scaffolding adds only the old version's missing signatures (including a no-op completed notification); it adds no deletion repair. The test-intent evidence producer is unchanged. A temporary npx shim uses the installed Vitest entry point to repair the producer's dereferenced .bin copy; it changes neither test selection nor product code. Exact-head fail-before evidence and the writer sweep are in tmp/wp52-cd3/.
+
+Legacy frontend evidence was regenerated against dependencies installed from its own 97439fc54 package lock; newer before refs use the matching candidate lock. Comparison copies were removed after use.
+
+CD4 checks are durable. F2 changes only harness synchronization. Repaired CD4 checks use exact 4cab228fe before evidence, except F2 which uses 5a71c91bf. Existing accepted entries and acceptance records remain unchanged. The newest 100 markers bound the wire without expiring older process-lifetime write protection; exact missing-id reads cover windows that missed that bound or an Engine restart.
 
 ## Acceptance records
 

@@ -75,8 +75,11 @@ it('a history read already in flight cannot restore deleted cached turns', async
 
 it('a thread read already in flight cannot restore deleted interaction events', async () => {
   let release!: (response: Response) => void;
-  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { release = resolve; })));
+  vi.stubGlobal('fetch', vi.fn((url: unknown) => String(url).includes('/api/thread/conversation')
+    ? new Promise<Response>(resolve => { release = resolve; })
+    : Promise.resolve(new Response(JSON.stringify({ sessions: [], events: [], lifecycles: [] })))));
   const loading = el.refreshUnifiedThread();
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
   // The DELETE must finish while the captured GET is still held.
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true }))));
   await deleteConversationWithCascade('conversation');
@@ -86,5 +89,21 @@ it('a thread read already in flight cannot restore deleted interaction events', 
   }], lifecycles: [] })));
   await loading;
   expect(el.unifiedEvents).toEqual([]);
+  expect(readLastViewedConversation()).toBeNull();
+});
+
+it('clears cached content after restart when the missing server row is confirmed absent', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    sessions: [{ sessionId: 'conversation', shapeId: 'core.free-chat' }], deletedIds: [],
+  }))));
+  await loadConversations();
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown) => new Response(JSON.stringify(
+    String(url).includes('/history?existsOnly=true') ? { exists: false } : { sessions: [], deletedIds: [] },
+  ))));
+  await loadConversations();
+  await el.updateComplete;
+  expect(el.thread).toEqual([]);
+  expect(el.unifiedEvents).toEqual([]);
+  expect(el.sessionId).not.toBe('conversation');
   expect(readLastViewedConversation()).toBeNull();
 });

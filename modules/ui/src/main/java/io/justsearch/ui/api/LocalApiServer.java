@@ -511,6 +511,10 @@ public class LocalApiServer {
     app.exception(io.justsearch.core.execution.EngineExecutorRejectedException.class,
         (failure, ctx) -> ApiErrorHandler.writeExecutorRefusal(ctx, failure, telemetry));
 
+    app.exception(io.justsearch.agent.api.conversation.ConversationWork.Refused.class,
+        (failure, ctx) -> ctx.status(409).json(Map.of(
+            "ok", false, "errorCode", failure.code(), "error", failure.getMessage())));
+
     // Global fallback: catch any unhandled exception that slips past per-controller try-catch blocks.
     // This ensures all error responses use the standardized ApiErrorHandler shape instead of Javalin's default.
     app.exception(Exception.class, (e, ctx) -> {

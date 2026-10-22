@@ -77,6 +77,8 @@ public final class ConversationWork {
     deleted.add(id);
   }
 
-  /** Exact deletions, independent of the recent list's limit and encrypted store visibility. */
-  public synchronized List<String> deletedIds() { return List.copyOf(deleted); }
+  /** Newest 100 exact deletions on the wire; older process markers still refuse stale writes. */
+  public synchronized List<String> deletedIds() {
+    return deleted.stream().skip(Math.max(0, deleted.size() - 100)).toList();
+  }
 }

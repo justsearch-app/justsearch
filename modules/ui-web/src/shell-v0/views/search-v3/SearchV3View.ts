@@ -188,6 +188,7 @@ import {
 // conversation, so identity, existence, title and its markdown export come from here — this window
 // mints none of them.
 import {
+  rememberServerConversation,
   branchConversation,
   clearContextFloor,
   compactContext,
@@ -2947,6 +2948,7 @@ export class SearchV3View extends JfElement {
       },
       {
         onDelta: (text) => {
+          if (text) rememberServerConversation(ref.sessionId);
           this.sessions = appendTurnDelta(this.sessions, ref, text);
         },
         onEvidence: (evidence) => {

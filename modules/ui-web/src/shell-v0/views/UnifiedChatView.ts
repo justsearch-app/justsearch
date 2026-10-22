@@ -295,6 +295,7 @@ import {
   createConversationId,
   getRecentSessions,
   recordRecentSession,
+  rememberServerConversation,
   branchConversation,
   fetchMessageIds,
   // Tempdoc 610 Phase B — the loaded conversation list + the pure sibling-set
@@ -6348,6 +6349,7 @@ export class UnifiedChatView extends JfElement {
     this.rewriteNote = null;
     this.claims = [];
 
+    const streamSessionId = this.sessionId;
     const url = (this.apiBase || '') + '/api/chat/dispatch';
 
     const handlers: Record<string, (payload: unknown) => void> = {
@@ -6364,6 +6366,7 @@ export class UnifiedChatView extends JfElement {
               ? (p.text as string)
               : '';
         if (t) {
+          rememberServerConversation(streamSessionId);
           if (!this.streamingText) setAiActivity({ state: 'streaming' });
           this.streamingText = this.streamingText + t;
         }
@@ -6432,6 +6435,7 @@ export class UnifiedChatView extends JfElement {
           : (donePayload?.finalResponse ?? '');
         msg.content = settledText;
         if (settledText.trim()) {
+          rememberServerConversation(streamSessionId);
           this.thread = [...this.thread, msg];
         } else if (!this.errorMessage) {
           // Nothing streamed and nothing in the payload: the dispatch completed with no answer.

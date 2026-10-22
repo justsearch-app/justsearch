@@ -303,6 +303,15 @@ function watchOtherWindowsLegacyTitles(): void {
   stopLegacyWatch = () => window.removeEventListener('storage', onStorage);
 }
 
+// Identities observed in this window's server rows or cached server content. Never enumerate the
+// Engine's full history: only these held identities can need a missing-row confirmation.
+const serverConversations = new Set<string>();
+
+export function rememberServerConversation(id: string): void {
+  if (serverConversations.has(id)) return;
+  if (!state.deletedIds.includes(id)) serverConversations.add(id);
+}
+
 export async function loadConversations(): Promise<void> {
   watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
@@ -321,9 +330,14 @@ export async function loadConversations(): Promise<void> {
     // written through when a person acts and erased once a list answer confirms the write.
     const legacy = loadTitles();
     const conversations = rows.map((row) => toConversation(row, request, legacy));
-    const deletedIds: string[] = Array.isArray(data.deletedIds)
+    const listed = new Set(conversations.map(c => c.id));
+    const markers: string[] = Array.isArray(data.deletedIds)
       ? data.deletedIds.filter((id: unknown): id is string => typeof id === 'string')
-      : state.deletedIds;
+      : [];
+    const missing = [...serverConversations].filter(id => !listed.has(id) && !markers.includes(id));
+    const deletedIds = [...new Set([...state.deletedIds.filter(id => !listed.has(id)), ...markers])];
+    for (const id of listed) serverConversations.add(id);
+    for (const id of deletedIds) serverConversations.delete(id);
     for (const id of deletedIds) forgetRecentSession(id);
     state = { ...state, conversations: conversations.filter(c => !deletedIds.includes(c.id)), deletedIds,
       activeId: state.activeId !== null && deletedIds.includes(state.activeId) ? null : state.activeId,
@@ -339,6 +353,20 @@ export async function loadConversations(): Promise<void> {
     forgetOutgrownLegacyTitles(rows, legacy);
     if (conversations.some((c) => needsAdoption(c, legacy))) adoptLegacyTitlesWhenAPersonActs();
     resumeAutoTitles(state.conversations);
+    // Apply each exact answer independently: one unavailable read must not delay the list or
+    // another confirmed absence. A limited list, failed read or old-server reply proves nothing.
+    await Promise.all(missing.map(async id => {
+      try {
+        const answer = await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/history?existsOnly=true`);
+        if (!answer.ok || (await answer.json()).exists !== false || request < listShown) return;
+        serverConversations.delete(id);
+        forgetRecentSession(id);
+        state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
+          deletedIds: [...new Set([...state.deletedIds, id])],
+          activeId: state.activeId === id ? null : state.activeId };
+        emit();
+      } catch { /* Keep the held conversation when existence could not be determined. */ }
+    }));
   } catch {
     state = { ...state, loading: false };
     emit();
@@ -630,6 +658,7 @@ async function sendTitle(
       `${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/title`,
       { method: 'POST', headers, body: JSON.stringify({ title, source }) },
     );
+    if (res.ok) rememberServerConversation(id);
     if (res.status !== 412) return { ok: res.ok, status: res.status };
     const body = await readJson(res);
     return {
@@ -1029,6 +1058,7 @@ export async function resumeConversation(
         };
       });
     if (state.deletedIds.includes(sessionId)) return { sessionId, shapeId, messages: [] };
+    if (messages.length > 0) rememberServerConversation(sessionId);
     if (claim) setActiveConversation(sessionId);
     return {
       sessionId,
@@ -1213,6 +1243,9 @@ export async function fetchMessageIds(
     const data = (await res.json()) as {
       messages?: Array<{ role?: string; content?: string; id?: string }>;
     };
+    if ((data.messages ?? []).some(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')) {
+      rememberServerConversation(sessionId);
+    }
     return (data.messages ?? []).map((m) => ({
       role: typeof m.role === 'string' ? m.role : '',
       content: typeof m.content === 'string' ? m.content : '',
@@ -1243,6 +1276,7 @@ export async function branchConversation(
     const data = (await res.json()) as { sessionId?: string };
     const newSessionId = data.sessionId;
     if (!newSessionId) return null;
+    if (typeof newSessionId === 'string') rememberServerConversation(newSessionId);
     // Record as recent so the resume prompt + history dropdown surface it
     // without waiting for the next listSessions roundtrip.
     // Tempdoc 562: record the session POINTER only (no cached content); the preview is derived from the
@@ -1368,6 +1402,7 @@ export function exportConversationMarkdown(
 export function __resetConversationListForTest(): void {
   state = { conversations: [], deletedIds: [], activeId: null, loading: false };
   listeners.clear();
+  serverConversations.clear();
   apiBase = '';
   pendingTitles.clear();
   adoptBlockedIds.clear();

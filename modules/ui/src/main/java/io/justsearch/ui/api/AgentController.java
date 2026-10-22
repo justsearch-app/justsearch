@@ -202,6 +202,9 @@ final class AgentController {
                   // disconnect (it throws, so the run drops it), the precondition the
                   // zero-observer park needs.
                   sseEvent -> sseWriter.writeOrEvict(ctx, sseEvent.name(), sseEvent.payload()), RequestEngineContext.agent(ctx)));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      sseWriter.writeEvent(ctx, "error", Map.of(
+          "error", refused.getMessage(), "errorCode", refused.code(), "retryable", false));
     } catch (UnknownShapeException unknown) {
       LOG.warn("Rejecting agent run for unknown shapeId: {}", unknown.getMessage());
       Map<String, Object> errPayload = new LinkedHashMap<>();

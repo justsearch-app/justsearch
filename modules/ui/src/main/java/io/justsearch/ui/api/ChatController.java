@@ -371,6 +371,9 @@ public final class ChatController {
     } catch (ConversationEngine.AudienceDeniedException denied) {
       LOG.info("Audience denied for shape {}: {}", shapeId.value(), denied.getMessage());
       sink.accept(errorEvent(denied.getMessage(), ApiErrorCode.INVALID_REQUEST));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      sink.accept(new SseEvent("error", Map.of(
+          "error", refused.getMessage(), "errorCode", refused.code(), "retryable", false)));
     } catch (ConversationEngine.ShapeNotFoundException notFound) {
       LOG.error("Shape not registered: {}", shapeId.value());
       sink.accept(errorEvent(notFound.getMessage(), ApiErrorCode.NOT_FOUND));
@@ -583,6 +586,19 @@ public final class ChatController {
   public void handleLoadHistory(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    if ("true".equals(ctx.queryParam("existsOnly"))) {
+      if (conversationStore.isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
+      boolean exists;
+      if (conversationDeletion != null) {
+        exists = conversationDeletion.exists(sessionId);
+      } else {
+        AgentService agent = agentService.get();
+        exists = conversationStore.getSessionMeta(sessionId).isPresent()
+            || (agent != null && !agent.lifecycles(sessionId).isEmpty());
+      }
+      ctx.json(Map.of("exists", exists));
+      return;
+    }
     List<Map<String, Object>> messages = conversationStore.loadHistory(sessionId);
     // Slice 513 + 515 FIX-7 — include parent pointers in the response so the
     // FE can mark inherited messages with a branch indicator. Direct
@@ -724,6 +740,7 @@ public final class ChatController {
   public void handleSetTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationWork(Map.of("conversationId", sessionId)).close();
     String title = null;
     String source = ConversationStore.TITLE_SOURCE_USER;
     String precondition = ctx.header("If-None-Match");
@@ -810,6 +827,7 @@ public final class ChatController {
   public void handleAutoTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationWork(Map.of("conversationId", sessionId)).close();
     Optional<ConversationStore.SessionSummary> meta = conversationStore.getSessionMeta(sessionId);
     if (meta.isEmpty()) {
       noSuchConversation(ctx, sessionId);
@@ -1023,6 +1041,7 @@ public final class ChatController {
   public void handleEditContextFloorSummary(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationWork(Map.of("conversationId", sessionId)).close();
     String summaryText = null;
     try {
       @SuppressWarnings("unchecked")

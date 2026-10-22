@@ -784,7 +784,8 @@ public final class FileConversationStore implements ConversationStore {
 
   private Map<String, Object> readMeta(String sessionId) {
     Path metaFile = resolveSessionDir(sessionId).resolve("meta.json");
-    if (!Files.exists(metaFile)) return null;
+    // An inaccessible path is inconclusive; reading it must surface the error.
+    if (Files.notExists(metaFile)) return null;
     try {
       Map<String, Object> meta = readRawMeta(metaFile);
       // Tempdoc 629 (LAYER): decrypt the content fields. KeyLockedException propagates (the conversation

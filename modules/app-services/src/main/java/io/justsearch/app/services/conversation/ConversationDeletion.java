@@ -33,6 +33,16 @@ public final class ConversationDeletion {
     conversations.pendingDeletions().values().forEach(history::suppress);
   }
 
+  /** Exact two-store identity read, including empty and run-only conversations, while unlocked. */
+  public boolean exists(String id) {
+    StoreIds.requireValid(id);
+    synchronized (keys) {
+      if (conversations.isLocked() || runs.isLocked()) throw new KeyLockedException();
+      return conversations.getSessionMeta(id).isPresent()
+          || !runs.listRunIdsByConversation(id).isEmpty();
+    }
+  }
+
   public int delete(String id) {
     StoreIds.requireValid(id);
     if (conversations.isLocked() || runs.isLocked()) throw new KeyLockedException();

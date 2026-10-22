@@ -1570,3 +1570,21 @@ it('a deletion refresh clears this window without claiming another windows activ
   expect(el.sessions.activeId).toBeNull();
   expect(getConversationListState().activeId).toBe('other-window');
 });
+
+it('forgets cached turns after restart when the missing server row is confirmed absent', async () => {
+  twoTurnConversation();
+  const el = await mount();
+  await openConversation(el);
+  const fetchBefore = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).includes('/api/chat/conversations?')) return new Response(JSON.stringify({ sessions: [], deletedIds: [] }));
+    if (String(url).endsWith('/uc-branch/history?existsOnly=true')) return new Response(JSON.stringify({ exists: false }));
+    return fetchBefore(url, init);
+  }));
+  await loadConversations();
+  await settle(el);
+  expect(el.sessions.sessions.map(s => s.id)).not.toContain('uc-branch');
+  expect(el.sessions.activeId).toBeNull();
+  expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
+  expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
+});

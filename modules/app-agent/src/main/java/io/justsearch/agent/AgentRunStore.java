@@ -886,7 +886,8 @@ public final class AgentRunStore {
       return null;
     }
     Path p = metaPath(sessionId);
-    if (!Files.exists(p)) {
+    // An inaccessible path is inconclusive; reading it must surface the error.
+    if (Files.notExists(p)) {
       return null;
     }
     boolean locked = isLocked();

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T14:35:22.421Z",
-  "revision": "5a71c91bff14601f36a391f80c478df4588018b2",
-  "tree": "5583af1324f7a29d5546f831c8b418916c090139",
+  "createdAt": "2026-10-22T03:14:19.628Z",
+  "revision": "c1cd13378d6a79a9aad776beeee28071e1c1c4a3",
+  "tree": "8a65f1cfb75a6b25eabba0682ef45be3d9e9d578",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-vitest-653769-1792593299471.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4141352-1792638845975.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 7674
+      "durationMs": 5873
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#a deletion refresh clears this window without claiming another windows active conversation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:cb9b7d14c8838dce67a550f3e093707123b0324e392a067eec01e2e9b597bf13",
+      "contentDigest": "sha256:a73e686a1cdec90abd6f187e47acb71f79df99cbeabfa1c95d501b980f8ea249",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets the open deleted child and cached turns when the next cascade child fails",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:cb9b7d14c8838dce67a550f3e093707123b0324e392a067eec01e2e9b597bf13",
+      "contentDigest": "sha256:a73e686a1cdec90abd6f187e47acb71f79df99cbeabfa1c95d501b980f8ea249",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets a cached open conversation when a refreshed list confirms its deletion",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:cb9b7d14c8838dce67a550f3e093707123b0324e392a067eec01e2e9b597bf13",
+      "contentDigest": "sha256:a73e686a1cdec90abd6f187e47acb71f79df99cbeabfa1c95d501b980f8ea249",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears the old window transcript and pointer after a confirmed local delete",
       "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a81f2bfbc09fd57d8e0b94207f549c64f576d0bcf67e7a9864e064c9554d844b",
+      "contentDigest": "sha256:b456f55307a6132d2639bac8f5ac28f2f25fb184ae41c8f3efd65c5722433f7c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears the old window transcript and pointer when a refreshed list confirms deletion",
       "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a81f2bfbc09fd57d8e0b94207f549c64f576d0bcf67e7a9864e064c9554d844b",
+      "contentDigest": "sha256:b456f55307a6132d2639bac8f5ac28f2f25fb184ae41c8f3efd65c5722433f7c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a list requested before DELETE cannot resurrect a confirmed deletion",
       "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3995d2ac080091702b0157a025f0445252a0c699d662f1b65dddaea169535eac",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a history response captured before DELETE cannot reclaim its deleted conversation",
       "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3995d2ac080091702b0157a025f0445252a0c699d662f1b65dddaea169535eac",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a stale navigation cannot claim or restore a confirmed deleted identity",
       "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3995d2ac080091702b0157a025f0445252a0c699d662f1b65dddaea169535eac",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a history read already in flight cannot restore deleted cached turns",
       "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a81f2bfbc09fd57d8e0b94207f549c64f576d0bcf67e7a9864e064c9554d844b",
+      "contentDigest": "sha256:b456f55307a6132d2639bac8f5ac28f2f25fb184ae41c8f3efd65c5722433f7c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a thread read already in flight cannot restore deleted interaction events",
       "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a81f2bfbc09fd57d8e0b94207f549c64f576d0bcf67e7a9864e064c9554d844b",
+      "contentDigest": "sha256:b456f55307a6132d2639bac8f5ac28f2f25fb184ae41c8f3efd65c5722433f7c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -183,65 +183,65 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-vitest-653769-1792593312004.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4141352-1792638853139.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9772,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-vitest-653769-1792593312004.json\n\n"
+        "durationMs": 6279,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4141352-1792638853139.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#a deletion refresh clears this window without claiming another windows active conversation",
         "classification": "assertion",
-        "detail": "a deletion refresh clears this window without claiming another windows active conversation:  AssertionError: expected 'uc-branch' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1570:32\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+        "detail": "a deletion refresh clears this window without claiming another windows active conversation:  AssertionError: expected 'uc-branch' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1570:32\n    at file:///home/elias/dev/justsearch/.claude"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets the open deleted child and cached turns when the next cascade child fails",
         "classification": "assertion",
-        "detail": "CD3 confirmed conversation deletion forgets the open deleted child and cached turns when the next cascade child fails:  AssertionError: expected [ 'parent', 'child-one', 'child-two' ] to not include 'child-one'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)"
+        "detail": "CD3 confirmed conversation deletion forgets the open deleted child and cached turns when the next cascade child fails:  AssertionError: expected [ 'parent', 'child-one', 'child-two' ] to not include 'child-one'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/baselines/legacy-deps/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Pro"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets a cached open conversation when a refreshed list confirms its deletion",
         "classification": "assertion",
-        "detail": "CD3 confirmed conversation deletion forgets a cached open conversation when a refreshed list confirms its deletion:  AssertionError: expected [ 'uc-branch' ] to not include 'uc-branch'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous>"
+        "detail": "CD3 confirmed conversation deletion forgets a cached open conversation when a refreshed list confirms its deletion:  AssertionError: expected [ 'uc-branch' ] to not include 'uc-branch'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/baselines/legacy-deps/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file://"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears the old window transcript and pointer after a confirmed local delete",
         "classification": "assertion",
-        "detail": "clears the old window transcript and pointer after a confirmed local delete:  AssertionError: expected [ { role: 'user', …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:45:21\n    at processTicksAndRejections (node:i"
+        "detail": "clears the old window transcript and pointer after a confirmed local delete:  AssertionError: expected [ { role: 'user', …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:45:21\n    at processTicksAndRejections"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears the old window transcript and pointer when a refreshed list confirms deletion",
         "classification": "assertion",
-        "detail": "clears the old window transcript and pointer when a refreshed list confirms deletion:  AssertionError: expected [ { role: 'user', …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:55:21\n    at file:///home/elias/dev/justsearch"
+        "detail": "clears the old window transcript and pointer when a refreshed list confirms deletion:  AssertionError: expected [ { role: 'user', …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:55:21\n    at file:///home/elias/dev/ju"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a list requested before DELETE cannot resurrect a confirmed deletion",
         "classification": "assertion",
-        "detail": "a list requested before DELETE cannot resurrect a confirmed deletion:  AssertionError: expected [ { id: 'conversation', …(10) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:23:52\n    at processTicksAndRejectio"
+        "detail": "a list requested before DELETE cannot resurrect a confirmed deletion:  AssertionError: expected [ { id: 'conversation', …(10) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:24:52\n    at processTicksAnd"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a history response captured before DELETE cannot reclaim its deleted conversation",
         "classification": "assertion",
-        "detail": "a history response captured before DELETE cannot reclaim its deleted conversation:  AssertionError: expected 'conversation' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:45:47\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+        "detail": "a history response captured before DELETE cannot reclaim its deleted conversation:  AssertionError: expected 'conversation' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:46:47\n    at file:///home/elias/dev/justsearch/.claude/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a stale navigation cannot claim or restore a confirmed deleted identity",
         "classification": "assertion",
-        "detail": "a stale navigation cannot claim or restore a confirmed deleted identity:  AssertionError: expected 'conversation' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:52:47\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+        "detail": "a stale navigation cannot claim or restore a confirmed deleted identity:  AssertionError: expected 'conversation' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts:53:47\n    at file:///home/elias/dev/justsearch/.claude/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a history read already in flight cannot restore deleted cached turns",
         "classification": "assertion",
-        "detail": "a history read already in flight cannot restore deleted cached turns:  AssertionError: expected [ { role: 'user', …(5) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:72:21\n    at file:///home/elias/dev/justsearch"
+        "detail": "a history read already in flight cannot restore deleted cached turns:  AssertionError: expected [ { role: 'user', …(5) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:72:21\n    at file:///home/elias/dev/ju"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a thread read already in flight cannot restore deleted interaction events",
         "classification": "assertion",
-        "detail": "a thread read already in flight cannot restore deleted interaction events:  AssertionError: expected [ { id: 'old-turn', …(5) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/wp52-cd3/test-intent-before-vGAgfs/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:88:28\n    at file:///home/elias/dev/justsear"
+        "detail": "a thread read already in flight cannot restore deleted interaction events:  AssertionError: expected [ { id: 'old-turn', …(5) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-SpeC9c/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:91:28\n    at file:///home/elias/dev/"
       }
     ]
   },
-  "digest": "sha256:4bc681237e084cc7cfdd0386ddaf9d9cb5a58a9832a0dc95099f23a55c736ea9"
+  "digest": "sha256:5aa7ee492e1f3874699b0b8a68baf186c8e345ce08222cfae69cdbc205006f76"
 }
