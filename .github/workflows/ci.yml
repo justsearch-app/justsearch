@@ -2109,6 +2109,54 @@ jobs:
             build/ci/integration-test-attribution.md
           if-no-files-found: warn
 
+  # Main/dispatch coverage for the integration source sets outside system-tests.
+  # Advisory check: keep it out of requiredStatusChecks and PR input selection.
+  module-integration-tests:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    name: Integration tests (module tier)
+    runs-on: ubuntu-latest
+    # Measured locally at 139s including compilation; allow for a cold hosted runner.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Model-dependent cases self-skip when model files are absent.
+      - name: Module integration tier
+        shell: bash
+        run: |
+          chmod +x ./gradlew 2>/dev/null || true
+          ./gradlew :modules:app-api:integrationTest :modules:app-services:integrationTest :modules:indexing:integrationTest :modules:reranker:integrationTest :modules:ui:integrationTest --continue -PskipWebBuild=true --console=plain
+
+      - name: Upload module integration-test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: module-integration-test-results
+          path: |
+            modules/app-api/build/test-results/integrationTest/TEST-*.xml
+            modules/app-api/build/reports/tests/integrationTest/**
+            modules/app-services/build/test-results/integrationTest/TEST-*.xml
+            modules/app-services/build/reports/tests/integrationTest/**
+            modules/indexing/build/test-results/integrationTest/TEST-*.xml
+            modules/indexing/build/reports/tests/integrationTest/**
+            modules/reranker/build/test-results/integrationTest/TEST-*.xml
+            modules/reranker/build/reports/tests/integrationTest/**
+            modules/ui/build/test-results/integrationTest/TEST-*.xml
+            modules/ui/build/reports/tests/integrationTest/**
+          if-no-files-found: warn
+
   # Installed Engine lifecycle cases need their own 30-minute task budget. Keep AI
   # acceptance selectable locally with -PincludeAiTests=true; hosted CI owns the
   # model-free cases even while the broader integration tier remains advisory.
@@ -2264,7 +2312,7 @@ jobs:
     # budget: `report-ci-walltime-attribution.mjs` drops any job with no end time, so an
     # attribution taken while the ~6.5-minute suite still runs would omit it entirely and
     # `report-ci-walltime-budget.mjs` would warn `missing-required-lane` on every run.
-    needs: [public-claims, license-and-notices, build, unit-tests-search-worker, unit-tests-platform-contracts, app-ui, windows-native-tests, shell-rust-tests, shell-rust-tests-linux, integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
+    needs: [public-claims, license-and-notices, build, unit-tests-search-worker, unit-tests-platform-contracts, app-ui, windows-native-tests, shell-rust-tests, shell-rust-tests-linux, integration-tests, module-integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
     if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     steps:
       - name: Checkout
