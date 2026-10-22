@@ -307,17 +307,20 @@ final class ConversationApiAssembly {
                     continue;
                   }
                   String shapeId = c.get("shapeId") == null ? null : c.get("shapeId").toString();
-                  if (c.get("messages") instanceof List<?> list) {
-                    for (var msg : list) {
-                      if (msg instanceof java.util.Map<?, ?> raw) {
-                        var typed = new java.util.LinkedHashMap<String, Object>();
-                        for (var e : raw.entrySet()) {
-                          typed.put(String.valueOf(e.getKey()), e.getValue());
+                  try (var ignoredWriting = conversationStore.conversationWork().restore(sid.toString())) {
+                    if (c.get("messages") instanceof List<?> list) {
+                      if (!list.isEmpty()) conversationStore.createSession(sid.toString(), shapeId);
+                      for (var msg : list) {
+                        if (msg instanceof java.util.Map<?, ?> raw) {
+                          var typed = new java.util.LinkedHashMap<String, Object>();
+                          for (var e : raw.entrySet()) {
+                            typed.put(String.valueOf(e.getKey()), e.getValue());
+                          }
+                          conversationStore.appendMessage(sid.toString(), shapeId, typed);
                         }
-                        conversationStore.appendMessage(sid.toString(), shapeId, typed);
                       }
+                      restored++;
                     }
-                    restored++;
                   }
                 }
                 return restored;
@@ -473,6 +476,14 @@ final class ConversationApiAssembly {
                     }
                   };
                 });
+    if (b.HeadAssembly != null && b.HeadAssembly.agentRunStore() != null
+        && b.HeadAssembly.agentHistoryIndexer() != null) {
+      var deletion = new io.justsearch.app.services.conversation.ConversationDeletion(
+          conversationStore, b.HeadAssembly.agentRunStore(), b.HeadAssembly.agentHistoryIndexer(),
+          runChannelRegistry, b.HeadAssembly.dataKeyManager());
+      chatController.setConversationDeletion(deletion);
+      deletion.recoverPending();
+    }
     // Tempdoc 834 §1.6 / §15.1.3 — the run-stream family. It dispatches THROUGH ChatController's
     // sink-taking entry point rather than around it, so a mid-run failure reaches every observer of
     // the run instead of only the socket that started it.

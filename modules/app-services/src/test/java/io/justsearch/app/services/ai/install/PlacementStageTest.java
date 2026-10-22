@@ -31,7 +31,7 @@ class PlacementStageTest {
     Files.writeString(partial, "candidate", StandardCharsets.UTF_8);
 
     String sha = DownloadExecutor.sha256(target);
-    String failure = new PlacementStage(tempDir).place(download(sha, 9));
+    String failure = new PlacementStage(tempDir).place(download(sha, 9), false);
 
     assertNull(failure);
     assertEquals("candidate", Files.readString(target));
@@ -47,7 +47,7 @@ class PlacementStageTest {
     Files.writeString(partial, "new-bytes", StandardCharsets.UTF_8);
 
     String sha = DownloadExecutor.sha256(partial);
-    String failure = new PlacementStage(tempDir).place(download(sha, 9));
+    String failure = new PlacementStage(tempDir).place(download(sha, 9), false);
 
     assertTrue(failure.contains("different bytes"));
     assertEquals("old-bytes", Files.readString(target));
@@ -62,7 +62,7 @@ class PlacementStageTest {
     Files.writeString(partial, "candidate", StandardCharsets.UTF_8);
 
     String sha = DownloadExecutor.sha256(partial);
-    String failure = new PlacementStage(tempDir).place(download(sha, 9));
+    String failure = new PlacementStage(tempDir).place(download(sha, 9), false);
 
     assertNull(failure);
     assertEquals("candidate", Files.readString(target));
@@ -80,7 +80,7 @@ class PlacementStageTest {
     String sha = DownloadExecutor.sha256(partial);
     String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
         "embedding", "https://example.invalid/model.onnx", CANDIDATE_TARGET_PATH,
-        sha, 9, true));
+        sha, 9, true), false);
 
     assertNull(failure);
     assertEquals("candidate", Files.readString(target));
@@ -99,7 +99,7 @@ class PlacementStageTest {
 
     String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
         "embedding", "https://example.invalid/tokenizer.json", relative, sha,
-        Files.size(partial), false));
+        Files.size(partial), false), false);
 
     assertTrue(failure.contains("different bytes"));
     assertEquals("old-tokenizer", Files.readString(target));
@@ -117,7 +117,7 @@ class PlacementStageTest {
 
     String failure = new PlacementStage(tempDir).place(new InstallPlan.PlannedDownload(
         "embedding", "https://example.invalid/auxiliary.onnx", relative,
-        DownloadExecutor.sha256(partial), Files.size(partial), false));
+        DownloadExecutor.sha256(partial), Files.size(partial), false), false);
 
     assertTrue(failure.contains("different bytes"));
     assertEquals("old-bytes", Files.readString(target));

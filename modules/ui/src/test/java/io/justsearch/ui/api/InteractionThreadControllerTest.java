@@ -533,6 +533,7 @@ final class InteractionThreadControllerTest {
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(key);
     var conversationStore =
         new io.justsearch.app.services.conversation.FileConversationStore(tmp, cipher);
+    conversationStore.createSession("conv-locked", "core.free-chat");
     conversationStore.appendMessage(
         "conv-locked", "core.free-chat", Map.of("role", "user", "content", "q1"));
     key.locked = true;

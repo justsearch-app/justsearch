@@ -15,6 +15,7 @@ import {
   type Conversation,
 } from '../../state/conversationListStore.js';
 import { confirmAsync } from '../ConfirmDialog.js';
+import { emitEphemeralToast } from '../advisory/ephemeralToast.js';
 
 function relativeTime(ms: number): string {
   const seconds = Math.round((Date.now() - ms) / 1000);
@@ -211,7 +212,9 @@ export class ConversationHistory extends JfElement {
     // conversation has child branches (HTTP 409), surface a second
     // confirm naming the branches (looked up from the loaded conversations
     // array) and recursively delete them on consent.
-    await deleteConversationWithCascade(c.id, async (childIds) => {
+    const labels = new Map(this.conversations.map(row => [row.id, row.title ?? row.firstUserMessage ?? row.id]));
+    let declined = false;
+    const result = await deleteConversationWithCascade(c.id, async (childIds) => {
       const childLabels = childIds.map((id) => {
         const child = this.conversations.find((p) => p.id === id);
         const childLabel = child
@@ -223,13 +226,25 @@ export class ConversationHistory extends JfElement {
         `"${label}" has ${childIds.length} child branch${childIds.length === 1 ? '' : 'es'}:\n`
         + `${childLabels.join('\n')}\n\n`
         + `Delete the conversation and ${childIds.length === 1 ? 'its branch' : 'all branches'} together?`;
-      return confirmAsync({
+      const consented = await confirmAsync({
         title: 'Delete conversation and branches?',
         message,
         variant: 'danger',
         confirmLabel: `Delete all (${childIds.length + 1})`,
       });
+      declined = !consented;
+      return consented;
     });
+    if (!result.ok && !declined) {
+      const progress = result.deletedIds?.length
+        ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. Deleted: ${result.deletedIds.map(id => `“${labels.get(id) ?? id}”`).join(', ')}. ` : '';
+      const failedRow = this.conversations.find(row => row.id === result.failedId);
+      const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${failedRow?.title ?? failedRow?.firstUserMessage ?? result.failedId}”. ` : '';
+      emitEphemeralToast({ message: progress + failed + (result.error ?? 'Could not delete the conversation. Try again.'), severity: 'warning' });
+      if (result.deletedIds?.length || !['STORE_LOCKED', 'CONVERSATION_BUSY'].includes(result.errorCode ?? '')) {
+        await loadConversations();
+      }
+    }
   }
 
   private renderItem(c: Conversation): TemplateResult {
