@@ -78,7 +78,8 @@ test('main keeps the running run and runs all slow tiers without masking failure
 test('the synchronize guard cannot execute PR code and has only its required permissions', () => {
   const guard = load(read('.github/workflows/auto-merge-guard.yml'));
   assert.deepEqual(guard.on, { pull_request_target: { types: ['synchronize'] } });
-  assert.deepEqual(guard.permissions, { 'pull-requests': 'write', contents: 'read' });
+  assert.deepEqual(guard.permissions, {});
+  assert.deepEqual(guard.jobs['disable-auto-merge'].permissions, { 'pull-requests': 'write', contents: 'write' });
   const [checkout, script] = guard.jobs['disable-auto-merge'].steps;
   assert.equal(checkout.uses, 'actions/checkout@v7');
   assert.equal(checkout.with.ref, '${{ github.event.pull_request.base.sha }}');
