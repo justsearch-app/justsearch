@@ -13,6 +13,7 @@ import io.justsearch.app.api.runtime.child.StopMode;
 import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.telemetry.catalog.EmptyTags;
 import java.io.IOException;
 import java.io.InputStream;
@@ -312,8 +313,11 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   public ExtractionArtifact extract(Path file)
       throws IOException, ContentExtractor.ExtractionException {
     Objects.requireNonNull(file, "file");
-    if (closed) {
-      throw new SandboxExtractionException("Sandbox is closed", null);
+    synchronized (this) {
+      if (closed) {
+        throw new IngestionServiceUnavailableException(
+            "Extraction sandbox is closed");
+      }
     }
     Slot slot;
     try {
@@ -324,6 +328,13 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
     try {
       return extractOnSlot(slot, file);
+    } catch (IOException | ContentExtractor.ExtractionException | RuntimeException failure) {
+      synchronized (this) {
+        if (closed) {
+          throw new SandboxServiceUnavailableException("Extraction sandbox is closing", failure);
+        }
+      }
+      throw failure;
     } finally {
       freeSlots.add(slot);
     }
@@ -336,10 +347,8 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       child = acquireChild(slot);
     } catch (IOException e) {
       // Failure to open the child is sandbox infrastructure failure, not failure to read the
-      // source file. Keep source-file IOException unchanged below so JobBatchExtractor can retain
-      // its IO_FAILED distinction, while an unavailable process boundary follows the durable
-      // SANDBOX_FAILED retry path.
-      throw new SandboxExtractionException("Failed to start sandbox child", e);
+      // source file. Keep source IO and child/parser failures document-specific below.
+      throw new SandboxServiceUnavailableException("Failed to start sandbox child", e);
     }
     child.requests++;
     // The tail is reported per FILE, so it must not carry the previous request's chatter.
@@ -364,8 +373,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     Future<byte[]> pending;
     try {
       pending = readers.submit(() -> SandboxFrames.read(child.stdout, maxResponseBytes));
+    } catch (java.util.concurrent.RejectedExecutionException refused) {
+      // A request is already on the pipe. Retire it before reporting shared reader unavailability.
+      discardChild(slot, child, REASON_PROTOCOL);
+      throw new SandboxServiceUnavailableException("Sandbox reader cannot accept work", refused);
     } catch (RuntimeException refused) {
-      // A request is already on the pipe. Reusing this slot could give its answer to the next file.
+      // Unknown child failures retain the per-document retry policy.
       throw discardAndClassify(slot, child, REASON_PROTOCOL, refused);
     } catch (Error fatal) {
       try {
@@ -617,8 +630,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       current = null;
     }
     if (current == null) {
-      current = spawn();
-      slot.child = current;
+      // Serialize the final admission and publication with close's flag. A slot waiter must not
+      // spawn a new child after close has already enumerated the children it owns.
+      synchronized (this) {
+        if (closed) {
+          throw new IngestionServiceUnavailableException(
+              "Extraction sandbox is closed");
+        }
+        current = spawn();
+        slot.child = current;
+      }
     }
     return current;
   }
@@ -650,7 +671,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   @Override
   public void close() {
-    closed = true;
+    synchronized (this) { closed = true; }
     List<String> survivors = stopAllGracefully();
     shutdownAndCancelQueued(readers);
     try {

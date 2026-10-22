@@ -392,10 +392,147 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Every audited shared ingestion availability state defers healthy files without attempts beyond grace, with bounded shared deadlines, WAITING status and prompt recovery through a running loop; document poison, source access ladders and revive remain unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Make every one of them throw a typed \"service unavailable\" signal at the service boundary.",
+          "location": "task t-20261020-c2e24a user turn Round 7"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Audit shared ingestion services and repair availability signals, preserving document poison/source retry behavior, prior pacing/status/recovery and schema.",
+          "choice": "Retain Lucene IndexWriterUnavailableException and provenance-tagged IndexRuntimeIOException. Gate every coordinator mutation under the existing write barrier and session close-state monitor before accessing collaborators; distinguish actual writer/Directory closure from an arbitrary analyzer AlreadyClosedException. Component-open IO has no document input and is shared index IO. Use an IllegalStateException-compatible IngestionServiceUnavailableException for identity/path store and timebox availability. Store closed flags and JDBC isClosed checks run under their existing connection locks on every API. Classify known SQLite infrastructure primary result codes at fixed-SQL service boundaries, including schema/permission/connection failures; constraints, mismatched/oversized values, range and unknown codes remain ambiguous. Move path recording into the batched dependency failure boundary. Extraction submission/closed sandbox and child startup/reader rejection are service failures; keep SandboxExtractionException compatibility with a dedicated unavailable subtype, original causes and cleanup. Child crash/OOM/protocol/parser/file failures retain existing per-file semantics. Give extraction availability its own bounded service history, so successful identity resolution cannot reset an extraction outage. Recheck the timebox closed flag before classifying failed futures and the parser-pool flag before classifying EOF/IO from an in-flight request; serialize child startup/publication with closing so a slot waiter cannot create a child after close enumerates owned children. Preserve DRAINING precedence after a runtime has drained, rather than changing that existing typed signal to absent-writer. Existing service success resets its own history; restart preserves durable attempts/deadlines and resets only in-memory counters. Recovery in the matrix routes to reopened real services, matching owner replacement during cutover; no automatic recreation or deletion of production stores. Before compares exact final test source to1baf378a8; fixture uses real stores/runtimes, native SQLite/FS faults and controlled lifecycle state. Existing typed states are preservation cases; untyped states fail assertions. No schema/status changes; preserve acceptance bytes.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-service-audit.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
+
+
+## Round seven shared-service availability audit
+
+Scope traced from `JobBatchExtractor.extractJob`, `JobBatchWriter.write`,
+`IndexingLoop.processBatchInner`, the running/deferred runtime owners, and both SQLite stores.
+Production identity implementations are the SQLite authority and UNAVAILABLE sentinel. No
+connection is published before constructor success; a failed open cannot yield a half-started store.
+Runtime phases publish a RunningRuntime only after writer construction succeeds. Both SQLite
+close operations serialize with operations under their own lock: a concurrent resolve waits for
+close, then observes the closed flag, so closing and a retired receiver converge on the closed
+case below. Runtime closing uses its existing session flag/monitor, with write-barrier protection
+before mutation. Cutover retains old receivers until owner rebinding; the matrix replaces them
+with newly opened real instances while the loop remains running. No service is silently recreated
+in production. The D6 case opens and closes the production identity store on the same jobs.db as
+the queue, leaves that receiver routed to the running loop, and visits four batches.
+
+The test column names `SharedServiceAvailabilityTest` parameter values. `IWU` means
+IndexWriterUnavailableException; `IRI` means IndexRuntimeIOException with proven index-storage
+provenance/reason; `ISU` means IngestionServiceUnavailableException; `SSU` means
+SandboxServiceUnavailableException, a SandboxExtractionException subtype preserving its cause.
+SQL classifications are by result code, never message. Before values are source-audited here;
+per-parameter execution results and first observed exceptions are retained with the machine evidence.
+
+| Shared state | What it threw before (1baf378a8) | Boundary now | Matrix case |
+| --- | --- | --- | --- |
+| Writer/runtime closed or retired after switch | IWU in WritePathOps | IWU before collaborator access | WRITER_CLOSED |
+| Runtime closing with issued generation lease, snapshot still live | Mutation could succeed; no close-state gate | IWU under session monitor | WRITER_CLOSING |
+| Writer not started/read-only/deferred phase | IWU if leaked coordinator reaches WritePathOps; write accessor absent from phase type | IWU before document validation | WRITER_DEFERRED |
+| Writer handle rolled back/lost/tragically closed | IWU if isOpen observed; AlreadyClosedException if closure races write | IWU, including race at write boundary | WRITER_CONNECTION_LOST |
+| Directory closed while writer receiver remains wired | Raw Lucene AlreadyClosedException; ambiguous if writer remains open | IWU for index Directory provenance | WRITER_DIRECTORY_CLOSED |
+| Retiring/draining generation during switch | IRI(DRAINING); RMW guard used untyped IllegalStateException | IRI(DRAINING) for mutation lanes | WRITER_DRAINING |
+| Shared writer backpressure/queue admission | IRI(BACKPRESSURE) | Same typed rejection | WRITER_BACKPRESSURE |
+| Index directory read-only/access denied | IRI with storage provenance (AccessDeniedException) | Same typed outage | WRITER_READ_ONLY |
+| Index directory/files missing during mutation | IRI with index-owned filesystem path | Same typed outage | WRITER_DIRECTORY_LOST |
+| Runtime open fails on index filesystem (no document has been supplied) | IRI(DISK_IO), not storage-tagged; could spend grace then attempts | Storage-tagged IRI from component-open boundary | WRITER_OPEN_FAILED |
+| Replacement writer cannot acquire existing index lock | IRI(LOCKED) | Same typed outage | WRITER_OPEN_LOCKED |
+| Identity authority not wired/not started | Untyped IllegalStateException from sentinel (a routed receiver loses sentinel identity) | ISU from sentinel itself | IDENTITY_UNWIRED |
+| Identity store closed/closing/old receiver after replacement (D6) | NullPointerException from null connection | ISU checked under store lock | IDENTITY_CLOSED |
+| Identity JDBC connection lost/closed outside store | Wrapped SQLException, often code0 and ambiguous | ISU from JDBC isClosed under lock | IDENTITY_CONNECTION_LOST |
+| Identity connection read-only or filesystem read-only | IllegalStateException wrapping SQLITE_READONLY | ISU with original SQLException | IDENTITY_READ_ONLY |
+| Identity table/schema lost | IllegalStateException wrapping SQLITE_ERROR | ISU: fixed SQL has no document-dependent syntax/schema | IDENTITY_SCHEMA_LOST |
+| Open identity DB file removed/lost | IllegalStateException wrapping native READONLY_DBMOVED/IOERR | ISU with original native result | IDENTITY_FILE_LOST |
+| Identity open/connection establishment fails (missing parent) | IllegalStateException wrapping SQLITE_CANTOPEN | ISU before construction succeeds | IDENTITY_OPEN_FAILED |
+| Identity locked/busy connection | IllegalStateException wrapping SQLITE_BUSY | ISU; bounded service retry | IDENTITY_BUSY |
+| Identity file is not a SQLite database/corrupt | IllegalStateException wrapping SQLITE_NOTADB/CORRUPT | ISU; no destructive automatic recovery | IDENTITY_CORRUPT |
+| Path-resolution service closed/closing/old receiver | NullPointerException before identity resolution | ISU under store lock, batched by extractor | PATH_CLOSED |
+| Path-resolution JDBC connection lost | SQLException logged and swallowed | ISU checked under store lock | PATH_CONNECTION_LOST |
+| Path-resolution read-only | SQLException logged and swallowed | ISU with native result | PATH_READ_ONLY |
+| Path-resolution fixed schema missing | SQLException logged and swallowed | ISU with native result | PATH_SCHEMA_LOST |
+| Path-resolution open fails | Untyped IllegalStateException wrapping CANTOPEN | ISU at constructor boundary | PATH_OPEN_FAILED |
+| Timeboxed extraction closed/closing | Untyped JDK RejectedExecutionException or existing typed Engine refusal | ISU using submission/close monitor | EXTRACTOR_CLOSED |
+| Extraction executor/registration unavailable or saturated | JDK rejection or EngineExecutorRejectedException | ISU for untyped rejection; retain existing Engine typed refusal | EXTRACTION_EXECUTOR_CLOSED |
+| Parser pool closed/closing | SandboxExtractionException; counted as per-file failure | ISU under pool close-state monitor, propagated through timebox | EXTRACTION_SANDBOX_CLOSED |
+| Timebox closes during an admitted extraction (interrupted/cancelled future) | Source IOException / ExtractionException after executor shutdown, charged as a file failure | ISU checked under submission/close monitor before classifying the failed future | EXTRACTOR_CLOSING |
+| Parser pool closes during an admitted request | Pipe EOF/IO reported as a per-file SandboxExtractionException | SSU after checking close flag under pool monitor; no new child admitted after closing | EXTRACTION_SANDBOX_CLOSING |
+| Parser child cannot start (missing executable/control/manifest unavailable) | SandboxExtractionException with original IOException | SSU with same cause; no file bytes parsed yet | EXTRACTION_START_FAILED |
+| Shared sandbox reader rejects request | SandboxExtractionException after child cleanup | SSU after the same cleanup; retain child ownership | EXTRACTION_READER_CLOSED |
+
+Additional equivalences and exclusions checked from code:
+
+- Other index-directory IO (disk full, generic IO, corrupt/missing segments, locks) follows the same
+  `IndexRuntimeIOException.fromIndexOperation` storage classifier. Existing running-loop DISK_FULL
+  checks and `VerifierReadOnlyWriterTest` exercise this lane. No disk-filling fixture is generated.
+  CommitOps already checks writer absence and wraps index IO; a racing closed Directory now yields
+  IWU. Its metadata-validation failures remain document/configuration errors. Snapshot reader/count
+  failures in extraction are deliberately caught and extraction proceeds to the guarded writer;
+  they cannot charge a healthy file on their own.
+- Raw writer IO can originate in a document token stream/analyzer. An explicit filesystem path
+  outside the index remains document IO even under Lucene calls; pathless IO needs Lucene store
+  frames, not merely IndexWriter frames. Malformed chunk re-derivation can throw raw IOException
+  in RMW. `DISK_IO`/CONFIGURATION without storage provenance, arbitrary NPE/IllegalStateException,
+  constraints, mismatched/oversized values and nonfatal poison errors retain the existing ambiguity
+  budget/ladder. Existing single/all-poison and U19 checks remain unchanged.
+- SQLite services use fixed SQL with normalized path hashes, UUIDs and timestamp fields. Known
+  primary availability codes are1–17,21–24 and26–28 (see exact switch); constraints19,
+  value types20, oversized18, range25 and unknown0 remain per-file/ambiguous. `isClosed` catches
+  real lost JDBC connections even when the driver would otherwise report code0. Native read-only,
+  busy, missing file/schema and malformed DB are exercised, without fabricating SQL exceptions.
+- Optional embedding/SPLADE and model metadata are not required lexical publication services:
+  unavailable bindings choose lexical/pending-vector output; batch embedding and token-count
+  exceptions are caught by their existing fallbacks. No new attempt policy is introduced there.
+- Sandbox response protocol failure, timeout, child crash/OOM and decoder errors can be caused by
+  one file. They remain per-document outcomes. A parser process dying on a poison file is not
+  evidence that every parser is unavailable. Startup happens before any file request; reader
+  rejection is an explicit shared executor admission failure, so those two are proven outages.
+- Closing is checked again when an admitted extraction fails, not only before submission. The
+  matrix closes a real timebox while its task is blocked and a real persistent pool after a child
+  consumes the first request byte. Failed futures/pipe EOF caused by these closes remain uncounted
+  outages. Child startup/publication is serialized with the pool close flag. A missing individual
+  identity row still yields the existing per-hash convergence/integrity error; no closed connection
+  can reach that path after the locked open check.
+- jobs.db is the durable queue/control plane, not an alternate document authority. Its existing
+  OutcomeWriteException and outer loop recovery retain claims; an extension failure retains the
+  orchestrator's bounded pause and minute-rate warning. This round does not alter that handler,
+  ledger commit ordering, background sync/watcher revive, file locks or source read policy.
 
 ## Acceptance records
 

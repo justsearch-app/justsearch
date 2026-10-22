@@ -3,6 +3,8 @@ package io.justsearch.indexerworker.loop;
 
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -126,7 +128,9 @@ final class BatchServiceFailures {
   }
 
   private static boolean provenOutage(Throwable failure) {
-    if (failure instanceof IndexWriterUnavailableException) return true;
+    if (failure instanceof EngineExecutorRejectedException) return true;
+    if (failure instanceof IndexWriterUnavailableException
+        || failure instanceof IngestionServiceUnavailableException) return true;
     // Untagged DISK_IO can concern a document; the Lucene boundary tags index-owned IO.
     if (failure instanceof IndexRuntimeIOException indexError) {
       if (indexError.isIndexStorageFailure()) return true;

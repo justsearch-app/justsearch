@@ -125,6 +125,8 @@ public final class CommitOps {
             session.commitCount.increment(trackedReason);
           }
           return new CommitResult(elapsedMs, pendingAtCommit);
+        } catch (org.apache.lucene.store.AlreadyClosedException closed) {
+          throw new IndexWriterUnavailableException("Index storage closed during commit", closed);
         } catch (IOException e) {
           throw IndexRuntimeIOException.fromIndexOperation(e, "Commit failed", session);
         }
@@ -164,7 +166,7 @@ public final class CommitOps {
   private void refreshAdmissionReader() throws IOException {
     if (admissionManager == null) {
       var snapshot = session.snapshot;
-      if (snapshot == null) throw new IllegalStateException("Runtime closed during admission publication");
+      if (snapshot == null) throw new IndexWriterUnavailableException("Runtime closed during admission publication");
       var reader = new SoftDeletesDirectoryReaderWrapper(
           DirectoryReader.open(snapshot.writer(), true, true), session.softDeleteField);
       try {

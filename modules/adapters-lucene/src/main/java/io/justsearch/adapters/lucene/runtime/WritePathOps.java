@@ -106,6 +106,14 @@ public final class WritePathOps {
       } else {
         w.updateDocument(new Term(idField, idValue), luceneDoc);
       }
+    } catch (org.apache.lucene.store.AlreadyClosedException closed) {
+      LifecycleSnapshot current = session.snapshot;
+      if (current == null || current.writer() == null || !current.writer().isOpen()
+          || java.util.Arrays.stream(closed.getStackTrace()).anyMatch(frame ->
+              frame.getClassName().startsWith("org.apache.lucene.store."))) {
+        throw new IndexWriterUnavailableException("Index storage closed during write", closed);
+      }
+      throw closed;
     } catch (IOException e) {
       throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to add document", session);
     }
@@ -137,6 +145,14 @@ public final class WritePathOps {
             work.doc(),
             new NumericDocValuesField(session.softDeleteField, 1));
       }
+    } catch (org.apache.lucene.store.AlreadyClosedException closed) {
+      LifecycleSnapshot current = session.snapshot;
+      if (current == null || current.writer() == null || !current.writer().isOpen()
+          || java.util.Arrays.stream(closed.getStackTrace()).anyMatch(frame ->
+              frame.getClassName().startsWith("org.apache.lucene.store."))) {
+        throw new IndexWriterUnavailableException("Index storage closed during write", closed);
+      }
+      throw closed;
     } catch (IOException e) {
       throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to apply batch", session);
     }
@@ -975,12 +991,12 @@ public final class WritePathOps {
     // construction has an open writer. Snapshot null means the runtime was closed.
     // Also reject writes during drain with IllegalStateException.
     if (session.draining) {
-      throw new IllegalStateException(
-          "Runtime is draining; retry on the new instance via the supplier holder");
+      throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DRAINING,
+          "Runtime is draining", null);
     }
     LifecycleSnapshot snap = session.snapshot;
     if (snap == null || snap.writer() == null) {
-      throw new IllegalStateException("Index is not writable (writer unavailable)");
+      throw new IndexWriterUnavailableException("Index is not writable (writer unavailable)");
     }
   }
 

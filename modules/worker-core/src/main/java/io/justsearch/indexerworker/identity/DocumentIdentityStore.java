@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.identity;
 
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -18,8 +19,9 @@ public interface DocumentIdentityStore {
    * Production indexing must never mint identity from a second authority.
    */
   DocumentIdentityStore UNAVAILABLE = new DocumentIdentityStore() {
-    private IllegalStateException unavailable() {
-      return new IllegalStateException("Document identity store is unavailable");
+    private IngestionServiceUnavailableException unavailable() {
+      return new IngestionServiceUnavailableException(
+          "Document identity store is unavailable");
     }
 
     @Override

@@ -5,6 +5,7 @@ import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -61,6 +62,8 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
   private final ExtractionSandbox sandbox;
   private final Duration timeout;
   private final AtomicReference<ExecutorService> executor = new AtomicReference<>();
+  // Guarded by executor, together with accepting submissions during close.
+  private boolean closed;
   private final AtomicLong executorGeneration = new AtomicLong();
 
   // Observability counters
@@ -195,12 +198,26 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
             taskReturned.set(true);
           }
         };
-    ExecutorService current = executor.get();
-    Future<ExtractionArtifact> future = current.submit(task);
+    ExecutorService current;
+    Future<ExtractionArtifact> future;
+    synchronized (executor) {
+      if (closed) {
+        throw new IngestionServiceUnavailableException(
+            "Extraction service is closed");
+      }
+      current = executor.get();
+      try { future = current.submit(task); }
+      catch (EngineExecutorRejectedException rejected) { throw rejected; }
+      catch (java.util.concurrent.RejectedExecutionException rejected) {
+        throw new IngestionServiceUnavailableException(
+            "Extraction service cannot accept work", rejected);
+      }
+    }
 
     try {
       return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
+      ensureOpen();
       // Best-effort cancellation
       future.cancel(true);
       replaceIfWedged(current, taskReturned);
@@ -210,10 +227,14 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       future.cancel(true);
+      ensureOpen();
       throw new ExtractionException("Extraction interrupted for: " + file.getFileName(), e);
     } catch (ExecutionException e) {
+      ensureOpen();
       Throwable cause = e.getCause();
-      if (cause instanceof IOException ioe) {
+      if (cause instanceof IngestionServiceUnavailableException unavailable) {
+        throw unavailable;
+      } else if (cause instanceof IOException ioe) {
         throw ioe;
       } else if (cause instanceof ExtractionException ee) {
         throw ee;
@@ -221,6 +242,7 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
         throw new ExtractionException("Extraction failed for: " + file.getFileName(), cause);
       }
     } catch (CancellationException e) {
+      ensureOpen();
       throw new ExtractionException("Extraction was cancelled for: " + file.getFileName(), e);
     }
   }
@@ -296,6 +318,15 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
     }
   }
 
+  private void ensureOpen() {
+    synchronized (executor) {
+      if (closed) {
+        throw new IngestionServiceUnavailableException(
+            "Extraction service is closed");
+      }
+    }
+  }
+
   private void recordTimeout(Path file) {
     long count = timeoutCount.incrementAndGet();
     if (catalog != null) {
@@ -314,7 +345,11 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
 
   @Override
   public void close() {
-    ExecutorService current = executor.get();
+    ExecutorService current;
+    synchronized (executor) {
+      closed = true;
+      current = executor.get();
+    }
     shutdownAndCancelQueued(current);
     try {
       if (!current.awaitTermination(5, TimeUnit.SECONDS)) {

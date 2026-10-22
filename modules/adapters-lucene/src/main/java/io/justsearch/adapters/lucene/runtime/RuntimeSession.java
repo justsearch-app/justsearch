@@ -744,8 +744,7 @@ final class RuntimeSession implements AutoCloseable {
           nrtHardMaxStaleMs,
           chunkCompleteness);
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to open Lucene components", e);
+      throw IndexRuntimeIOException.fromIndexOpen(e, "Failed to open Lucene components");
     }
   }
 

@@ -65,6 +65,11 @@ public final class IndexRuntimeIOException extends RuntimeException {
     return fromIndexOperation(cause, message, directory);
   }
 
+  /** Opening components consumes no documents: any IO there belongs to the shared index. */
+  static IndexRuntimeIOException fromIndexOpen(IOException cause, String message) {
+    return new IndexRuntimeIOException(LuceneRuntimeUtils.classifyIOException(cause), message, cause, true);
+  }
+
   public boolean isIndexStorageFailure() {
     return indexStorageFailure;
   }

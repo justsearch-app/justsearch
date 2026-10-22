@@ -58,18 +58,31 @@ public final class IndexingCoordinator {
   /**
    * Tempdoc 406 observability — acquires the writeBarrier readLock and emits the
    * blocked-time as an {@code onWriteBarrierContention} event when telemetry is
-   * wired. Negligible overhead when telemetry is null (one volatile read +
-   * branch); two {@code System.nanoTime()} calls when wired.
+   * wired. Closing/open state is checked under the session monitor after acquiring the barrier;
+   * timing is collected only when telemetry is wired.
    */
   private void acquireReadLockTimed() {
     LuceneRuntimeTypes.TelemetryEvents events = session.telemetryEvents;
-    if (events == null) {
-      session.writeBarrier.readLock().lock();
-      return;
-    }
-    long start = System.nanoTime();
+    long start = events == null ? 0L : System.nanoTime();
     session.writeBarrier.readLock().lock();
-    events.onWriteBarrierContention(System.nanoTime() - start);
+    try {
+      synchronized (session) {
+        if (session.draining) {
+          throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DRAINING,
+              "runtime_draining", null);
+        }
+        LifecycleSnapshot snapshot = session.snapshot;
+        if (session.isClosing() || snapshot == null || snapshot.writer() == null
+            || !snapshot.writer().isOpen()) {
+          throw new IndexWriterUnavailableException(
+              "IndexWriter not available (runtime not started or closed)");
+        }
+      }
+      if (events != null) events.onWriteBarrierContention(System.nanoTime() - start);
+    } catch (RuntimeException | Error failure) {
+      releaseWriteBarrierAndReport();
+      throw failure;
+    }
   }
 
   // ==========================================================================

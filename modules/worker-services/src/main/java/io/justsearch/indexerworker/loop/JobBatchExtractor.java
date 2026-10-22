@@ -3,10 +3,12 @@ package io.justsearch.indexerworker.loop;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.indexerworker.extract.ContentExtractor;
 import io.justsearch.indexerworker.extract.ContentExtractor.BudgetExceededException;
 import io.justsearch.indexerworker.extract.ExtractionArtifact;
 import io.justsearch.indexerworker.extract.SandboxExtractionException;
+import io.justsearch.indexerworker.extract.SandboxServiceUnavailableException;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor.ExtractionTimeoutException;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
@@ -15,6 +17,7 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.indexerworker.loop.ops.BatchStats;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
@@ -81,6 +84,7 @@ public final class JobBatchExtractor {
 
   private boolean indexEmptyForBatch;
   private final BatchServiceFailures identityFailures = new BatchServiceFailures();
+  private final BatchServiceFailures extractionFailures = new BatchServiceFailures();
 
   public JobBatchExtractor(
       WorkerIngestionAuthority ingestionAuthority,
@@ -132,13 +136,15 @@ public final class JobBatchExtractor {
     try {
       return extractForBatch(jobs);
     } finally {
-      identityFailures.finish();
+      long delay = prepareRetry();
+      finishBatch(System.currentTimeMillis() + delay);
     }
   }
 
   /** The running loop completes both services together after the write phase. */
   List<ExtractedJob> extractForBatch(List<JobQueue.IndexJob> jobs) {
     identityFailures.begin();
+    extractionFailures.begin();
     indexEmptyForBatch = indexKnownEmpty();
     List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
     for (JobQueue.IndexJob job : jobs) {
@@ -152,19 +158,20 @@ public final class JobBatchExtractor {
   }
 
   long prepareRetry() {
-    return identityFailures.prepareRetry();
+    return Math.max(identityFailures.prepareRetry(), extractionFailures.prepareRetry());
   }
 
   void finishBatch(long retryAtMs) {
     identityFailures.finish(retryAtMs);
+    extractionFailures.finish(retryAtMs);
   }
 
   long retryDelayMs() {
-    return identityFailures.retryDelayMs();
+    return Math.max(identityFailures.retryDelayMs(), extractionFailures.retryDelayMs());
   }
 
   boolean deferredBatch() {
-    return identityFailures.deferredBatch();
+    return identityFailures.deferredBatch() || extractionFailures.deferredBatch();
   }
 
   /**
@@ -235,13 +242,13 @@ public final class JobBatchExtractor {
         return null;
       }
       envelope = admission.envelope();
-      // Tempdoc 419 / T5.2 (ADR-0028): record (pathHash, normalizedPath) into the scoped
-      // reverse-lookup store so the activity panel can later answer "which file is this hash?".
-      pathResolutionStoreSupplier.get().record(
-          envelope.pathHash(), envelope.normalizedPath(), envelope.observedAtMs());
       String docUid;
       DocumentIdentityStore identityStore = null;
       try {
+        // Tempdoc 419 / T5.2 (ADR-0028): record (pathHash, normalizedPath) into the scoped
+        // reverse-lookup store so the activity panel can later answer "which file is this hash?".
+        pathResolutionStoreSupplier.get().record(
+            envelope.pathHash(), envelope.normalizedPath(), envelope.observedAtMs());
         identityStore = documentIdentityStoreSupplier.get();
         docUid = identityStore.resolve(envelope.pathHash(), envelope.observedAtMs()).docUid();
         identityFailures.success();
@@ -307,6 +314,7 @@ public final class JobBatchExtractor {
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
+        extractionFailures.success();
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
         artifact = rawArtifact.validate(contentExtractor.extractionPolicy(), sourcePathHash);
       } finally {
@@ -359,6 +367,19 @@ public final class JobBatchExtractor {
       return new ExtractedJob(
           claim, artifact, startTime, envelope, sourceSha256, docUid);
 
+    } catch (IngestionServiceUnavailableException
+        | EngineExecutorRejectedException
+        | SandboxServiceUnavailableException unavailable) {
+      FileEnvelope admittedEnvelope = envelope;
+      extractionFailures.unavailable(unavailable, systemic -> journal.recordOutcomeSafely(
+          filePath, "WRITE_FAILED(shared_service)", () -> jobQueue.deferClaim(claim,
+              journal.outcome(IngestionOutcomeClass.WRITE_FAILED, IngestionReasonCodes.WRITE_FAILED,
+                  IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, failureDetail(unavailable)),
+              ledgerEntry(filePath, admittedEnvelope, collection, null, provenance),
+              extractionFailures.retryAtMs())));
+      journal.recordFailedMetric(filePath, null);
+      batchStats.recordFailed();
+      return null;
     } catch (BudgetExceededException e) {
       log.warn("Extraction budget exceeded for: {} - {}", filePath, e.getMessage());
       FileEnvelope envelopeForLedger = envelope;

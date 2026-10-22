@@ -6,4 +6,7 @@ public final class IndexWriterUnavailableException extends IllegalStateException
   public IndexWriterUnavailableException(String message) {
     super(message);
   }
+  public IndexWriterUnavailableException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

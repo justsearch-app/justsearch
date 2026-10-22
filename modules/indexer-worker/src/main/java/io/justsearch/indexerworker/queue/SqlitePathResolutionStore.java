@@ -58,6 +58,7 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
   private final Path dbPath;
   private final ReentrantLock lock = new ReentrantLock();
   private Connection connection;
+  private boolean closed;
 
   public SqlitePathResolutionStore(Path dbPath) {
     this.dbPath = Objects.requireNonNull(dbPath, "dbPath");
@@ -74,7 +75,7 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
       }
       this.connection = conn;
     } catch (SQLException e) {
-      throw new IllegalStateException("Failed to open PathResolutionStore at " + dbPath, e);
+      throw SqliteServiceAvailability.failure("Failed to open PathResolutionStore at " + dbPath, e);
     }
   }
 
@@ -98,13 +99,16 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
             last_seen_at = excluded.last_seen_at,
             removed_at = NULL
           """;
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      try (PreparedStatement stmt = openConnection().prepareStatement(sql)) {
         stmt.setString(1, pathHash);
         stmt.setString(2, normalizedPath);
         stmt.setLong(3, nowMs);
         stmt.executeUpdate();
       }
     } catch (SQLException e) {
+      if (SqliteServiceAvailability.unavailable(e)) {
+        throw SqliteServiceAvailability.failure("Path resolution service unavailable", e);
+      }
       log.warn("PathResolutionStore.record failed for hash {}: {}", pathHash, e.getMessage());
     } finally {
       lock.unlock();
@@ -123,12 +127,15 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
     try {
       String sql =
           "UPDATE path_resolution SET removed_at = ? WHERE path_hash = ? AND removed_at IS NULL";
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      try (PreparedStatement stmt = openConnection().prepareStatement(sql)) {
         stmt.setLong(1, nowMs);
         stmt.setString(2, pathHash);
         stmt.executeUpdate();
       }
     } catch (SQLException e) {
+      if (SqliteServiceAvailability.unavailable(e)) {
+        throw SqliteServiceAvailability.failure("Path resolution service unavailable", e);
+      }
       log.warn(
           "PathResolutionStore.markRemoved failed for hash {}: {}", pathHash, e.getMessage());
     } finally {
@@ -149,7 +156,7 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
       String sql =
           "SELECT path_hash, normalized_path, last_seen_at, removed_at"
               + " FROM path_resolution WHERE path_hash = ?";
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      try (PreparedStatement stmt = openConnection().prepareStatement(sql)) {
         stmt.setString(1, pathHash);
         try (ResultSet rs = stmt.executeQuery()) {
           if (!rs.next()) {
@@ -166,6 +173,9 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
         }
       }
     } catch (SQLException e) {
+      if (SqliteServiceAvailability.unavailable(e)) {
+        throw SqliteServiceAvailability.failure("Path resolution service unavailable", e);
+      }
       log.warn("PathResolutionStore.lookup failed for hash {}: {}", pathHash, e.getMessage());
       return Optional.empty();
     } finally {
@@ -187,11 +197,14 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
     lock.lock();
     try {
       String sql = "DELETE FROM path_resolution WHERE normalized_path LIKE ?";
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      try (PreparedStatement stmt = openConnection().prepareStatement(sql)) {
         stmt.setString(1, prefix + "%");
         return stmt.executeUpdate();
       }
     } catch (SQLException e) {
+      if (SqliteServiceAvailability.unavailable(e)) {
+        throw SqliteServiceAvailability.failure("Path resolution service unavailable", e);
+      }
       log.warn(
           "PathResolutionStore.pruneByRootPrefix failed for prefix {}: {}",
           rootPrefix,
@@ -215,11 +228,14 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
     lock.lock();
     try {
       String sql = "DELETE FROM path_resolution WHERE removed_at IS NOT NULL AND removed_at < ?";
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      try (PreparedStatement stmt = openConnection().prepareStatement(sql)) {
         stmt.setLong(1, cutoffMs);
         return stmt.executeUpdate();
       }
     } catch (SQLException e) {
+      if (SqliteServiceAvailability.unavailable(e)) {
+        throw SqliteServiceAvailability.failure("Path resolution service unavailable", e);
+      }
       log.warn("PathResolutionStore.pruneOldRemoved failed: {}", e.getMessage());
       return 0;
     } finally {
@@ -227,10 +243,15 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
     }
   }
 
+  private Connection openConnection() throws SQLException {
+    return SqliteServiceAvailability.requireOpen(connection, closed);
+  }
+
   @Override
   public void close() throws IOException {
     lock.lock();
     try {
+      closed = true;
       if (connection != null) {
         connection.close();
         connection = null;
