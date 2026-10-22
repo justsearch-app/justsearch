@@ -773,3 +773,14 @@ Fourth-verifier repair entries appended by builder session z9p1afsx on 2026-10-2
   "note": "Reviewed sources and prior-state expectations; fresh run-evidence passes candidate checks and reproduces assertion fail-before for every repaired check id. Product verification fails separately on old-window connection loss and focused-toast displacement."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "mc8fa9g6",
+  "verdict": "accept",
+  "digest": "sha256:ea4c75f13a1f21099e0bd943c92d5ac28149b0eed55b202d0a2c6c1f296a947b",
+  "note": "Test intent only: reviewed prior-state tests, scenarios and delegated decisions, then diffs. Fresh scratch evidence passes all named checks with assertion fail-before for repaired check ids. Product verification fails separately on focus movement within a retained toast and stopped Structured output. The broad UI Java run also encountered missing esbuild. This is not product sign-off."
+}
+```
