@@ -49,7 +49,7 @@ class ArchiveInstallWindowsPreservationTest {
     Files.createDirectories(runtime());
     Path archive = runtime().resolve("pack.zip");
     Files.write(archive, ArchiveInstallRepairTest.zip(Map.of("library.dll", "payload")));
-    AiInstallService.extractZipInPlace(archive, runtime());
+    ArchiveInstallRepairTest.extract(archive, runtime());
     assertEquals("payload", Files.readString(root.resolve("real-home/models/cuda12/library.dll")));
   }
 
@@ -78,7 +78,7 @@ class ArchiveInstallWindowsPreservationTest {
       var registry = new ModelRegistry(2, "archive repair", List.of(
           new ModelPackage("runtime", "Runtime", "test", "cuda12", List.of(), List.of(archive), 0, null)));
       Files.write(runtime().resolve("pack.zip"), bytes);
-      AiInstallService.extractZipInPlace(runtime().resolve("pack.zip"), runtime());
+      ArchiveInstallRepairTest.extract(runtime().resolve("pack.zip"), runtime());
       assertEquals("payload", Files.readString(real.resolve("library.dll")));
       var installed = InstallPlanner.plan(registry, HardwareProfile.cpuOnly(), home.resolve("models"));
       assertTrue(installed.downloads().isEmpty(), "a healthy install must not become incomplete");

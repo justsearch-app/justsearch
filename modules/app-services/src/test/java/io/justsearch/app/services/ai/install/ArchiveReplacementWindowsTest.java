@@ -28,7 +28,7 @@ class ArchiveReplacementWindowsTest {
     Files.writeString(target, "old-bytes");
     try (FileChannel held = FileChannel.open(target, StandardOpenOption.READ)) {
       try {
-        AiInstallService.extractZipInPlace(archive, root);
+        ArchiveInstallRepairTest.extract(archive, root);
         assertEquals("new-bytes", Files.readString(target));
         assertTrue(Files.isRegularFile(root.resolve(".archive-receipts/pack.zip.json")));
         var oldBytes = java.nio.ByteBuffer.allocate(9);
@@ -41,7 +41,7 @@ class ArchiveReplacementWindowsTest {
       }
       assertTrue(held.isOpen());
     }
-    AiInstallService.extractZipInPlace(archive, root);
+    ArchiveInstallRepairTest.extract(archive, root);
     assertEquals("new-bytes", Files.readString(target));
   }
 
@@ -62,7 +62,7 @@ class ArchiveReplacementWindowsTest {
     }
     assertEquals(0, maker.exitValue(), new String(maker.getInputStream().readAllBytes()));
     try {
-      assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(archive, target));
+      assertThrows(IOException.class, () -> ArchiveInstallRepairTest.extract(archive, target));
       assertEquals("old-bytes", Files.readString(outside.resolve("library.dll")));
     } finally {
       Files.deleteIfExists(junction);

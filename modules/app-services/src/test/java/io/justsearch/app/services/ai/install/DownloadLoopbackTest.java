@@ -116,7 +116,7 @@ class DownloadLoopbackTest {
   private void placeVerified() throws Exception {
     assertFalse(Files.exists(root.resolve("model.onnx")), "target is absent until verified placement");
     assertNull(new PlacementStage(root).place(new InstallPlan.PlannedDownload(
-        "embedding", url, "model.onnx", sha, bytes.length, false, false)));
+        "embedding", url, "model.onnx", sha, bytes.length, false, false), false));
     assertArrayEquals(bytes, Files.readAllBytes(root.resolve("model.onnx")));
     assertFalse(Files.exists(partial));
     assertFalse(Files.exists(DownloadResume.sidecarFor(partial)));

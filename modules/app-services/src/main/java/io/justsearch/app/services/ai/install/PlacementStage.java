@@ -45,12 +45,6 @@ final class PlacementStage {
    * @return the user-facing failure message, or {@code null} when the item is in place. Failures are
    *     returned rather than thrown because one file failing must not end the set — the caller marks
    *     the package failed and moves to the next item.
-   */
-  String place(InstallPlan.PlannedDownload dl) {
-    return place(dl, false);
-  }
-
-  /**
    * @param keptArchiveVerified the acquisition stage hashed the kept archive at the target in this
    *     run; it is applied without hashing it again
    */

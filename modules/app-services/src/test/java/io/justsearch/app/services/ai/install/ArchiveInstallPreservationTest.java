@@ -116,8 +116,8 @@ class ArchiveInstallPreservationTest {
     assertTrue(InstallCompleteness.compute(installed, null).installedFully());
     FileTime old = FileTime.fromMillis(1000);
     Files.setLastModifiedTime(runtime().resolve("library.dll"), old);
-    AiInstallService.extractZipInPlace(kept("healthy.zip"), runtime());
-    AiInstallService.extractZipInPlace(kept("healthy.zip"), runtime());
+    ArchiveInstallRepairTest.extract(kept("healthy.zip"), runtime());
+    ArchiveInstallRepairTest.extract(kept("healthy.zip"), runtime());
     assertEquals(old, Files.getLastModifiedTime(runtime().resolve("library.dll")));
     assertEquals(0, transfers.get());
   }
@@ -129,8 +129,8 @@ class ArchiveInstallPreservationTest {
     for (String name : List.of("library.dll.partial", "library.dll.archive-old-user-owned")) {
       Files.writeString(runtime().resolve(name), "user-owned");
     }
-    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
-    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    ArchiveInstallRepairTest.extract(kept("pack.zip"), runtime());
+    ArchiveInstallRepairTest.extract(kept("pack.zip"), runtime());
     for (String name : List.of("library.dll.partial", "library.dll.archive-old-user-owned")) {
       assertEquals("user-owned", Files.readString(runtime().resolve(name)), name);
     }
@@ -140,7 +140,7 @@ class ArchiveInstallPreservationTest {
   void traversalAndAbsolutePathsAreRejected(String entry) throws Exception {
     var archive = source("hostile.zip", Map.of(entry, "bad"));
     keep(archive);
-    assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("hostile.zip"), runtime()));
+    assertThrows(IOException.class, () -> ArchiveInstallRepairTest.extract(kept("hostile.zip"), runtime()));
     assertFalse(Files.exists(models().resolve("outside.dll")));
   }
 
@@ -157,7 +157,7 @@ class ArchiveInstallPreservationTest {
       case "parent" -> { Files.delete(runtime().resolve("nested")); Files.createSymbolicLink(runtime().resolve("nested"), outside); }
       case "output" -> Files.createSymbolicLink(runtime().resolve("nested/library.dll"), outside.resolve("library.dll"));
     }
-    assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("links.zip"), runtime()));
+    assertThrows(IOException.class, () -> ArchiveInstallRepairTest.extract(kept("links.zip"), runtime()));
     assertEquals("old", Files.readString(outside.resolve("library.dll")));
   }
 

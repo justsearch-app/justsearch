@@ -57,6 +57,17 @@ class ArchiveInstallRepairTest {
     return bytes.toByteArray();
   }
 
+  /** Applies a kept archive as the only one its folder lists, after hashing it. */
+  static void extract(Path archive, Path target) throws IOException {
+    String sha;
+    try {
+      sha = DownloadExecutor.sha256(archive);
+    } catch (Exception failure) {
+      throw new IOException("Cannot hash archive", failure);
+    }
+    ArchiveExtractor.apply(archive, target, sha, null);
+  }
+
   SupportingFile source(String name, Map<String, String> entries) throws Exception {
     byte[] bytes = zip(entries);
     sources.put("https://example.invalid/" + name, bytes);
@@ -225,14 +236,14 @@ class ArchiveInstallRepairTest {
     // Interrupt the real atomic publisher immediately before its rename. Its temp must disappear.
     // Apply works on the destination's real path, which may spell the temp folder differently.
     Path receiptTarget = Path.of("cuda12", ".archive-receipts", "receipt.zip.json");
-    try (var files = mockStatic(Files.class, invocation -> {
+    try (var _ = mockStatic(Files.class, invocation -> {
       if (invocation.getMethod().getName().equals("move")
           && invocation.getArgument(1) instanceof Path to && to.endsWith(receiptTarget)) {
         throw new java.io.InterruptedIOException("interrupted receipt publication");
       }
       return invocation.callRealMethod();
     })) {
-      assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("receipt.zip"), runtime()));
+      assertThrows(IOException.class, () -> extract(kept("receipt.zip"), runtime()));
     }
     assertFalse(Files.exists(receipt("receipt.zip")));
     assertEquals(1, plan(registry(archive)).downloads().size(), "all output sizes alone cannot hide interrupted receipt");
@@ -245,7 +256,7 @@ class ArchiveInstallRepairTest {
     var archive = source("diskfull.zip", Map.of("library.dll", "expected"));
     var initial = plan(registry(archive));
     Path staging = runtime().resolve(".archive-staging");
-    try (var files = mockStatic(Files.class, invocation -> {
+    try (var _ = mockStatic(Files.class, invocation -> {
       if (invocation.getMethod().getName().equals("newOutputStream")
           && invocation.getArgument(0) instanceof Path to && to.getParent().endsWith(Path.of("cuda12", ".archive-staging"))) {
         return new java.io.FilterOutputStream((OutputStream) invocation.callRealMethod()) {
@@ -295,7 +306,7 @@ class ArchiveInstallRepairTest {
     assertEquals(5, transfers.get());
     for (int repeat = 0; repeat < 3; repeat++) {
       assertTrue(plan(registry).downloads().isEmpty());
-      for (var archive : archives) AiInstallService.extractZipInPlace(kept(archive.filename()), runtime());
+      for (var archive : archives) extract(kept(archive.filename()), runtime());
     }
     assertEquals("keep", Files.readString(runtime().resolve("shell-only.txt")));
   }
@@ -314,7 +325,7 @@ class ArchiveInstallRepairTest {
     Files.delete(blocked);
     Files.createDirectory(blocked);
     var observedMidApply = new java.util.concurrent.atomic.AtomicBoolean();
-    try (var files = mockStatic(Files.class, invocation -> {
+    try (var _ = mockStatic(Files.class, invocation -> {
       if (invocation.getMethod().getName().equals("newOutputStream")
           && invocation.getArgument(0) instanceof Path to && to.getParent().endsWith(".archive-staging")) {
         assertFalse(Files.exists(runtime().resolve("ort-native-version.txt")), "ORT must see no marker during payload writes");
@@ -381,7 +392,7 @@ class ArchiveInstallRepairTest {
   void traversalAndAbsolutePathsAreRejected(String entry) throws Exception {
     var archive = source("hostile.zip", Map.of(entry, "bad"));
     keep(archive);
-    assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("hostile.zip"), runtime()));
+    assertThrows(IOException.class, () -> extract(kept("hostile.zip"), runtime()));
     assertFalse(Files.exists(models().resolve("outside.dll")));
   }
 
@@ -461,7 +472,7 @@ class ArchiveInstallRepairTest {
     assertEquals(1, install.downloads().size());
     assertEquals(0, install.remainingBytes());
     var zipReads = new AtomicInteger();
-    try (var files = mockStatic(Files.class, invocation -> {
+    try (var _ = mockStatic(Files.class, invocation -> {
       if (invocation.getMethod().getName().equals("newInputStream")
           && invocation.getArgument(0) instanceof Path read && read.endsWith("legacy.zip")) {
         zipReads.incrementAndGet();
@@ -490,7 +501,7 @@ class ArchiveInstallRepairTest {
       assertFalse(Files.exists(receipt("second.zip")));
     }
     var failure = assertThrows(IOException.class,
-        () -> AiInstallService.extractZipInPlace(kept("second.zip"), runtime()));
+        () -> extract(kept("second.zip"), runtime()));
     assertTrue(failure.getMessage().contains("first.zip") && failure.getMessage().contains("second.zip"),
         failure.getMessage());
     assertFalse(Files.exists(runtime().resolve("second.dll")), "the refused archive writes nothing");
@@ -549,7 +560,7 @@ class ArchiveInstallRepairTest {
     Files.createDirectories(runtime().resolve("nested"));
     Files.writeString(runtime().resolve("nested/library.dll"), "old output");
     Files.createSymbolicLink(runtime().resolve(folder), outside);
-    assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("links.zip"), runtime()));
+    assertThrows(IOException.class, () -> extract(kept("links.zip"), runtime()));
     assertEquals("old", Files.readString(outside.resolve("library.dll")));
     try (var files = Files.list(outside)) { assertEquals(1, files.count(), "nothing written or removed outside"); }
   }
@@ -562,7 +573,7 @@ class ArchiveInstallRepairTest {
     Files.writeString(runtime().resolve(".archive-staging/0d6f1c4e-interrupted"), "half");
     Files.createDirectories(runtime().resolve(".archive-old"));
     Files.writeString(runtime().resolve(".archive-old/5b2a9e70-interrupted"), "old dll");
-    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    extract(kept("pack.zip"), runtime());
     assertFalse(Files.exists(runtime().resolve(".archive-staging")), "stale staged file cleaned");
     assertFalse(Files.exists(runtime().resolve(".archive-old")), "stale moved-aside file cleaned");
     assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
@@ -573,7 +584,7 @@ class ArchiveInstallRepairTest {
     keep(archive);
     Path unlisted = runtime().resolve("library.dll.partial");
     Files.writeString(unlisted, "user-owned");
-    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    extract(kept("pack.zip"), runtime());
     assertTrue(Files.exists(unlisted), "a file no archive lists was deleted");
     assertEquals("user-owned", Files.readString(unlisted));
     assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
@@ -587,14 +598,14 @@ class ArchiveInstallRepairTest {
     Files.writeString(target, "old-bytes");
     var moves = new java.util.ArrayList<Path>();
     try (var held = Files.newInputStream(target);
-        var files = mockStatic(Files.class, invocation -> {
+        var _ = mockStatic(Files.class, invocation -> {
           if (invocation.getMethod().getName().equals("move") && invocation.getArgument(0) instanceof Path from
               && from.endsWith(Path.of("cuda12", "library.dll"))) {
             moves.add(invocation.getArgument(1));
           }
           return invocation.callRealMethod();
         })) {
-      AiInstallService.extractZipInPlace(kept("held.zip"), runtime());
+      extract(kept("held.zip"), runtime());
       assertEquals("new-bytes-longer", Files.readString(target));
       assertEquals("old-bytes", new String(held.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8),
           "the old file is moved aside, never truncated or rewritten in place");

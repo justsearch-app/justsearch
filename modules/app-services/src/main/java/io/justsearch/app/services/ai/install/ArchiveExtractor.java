@@ -21,20 +21,6 @@ import java.util.zip.ZipFile;
 final class ArchiveExtractor {
   private ArchiveExtractor() {}
 
-  static void apply(Path archive, Path target) throws IOException {
-    if (archive == null || !Files.isRegularFile(archive, LinkOption.NOFOLLOW_LINKS)) {
-      throw new IOException("Archive not found: " + archive);
-    }
-    ArchiveExtractionState.requireSafeFile(archive);
-    String sha;
-    try {
-      sha = DownloadExecutor.sha256(archive);
-    } catch (Exception failure) {
-      throw new IOException("Cannot hash archive", failure);
-    }
-    apply(archive, target, sha, null);
-  }
-
   /**
    * @param listedArchives file name and SHA-256 of each archive the current registry extracts into
    *     this destination; receipts of others are retired. Null keeps every receipt in the overlap

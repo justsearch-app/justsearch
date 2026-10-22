@@ -1084,7 +1084,8 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadExecutor.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadResume.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/RuntimeRestoreUtil.java",
-        "modules/core/src/main/java/io/justsearch/core/util/Sha256SidecarCache.java"
+        "modules/core/src/main/java/io/justsearch/core/util/Sha256SidecarCache.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ArchiveExtractor.java"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/AiPackImportServiceTest.java"
@@ -1163,6 +1164,44 @@
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/AiPackImportServiceTest.java"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "ai-archive-extraction-receipts",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "Only the folder and file names are literals (ArchiveExtractionState.DIRECTORY \".archive-receipts\", STAGING \".archive-staging\", OLD \".archive-old\", hiddenMarkerPath's \"ort-native-version.txt\"). Each is resolved against the directory holding the kept ZIP, which is also its extraction destination: PlacementStage passes targetFile.getParent(), and InstallPlanner composes that directory from the registry pack's installRoot + targetDir (model-registry.v2.json: native-bin/llama-server/variants + cuda12, today the only pack with extract archives). receiptPath appends <archive file name>.json and pendingPath .pending to it.",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Per kept archive: the registry SHA-256 it was applied from and the ZIP's central-directory entry names, sizes and CRC-32s; an empty pending marker; a set-aside copy of ORT's ort-native-version.txt from the same ZIP. App-distributed runtime metadata identical on every install; no user content and no user-chosen path.",
+      "owner": "HEAD",
+      "root": "AI_HOME",
+      "ownedPaths": [
+        "native-bin/llama-server/variants/*/.archive-receipts/*.json",
+        "native-bin/llama-server/variants/*/.archive-receipts/*.json.pending",
+        "native-bin/llama-server/variants/*/.archive-receipts/ort-native-version.txt",
+        "native-bin/llama-server/variants/*/.archive-staging/**",
+        "native-bin/llama-server/variants/*/.archive-old/**"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "JSON receipt {sha256, entries: [{name, size, crc}]} per kept archive with no version envelope; a one-byte <receipt>.pending marker while an apply is unfinished; the ORT version marker set aside byte for byte",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "CLASSIFY_UNCLEAN_AND_REGENERATE",
+      "corruptionNote": "A receipt only records that an apply finished; the registry SHA-256 and the outputs are the truth. A missing, unparseable or pending receipt, or one whose SHA-256 or entry list differs from the registry and the kept ZIP, makes the archive not applied (ArchiveExtractionState.hasReceipt and isApplied answer false; requireNoOverlap lets an unreadable receipt claim nothing), so the next install run re-applies it from the kept ZIP - content-aware, rewriting only entries whose size or CRC differ - and atomically writes a fresh receipt (AtomicFileWrites.replaceStrict). Even a matching receipt counts only while every output exists at its entry's size. Status alone keeps a healthy install from before receipts installed; an install run hashes its ZIP once and records the receipt. A receipt of an archive the registry no longer lists in that folder is deleted; its outputs stay. The set-aside ORT marker is an entry of that ZIP, rewritten by the next apply if lost. Tested: missing, interrupted (pending), changed-SHA and output-contradicted receipts, retirement and the marker; the unparseable-receipt branch takes the same catch-and-answer-false path and has no dedicated case.",
+      "reconciliation": "REAPPLY_KEPT_ARCHIVE_WHEN_RECEIPT_IS_MISSING_STALE_OR_UNREADABLE",
+      "scratchNote": ".archive-staging and .archive-old are the extractor's scratch inside each destination, on the destination's volume so a rename is atomic and Windows can move a loaded DLL aside: a ZIP entry is staged under a random name, CRC-checked and renamed over its output; the output it replaces is renamed into .archive-old first. Both folders are emptied, best effort, at the start and end of every apply; a file still held open waits for the next one. Nothing reads either folder, so losing their contents costs nothing. They are listed here rather than in nonDurableWriteSites because that classification is per source file and ArchiveExtractor also writes the receipts and the managed runtime files.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/configuration/src/main/java/io/justsearch/configuration/model/ArchiveExtractionState.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ArchiveExtractor.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
+      ],
+      "tests": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ArchiveInstallRepairTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ArchiveInstallPreservationTest.java"
       ],
       "fixtures": []
     },
