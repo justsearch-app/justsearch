@@ -43,6 +43,8 @@ final class StatusIndexingPauseTest {
     Object paused = method.invoke(assembler, null, worker, 1L, Instant.now());
     assertEquals("PAUSED", call(paused, "state").toString(), "an empty queue still reports user pause");
     when(core.pendingJobs()).thenReturn(1L);
+    // IndexStatusOps classifies ready queued work as INDEXING even when processing is held.
+    when(core.indexState()).thenReturn("INDEXING");
     Object waiting = method.invoke(assembler, null, worker, 1L, Instant.now());
     assertEquals(true, call(waiting, "waitingForResume"));
     call(hold, "resume");

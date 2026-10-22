@@ -240,6 +240,34 @@ final class EngineRuntimeReloadTest {
   }
 
   @Test
+  void reloadArrivingInTheServicePublicationGapWaitsForItsPredecessor() throws Exception {
+    try (var f = new Fixture(5_000)) {
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      f.publicationBarrier = () -> { entered.countDown(); awaitUninterruptibly(release); };
+      var first = CompletableFuture.runAsync(() -> reloadSuccessfully(f));
+      CompletableFuture<Void> second;
+      try {
+        assertTrue(entered.await(8, TimeUnit.SECONDS), "first reload reaches service publication");
+        assertNull(get(f.server, "appServices"), "closed services are withdrawn before publication");
+        var resolving = new AtomicReference<Thread>();
+        f.serviceLookup = resolving::set;
+        second = CompletableFuture.runAsync(() -> reloadSuccessfully(f));
+        var queued = second;
+        // Admission alone does not prove the worker reached service resolution. Keep the first
+        // publication blocked until the second has either failed or actually waits in the getter.
+        await(() -> queued.isDone() || waitingForServicePublication(resolving.get()));
+        assertFalse(second.isDone(), "A reload must wait while its predecessor publishes services");
+        assertEquals(1, f.opens.get());
+      } finally { release.countDown(); }
+      assertDoesNotThrow(() -> first.get(8, TimeUnit.SECONDS));
+      assertDoesNotThrow(() -> second.get(8, TimeUnit.SECONDS),
+          "A concurrent reload waits across withdrawal and replacement publication");
+      assertEquals(2, f.opens.get());
+    }
+  }
+
+  @Test
   void concurrentReloadsSerializeAroundPublication() throws Exception {
     try (var f = new Fixture(5_000)) {
       var entered = new CountDownLatch(1);
@@ -470,6 +498,8 @@ final class EngineRuntimeReloadTest {
     final List<RunningRuntime> openedRuntimes = new CopyOnWriteArrayList<>();
     final EngineKnowledgeClient client;
     volatile Runnable openBarrier = () -> {};
+    volatile Runnable publicationBarrier = () -> {};
+    volatile java.util.function.Consumer<Thread> serviceLookup = ignored -> {};
 
     Fixture(long deadline) throws Exception {
       server = spy(new KnowledgeServer(registry,
@@ -481,7 +511,10 @@ final class EngineRuntimeReloadTest {
       creation.setAccessible(true);
       var unused = doAnswer(ignored -> services()).when(server);
       creation.invoke(server);
-      client = new EngineKnowledgeClient(registry, server::appServices,
+      client = new EngineKnowledgeClient(registry, () -> {
+        serviceLookup.accept(Thread.currentThread());
+        return server.appServices();
+      },
           new ForegroundLoadGate(new ForegroundLoad()), deadline, 100, IpcTelemetry.noop(),
           () -> {}, admission, WatchedRootsState.inMemory(), server::captureServingView);
     }
@@ -495,6 +528,8 @@ final class EngineRuntimeReloadTest {
       doNothing().when(ingest).setRuntimeReloadTrigger(any());
       var services = mock(DefaultWorkerAppServices.class);
       when(services.ingestService()).thenReturn(ingest);
+      doAnswer(ignored -> { publicationBarrier.run(); return null; })
+          .when(services).startIndexingLoop();
       return services;
     }
 
@@ -524,6 +559,15 @@ final class EngineRuntimeReloadTest {
 
   private static boolean retiring(KnowledgeServer server) {
     return (boolean) getUnchecked(getUnchecked(server, "servingView"), "retiring");
+  }
+
+  private static boolean waitingForServicePublication(Thread resolver) {
+    if (resolver == null || resolver.getState() != Thread.State.WAITING) return false;
+    for (var frame : resolver.getStackTrace()) {
+      if (frame.getClassName().equals(KnowledgeServer.class.getName())
+          && frame.getMethodName().equals("appServices")) return true;
+    }
+    return false;
   }
 
   private static Object getUnchecked(Object owner, String name) {

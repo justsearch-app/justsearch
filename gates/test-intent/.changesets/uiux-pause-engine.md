@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: wp3.6-builder-e9cx5hlb
+author-session: mhh7ddar-wp36-repair-builder
 ---
 
 # Test-intent entries
@@ -177,7 +177,7 @@ WP3.6. Dotted agreed scenario IDs are preserved in agreedScenario; the gate IDs 
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusIndexingPauseTest.java"
       ],
       "class": "New",
-      "behaviour": "Operating status waits for acknowledgment, overrides idle with user pause, carries end time and reports queued work waiting for Resume.",
+      "behaviour": "Operating status waits for acknowledgment, overrides idle with user pause, carries end time and reports queued work waiting for Resume. Fixture completion after the main merge: the ready pending-job mock also reports INDEXING, as IndexStatusOps does on the real worker. All original assertions are retained. The original pause-introduction fail-before remains 1016257d2; the fixture itself is corroborated on the private Engine rather than described as a product repair.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -212,7 +212,7 @@ WP3.6. Dotted agreed scenario IDs are preserved in agreedScenario; the gate IDs 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-pause-engine-repaired-java.json",
+      "evidence": "gates/test-intent/evidence/uiux-pause-engine-status-fixture.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusIndexingPauseTest.java"
       ],
@@ -686,6 +686,117 @@ WP3.6. Dotted agreed scenario IDs are preserved in agreedScenario; the gate IDs 
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A reload arriving while its predecessor has withdrawn the closed services waits for replacement publication and both reloads finish. Retain all 22 existing tests and their assertions, including concurrentReloadsSerializeAroundPublication; only the fixture gets no-op-by-default publication and service-lookup instrumentation used by the added check.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S369",
+          "agreedScenario": "S36.9",
+          "quote": "Overlapping Pause, Resume and unrelated settings saves (two windows, Settings open, exclusions being saved) end in an authoritative accepted order or an explicit conflict; unrelated preferences are preserved; a lost response or publication failure is reported as uncertain until reconciled, and retry does not apply a different change. A pause or resume causes no model reload and no \"restart required\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, WP3.6 indexing pause Engine side.",
+          "choice": "Apply K1-K5 (battery pause off by default; manual pause survives restart; processing paused while discovery and cleanup continue; one global schedule; retire pauseIndexingDuringAi). Apply decisions 4 (keep automatic hold semantics), 5 (extraction, all enrichment, picture reading and GPL stop; explicit work waits), 6 (cutover and upgrade preparation still complete), 7 (corrupt-settings recovery starts paused with exclusions warning), 10 (measure Pause-to-quiet against 2 minutes), 14 (Engine side has no new UI controls), and pass-2 finding 3 (after acknowledgment covered processors publish no further progress; deletion/cleanup/cutover count changes are permitted).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Find the cause in this package's changes and fix the product so concurrent reloads serialise as before; a pause or resume must cause no model reload (S36.9). Do not weaken the test.",
+          "location": "task t-20261019-bd718f request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-engine-settings-reload-repair.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#reloadArrivingInTheServicePublicationGapWaitsForItsPredecessor"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ReconfigureOverlapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "An overlapping accepted public save returns a typed terminal conflict; replay of the same key keeps that conflict instead of UNCAUGHT_EXCEPTION. The first accepted save and a later fresh reviewed save each commit once, preserving unrelated preferences. Uses the real dispatcher, durable runner, settings owner and store; only admission handles and an explicit latch are test instrumentation.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S369",
+          "agreedScenario": "S36.9",
+          "quote": "Overlapping Pause, Resume and unrelated settings saves (two windows, Settings open, exclusions being saved) end in an authoritative accepted order or an explicit conflict; unrelated preferences are preserved; a lost response or publication failure is reported as uncertain until reconciled, and retry does not apply a different change. A pause or resume causes no model reload and no \"restart required\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "N362",
+          "agreedScenario": "N36.2",
+          "quote": "Settings save, conflict handling, corruption quarantine and downgrade reading of older files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, WP3.6 indexing pause Engine side.",
+          "choice": "Apply K1-K5 (battery pause off by default; manual pause survives restart; processing paused while discovery and cleanup continue; one global schedule; retire pauseIndexingDuringAi). Apply decisions 4 (keep automatic hold semantics), 5 (extraction, all enrichment, picture reading and GPL stop; explicit work waits), 6 (cutover and upgrade preparation still complete), 7 (corrupt-settings recovery starts paused with exclusions warning), 10 (measure Pause-to-quiet against 2 minutes), 14 (Engine side has no new UI controls), and pass-2 finding 3 (after acknowledgment covered processors publish no further progress; deletion/cleanup/cutover count changes are permitted).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-engine-settings-reload-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ReconfigureOverlapTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.overlap.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A Dark choice in the declared Settings control writes only its edited field once; a rejected save reconciles the control and document with stored preferences; a delayed mount observation preserves newer accepted edits while loading unrelated preferences. These three repair cases assertion-fail on 0a4a706f3. A fourth preservation case (earlier conflict plus a later overlapping successful save) passes before and after, and assertion-failed against the initial immediate-readback implementation (tmp/wp3.6-repair/before-overlap-reconciliation.log). It ensures reconciliation waits for all local saves to settle. Every case settles lazy imports and pending writes before teardown.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S369",
+          "agreedScenario": "S36.9",
+          "quote": "Overlapping Pause, Resume and unrelated settings saves (two windows, Settings open, exclusions being saved) end in an authoritative accepted order or an explicit conflict; unrelated preferences are preserved; a lost response or publication failure is reported as uncertain until reconciled, and retry does not apply a different change. A pause or resume causes no model reload and no \"restart required\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "N362",
+          "agreedScenario": "N36.2",
+          "quote": "Settings save, conflict handling, corruption quarantine and downgrade reading of older files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, WP3.6 indexing pause Engine side.",
+          "choice": "Apply K1-K5 (battery pause off by default; manual pause survives restart; processing paused while discovery and cleanup continue; one global schedule; retire pauseIndexingDuringAi). Apply decisions 4 (keep automatic hold semantics), 5 (extraction, all enrichment, picture reading and GPL stop; explicit work waits), 6 (cutover and upgrade preparation still complete), 7 (corrupt-settings recovery starts paused with exclusions warning), 10 (measure Pause-to-quiet against 2 minutes), 14 (Engine side has no new UI controls), and pass-2 finding 3 (after acknowledgment covered processors publish no further progress; deletion/cleanup/cutover count changes are permitted).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-engine-settings-overlap-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.overlap.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

@@ -6905,7 +6905,17 @@ public final class KnowledgeServer implements Closeable {
    * a deferred-runtime upgrade or a dev hot-reload — callers must re-read it rather than cache it.
    */
   public WorkerAppServices appServices() {
-    return appServices;
+    WorkerAppServices current = appServices;
+    if (current != null) return current;
+    // Lifecycle triggers remain usable while their serving view retires. Only a withdrawal gap
+    // needs to wait for publication. Release the lock before invocation: completion callbacks
+    // can re-enter lifecycle operations. Ordinary calls use their captured serving view.
+    runtimeSwapLock.lock();
+    try {
+      return appServices;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
   }
 
   /** Captures one published physical view under the process configuration publication guard. */
