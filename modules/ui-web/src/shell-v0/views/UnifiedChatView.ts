@@ -6416,8 +6416,12 @@ export class UnifiedChatView extends JfElement {
         // Tempdoc 941 R19-F1 — the `done` payload carries the substrate's authoritative answer
         // (`ConversationEngine.emitDone` -> `finalResponse`). Chunks can include rejected
         // extraction attempts, so only the terminal answer belongs in the completed card and
-        // subsequent context. Fall back to chunks only when the terminal omits its answer.
-        const settledText = donePayload?.finalResponse ?? this.streamingText;
+        // subsequent context. Ordinary shapes can send an empty terminal after streaming their
+        // answer. Preserve those chunks; an explicitly empty extraction must not accept attempts.
+        const finalResponse = donePayload?.finalResponse;
+        const settledText = shapeId === 'core.extract'
+          ? finalResponse ?? this.streamingText
+          : finalResponse || this.streamingText;
         msg.content = settledText;
         if (settledText.trim()) {
           this.thread = [...this.thread, msg];
@@ -6449,6 +6453,8 @@ export class UnifiedChatView extends JfElement {
           (p?.error as string) ??
           (p?.message as string) ??
           'An error occurred';
+        // Rejected extraction attempts are transient, never a completed answer or future context.
+        if (shapeId === 'core.extract') this.streamingText = '';
         this.isStreaming = false;
         this.stopRenderTick();
         setAiActivity({ state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null });

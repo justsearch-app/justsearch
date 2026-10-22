@@ -15,6 +15,7 @@
 
 import { css, html, type TemplateResult, nothing } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
+import { cache } from 'lit/directives/cache.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import {
   AdvisoryStore,
@@ -79,6 +80,7 @@ const MAX_VISIBLE_TOASTS = 3;
 
 interface VisibleToast {
   readonly record: AdvisoryRecord;
+  announcement: 'pending' | 'announced' | 'silent';
   /**
    * Null only for a sticky local ERROR toast (which lives nowhere else — dismissing it destroys
    * it). Every store-backed toast, {@code REQUIRES_ACK} included, carries a timeout:
@@ -400,7 +402,7 @@ export class AdvisoryToastHost extends JfElement {
     const timeoutId = sticky
       ? null
       : setTimeout(() => this.dismiss(record.key), durationMs);
-    this.visible = [...this.visible, { record, timeoutId }];
+    this.visible = [...this.visible, { record, timeoutId, announcement: 'pending' }];
   }
 
   private dismiss(key: string): void {
@@ -479,19 +481,28 @@ export class AdvisoryToastHost extends JfElement {
     }
   }
 
+  override updated(): void {
+    const firstShown = Math.max(0, this.visible.length - MAX_VISIBLE_TOASTS);
+    for (const [i, toast] of this.visible.entries()) {
+      if (i >= firstShown && toast.announcement === 'pending') toast.announcement = 'announced';
+      // Silence only after displacement, keeping ordinary polite regions stable while visible.
+      else if (i < firstShown && toast.announcement === 'announced') toast.announcement = 'silent';
+    }
+  }
+
   override render(): TemplateResult | typeof nothing {
     if (this.visible.length === 0) return nothing;
     // `visible` is append-ordered (oldest first) and the slot stacks downward, so cap the REVERSED
     // list — a burst must never push the just-arrived toast out of view — then restore render order.
     const capped = capWithOverflow([...this.visible].reverse(), MAX_VISIBLE_TOASTS);
     const overflow = capped.overflow;
-    const stack = [...capped.shown].reverse();
+    const shownKeys = new Set(capped.shown.map(t => t.record.key));
     return html`${overflow > 0
       ? html`<div class="more" data-testid="toast-more">
           +${overflow} earlier ${overflow === 1 ? 'notification' : 'notifications'}
         </div>`
       : nothing}
-    ${repeat(stack, (t) => t.record.key, (t) => {
+    ${repeat(this.visible, (t) => t.record.key, (t) => {
       // 559 Authority III — local-origin records render their literal message +
       // severity tone + plain callback action (no advisory class chrome / meta).
       const isLocal = t.record.origin === 'local';
@@ -570,13 +581,15 @@ export class AdvisoryToastHost extends JfElement {
             ? 'Undo'
             : present({ kind: 'operation', id: action.target }).label || 'Fix'
           : undefined;
-      return html`
+      // Keep a displaced toast's DOM in Lit's cache, with its identity intact. On return its
+      // notice is silent: the first exposed render already delivered this occurrence.
+      return html`${cache(shownKeys.has(t.record.key) ? html`
           <div
             class="toast"
             data-key=${t.record.key}
             @click=${() => this.handleClick(t.record)}
           >
-            <jf-system-notice tone=${tone} live=${live}>
+            <jf-system-notice tone=${tone} live=${t.announcement === 'silent' ? 'off' : live}>
               <div class="title-row">
                 <div class="title">${isLocal ? nothing : chrome.icon} ${title}</div>
                 <!-- Until now the ONLY way to dismiss a toast was clicking anywhere on it — an
@@ -624,7 +637,7 @@ export class AdvisoryToastHost extends JfElement {
                 : nothing}
             </jf-system-notice>
           </div>
-        `;
+        ` : nothing)}`;
     })}`;
   }
 }
