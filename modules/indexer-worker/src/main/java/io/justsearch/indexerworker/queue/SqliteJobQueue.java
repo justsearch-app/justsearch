@@ -1926,7 +1926,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public boolean deferClaim(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    return finishClaim(claim, () -> deferWithOutcome(claim.path(), outcome, entry, claim),
+    return deferClaim(claim, outcome, entry, 0L);
+  }
+
+  @Override
+  public boolean deferClaim(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry,
+      long retryAtMs) {
+    return finishClaim(claim, () -> deferWithOutcome(claim.path(), outcome, entry, claim, retryAtMs),
         () -> recordSupersededOutcome(claim, outcome, entry, null));
   }
 
@@ -2366,11 +2372,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public void defer(Path path, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    deferWithOutcome(path, outcome, entry, null);
+    deferWithOutcome(path, outcome, entry, null, 0L);
   }
 
   private void deferWithOutcome(Path path, IngestionOutcome outcome,
-      JobQueue.IngestionLedgerEntry entry, IndexJob claim) {
+      JobQueue.IngestionLedgerEntry entry, IndexJob claim, long retryAtMs) {
     lock.lock();
     try {
       ensureOpen();
@@ -2391,7 +2397,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     """;
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                   stmt.setLong(1, now);
-                  stmt.setLong(2, now + 1000L);
+                  stmt.setLong(2, retryAtMs > 0 ? retryAtMs : now + 1000L);
                   bindOutcomeOnly(stmt, 3, outcome, normalizedPath);
                   int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {

@@ -666,6 +666,12 @@ public interface JobQueue extends Closeable {
     return true;
   }
 
+  /** Defer a claim until the running batch's shared retry deadline (epoch milliseconds). */
+  default boolean deferClaim(IndexJob claim, IngestionOutcome outcome, IngestionLedgerEntry entry,
+      long retryAtMs) {
+    return deferClaim(claim, outcome, entry);
+  }
+
   /**
    * Marks multiple jobs as successfully completed in a single batch operation.
    *

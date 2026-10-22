@@ -123,8 +123,12 @@ public final class JobBatchWriter {
     return writeFailures.retryDelayMs();
   }
 
-  void finishBatch() {
-    writeFailures.finish();
+  long prepareRetry() {
+    return writeFailures.prepareRetry();
+  }
+
+  void finishBatch(long retryAtMs) {
+    writeFailures.finish(retryAtMs);
   }
 
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
@@ -257,8 +261,7 @@ public final class JobBatchWriter {
         return;
       }
       if (isDrainingWriteRejection(e)) {
-        writeFailures.unavailable(e);
-        journal.recordOutcomeSafely(
+        writeFailures.unavailable(e, systemic -> journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_UNAVAILABLE_DRAINING",
             () ->
@@ -273,7 +276,8 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy(), ex.provenance())));
+                        contentExtractor.extractionPolicy(), ex.provenance()),
+                    writeFailures.retryAtMs())));
       } else {
         writeFailures.failure(e, systemic -> {
           var outcome = journal.outcome(
@@ -285,7 +289,7 @@ public final class JobBatchWriter {
           journal.recordOutcomeSafely(ex.filePath(), "WRITE_FAILED", () -> {
             var entry = LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(),
                 ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance());
-            if (systemic) jobQueue.deferClaim(ex.claim(), outcome, entry);
+            if (systemic) jobQueue.deferClaim(ex.claim(), outcome, entry, writeFailures.retryAtMs());
             else jobQueue.markClaimFailed(ex.claim(), outcome, entry);
           });
         });

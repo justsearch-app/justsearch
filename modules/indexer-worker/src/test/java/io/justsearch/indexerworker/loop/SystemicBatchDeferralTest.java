@@ -125,7 +125,7 @@ final class SystemicBatchDeferralTest {
   void systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(
       boolean identityFailure, RuntimeException outage)
       throws Exception {
-    enqueue("a.txt", "b.txt", "c.txt", "d.txt");
+    var files = enqueue("a.txt", "b.txt", "c.txt", "d.txt");
     if (identityFailure) {
       when(identities.resolve(anyString(), anyLong())).thenThrow(outage);
     } else {
@@ -133,15 +133,17 @@ final class SystemicBatchDeferralTest {
     }
     var polledTwice = new java.util.concurrent.CountDownLatch(2);
     var pollTimes = new java.util.concurrent.CopyOnWriteArrayList<Long>();
-    var firstBatchExit = new java.util.concurrent.atomic.AtomicLong();
+    var firstDeadline = new java.util.concurrent.atomic.AtomicLong();
+    var pollWallTimes = new java.util.concurrent.CopyOnWriteArrayList<Long>();
     doAnswer(call -> {
       Object result = call.callRealMethod();
-      firstBatchExit.compareAndSet(0, System.nanoTime());
+      firstDeadline.compareAndSet(0, row(files.getFirst()).retryAfter());
       return result;
     }).when(queue).returnUnfinishedClaims(anyCollection());
     // Force small real claims so ready, never-attempted work remains after the first batch.
     doAnswer(call -> {
       pollTimes.add(System.nanoTime());
+      pollWallTimes.add(System.currentTimeMillis());
       var claims = queue.pollPending(2);
       polledTwice.countDown();
       return claims;
@@ -154,9 +156,12 @@ final class SystemicBatchDeferralTest {
       assertTrue(polledTwice.await(10, java.util.concurrent.TimeUnit.SECONDS),
           "a service outage must still revisit the backlog promptly");
       long intervalMs = java.util.concurrent.TimeUnit.NANOSECONDS
-          .toMillis(pollTimes.get(1) - firstBatchExit.get());
+          .toMillis(pollTimes.get(1) - pollTimes.getFirst());
       System.out.println("systemic backlog poll intervalMs=" + intervalMs);
+      // The backoff window includes persisting outcomes; a second full sleep would outlast retry_after.
       assertTrue(intervalMs >= 1000, "no hot loop across fresh batches: " + intervalMs);
+      assertTrue(firstDeadline.get() > 0 && pollWallTimes.get(1) >= firstDeadline.get(),
+          "fresh backlog cannot bypass the persisted outage deadline");
     } finally {
       loop.close();
     }

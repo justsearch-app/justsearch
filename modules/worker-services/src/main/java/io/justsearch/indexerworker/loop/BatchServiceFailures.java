@@ -24,10 +24,10 @@ final class BatchServiceFailures {
   private final List<Failure> pending = new ArrayList<>();
   private boolean active;
   private boolean succeeded;
-  private boolean unavailable;
   private int ambiguousBatches;
   private long nextDelayMs = 1_000;
   private long delayMs;
+  private long retryAtMs;
   private long lastLogNs;
   private long unreportedFailures;
   private Throwable sample;
@@ -35,7 +35,6 @@ final class BatchServiceFailures {
   void begin() {
     pending.clear();
     succeeded = false;
-    unavailable = false;
     delayMs = 0;
     sample = null;
     active = true;
@@ -51,15 +50,21 @@ final class BatchServiceFailures {
     noteFailure(failure);
     if (active && failure instanceof RuntimeException
         && !(failure instanceof IllegalArgumentException)) {
-      pending.add(new Failure(failure, record));
+      pending.add(new Failure(failure, record, false));
     } else {
       record.accept(false);
     }
   }
 
-  void unavailable(Throwable failure) {
+  void unavailable(Throwable failure, Consumer<Boolean> record) {
     noteFailure(failure);
-    unavailable = true;
+    if (active) {
+      pending.add(new Failure(failure, record, true));
+    } else {
+      // Standalone writes have no batch finalizer; preserve their immediate uncounted outcome.
+      retryAtMs = System.currentTimeMillis() + 1_000;
+      record.accept(true);
+    }
   }
 
   void noteFailure(Throwable failure) {
@@ -75,21 +80,37 @@ final class BatchServiceFailures {
     return delayMs;
   }
 
-  void finish() {
+  long retryAtMs() {
+    return retryAtMs;
+  }
+
+  // Classify both services before persisting outcomes so their rows and the loop share one deadline.
+  long prepareRetry() {
     active = false;
-    boolean ambiguous = pending.stream().anyMatch(f -> !provenOutage(f.error()));
+    boolean ambiguous = pending.stream().anyMatch(f -> !f.unavailable() && !provenOutage(f.error()));
     if (!succeeded && ambiguous) ambiguousBatches = Math.min(4, ambiguousBatches + 1);
-    boolean deferred = unavailable;
+    if (pending.stream().anyMatch(this::systemic)) {
+      delayMs = nextDelayMs;
+      nextDelayMs = Math.min(MAX_DELAY_MS, nextDelayMs * 2);
+    }
+    return delayMs;
+  }
+
+  private boolean systemic(Failure failure) {
+    return failure.unavailable() || provenOutage(failure.error())
+        || (!succeeded && ambiguousBatches <= 3);
+  }
+
+  void finish() {
+    long delay = prepareRetry();
+    finish(System.currentTimeMillis() + delay);
+  }
+
+  void finish(long batchRetryAtMs) {
+    retryAtMs = batchRetryAtMs;
     try {
       for (var failure : pending) {
-        boolean systemic = provenOutage(failure.error())
-            || (!succeeded && ambiguousBatches <= 3);
-        failure.record().accept(systemic);
-        deferred |= systemic;
-      }
-      if (deferred) {
-        delayMs = nextDelayMs;
-        nextDelayMs = Math.min(MAX_DELAY_MS, nextDelayMs * 2);
+        failure.record().accept(systemic(failure));
       }
       long now = System.nanoTime();
       if (sample != null && (lastLogNs == 0 || now - lastLogNs >= LOG_INTERVAL_NS)) {
@@ -128,5 +149,5 @@ final class BatchServiceFailures {
     return false;
   }
 
-  private record Failure(Throwable error, Consumer<Boolean> record) {}
+  private record Failure(Throwable error, Consumer<Boolean> record, boolean unavailable) {}
 }

@@ -129,27 +129,34 @@ public final class JobBatchExtractor {
    * empty index (312 item 10).
    */
   public List<ExtractedJob> extractAll(List<JobQueue.IndexJob> jobs) {
-    indexEmptyForBatch = indexKnownEmpty();
-
-    List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
-    identityFailures.begin();
     try {
-      for (JobQueue.IndexJob job : jobs) {
-        if (!running.get()) break;
-
-        ExtractedJob ex = extractJob(job);
-        if (ex != null) {
-          extracted.add(ex);
-        }
-        // Tempdoc 885 item 3: extraction is the CPU-heaviest step in the batch, so it paces per
-        // file. The predecessor abandoned the rest of the batch on user activity; the duty cycle
-        // slows it instead, which is why arm (c) can still make progress under continuous search.
-        indexingPacing.pace();
-      }
+      return extractForBatch(jobs);
     } finally {
       identityFailures.finish();
     }
+  }
+
+  /** The running loop completes both services together after the write phase. */
+  List<ExtractedJob> extractForBatch(List<JobQueue.IndexJob> jobs) {
+    identityFailures.begin();
+    indexEmptyForBatch = indexKnownEmpty();
+    List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
+    for (JobQueue.IndexJob job : jobs) {
+      if (!running.get()) break;
+      ExtractedJob ex = extractJob(job);
+      if (ex != null) extracted.add(ex);
+      // Pace extraction per file while keeping the remaining claims owned by this batch.
+      indexingPacing.pace();
+    }
     return extracted;
+  }
+
+  long prepareRetry() {
+    return identityFailures.prepareRetry();
+  }
+
+  void finishBatch(long retryAtMs) {
+    identityFailures.finish(retryAtMs);
   }
 
   long retryDelayMs() {
@@ -249,14 +256,13 @@ public final class JobBatchExtractor {
               failureDetail(identityError));
           journal.recordOutcomeSafely(filePath, "WRITE_FAILED(document_identity)", () -> {
             var entry = ledgerEntry(filePath, admittedEnvelope, collection, null, provenance);
-            if (systemic) jobQueue.deferClaim(claim, outcome, entry);
+            if (systemic) jobQueue.deferClaim(claim, outcome, entry, identityFailures.retryAtMs());
             else jobQueue.markClaimFailed(claim, outcome, entry);
           });
         };
         if (identityStore == DocumentIdentityStore.UNAVAILABLE) {
           // This receiver rejects every document independently of its content.
-          identityFailures.unavailable(identityError);
-          recordFailure.accept(true);
+          identityFailures.unavailable(identityError, recordFailure);
         } else {
           identityFailures.failure(identityError, recordFailure);
         }

@@ -737,10 +737,10 @@ public class IndexingLoop implements Closeable {
         transitionToRunning();
 
         // Batch processing: extract all → batch embed → build+write
-        processBatch(jobs);
+        long retryAtMs = processBatch(jobs);
         // Row deadlines alone do not throttle an outage while fresh backlog remains ready.
         if ((writer.deferredBatch() || extractor.deferredBatch())
-            && !sleepAfterError(Math.max(writer.retryDelayMs(), extractor.retryDelayMs()))) break;
+            && !sleepAfterError(Math.max(0, retryAtMs - System.currentTimeMillis()))) break;
 
         // Time-based commit strategy (every 10s or when buffer is full)
         long now = System.currentTimeMillis();
@@ -950,7 +950,8 @@ public class IndexingLoop implements Closeable {
     }
   }
 
-  private void processBatch(List<JobQueue.IndexJob> jobs) {
+  private long processBatch(List<JobQueue.IndexJob> jobs) {
+    long retryAtMs = 0;
     Span batchSpan = Span.getInvalid();
     boolean fatal = false;
     writer.beginBatch();
@@ -973,18 +974,28 @@ public class IndexingLoop implements Closeable {
       // A stopped/failed batch may not visit every polled claim. Written claims retain their
       // existing commit owner; the remainder return only after synchronous batch execution exits.
       if (!fatal) {
-        writer.finishBatch();
-        journal.returnBatchClaims(jobs);
+        long delayMs = Math.max(writer.prepareRetry(), extractor.prepareRetry());
+        retryAtMs = System.currentTimeMillis() + delayMs;
+        try {
+          writer.finishBatch(retryAtMs);
+        } finally {
+          try {
+            extractor.finishBatch(retryAtMs);
+          } finally {
+            journal.returnBatchClaims(jobs);
+          }
+        }
       }
       batchSpan.end();
     }
+    return retryAtMs;
   }
 
   private void processBatchInner(List<JobQueue.IndexJob> jobs, Span batchSpan) {
     // Phase 1: Extract all — pre-checks and Tika extraction per job.
     // Slice 4a.3 (W5.2): JobBatchExtractor owns the per-job loop, the indexEmptyForBatch
     // cache, and the per-outcome ledger/batchStats bookkeeping.
-    List<ExtractedJob> extracted = extractor.extractAll(jobs);
+    List<ExtractedJob> extracted = extractor.extractForBatch(jobs);
 
     if (extracted.isEmpty()) {
       batchSpan.setAttribute("batch.extracted", 0L);
