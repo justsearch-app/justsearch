@@ -53,20 +53,32 @@ final class EnrichmentExclusionPublicationTest extends LuceneExecutorTestBase {
     race(stage, false, true, "[\"private/\"]");
   }
 
+  @ParameterizedTest(name="sourcePathDifferentFromDocumentIdIsExcluded({0})")
+  @EnumSource(value=Stage.class, names={"EMBEDDING","COMBINED_CHUNK"})
+  void sourcePathDifferentFromDocumentIdIsExcluded(Stage stage) throws Exception {
+    race(stage, false, false, "[\"private.png\"]", true);
+  }
+
   private void race(Stage stage, boolean fail, boolean fallback, String patterns) throws Exception {
+    race(stage, fail, fallback, patterns, false);
+  }
+
+  private void race(Stage stage, boolean fail, boolean fallback, String patterns, boolean opaqueId) throws Exception {
     var previous = ConfigStore.globalOrNull();
     var installed = new ConfigStore(config("[]"));
     ConfigStore.setGlobal(installed);
     try (var runtime = open()) {
       var folder = java.nio.file.Files.createDirectories(directory.resolve("private"));
-      String parent = java.nio.file.Files.writeString(folder.resolve("private.png"), "source").toString();
+      String source = java.nio.file.Files.writeString(folder.resolve("private.png"), "source").toString();
+      String parent = opaqueId ? "opaque-parent-id" : source;
       String stable = java.nio.file.Files.writeString(directory.resolve("public.txt"), "source").toString();
-      seed(runtime, parent, OLD);
+      seed(runtime, parent, OLD, opaqueId ? source : null);
       if (chunkStage(stage) || stage == Stage.COMBINED_LATE) seedChunk(runtime, parent, OLD);
       if (stage != Stage.CHUNK) seed(runtime, stable, OLD);
       new WorkerIngestService(null,null,null,IndexingPacing.unthrottled(),null,null,runtime,runtime,null,0L)
           .useExclusionRoots(() -> List.of(directory));
       commit(runtime);
+      if (opaqueId) assertEquals(source, runtime.documentFieldOps().getDocumentField(parent, SchemaFields.PATH));
       var inferred = new java.util.concurrent.atomic.AtomicBoolean();
       run(stage, runtime, () -> {
         inferred.set(true);
@@ -126,8 +138,13 @@ final class EnrichmentExclusionPublicationTest extends LuceneExecutorTestBase {
   }
 
   private void seed(RunningRuntime runtime, String id, String content) {
+    seed(runtime, id, content, null);
+  }
+
+  private void seed(RunningRuntime runtime, String id, String content, String source) {
     Map<String,Object> fields = new HashMap<>();
     fields.put(SchemaFields.DOC_ID,id); fields.put(SchemaFields.DOC_UID,id+"-uid");
+    if (source != null) fields.put(SchemaFields.PATH,source);
     fields.put(SchemaFields.CONTENT,content); fields.put(SchemaFields.CONTENT_SHA256,ChunkParentRevision.sha256Hex(content));
     fields.put(SchemaFields.SOURCE_SHA256,ChunkParentRevision.sha256Hex(content));
     fields.put(SchemaFields.IS_CHUNK,"false");
