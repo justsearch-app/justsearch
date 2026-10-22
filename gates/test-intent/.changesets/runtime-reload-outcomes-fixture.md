@@ -56,3 +56,14 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
   "note": "Base fails 7/7 at Fixture start().get (unstubbed outcomes never registers); candidate 7/7 x5; two production mutations (outcomes keeps old-view hold; outcomes never re-subscribes) both caught; no assertion weakened or deadline raised."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a162d0-5e19-7460-88e2-84218dd94408",
+  "verdict": "accept",
+  "digest": "sha256:baba939abc8116002eb7b4e7b2d7124b0863a3dea115c336dbea9fd79e8cdeae",
+  "note": "Incidental fixture repair preserves HTTP reload/refusal intent and all deadlines; candidate 7/7; auditor outcomes retirement silent-close mutation produces four assertion failures including missing outcomes reconnection; production restored cleanly. Evidence: tmp/audit/."
+}
+```
