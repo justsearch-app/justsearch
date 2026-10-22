@@ -1268,3 +1268,14 @@ CD4 checks are durable. F2 changes only harness synchronization. Repaired CD4 ch
   "note": "Sources and adaptation oracles reviewed against the supplied S52/N52 and DC/CD decisions. Reject current execution evidence: UnifiedChatView.deletion.test.ts, a thread read already in flight cannot restore deleted interaction events, repeatedly throws TypeError: release is not a function before its behavioral assertion on exact snapshot 4cab228fe. Reproduced in the full suite, isolated with no cache, and the independent run-evidence replay. The real-browser delayed-response behavior passes; that does not make the named check a pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-lx2kf4nn",
+  "verdict": "accept",
+  "digest": "sha256:1a86f3e5b1502f881f807a7a1916c9031f3d4c7b18783689fec420c8a7f8cf3f",
+  "note": "CD4 entries (#22-#27) checked against the CD4 amendment and DS1; all 8 UI and 8 Java evidence files replayed on 08ebd793f: every cited new check executes and passes, every cited repaired check fails by assertion on its before revision (ConversationDeleteWorkTest#refusesDeleteThroughoutShapeRunIncludingTerminalDelivery confirmed alone, since its module-mate ConversationDeletionTest changed after uiux-conversation-delete-java.json was recorded and no longer compiles at 97439fc54; those 7 checks are uncited there and covered by repair-java). Exempt CD4 files isolated (globals unstubbed, permissions restored). CD4 F1-F4 and guards verified live, fail on c1cd13378."
+}
+```
