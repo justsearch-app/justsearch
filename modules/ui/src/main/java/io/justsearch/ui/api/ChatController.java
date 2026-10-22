@@ -457,15 +457,33 @@ public final class ChatController {
    *       into O(runs x events) and defeating the run store's lazy limit. Absent = not told.
    * </ul>
    *
+   * <p>WP1.4a: a paired {@code parentSessionId}/{@code branchPointMessageId} filter reads the base
+   * and every direct branch at that point, without a recent-list limit or run-only rows. The
+   * response identifies the requested fork so an older Engine's recent window cannot be mistaken
+   * for a complete answer. The default joined list below is unchanged.
+   *
    * <p>{@link #handleLoadHistory} deliberately does NOT join: Search v3's transcript already comes
    * from {@code GET /api/thread/{id}}, and a second join here would give one transcript two sources.
    */
   public void handleListSessions(Context ctx) {
     String shapeId = ctx.queryParam("shapeId");
+    String parent = ctx.queryParam("parentSessionId");
+    String point = ctx.queryParam("branchPointMessageId");
+    boolean forkRead = parent != null || point != null;
+    if (forkRead && (parent == null || point == null || point.isBlank())) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "parentSessionId and a non-blank branchPointMessageId are required together"));
+      return;
+    }
+    if (forkRead && StoreIdRequest.rejectUnsafe(ctx, parent)) return;
     String limitParam = ctx.queryParam("limit");
-    int limit = Math.min(limitParam != null ? Integer.parseInt(limitParam) : 20, 100);
-    List<ConversationStore.SessionSummary> sessions =
-        conversationStore.listSessions(shapeId, limit);
+    int limit = forkRead ? Integer.MAX_VALUE
+        : Math.min(limitParam != null ? Integer.parseInt(limitParam) : 20, 100);
+    List<ConversationStore.SessionSummary> sessions = conversationStore.listSessions(shapeId, limit);
+    if (forkRead) {
+      sessions = sessions.stream().filter(s -> parent.equals(s.sessionId())
+          || parent.equals(s.parentSessionId()) && point.equals(s.branchPointMessageId())).toList();
+    }
     List<Map<String, Object>> storeRows = sessions.stream().map(s -> {
       Map<String, Object> m = new LinkedHashMap<>();
       m.put("sessionId", s.sessionId());
@@ -489,13 +507,15 @@ public final class ChatController {
       return m;
     }).toList();
     List<Map<String, Object>> result = new ArrayList<>(storeRows);
-    result.addAll(runBackedRows(shapeId, limit, storeRows));
+    // Only store-backed conversations can fork. The unfiltered two-store join stays unchanged.
+    if (!forkRead) result.addAll(runBackedRows(shapeId, limit, storeRows));
     // One order for both records. The store side already sorts by last activity, so a STABLE sort on
     // the same key leaves it untouched and only decides where the synthesized rows land.
     result.sort((a, b) -> Long.compare(asMillis(b.get("lastActiveAtMs")), asMillis(a.get("lastActiveAtMs"))));
     var writes = conversationStore.conversationWork();
     Map<String, Object> response = new LinkedHashMap<>();
     response.put("sessions", result.size() <= limit ? result : result.subList(0, limit));
+    if (forkRead) response.put("fork", Map.of("parentSessionId", parent, "branchPointMessageId", point));
     response.put("deletedIds", List.of());
     if (writes != null) {
       // A deletion must not advance the count between sampling its markers and its count: that

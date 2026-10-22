@@ -72,7 +72,7 @@ import {
   __resetAiStateForTest,
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
-import { getConversationListState, setActiveConversation, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
+import { getConversationListState, restoreActiveConversation, setActiveConversation, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { __resetContextInspectorDrawer } from '../../state/contextInspectorDrawer.js';
@@ -128,6 +128,10 @@ interface Backend {
   minted: number;
   /** When set, the next branch response waits for this gate — availability can change meanwhile. */
   branchGate: Promise<void> | null;
+  recentLimit?: number;
+  historyLocked?: boolean;
+  forkGate?: Promise<void>;
+  refuseForkRead?: boolean;
 }
 let backend: Backend;
 
@@ -274,6 +278,7 @@ function stubFetch(): void {
       backend.historyReads.push(id);
       const record = backend.histories[id];
       if (record === undefined) return { ok: false, status: 404, json: () => Promise.resolve({}) };
+      if (backend.historyLocked) return { ok: false, status: 423, json: () => Promise.resolve({ errorCode: 'STORE_LOCKED' }) };
       // SNAPSHOT AT SERVE TIME, before any hold — a real server answers with what it read when it
       // handled the request. Without this a held read would "catch up" to the writes that landed
       // while it waited, and the stale answer the ordering case is about could not exist.
@@ -310,13 +315,24 @@ function stubFetch(): void {
       return { ok: true, status: 200, json: () => Promise.resolve({ ok: true }) };
     }
     if (href.includes('/api/chat/conversations')) {
+      const query = new URL(href, 'http://engine.test').searchParams;
+      const parent = query.get('parentSessionId');
+      const point = query.get('branchPointMessageId');
+      const rows = parent === null ? backend.conversations.slice(0, backend.recentLimit)
+        : backend.conversations.filter(c => c.sessionId === parent
+          || c.parentSessionId === parent && c.branchPointMessageId === point);
+      if (parent !== null) {
+        if (backend.forkGate) await backend.forkGate;
+        if (backend.refuseForkRead) return { ok: false, status: 503 };
+      }
       return {
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ sessions: backend.conversations }),
+        json: () => Promise.resolve({ sessions: rows, ...(parent === null ? {} : { fork: { parentSessionId: parent, branchPointMessageId: point } }) }),
       };
     }
     if (href.includes('/api/thread/')) {
+      if (backend.historyLocked) return { ok: false, status: 423, json: () => Promise.resolve({ errorCode: 'STORE_LOCKED' }) };
       const id = decodeURIComponent(
         href.slice(href.lastIndexOf('/api/thread/') + '/api/thread/'.length),
       );
@@ -652,10 +668,8 @@ describe('the version pager', () => {
     // back is the store's transcript rather than whatever the window still held.
     expect(el.sessions.activeId).toBe('uc-branch-branch-1');
     main = await region(el, 'jf-sv3-main');
-    // The branch inherited one turn and has none of its own yet, so the divergence point is not on
-    // screen and neither is a pager — the same place the reference window ends up, because both
-    // gate it on a turn the conversation OWNS.
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')).toBeNull();
+    // S16.1: an empty branch still exposes the versions at its continuation point.
+    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim()).toBe('2 / 2');
   });
 
   it('shows a branch as version 2 once it has a turn of its own', async () => {
@@ -1587,4 +1601,271 @@ it('forgets cached turns after restart when the missing server row is confirmed 
   expect(el.sessions.activeId).toBeNull();
   expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
   expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
+});
+
+
+/* WP1.4a: agent-adopted branch discovery, independent of the sidebar window. */
+describe('WP1.4a branch discovery', () => {
+  const counts = async (el: Mounted): Promise<string[]> => {
+    const main = await region(el, 'jf-sv3-main');
+    return [...(main.shadowRoot?.querySelectorAll('[data-testid="sv3-version-count"]') ?? [])]
+      .map(n => n.textContent?.trim() ?? '');
+  };
+
+  function oldFork(): void {
+    twoTurnConversation('old-base');
+    backend.conversations.unshift(...Array.from({ length: 110 }, (_, i) => conversationRow(`recent-${i}`, `recent ${i}`)));
+    backend.recentLimit = 20;
+    for (let i = 0; i < 120; i++) backend.conversations.push({
+      ...conversationRow(`old-child-${i}`, `old child ${i}`, { parentSessionId: 'old-base', branchPointMessageId: storedId(1) }),
+      createdAtMs: i + 2,
+    });
+    backend.conversations.push(conversationRow('other-point', 'other fork', {
+      parentSessionId: 'old-base', branchPointMessageId: EMPTY_PREFIX_SENTINEL,
+    }));
+    backend.threads['old-child-0'] = { ...backend.threads['old-base']!, conversationId: 'old-child-0' };
+    backend.histories['old-child-0'] = {
+      ...backend.histories['old-base']!, sessionId: 'old-child-0',
+      parentSessionId: 'old-base', branchPointMessageId: storedId(1),
+    };
+  }
+
+  it('S16.1 discovers every old version on both sides after reload without enlarging recents', async () => {
+    oldFork();
+    restoreActiveConversation('old-base');
+    let el = await mount();
+    expect(await counts(el)).toEqual(['1 / 2', '1 / 121']);
+    expect(getConversationListState().conversations).toHaveLength(20);
+    expect(getConversationListState().conversations.some(c => c.id === 'old-child-0')).toBe(false);
+    await press((await region(el, 'jf-sv3-main')).shadowRoot?.querySelectorAll('[data-testid="sv3-version-next"]')[1]);
+    await settle(el);
+    expect(el.sessions.activeId).toBe('old-child-0');
+    expect(await counts(el)).toEqual(['2 / 121']);
+    el.remove();
+    __resetConversationListForTest();
+    restoreActiveConversation('old-child-0');
+    el = await mount();
+    expect(await counts(el)).toEqual(['2 / 121']);
+    expect(getConversationListState().conversations).toHaveLength(20);
+  });
+
+  it('S16.2 hides counts while pending and failed and preserves typing', async () => {
+    twoTurnConversation('old-base');
+    backend.conversations.push(conversationRow('child', 'child', { parentSessionId: 'old-base', branchPointMessageId: storedId(1) }));
+    restoreActiveConversation('old-base');
+    const el = await mount();
+    expect(await counts(el)).toContain('1 / 2');
+    let release!: () => void;
+    backend.forkGate = new Promise<void>(r => { release = r; });
+    const refresh = loadConversations();
+    await settle(el);
+    expect(await counts(el)).toEqual([]);
+    const composer = await region(el, 'jf-sv3-composer') as Updatable & { draft: string };
+    composer.draft = 'keep typing';
+    backend.refuseForkRead = true;
+    release();
+    await refresh;
+    await settle(el);
+    expect(await counts(el)).toEqual([]);
+    expect(composer.draft).toBe('keep typing');
+    backend.forkGate = undefined;
+    backend.refuseForkRead = false;
+    await loadConversations();
+    await settle(el);
+    expect(await counts(el)).toContain('1 / 2');
+  });
+
+  it('S16.2 refreshes old fork membership on creation and deletion', async () => {
+    oldFork();
+    restoreActiveConversation('old-base');
+    const el = await mount();
+    expect(await counts(el)).toContain('1 / 121');
+    backend.conversations.push(conversationRow('new-version', 'new version', {
+      parentSessionId: 'old-base', branchPointMessageId: storedId(1),
+    }));
+    await loadConversations();
+    await settle(el);
+    expect(await counts(el)).toContain('1 / 122');
+    backend.conversations = backend.conversations.filter(c => c.sessionId !== 'old-child-0');
+    await loadConversations();
+    await settle(el);
+    expect(await counts(el)).toContain('1 / 121');
+  });
+
+  it('S16.3 S16.4 names the immediate parent and opens it through an accessible native control', async () => {
+    oldFork();
+    restoreActiveConversation('old-child-0');
+    const el = await mount();
+    const origin = el.shadowRoot?.querySelector('[data-testid="sv3-branch-origin"]');
+    expect(origin?.textContent ?? '').toContain('why did the renewal fail?');
+    const open = origin?.querySelector('button');
+    expect(open?.textContent).toContain('Open original');
+    expect(open?.getAttribute('aria-label')).toContain('why did the renewal fail?');
+    open?.click();
+    await settle(el);
+    expect(el.sessions.activeId).toBe('old-base');
+    expect(el.shadowRoot?.querySelector('[data-testid="sv3-branch-origin"]')).toBeNull();
+  });
+
+  it('S16.3 restores the neutral immediate-parent control for an old locked branch', async () => {
+    oldFork();
+    backend.historyLocked = true;
+    for (const row of backend.conversations) row.firstUserMessage = '';
+    restoreActiveConversation('old-child-0');
+    const el = await mount();
+    const origin = el.shadowRoot?.querySelector('[data-testid="sv3-branch-origin"]');
+    expect(origin?.textContent ?? '').toContain('Original conversation');
+    expect(origin?.querySelector('button')?.getAttribute('aria-label')).toBe('Open original: Original conversation');
+    expect(getConversationListState().conversations).toHaveLength(20);
+    expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
+    origin?.querySelector('button')?.click();
+    await settle(el);
+    expect(el.sessions.activeId).toBe('old-base');
+    expect(el.shadowRoot?.querySelector('[data-testid="sv3-branch-origin"]')).toBeNull();
+  });
+
+  it('S16.3 uses a neutral name for a hidden parent on an empty branch', async () => {
+    twoTurnConversation('parent');
+    backend.conversations.push(conversationRow('empty-child', 'empty', {
+      parentSessionId: 'parent', branchPointMessageId: EMPTY_PREFIX_SENTINEL,
+    }));
+    backend.conversations[0]!.firstUserMessage = '';
+    backend.threads['empty-child'] = { conversationId: 'empty-child', events: [] };
+    backend.histories['empty-child'] = { sessionId: 'empty-child', messages: [],
+      parentSessionId: 'parent', branchPointMessageId: EMPTY_PREFIX_SENTINEL };
+    restoreActiveConversation('empty-child');
+    const el = await mount();
+    const origin = el.shadowRoot?.querySelector('[data-testid="sv3-branch-origin"]');
+    expect(origin?.textContent ?? '').toContain('Original conversation');
+    expect(origin?.querySelector('button')?.getAttribute('aria-label')).toContain('Original conversation');
+  });
+});
+
+
+describe('WP1.4a continuation and lineage boundaries', () => {
+  it('S16.1 pages an empty continuation at the last answer from base and branch', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openConversation(el);
+    await chooseFromTurnMenu(el, 1, BRANCH_MENU_BRANCH);
+    let main = await region(el, 'jf-sv3-main');
+    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim()).toBe('2 / 2');
+    await press(main.shadowRoot?.querySelector('[data-testid="sv3-version-previous"]'));
+    await settle(el);
+    expect(el.sessions.activeId).toBe('uc-branch');
+    main = await region(el, 'jf-sv3-main');
+    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim()).toBe('1 / 2');
+  });
+
+  it('S16.1 keeps the parent fork on the first own turn and own forks on later turns', async () => {
+    threeTurnConversation('child');
+    backend.histories.child!.parentSessionId = 'parent';
+    backend.histories.child!.branchPointMessageId = storedId(1);
+    backend.conversations[0]!.parentSessionId = 'parent';
+    backend.conversations[0]!.branchPointMessageId = storedId(1);
+    backend.conversations.push(conversationRow('parent', 'parent question'),
+      conversationRow('sibling', 'sibling', { parentSessionId: 'parent', branchPointMessageId: storedId(1) }),
+      conversationRow('grandchild', 'grandchild', { parentSessionId: 'child', branchPointMessageId: storedId(3) }),
+      conversationRow('wrong-key', 'wrong', { parentSessionId: 'child', branchPointMessageId: storedId(1) }));
+    backend.recentLimit = 1;
+    restoreActiveConversation('child');
+    const el = await mount();
+    const turns = turnsIn(await region(el, 'jf-sv3-main'));
+    const count = (turn: HTMLElement | undefined): string | null => turn?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim() ?? null;
+    expect(turns).toHaveLength(3);
+    expect(count(turns[0])).toBeNull();
+    expect(count(turns[1])).toBe('2 / 3');
+    expect(count(turns[2])).toBe('1 / 2');
+    expect(el.shadowRoot?.querySelector('[data-testid="sv3-branch-origin"]')?.textContent).toContain('parent question');
+  });
+
+  it('S16.2 ignores a stale successful read after a newer deletion refresh', async () => {
+    twoTurnConversation();
+    backend.conversations.push(conversationRow('child', 'child', { parentSessionId: 'uc-branch', branchPointMessageId: storedId(1) }));
+    const el = await mount();
+    await openConversation(el);
+    let release!: () => void;
+    backend.forkGate = new Promise<void>(r => { release = r; });
+    await loadConversations();
+    await settle(el);
+    backend.conversations = backend.conversations.filter(c => c.sessionId !== 'child');
+    backend.forkGate = undefined;
+    await loadConversations();
+    await settle(el);
+    release();
+    await settle(el);
+    const main = await region(el, 'jf-sv3-main');
+    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')).toBeNull();
+  });
+});
+
+it('S16.2 never labels a removed open branch as the base version while absence is unconfirmed', async () => {
+  twoTurnConversation('base');
+  backend.conversations.push(conversationRow('child', 'child', {
+    parentSessionId: 'base', branchPointMessageId: storedId(1),
+  }), conversationRow('sibling', 'sibling', {
+    parentSessionId: 'base', branchPointMessageId: storedId(1),
+  }));
+  backend.threads.child = { ...backend.threads.base!, conversationId: 'child' };
+  backend.histories.child = { ...backend.histories.base!, sessionId: 'child',
+    parentSessionId: 'base', branchPointMessageId: storedId(1) };
+  restoreActiveConversation('child');
+  const el = await mount();
+  let main = await region(el, 'jf-sv3-main');
+  expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')?.textContent?.trim()).toBe('2 / 3');
+  backend.conversations = backend.conversations.filter(c => c.sessionId !== 'child');
+  // The recent-window omission and the mock's inconclusive exists answer do not prove deletion.
+  // The COMPLETE fork answer can still prove that this open branch is no longer a current version.
+  await loadConversations();
+  await settle(el);
+  expect(el.sessions.activeId).toBe('child');
+  main = await region(el, 'jf-sv3-main');
+  expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')).toBeNull();
+});
+
+it('BN1 S16.2 Retry sends while complete fork reads are still pending', async () => {
+  twoTurnConversation();
+  const el = await mount();
+  await openConversation(el);
+  let release!: () => void;
+  backend.forkGate = new Promise<void>(r => { release = r; });
+  try {
+    await loadConversations();
+    await settle(el);
+    await chooseFromTurnMenu(el, 1, BRANCH_MENU_RETRY);
+    expect(el.sessions.activeId).toBe('uc-branch-branch-1');
+    expect(backend.dispatches).toEqual([
+      { conversationId: 'uc-branch-branch-1', question: 'and the second one?' },
+    ]);
+    const main = await region(el, 'jf-sv3-main');
+    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')).toBeNull();
+  } finally {
+    release();
+    await settle(el);
+  }
+});
+
+it('S16.1 S16.2 waits for branch lineage before presenting a fork count', async () => {
+  threeTurnConversation('child');
+  backend.histories.child!.parentSessionId = 'parent';
+  backend.histories.child!.branchPointMessageId = storedId(1);
+  backend.conversations[0]!.parentSessionId = 'parent';
+  backend.conversations[0]!.branchPointMessageId = storedId(1);
+  backend.conversations.push(conversationRow('parent', 'parent question'),
+    conversationRow('wrong-first', 'wrong first', { parentSessionId: 'child', branchPointMessageId: EMPTY_PREFIX_SENTINEL }),
+    conversationRow('later-child', 'later child', { parentSessionId: 'child', branchPointMessageId: storedId(3) }));
+  backend.holdHistoryFor.add('child');
+  restoreActiveConversation('child');
+  const el = await mount();
+  try {
+    const main = await region(el, 'jf-sv3-main');
+    expect(turnsIn(main)).toHaveLength(3);
+    expect(main.shadowRoot?.querySelector('[data-testid="sv3-version-count"]')).toBeNull();
+  } finally {
+    backend.heldHistories.get('child')?.();
+    await settle(el);
+  }
+  const main = await region(el, 'jf-sv3-main');
+  expect([...(main.shadowRoot?.querySelectorAll('[data-testid="sv3-version-count"]') ?? [])]
+    .map(n => n.textContent?.trim())).toEqual(['2 / 2', '1 / 2']);
 });

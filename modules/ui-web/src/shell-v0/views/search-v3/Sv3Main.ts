@@ -1323,6 +1323,7 @@ export class Sv3Main extends JfElement {
     expandedSources: { state: true },
     turnContexts: { attribute: false },
     turnLineage: { attribute: false },
+    continuationVersions: { attribute: false },
     floorSummary: { attribute: false },
     streaming: { type: Boolean },
     stopping: { attribute: false },
@@ -1429,6 +1430,8 @@ export class Sv3Main extends JfElement {
    * the arithmetic and performs none of it.
    */
   declare turnLineage: readonly Sv3TurnLineage[];
+  /** The versions after the last answer, before a continuation has its own question. */
+  declare continuationVersions: Sv3VersionSet | null;
   /** The compaction summary standing at the floor, or null for a plain rewind / no floor. */
   declare floorSummary: string | null;
   /**
@@ -1584,7 +1587,7 @@ export class Sv3Main extends JfElement {
   private get transcriptArmRendered(): boolean {
     if (this.resultsArmRendered) return false;
     if (this.locksTranscript) return false;
-    return (this.turns ?? []).length > 0 || this.recordNotice;
+    return (this.turns ?? []).length > 0 || this.recordNotice || this.continuationVersions !== null;
   }
 
   constructor() {
@@ -1607,6 +1610,7 @@ export class Sv3Main extends JfElement {
     this.expandedSources = new Set();
     this.turnContexts = [];
     this.turnLineage = [];
+    this.continuationVersions = null;
     this.floorSummary = null;
     this.streaming = false;
     this.stopping = null;
@@ -1849,6 +1853,7 @@ export class Sv3Main extends JfElement {
               </div>`
             : nothing}
           ${turns.map((turn) => this.turn(turn))}
+          ${this.versionPager(null)}
         </div>
       </div>
       <!-- OUTSIDE the scroller: the card is viewport-positioned from the mark's own rect, so a
@@ -2143,8 +2148,9 @@ export class Sv3Main extends JfElement {
    * Selecting a version CLAIMS that conversation; it is navigation, not a write, so the window's
    * ordinary open path handles it and nothing here is optimistic.
    */
-  private versionPager(turn: Sv3Turn): TemplateResult | typeof nothing {
-    const versions = sv3LineageFor(this.turnLineage, turn.id)?.versions ?? null;
+  private versionPager(turn: Sv3Turn | null): TemplateResult | typeof nothing {
+    const versions = turn === null ? this.continuationVersions
+      : sv3LineageFor(this.turnLineage, turn.id)?.versions ?? null;
     if (versions === null) return nothing;
     const go = (next: number): void => {
       const target = versions.sessions[next];
