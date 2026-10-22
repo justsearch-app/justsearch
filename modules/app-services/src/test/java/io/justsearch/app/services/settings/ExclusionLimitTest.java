@@ -176,6 +176,6 @@ class ExclusionLimitTest {
   }
 
   private static SettingsV2 patch(List<String> patterns) {
-    return new SettingsV2(new UiSettingsV2(null, null, null, null, null, null, null, null, null, patterns, null), null, null, null);
+    return new SettingsV2(new UiSettingsV2(null, null, null, null, null, null, null, null, patterns, null), null, null, null);
   }
 }

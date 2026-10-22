@@ -21,6 +21,7 @@ import {
   answerFrame,
   answerFrameLabel,
   groundingCoverage,
+  coverageHonesty,
   groundingDegraded,
   sourcesAreChunkPrecise,
   type AnswerFrame,
@@ -381,7 +382,7 @@ export function sv3AnswerFrame(turn: Sv3Turn): AnswerFrame | null {
     // resolver dropped (no verified ref, or one addressing no source) renders no mark, so counting
     // it would claim a verification the reader cannot see. The frame degrades because the evidence
     // degraded — the same read the shipped window makes.
-    groundingCoverage(evidence.marks, turn.answer),
+    groundingCoverage(evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal),
     sourcesAreChunkPrecise(evidence.sources),
     // Settled: the evidence record exists only once the terminal landed, so the matcher has finished
     // and a zero-cite answer can no longer excuse itself as "marks pending".

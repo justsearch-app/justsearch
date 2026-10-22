@@ -116,7 +116,7 @@
         "optLevel" : "BASIC_OPT"
       },
       "lifecycle" : {
-        "deferCpuSession" : false,
+        "deferCpuSession" : true,
         "gpuRetryEnabled" : false,
         "gpuRetryIntervalMs" : 60000
       },

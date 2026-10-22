@@ -109,6 +109,29 @@ public final class UiSettingsStore {
     this.settingsFile = Objects.requireNonNull(settingsFile, "settingsFile");
   }
 
+  private volatile io.justsearch.core.scheduling.IndexingHold indexingHold;
+
+  /** Bound once before any processor starts. Publication is part of the accepted settings commit. */
+  public void bindIndexingHold(io.justsearch.core.scheduling.IndexingHold hold) {
+    indexingHold = Objects.requireNonNull(hold, "hold");
+    publishIndexingPause(load());
+  }
+
+  void publishIndexingPause(UiSettings settings) {
+    var hold = indexingHold;
+    if (hold == null) return;
+    var policy = settings.getIndexingPause();
+    if (policy != null && policy.paused()) hold.pause(policy.untilEpochMs(), policy.reason());
+    else hold.resume();
+  }
+
+  private static Snapshot recoveryDefaults() {
+    var defaults = new UiSettings();
+    defaults.setIndexingPause(new io.justsearch.app.api.settings.IndexingPausePolicy(
+        true, null, "SETTINGS_RECOVERY"));
+    return new Snapshot(defaults, new SettingsWitness(0, null), null);
+  }
+
   public UiSettings load() {
     return loadSnapshot().settings();
   }
@@ -119,13 +142,14 @@ public final class UiSettingsStore {
       return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
     }
     if (!Files.exists(settingsFile)) {
-      return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
+      try { return inspect(); }
+      catch (CorruptDurableStoreException quarantined) { return recoveryDefaults(); }
     }
     try {
       return parseOrThrow();
     } catch (CorruptDurableStoreException e) {
       lastRecovery = quarantineCorruptFile(e);
-      return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
+      return recoveryDefaults();
     }
   }
 

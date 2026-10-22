@@ -21,7 +21,7 @@
  *    `m.similarity` straight). Gating only the first left the marks honest and the panel not: the
  *    same cosine number that mints no mark still painted a verification tier beside the source.
  */
-import type { CitationMatch, Claim } from './citationTypes.js';
+import type { CitationMatch, Claim, SourceCoverage } from './citationTypes.js';
 import { isVerifiedProducer } from './evidenceProjection.js';
 
 /**
@@ -142,4 +142,44 @@ export function matchesFromRecord(claimMatches: unknown): CitationMatch[] {
     parentDocId: typeof m.parentDocId === 'string' ? m.parentDocId : '',
   }));
   return [...admittedMatches(parsed, readScorer(claimMatches))];
+}
+
+
+/** Tempdoc 836 S2S3-A.1 — read the per-source examination facts off a payload or a record. */
+export function readSourceCoverage(payload: unknown): SourceCoverage[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const raw = (payload as { sourceCoverage?: unknown }).sourceCoverage;
+  if (!Array.isArray(raw)) return [];
+  const out: SourceCoverage[] = [];
+  for (const c of raw) {
+    if (!c || typeof c !== 'object') continue;
+    const r = c as Record<string, unknown>;
+    if (
+      typeof r.sourceIndex === 'number' &&
+      typeof r.windowsConsidered === 'number' &&
+      typeof r.windowsScored === 'number'
+    ) {
+      out.push({
+        sourceIndex: r.sourceIndex,
+        windowsConsidered: r.windowsConsidered,
+        windowsScored: r.windowsScored,
+      });
+    }
+  }
+  return out;
+}
+
+/** Coverage facts shared by the live Ask envelope and its saved claimMatches. Absence stays absent. */
+export function coverageFactsFromRecord(payload: unknown): {
+  readonly sentencesTotal?: number;
+  readonly sentencesScored?: number;
+  readonly sourceCoverage?: readonly SourceCoverage[];
+} {
+  if (!payload || typeof payload !== 'object') return {};
+  const p = payload as Record<string, unknown>;
+  return {
+    ...(typeof p.sentencesTotal === 'number' ? { sentencesTotal: p.sentencesTotal } : {}),
+    ...(typeof p.sentencesScored === 'number' ? { sentencesScored: p.sentencesScored } : {}),
+    ...(Array.isArray(p.sourceCoverage) ? { sourceCoverage: readSourceCoverage(p) } : {}),
+  };
 }

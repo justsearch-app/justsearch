@@ -495,8 +495,10 @@ findings that change an item. The facts that supersede entries in this file:
   `Optional<Permit>`; no production producer exists for any kind; `EngineResourcePolicyTest:25-38`
   is the drift check. `EngineAdmissionController.cancelInteractive` filters `INTERACTIVE` only
   (`:167-168`); `freezeAdmission` lives on `OperationLeaseService.java:70`.
-- `modules/system-tests` `integrationTest` is capped at 30 minutes (`build.gradle.kts:220-226`)
-  and lists the scenario modules as inputs (`:180-183`); `EngineLifecycleE2ETest` does not exist.
+- At D1 discovery, `modules/system-tests` `integrationTest` was capped at 30 minutes
+  (`build.gradle.kts:220-226`) and listed the scenario modules as inputs (`:180-183`);
+  `EngineLifecycleE2ETest` did not exist. The non-AI, non-agent task cap is now 50 minutes,
+  with a 60-minute hosted job budget; agent and AI budgets are unchanged.
 - `LuceneRuntimeTypes.BuildState` is `{BUILDING, COMPLETE}` and is a commit marker set by
   `CommitOps.commitWithBuildState` (`:152-155`), already used at cutover
   (`KnowledgeServerMigrationOps.java:241-246`); no reopen is needed to make a generation active.

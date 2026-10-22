@@ -38,6 +38,14 @@ public interface WorkerSignalBus extends Closeable {
    */
   void open() throws IOException;
 
+  /** User hold shared by processing lanes; absent only in isolated scheduling fixtures. */
+  default io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
+
+  default boolean isIndexingHeld() {
+    var hold = indexingHold();
+    return hold != null && hold.held();
+  }
+
   /**
    * Checks if the Main process is actively using the GPU (Online Mode).
    * Used to pause GPU-accelerated embeddings when Main has the GPU.

@@ -18,6 +18,7 @@ public final class ConversationWork {
   private final Set<String> incomplete = new HashSet<>();
   // Process-lifetime markers distinguish a stale first write from an unseen conversation id.
   private final Set<String> deleted = new LinkedHashSet<>();
+  private long deletionCount;
 
   @FunctionalInterface
   public interface Lease extends AutoCloseable {
@@ -75,6 +76,12 @@ public final class ConversationWork {
     Objects.requireNonNull(id, "id");
     incomplete.remove(id);
     deleted.add(id);
+    deletionCount++;
+  }
+
+  /** Cumulative successful deletions in this Engine run, including markers no longer on the wire. */
+  public synchronized long deletionCount() {
+    return deletionCount;
   }
 
   /** Newest 100 exact deletions on the wire; older process markers still refuse stale writes. */

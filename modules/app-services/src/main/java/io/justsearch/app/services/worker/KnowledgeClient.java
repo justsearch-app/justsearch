@@ -101,6 +101,9 @@ import org.slf4j.LoggerFactory;
  * die with it.
  */
 public abstract class KnowledgeClient implements Closeable, SearchPort, IndexingService {
+  /** Local scheduling authority; never a mutation exposed over MCP or HTTP. */
+  public io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
+
     private static final Logger log = LoggerFactory.getLogger(KnowledgeClient.class);
 
     /**

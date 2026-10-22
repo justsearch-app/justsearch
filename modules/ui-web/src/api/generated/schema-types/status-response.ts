@@ -250,10 +250,12 @@ export interface StatusResponse {
       agingReleaseAt: string | null;
       pendingJobs: number;
       reasonCode: string | null;
-      reasons: ("game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating")[];
+      reasons: ("user_paused" | "settings_recovery" | "game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating")[];
       sampledAt: string;
       since: string;
-      state: "IDLE" | "RUNNING" | "SLOWED" | "PAUSED";
+      state: "IDLE" | "RUNNING" | "SLOWED" | "PAUSING" | "PAUSED";
+      untilEpochMs: number | null;
+      waitingForResume: boolean;
     };
     schemaVersion: number;
     seq: number;
@@ -685,10 +687,12 @@ export const statusResponseSchema = z.strictObject({
       "agingReleaseAt": z.string().nullable(),
       "pendingJobs": z.number().int(),
       "reasonCode": z.string().nullable(),
-      "reasons": z.array(z.enum(["game_mode", "gpu_busy_external", "energy_saver", "chat_generating"])),
+      "reasons": z.array(z.enum(["user_paused", "settings_recovery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"])),
       "sampledAt": z.string(),
       "since": z.string(),
-      "state": z.enum(["IDLE", "RUNNING", "SLOWED", "PAUSED"]),
+      "state": z.enum(["IDLE", "RUNNING", "SLOWED", "PAUSING", "PAUSED"]),
+      "untilEpochMs": z.number().int().nullable(),
+      "waitingForResume": z.boolean(),
     }).optional(),
     "schemaVersion": z.number().int(),
     "seq": z.number().int(),

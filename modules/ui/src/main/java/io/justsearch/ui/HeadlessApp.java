@@ -483,7 +483,7 @@ public class HeadlessApp {
         // Autostart is a settings transaction, so every physical owner and recovery witness
         // must exist before it can seed a fresh profile.
         var runtimeHandles = bootstrap.serviceOut().inferenceRuntimeHandles();
-        if (runtimeHandles.runtimeSpecStore() != null) {
+        if (runtimeHandles.runtimeSpecStore() != null && runtimeHandles.runtimeReconciler() != null) {
           io.justsearch.app.services.bootstrap.phases.InferenceWiring.seedAutostartSpec(
               runtimeHandles.runtimeSpecStore());
           bootstrap.runtimeReconciler().requestBootConvergence();
@@ -1486,6 +1486,7 @@ public class HeadlessApp {
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
           childControl, requestedRestartAction, operationAuthority, configPhase.configStore(),
           runtimeResources);
+      resetSettingsStore.bindIndexingHold(engineRoot.indexingHold());
       processRoot = engineRoot;
       // Spec A step 10: the chat controller restarts the Engine after a lost GPU, within the limit
       // its own self-intent records allow.
