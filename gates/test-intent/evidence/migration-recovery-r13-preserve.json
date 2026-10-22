@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T01:59:58.064Z",
+  "revision": "beec1cb309ead14a9f36e2abd925187039212185",
+  "tree": "2c383a9d6c5fe65a526b5e51c43abe9fbade4fc2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.ConditionalDeleteReplayRoutesTest.ordinaryPromotionRetiresAFolderBeneathAListableParent\" --tests \"io.justsearch.indexerworker.loop.ConditionalDeleteReplayRoutesTest.promotedPointerRetiresAFolderBeneathAListableParent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4149
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#ordinaryPromotionRetiresAFolderBeneathAListableParent",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a87de1b02f26921b6371b5ae0296b8818bb38dfd308c581d3dca4469fecd6a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryPromotionRetiresAFolderBeneathAListableParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#promotedPointerRetiresAFolderBeneathAListableParent",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a87de1b02f26921b6371b5ae0296b8818bb38dfd308c581d3dca4469fecd6a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "promotedPointerRetiresAFolderBeneathAListableParent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "beec1cb30",
+    "revision": "beec1cb309ead14a9f36e2abd925187039212185",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.ConditionalDeleteReplayRoutesTest.ordinaryPromotionRetiresAFolderBeneathAListableParent\" --tests \"io.justsearch.indexerworker.loop.ConditionalDeleteReplayRoutesTest.promotedPointerRetiresAFolderBeneathAListableParent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5716
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#ordinaryPromotionRetiresAFolderBeneathAListableParent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#promotedPointerRetiresAFolderBeneathAListableParent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:12314dc90f0c99110ed1493f62a82d4323818d6fa1539757e96afcc8ab57b88d"
+}

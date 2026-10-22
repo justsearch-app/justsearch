@@ -78,6 +78,42 @@ only `state`, `reason_code`, and `state_since`. The camel-case
 `components.*.state_since` values identify the same state epoch; consumers must
 not treat them as two clocks or two authorities.
 
+## Retry waiting and indexed counts
+
+The Worker's `worker.core.indexState` is the queue activity authority. `INDEXING` means at least
+one job is ready (`retry_after` absent or less than or equal to the queue's observation time) or
+processing. `WAITING` means the backlog is positive but every pending job is in retry backoff and
+none is processing. `IDLE` means no unfinished jobs; terminal document failures give `ERROR`, and
+a fatal indexing-loop failure takes precedence as `FAILED`. A waiting backlog can coexist with
+terminal failures. `worker.core.pendingJobs` remains the entire PENDING + PROCESSING backlog;
+`worker.migration` exposes its ready, backoff and processing slices from the same queue observation.
+`worker.failure.nextRetryAtMs` gives the earliest pending retry as Unix epoch milliseconds (0 when
+unavailable). The UI says “Waiting to retry” with that backlog and local retry time, with no progress
+percentage or active-time estimate. Only a fresh Worker observation advances it to indexing; the
+browser clock does not override the queue's eligibility decision. Active-work checks and busy
+sampling consume the Worker's state, so retry-only waiting is not busy or stalled throughput.
+`operating.indexing` retains its vocabulary: without other runnable enrichment it is `IDLE` while
+waiting, and its `pendingJobs` still describes the retained backlog. Waiting never certifies a drain
+or authorizes migration cutover.
+
+`worker.core.indexedDocuments` counts non-chunk parent documents in the serving index, including
+collections searchable through an explicit scope. It never counts DONE queue rows or substitutes
+the building generation. `searchableDocuments` remains the default-scope subset (excluding
+agent-history); `worker.migration.buildingIndexedDocuments` separately describes build progress.
+Health and the status deck prefer a fresh known serving count during migration over a cached
+pre-migration count. They retain the existing last-known fallback when the observation is stale
+or unavailable. With no readable count and no prior count from that reader, `indexedDocumentsUnknown`
+is true.
+Runnable enrichment may continue alongside terminal file failures. Once it settles, those failures
+remain indexing errors in the UI, with their failure count; an empty queue containing failures never
+opens the successful completion window. The same observations
+apply after reopening persisted queues and serving indexes.
+
+Compatibility: `WAITING` is an additional value of the existing unconstrained string, not an enum
+expansion or a new field. Existing status JSON Schema, OpenAPI projections and generated strict
+validators already accept it; no response shape, manual compatibility baseline or Runtime Contract
+version changes. The lifecycle schema-2 subset and serving readiness remain unchanged.
+
 ## Automatic indexing holds
 
 `operating.indexing.state` keeps its existing `IDLE`, `RUNNING`, `SLOWED` and

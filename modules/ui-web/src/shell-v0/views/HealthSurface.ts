@@ -46,6 +46,7 @@ import '../aggregate-substrate/components/JfOperation.js';
 // snapshot types are the generated/poll shapes, re-exported by the store.
 import {
   subscribeAiState,
+  hasLiveDocumentCount,
   type AiState,
   type StatusSnapshot,
   type InferenceSnapshot,
@@ -882,7 +883,7 @@ export class HealthSurface extends JfElement {
     }
     if (this.provisional) return 'Rebuilding…';
     if (!known) return 'Unknown';
-    if (queue > 0) return 'Indexing';
+    if (queue > 0) return progress.activity.summary;
     // 809 finding 1 — the JOB queue draining is not the work finishing. Embedding/SPLADE/NER run
     // afterwards on the backfill scheduler, and until they drain, semantic and hybrid search do not
     // work — so neither the terminal "Up to date" nor "Idle" is true here. Phase comes from the ONE
@@ -941,7 +942,9 @@ export class HealthSurface extends JfElement {
     // Size honesty: only surface a last-known size that was actually observed; a settled snap that
     // lacked `indexSizeBytes` retains `null`, and Size falls back to '…' rather than a fake "0 B".
     const lastKnownSize = lastKnownIdx && settled!.indexSizeBytes != null;
-    const filesDisp = lastKnownIdx
+    const currentCount = hasLiveDocumentCount(this.aiState);
+    const lastKnownFiles = lastKnownIdx && !currentCount;
+    const filesDisp = currentCount ? filesVal : lastKnownFiles
       ? formatCount(settled!.documentCount)
       : wkr(filesVal);
     const sizeDisp = lastKnownSize ? formatBytes(settled!.indexSizeBytes!) : wkr(sizeVal);
@@ -951,7 +954,7 @@ export class HealthSurface extends JfElement {
     const statsBody = activeBodyFor(HEALTH_STATS_REGION);
     if (statsBody) {
       const metrics = [
-        { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && known && docs > 0 ? 'success' : 'neutral', sub: lastKnownIdx ? 'Last known' : undefined },
+        { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && known && docs > 0 ? 'success' : 'neutral', sub: lastKnownFiles ? 'Last known' : undefined },
         { label: 'Size', value: sizeDisp, icon: 'database', tone: 'neutral', sub: lastKnownSize ? 'Last known' : undefined },
         { label: 'Memory', value: memVal, icon: 'memory-stick', tone: memDot === 'healthy' ? 'success' : memDot, sub: memMax > 0 ? `of ${formatBytes(memMax)}` : undefined },
         { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
@@ -976,8 +979,8 @@ export class HealthSurface extends JfElement {
             </div>
             <jf-status-dot tone=${!this.provisional && known && docs > 0 ? 'success' : 'neutral'}></jf-status-dot>
           </div>
-          <div class="card-value" title=${lastKnownIdx ? 'Last known — updating' : nothing}>${filesDisp}</div>
-          ${lastKnownIdx ? html`<div class="card-sub">Last known</div>` : nothing}
+          <div class="card-value" title=${lastKnownFiles ? 'Last known — updating' : nothing}>${filesDisp}</div>
+          ${lastKnownFiles ? html`<div class="card-sub">Last known</div>` : nothing}
         </div>
         <div class="card">
           <div class="card-head">
