@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T20:51:45.747Z",
+  "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+  "tree": "abf474cd787d684d2b9afd432bd9a63ed146d83d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.Release030FixtureTest.authenticFoldersRetainReleaseStateAndRelocateTogether\" --tests \"io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.issue739CurrentMainStartsMigrationForAuthenticReleaseIndex\" --tests \"io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.issue739CurrentMainRetiresReadyLegacyJobsWithoutReadingThem\" --continue --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2168014
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030FixtureTest.java#authenticFoldersRetainReleaseStateAndRelocateTogether",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030FixtureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:556ca04979c883d91475cafeea53da5024626e19790c31f6688b763d1254b537",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authenticFoldersRetainReleaseStateAndRelocateTogether(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java#issue739CurrentMainStartsMigrationForAuthenticReleaseIndex",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80d5c2c98f8ea1c5ae45e93038bc549e018a099fed2359025e6af125aa01f9be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "issue739CurrentMainStartsMigrationForAuthenticReleaseIndex(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java#issue739CurrentMainRetiresReadyLegacyJobsWithoutReadingThem",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80d5c2c98f8ea1c5ae45e93038bc549e018a099fed2359025e6af125aa01f9be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "issue739CurrentMainRetiresReadyLegacyJobsWithoutReadingThem(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cef13b7ca82eda4ba0ec5f49a172c49635f8577d496be563c81d2bf5d23c2e2d"
+}
