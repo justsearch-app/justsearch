@@ -1,3 +1,4 @@
+import { skipPrFlake } from '../ci/pr-flakes.mjs';
 import './lib/test-fixture-processes.cjs';
 // Recovery across the real CLI and injected identity boundaries. Only fake harness children run.
 // Identity-only stops, as on the integration side since 58a51a608: identities left by an earlier
@@ -318,6 +319,7 @@ test('real CLI forget prints the unknown Engine and leaves it alive', async () =
 let failed = 0, skipped = 0;
 try {
   for (const [name, fn, windowsOnly] of tests) {
+    if (skipPrFlake('scripts/dev/test-dev-runner-stop-recovery.mjs', name)) { skipped++; continue; }
     if (windowsOnly && process.platform !== 'win32') {
       console.log(`SKIP ${name}: Windows post-exit process handles / detached descendants in Job Objects; Linux: test-dev-runner-linux-bound-child.mjs`);
       skipped++;

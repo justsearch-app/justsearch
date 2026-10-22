@@ -1,32 +1,61 @@
 {
-  "schema": "github-advisory-report.v1",
-  "source": { "provider": "github-global-security-advisories", "api_version": "2026-03-10" },
+  "schema": "github-advisory-report.v2",
+  "source": {
+    "provider": "github-global-security-advisories",
+    "api_version": "2026-03-10"
+  },
   "targets": [
     {
-      "target_id": "root", "lockfile": "package-lock.json", "available": true,
+      "target_id": "root",
+      "lockfile": "package-lock.json",
+      "available": true,
       "lockfile_sha256": "4579aec81bdbde4e6eb0b61d1547c4ffd2cde788ce2713e0f1b2989712123524",
       "package_versions": 1,
-      "advisories": [{ "ghsa_id": "GHSA-35JH-R3H4-6JHM", "severity": "high", "html_url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm" }]
+      "advisories": [
+        {
+          "ghsa_id": "GHSA-35JH-R3H4-6JHM",
+          "severity": "high",
+          "html_url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm",
+          "affected": [
+            {
+              "package": "example",
+              "version": "1.0.0"
+            }
+          ]
+        }
+      ]
     },
     {
-      "target_id": "ui-web", "lockfile": "modules/ui-web/package-lock.json", "available": true,
+      "target_id": "ui-web",
+      "lockfile": "modules/ui-web/package-lock.json",
+      "available": true,
       "lockfile_sha256": "35be7134993f06d40974c585faaa025ccdce2a09e98bd3565db95b092bdede9e",
-      "package_versions": 1, "advisories": []
+      "package_versions": 1,
+      "advisories": []
     },
     {
-      "target_id": "shell", "lockfile": "modules/shell/package-lock.json", "available": true,
+      "target_id": "shell",
+      "lockfile": "modules/shell/package-lock.json",
+      "available": true,
       "lockfile_sha256": "64766e77f299990847b4bc834d97affbc97de4a9f8797ff1c390bbeb09aafd28",
-      "package_versions": 1, "advisories": []
+      "package_versions": 1,
+      "advisories": []
     },
     {
-      "target_id": "runtime-client", "lockfile": "packages/runtime-client/package-lock.json", "available": true,
+      "target_id": "runtime-client",
+      "lockfile": "packages/runtime-client/package-lock.json",
+      "available": true,
       "lockfile_sha256": "4fa65c589a97bc41fa54015c8a5b1a26759b6033e9e8c8f3e4496b3f5c468a6d",
-      "package_versions": 1, "advisories": []
+      "package_versions": 1,
+      "advisories": []
     },
     {
-      "target_id": "wire-contract", "lockfile": "scripts/wire-contract/package-lock.json", "available": true,
+      "target_id": "wire-contract",
+      "lockfile": "scripts/wire-contract/package-lock.json",
+      "available": true,
       "lockfile_sha256": "cc8d13c4be08cdbd2155db089b16a0049fd0d86b45513de4b9672b3691db4bad",
-      "package_versions": 1, "advisories": []
+      "package_versions": 1,
+      "advisories": []
     }
   ]
 }

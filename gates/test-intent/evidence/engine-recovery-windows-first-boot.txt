@@ -1,0 +1,116 @@
+Windows recovery-race conformance follow-up (2026-10-21)
+
+Candidate base: 5b89d03f0. No commit in this follow-up.
+Only scripts/supervisor-conformance/recovery-scenario.mjs and its startup-budget script checks change.
+No supervisor, product test, policy, Rust or Java change; no cargo build, new target or Gradle run.
+All temporary checkouts/data/logs are under the supplied TMPDIR or the existing repo tmp harness root.
+
+CI evidence retrieved using the supplied gh executable:
+  gh run view -R justsearch-app/justsearch 39620243172 --log-failed
+  gh api repos/justsearch-app/justsearch/actions/jobs/119291888403/logs
+  gh api repos/justsearch-app/justsearch/actions/artifacts/12355700534/zip
+  gh api repos/justsearch-app/justsearch/actions/artifacts/12355084132/zip
+Artifacts: supervisor-conformance-windows-attempt-1 (99 files) and -attempt-2 (40 files).
+Raw downloads/extracted relevant files remain at tmp/builder/windows-recovery-race/.
+
+Both attempts fail the same first running observation in recovery-scenario.mjs:65:
+  Error: timed out after 15000ms waiting for recovery-manual-retry-races-deadline-and-quit
+  at runRecoveryCase (.../recovery-scenario.mjs:65:19)
+This is before the fault gate is released, exhaustion is awaited, or restart-quit-race is sent.
+It is not a timeout in manual restart or quit processing. stderr has only launch preparation
+messages, not an incarnation-exit/restart narration. Exact Windows first-boot phase durations
+are unavailable: both logs report ENOENT writing the race's supervisor stdout log, and neither
+artifact has the race's timing record or work directory. The recovery helper removed that directory
+before the outer timing collector finished. Only the separate never-healthy recovery case has a
+recovery timing JSON in either upload.
+
+Conclusion: a harness first-boot observation budget mismatch, not an observed E5 supervisor race.
+The dev-runner adapter already permits 60000ms each for initial port/readiness plus 20000ms setup
+(its existing FIRST_RUNNING_TIMEOUT_MS is 140000). The recovery helper cut off that setup at 15000.
+Only the FIRST dev-runner running observation now reuses the existing 140000ms fixture allowance.
+Subsequent recovery observations remain 15000ms, control replies 5000ms, and the E5 race still fires
+100ms before retryAt. Its assertions (successful racing command; restart refused after quit;
+stopped; incarnation <= 5; no live Engine) are unchanged. Tauri's initial 15000ms observation is
+unchanged. Actual startup budgets and product supervision behavior are unchanged.
+
+Timing witness fix: the dev-runner driver keeps its work directory after its ordinary identity-aware
+process cleanup. Both shared recovery helpers schedule deletion through the runner's existing
+io.deferCleanup, using removeFixtureDirectory, so timing/output are written before removal. Failed
+hosted cases can now retain their normal artifacts. Without an outer cleanup registrar the helper
+still removes the directory itself. No process cleanup, identity check or scenario assertion is skipped.
+
+Deterministic Linux fail-before:
+A detached shared clone of 5b89d03f0 receives ONLY the two new script regression checks, plus the
+unchanged installed bound-exec prerequisite. No baseline product/harness implementation is patched.
+Command in that clone:
+  node --test --test-name-pattern='recovery race' scripts/supervisor-conformance/recovery-startup-budget.test.mjs
+Exit 1; both new checks fail by assertion:
+- Normal-speed E5 completes, but its timing record is absent: actual 0 / expected 1 records.
+- A synchronous 16000ms delay at the FIRST actuator spawn boundary (matching Windows job-host setup)
+  is within the existing 60000ms first-boot budget but causes the same first-running 15000ms timeout,
+  before any restart/quit race is commanded. The script asserts the real runner exits 0, gets 1.
+The delay uses Atomics.wait in the child runner, not CPU load or a slowed parent observer. Later
+spawns and recovery timers are untouched. Each check records that its boundary delay was exercised.
+
+Pass-after:
+  node --test scripts/supervisor-conformance/recovery-startup-budget.test.mjs
+Exit 0; all FOUR checks pass, including the two existing 900ms third-spawn cases unchanged.
+The controlled first-running observation took 16164ms, with budget 140000ms; the timing JSON has
+ready and stoppedPublished events and no problems or timing warning. Remaining recorded waits are
+<=15000ms. This completes the same E5 interleaving after slow fixture setup.
+Raw logs: regression-before.log, regression-after.log; captured slow-first-boot-timing.json.
+
+Other first-attempt failures are separate from the recovery helper and are not changed here:
+- quit-deadline-is-the-contract-value: artifact measures quitToStopped 13414ms vs the 10000ms bound;
+  retry measures 8249ms and passes. The force request was issued at 7903ms; exit observation and
+  stop publication added time. No quit assertion or supervisor timeout is widened.
+- data-dir-locked-after-own-predecessor-waits-once: stderr shows incarnation 2 did not publish a port
+  within its existing 4s replacement budget, so it was classified as a TRANSIENT hang and charged;
+  then incarnations 3 and 4 exit 2. Retry has only three spawns and passes. No lock retry assertion,
+  exit classification or replacement-start budget is changed. This explains the observed 4 != 3.
+These Windows outcomes are not reproduced or claimed fixed by the first-boot observer change.
+
+Windows execution is unavailable locally. The Linux boundary reproduction verifies the mismatch
+and the correction; actual Windows host setup duration cannot be recovered from the deleted artifacts.
+The next Windows run will have recovery timing/output artifacts instead of losing them on teardown.
+
+Required repeated race probe:
+  node scripts/supervisor-conformance/run.mjs --adapter dev-runner \
+    --case recovery-manual-retry-races-deadline-and-quit --repeat 50
+Exit 0; 50/50 passed. No timing warning. All 50 completed timing records have zero problems and
+stoppedPublished events. Case duration p50/p95/max: 4449/4522/4650ms; initial-running wait
+p50/p95/max: 200/202/302ms. CI=1 preserves records across the subsequent local invocations;
+per-fixture driver startup still explicitly clears child CI and uses its normal harness settings.
+Raw records/summary: tmp/builder/windows-recovery-race/repeat-records/ and repeat-summary.json.
+
+Additional related script checks:
+  node --test scripts/supervisor-conformance/timings.test.mjs scripts/supervisor-conformance/fixture-cleanup.test.mjs
+Exit 0; 15 passed, 3 existing Windows-only checks skipped on Linux, none failed.
+  node --check scripts/supervisor-conformance/recovery-scenario.mjs
+  node --check scripts/supervisor-conformance/recovery-startup-budget.test.mjs
+Both exit 0. All original recovery-scenario assertion lines are byte-identical to 5b89d03f0.
+No existing test input, assertion or fault injection is weakened; two regression cases are appended
+to the existing script test file. The normal-speed case independently fails before for missing
+timing evidence, while the 16s case fails before for premature first-running observation.
+
+Timing interpretation: the existing generic timing formatter labels initialPort/initialReady as
+10000ms in old dev-runner records; the actual adapter constants used at runtime are 60000ms.
+This follow-up uses the completed wait row (140000ms) and inspected adapter source for the initial
+setup comparison, rather than treating the formatter's old label as the runtime budget.
+
+Final requested conformance checks (after the 50-repetition probe):
+  node scripts/supervisor-conformance/run.mjs --self-test -> exit 0, 35/35.
+  node scripts/supervisor-conformance/run.mjs --adapter dev-runner -> exit 0, 51/51.
+  node scripts/supervisor-conformance/run.mjs --adapter tauri -> exit 0, 61/61.
+No timing warnings in either full adapter. Both include the E5 race and the unrelated quit/lock
+checks, which pass on Linux. Tauri uses the worktree's existing target/debug/supervisor-conformance
+binary (last built 2026-10-21 15:17 local); it is not rebuilt because no Rust changes are authorized
+or needed for this harness correction. This is an execution of the existing binary through the
+updated script driver, not a claim of a fresh Rust source build.
+No product code, test, supervisor or contract-register file differs from HEAD 5b89d03f0.
+All historical test-intent evidence source digests remain valid.
+
+Final test-intent --pr 826: exit 1 with only acceptance-stale. All thirteen flagged product items
+are covered, with no invalid evidence. Every historical acceptance/rejection record is byte-identical.
+No acceptance record was written by the builder. Nonblocking audit warning: 1/9 audited PRs (11.1%)
+had third-reviewer tie-breaks. git diff --check passes; HEAD remains 5b89d03f0, no commit added.

@@ -1,0 +1,12 @@
+allprojects { p ->
+  p.tasks.withType(Test).configureEach { t ->
+    t.systemProperty 'java.io.tmpdir', System.getenv('TMPDIR')
+    if (p.path == ':modules:app-services' && t.name == 'test') {
+      t.doFirst {
+        t.jvmArgumentProviders.removeAll { it.class.simpleName == 'AgentTestTmpDir' }
+        new File(System.getenv('TMPDIR'), 'evidence/test-classpath.txt').text = t.classpath.asPath
+        new File(System.getenv('TMPDIR'), 'evidence/test-java.txt').text = t.javaLauncher.get().executablePath.asFile.absolutePath
+      }
+    }
+  }
+}

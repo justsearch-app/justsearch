@@ -165,11 +165,18 @@ public final class WorkerMutationAdmission {
       installed = true;
     }
 
-    /** Stops late callbacks from re-entering an owner whose producers have actually closed. */
-    public void retireCurrentOwner() {
+    /**
+     * Withdraws an uncertified successor after a failed same-generation handoff. Callbacks waiting
+     * on this fence then enter the drained prior owner, which records them as durable obligations
+     * instead of refusing them.
+     */
+    public void restorePriorOwner() {
       requireOpen();
-      if (installed) throw new IllegalStateException("Successor has already been installed");
-      owner = fencedOwner;
+      if (certified || replayCertificateArmed) {
+        throw new IllegalStateException("A certified or armed successor cannot be withdrawn");
+      }
+      owner = prior;
+      installed = false;
     }
 
     /**

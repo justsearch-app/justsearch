@@ -87,7 +87,7 @@ final class OperatingIndexingGameModeTest {
             "ONLINE", null, false, null, new LifecycleCounters(0L, 0L, 0L), true, "Healthy", "",
             "", "");
     var worker = WorkerOperationalViewBuilder.builder(WorkerOperationalView.fallback("SERVING"))
-        .core(new CoreIndexView(true, 3_000, 5, "SERVING", 0, 0))
+        .core(new CoreIndexView(true, 3_000, 5, "INDEXING", 0, 0))
         .enrichment(EnrichmentProgressView.empty())
         .build();
     return assembler

@@ -59,6 +59,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import { buildPublicSquashRecord } from '../ci/lib/squash-message-projection.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -204,7 +205,7 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
   }
 }
 
-export async function runWaitSha(bin, sha, timeoutSec, { workflow = 'CI', branch = null, event = null } = {}, {
+export async function runWaitSha(bin, sha, timeoutSec, { workflow = 'CI', branch = 'main', event = 'push' } = {}, {
   loadJson = capturedJson,
   now = () => Date.now(),
   pause = sleep,
@@ -213,7 +214,7 @@ export async function runWaitSha(bin, sha, timeoutSec, { workflow = 'CI', branch
   const deadline = now() + timeoutSec * 1000;
   let previousKey = null;
   for (;;) {
-    const args = ['run', 'list', '--workflow', workflow, '--commit', sha, '--limit', '20', '--json',
+    const args = ['run', 'list', '--workflow', workflow, '--limit', '100', '--json',
       'databaseId,status,conclusion,headSha,event,createdAt,url'];
     if (branch) args.push('--branch', branch);
     if (event) args.push('--event', event);
@@ -222,7 +223,28 @@ export async function runWaitSha(bin, sha, timeoutSec, { workflow = 'CI', branch
       process.stderr.write(`run-gh run-wait-sha: ${loaded.error.message}\n`);
       return 2;
     }
-    const classified = classifyWorkflowRun(selectWorkflowRun(loaded.value, sha, event));
+    let selected = selectWorkflowRun(loaded.value, sha, event);
+    let covering = false;
+    if ((!selected || selected.conclusion === 'cancelled') && branch === 'main' && event === 'push') {
+      const candidates = (Array.isArray(loaded.value) ? loaded.value : [])
+        .filter((row) => row.event === 'push' && row.headSha !== sha && row.conclusion !== 'cancelled'
+          && (!selected || String(row.createdAt) >= String(selected.createdAt)))
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+      for (const candidate of candidates) {
+        const comparison = loadJson(bin, ['api', `repos/{owner}/{repo}/compare/${sha}...${candidate.headSha}`]);
+        if (comparison.error) {
+          process.stderr.write(`run-gh run-wait-sha: ${comparison.error.message}\n`);
+          return 2;
+        }
+        if (['ahead', 'identical'].includes(comparison.value?.status)) {
+          selected = candidate;
+          covering = true;
+          break;
+        }
+      }
+    }
+    const classified = classifyWorkflowRun(selected);
+    if (covering) classified.message = `following covering run ${selected.databaseId} (${selected.headSha}) for ${sha}: ${classified.message}`;
     previousKey = emit(`run-gh run-wait-sha ${sha.slice(0, 12)}`, classified, previousKey);
     if (classified.verdict === 'pass') return 0;
     if (classified.verdict === 'fail') return 1;
@@ -368,6 +390,26 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
   reviewRecordScript = REVIEW_RECORD_SCRIPT,
   writeError = (message) => process.stderr.write(message),
 } = {}) {
+  const readSnapshot = () => {
+    const args = ['pr', 'view', String(prNumber), '--json', 'headRefOid,title,body,isDraft,mergeable'];
+    if (repo) args.push('--repo', repo);
+    const response = run(bin, args, { encoding: 'utf8', windowsHide: true });
+    const failure = childFailure('PR snapshot', response, writeError);
+    if (failure) return { failure };
+    try {
+      const value = JSON.parse(response.stdout);
+      if (!/^[a-f0-9]{40}$/.test(value.headRefOid) || typeof value.title !== 'string'
+          || typeof value.body !== 'string' || typeof value.isDraft !== 'boolean'
+          || !['MERGEABLE', 'CONFLICTING', 'UNKNOWN'].includes(value.mergeable)) throw new Error('incomplete PR snapshot');
+      if (value.isDraft || value.mergeable !== 'MERGEABLE') throw new Error(value.isDraft ? 'PR is a draft' : `PR mergeability is ${value.mergeable}`);
+      return { value };
+    } catch (error) {
+      writeError(`run-gh enqueue: ${error.message}\n`);
+      return { failure: 2 };
+    }
+  };
+  const before = readSnapshot();
+  if (before.failure) return before.failure;
   const commonArgs = ['--pr', String(prNumber)];
   if (repo) commonArgs.push('--repo', repo);
   const steps = [
@@ -380,10 +422,19 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
     if (failure !== 0) return failure;
   }
 
-  const mergeArgs = ['pr', 'merge', String(prNumber)];
+  const after = readSnapshot();
+  if (after.failure) return after.failure;
+  if (['headRefOid', 'title', 'body', 'isDraft', 'mergeable'].some((key) => before.value[key] !== after.value[key])) {
+    writeError('run-gh enqueue: PR changed during validation; enqueue again.\n');
+    return 2;
+  }
+  // Use the preview's projection, including GitHub's PR-number suffix and LF body.
+  const preview = buildPublicSquashRecord({ pr: { ...after.value, number: prNumber } });
+  const mergeArgs = ['pr', 'merge', String(prNumber), '--squash', '--auto',
+    '--match-head-commit', after.value.headRefOid, '--subject', preview.expectedLandedSubject, '--body', preview.body];
   if (repo) mergeArgs.push('--repo', repo);
   const result = run(bin, mergeArgs, { stdio: 'inherit', windowsHide: true });
-  return childFailure('merge-queue request', result, writeError);
+  return childFailure('squash auto-merge request', result, writeError);
 }
 
 async function main() {
@@ -415,8 +466,8 @@ async function main() {
   if (argv[0] === 'run-wait-sha') {
     const { timeoutSec, rest: afterTimeout } = parseTimeoutSec(argv.slice(1));
     const workflowFlag = parseValueFlag(afterTimeout, '--workflow', 'CI');
-    const branchFlag = parseValueFlag(workflowFlag.rest, '--branch');
-    const eventFlag = parseValueFlag(branchFlag.rest, '--event');
+    const branchFlag = parseValueFlag(workflowFlag.rest, '--branch', 'main');
+    const eventFlag = parseValueFlag(branchFlag.rest, '--event', 'push');
     const sha = eventFlag.rest[0];
     if (!sha) {
       process.stderr.write('run-gh run-wait-sha: missing <sha>\n');

@@ -210,25 +210,23 @@ testing {
         // against API records in app-api.
         implementation(project(":modules:app-api"))
       }
-      targets {
-        all {
-          testTask.configure {
-            jvmArgs("-Dnet.bytebuddy.experimental=true")
-            // Tempdoc 408 Tier 2: shard worker-services tests across 2 JVM forks.
-            // worker-services:test was the slowest single-task in the profile
-            // (27s, single JVM). Tests are fork-safe: no static singleton mutation,
-            // no shared file paths (all use @TempDir), no port bindings, and the
-            // System.setProperty("justsearch.config", ...) usage is per-test with
-            // save/restore — each fork gets its own JVM properties.
-            // Each fork uses ~384 MB heap (JvmBaseConventionsPlugin default), so
-            // 2 forks = ~768 MB total per worker-services:test invocation.
-            // Empirically: 1 fork → 27.2s; 2 forks → 21.9s; 3 forks → 26.95s
-            // (3-fork JVM-startup overhead overwhelms the parallelism gain on this
-            // workload distribution). 2 forks is the local optimum.
-            maxParallelForks = 2
-          }
-        }
-      }
     }
   }
+}
+
+// Keep the complete local suite and its hosted class shards on the same unit configuration.
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  jvmArgs("-Dnet.bytebuddy.experimental=true")
+  // Tempdoc 408 Tier 2: shard worker-services tests across 2 JVM forks.
+  // worker-services:test was the slowest single-task in the profile
+  // (27s, single JVM). Tests are fork-safe: no static singleton mutation,
+  // no shared file paths (all use @TempDir), no port bindings, and the
+  // System.setProperty("justsearch.config", ...) usage is per-test with
+  // save/restore — each fork gets its own JVM properties.
+  // Each fork uses ~384 MB heap (JvmBaseConventionsPlugin default), so
+  // 2 forks = ~768 MB total per worker-services:test invocation.
+  // Empirically: 1 fork → 27.2s; 2 forks → 21.9s; 3 forks → 26.95s
+  // (3-fork JVM-startup overhead overwhelms the parallelism gain on this
+  // workload distribution). 2 forks is the local optimum.
+  maxParallelForks = 2
 }

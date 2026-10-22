@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T11:51:16.162Z",
+  "revision": "dfa1d18e18df58dad28a963c3c54415ec5403a70",
+  "tree": "14263230221c1e31710dea72315708369f7ff21d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeDirectoryPermissionsTest.linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3326
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java#linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:43ce96d81b1814faf7eb17cc6326f3468474d35e0e32a3fbeabfeb5b55219850",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4975ceedf",
+    "revision": "4975ceedf408a7067ccd285d4ef2eb22bd67f400",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeDirectoryPermissionsTest.linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 4324
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java#linkedRuntimeStillPublishesWithoutChangingTargetOrParentPermissions",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0370ec595c45ec6d7ef37ded41ed7a2fe4e8652e8a9765f4919dae8d2cd34b96"
+}

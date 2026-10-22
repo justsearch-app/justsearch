@@ -18,6 +18,7 @@
  */
 
 import type { StatusResponse } from '../../api/generated/index.js';
+import { formatCount } from '../display/format.js';
 
 /**
  * The 813 §3a phase model, index-wide scope. `Scanning` is per-scan (the scan SSE) and is therefore
@@ -31,7 +32,7 @@ import type { StatusResponse } from '../../api/generated/index.js';
  * reachable (`unreachable-seed-green`). It is deliberately NOT folded into `enriching`: nothing is
  * running, so no percent moves and no estimate exists.
  */
-export type IndexingPhase = 'indexing' | 'enriching' | 'blocked' | 'ready' | 'unknown';
+export type IndexingPhase = 'indexing' | 'waiting' | 'error' | 'enriching' | 'blocked' | 'ready' | 'unknown';
 
 /**
  * 813 §4 — which PARENT enrichment stages are applicable to this deployment, index-wide.
@@ -209,7 +210,7 @@ export interface IndexingProgress {
  * (`WorkerStatusCache.status()` / `CoreIndexView.fallback`), so its zeros are absence, not "settled".
  * Reading them as `ready` is the "0 == done" lie this allowlist exists to prevent.
  */
-const INDEX_REPORTED_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'ERROR', 'FAILED']);
+const INDEX_REPORTED_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'WAITING', 'ERROR', 'FAILED']);
 
 /**
  * Does this snapshot carry a WORKER-REPORTED index block (as opposed to the hard-zeroed fallback
@@ -400,10 +401,13 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
  * the semantic stage cannot run — a SPLADE-only backfill is still visible as a stage row in the
  * disclosure, so nothing is hidden by saying the truer thing in the headline.
  */
-function derivePhase(jobsPending: number, work: EnrichmentWork): IndexingPhase {
+function derivePhase(indexState: string | null | undefined, jobsPending: number, work: EnrichmentWork): IndexingPhase {
+  // Eligibility is decided by the queue in the Worker; browser time never makes a retry due.
+  if (indexState === 'WAITING') return 'waiting';
   if (jobsPending > 0) return 'indexing';
-  if (work.blockedPending > 0) return 'blocked';
-  return work.rawPending > 0 ? 'enriching' : 'ready';
+  if (work.blockedPending > 0) return indexState === 'ERROR' ? 'error' : 'blocked';
+  if (work.rawPending > 0) return 'enriching';
+  return indexState === 'ERROR' ? 'error' : 'ready';
 }
 
 /**
@@ -419,7 +423,7 @@ export function selectIndexingPhase(status: StatusResponse | null | undefined): 
   if (!isWorkerReportedIndex(status) || !core) return 'unknown';
   // The counts remain real, but no progress or completion claim survives a fatal loop death.
   if (core.indexState === 'FAILED') return 'unknown';
-  return derivePhase(count(core.pendingJobs), readEnrichmentWork(status));
+  return derivePhase(core.indexState, count(core.pendingJobs), readEnrichmentWork(status));
 }
 
 /**
@@ -598,7 +602,7 @@ export function selectIndexingProgress(
     ? Math.min(work.rawPending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100))
     : null;
 
-  const phase = derivePhase(jobsPending, work);
+  const phase = derivePhase(core.indexState, jobsPending, work);
   const activity = indexingActivity(status, indexingStatusLive, phase, work.rawPending);
 
   // 813 §19 (W2) — the high-water denominator. `episodeMax > jobsPending` is the whole admission
@@ -654,8 +658,10 @@ export function selectIndexingProgress(
 export function indexingTaskStatus(
   task: { id: string; status: string },
   activity: IndexingProgress['activity'],
+  phase: IndexingPhase,
 ): string {
-  return task.id.startsWith('idxjob:') && !activity.confirmed
+  return task.id.startsWith('idxjob:') && (!activity.confirmed ||
+    (phase !== 'indexing' && task.status === 'running'))
     ? `last observed ${task.status}`
     : task.status;
 }
@@ -692,6 +698,23 @@ function indexingActivity(
   }
   if (reasons.has('chat_generating') && !enrichmentDeferred) {
     details.push('Indexing shares time with chat.');
+  }
+  if (phase === 'error') {
+    const failed = count(status.worker?.failure?.failedJobs);
+    return { summary: 'Indexing error',
+      detail: failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be indexed.`
+        : 'Some files could not be indexed.',
+      confirmed: true, enrichmentDeferred };
+  }
+  if (phase === 'waiting') {
+    const jobs = count(status.worker?.core?.pendingJobs);
+    const retry = count(status.worker?.failure?.nextRetryAtMs);
+    const deadline = retry > 0 ? new Date(retry) : null;
+    const nextRetry = deadline && Number.isFinite(deadline.getTime())
+      ? ` Next retry: ${deadline.toLocaleString()}.` : '';
+    return { summary: 'Waiting to retry',
+      detail: `${formatCount(jobs)} ${jobs === 1 ? 'file' : 'files'} waiting.${nextRetry}`,
+      confirmed: true, enrichmentDeferred };
   }
   const summary = phase === 'indexing'
     ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'

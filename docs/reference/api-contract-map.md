@@ -321,9 +321,14 @@ fires. The pattern is named-question, not generic-dashboard (419 C3 explicit non
   the existing `gpu.recentUtilizationPercent` sparkline renders next to it.
 
 **Corpus counts — two distinct numbers (post tempdoc 811 C-4, 2026-08-06):**
-- `worker.core.indexedDocuments: long` — every non-chunk document in the index (total docs minus
+- `worker.core.indexState: string` — `INDEXING` for ready or processing jobs, `WAITING` for
+  retry-only backlog, `IDLE` when empty, `ERROR` for terminal failures with no unfinished work,
+  `FAILED` for fatal loop failure. Waiting uses the existing `worker.failure.nextRetryAtMs` and
+  total `worker.core.pendingJobs`; see [retry waiting and counts](contracts/health-readiness-contract.v1.md#retry-waiting-and-indexed-counts).
+- `worker.core.indexedDocuments: long` — every non-chunk parent document in the serving index (total docs minus
   chunk docs). Describes the INDEX. Consumed by Health (`core.files`), jseval readiness, and
-  sandbox evidence; its meaning is unchanged and must stay unchanged.
+  sandbox evidence. Building-generation progress is reported separately through
+  `worker.migration.buildingIndexedDocuments`, and completed queue rows never substitute for this count.
 - `worker.core.searchableDocuments: long` — the population a DEFAULT-scope search can actually
   return: `indexedDocuments` minus the collections the default scope excludes (today exactly
   `agent-history`). Derived in `IndexStatusOps#countDefaultScopeDocs` from
@@ -525,6 +530,10 @@ The unreleased queue branch also used V23: V24 idempotently ensures main's admis
 objects before adding bookkeeping, so those development databases can upgrade without
 discarding jobs or resetting an existing admission counter. Historical V23 execution receipts
 describe that unreleased branch; new migration evidence is explicitly named V24.
+V25 follows V24 without a table-layout change: switch-buffer DELETE payloads carry their
+origin and watcher-reconciliation receipts are kept as switch-buffer rows, so older binaries,
+which would read a versioned DELETE as a raw path, refuse V25. Neither adds a `jobs` row, so
+`job_counts` and the claim indexes are unaffected.
 
 The indexing-jobs worker/head bridge carries an optional `state_presence` message on existing
 `IndexingJobsFrame` frames: every snapshot contains the set of states present anywhere in jobs.db;

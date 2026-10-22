@@ -71,6 +71,69 @@ final class JobQueueMigrationTest {
     }
   }
 
+  @ParameterizedTest(name = "releasedVersionUpgradesToV25KeepingAdmissionCount({0})")
+  @ValueSource(ints = {22, 23, 24})
+  void releasedVersionUpgradesToV25KeepingAdmissionCount(int version) throws Exception {
+    Path db = tempDir.resolve("released-v" + version + ".db");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      queue.enqueue(List.of(tempDir.resolve("saved-job")));
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      // Built by hand so the fixture is a released shape (a V22 install, main's V23, or main's
+      // V24), not whatever this binary writes: V23 is the admission counter and its trigger; V24
+      // is main's job counts and claim indexes; V25 adds no table layout.
+      if (version < 24) {
+        for (String trigger : List.of("jobs_counts_insert", "jobs_counts_update", "jobs_counts_delete")) {
+          statement.execute("DROP TRIGGER IF EXISTS " + trigger);
+        }
+        statement.execute("DROP TABLE IF EXISTS job_counts");
+        for (String index : List.of("idx_jobs_state_retry", "idx_jobs_pending_ready", "idx_jobs_pending_retry")) {
+          statement.execute("DROP INDEX IF EXISTS " + index);
+        }
+      }
+      statement.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      statement.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
+      if (version >= 23) {
+        statement.execute("CREATE TABLE switch_buffer_admissions "
+            + "(id INTEGER PRIMARY KEY CHECK(id = 1), count INTEGER NOT NULL CHECK(count >= 0))");
+        statement.execute("INSERT INTO switch_buffer_admissions VALUES (1, 7)");
+        statement.execute("CREATE TRIGGER count_switch_buffer_admission AFTER INSERT ON switch_buffer "
+            + "BEGIN UPDATE switch_buffer_admissions SET count = count + 1 WHERE id = 1; END");
+      }
+      statement.execute("PRAGMA user_version = " + version);
+    }
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      try (ResultSet rs = statement.executeQuery("PRAGMA user_version")) {
+        assertTrue(rs.next());
+        assertEquals(25, rs.getInt(1),
+            "a V" + version + " queue must reach V25 so older readers refuse versioned DELETE");
+      }
+      statement.execute("INSERT INTO switch_buffer "
+          + "(generation, key, op, payload, last_updated, revision, accepted_order) "
+          + "VALUES ('', 'after-upgrade', 'DELETE', '{}', 1, 'revision', 1)");
+      try (ResultSet rs = statement.executeQuery(
+          "SELECT count FROM switch_buffer_admissions WHERE id = 1")) {
+        assertTrue(rs.next(), "V23's admission counter must exist after the upgrade");
+        assertEquals(version >= 23 ? 8 : 1, rs.getInt(1),
+            "the upgrade keeps main's V23 count and keeps counting admissions");
+      }
+      try (ResultSet rs = statement.executeQuery(
+          "SELECT (SELECT COALESCE(SUM(n), 0) FROM job_counts), (SELECT COUNT(*) FROM jobs)")) {
+        assertTrue(rs.next());
+        assertEquals(1, rs.getLong(2));
+        assertEquals(rs.getLong(2), rs.getLong(1),
+            "job counts follow jobs rows only; a switch-buffer row does not change them");
+      }
+    }
+    assertMatchesFreshSchema(db);
+  }
+
   @Test
   void failedBackupPreservesLiveDatabaseAndCompletedBackup() throws Exception {
     Path dbPath = tempDir.resolve("jobs.db");
@@ -1024,7 +1087,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(24, SqliteSchema.TARGET_VERSION);
+      assertEquals(25, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
