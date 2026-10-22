@@ -58,9 +58,17 @@ author-session: ci-one-run-builder-20261021
           "scenario": "O12",
           "quote": "Known flake families no longer block PRs; deterministic failures in the PR lanes still do.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Approved direction: slow suites and the combined-tree check on main after merging, flaky tests out of the required set",
+          "choice": "Run the slow suites and the combined-tree check on main after merging; exclude the listed flaky tests from the required PR set while retaining their execution on main and dispatch.",
+          "label": "agent choice"
         }
       ],
-      "conflictSearch": "decision records searched for a conflict: ADR-0026 and ADR-0044/0045 describe the prior full PR / light queue and dispatch-only slow tiers. The agreed O1\u2013O5, O8 and O12 replace that execution selection; ADR-0053 records the supersession. Product assertions remain, and the listed exclusions execute on main and dispatch. Acceptance remains pending independent review."
+      "conflictSearch": "decision records searched for a conflict: ADR-0026 and ADR-0044/0045 describe the prior full PR / light queue and dispatch-only slow tiers. The agreed O1\u2013O5, O8 and O12 replace that execution selection; ADR-0053 records the supersession. Product assertions remain, and the listed exclusions execute on main and dispatch."
     },
     {
       "items": [
@@ -143,6 +151,14 @@ author-session: ci-one-run-builder-20261021
           "kind": "delegated-choice",
           "delegationQuote": "agreed to all",
           "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Scenario O1: docs-only PRs keep the repository-wide static assertions in always-on Public claims",
+          "choice": "Move the repository-wide Vite scan, action-ledger documentation check and registry-projected legal table check into always-on Public claims so docs-only PRs retain those assertions.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "agreed to all",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
           "delegationScope": "Scoped Java lanes and delivery timing",
           "choice": "Split Linux Java unit lanes over 12 minutes into shards balanced by measured per-class timings, targeting at most about 10 minutes per shard.",
           "label": "agent choice"
@@ -200,14 +216,6 @@ author-session: ci-one-run-builder-20261021
           "delegationQuote": "yes",
           "delegationLocation": "task t-20261020-5d7302 agreement",
           "delegationScope": "Auto-merge bound to the validated PR head",
-          "choice": "Leave auto-merge enabled when the PR head has changed again or auto-merge was enabled after workflow creation; compare enabledAt against the run created_at.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "yes",
-          "delegationLocation": "task t-20261020-5d7302 agreement",
-          "delegationScope": "Auto-merge bound to the validated PR head",
           "choice": "Compare enabledAt against the synchronize payload pull_request.updated_at instead, without an extra request. Disable auto-merge on missing or invalid timestamps or other uncertainty; leave it enabled only when the head changed again or it was enabled after the push.",
           "label": "agent choice"
         }
@@ -240,5 +248,16 @@ Pending independent acceptance by the orchestrator or verifier; the builder cann
   "verdict": "accept",
   "digest": "sha256:69dafaa13a50f5c92ab3feae221765e8ff56cecab70b57d94a520e1b74dff92a",
   "note": "Re-reviewed after the reject: the nine fix-round choices are now delegated-choice sources quoting the owner's words, which the task record holds (light queue and autonomy 2026-10-20; 'yes' to the direction and 'agreed to all' 2026-10-21); each choice lies within its delegation. Scenario sources match the agreed r2 text. Verification: verifier r4 (full) and r5 (focused) on this candidate passed."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "justsearch-03",
+  "verdict": "accept",
+  "digest": "sha256:29e3fa15fc7f5ffd5a004e28a71287e1d7711f96cb4c1ecd5910efa41d9438c8",
+  "note": "Re-accepted after an independent read: the stale created_at choice is removed, the out-of-date pending sentence is gone, and entries 1 and 3 now also cite the owner's 'yes' and 'agreed to all' for their direct scopes. Each choice lies within its delegation."
 }
 ```
