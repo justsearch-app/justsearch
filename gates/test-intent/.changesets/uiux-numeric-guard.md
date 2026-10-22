@@ -1864,3 +1864,14 @@ Detailed builder report: tmp/nx3/builder-report.md.
   "note": "Reject: the literal checks execute (39/39; NX2 11 assertion failures before, 11 passes after), but omit boundaries required by D8/F1/NX1/NX2. A supported spaced unit range (5 kg - 10 kg) loses its mark; -10 kg verifies against 5 kg -10 kg; 1 verifies against undecided 1.2.3e4; currency deletion invents 15 from 1$5 (real cosine API); percent after a unit is lost (5 against 5kg%). Real private Ask/Delegate/API and Chromium evidence confirms applicable failures. NG6 also fails in the pre-existing old Delegate cosine frame: zero marks but Grounded 1 of 1. Evidence: /home/elias/dev/justsearch/tmp/verify/wp4.5/verifier-3/verification-report.md. NG8 production Ask and NG9 shipped-model counts remain unverified; scorer-only timing meets D10."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp45-nx3-8dh3rho2",
+  "verdict": "accept",
+  "digest": "sha256:e43aa1cb618ea26e3ec6518afd9ac9d4014973900bcaab1477129567649f7e96",
+  "note": "Expectations accepted under NX3; 48 named checks rerun with zero skips. Five selected repairs assertion-fail on 062011106 and seven on 76efc1c10. This accepts test intent, not the implementation: independent grouped-value and Unicode-form checks fail. Evidence: /home/elias/.cache/am/8dh3rho2/evidence."
+}
+```
