@@ -567,3 +567,14 @@ recorded here for the independent verifier; they do not replace any existing exp
   failures and seventeen passes in `tmp/builder/followup/evidence/harness-before.log`.
 - After: candidate harness and readiness checks; 76 passes plus five passing subtests in
   `tmp/builder/followup/evidence/harness-after.log`. No existing test expectation was weakened.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a161b1-ca67-7ef2-9f4d-c64a90c6af09",
+  "verdict": "accept",
+  "digest": "sha256:57254e3e27792b1d56475bfcd81793d361200db6a580099990dc72154a56ed94",
+  "note": "All fourteen entries preserve existing checks or add agreed U15/U16/U20 coverage, and delegated implementation choices are honestly attributed."
+}
+```
