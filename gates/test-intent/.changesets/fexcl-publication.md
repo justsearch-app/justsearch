@@ -67,7 +67,7 @@ Gradle uses its defaults of one fork and no fork recycling):
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "An exclusion saved while an enrichment pass is in progress stops that pass from publishing or spending retries for the excluded document, including when its stored path differs from its id, while unaffected and later-unexcluded work remains runnable.",
           "label": "agent choice"
         }
@@ -97,7 +97,7 @@ Gradle uses its defaults of one fork and no fork recycling):
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "A settings save can finish during VDU publication, and explicit Apply runs after that publication under the fence and removes the excluded document and its chunks.",
           "label": "agent choice"
         }
@@ -117,14 +117,14 @@ Gradle uses its defaults of one fork and no fork recycling):
       "sources": [
         {
           "kind": "defect-source",
-          "safeguard": "no leak across a requested scope",
+          "safeguard": "no hang",
           "reproduction": "Enforcing the requested exclusion scope must remain possible during publication. gates/test-intent/evidence/fexcl-round2.json records bounded assertion fail-before at 226be391d for VduPolicySaveDeadlockTest#vduSaveAndLoopWriterAllFinish: loop writer, VDU and settings-save threads failed to finish because of a lock cycle. The round-5 evidence for this entry is preservation on recorded-base d05fb4bba and candidate, both passing."
         },
         {
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "VDU publication and claims, the loop writer and a competing settings save all finish without a lock-order deadlock.",
           "label": "agent choice"
         }
@@ -151,7 +151,7 @@ Gradle uses its defaults of one fork and no fork recycling):
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "Explicit Apply runs after an in-flight Engine publication under the fence and removes the excluded document, its enrichment and its search result.",
           "label": "agent choice"
         }
@@ -171,14 +171,14 @@ Gradle uses its defaults of one fork and no fork recycling):
       "sources": [
         {
           "kind": "defect-source",
-          "safeguard": "no leak across a requested scope",
+          "safeguard": "no hang",
           "reproduction": "Enforcing the requested exclusion scope must not block behind a settings writer at publication. gates/test-intent/evidence/fexcl-round5-repairs.json records assertion fail-before at d05fb4bba for VduPolicySaveDeadlockTest#publicationPolicyReadDoesNotQueueBehindSavingWriter: the policy read timed out behind the saving writer. gates/test-intent/evidence/fexcl-round2.json also records that assertion failure at 226be391d."
         },
         {
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "The exclusion-policy snapshot read at publication completes without waiting behind a queued settings writer.",
           "label": "agent choice"
         }
@@ -206,7 +206,7 @@ Gradle uses its defaults of one fork and no fork recycling):
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "Engine tests run with their own data folder and home and never read or write the user's real profile.",
           "label": "agent choice"
         }
@@ -233,7 +233,7 @@ Gradle uses its defaults of one fork and no fork recycling):
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
-          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "delegationScope": "all remaining work the user had assigned to this session in task t-20261018-6108b0, which the user extended with \"actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that\" (2026-10-18T21:16:56Z). The later review-swarm request was \"i want you to think about what angles we could run a swarm of opus high agents on for this project\" (2026-10-19T19:15:01Z), followed by \"do that\" (2026-10-19T19:15:45Z). The swarm request asked for analysis; fixing its findings is the agent's reading of the broader delegation, which the user validates afterwards.",
           "choice": "Failed Engine harness startup leaves the caller's data-folder and home properties unchanged.",
           "label": "agent choice"
         }
