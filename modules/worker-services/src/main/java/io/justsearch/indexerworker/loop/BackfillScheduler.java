@@ -215,6 +215,7 @@ public final class BackfillScheduler {
    * returns to the caller's job-queue poll regardless of what the enrichment population does.
    */
   public boolean runIdleCycle() {
+    if (signalBus.isIndexingHeld()) return false;
     boolean backfillDidWork = false;
     final long cycleStartNanos = System.nanoTime();
     final long cycleDeadlineNanos =
@@ -273,7 +274,7 @@ public final class BackfillScheduler {
         commitOps.withNrtSuspended(
             () -> {
               while (useCombinedRef[0]) {
-                if (!running.get() || Thread.currentThread().isInterrupted()) break;
+                if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
                 // Tempdoc 885 item 3: yield to foreground load, do not abandon the cycle for it.
                 indexingPacing.pace();
                 if (signalBus.shouldYieldGpuBackfill()) break; // tempdoc 630: GPU-claimed OR energy-reduced
@@ -407,7 +408,7 @@ public final class BackfillScheduler {
   public void runInterleavedSplade(long now) {
     if (spladeEncoderSupplier.get() == null && bgeM3EncoderSupplier.get() == null) return;
     // Spec E section 1.3 item 5: no interleaved sparse batch starts while bulk GPU work is held.
-    if (signalBus.isBulkHeld()) return;
+    if (signalBus.isIndexingHeld() || signalBus.isBulkHeld()) return;
     if (now < nextSpladeRetryTime) return;
     long spladeIntervalMs = pacing().spladeInterleaveIntervalMs();
     if (now - lastSpladeInterleaveTime < spladeIntervalMs) return;
@@ -481,7 +482,7 @@ public final class BackfillScheduler {
         boolean anyChunkProgress = chunkOutcome.docsProcessed() > 0;
         while (chunkDidWork) {
           backfillDidWork = true;
-          if (!running.get() || Thread.currentThread().isInterrupted()) break;
+          if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
           indexingPacing.pace(); // tempdoc 885 item 3: duty cycle, not a stop
           if (signalBus.shouldYieldGpuBackfill()) break; // tempdoc 630: GPU-claimed OR energy-reduced
           if (signalBus.hasPendingIngest()) break; // tempdoc 798: primary indexing outranks backfill
@@ -673,6 +674,7 @@ public final class BackfillScheduler {
   /** Stop reasons that must not be hidden by a first-unit scheduling floor. */
   private boolean hardStopBackfillWork() {
     return !running.get()
+        || signalBus.isIndexingHeld()
         || Thread.currentThread().isInterrupted()
         || signalBus.shouldYieldGpuBackfill()
         || signalBus.hasPendingIngest();
@@ -701,7 +703,7 @@ public final class BackfillScheduler {
             embeddingLifecycle::embeddingProvider,
             spladeEncoderSupplier,
             nerServiceSupplier,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing.embeddingBackfillBatchSize(),
             log,
@@ -732,7 +734,7 @@ public final class BackfillScheduler {
             signalBus,
             indexingPacing,
             embeddingLifecycle::embeddingProvider,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing().embeddingBackfillBatchSize(),
             log));
@@ -747,7 +749,7 @@ public final class BackfillScheduler {
             signalBus,
             indexingPacing,
             embeddingLifecycle::embeddingProvider,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing().embeddingBackfillBatchSize(),
             log));
@@ -761,7 +763,7 @@ public final class BackfillScheduler {
             commitOps,
             indexingPacing,
             nerServiceSupplier,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().nerBackfillBatchSize(),
             log));
   }
@@ -799,7 +801,7 @@ public final class BackfillScheduler {
               commitOps,
               signalBus,
               () -> bge,
-              running::get,
+              () -> running.get() && !signalBus.isIndexingHeld(),
               pacing().bgeM3BackfillBatchSize(),
               true,
               chunkSpladeEnabled(),
@@ -812,7 +814,7 @@ public final class BackfillScheduler {
             commitOps,
             indexingPacing,
             spladeEncoderSupplier,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().spladeBackfillBatchSize(),
             true,
             chunkSpladeEnabled(),
@@ -829,7 +831,7 @@ public final class BackfillScheduler {
               commitOps,
               signalBus,
               () -> bge,
-              running::get,
+              () -> running.get() && !signalBus.isIndexingHeld(),
               pacing().bgeM3InterleaveBatchSize(),
               false,
               chunkSpladeEnabled(),
@@ -842,7 +844,7 @@ public final class BackfillScheduler {
             commitOps,
             indexingPacing,
             spladeEncoderSupplier,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().spladeInterleaveBatchSize(),
             false,
             chunkSpladeEnabled(),
@@ -855,7 +857,7 @@ public final class BackfillScheduler {
             documentFieldOps,
             indexingPacing,
             disambiguationServiceSupplier,
-            running::get,
+            () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().disambiguationBackfillBatchSize(),
             log));
   }

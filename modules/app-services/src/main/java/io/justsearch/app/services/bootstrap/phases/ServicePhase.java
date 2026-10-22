@@ -114,8 +114,8 @@ public final class ServicePhase {
       RuntimeReconciler runtimeReconciler,
       // Tempdoc 737 §12b: the spec writer, exposed so the core.set-chat-enabled /
       // core.switch-inference-mode(alias) operation handlers can record the chat-enabled intent
-      // through the one authority (write via this store, then reconciler.specChanged()). Nullable
-      // when inference is not configured.
+      // through the one authority (write via this store, then reconciler.specChanged()). The
+      // settings intent writer also serves indexing pause when inference is not configured.
       RuntimeSpecStore runtimeSpecStore) {}
 
   /** Bundled output — all services every downstream phase consumes. */
@@ -185,7 +185,7 @@ public final class ServicePhase {
     OfflineCoordinator offlineCoordinator = null;
     try {
     RuntimeReconciler runtimeReconciler = null;
-    RuntimeSpecStore runtimeSpecStore = null;
+    RuntimeSpecStore runtimeSpecStore = new RuntimeSpecStore(in.settingsStore(), in.attempts());
     io.justsearch.app.inference.chat.ChatHolds chatHolds = null;
     // §31 Phase 1.A: EnterprisePolicyService impl in app-services. Tempdoc 737: constructed up-front
     // (moved from below) so the runtime reconciler can read the online-AI policy ceiling.
@@ -219,7 +219,8 @@ public final class ServicePhase {
               // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
               var bulkWork = ks != null ? ks.bulkWork() : null;
               boolean bulkHeld = bulkWork != null && bulkWork.held();
-              return newActivity || energyReduced || bulkHeld;
+              return newActivity || energyReduced || bulkHeld
+                  || (ks != null && ks.gpuScheduling().indexingHold().held());
             };
           };
       // Tempdoc 737 Phase 1/2: the single-writer runtime authority. Constructed BEFORE the offline
@@ -227,7 +228,6 @@ public final class ServicePhase {
       // its mode listener attaches (mirror-initial-then-forward) before the first boot convergence.
       // The env autostart flag seeds the persisted spec (item 1); the reconciler then converges the
       // engine toward spec — replacing the former direct InferenceWiring.tryStartOnlineMode switch.
-      runtimeSpecStore = new RuntimeSpecStore(in.settingsStore(), in.attempts());
       InferenceLifecycleManager manager = in.inferenceManager();
       runtimeReconciler =
           new RuntimeReconciler(

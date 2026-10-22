@@ -98,6 +98,7 @@ import {
   sv3PaneIsInline,
   sv3PaneOccupiedWidth,
   SV3_GRIP_KEY_STEP_PX,
+  SV3_MAIN_MIN_PX,
   SV3_PANE_DEFAULT_PX,
   SV3_SIDEBAR_COLLAPSED_PX,
   SV3_SIDEBAR_DEFAULT_PX,
@@ -705,6 +706,37 @@ export class SearchV3View extends JfElement {
           transition: none;
         }
       }
+      /* Reuse the icon rail when the two regions cannot fit. Its controls are fixed-size icons;
+         text zoom must not double the empty rail or the gutters at the expense of the answer. */
+      :host([sidebar-narrow]) {
+        --sidebar-width-icon: var(--space-12);
+        --sidebar-content-inset: var(--space-2);
+        --floating-content-inset: var(--space-3);
+      }
+      /* Reopening the sidebar in a narrow window is a sheet, like the citation pane. The column
+         keeps exactly the icon rail's reservation, so opening the sheet never squeezes it. */
+      :host([sidebar-narrow]:not([sidebar-collapsed])) jf-sv3-sidebar {
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        max-width: 100%;
+        z-index: var(--z-overlay);
+      }
+      :host([sidebar-narrow]:not([sidebar-collapsed])) .column {
+        margin-inline-start: var(--sidebar-width-icon);
+      }
+      :host([sidebar-narrow]) button.sidebar-grip {
+        display: none;
+      }
+      .sidebar-backdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        padding: 0;
+        background: var(--dialog-backdrop);
+        cursor: default;
+        z-index: var(--z-overlay);
+      }
     `,
   ];
 
@@ -718,6 +750,7 @@ export class SearchV3View extends JfElement {
     askStopping: { state: true },
     sidebarWidthPx: { state: true },
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
+    sidebarNarrow: { type: Boolean, reflect: true, attribute: 'sidebar-narrow' },
     resizing: { type: Boolean, reflect: true },
     paneDocPath: { state: true },
     paneCitation: { state: true },
@@ -769,6 +802,8 @@ export class SearchV3View extends JfElement {
    */
   declare sidebarWidthPx: number;
   declare sidebarCollapsed: boolean;
+  private declare sidebarNarrow: boolean;
+  private sidebarSheetInvoker: HTMLElement | null = null;
   /** A drag is in progress — the transitions stand down so the panel tracks the pointer exactly. */
   declare resizing: boolean;
   /**
@@ -976,6 +1011,7 @@ export class SearchV3View extends JfElement {
     this.askStopping = null;
     this.sidebarWidthPx = SV3_SIDEBAR_DEFAULT_PX;
     this.sidebarCollapsed = false;
+    this.sidebarNarrow = false;
     this.resizing = false;
     this.paneDocPath = null;
     this.paneCitation = null;
@@ -1229,6 +1265,7 @@ export class SearchV3View extends JfElement {
     if (typeof ResizeObserver !== 'function') return;
     this.boxObserver = new ResizeObserver(() => {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
+      this.reflowSidebar();
     });
     this.boxObserver.observe(this);
   }
@@ -1326,6 +1363,9 @@ export class SearchV3View extends JfElement {
   protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has('sessions')) this.upgradeOpenPaneAnchor();
     this.syncForkReads();
+    if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
+      this.reflowSidebar();
+    }
     // Here rather than in the store's callback: by now a first connect has also restored the saved
     // draft, which `followSharedQuery` must see before it writes the composer.
     const move = this.search.takeSharedMove();
@@ -2178,7 +2218,8 @@ export class SearchV3View extends JfElement {
    * rail, and an overlaid pane occupies nothing at all.
    */
   private sidebarOccupiedWidth(): number {
-    return this.sidebarCollapsed ? SV3_SIDEBAR_COLLAPSED_PX : this.sidebarWidthPx;
+    return this.sidebarCollapsed || this.sidebarNarrow
+      ? SV3_SIDEBAR_COLLAPSED_PX : this.sidebarWidthPx;
   }
 
   private paneOccupiedWidth(available: number): number {
@@ -2218,6 +2259,18 @@ export class SearchV3View extends JfElement {
       this.sidebarOccupiedWidth(),
     );
     this.applyPaneWidth(this.paneWidthPx);
+    this.reflowSidebar();
+  }
+
+  /** A temporary presentation choice never overwrites the reader's saved preference. Reopening
+   *  the sidebar while narrow overlays it; returning to a wide box restores the saved choice. */
+  private reflowSidebar(): void {
+    const available = this.availableWidth();
+    const narrow = available - this.paneOccupiedWidth(available)
+      < this.sidebarWidthPx + SV3_MAIN_MIN_PX;
+    if (narrow === this.sidebarNarrow) return;
+    this.sidebarNarrow = narrow;
+    this.sidebarCollapsed = narrow || readStoredSv3SidebarCollapsed();
   }
 
   /** A chosen width is adopted AND remembered; the two are one act (818 L13). */
@@ -2397,8 +2450,21 @@ export class SearchV3View extends JfElement {
     storeSv3SidebarCollapsed(collapsed);
   }
 
-  private onSidebarToggle(): void {
+  private onSidebarToggle(event: Event): void {
+    this.sidebarSheetInvoker = this.sidebarNarrow && this.sidebarCollapsed
+      ? (event.composedPath()[0] ?? null) as HTMLElement | null
+      : null;
     this.setSidebarCollapsed(!this.sidebarCollapsed);
+  }
+
+  /** Dismissing a temporary sheet is not a new sidebar preference. */
+  private async dismissSidebarSheet(): Promise<void> {
+    if (!this.sidebarNarrow || this.sidebarCollapsed) return;
+    this.sidebarCollapsed = true;
+    const invoker = this.sidebarSheetInvoker;
+    this.sidebarSheetInvoker = null;
+    await this.updateComplete;
+    if (invoker?.isConnected) invoker.focus();
   }
 
   /* ── The citation pane (tempdoc 822 Phase F8) ─────────────────────────────────────────────── */
@@ -2492,7 +2558,7 @@ export class SearchV3View extends JfElement {
   }
 
   private readonly onHostKeydown = (event: KeyboardEvent): void => {
-    // ESCAPE ORDER — rename > pane > palette > composer flip. The MOST LOCAL transient state wins:
+    // ESCAPE ORDER — rename > pane > sidebar sheet > palette > composer flip. The MOST LOCAL transient state wins:
     // an Escape belongs to the smallest thing the reader is currently inside, and only after that
     // to the regions around it. Stopping the event at the winner is what makes the order true
     // rather than approximately true — unstopped, the SAME keystroke would also hide the palette
@@ -2513,6 +2579,12 @@ export class SearchV3View extends JfElement {
       event.preventDefault();
       event.stopPropagation();
       this.closePane();
+      return;
+    }
+    if (event.key === 'Escape' && !event.isComposing && this.sidebarNarrow && !this.sidebarCollapsed) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.dismissSidebarSheet();
       return;
     }
     if (!isPaletteChord(event)) return;
@@ -4093,6 +4165,13 @@ export class SearchV3View extends JfElement {
     const session = this.activeSession;
     const contexts = this.turnContexts();
     return html`
+      ${this.sidebarNarrow && !this.sidebarCollapsed ? html`<button
+        type="button"
+        class="sidebar-backdrop"
+        data-testid="sv3-sidebar-backdrop"
+        aria-label="Close the sidebar"
+        @click=${this.dismissSidebarSheet}
+      ></button>` : nothing}
       <jf-sv3-sidebar
         .groups=${sessionGroups}
         .renamingId=${this.renamingId}
