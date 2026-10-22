@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -79,6 +80,7 @@ public final class JobBatchExtractor {
   private final LongConsumer indexedDelta;
 
   private boolean indexEmptyForBatch;
+  private final BatchServiceFailures identityFailures = new BatchServiceFailures();
 
   public JobBatchExtractor(
       WorkerIngestionAuthority ingestionAuthority,
@@ -130,19 +132,32 @@ public final class JobBatchExtractor {
     indexEmptyForBatch = indexKnownEmpty();
 
     List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
-    for (JobQueue.IndexJob job : jobs) {
-      if (!running.get()) break;
+    identityFailures.begin();
+    try {
+      for (JobQueue.IndexJob job : jobs) {
+        if (!running.get()) break;
 
-      ExtractedJob ex = extractJob(job);
-      if (ex != null) {
-        extracted.add(ex);
+        ExtractedJob ex = extractJob(job);
+        if (ex != null) {
+          extracted.add(ex);
+        }
+        // Tempdoc 885 item 3: extraction is the CPU-heaviest step in the batch, so it paces per
+        // file. The predecessor abandoned the rest of the batch on user activity; the duty cycle
+        // slows it instead, which is why arm (c) can still make progress under continuous search.
+        indexingPacing.pace();
       }
-      // Tempdoc 885 item 3: extraction is the CPU-heaviest step in the batch, so it paces per
-      // file. The predecessor abandoned the rest of the batch on user activity; the duty cycle
-      // slows it instead, which is why arm (c) can still make progress under continuous search.
-      indexingPacing.pace();
+    } finally {
+      identityFailures.finish();
     }
     return extracted;
+  }
+
+  long retryDelayMs() {
+    return identityFailures.retryDelayMs();
+  }
+
+  boolean deferredBatch() {
+    return identityFailures.deferredBatch();
   }
 
   /**
@@ -218,26 +233,33 @@ public final class JobBatchExtractor {
       pathResolutionStoreSupplier.get().record(
           envelope.pathHash(), envelope.normalizedPath(), envelope.observedAtMs());
       String docUid;
+      DocumentIdentityStore identityStore = null;
       try {
-        docUid =
-            documentIdentityStoreSupplier
-                .get()
-                .resolve(envelope.pathHash(), envelope.observedAtMs())
-                .docUid();
+        identityStore = documentIdentityStoreSupplier.get();
+        docUid = identityStore.resolve(envelope.pathHash(), envelope.observedAtMs()).docUid();
+        identityFailures.success();
       } catch (RuntimeException identityError) {
-        log.error("Document identity persistence failed for: {}", filePath, identityError);
         FileEnvelope admittedEnvelope = envelope;
-        journal.recordOutcomeSafely(
-            filePath,
-            "WRITE_FAILED(document_identity)",
-            () ->
-                jobQueue.markClaimFailed(claim,
-                    journal.outcome(
-                        IngestionOutcomeClass.WRITE_FAILED,
-                        IngestionReasonCodes.WRITE_FAILED,
-                        IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                        failureDetail(identityError)),
-                    ledgerEntry(filePath, admittedEnvelope, collection, null, provenance)));
+        Consumer<Boolean> recordFailure = systemic -> {
+          IngestionOutcome outcome = journal.outcome(
+              IngestionOutcomeClass.WRITE_FAILED,
+              IngestionReasonCodes.WRITE_FAILED,
+              systemic ? IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT
+                  : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+              failureDetail(identityError));
+          journal.recordOutcomeSafely(filePath, "WRITE_FAILED(document_identity)", () -> {
+            var entry = ledgerEntry(filePath, admittedEnvelope, collection, null, provenance);
+            if (systemic) jobQueue.deferClaim(claim, outcome, entry);
+            else jobQueue.markClaimFailed(claim, outcome, entry);
+          });
+        };
+        if (identityStore == DocumentIdentityStore.UNAVAILABLE) {
+          // This receiver rejects every document independently of its content.
+          identityFailures.unavailable(identityError);
+          recordFailure.accept(true);
+        } else {
+          identityFailures.failure(identityError, recordFailure);
+        }
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
         return null;

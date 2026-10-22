@@ -736,6 +736,9 @@ public class IndexingLoop implements Closeable {
 
         // Batch processing: extract all → batch embed → build+write
         processBatch(jobs);
+        // Row deadlines alone do not throttle an outage while fresh backlog remains ready.
+        if ((writer.deferredBatch() || extractor.deferredBatch())
+            && !sleepAfterError(Math.max(writer.retryDelayMs(), extractor.retryDelayMs()))) break;
 
         // Time-based commit strategy (every 10s or when buffer is full)
         long now = System.currentTimeMillis();
@@ -890,8 +893,12 @@ public class IndexingLoop implements Closeable {
    * Exception and Error recovery paths). Returns {@code false} if interrupted (caller should break).
    */
   private boolean sleepBrieflyAfterError() {
+    return sleepAfterError(ERROR_BACKOFF_MS);
+  }
+
+  private boolean sleepAfterError(long delayMs) {
     try {
-      Thread.sleep(ERROR_BACKOFF_MS);
+      Thread.sleep(delayMs);
       return true;
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
@@ -930,6 +937,7 @@ public class IndexingLoop implements Closeable {
   private void processBatch(List<JobQueue.IndexJob> jobs) {
     Span batchSpan = Span.getInvalid();
     boolean fatal = false;
+    writer.beginBatch();
     try {
       batchSpan = maybeSpan("indexing.batch");
       batchSpan.setAttribute("batch.polled", (long) jobs.size());
@@ -948,7 +956,10 @@ public class IndexingLoop implements Closeable {
     } finally {
       // A stopped/failed batch may not visit every polled claim. Written claims retain their
       // existing commit owner; the remainder return only after synchronous batch execution exits.
-      if (!fatal) journal.returnBatchClaims(jobs);
+      if (!fatal) {
+        writer.finishBatch();
+        journal.returnBatchClaims(jobs);
+      }
       batchSpan.end();
     }
   }
@@ -1013,7 +1024,7 @@ public class IndexingLoop implements Closeable {
     // Liveness beat: batch embedding (Phase 2) can be long on GPU — signal we still own these.
     heartbeat();
 
-    // Phase 3: Build and write all docs
+    // Phase 3: Build and write all docs. Judge shared-service failures after visiting peers.
     for (int i = 0; i < extracted.size(); i++) {
       if (!running.get()) break;
 
