@@ -720,3 +720,14 @@ publish this service-outage deadline. The replacement parser pool is probed with
   "note": "I7 reports INDEXING during a real outage pause, I9 retries and logs every second with persistent queue READONLY, and I10 misses a closed extractor registry that terminally fails healthy files."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16459-f3dc-7af3-94a1-7bc9e936867b",
+  "verdict": "reject",
+  "digest": "sha256:e8ba6c08ac924ce5d8f2ecaf2ec3deca821ce5f1f91d5b144a7778be1ec8c648",
+  "note": "I10 fails: a read-only or missing shared parser snapshot directory charges healthy files and schedules minute-scale retries."
+}
+```
