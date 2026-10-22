@@ -309,3 +309,14 @@ All checks are durable. UI expectations add Structured behavior; the Engine entr
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "w2mq0wtk",
+  "verdict": "accept",
+  "digest": "sha256:e979f512114786adbc09fac1bb3af666a6655ec2306044c6f6ef81a95d432c1c",
+  "note": "Test intent only: sources and changed expectations match the agreed scenarios and delegated decisions. Independent Java evidence: 10 assertion failures before, 10 passes after; UI evidence: new checks fail by assertion before and pass after. Product verdict remains fail for S14.3 invalid schema acceptance and S14.9 accessibility/narrow pane findings; this record is not product sign-off."
+}
+```
