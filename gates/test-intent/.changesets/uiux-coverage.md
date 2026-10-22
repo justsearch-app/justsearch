@@ -262,6 +262,65 @@ The builder has not authored an acceptance record.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 keeps a saved collapsed choice through reflow and remount"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "HC8 sheet repair: Escape and the outside-click backdrop dismiss the reopened narrow sidebar to its rail, restore the exact opening control, and preserve saved sidebar width/collapse preferences. Escape dismisses only the sheet, leaving the composer docked.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "HC8",
+          "quote": "The coverage note stays readable without overflow at about 360 px, at 200 % text zoom, in both themes and in forced colors; it is reachable as text on the turn and is not re-announced on each streamed frame.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Implement the agreed designs; orchestrator D1 divides WP4.2 into frontend coverage WP4.2a and the other packages.",
+          "choice": "Decision D1: four packages; WP4.2a is coverage only, frontend only. S10.7 (unfinished check) belongs to WP4.3. Order after pass 2: 4.5 and 4.2a first, then 4.2b, then 4.3. Repair HC8 narrow sidebar sheet exits to match the existing citation pane: Escape and outside click dismiss to the rail, restore focus to the opener, and leave the saved sidebar preference unchanged. Retain inline sidebar and IME Escape behavior.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-coverage-sidebar-sheet.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts#HC8 Escape dismisses the sidebar sheet and restores its opener without saving the dismissal",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts#HC8 the sidebar backdrop dismisses the sheet and restores its opener without saving the dismissal"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve the expanded inline sidebar on Escape without a backdrop or preference writes; an Escape belonging to IME composition leaves the narrow sheet open.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "HC8",
+          "quote": "The coverage note stays readable without overflow at about 360 px, at 200 % text zoom, in both themes and in forced colors; it is reachable as text on the turn and is not re-announced on each streamed frame.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Implement the agreed designs; orchestrator D1 divides WP4.2 into frontend coverage WP4.2a and the other packages.",
+          "choice": "Decision D1: four packages; WP4.2a is coverage only, frontend only. S10.7 (unfinished check) belongs to WP4.3. Order after pass 2: 4.5 and 4.2a first, then 4.2b, then 4.3. Repair HC8 narrow sidebar sheet exits to match the existing citation pane: Escape and outside click dismiss to the rail, restore focus to the opener, and leave the saved sidebar preference unchanged. Retain inline sidebar and IME Escape behavior.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-coverage-sidebar-sheet-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts#HC8 the expanded inline sidebar keeps its Escape and has no backdrop",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts#HC8 an IME Escape leaves the sidebar sheet open"
+      ]
     }
   ]
 }

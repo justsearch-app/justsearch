@@ -692,6 +692,15 @@ export class SearchV3View extends JfElement {
       :host([sidebar-narrow]) button.sidebar-grip {
         display: none;
       }
+      .sidebar-backdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        padding: 0;
+        background: var(--dialog-backdrop);
+        cursor: default;
+        z-index: var(--z-overlay);
+      }
     `,
   ];
 
@@ -758,6 +767,7 @@ export class SearchV3View extends JfElement {
   declare sidebarWidthPx: number;
   declare sidebarCollapsed: boolean;
   private declare sidebarNarrow: boolean;
+  private sidebarSheetInvoker: HTMLElement | null = null;
   /** A drag is in progress — the transitions stand down so the panel tracks the pointer exactly. */
   declare resizing: boolean;
   /**
@@ -2311,8 +2321,21 @@ export class SearchV3View extends JfElement {
     storeSv3SidebarCollapsed(collapsed);
   }
 
-  private onSidebarToggle(): void {
+  private onSidebarToggle(event: Event): void {
+    this.sidebarSheetInvoker = this.sidebarNarrow && this.sidebarCollapsed
+      ? (event.composedPath()[0] ?? null) as HTMLElement | null
+      : null;
     this.setSidebarCollapsed(!this.sidebarCollapsed);
+  }
+
+  /** Dismissing a temporary sheet is not a new sidebar preference. */
+  private async dismissSidebarSheet(): Promise<void> {
+    if (!this.sidebarNarrow || this.sidebarCollapsed) return;
+    this.sidebarCollapsed = true;
+    const invoker = this.sidebarSheetInvoker;
+    this.sidebarSheetInvoker = null;
+    await this.updateComplete;
+    if (invoker?.isConnected) invoker.focus();
   }
 
   /* ── The citation pane (tempdoc 822 Phase F8) ─────────────────────────────────────────────── */
@@ -2406,7 +2429,7 @@ export class SearchV3View extends JfElement {
   }
 
   private readonly onHostKeydown = (event: KeyboardEvent): void => {
-    // ESCAPE ORDER — rename > pane > palette > composer flip. The MOST LOCAL transient state wins:
+    // ESCAPE ORDER — rename > pane > sidebar sheet > palette > composer flip. The MOST LOCAL transient state wins:
     // an Escape belongs to the smallest thing the reader is currently inside, and only after that
     // to the regions around it. Stopping the event at the winner is what makes the order true
     // rather than approximately true — unstopped, the SAME keystroke would also hide the palette
@@ -2427,6 +2450,12 @@ export class SearchV3View extends JfElement {
       event.preventDefault();
       event.stopPropagation();
       this.closePane();
+      return;
+    }
+    if (event.key === 'Escape' && !event.isComposing && this.sidebarNarrow && !this.sidebarCollapsed) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.dismissSidebarSheet();
       return;
     }
     if (!isPaletteChord(event)) return;
@@ -3997,6 +4026,13 @@ export class SearchV3View extends JfElement {
     const session = this.activeSession;
     const contexts = this.turnContexts();
     return html`
+      ${this.sidebarNarrow && !this.sidebarCollapsed ? html`<button
+        type="button"
+        class="sidebar-backdrop"
+        data-testid="sv3-sidebar-backdrop"
+        aria-label="Close the sidebar"
+        @click=${this.dismissSidebarSheet}
+      ></button>` : nothing}
       <jf-sv3-sidebar
         .groups=${sessionGroups}
         .renamingId=${this.renamingId}
