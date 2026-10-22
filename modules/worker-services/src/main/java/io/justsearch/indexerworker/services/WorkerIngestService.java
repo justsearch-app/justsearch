@@ -525,8 +525,7 @@ public final class WorkerIngestService {
       io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
     return withFileMutationFence(() -> {
       Path file = Path.of(deletion.path());
-      Path root = deletion.root() == null ? pruneRootFor(deletion.path()) : Path.of(deletion.root());
-      if (root.equals(file.toAbsolutePath().normalize())) root = file.toAbsolutePath().getParent();
+      Path root = bufferedDeleteRoot(deletion);
       var binding = rootWatcherRegistry.subscription(root);
       String collection = binding == null ? deletion.collection() : binding.collection();
       if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY
@@ -580,6 +579,17 @@ public final class WorkerIngestService {
       return confirmedAbsent(deletion.path(), root)
           ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
     });
+  }
+
+  /**
+   * The root {@link #replayBufferedFileDelete} judges a buffered file delete under: the receipt's
+   * root, else the watched root that holds the path; an explicit file's own folder when the root
+   * names the file itself.
+   */
+  public Path bufferedDeleteRoot(io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
+    Path file = Path.of(deletion.path());
+    Path root = deletion.root() == null ? pruneRootFor(deletion.path()) : Path.of(deletion.root());
+    return root.equals(file.toAbsolutePath().normalize()) ? file.toAbsolutePath().getParent() : root;
   }
 
   /**

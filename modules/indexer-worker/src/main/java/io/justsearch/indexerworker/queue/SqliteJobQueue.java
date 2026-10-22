@@ -1076,6 +1076,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private int enqueueEntries(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
       boolean exactCollection) {
+    return enqueueEntries(entries, collection, scanId, exactCollection, null);
+  }
+
+  /** {@code unitRevision} names the admission; null mints a fresh one. */
+  private int enqueueEntries(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
+      boolean exactCollection, String unitRevision) {
     if (entries == null || entries.isEmpty()) {
       return 0;
     }
@@ -1114,7 +1121,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
       int count = inTransaction(
-          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection));
+          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection, unitRevision));
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
@@ -1129,7 +1136,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private int enqueueEntriesInTransaction(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
-      boolean exactCollection)
+      boolean exactCollection, String unitRevision)
       throws SQLException {
     String sql = """
         INSERT INTO jobs
@@ -1141,7 +1148,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           ?,
           COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-          lower(hex(randomblob(16))), ?, ?,
+          COALESCE(?, lower(hex(randomblob(16)))), ?, ?,
           COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
         """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
     int accepted = 0;
@@ -1171,12 +1178,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.setString(10, normalizedPath);
         stmt.setString(11, entry.provenance() == null ? null : entry.provenance().transport());
         stmt.setString(12, normalizedPath);
-        if (membership.epoch() == null) stmt.setNull(13, java.sql.Types.BIGINT);
-        else stmt.setLong(13, membership.epoch());
-        stmt.setString(14, membership.plannedSourceSha256() == null
+        stmt.setString(13, unitRevision);
+        if (membership.epoch() == null) stmt.setNull(14, java.sql.Types.BIGINT);
+        else stmt.setLong(14, membership.epoch());
+        stmt.setString(15, membership.plannedSourceSha256() == null
             ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
-        stmt.setString(15, PathNormalizer.normalizeKey(entry.ingestionRoot()));
-        stmt.setString(16, normalizedPath);
+        stmt.setString(16, PathNormalizer.normalizeKey(entry.ingestionRoot()));
+        stmt.setString(17, normalizedPath);
         stmt.executeUpdate();
         if (membership.epoch() != null) {
           SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -1264,7 +1272,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         int accepted = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false);
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false, null);
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
@@ -1408,6 +1416,105 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException unavailable) {
       recordDbError();
       throw new IllegalStateException("Accepted file projection evidence is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * A terminal outcome of A's normal policy for a source that is not indexable as it is: not a
+   * regular file, excluded, unsupported or too large. Outside a migration nothing more happens
+   * to the file until it changes. Writes and UNCHANGED are judged by the index instead; failures
+   * (I/O, unreadable, parser, sandbox, write), stale sources, deferrals and every retirement
+   * reason (refused, stopped enumeration, missing boundary, removed) are no such effect.
+   */
+  private static boolean endedByPolicy(String state, String outcomeClass, String reason,
+      String retryPolicy) {
+    boolean terminal = STATE_DONE.equals(state) || (STATE_FAILED.equals(state)
+        && io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE.name().equals(retryPolicy));
+    if (!terminal || outcomeClass == null) return false;
+    return switch (outcomeClass) {
+      case "UNSUPPORTED", "BUDGET_EXCEEDED" -> true;
+      case "SKIPPED_POLICY" ->
+          io.justsearch.indexerworker.ingest.IngestionReasonCodes.NON_REGULAR_SOURCE.equals(reason)
+              || io.justsearch.indexerworker.ingest.IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM
+                  .equals(reason);
+      default -> false;
+    };
+  }
+
+  @Override
+  public int enqueueRefusalCleanupAdmission(
+      JobQueue.EnqueueEntry entry, String collection, String admission) {
+    if (entry == null || !isAdmissionRevision(admission)) return 0;
+    return enqueueEntries(List.of(entry), collection, null, false, admission);
+  }
+
+  @Override
+  public boolean holdsRefusalCleanupAdmission(String path, String admission) {
+    if (path == null || !isAdmissionRevision(admission)) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query =
+          connection.prepareStatement("SELECT unit_revision FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          return row.next() && admission.equals(row.getString(1));
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Queue admission ownership evidence is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** The shape of a minted unit revision: 32 lowercase hex digits. */
+  private static boolean isAdmissionRevision(String revision) {
+    return revision != null && revision.matches("[0-9a-f]{32}");
+  }
+
+  @Override
+  public SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
+    if (path == null) return SourceFileWork.NONE;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT state, content_hash, last_outcome_class, last_reason_code, last_retry_policy,"
+              + " retry_after FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          if (!row.next()) return SourceFileWork.NONE;
+          String state = row.getString("state");
+          if (endedByPolicy(state, row.getString("last_outcome_class"),
+              row.getString("last_reason_code"), row.getString("last_retry_policy"))) {
+            return SourceFileWork.POLICY;
+          }
+          if (STATE_FAILED.equals(state) || STATE_RETRY_EXHAUSTED.equals(state)) {
+            return SourceFileWork.FAILED;
+          }
+          if (STATE_PENDING.equals(state)) {
+            long retryAfter = row.getLong("retry_after");
+            return !row.wasNull() && retryAfter > System.currentTimeMillis()
+                ? SourceFileWork.FAILED : SourceFileWork.OUTSTANDING;
+          }
+          if (!STATE_DONE.equals(state)) return SourceFileWork.OUTSTANDING;
+          // Only a write records content_hash, and every admission clears it, so a hash here
+          // was written by this admission or a later one; a retired, refused or skipped row has
+          // none. A later admission's bytes supersede the accepted ones even when they differ
+          // from its captured plan, because the file legitimately changed again.
+          String committed = row.getString("content_hash");
+          return JobQueue.IngestionLedgerTransition.isSha256(committed)
+              && committed.equals(indexedSourceSha256)
+              ? SourceFileWork.COMMITTED : SourceFileWork.NONE;
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Queue admission ownership evidence is unreadable", unavailable);
     } finally {
       lock.unlock();
     }
@@ -3716,7 +3823,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         return enqueueEntriesInTransaction(List.of(entry), collection, null,
-            System.currentTimeMillis(), false) == 1;
+            System.currentTimeMillis(), false, null) == 1;
       });
     } catch (SQLException failure) {
       log.warn("Cannot admit recreated file {}", entry.path(), failure);
