@@ -2,12 +2,13 @@ name: Auto-merge head guard
 on:
   pull_request_target:
     types: [synchronize]
-permissions:
-  pull-requests: write
-  contents: read
+permissions: {}
 jobs:
   disable-auto-merge:
     name: Require enqueue for the new head
+    permissions:
+      pull-requests: write
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
