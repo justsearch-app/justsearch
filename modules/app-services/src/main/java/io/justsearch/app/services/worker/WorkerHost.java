@@ -22,6 +22,9 @@ import java.io.Closeable;
  * integration down and boot recovery restarts it against the same instance.
  */
 public interface WorkerHost extends Closeable {
+  /** Process-lifetime user hold; null for a fixture without processing lanes. */
+  default io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
+
 
   /** Exact physical serving view retained by an operation after publication capture. */
   interface ServingLease extends AutoCloseable {

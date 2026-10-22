@@ -651,6 +651,10 @@ export class Sv3Composer extends JfElement {
         pointer-events: none;
         position: absolute;
         inset: 0;
+        /* Like a native input placeholder, keep the hint inside the field when text is enlarged. */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
         color: var(--placeholder);
         font-size: var(--font-size-sv3-sm);
         line-height: 1.625;

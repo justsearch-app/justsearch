@@ -155,7 +155,6 @@ interface UISettings {
   highContrast?: boolean;
   defaultAction?: 'open' | 'reveal' | 'preview';
   vimMode?: boolean;
-  pauseIndexingDuringAi?: boolean;
 }
 
 /**
@@ -329,6 +328,10 @@ export class SettingsSurface extends JfElement {
   private themeUnsub: (() => void) | null = null;
   // 569 §14 — save-settings Effect listener (the appearance statechart persists through it).
   private saveSettingsListener: ((e: Event) => void) | null = null;
+  private appearanceRevision = 0;
+  private appearanceFieldRevisions = new Map<string, number>();
+  private pendingAppearanceSaves = 0;
+  private appearanceNeedsReconciliation = false;
   // 569 §14 — the appearance behaviour, run as a declared statechart through the gated dispatcher.
   private appearanceMachine: InteractionMachine | null = null;
   // 569 §15 — the BRANCHING delete-confirm ceremony (CONFIRM_CEREMONY), run as a declared statechart.
@@ -944,7 +947,7 @@ export class SettingsSurface extends JfElement {
       const settings = (e as CustomEvent<{ settings?: Record<string, unknown> }>).detail?.settings;
       if (!settings || this.readOnly) return;
       // This surface owns the persist lifecycle the statechart's save-settings edge triggers:
-      // optimistic apply already happened (set-appearance effect); persistence is best-effort.
+      // Optimistic appearance is reconciled from the settings owner if persistence is refused.
       let patch: SettingsPatch;
       try {
         patch = captureSettingsPatch(settings);
@@ -952,15 +955,24 @@ export class SettingsSurface extends JfElement {
         this.error = err instanceof Error ? err.message : String(err);
         return;
       }
+      this.pendingAppearanceSaves++;
       this.saving = true;
       const send = (path: string, init?: RequestInit) => this.doFetch(path, init);
       const writesMode = patch.ui != null && 'mode' in patch.ui;
       void (writesMode ? enqueueUiModeSettings(send, patch) : saveAbsoluteSettings(send, patch))
         .catch((err: unknown) => {
           this.error = err instanceof Error ? err.message : String(err);
+          this.appearanceNeedsReconciliation = true;
         })
-        .finally(() => {
-          this.saving = false;
+        .finally(async () => {
+          this.pendingAppearanceSaves--;
+          if (this.pendingAppearanceSaves === 0) {
+            if (this.appearanceNeedsReconciliation) {
+              this.appearanceNeedsReconciliation = false;
+              await this.loadSettings();
+            }
+            this.saving = this.pendingAppearanceSaves > 0;
+          }
         });
     };
     document.addEventListener('jf-save-settings', this.saveSettingsListener);
@@ -1072,6 +1084,7 @@ export class SettingsSurface extends JfElement {
 
   private async loadSettings(): Promise<void> {
     const modeRevision = getUiModeRevision();
+    const appearanceRevision = this.appearanceRevision;
     try {
       const res = await this.doFetch('/api/settings/v2');
       if (!res.ok) return;
@@ -1079,12 +1092,14 @@ export class SettingsSurface extends JfElement {
       // Boot restoration normally seeds uiModeState first. Retain the fallback for isolated mounts,
       // but never let this slower surface-local GET overwrite a choice made while it was in flight.
       if (getUiModeRevision() === modeRevision) setUiMode(data.ui?.mode);
-      this.ui = { ...(data.ui ?? {}), mode: getUiMode() };
+      // A late observation restores untouched preferences while preserving newer field intents.
+      const newerFields = Object.fromEntries(Object.entries(this.ui).filter(
+        ([key]) => (this.appearanceFieldRevisions.get(key) ?? 0) > appearanceRevision,
+      ));
+      this.ui = { ...(data.ui ?? {}), ...newerFields, mode: getUiMode() };
+      this.applyAppearance();
       this.llm = data.llm ?? {};
       this.readOnly = data.settingsMode === 'in_memory';
-      // §2.C: replay the persisted appearance on load (one writer) so the theme
-      // survives reload and the high-contrast class is applied.
-      this.applyAppearance();
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     }
@@ -1213,6 +1228,8 @@ export class SettingsSurface extends JfElement {
    */
   private patch(updates: Partial<UISettings>): void {
     if (this.readOnly) return;
+    this.appearanceRevision++;
+    for (const key of Object.keys(updates)) this.appearanceFieldRevisions.set(key, this.appearanceRevision);
     this.ui = { ...this.ui, ...updates };
     const m = this.appearanceMachine;
     if (!m) return;
@@ -1408,7 +1425,7 @@ export class SettingsSurface extends JfElement {
           .data=${this.ui as Record<string, unknown>}
           .enabled=${!this.readOnly}
           @surface-change=${(e: CustomEvent<SurfaceChangeEventDetail>) =>
-            void this.patch(e.detail.data as Partial<UISettings>)}
+            void this.patch({ [e.detail.path]: e.detail.value } as Partial<UISettings>)}
         ></jf-declared-surface>
       </div>
       <div class="section">${this.renderRelatedSettingsRow('appearance', 'accessibility')}</div>

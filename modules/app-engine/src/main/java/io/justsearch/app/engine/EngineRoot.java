@@ -80,6 +80,11 @@ public final class EngineRoot implements WorkerHost {
    */
   private final io.justsearch.core.scheduling.BulkWorkGate bulkWork =
       new io.justsearch.core.scheduling.BulkWorkGate();
+  private final io.justsearch.core.scheduling.IndexingHold indexingHold =
+      new io.justsearch.core.scheduling.IndexingHold();
+
+  @Override public io.justsearch.core.scheduling.IndexingHold indexingHold() { return indexingHold; }
+
   private final Object generationActivityLock = new Object();
   private io.justsearch.app.api.chat.GenerationActivity generationActivity; // Guarded by the lock.
   private AutoCloseable generationEdges; // Guarded by generationActivityLock.
@@ -1056,6 +1061,7 @@ public final class EngineRoot implements WorkerHost {
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
             () -> requestRestart(started), admission, authority.roots(),
             started::captureServingView);
+    built.bindIndexingHold(gpuScheduling.indexingHold());
     built.bindProjectionSourceIds(projectionSeedSources.stream()
         .map(io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId)
         .sorted().toList());

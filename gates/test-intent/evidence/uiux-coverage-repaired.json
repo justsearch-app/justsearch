@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T14:50:10.187Z",
+  "revision": "1016257d2f200a6fd39bc1b4e88d20595e66223f",
+  "tree": "ebb3754d12d3e751f049cd07d4ee657551d50d7a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-coverage.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/tmp/agent-tmp/test-intent-vitest-905636-1792594204532.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2066
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC1 uses the check count for a fully verified list live and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC1 uses the check count for a fully verified list live and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC1 honors a count even when other coverage facts are absent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC1 honors a count even when other coverage facts are absent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the sources note live refreshed and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC2 shares the sources note live refreshed and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the text note live refreshed and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC2 shares the text note live refreshed and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the sentences note live refreshed and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC2 shares the sentences note live refreshed and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the not scored note live refreshed and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC2 shares the not scored note live refreshed and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC5 supplies examination facts with matches present=true",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC5 supplies examination facts with matches present=true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC5 supplies examination facts with matches present=false",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC5 supplies examination facts with matches present=false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC6 preserves each live fact when a settled refresh carries only some facts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC6 preserves each live fact when a settled refresh carries only some facts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC6 fills absent live facts from the record without inventing source facts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC6 fills absent live facts from the record without inventing source facts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC6 retains live facts during streaming or checking refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC6 retains live facts during streaming or checking refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC8 keeps the note as ordinary stable text without live announcements",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC8 keeps the note as ordinary stable text without live announcements",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1016257d2",
+    "revision": "1016257d2f200a6fd39bc1b4e88d20595e66223f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-coverage.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/tmp/agent-tmp/test-intent-vitest-905636-1792594207992.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1944,
+        "output": "JSON report written to /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-vitest-905636-1792594207992.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC1 uses the check count for a fully verified list live and cold",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC1 uses the check count for a fully verified list live and cold:  AssertionError: expected 'partially-grounded' to be 'grounded' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:80:38\n    at processTicksAndRejections (node:internal/process/task_queues:10"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC1 honors a count even when other coverage facts are absent",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC1 honors a count even when other coverage facts are absent:  AssertionError: expected 'partially-grounded' to be 'grounded' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:86:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-covera"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the sources note live refreshed and cold",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC2 shares the sources note live refreshed and cold:  AssertionError: expected undefined to be 'Grounded · 2 of 2 sentences · 1 sourc…' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:100:52\n    at processTicksAndRejections (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the text note live refreshed and cold",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC2 shares the text note live refreshed and cold:  AssertionError: expected undefined to be 'Grounded · 2 of 2 sentences · part of…' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:100:52\n    at file:///home/elias/dev/justsearch/.claude/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the sentences note live refreshed and cold",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC2 shares the sentences note live refreshed and cold:  AssertionError: expected undefined to be 'Grounded · 1 of 2 sentences · 1 of 2 …' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:100:52\n    at runNextTicks (node:internal/process/task_qu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC2 shares the not scored note live refreshed and cold",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC2 shares the not scored note live refreshed and cold:  AssertionError: expected undefined to be 'Not scored' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:100:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-coverage/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC5 supplies examination facts with matches present=true",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC5 supplies examination facts with matches present=true:  AssertionError: expected [] to deeply equal [ { sourceIndex: +0, …(2) }, …(1) ]\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:112:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-coverage/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC5 supplies examination facts with matches present=false",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC5 supplies examination facts with matches present=false:  AssertionError: expected [] to deeply equal [ { sourceIndex: +0, …(2) }, …(1) ]\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:112:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-coverage/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC6 preserves each live fact when a settled refresh carries only some facts",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC6 preserves each live fact when a settled refresh carries only some facts:  AssertionError: expected { …(8) } to match object { sentencesTotal: 2, …(2) }\n(7 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-coverage/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonym"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC6 fills absent live facts from the record without inventing source facts",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC6 fills absent live facts from the record without inventing source facts:  AssertionError: expected { …(8) } to match object { sentencesScored: 1, …(1) }\n(8 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-coverage/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anony"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC6 retains live facts during streaming or checking refresh",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC6 retains live facts during streaming or checking refresh:  AssertionError: expected { …(6) } to match object { sentencesTotal: 2, …(2) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-coverage/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonym"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC8 keeps the note as ordinary stable text without live announcements",
+        "classification": "assertion",
+        "detail": "WP4.2a coverage honesty HC8 keeps the note as ordinary stable text without live announcements:  AssertionError: expected undefined to be 'Grounded · 2 of 2 sentences · 1 of 2 …' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/agent-tmp/test-intent-before-e34IsJ/modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts:141:32\n    at file:///home/elias/dev/justsearch/.claude/w"
+      }
+    ]
+  },
+  "digest": "sha256:eafa2e7069a88699e77ec8ee949794268f43e1e4fe0520359b4db5ef4322e3ab"
+}

@@ -1,0 +1,344 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T20:59:42.853Z",
+  "revision": "1016257d2f200a6fd39bc1b4e88d20595e66223f",
+  "tree": "cf5ea8ad6bbec94cf9ec45437ca31d9ce2115bd8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.operations.handlers.ReconfigureHandlerTest\" --tests \"io.justsearch.app.services.settings.ExclusionLimitTest\" --tests \"io.justsearch.app.services.settings.SettingsV2ProjectionTest\" --tests \"io.justsearch.app.services.registry.validator.ValidatorRunnerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2928
+    },
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.status.operating.BulkWorkVocabularyMirrorTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1469
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.SettingsControllerReconfigureDispatchTest\" --tests \"io.justsearch.ui.api.SettingsV2ContractTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3160
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ReconfigureHandlerTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ReconfigureHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aaf3031514c781bb6f1130cbc5a310db2096ac599a985b91f853240f0f466644",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directExecutionCannotBypassTheAcceptedRunnerRecord()",
+          "status": "passed"
+        },
+        {
+          "name": "replayAndAcceptedRecordMustRetainTheOperationKey()",
+          "status": "passed"
+        },
+        {
+          "name": "refreshFreezesTheServingProfileBeforeAcceptance()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyAcceptedRefreshRetainsItsOriginalNoProfileMeaning()",
+          "status": "passed"
+        },
+        {
+          "name": "preparationIsTypedAndDoesNotAskTheSettingsOwnerToAcceptOrStart()",
+          "status": "passed"
+        },
+        {
+          "name": "malformedOrIncompleteEnvelopeIsATypedBadRequestRefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedRefreshIntentReachesTheSettingsOwnerAndCannotBeChangedInReplay()",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedExecutionPassesTheFrozenSettingsAndModeIntentToTheOwner()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/ExclusionLimitTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/ExclusionLimitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da3684ae453ea8af99ddcf4e938e02a2da37ca0f61ef03020ef7b824b8f47997",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EX4PreviewAndApplyCountFilesAndRemoveExactMembership()",
+          "status": "passed"
+        },
+        {
+          "name": "EN1ResolvedOperatorOverridesPreserveBareNameMatching()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4InputOverflowRefusesWithoutReplacingPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4SeparatorsAndNativeCaseRuleArePreserved()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4QualifiedDirectoryPatternsIncludeDescendants()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4DoubleStarAloneMatchesAllFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4MalformedGlobIsRefusedBeforeSaving()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4WindowsCaseRuleIncludesUnicodeNames()",
+          "status": "passed"
+        },
+        {
+          "name": "EN1PatternLimitsKeepCompleteSupportedLists()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4ExpandedOverflowRefusesWithoutReplacingPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4AcceptedMetacharactersMatchExactCorpusMembership()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:255dcbda3bccd84e8161a228a6e2054c6681fbfcea1cec4855757f6f73d2f3a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "patchPreservesOmissionAndCarriesExplicitEphemeralPort()",
+          "status": "passed"
+        },
+        {
+          "name": "compositionEvidenceIsResponseOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "patchRejectsOutOfRangePortBeforeMutation()",
+          "status": "passed"
+        },
+        {
+          "name": "preservesUnsetAndAutomaticValuesWithoutInventingAnIndexPath()",
+          "status": "passed"
+        },
+        {
+          "name": "responseListsDoNotAliasTheMutableSettingsCandidate()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitCpuRemainsDistinctFromAutomaticOnTheCanonicalWire()",
+          "status": "passed"
+        },
+        {
+          "name": "projectsEveryStoredFieldWithoutTrimmingPaths()",
+          "status": "passed"
+        },
+        {
+          "name": "queryModelPathsRoundTripThroughTheWitnessedPatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b2e278b7d52d5e82bb02076f315e45e1d0278054b15b48ab17beaac19460e883",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@1b1ea1d9",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@68d8ae27",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@75a9cc24",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@7d7d8911",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@6cd7f381",
+          "status": "passed"
+        },
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@70777a65",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@727dcc64",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@288409f0",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@61eab26b",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@116fc29e",
+          "status": "passed"
+        },
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@1a0ffb9b",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@319aa9ee",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@2b9d4b0",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@2be50bba",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@79c4f23b",
+          "status": "passed"
+        },
+        {
+          "name": "composedCatalogActuallyCoversProjectedWorkflowTools()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/status/operating/BulkWorkVocabularyMirrorTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/status/operating/BulkWorkVocabularyMirrorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f7d10b207b93193f866e00a88ab91c4b54d5873834bfd5c9d33ef2ffb4a3536d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "profiles()",
+          "status": "passed"
+        },
+        {
+          "name": "reasons()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsControllerReconfigureDispatchTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsControllerReconfigureDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4857d047e8e868e5648009956c14e28ac165c0de303953b1bdec9fbcdeaaaf67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "productionRouteDispatchesOneTypedEnvelopeAndPreservesFullWitnessWithNullModeIntent()",
+          "status": "passed"
+        },
+        {
+          "name": "componentFailureFromReconfigureCannotBecomeHttp200()",
+          "status": "passed"
+        },
+        {
+          "name": "generationBoundRefusalNamesKeysAndTheSeparateReindexOperation()",
+          "status": "passed"
+        },
+        {
+          "name": "completedQueryReconfigureProjectsTypedAndDecodedNestedCompositionEvidence()",
+          "status": "passed"
+        },
+        {
+          "name": "refreshHeaderBecomesAnAcceptedReconfigureIntentWithTheSameWitnessAndKey()",
+          "status": "passed"
+        },
+        {
+          "name": "versionConflictFromReconfigureIsProjectedAsConflictAndRetainsOperationKey()",
+          "status": "passed"
+        },
+        {
+          "name": "queryCompositionRefusalExposesMeasuredReason()",
+          "status": "passed"
+        },
+        {
+          "name": "completedRestartRequiredReceiptExposesRestartScheduled()",
+          "status": "passed"
+        },
+        {
+          "name": "malformedRefreshHeaderCannotFallThroughToOrdinarySettings()",
+          "status": "passed"
+        },
+        {
+          "name": "missingWitnessPreparationRefusalIsHttp400()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsV2ContractTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsV2ContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a4c5d7dcd40882fc9253cee56a713ff1729ff47d249c23e0396d591aeadbe3e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Generate SettingsV2 fixture and verify round-trip fidelity",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4beb844fc2c9c4b18a914d339d8975aa758ae687f0361cbb9167da2a22677700"
+}

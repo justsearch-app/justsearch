@@ -168,7 +168,7 @@ public final class OfflineCoordinator implements AutoCloseable {
         try {
           checkCancellation(work);
           if (closing.get()) throw new CancellationException("Enrichment is stopping");
-          var outcome = runProcedure(work.context(), progress, automaticEligibility);
+          var outcome = runProcedure(work.context(), progress, automaticEligibility, explicit);
           checkCancellation(work);
           body.complete(outcome);
         } catch (RuntimeException | Error failure) {
@@ -283,12 +283,20 @@ public final class OfflineCoordinator implements AutoCloseable {
 
   private OfflineProcessingOutcome runProcedure(
       EngineContext context, Consumer<OfflineProcessingOutcome> progress,
-      java.util.function.BooleanSupplier automaticEligibility) {
+      java.util.function.BooleanSupplier automaticEligibility, boolean explicit) {
     KnowledgeClient client = knowledgeClientSupplier.get();
     if (client == null) {
       return report(progress, new OfflineProcessingOutcome(
           0, 0, 0, BlockReason.WORKER_UNAVAILABLE, EmbeddingHandoff.NOT_EVALUATED));
     }
+    var hold = client.indexingHold();
+    try {
+    var lease = hold == null ? null : (explicit ? hold.acquire() : hold.tryAcquire());
+    if (hold != null && lease == null) {
+      return report(progress, new OfflineProcessingOutcome(
+          0, 0, 0, BlockReason.NONE, EmbeddingHandoff.NOT_NEEDED));
+    }
+    try (lease) {
     client.recoverVduProcessing(context);
     OfflineProcessingOutcome outcome;
     // The batch holds the chat server in VDU mode for itself; a refused hold blocks it AI_OFFLINE.
@@ -301,6 +309,11 @@ public final class OfflineCoordinator implements AutoCloseable {
     }
     // No chat stop for embeddings (O2): the index half's backfill embeds beside chat.
     return report(progress, outcome.withEmbeddingHandoff(EmbeddingHandoff.NOT_NEEDED));
+    }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new CancellationException("Enrichment interrupted while waiting for Resume");
+    }
   }
 
   private static OfflineProcessingOutcome report(

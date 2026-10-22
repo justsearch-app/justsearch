@@ -72,7 +72,7 @@ import {
   __resetAiStateForTest,
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
-import { __resetConversationListForTest } from '../../state/conversationListStore.js';
+import { getConversationListState, setActiveConversation, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { __resetContextInspectorDrawer } from '../../state/contextInspectorDrawer.js';
@@ -1414,6 +1414,47 @@ describe('deleting a conversation that has branches', () => {
     expect(el.sessions.sessions.map((s) => s.id)).toContain('uc-branch-branch-1');
   });
 
+  it('reports which branch failed after a partially completed cascade', async () => {
+    twoTurnConversation();
+    backend.conversations.push(
+      conversationRow('child-one', 'first branch', { parentSessionId: 'uc-branch', branchPointMessageId: storedId(1) }),
+      conversationRow('child-two', 'second branch', { parentSessionId: 'uc-branch', branchPointMessageId: storedId(1) }),
+    );
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE' && String(url).endsWith('/child-two')) return new Response(JSON.stringify({
+        errorCode: 'CONVERSATION_BUSY', error: 'Stop the running agent.',
+      }), { status: 409 });
+      return fetchBefore(url, init);
+    }));
+    const el = await mount();
+    await openConversation(el);
+    const seen = toasts();
+    await discardConversation(el, 'why did the renewal fail?');
+    await answerConfirm(el, true);
+    expect(seen.some(message => message.includes('1 branch deleted.')
+      && message.includes('second branch') && message.includes('Stop the running agent.'))).toBe(true);
+    expect(backend.conversations.map(c => c.sessionId)).toEqual(['uc-branch', 'child-two']);
+  });
+
+  it('displays a refusal from another client without asking to delete branches', async () => {
+    twoTurnConversation();
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE') return new Response(JSON.stringify({
+        errorCode: 'CONVERSATION_BUSY', error: 'Stop the running Ask in the other window.',
+      }), { status: 409 });
+      return fetchBefore(url, init);
+    }));
+    const el = await mount();
+    await openConversation(el);
+    const seen = toasts();
+    await discardConversation(el, 'why did the renewal fail?');
+    expect(document.querySelector('jf-confirm-dialog')).toBeNull();
+    expect(seen).toContain('Stop the running Ask in the other window.');
+    expect(el.sessions.sessions.map(s => s.id)).toContain('uc-branch');
+  });
+
   it('says so when the store refuses the delete outright', async () => {
     twoTurnConversation();
     backend.refuse.add('delete');
@@ -1458,4 +1499,92 @@ describe('two reloads of the same conversation cannot land out of order', () => 
       storedId(3),
     );
   });
+});
+
+
+describe('CD3 confirmed conversation deletion', () => {
+  it('forgets the open deleted child and cached turns when the next cascade child fails', async () => {
+    twoTurnConversation('child-one');
+    backend.conversations = [
+      conversationRow('parent', 'parent'),
+      conversationRow('child-one', 'first branch', { parentSessionId: 'parent', branchPointMessageId: storedId(1) }),
+      conversationRow('child-two', 'second branch', { parentSessionId: 'parent', branchPointMessageId: storedId(1) }),
+    ];
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE' && String(url).endsWith('/child-two')) return new Response(JSON.stringify({
+        errorCode: 'CONVERSATION_DELETE_INCOMPLETE', error: 'Permission denied.',
+      }), { status: 503 });
+      return fetchBefore(url, init);
+    }));
+    const el = await mount();
+    await openConversation(el, 'first branch');
+    expect(el.sessions.sessions.find(s => s.id === 'child-one')?.turns.length).toBeGreaterThan(0);
+    const seen = toasts();
+    await discardConversation(el, 'parent');
+    await answerConfirm(el, true);
+    await loadConversations();
+    await settle(el);
+    expect(el.sessions.sessions.map(s => s.id)).not.toContain('child-one');
+    expect(el.sessions.sessions.map(s => s.id)).toEqual(expect.arrayContaining(['parent', 'child-two']));
+    expect(el.sessions.activeId).toBeNull();
+    expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
+    expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
+    expect(seen.some(m => m.includes('1 branch deleted.') && m.includes('first branch') && m.includes('second branch') && m.includes('Permission denied.'))).toBe(true);
+  });
+
+  it('forgets a cached open conversation when a refreshed list confirms its deletion', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openConversation(el);
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).includes('/api/chat/conversations?')) return new Response(JSON.stringify({
+        sessions: [], deletedIds: ['uc-branch'],
+      }));
+      return fetchBefore(url, init);
+    }));
+    await loadConversations();
+    await settle(el);
+    expect(el.sessions.sessions.map(s => s.id)).not.toContain('uc-branch');
+    expect(el.sessions.activeId).toBeNull();
+    expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
+    expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
+  });
+});
+
+it('a deletion refresh clears this window without claiming another windows active conversation', async () => {
+  twoTurnConversation();
+  const el = await mount();
+  await openConversation(el);
+  setActiveConversation('other-window');
+  const fetchBefore = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).includes('/api/chat/conversations?')) return new Response(JSON.stringify({
+      sessions: [conversationRow('other-window', 'Other conversation')], deletedIds: ['uc-branch'],
+    }));
+    return fetchBefore(url, init);
+  }));
+  await loadConversations();
+  await settle(el);
+  expect(el.sessions.activeId).toBeNull();
+  expect(getConversationListState().activeId).toBe('other-window');
+});
+
+it('forgets cached turns after restart when the missing server row is confirmed absent', async () => {
+  twoTurnConversation();
+  const el = await mount();
+  await openConversation(el);
+  const fetchBefore = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).includes('/api/chat/conversations?')) return new Response(JSON.stringify({ sessions: [], deletedIds: [] }));
+    if (String(url).endsWith('/uc-branch/history?existsOnly=true')) return new Response(JSON.stringify({ exists: false }));
+    return fetchBefore(url, init);
+  }));
+  await loadConversations();
+  await settle(el);
+  expect(el.sessions.sessions.map(s => s.id)).not.toContain('uc-branch');
+  expect(el.sessions.activeId).toBeNull();
+  expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
+  expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
 });

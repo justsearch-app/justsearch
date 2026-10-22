@@ -808,6 +808,10 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .arg("--sun-misc-unsafe-memory-access=warn")
         // FFM downcalls (NVML, the Windows job object, the GPU driver probe); JDK 25 warns without this, a later JDK (JEP 472) refuses.
         .arg("--enable-native-access=ALL-UNNAMED");
+    // HotSpot implements native heap trimming only on Linux with glibc. Keep this in argv:
+    // option environment variables would also reach llama-server and other Engine children.
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    cmd.arg("-XX:TrimNativeHeapInterval=30000");
     if aot_cache.exists() {
         cmd.arg(format!("-XX:AOTCache={}", aot_cache.to_string_lossy()));
     }

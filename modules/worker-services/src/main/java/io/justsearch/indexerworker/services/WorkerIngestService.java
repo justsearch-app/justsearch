@@ -2144,6 +2144,7 @@ public final class WorkerIngestService {
       String normalizedId = normalizeDocIdForMutation(docId);
 
       if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
+        if (request.getRequireSettled()) throw IngestSwitchBufferOps.switchingUnavailable();
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
           return switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedId);
         }
@@ -2153,8 +2154,15 @@ public final class WorkerIngestService {
       return withFileMutationFence(() -> {
         journalAndProjectDeleteToServing(normalizedId, CommitReason.GRPC_DELETE_BY_ID);
         ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(normalizedId);
-        jobQueue.deleteByExactPath(normalizedId);
+        if (jobQueue.deleteByExactPath(normalizedId) < 0) {
+          throw new IllegalStateException("Could not remove pending ingestion for deleted document");
+        }
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_ID);
+        if (request.getRequireSettled()) {
+          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          if (searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime serving
+              && serving != ingestLifecycle) serving.commitOps().maybeRefreshBlocking();
+        }
         log.info("deleteById complete for doc_id: {}", normalizedId);
         return deleteByIdResponse(true, "");
       });
