@@ -224,7 +224,7 @@ enum InstallStage {
       List<InstallPlan.PlannedDownload> stageDownloads = byStage.get(stage);
       long bytes = 0L;
       for (InstallPlan.PlannedDownload dl : stageDownloads) {
-        bytes += Math.max(0L, dl.sizeBytes());
+        bytes += dl.extractionOnly() ? 0L : Math.max(0L, dl.sizeBytes());
       }
       slices.add(new Slice(stage, stageDownloads, bytes, packagesByStage.get(stage)));
     }

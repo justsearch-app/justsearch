@@ -108,8 +108,8 @@ public final class RunEventStore {
     if (!isEnabled()) {
       return null;
     }
+    requireRun(sessionId);
     try {
-      Files.createDirectories(runDir(sessionId));
       var record = new LinkedHashMap<String, Object>();
       record.put("schemaVersion", CURRENT_SCHEMA_VERSION);
       record.put("timestamp", Instant.now().toString());
@@ -144,8 +144,8 @@ public final class RunEventStore {
     if (!isEnabled() || records == null || records.isEmpty()) {
       return;
     }
+    requireRun(sessionId);
     try {
-      Files.createDirectories(runDir(sessionId));
       StringBuilder sb = new StringBuilder();
       for (Object record : records) {
         if (!(record instanceof Map<?, ?> rec)) {
@@ -231,7 +231,7 @@ public final class RunEventStore {
   }
 
   /**
-   * Tempdoc 565 §15.C — write the generic run-index {@code meta.json} (sessionId / conversationId /
+   * Creates the generic run-index {@code meta.json} (sessionId / conversationId /
    * shapeId / startedAt / state / background …). The unified thread finds a run by scanning these for
    * a matching {@code conversationId}, so a workflow run that writes one is projected alongside agent
    * runs. The AGENT run layers richer fields (profiles / handoff / resume) on the same file via
@@ -248,6 +248,23 @@ public final class RunEventStore {
     } catch (Exception e) {
       throw new CorruptDurableStoreException(
           "run-events", "Failed to write run metadata for session " + sessionId, e);
+    }
+  }
+
+  /** Updates an existing run; terminal callbacks must never recreate a deleted run. */
+  public synchronized void updateRunMeta(String sessionId, Map<String, Object> meta) {
+    StoreIds.requireValid(sessionId);
+    if (!isEnabled()) return;
+    requireRun(sessionId);
+    writeRunMeta(sessionId, meta);
+  }
+
+  private void requireRun(String sessionId) {
+    if (Files.notExists(metaPath(sessionId))) {
+      throw new IllegalArgumentException("No such run: " + sessionId);
+    }
+    if (!Files.isRegularFile(metaPath(sessionId))) {
+      throw new CorruptDurableStoreException("run-events", "Run metadata is unreadable: " + sessionId);
     }
   }
 

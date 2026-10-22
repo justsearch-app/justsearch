@@ -170,6 +170,18 @@ public final class ChatController {
             "chat-stream-heartbeat"));
   }
 
+  private io.justsearch.app.services.conversation.ConversationDeletion conversationDeletion;
+
+  public void setConversationDeletion(io.justsearch.app.services.conversation.ConversationDeletion deletion) {
+    this.conversationDeletion = java.util.Objects.requireNonNull(deletion, "deletion");
+  }
+
+  io.justsearch.agent.api.conversation.ConversationWork.Lease conversationWork(Map<String, Object> body) {
+    var gate = conversationStore.conversationWork();
+    Object raw = body.getOrDefault("conversationId", body.get("sessionId"));
+    return gate == null ? () -> {} : gate.start(raw instanceof String id && !id.isBlank() ? id : null);
+  }
+
   /** The residency gate every chat run passes before it streams (Spec A step 9). */
   private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
 
@@ -310,10 +322,11 @@ public final class ChatController {
     // Spec A step 9: chat unloaded for another GPU user answers a typed refusal, or reloads for a
     // person, before the stream commits a 200.
     if (!admitResidency(ctx, parsedBody)) return;
-    sseWriter.initSseHeaders(ctx, route);
+
     // Tempdoc 859 D live-defect D2 — the heartbeat wraps the BLOCKING run, and only it: the pre-run
     // refusals above answer and return without ever opening a stream to beat on.
-    try {
+    try (var ignoredWriting = conversationWork(parsedBody)) {
+      sseWriter.initSseHeaders(ctx, route);
       heartbeat.around(
           ctx,
           () ->
@@ -322,6 +335,8 @@ public final class ChatController {
                   parsedBody,
                   readAudience(ctx),
                   sseEvent -> sseWriter.writeEvent(ctx, sseEvent.name(), sseEvent.payload()), engineContext));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status(409).json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
     } catch (Exception impossible) {
       // runToSink catches every mid-run failure and reports it ON THE RUN (§15.1.3); the only way
       // out of `around` is therefore a failure of the heartbeat plumbing itself, which must not be
@@ -356,6 +371,9 @@ public final class ChatController {
     } catch (ConversationEngine.AudienceDeniedException denied) {
       LOG.info("Audience denied for shape {}: {}", shapeId.value(), denied.getMessage());
       sink.accept(errorEvent(denied.getMessage(), ApiErrorCode.INVALID_REQUEST));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      sink.accept(new SseEvent("error", Map.of(
+          "error", refused.getMessage(), "errorCode", refused.code(), "retryable", false)));
     } catch (ConversationEngine.ShapeNotFoundException notFound) {
       LOG.error("Shape not registered: {}", shapeId.value());
       sink.accept(errorEvent(notFound.getMessage(), ApiErrorCode.NOT_FOUND));
@@ -469,13 +487,15 @@ public final class ChatController {
     // One order for both records. The store side already sorts by last activity, so a STABLE sort on
     // the same key leaves it untouched and only decides where the synthesized rows land.
     result.sort((a, b) -> Long.compare(asMillis(b.get("lastActiveAtMs")), asMillis(a.get("lastActiveAtMs"))));
-    ctx.json(Map.of("sessions", result.size() <= limit ? result : result.subList(0, limit)));
+    var writes = conversationStore.conversationWork();
+    ctx.json(Map.of("sessions", result.size() <= limit ? result : result.subList(0, limit),
+        "deletedIds", writes == null ? List.of() : writes.deletedIds()));
   }
 
   /**
    * The run-backed half of {@link #handleListSessions}: conversations that live ONLY in the agent-run
    * record. Empty when {@code shapeId} names a non-agent shape, when the agent capability is
-   * unavailable, and when its store is sealed + locked (which lists nothing rather than failing).
+   * unavailable, and when no conversation identity can be read while its store is locked.
    */
   private List<Map<String, Object>> runBackedRows(
       String shapeId, int limit, List<Map<String, Object>> storeRows) {
@@ -566,6 +586,19 @@ public final class ChatController {
   public void handleLoadHistory(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    if ("true".equals(ctx.queryParam("existsOnly"))) {
+      if (conversationStore.isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
+      boolean exists;
+      if (conversationDeletion != null) {
+        exists = conversationDeletion.exists(sessionId);
+      } else {
+        AgentService agent = agentService.get();
+        exists = conversationStore.getSessionMeta(sessionId).isPresent()
+            || (agent != null && !agent.lifecycles(sessionId).isEmpty());
+      }
+      ctx.json(Map.of("exists", exists));
+      return;
+    }
     List<Map<String, Object>> messages = conversationStore.loadHistory(sessionId);
     // Slice 513 + 515 FIX-7 — include parent pointers in the response so the
     // FE can mark inherited messages with a branch indicator. Direct
@@ -707,6 +740,7 @@ public final class ChatController {
   public void handleSetTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationWork(Map.of("conversationId", sessionId)).close();
     String title = null;
     String source = ConversationStore.TITLE_SOURCE_USER;
     String precondition = ctx.header("If-None-Match");
@@ -793,6 +827,7 @@ public final class ChatController {
   public void handleAutoTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationWork(Map.of("conversationId", sessionId)).close();
     Optional<ConversationStore.SessionSummary> meta = conversationStore.getSessionMeta(sessionId);
     if (meta.isEmpty()) {
       noSuchConversation(ctx, sessionId);
@@ -943,6 +978,12 @@ public final class ChatController {
       ctx.status(400).json(err);
       return;
     }
+    try (var ignoredWriting = conversationWork(Map.of("conversationId", sessionId))) {
+      compactOwned(ctx, sessionId, floorMessageId);
+    }
+  }
+
+  private void compactOwned(Context ctx, String sessionId, String floorMessageId) {
     // The prefix to summarize = the resolved history up to (not including) the
     // floor. If the floor is the first message there is nothing to compact.
     List<Map<String, Object>> full = conversationStore.loadHistory(sessionId);
@@ -1000,6 +1041,7 @@ public final class ChatController {
   public void handleEditContextFloorSummary(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationWork(Map.of("conversationId", sessionId)).close();
     String summaryText = null;
     try {
       @SuppressWarnings("unchecked")
@@ -1101,10 +1143,22 @@ public final class ChatController {
   public void handleDeleteConversation(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    if (conversationStore.isLocked()) {
+      ctx.status(LOCKED_STATUS).json(Map.of("ok", false, "errorCode", "STORE_LOCKED",
+          "error", "Unlock chat history before deleting this conversation."));
+      return;
+    }
     try {
-      conversationStore.deleteSession(sessionId);
-      AgentService agent = agentService.get();
-      int runsDeleted = agent == null ? 0 : agent.deleteConversationRuns(sessionId);
+      int runsDeleted;
+      if (conversationDeletion != null) {
+        runsDeleted = conversationDeletion.delete(sessionId);
+      } else {
+        conversationStore.deleteSession(sessionId);
+        AgentService agent = agentService.get();
+        runsDeleted = agent == null ? 0 : agent.deleteConversationRuns(sessionId);
+        var writes = conversationStore.conversationWork();
+        if (writes != null) writes.completed(sessionId);
+      }
       ctx.json(Map.of("ok", true, "agentRunsDeleted", runsDeleted));
     } catch (BranchesPreventDeletionException blocked) {
       // Slice 515 FIX-3 — 409 Conflict with the child session ids so the
@@ -1114,6 +1168,15 @@ public final class ChatController {
       err.put("errorCode", "BRANCHES_PREVENT_DELETION");
       err.put("childSessionIds", blocked.childSessionIds());
       ctx.status(409).json(err);
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status(409).json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException locked) {
+      ctx.status(LOCKED_STATUS).json(Map.of("ok", false, "errorCode", "STORE_LOCKED",
+          "error", "Unlock chat history before deleting this conversation."));
+    } catch (RuntimeException failure) {
+      LOG.warn("Conversation {} deletion is incomplete", sessionId, failure);
+      ctx.status(503).json(Map.of("ok", false, "errorCode", "CONVERSATION_DELETE_INCOMPLETE",
+          "error", "Conversation deletion is incomplete. " + message(failure)));
     }
   }
 
