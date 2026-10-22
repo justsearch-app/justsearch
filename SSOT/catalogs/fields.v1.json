@@ -176,6 +176,7 @@
     },
     {
       "id": "projection_source_id",
+      "compatibleAddition": true,
       "type": "keyword",
       "stored": true,
       "docValues": false,
@@ -183,6 +184,7 @@
     },
     {
       "id": "projection_source_revision",
+      "compatibleAddition": true,
       "type": "keyword",
       "stored": true,
       "docValues": false,
@@ -190,6 +192,7 @@
     },
     {
       "id": "projection_digest",
+      "compatibleAddition": true,
       "type": "keyword",
       "stored": true,
       "docValues": false,

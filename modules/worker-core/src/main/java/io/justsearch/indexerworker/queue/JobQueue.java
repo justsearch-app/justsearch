@@ -470,6 +470,16 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Exact collection enqueue is unavailable");
   }
 
+  /** Automatic discovery keeps terminal failures and parser/I/O waits; explicit retries use normal admission. */
+  default int enqueueMaintenanceScanEntries(List<EnqueueEntry> entries, String collection, String scanId) {
+    return enqueueEntries(entries, collection, scanId);
+  }
+
+  /** Upgrade reconciliation admits missing/DONE paths without disturbing any pending retry. */
+  default int enqueueUpgradeRecoveryEntries(List<EnqueueEntry> entries, String collection) {
+    throw new UnsupportedOperationException("Upgrade recovery enqueue is unavailable");
+  }
+
   /**
    * Reports whether the durable row for one exact path already carries the expected root
    * collection.

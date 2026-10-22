@@ -43,6 +43,7 @@ import io.justsearch.indexerworker.util.IndexRootLock;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.Release030RecoveryState;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
@@ -359,6 +360,8 @@ public final class KnowledgeServer implements Closeable {
   /** How often a root the committed boot deferred is checked for its recorded volume (round 7). */
   private static final long DEFERRED_BOOT_ROOT_CHECK_MS = 10_000L;
   private volatile java.util.concurrent.ScheduledFuture<?> deferredBootRootTask;
+  private Release030RecoveryState release030Recovery;
+  private java.util.concurrent.ScheduledFuture<?> release030RecoveryTask;
   private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
@@ -1832,6 +1835,7 @@ public final class KnowledgeServer implements Closeable {
       appServices = newAppServices();
       wireAppServicesPostConstruction(appServices);
       seedRootVolumesAfterUpgrade();
+      if (!unfinishedMigration) prepareRelease030Recovery();
 
       // 3.6 Embedding compatibility — MUST resolve BEFORE anything can commit (tempdoc 819 A).
       // This used to live in initDeferredModels() (async, behind multi-second ONNX composition),
@@ -1853,6 +1857,10 @@ public final class KnowledgeServer implements Closeable {
       }
       recoverStuckJobsAdmitted(jobQueue, null);
       startStuckJobReaper(jobQueue);
+      if (release030Recovery != null) {
+        release030RecoveryTask = stuckJobReaper.scheduleWithFixedDelay(
+            this::recoverRelease030RootsSafely, 1_000L, 10_000L, TimeUnit.MILLISECONDS);
+      }
 
 
       // Dev hot-reload manager (Phase 2, tempdoc 305)
@@ -7098,6 +7106,78 @@ public final class KnowledgeServer implements Closeable {
     // Round 8b (decision 3): configured collection roots are seeded once, like upgraded roots.
     producer.ingestService().seedConfiguredRoots(configuredRoots(
         startupConfiguration == null ? null : startupConfiguration.collections()));
+  }
+
+  /** No legacy job can be claimed between the lossless migration and this atomic repair. */
+  private void prepareRelease030Recovery() throws IOException, SQLException {
+    if (!bootRootBindingsBound || !(jobQueue instanceof SqliteJobQueue queue)
+        || !(appServices instanceof DefaultWorkerAppServices services)) return;
+    var state = indexGenerationManager.readStateBestEffort();
+    // Interrupted index migration belongs to its existing replay path, not this repair.
+    if (state == null || !"IDLE".equals(state.migration_state())) return;
+    release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
+    if (release030Recovery == null) return;
+    if (!release030Recovery.prepared()) {
+      List<Path> roots = new ArrayList<>(bootRootBindings.stream().map(RootBinding::path).toList());
+      var collections = startupConfiguration.collections();
+      for (var collection : collections.items()) roots.addAll(collection.roots());
+      // Unlike a person's unavailable root, an absent optional bundled-help directory is not
+      // outstanding user work. Some launch modes deliberately do not install that source.
+      var help = collections.bundledHelp();
+      if (help != null && Files.isDirectory(help.path())) roots.add(help.path());
+      queue.prepareRelease030Recovery(roots);
+      release030Recovery.prepared(roots);
+    }
+    queue.prepareRelease030ExplicitFiles(services.ingestService()::seedRelease030ExplicitFile);
+  }
+
+  private void recoverRelease030RootsSafely() {
+    if (closeStarted || release030Recovery == null
+        || !(jobQueue instanceof SqliteJobQueue queue)
+        || !(appServices instanceof DefaultWorkerAppServices services)
+        || !(ingestLifecycle instanceof RunningRuntime runtime)
+        || !runtime.isAcceptingWrites()) return;
+    var state = indexGenerationManager.readStateBestEffort();
+    if (state == null || !"IDLE".equals(state.migration_state())) return;
+    try {
+      boolean explicitReady = queue.prepareRelease030ExplicitFiles(
+          services.ingestService()::seedRelease030ExplicitFile);
+      for (Path root : release030Recovery.pendingRoots()) {
+        if (closeStarted) return;
+        var currentRoots = new ArrayList<>(exclusionRoots.get());
+        currentRoots.addAll(configuredRoots(startupConfiguration.collections()));
+        if (currentRoots.stream().noneMatch(current -> current.toAbsolutePath().normalize()
+            .equals(root.toAbsolutePath().normalize()))) {
+          release030Recovery.completed(root); // A removed root no longer authorizes a walk.
+          continue;
+        }
+        var result = services.ingestService().recoverRelease030Root(root, release030Collection(root),
+            () -> closeStarted || Thread.currentThread().isInterrupted());
+        if (result.getError().isBlank() && !result.getSkipped()
+            && !result.getDeleteDetectionUnverified()) release030Recovery.completed(root);
+      }
+      if (explicitReady && release030Recovery.pendingRoots().isEmpty()) {
+        release030Recovery.finish();
+        release030Recovery = null;
+        if (release030RecoveryTask != null) release030RecoveryTask.cancel(false);
+        log.info("0.3.0 queued-work recovery complete; no index rebuild was needed");
+      }
+    } catch (IOException | SQLException | RuntimeException unavailable) {
+      log.warn("0.3.0 queued-work recovery will resume: {}", unavailable.toString());
+    }
+  }
+
+  private String release030Collection(Path root) {
+    for (var binding : bootRootBindings) {
+      if (binding.path().toAbsolutePath().normalize().equals(root)) return binding.collection();
+    }
+    for (var collection : startupConfiguration.collections().items()) {
+      if (collection.roots().stream().anyMatch(path -> path.toAbsolutePath().normalize().equals(root))) {
+        return collection.name();
+      }
+    }
+    var help = startupConfiguration.collections().bundledHelp();
+    return help != null && help.path().equals(root) ? help.collection() : null;
   }
 
   /** The configured collection roots and the bundled help folder: configuration, not added roots. */

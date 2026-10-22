@@ -1029,6 +1029,39 @@ public final class WorkerIngestService {
     return rootWitness.provenOnRecordedVolume(root);
   }
 
+  /** Exact release-v13 queued files retain explicit-file admission under today's exclusions. */
+  public boolean seedRelease030ExplicitFile(Path file) {
+    if (isUserExcluded(file, file)
+        || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, file)) return true;
+    Path parent = file.toAbsolutePath().normalize().getParent();
+    if (parent == null) return false;
+    try {
+      // Never replace a known volume with the drive currently occupying its path.
+      if (rootVolumes.recordedFor(parent).isEmpty()
+          && rootVolumes.recordedFileFolder(parent).isEmpty()) {
+        rootWitness.recordExplicitFileFolder(parent);
+      }
+      return rootWitness.admitsFile(parent);
+    } catch (IOException unavailable) {
+      return false;
+    }
+  }
+
+  /** Resume a checkpointed root using bounded admissions, retaining unrelated retry deadlines. */
+  public SyncDirectoryResponse recoverRelease030Root(Path root, String collection,
+      java.util.function.BooleanSupplier cancelled) {
+    try (var ignoredMutation = mutationLease()) {
+      SyncDirectoryResponse refused = refuseSyncOfRootOnAnotherVolume(root.toString());
+      if (refused != null) return refused;
+      if (!rootWitness.admits(root) || !canApplyWatcherReceipts()) {
+        return syncDirectoryErrorResponse("Upgrade recovery waits for its writable root");
+      }
+      var binding = rootWatcherRegistry.subscription(root);
+      return syncOps.execute(root.toString(), true, null, cancelled,
+          binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY);
+    }
+  }
+
   /**
    * Round 8 (S8): the current count of root removals (unwatches); {@link #rootRemovedSince} tells
    * whether a root was removed after a count was taken.
@@ -2193,24 +2226,29 @@ public final class WorkerIngestService {
     JobQueue.EnqueueProvenance provenance =
         ctx.engineContext().clientKind() == io.justsearch.core.context.EngineContext.ClientKind.INTERNAL
             && "SYSTEM_INTERNAL".equals(ctx.provenance().transport()) ? null : ctx.provenance();
-    return syncDirectoryCommon(request, ctx, provenance, false);
+    return syncDirectoryCommon(request, ctx, provenance, false, provenance == null
+        && ctx.engineContext().survival() == io.justsearch.core.context.EngineContext.Survival.DURABLE
+        && ctx.engineContext().urgency() == io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
+        ? SyncDirectoryOps.AdmissionMode.MAINTENANCE : SyncDirectoryOps.AdmissionMode.DEFAULT);
   }
 
   /** Replays a durable sync with its persisted descriptive attribution. */
   public SyncDirectoryResponse syncDirectoryForReplay(
       SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
-    return syncDirectoryCommon(request, CallContext.none(), provenance, false);
+    return syncDirectoryCommon(request, CallContext.none(), provenance, false,
+        SyncDirectoryOps.AdmissionMode.DEFAULT);
   }
 
   /** The final cutover fence owns SWITCHING and replays this version directly onto Green. */
   public SyncDirectoryResponse syncDirectoryForFinalCutoverReplay(
       SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
-    return syncDirectoryCommon(request, CallContext.none(), provenance, true);
+    return syncDirectoryCommon(request, CallContext.none(), provenance, true,
+        SyncDirectoryOps.AdmissionMode.DEFAULT);
   }
 
   private SyncDirectoryResponse syncDirectoryCommon(
       SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance,
-      boolean finalCutoverReplay) {
+      boolean finalCutoverReplay, SyncDirectoryOps.AdmissionMode admissionMode) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       boolean force = request.getForce();
@@ -2254,9 +2292,11 @@ public final class WorkerIngestService {
       }
 
       var binding = rootWatcherRegistry.subscription(parsedRoot(rootPath));
-      return binding == null
-          ? syncOps.execute(rootPath, force, provenance, ctx::cancelled)
-          : syncOps.execute(rootPath, force, provenance, ctx::cancelled, binding.collection());
+      if (binding == null && admissionMode == SyncDirectoryOps.AdmissionMode.DEFAULT) {
+        return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
+      }
+      return syncOps.execute(rootPath, force, provenance, ctx::cancelled,
+          binding == null ? null : binding.collection(), admissionMode);
     }
   }
 

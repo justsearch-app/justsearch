@@ -762,6 +762,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    * @throws IOException if backup fails before migration
    */
   private void initSchema() throws SQLException, IOException {
+    // A kill after migration must not erase the fact that these were release-v13 jobs. Capture
+    // before any DDL, leaving the migration itself lossless (including every saved retry field).
+    if (SqliteQueueMigrationOps.getSchemaVersion(connection) == 13) {
+      Release030RecoveryState.capture(dbPath);
+    }
     // Create base tables if they don't exist
     try (Statement stmt = connection.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
@@ -1073,9 +1078,21 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return enqueueEntries(entries, collection, scanId, false);
   }
 
+  @Override
+  public int enqueueMaintenanceScanEntries(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId) {
+    return enqueueEntries(entries, collection, scanId, false, true);
+  }
+
   private int enqueueEntries(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
       boolean exactCollection) {
+    return enqueueEntries(entries, collection, scanId, exactCollection, false);
+  }
+
+  private int enqueueEntries(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
+      boolean exactCollection, boolean preserveRetryWaits) {
     if (entries == null || entries.isEmpty()) {
       return 0;
     }
@@ -1114,7 +1131,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
       int count = inTransaction(
-          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection));
+          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection, preserveRetryWaits));
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
@@ -1127,10 +1144,124 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  /** Run once before workers claim v13 work. The checkpoint is retained until every root walks. */
+  public void prepareRelease030Recovery(List<Path> roots) throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      inTransaction(() -> {
+        // Longest boundary wins for nested roots. SQL compares normalized path components,
+        // not LIKE patterns (a person's folder may contain '_' or '%').
+        try (var update = connection.prepareStatement("""
+            UPDATE jobs SET ingestion_root=? WHERE ingestion_root IS NULL
+              AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')
+              AND (path=? OR (path>=? AND path<?))
+            """)) {
+          for (Path root : roots.stream().sorted(
+              java.util.Comparator.comparingInt((Path path) -> path.getNameCount()).reversed()).toList()) {
+            String key = PathNormalizer.normalizeKey(root);
+            String prefix = PathNormalizer.normalizePathPrefix(key);
+            update.setString(1, key);
+            update.setString(2, key);
+            update.setString(3, prefix);
+            int separator = prefix.length() - 1;
+            update.setString(4, prefix.substring(0, separator) + (char) (prefix.charAt(separator) + 1));
+            update.executeUpdate();
+          }
+        }
+        try (var update = connection.createStatement()) {
+          // Outside every current root, only the exact legacy path is grandfathered. No parent
+          // folder is admitted. Terminal failed rows need no recovery or cutover certificate.
+          update.executeUpdate("UPDATE jobs SET ingestion_root=path WHERE ingestion_root IS NULL "
+              + "AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')");
+          update.executeUpdate("""
+              UPDATE jobs SET state='PENDING', attempts=0, retry_after=NULL, first_failed_at=NULL,
+                error_message=NULL, last_outcome_class=NULL, last_reason_code=NULL,
+                last_retry_policy=NULL, last_diagnostic_summary=NULL, last_outcome_at=NULL
+              WHERE state='RETRY_EXHAUSTED'
+                OR (state='PENDING' AND last_outcome_class='WRITE_FAILED')
+              """);
+        }
+        return 0;
+      });
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  /** Bounded iteration over exact legacy files outside roots; never expands their parents. */
+  public boolean prepareRelease030ExplicitFiles(java.util.function.Predicate<Path> admission)
+      throws SQLException {
+    String cursor = "";
+    boolean allAdmitted = true;
+    while (true) {
+      List<Path> paths = new ArrayList<>();
+      lockTimed();
+      try {
+        ensureOpen();
+        try (var query = connection.prepareStatement("""
+            SELECT path FROM jobs WHERE path>? AND ingestion_root=path
+              AND state='PENDING' ORDER BY path LIMIT 256
+            """)) {
+          query.setString(1, cursor);
+          try (var rows = query.executeQuery()) {
+            while (rows.next()) paths.add(Path.of(rows.getString(1)));
+          }
+        }
+      } finally {
+        unlockAfterChanges();
+      }
+      if (paths.isEmpty()) return allAdmitted;
+      for (Path path : paths) allAdmitted &= admission.test(path);
+      cursor = PathNormalizer.normalizeKey(paths.getLast());
+    }
+  }
+
+  @Override
+  public int enqueueUpgradeRecoveryEntries(List<JobQueue.EnqueueEntry> entries, String collection) {
+    if (entries.isEmpty()) return 0;
+    if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient recovery disk space");
+    lockTimed();
+    try {
+      ensureOpen();
+      return inTransaction(() -> {
+        try (var insert = connection.prepareStatement("""
+            INSERT INTO jobs(path,state,attempts,last_updated,collection,size_bytes,ingestion_root,unit_revision)
+              VALUES(?,'PENDING',0,?,?,?,?,lower(hex(randomblob(16))))
+            ON CONFLICT(path) DO UPDATE SET state='PENDING',last_updated=excluded.last_updated,
+              size_bytes=excluded.size_bytes,ingestion_root=excluded.ingestion_root,
+              unit_revision=excluded.unit_revision
+            WHERE jobs.state='DONE' AND jobs.walk_seen_epoch IS NULL
+            """)) {
+          for (var entry : entries) {
+            insert.setString(1, PathNormalizer.normalizeKey(entry.path()));
+            insert.setLong(2, System.currentTimeMillis());
+            insert.setString(3, collection == null || collection.isBlank() ? null : collection);
+            if (entry.sizeBytes() < 0) insert.setNull(4, java.sql.Types.BIGINT);
+            else insert.setLong(4, entry.sizeBytes());
+            insert.setString(5, PathNormalizer.normalizeKey(entry.ingestionRoot()));
+            insert.addBatch();
+          }
+          insert.executeBatch();
+        }
+        return entries.size(); // Existing unfinished rows already retain their durable admission.
+      });
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Upgrade recovery admissions were not saved", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
   private int enqueueEntriesInTransaction(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
-      boolean exactCollection)
-      throws SQLException {
+      boolean exactCollection) throws SQLException {
+    return enqueueEntriesInTransaction(entries, collection, scanId, now, exactCollection, false);
+  }
+
+  private int enqueueEntriesInTransaction(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
+      boolean exactCollection, boolean preserveRetryWaits) throws SQLException {
     String sql = """
         INSERT INTO jobs
           (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
@@ -1144,6 +1275,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           lower(hex(randomblob(16))), ?, ?,
           COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
         """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
+    if (preserveRetryWaits) {
+      // A startup scan is discovery, not a request to retry a terminal failure or an unchanged
+      // failing parser/file before its deadline.
+      // Recorded memberships retain their own existing mutation contract. An exhausted row is
+      // still revived; explicit/forced scans, watcher events and ordinary sync are unchanged.
+      sql += " WHERE NOT (jobs.walk_seen_epoch IS NULL AND (jobs.state='FAILED' "
+          + "OR (jobs.state='PENDING' AND COALESCE(jobs.retry_after,0)>? "
+          + "AND COALESCE(jobs.last_outcome_class,'') IN ('PARSER_TIMEOUT','IO_FAILED'))))";
+    }
     int accepted = 0;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       for (JobQueue.EnqueueEntry entry : entries) {
@@ -1177,6 +1317,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
         stmt.setString(15, PathNormalizer.normalizeKey(entry.ingestionRoot()));
         stmt.setString(16, normalizedPath);
+        if (preserveRetryWaits) stmt.setLong(17, now);
         stmt.executeUpdate();
         if (membership.epoch() != null) {
           SqliteIngestionWalkOps.noteMutation(connection, membership.key());

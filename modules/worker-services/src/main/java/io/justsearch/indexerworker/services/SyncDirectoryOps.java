@@ -539,6 +539,15 @@ final class SyncDirectoryOps {
   SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection) {
+    return execute(rootPath, force, provenance, cancelled, collection, AdmissionMode.DEFAULT);
+  }
+
+  enum AdmissionMode { DEFAULT, MAINTENANCE, UPGRADE_RECOVERY }
+
+  SyncDirectoryResponse execute(String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
+      String collection, AdmissionMode admissionMode) {
+    boolean upgradeRecovery = admissionMode == AdmissionMode.UPGRADE_RECOVERY;
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
@@ -579,8 +588,11 @@ final class SyncDirectoryOps {
 
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
-          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection);
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection,
+              admissionMode);
       filesAdded = walk.filesAdded();
+      // A recovery checkpoint cannot certify a tree whose unreadable entries were skipped.
+      pruneIncomplete |= upgradeRecovery && walk.walkIncomplete();
 
       if (cancelled.getAsBoolean()) {
         return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Cancelled");
@@ -701,18 +713,19 @@ final class SyncDirectoryOps {
 
   // ==================== Walk logic ====================
 
-  record SyncWalkPhaseResult(int filesAdded, boolean walkInterrupted) {}
+  record SyncWalkPhaseResult(int filesAdded, boolean walkInterrupted, boolean walkIncomplete) {}
 
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
       Path root, boolean force, Set<String> indexedPaths,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
-      String collection) throws IOException {
+      String collection, AdmissionMode admissionMode) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {
       int[] counters = {0}; // [0]=fileCount (for throttle)
       boolean[] walkInterrupted = {false};
+      boolean[] walkIncomplete = {false};
       final Set<String> indexedPathsFinal = indexedPaths;
 
       Files.walkFileTree(
@@ -733,7 +746,10 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-              if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
+              if (!Files.isReadable(file)) {
+                walkIncomplete[0] = true;
+                return FileVisitResult.CONTINUE;
+              }
               if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
@@ -779,6 +795,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
               if (stopped()) return FileVisitResult.TERMINATE;
+              walkIncomplete[0] = true;
               log.debug(
                   "Skipping inaccessible path: {} ({})",
                   file,
@@ -800,6 +817,12 @@ final class SyncDirectoryOps {
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();
+            if (admissionMode == AdmissionMode.UPGRADE_RECOVERY) {
+              return jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection);
+            }
+            if (admissionMode == AdmissionMode.MAINTENANCE) {
+              return jobQueue.enqueueMaintenanceScanEntries(admitted, collection, null);
+            }
             return admitted.isEmpty() ? 0 : collection == null
                 ? jobQueue.enqueueEntries(admitted) : jobQueue.enqueueEntries(admitted, collection);
           });
@@ -807,7 +830,7 @@ final class SyncDirectoryOps {
       if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {
         log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);
       }
-      return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0]);
+      return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0], walkIncomplete[0]);
     }
   }
 
