@@ -60,7 +60,7 @@ active provider or mode, custodian, or private location class.
 |---|---|---|---|---|---|---|
 | GitHub organization ownership | `justsearch-app` organization | [FOUNDER TO FILL: minimum successor role] | GitHub organization ownership | None | Confirm the successor can reach organization ownership and recovery settings. | [FOUNDER TO FILL: custodian identity] |
 | Repository administration and releases | `justsearch-app/justsearch`, Actions, and GitHub Releases | [FOUNDER TO FILL: minimum successor role] | GitHub repository administration | None | Confirm repository administration, Actions, and release access without changing policy. | [FOUNDER TO FILL: custodian identity] |
-| Ruleset and merge-queue custody | `main-merge-queue` ruleset, required checks, and merge queue | [FOUNDER TO FILL: minimum successor role] | GitHub ruleset administration | None | Confirm the successor can inspect and administer the ruleset and its bypass custody. | [FOUNDER TO FILL: custodian identity] |
+| Branch-protection custody | Required checks and squash auto-merge | [FOUNDER TO FILL: minimum successor role] | GitHub ruleset administration | None | Confirm the successor can inspect and administer the ruleset and its bypass custody. | [FOUNDER TO FILL: custodian identity] |
 | Release-asset repository | `justsearch-releases` | [FOUNDER TO FILL: minimum successor role] | [FOUNDER TO FILL: active repository access mode] | None | Confirm access to upload the signed mirrors and native packs named by the release runbook. | [FOUNDER TO FILL: custodian identity] |
 | npm ownership and 2FA | npm scope `@justsearch`; packages `@justsearch/plugin-api` and `@justsearch/runtime-client` | [FOUNDER TO FILL: minimum npm role] | [FOUNDER TO FILL: active npm ownership and 2FA mode] | No repository secret or variable is currently declared. | Confirm package/scope ownership and 2FA recovery; rotate any future publish credential through npm and never store it in Git. | [FOUNDER TO FILL: custodian identity] |
 | Windows Authenticode signing | `build-installer.yml`, `sign-vendored-mirrors.yml`, and the configured signing provider | [FOUNDER TO FILL: minimum release-signing role] | [FOUNDER TO FILL: active signing provider and `pfx`, `store`, or `command` mode] | Secrets: `JUSTSEARCH_CODESIGN_MODE`, `JUSTSEARCH_CODESIGN_PFX_B64`, `JUSTSEARCH_CODESIGN_PFX_PASSWORD`, `JUSTSEARCH_CODESIGN_THUMBPRINT`, `JUSTSEARCH_CODESIGN_TIMESTAMP_URL`, `JUSTSEARCH_CODESIGN_COMMAND`. Variable: `JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED`. Local/script controls: `JUSTSEARCH_CODESIGN_PFX_PATH`, `JUSTSEARCH_CODESIGN_STORE`, `JUSTSEARCH_REQUIRE_SIGNING`. | Rotate at the provider and repository, then verify a signed non-tag candidate as directed by the release runbook. `JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED` is rehearsal-only and must be unset in production. | [FOUNDER TO FILL: custodian identity] |
@@ -120,11 +120,21 @@ and tempdoc-heavy agent work:
    node scripts/ci/preview-squash-message.mjs --repo justsearch-app/justsearch --pr <number>
    ```
 
-6. Enter the squash merge queue after the required checks are green. PRs and pushes to
-   `main` run the full required set; merge-queue runs check governance, build and secrets
-   on the combined tree. Runtime, unit and Windows tests do not rerun on that tree.
-   Measured axe, Integration tests and CI wall-clock attribution run only on manual dispatch.
+6. Enable validated squash auto-merge with `node scripts/dev/run-gh.mjs enqueue N`.
 7. Let GitHub delete the source branch after merge.
+
+`node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
+record, then enables squash auto-merge bound to the validated head, title and body. A new push
+requires a new enqueue. The PR runs the union of lanes that consume its changed files; all
+required names report, including intentional skips. Unknown inputs run every lane. Strict stays
+off, so an older green base needs no update push. There is no merge queue.
+
+After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
+suite, including Integration tests, Windows stop-census, supervisor conformance and Measured axe.
+Its running CI is never cancelled; only the newest pending commit runs, and the wait command
+follows a newer run that covers the requested commit. If main fails in your change's area, open
+a fix or revert PR at once through the normal path. Report a failure in a test listed in
+`scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.
 
 The review-record command owns its hidden PR/head/body marker, paginates the PR
 conversation, refuses duplicate or foreign-owned managed comments, and is a
