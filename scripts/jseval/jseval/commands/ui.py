@@ -145,11 +145,12 @@ def cmd_ui_shot(ctx, step_name, list_steps, affected_path, ui_url, output_dir,
 @click.option("--timeout-ms", default=30_000, show_default=True)
 @click.pass_context
 def cmd_ui_a11y_gate(ctx, ui_url, output_dir, timeout_ms):
-    """ASSERT gate (615 §11): fail on a NEW a11y violation vs the shared baseline.
+    """ASSERT gate (615 §11): fail on NEW or serious/critical a11y violations.
 
     Captures every surface in governance/ui-a11y-baseline.v1.json in the deterministic
     --fixtures state and compares its axe violations to the surface's accepted
-    knownRules. Exit 0 = clean, 1 = a NEW (non-baselined) violation, 2 = capture error.
+    knownRules. Exit 0 = clean, 1 = a NEW violation or any serious/critical violation
+    (including baselined rules), 2 = capture/axe error.
     Also runs on PRs as the advisory `Measured axe` job in ci.yml (ADR-0026 amendment
     2026-09-05); that lane is not a required check, so run this locally too.
     """

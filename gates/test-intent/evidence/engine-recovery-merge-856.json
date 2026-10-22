@@ -1,0 +1,153 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T08:48:17.496Z",
+  "revision": "e333bcdf50e35e563f9f647498d11b153d84b204",
+  "tree": "5662cff4fac850d2648daa48b6d0095632985629",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::download_failures_and_rejections_return_to_actionable_error\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 32216
+    },
+    {
+      "command": "npx vitest run \"src/boot/desktopRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-2643732-1792572478733.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1445
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:2ba3cd2c93b39d2cc40978ddedc666b3aa494e684607a9bf2cc7f81f677e3503",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::download_failures_and_rejections_return_to_actionable_error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "file": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06354fbf3ef1d94e900abebeba86bf85f009eae07ed49b3b62eb48f214a1b58d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop boot recovery subscribes before API discovery and exposes host installation without an API",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery words an escalated Engine exit from the supervisor observation while the API is down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery removes the recovery surface when the real API is available",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery replaces a running shell with terminal recovery without a successor binding",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery preserves exhaustion that arrives while the application is still mounting",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps an update failure visible and allows checking again",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows administrator refusal for Check for updates with the Engine down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows administrator refusal for Install update with the Engine down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery restarts through the host and shows a refused restart reason without losing controls",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows the spawn obstacle, retained crash evidence, and the count across budget resets",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps the running-but-not-ready explanation visible when the API answers",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery explains a locked data folder without suggesting an automatic retry",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps browser unresolved behavior and never invokes native recovery commands",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6d92d768f86d778ea805012b176c3349705018c",
+    "revision": "f6d92d768f86d778ea805012b176c3349705018c",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/fixtures/engine-recovery-updater-before.patch",
+        "contentDigest": "sha256:4ab0e9568f05e441c60fac251319c476d1a0156be6cb6dd6f1bcfc9686bd9f9c"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::download_failures_and_rejections_return_to_actionable_error\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 14625,
+        "output": "\nrunning 1 test\ntest updater::tests::download_failures_and_rejections_return_to_actionable_error ... FAILED\n\nfailures:\n\n---- updater::tests::download_failures_and_rejections_return_to_actionable_error stdout ----\n\nthread 'updater::tests::download_failures_and_rejections_return_to_actionable_error' (2653116) panicked at src/updater.rs:3521:13:\nassertion `left == right` failed: transport left recovery actions disabled\n  left: \"downloading\"\n right: \"error\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::download_failures_and_rejections_return_to_actionable_error\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 176 filtered out; finished in 0.00s\n\n\n    Blocking waiting for file lock on build directory\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/merge-main-856/test-intent-before-tzRKeA/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:208:4\n    |\n208 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1044:15\n     |\n1044 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1632:10\n     |\n1632 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2006:4\n     |\n2006 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.58s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "npx vitest run \"src/boot/desktopRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-2643732-1792572496172.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1191,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-2643732-1792572496172.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error",
+        "classification": "assertion",
+        "detail": "updater::tests::download_failures_and_rejections_return_to_actionable_error:  ---- updater::tests::download_failures_and_rejections_return_to_actionable_error stdout ----\n\nthread 'updater::tests::download_failures_and_rejections_return_to_actionable_error' (2653116) panicked at src/updater.rs:3521:13:\nassertion `left == right` failed: transport left recovery actions disabled\n  left: \"downloading\"\n right: \"error\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfail"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+        "classification": "assertion",
+        "detail": "desktop boot recovery replaces a running shell with terminal recovery without a successor binding:  AssertionError: expected '\\n      \\n        JustSearch could no…' to contain 'Restart JustSearch'\n    at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/merge-main-856/test-intent-before-tzRKeA/modules/ui-web/src/boot/desktopRecovery.test.ts:93:46\n    at file:///home/elias/d | desktop boot recovery restarts through the host and shows a refused restart reason without losing"
+      }
+    ]
+  },
+  "digest": "sha256:45d1dc6b0358fd8767d9bab3592f9007939157f6b82cc4ac2816d9391a68b19f"
+}

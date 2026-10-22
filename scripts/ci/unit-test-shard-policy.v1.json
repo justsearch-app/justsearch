@@ -11,14 +11,12 @@
       "owner": "app and UI hosted unit evidence",
       "platformClass": "mixed/needs targeted experiment",
       "platformRiskNotes": [
-        "Includes Windows-sensitive app-util and app-launcher behavior.",
-        "Includes runtime manifest, logging, headless eval, and app-instance locking surfaces.",
-        "Migrated to ubuntu-latest (tempdoc 668, advisory runs done). Genuinely Windows-specific tests (@Tag windows) run on the windows-native-tests lane."
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
       ],
       "gradleTasks": [
-        ":modules:ui:test"
+        ":modules:ui:ciUnitTest1"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:ui:test -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:ui:ciUnitTest1 -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
@@ -29,7 +27,31 @@
       "commands": [
         "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
         "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4"
-      ]
+      ],
+      "classifierLane": "ui"
+    },
+    {
+      "lane": "app-ui-ui-2",
+      "requiredCheck": "Unit tests (app-ui)",
+      "artifact": "unit-test-attribution-app-ui-ui-2",
+      "runnerLabel": "ubuntu-latest/app-ui-ui-2",
+      "owner": "app and UI hosted unit evidence",
+      "platformClass": "mixed/needs targeted experiment",
+      "platformRiskNotes": [
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
+      ],
+      "gradleTasks": [
+        ":modules:ui:ciUnitTest2"
+      ],
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:ui:ciUnitTest2 -PskipWebBuild=true --console=plain",
+      "advisoryBudgets": {
+        "maxSummedSuiteSeconds": 300,
+        "slowSuiteWarnSeconds": 60,
+        "maxSkipped": 50
+      },
+      "jobId": "app-ui-ui-2",
+      "jobName": "Unit tests (app-ui-ui-2)",
+      "classifierLane": "ui"
     },
     {
       "lane": "app-ui-services",
@@ -39,97 +61,192 @@
       "owner": "app and UI hosted unit evidence",
       "platformClass": "mixed/needs targeted experiment",
       "platformRiskNotes": [
-        "Includes Windows-sensitive app-util and app-launcher behavior.",
-        "Includes runtime manifest, logging, headless eval, and app-instance locking surfaces.",
-        "Migrated to ubuntu-latest (tempdoc 668, advisory runs done). Genuinely Windows-specific tests (@Tag windows) run on the windows-native-tests lane."
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
       ],
       "gradleTasks": [
-        ":modules:app-agent:test",
-        ":modules:app-agent-api:test",
-        ":modules:app-api:test",
-        ":modules:app-api-tck:test",
-        ":modules:app-config:test",
-        ":modules:app-launcher:test",
-        ":modules:app-observability:test",
-        ":modules:app-services:test",
-        ":modules:app-util:test"
+        ":modules:app-launcher:ciUnitTest1",
+        ":modules:app-services:ciUnitTest1",
+        ":modules:app-api:test"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:ciUnitTest1 :modules:app-services:ciUnitTest1 :modules:app-api:test -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
         "maxSkipped": 50
       },
       "jobId": "app-ui-services",
-      "jobName": "Unit tests (app-ui-services)"
+      "jobName": "Unit tests (app-ui-services)",
+      "classifierLane": "services"
     },
     {
-      "lane": "search-worker",
+      "lane": "app-ui-services-2",
+      "requiredCheck": "Unit tests (app-ui)",
+      "artifact": "unit-test-attribution-app-ui-services-2",
+      "runnerLabel": "ubuntu-latest/app-ui-services-2",
+      "owner": "app and UI hosted unit evidence",
+      "platformClass": "mixed/needs targeted experiment",
+      "platformRiskNotes": [
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
+      ],
+      "gradleTasks": [
+        ":modules:app-launcher:ciUnitTest2",
+        ":modules:app-services:ciUnitTest2",
+        ":modules:app-observability:test"
+      ],
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:ciUnitTest2 :modules:app-services:ciUnitTest2 :modules:app-observability:test -PskipWebBuild=true --console=plain",
+      "advisoryBudgets": {
+        "maxSummedSuiteSeconds": 300,
+        "slowSuiteWarnSeconds": 60,
+        "maxSkipped": 50
+      },
+      "jobId": "app-ui-services-2",
+      "jobName": "Unit tests (app-ui-services-2)",
+      "classifierLane": "services"
+    },
+    {
+      "lane": "app-ui-services-3",
+      "requiredCheck": "Unit tests (app-ui)",
+      "artifact": "unit-test-attribution-app-ui-services-3",
+      "runnerLabel": "ubuntu-latest/app-ui-services-3",
+      "owner": "app and UI hosted unit evidence",
+      "platformClass": "mixed/needs targeted experiment",
+      "platformRiskNotes": [
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
+      ],
+      "gradleTasks": [
+        ":modules:app-launcher:ciUnitTest3",
+        ":modules:app-services:ciUnitTest3",
+        ":modules:app-agent:test",
+        ":modules:app-util:test",
+        ":modules:app-agent-api:test",
+        ":modules:app-config:test",
+        ":modules:app-api-tck:test"
+      ],
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:ciUnitTest3 :modules:app-services:ciUnitTest3 :modules:app-agent:test :modules:app-util:test :modules:app-agent-api:test :modules:app-config:test :modules:app-api-tck:test -PskipWebBuild=true --console=plain",
+      "advisoryBudgets": {
+        "maxSummedSuiteSeconds": 300,
+        "slowSuiteWarnSeconds": 60,
+        "maxSkipped": 50
+      },
+      "jobId": "app-ui-services-3",
+      "jobName": "Unit tests (app-ui-services-3)",
+      "classifierLane": "services"
+    },
+    {
+      "lane": "search-worker-1",
       "requiredCheck": "Unit tests (search-worker)",
-      "artifact": "unit-test-attribution-search-worker",
-      "runnerLabel": "ubuntu-latest/search-worker",
+      "artifact": "unit-test-attribution-search-worker-1",
+      "runnerLabel": "ubuntu-latest/search-worker-1",
       "owner": "search and worker hosted unit evidence",
       "platformClass": "mixed/needs targeted experiment",
       "platformRiskNotes": [
-        "Includes Tika/PDF fixture-adjacent behavior, Lucene filesystem behavior, index locking, and worker model discovery.",
-        "Contains path and worker-runtime assumptions that need targeted proof before a platform move.",
-        "Migrated to ubuntu-latest (tempdoc 668). Cross-platform issues fixed (isCloudPlaceholder attr read, path-separator handling, blank-prefix guard, IndexRootLock spawn); timing-sensitive DrainAndClose method runs @Tag windows on the windows-native-tests lane."
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
       ],
       "gradleTasks": [
-        ":modules:adapters-lucene:test",
-        ":modules:configuration:test",
-        ":modules:core:test",
-        ":modules:core-contracts:test",
-        ":modules:indexer-worker:test",
-        ":modules:indexing:test",
-        ":modules:ipc-common:test",
-        ":modules:worker-core:test",
-        ":modules:worker-services:test"
+        ":modules:indexer-worker:ciUnitTest1",
+        ":modules:worker-services:ciUnitTest1",
+        ":modules:adapters-lucene:test"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test :modules:configuration:test :modules:core:test :modules:core-contracts:test :modules:indexer-worker:test :modules:indexing:test :modules:ipc-common:test :modules:worker-core:test :modules:worker-services:test -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:ciUnitTest1 :modules:worker-services:ciUnitTest1 :modules:adapters-lucene:test -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
         "maxSkipped": 50
-      }
+      },
+      "jobId": "unit-tests-search-worker-1",
+      "jobName": "Unit tests (search-worker-1)",
+      "classifierLane": "search"
     },
     {
-      "lane": "platform-contracts",
+      "lane": "search-worker-2",
+      "requiredCheck": "Unit tests (search-worker)",
+      "artifact": "unit-test-attribution-search-worker-2",
+      "runnerLabel": "ubuntu-latest/search-worker-2",
+      "owner": "search and worker hosted unit evidence",
+      "platformClass": "mixed/needs targeted experiment",
+      "platformRiskNotes": [
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
+      ],
+      "gradleTasks": [
+        ":modules:indexer-worker:ciUnitTest2",
+        ":modules:worker-services:ciUnitTest2",
+        ":modules:worker-core:test",
+        ":modules:configuration:test",
+        ":modules:core:test",
+        ":modules:indexing:test",
+        ":modules:core-contracts:test",
+        ":modules:ipc-common:test"
+      ],
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:ciUnitTest2 :modules:worker-services:ciUnitTest2 :modules:worker-core:test :modules:configuration:test :modules:core:test :modules:indexing:test :modules:core-contracts:test :modules:ipc-common:test -PskipWebBuild=true --console=plain",
+      "advisoryBudgets": {
+        "maxSummedSuiteSeconds": 300,
+        "slowSuiteWarnSeconds": 60,
+        "maxSkipped": 50
+      },
+      "jobId": "unit-tests-search-worker-2",
+      "jobName": "Unit tests (search-worker-2)",
+      "classifierLane": "search"
+    },
+    {
+      "lane": "platform-contracts-1",
       "requiredCheck": "Unit tests (platform-contracts)",
-      "artifact": "unit-test-attribution-platform-contracts",
-      "runnerLabel": "ubuntu-latest/platform-contracts",
+      "artifact": "unit-test-attribution-platform-contracts-1",
+      "runnerLabel": "ubuntu-latest/platform-contracts-1",
       "owner": "platform, inference, contract, and governance hosted unit evidence",
       "platformClass": "mixed/needs targeted experiment",
       "platformRiskNotes": [
-        "Includes GPU bridge, ORT/common, app-inference, system-test substrate, and native/runtime assumptions.",
-        "Includes app-engine recovery and mutation tests. The expected 9-12 minute addition fits the 25-minute hard timeout but exceeds every existing shard's advisory walltime and summed-suite budgets; platform-contracts has the lowest recorded hosted maximum. Review budgets after hosted measurement rather than treating this estimate as proof.",
-        "Migrated to ubuntu-latest (tempdoc 668). GPU/ORT tests self-skip via @EnabledOnOs; the timing-sensitive LlamaServerOps crash-telemetry method runs @Tag windows on the windows-native-tests lane.",
-        "Advisory --continue Linux runs were used to enumerate and fix the portability tail before flipping."
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
       ],
       "gradleTasks": [
-        ":modules:ai-backend:test",
-        ":modules:api-contract-projection-java:test",
-        ":modules:app-engine:test",
-        ":modules:app-inference:test",
-        ":modules:benchmarks:test",
-        ":modules:dead-code-audit:test",
-        ":modules:extension-substrate:test",
-        ":modules:gpu-bridge:test",
-        ":modules:infra-core:test",
-        ":modules:ort-common:test",
-        ":modules:prompt-support:test",
-        ":modules:reranker:test",
-        ":modules:ssot-tools:test",
-        ":modules:system-tests:test",
-        ":modules:telemetry:test",
-        ":modules:test-support:test"
+        ":modules:app-engine:ciUnitTest1",
+        ":modules:app-inference:test"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:ai-backend:test :modules:api-contract-projection-java:test :modules:app-engine:test :modules:app-inference:test :modules:benchmarks:test :modules:dead-code-audit:test :modules:extension-substrate:test :modules:gpu-bridge:test :modules:infra-core:test :modules:ort-common:test :modules:prompt-support:test :modules:reranker:test :modules:ssot-tools:test :modules:system-tests:test :modules:telemetry:test :modules:test-support:test -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:ciUnitTest1 :modules:app-inference:test -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
         "maxSkipped": 50
-      }
+      },
+      "jobId": "unit-tests-platform-contracts-1",
+      "jobName": "Unit tests (platform-contracts-1)",
+      "classifierLane": "platform"
+    },
+    {
+      "lane": "platform-contracts-2",
+      "requiredCheck": "Unit tests (platform-contracts)",
+      "artifact": "unit-test-attribution-platform-contracts-2",
+      "runnerLabel": "ubuntu-latest/platform-contracts-2",
+      "owner": "platform, inference, contract, and governance hosted unit evidence",
+      "platformClass": "mixed/needs targeted experiment",
+      "platformRiskNotes": [
+        "Uses the original unit source set, JVM conventions and module test configuration. Per-class partitions retain nested classes and route new classes automatically."
+      ],
+      "gradleTasks": [
+        ":modules:app-engine:ciUnitTest2",
+        ":modules:ort-common:test",
+        ":modules:api-contract-projection-java:test",
+        ":modules:dead-code-audit:test",
+        ":modules:gpu-bridge:test",
+        ":modules:telemetry:test",
+        ":modules:ai-backend:test",
+        ":modules:reranker:test",
+        ":modules:benchmarks:test",
+        ":modules:system-tests:test",
+        ":modules:test-support:test",
+        ":modules:prompt-support:test",
+        ":modules:ssot-tools:test",
+        ":modules:extension-substrate:test",
+        ":modules:infra-core:test"
+      ],
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:ciUnitTest2 :modules:ort-common:test :modules:api-contract-projection-java:test :modules:dead-code-audit:test :modules:gpu-bridge:test :modules:telemetry:test :modules:ai-backend:test :modules:reranker:test :modules:benchmarks:test :modules:system-tests:test :modules:test-support:test :modules:prompt-support:test :modules:ssot-tools:test :modules:extension-substrate:test :modules:infra-core:test -PskipWebBuild=true --console=plain",
+      "advisoryBudgets": {
+        "maxSummedSuiteSeconds": 300,
+        "slowSuiteWarnSeconds": 60,
+        "maxSkipped": 50
+      },
+      "jobId": "unit-tests-platform-contracts-2",
+      "jobName": "Unit tests (platform-contracts-2)",
+      "classifierLane": "platform"
     }
   ],
   "aggregates": [
@@ -138,7 +255,10 @@
       "requiredCheck": "Unit tests (app-ui)",
       "parts": [
         "app-ui-ui",
-        "app-ui-services"
+        "app-ui-ui-2",
+        "app-ui-services",
+        "app-ui-services-2",
+        "app-ui-services-3"
       ]
     },
     {
@@ -146,7 +266,24 @@
       "requiredCheck": "Windows-native tests",
       "parts": [
         "windows-native-node",
-        "windows-native-contracts"
+        "windows-native-contracts",
+        "windows-native-contracts-2"
+      ]
+    },
+    {
+      "jobId": "unit-tests-search-worker",
+      "requiredCheck": "Unit tests (search-worker)",
+      "parts": [
+        "unit-tests-search-worker-1",
+        "unit-tests-search-worker-2"
+      ]
+    },
+    {
+      "jobId": "unit-tests-platform-contracts",
+      "requiredCheck": "Unit tests (platform-contracts)",
+      "parts": [
+        "unit-tests-platform-contracts-1",
+        "unit-tests-platform-contracts-2"
       ]
     }
   ],
@@ -156,17 +293,20 @@
       "commands": [
         "npm ci --audit=false",
         "npm ci --prefix modules/ui-web --audit=false",
-        "npm run test:dev-runner -- --verbose"
+        "npm run test:dev-runner -- --verbose",
+        "node scripts/supervisor-conformance/run.mjs --adapter dev-runner",
+        "node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50"
       ],
-      "gradleTasks": []
+      "gradleTasks": [],
+      "mainOnlyCommands": [
+        "node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50"
+      ]
     },
     {
       "jobId": "windows-native-contracts",
       "commands": [
         "node --test scripts/release/evidence-capture-exit.test.mjs",
-        "node --test scripts/lib/engine-discovery.test.mjs",
-        "node scripts/supervisor-conformance/run.mjs --adapter dev-runner",
-        "node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50",
+        "node scripts/ci/run-node-tests.mjs scripts/lib/engine-discovery.test.mjs",
         "./scripts/ci/test-release-compatibility-baseline.ps1",
         "./scripts/ci/test-install-codesign-tool.ps1",
         "./scripts/ci/test-resolve-release-signing.ps1",
@@ -177,18 +317,11 @@
         "node scripts/ci/report-unit-test-attribution.mjs --lane windows-native-contracts --runner-label windows-latest --require-windows-classes --out-json build/ci/windows-unit-test-attribution.json --out-md build/ci/windows-unit-test-attribution.md"
       ],
       "gradleTasks": [
-        ":modules:app-api:test",
-        ":modules:app-util:test",
-        ":modules:app-agent:test",
         ":modules:app-services:test",
         ":modules:app-observability:test",
-        ":modules:ui:test",
         ":modules:adapters-lucene:test",
-        ":modules:app-inference:test",
-        ":modules:worker-services:test",
-        ":modules:ort-common:test",
         ":modules:configuration:test",
-        ":modules:indexer-worker:test"
+        ":modules:ort-common:test"
       ],
       "requiredClasses": [
         {
@@ -196,9 +329,6 @@
         },
         {
           "name": "io.justsearch.app.services.ai.install.AiInstallServiceCudaPolicyTest"
-        },
-        {
-          "name": "io.justsearch.ui.HeadlessAppCudaPolicyTest"
         },
         {
           "name": "io.justsearch.configuration.persistence.ContendedFileReadsTest",
@@ -212,6 +342,29 @@
         },
         {
           "name": "io.justsearch.configuration.PlatformPathsTest"
+        },
+        {
+          "name": "io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest"
+        }
+      ]
+    },
+    {
+      "jobId": "windows-native-contracts-2",
+      "commands": [
+        "node scripts/ci/report-unit-test-attribution.mjs --lane windows-native-contracts-2 --runner-label windows-latest --require-windows-classes --out-json build/ci/windows-unit-test-attribution.json --out-md build/ci/windows-unit-test-attribution.md"
+      ],
+      "gradleTasks": [
+        ":modules:app-api:test",
+        ":modules:app-util:test",
+        ":modules:app-agent:test",
+        ":modules:ui:test",
+        ":modules:app-inference:test",
+        ":modules:worker-services:test",
+        ":modules:indexer-worker:test"
+      ],
+      "requiredClasses": [
+        {
+          "name": "io.justsearch.ui.HeadlessAppCudaPolicyTest"
         },
         {
           "name": "io.justsearch.app.util.AppInstanceLockExclusionTest"
@@ -229,18 +382,6 @@
           "name": "io.justsearch.app.api.runtime.containment.WindowsJobWitnessReserveTest"
         },
         {
-          "name": "io.justsearch.indexerworker.extract.ExtractionSandboxCommandTest"
-        },
-        {
-          "name": "io.justsearch.indexerworker.services.RootPresenceGuardTest"
-        },
-        {
-          "name": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest"
-        },
-        {
-          "name": "io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest"
-        },
-        {
           "name": "io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest",
           "allowedSkips": [
             {
@@ -254,11 +395,73 @@
               "reason": "The test requires a second volume besides the temporary directory; its assumption reports needs a second volume besides."
             }
           ]
+        },
+        {
+          "name": "io.justsearch.indexerworker.extract.ExtractionSandboxCommandTest"
+        },
+        {
+          "name": "io.justsearch.indexerworker.services.RootPresenceGuardTest"
+        },
+        {
+          "name": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest"
         }
       ]
     }
   ],
   "historicalArtifacts": {
-    "app-ui": "unit-test-attribution-app-ui"
-  }
+    "app-ui": "unit-test-attribution-app-ui",
+    "search-worker": "unit-test-attribution-search-worker",
+    "platform-contracts": "unit-test-attribution-platform-contracts"
+  },
+  "unitTestModules": [
+    "adapters-lucene",
+    "ai-backend",
+    "api-contract-projection-java",
+    "app-agent",
+    "app-agent-api",
+    "app-api",
+    "app-api-tck",
+    "app-config",
+    "app-engine",
+    "app-inference",
+    "app-launcher",
+    "app-observability",
+    "app-services",
+    "app-util",
+    "benchmarks",
+    "configuration",
+    "core",
+    "core-contracts",
+    "dead-code-audit",
+    "extension-substrate",
+    "gpu-bridge",
+    "indexer-worker",
+    "indexing",
+    "infra-core",
+    "ipc-common",
+    "ort-common",
+    "prompt-support",
+    "reranker",
+    "ssot-tools",
+    "system-tests",
+    "telemetry",
+    "test-support",
+    "ui",
+    "worker-core",
+    "worker-services"
+  ],
+  "windowsTestModules": [
+    "app-api",
+    "app-util",
+    "app-agent",
+    "app-services",
+    "app-observability",
+    "ui",
+    "adapters-lucene",
+    "app-inference",
+    "worker-services",
+    "ort-common",
+    "configuration",
+    "indexer-worker"
+  ]
 }

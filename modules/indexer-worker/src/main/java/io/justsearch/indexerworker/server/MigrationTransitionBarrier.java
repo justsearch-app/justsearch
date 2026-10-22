@@ -31,10 +31,13 @@ public final class MigrationTransitionBarrier {
       "migration-green-drained", "migration-before-switching", "migration-switching-entered",
       "migration-before-pointer-commit", "migration-after-pointer-commit",
       "migration-before-live-activation", "migration-after-live-activation",
-      "migration-after-first-projection-replay", "migration-after-first-prune-removal");
+      "migration-after-first-projection-replay", "migration-after-first-prune-removal",
+      "migration-refusal-after-source-commit", "migration-refusal-after-journal-ack",
+      "migration-refusal-after-abandonment", "migration-refusal-after-retirement");
   /** Points inside an ordered replay: only a process halt there leaves a meaningful state. */
   private static final Set<String> REPLAY_HALT_POINTS = Set.of(
-      "migration-after-first-projection-replay", "migration-after-first-prune-removal");
+      "migration-after-first-projection-replay", "migration-after-first-prune-removal",
+      "migration-refusal-after-source-commit");
 
   public static Hook fromEnvironment(Path dataDir, Function<String, String> env) {
     String point = env.apply("JUSTSEARCH_MIGRATION_BARRIER_POINT");

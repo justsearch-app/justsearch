@@ -166,7 +166,7 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
       })
 }
 
-tasks.named<Test>("test") {
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
   inputs.file(rootProject.file("governance/store-recoverability.v1.json"))
     .withPropertyName("cliDataVersionStoreRegister").withPathSensitivity(PathSensitivity.RELATIVE)
 

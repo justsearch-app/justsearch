@@ -22,10 +22,10 @@ class StatusIsolationHttpTest {
   }
   static WorkerOperationalView view(long pendingJobs) {
     return WorkerOperationalViewBuilder.builder()
-      .core(new CoreIndexView(true, 10, pendingJobs, "SERVING", 0, 0))
+      .core(new CoreIndexView(true, 10, pendingJobs, pendingJobs > 0 ? "INDEXING" : "IDLE", 0, 0))
       .failure(FailureTrackingView.empty()).migration(MigrationGenerationViewBuilder.builder()
           .migrationEnumerator(MigrationGenerationView.empty().migrationEnumerator())
-          .pendingJobsCount(pendingJobs).build())
+          .pendingJobsCount(pendingJobs).pendingReadyJobsCount(pendingJobs).build())
       .compatibility(CompatibilityStatusView.empty()).queueDb(QueueDbStatusView.healthy())
       .enrichment(EnrichmentProgressView.empty()).gpu(GpuDiagnosticsView.empty())
       .vectorFormat(VectorFormatView.empty()).telemetry(new TelemetryMetricsView(0,0,0,0.25,"OK"))

@@ -293,7 +293,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     private void delete(String path) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
-        if (selected.runtime() == null) return;
         deleteAt(selected, path);
       }
     }
@@ -303,14 +302,15 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         String path) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
-        if (selected.runtime() == null) return;
         deleteAt(selected, witness, path);
       }
     }
 
     private static void deleteAt(Target selected, String path) {
       selected.ingest().acceptWatcherDelete(path, () -> {
-        if (!selected.runtime().isAcceptingWrites()) return;
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
+          throw new IllegalStateException("Watcher deletion lost its writable runtime");
+        }
         selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
         selected.deletionMarker().markIfAbsent(path);
       });
@@ -321,10 +321,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
         String path) {
       selected.ingest().acceptWatcherDelete(witness, path, () -> {
-        if (!selected.runtime().isAcceptingWrites()) return;
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
+          throw new IllegalStateException("Watcher deletion lost its writable runtime");
+        }
         selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
         selected.deletionMarker().markIfAbsent(path);
       });
+    }
+
+    private void applyPendingReceipts() {
+      try (RoutedTarget routed = acquireTarget()) {
+        routed.target().ingest().reconcilePendingWatcherRoots();
+      }
     }
 
     private void reconcile(Path root, boolean force) {
@@ -775,6 +783,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
           ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
           watcherCallbacks::delete);
+      workerWatcher.usePendingReceipts(watcherCallbacks::applyPendingReceipts);
       this.rootWatcherRegistry =
           new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
     } else {
@@ -1160,8 +1169,26 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         || successor.mutationAdmission != mutationAdmission) {
       throw new IllegalArgumentException("Native watcher successor changed");
     }
+    // Before A can close: every settled DELETE waiting on the fence becomes A's durable root
+    // receipt, through the same call a failed handoff's released callback makes on drained A. The
+    // fence's write lease admits it; the successor's reconciliation settles the receipt.
+    workerWatcher.forEachSettlingDelete((witness, path) -> {
+      try {
+        WatcherCallbacks.deleteAt(preparedWatcherTarget, witness, path);
+      } catch (RuntimeException unrecorded) {
+        // The waiting callback still holds this DELETE and applies or reports it once admitted.
+        log.warn("A waiting watcher DELETE was not recorded before the handoff: {}",
+            unrecorded.getMessage());
+      }
+    });
     producerOwnership.transferWatcherTo(successor.producerOwnership);
     watcherCallbacks.target = successor.preparedWatcherTarget;
+  }
+
+  /** A failed handoff routes the retained watcher back to this drained owner, inside the fence. */
+  public void withdrawNativeWatcherHandoff(WorkerMutationAdmission.FinalFence fence) {
+    watcherCallbacks.target = preparedWatcherTarget;
+    fence.restorePriorOwner();
   }
 
   public WorkerMutationAdmission mutationAdmission() { return mutationAdmission; }
@@ -1296,6 +1323,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void startIndexingLoop() {
+    ingestService.reconcilePendingWatcherRoots();
     if (indexingLoop != null) {
       indexingLoop.start();
     }
@@ -1697,7 +1725,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     producerOwnership.close(workerWatcher, indexingLoop);
   }
 
-  /** Stops native work and retains the watcher behind its mutation fence until replacement. */
+  /**
+   * Stops native work and retains the watcher behind its mutation fence until replacement. If the
+   * replacement fails, the fence closes on this owner: callbacks waiting on it reach this drained
+   * service, which records each watcher delete as a durable root obligation.
+   */
   public WorkerMutationAdmission.FinalFence closeForRuntimeReload()
       throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
     var fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 5_000);
@@ -1706,7 +1738,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     }
     try {
       closeNativeLoopRetainingModels();
-      fence.retireCurrentOwner();
       return fence;
     } catch (IOException | RuntimeException | Error failure) {
       fence.close();

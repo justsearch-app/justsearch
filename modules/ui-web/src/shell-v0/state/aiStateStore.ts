@@ -436,6 +436,12 @@ function documentCountUnknown(status: StatusSnapshot | null | undefined): boolea
   return status?.worker?.core?.indexedDocumentsUnknown === true;
 }
 
+/** A fresh serving-reader count stays usable while a different generation is being built. */
+export function hasLiveDocumentCount(state: AiState | null | undefined): boolean {
+  return state != null && state.indexingStatusLive && isWorkerReportedIndex(state.status)
+    && state.index.documentCount.known;
+}
+
 /**
  * The words shown in place of a document count the backend could not read: "Checking…" during the
  * start-up window, "Unknown" after it (or when the server's uptime is not reported). `null` when the

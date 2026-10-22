@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ad6a79c6598c774d738564f4beda504b23434af3173ac1586b35e96892e6f1f"
+  },
+  "createdAt": "2026-10-21T21:32:58.440Z",
+  "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+  "tree": "4adca9421a9e8c8ed2bc46b86fcd56686000f5ed",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/indexingTaskWaiting.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-596644-1792618374378.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1555
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#qualifies delayed running file rows after the worker stops runnable file work",
+      "file": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:54e94a1167f51027c421dc2d49252de9ed0bf4fb176809a3512be4af6cf95e6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "qualifies delayed running file rows after the worker stops runnable file work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#withdraws delayed file work from the running chip while preserving independent agent work",
+      "file": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:54e94a1167f51027c421dc2d49252de9ed0bf4fb176809a3512be4af6cf95e6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws delayed file work from the running chip while preserving independent agent work",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+    "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/indexingTaskWaiting.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-596644-1792618377187.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1121,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-596644-1792618377187.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#qualifies delayed running file rows after the worker stops runnable file work",
+        "classification": "assertion",
+        "detail": "qualifies delayed running file rows after the worker stops runnable file work:  AssertionError: expected 'running' to be 'last observed running' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-ZLDKnA/modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts:29:55\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#withdraws delayed file work from the running chip while preserving independent agent work",
+        "classification": "assertion",
+        "detail": "withdraws delayed file work from the running chip while preserving independent agent work:  AssertionError: expected <span class=\"group\" …(2)>…(2)</span> to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-ZLDKnA/modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts:47:76\n    at file:///home/elias/dev/justsearch/.claude/"
+      }
+    ]
+  },
+  "digest": "sha256:d523ee85d64205a60e4f826e54da59efbd9c1ffe6488864c369f05a8dca0711b"
+}

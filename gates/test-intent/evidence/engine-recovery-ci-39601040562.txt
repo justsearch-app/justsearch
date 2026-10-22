@@ -1,0 +1,117 @@
+CI run 39601040562 follow-up (Linux, 2026-10-21)
+
+Source parent: 3b0c4a16119c316e090b531214d6f25fba4c9bf4
+Merged origin/main: 738e6a443c9d6ce82383e9c938c264a3a20fb506
+Merge commit (only commit): 2a64b161f, Merge origin/main into worktree-engine-recovery
+Fixes, tests and evidence below remain uncommitted.
+No Java change or Gradle invocation. No real Engine/JVM launched: conformance uses its owned fake Engine.
+All task temporary checkouts, Chromium temp data and harness data are under the repository tmp/ tree.
+The main comparison uses a shared clone pinned to the exact origin/main hash above.
+Its ignored bound-exec helper was copied from the same installed distribution prerequisite;
+native/bound-exec and shell linux_process.rs have no diff against main.
+
+CI reproduction:
+Downloaded job 119226265278 logs using gh api repos/justsearch-app/justsearch/actions/jobs/119226265278/logs.
+Actual failure: src/boot/boot-lockdown.test.ts > RN3 Engine recovery Retry and both desktop event reloads
+mount under real lockdown; Error: Test timed out in 30000ms, test line 140.
+Command: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
+Original main: exit 0, 2 files / 14 tests passed.
+Original merged branch: exit 1, 1 failed / 13 passed: RN3 waits for Try connecting again on exhausted.
+Corrected test preserves Retry reload plus both desktop-event reload assertions in starting.
+E3 changes exhausted to Restart JustSearch and native restart. The added terminal check revealed
+that jf-button's composed control retained its first callback: a captured terminal=false closure
+still reloaded after the label became Restart JustSearch. Reading isTerminal(this.supervisor) on
+activation fixes this without changing the shared button. The test checks IPC once and zero
+navigation before a running event, followed by a new API binding and mounted shell under SES.
+The browser-boundary fixture retains that new binding through the reload, as a native host would.
+Candidate complete lockdown suite: exit 0, 2 files / 15 tests passed.
+
+Official evidence runner (unmodified, run inside a disposable shared candidate clone):
+node scripts/governance/gates/test-intent/run-evidence.mjs
+  --out gates/test-intent/evidence/engine-recovery-lockdown-restart.json
+  --check modules/ui-web/src/boot/boot-lockdown.test.ts
+  --before 2a64b161f --before-root <TMPDIR>/ci-39601040562
+Exit 0. Candidate: all five boot checks executed, passed, none skipped.
+Merged-parent fail-before: assertion in E3 terminal Engine recovery: restart_engine calls 0
+and an unexpected navigation, expected calls 1 / navigations [].
+No production code overlaid into the before-state. Evidence copied back byte-for-byte.
+
+Entry 10 refreshed with the same official runner:
+  --out gates/test-intent/evidence/engine-recovery-merge-839-updater.json
+  --check modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error
+  --before 738e6a443c9d6ce82383e9c938c264a3a20fb506
+  --before-root <TMPDIR>/ci-39601040562
+  --before-patch gates/test-intent/fixtures/engine-recovery-updater-before.patch
+Exit 0. Candidate passes; main fails the transport-error assertion (downloading vs error).
+The preexisting compatibility patch merely exposes main's inline downloaded-byte acceptance;
+it does not change main's state handling. Main's TLS-provider initialization and new tests stay.
+All other evidence digests remain valid; every older evidence and acceptance/rejection record kept.
+
+Requested checks:
+cargo test --locked --manifest-path modules/shell/src-tauri/Cargo.toml
+  Candidate: exit 101; library 226 passed; conformance harness 140 passed / 7 failed.
+  Main: exit 101; library 215 passed; conformance harness 129 passed / 7 failed.
+The seven updater_probe::handoff_tests exclusions are baseline failure, unchanged.
+Names and full panic bodies match after normalizing only thread PID numbers:
+  updater_probe::handoff_tests::held_crash_before_commit_still_launches_installer
+  updater_probe::handoff_tests::dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt
+  updater_probe::handoff_tests::launch_failure_resumes_one_child_and_one_supervisor_on_each_stop_path
+  updater_probe::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer
+  updater_probe::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer
+  updater_probe::handoff_tests::unbound_owned_engine_is_reaped_before_launch_and_witness_survives_reconciliation
+  updater_probe::handoff_tests::handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fallback
+cargo test --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --skip <each of those seven exact names>
+  Exit 0: 226 library / 140 harness passed; exactly seven excluded; binary/doc tests pass.
+cargo build --locked --manifest-path modules/shell/src-tauri/Cargo.toml --bin supervisor-conformance
+  Exit 0; fresh binary used for Tauri adapter.
+npx vitest run <16 related files listed below> --maxWorkers=4 (modules/ui-web)
+  Exit 0: 16 files / 127 tests passed.
+node scripts/supervisor-conformance/run.mjs --self-test -> exit 0, 35/35.
+node scripts/supervisor-conformance/run.mjs --adapter dev-runner -> exit 0, 51/51.
+node scripts/supervisor-conformance/run.mjs --adapter tauri -> exit 0, 61/61.
+  Both full adapters include fileless-clean-local-restart-is-not-counted, PASS.
+  Existing timing reporter ENOENT warnings occur after recovery-fixture cleanup; no failed checks.
+node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted
+  Main comparison: exit 0, 1/1.
+npm run typecheck (modules/ui-web) -> exit 0.
+npx eslint src/boot/boot-lockdown.test.ts src/shell-v0/components/EngineRecovery.ts -> exit 0.
+git diff --check -> exit 0.
+
+Related files:
+
+ src/boot/desktopRecovery.test.ts
+ src/boot/desktopRecoveryPolling.test.ts
+ src/boot/desktopRecoveryEntry.test.js
+ src/boot/factoryReset.test.ts
+ src/boot/factoryReset.newerVersion.test.ts
+ src/shell-v0/state/appUpdateState.test.ts
+ src/shell-v0/components/AppUpdateBanner.test.ts
+ src/shell-v0/views/SettingsSurface.appUpdate.test.ts
+ src/shell-v0/views/SettingsSurface.searchShortcut.test.ts
+ src/shell-v0/views/SettingsSurface.dataReset.test.ts
+ src/shell-v0/chrome/Shell.searchSummon.test.ts
+ src/shell-v0/state/readinessNotice.test.ts
+ src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts
+ src/shell-v0/state/readinessNoticeResidency.test.ts
+ src/shell-v0/state/indexingFreshness.test.ts
+ src/shell-v0/components/indexingStatusFollowup.test.ts
+
+Windows assessment (Windows unavailable here):
+The startDeadlines function in scripts/dev/lib/engine-supervisor.cjs and spawnEngineInJob
+in scripts/dev/dev-runner.cjs are byte-identical to the pinned main. run.mjs uses the same
+4000ms replacement-start override, and driveCase the same 60000ms fixture first-boot timeout.
+The fileless case is unchanged: first incarnation reaches running, exits cleanly with code 4,
+and the second must reach running with restartCount 0 and class REQUESTED. This runs no delayed
+exhaustion branch and the CLI stopOnInitialExhaustion option cannot affect a previously ready run.
+Branch-added crash-folder preparation happens before spawnEngineInJob starts timing the root wait;
+recovery-summary publication happens after that synchronous root wait. Neither shortens the root
+publication allowance. Additional recovery bookkeeping exists, but no branch-specific reduced
+budget or recovery condition explains the reported ~3999.9ms root-publication timeout. It remains
+the shared Windows fixture startup limitation, not reproduced on Linux. #842's first-boot-only
+allowance does not increase the successor's 4-second root-publication budget; no fixture change
+is made in this follow-up. Windows runtime overhead was not measured.
+
+Test-intent: --pr 826 reports all 13 items covered, no invalid evidence, only acceptance-stale.
+No acceptance record written by the builder. Nonblocking audit finding retained:
+1 of 9 audited PRs (11.1%) had third-reviewer tie-breaks in the last 28 days.
+Raw command logs remain under <TMPDIR>/ci-39601040562/.

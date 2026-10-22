@@ -779,7 +779,8 @@ final class StatusLifecycleHandlerTest {
   private static WorkerOperationalView workerView(
       long pendingJobsCount, long processingJobsCount, long pendingReadyJobsCount, String throughputWindowState) {
     return WorkerOperationalViewBuilder.builder()
-        .core(new CoreIndexView(true, 10, pendingJobsCount, "SERVING", 0, 0))
+        .core(new CoreIndexView(true, 10, pendingJobsCount,
+            processingJobsCount > 0 || pendingReadyJobsCount > 0 ? "INDEXING" : "IDLE", 0, 0))
         .failure(FailureTrackingView.empty())
         .migration(MigrationGenerationViewBuilder.builder()
             .pendingJobsCount(pendingJobsCount)

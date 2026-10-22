@@ -205,7 +205,6 @@ The diff runs from the base to the working tree, including deletions, renames an
 files. The gate resolves the base itself:
 
 - On `pull_request`, the merge-base with `origin/$GITHUB_BASE_REF`.
-- On `merge_group`, the event's `base_sha`.
 - On a push to main, the first parent.
 - Locally, the merge-base with `origin/main` (or `main`). Pass `--base <ref>` to override.
 
@@ -410,7 +409,7 @@ node scripts/governance/gates/test-intent/cli.mjs accept gates/test-intent/.chan
 The record carries a digest over the content of every flagged item the changeset covers (before
 and after), the changeset above the acceptance heading, and every evidence file it cites. Any
 later edit to a flagged item, an entry or an evidence file makes the record stale, and the
-acceptor reviews again and appends a new record. A rebase, a merge-group build or the squash push
+acceptor reviews again and appends a new record. A rebase or the squash push
 to main leaves the digest unchanged while the flagged items' before and after content stays the
 same; a rebase onto a base that changed a flagged item's before content makes the record stale. The gate fails when:
 
@@ -469,3 +468,21 @@ delivery. The warning never fails the gate. Locally:
 
 A fork PR without entries fails with a message saying a maintainer agent completes the test-intent
 changeset. Contributors are not expected to write one.
+
+## CI selection and publication
+
+`node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
+record, then enables squash auto-merge bound to the validated head, title and body. A new push
+requires a new enqueue. The PR runs the union of lanes that consume its changed files; all
+required names report, including intentional skips. Unknown inputs run every lane. Strict stays
+off, so an older green base needs no update push. There is no merge queue.
+
+After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
+suite, including both integration tiers (system-tests and module), Windows stop-census, supervisor
+conformance and Measured axe. The module tier runs app-api, app-services, indexing, reranker and ui
+integration tests on Linux. Both integration tiers run only on main pushes and manual dispatch;
+neither is a required PR check.
+Its running CI is never cancelled; only the newest pending commit runs, and the wait command
+follows a newer run that covers the requested commit. If main fails in your change's area, open
+a fix or revert PR at once through the normal path. Report a failure in a test listed in
+`scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.

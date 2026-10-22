@@ -63,6 +63,7 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.IndexingJobChangeFeed;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.WatcherRootReconciliation;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
@@ -512,6 +513,91 @@ public final class WorkerIngestService {
     return new ReplayedPrune(result, queued);
   }
 
+  /**
+   * Exact watcher/legacy replay shares the publisher's fence and root proof. Queue work is left
+   * intact: a newer UPSERT can arrive after the final filesystem probe. A recreated source is
+   * admitted even when an earlier replay crashed after deleting Lucene but before committing.
+   * Anything but {@link BufferedDeleteReplay#SETTLED} keeps the exact receipt durable for retry,
+   * unless the caller's surviving generation owns the file's root reconciliation.
+   */
+  public BufferedDeleteReplay replayBufferedFileDelete(
+      io.justsearch.adapters.lucene.runtime.RunningRuntime target,
+      io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
+    return withFileMutationFence(() -> {
+      Path file = Path.of(deletion.path());
+      Path root = bufferedDeleteRoot(deletion);
+      var binding = rootWatcherRegistry.subscription(root);
+      String collection = binding == null ? deletion.collection() : binding.collection();
+      if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY
+          && collection == null) {
+        try {
+          collection = target.documentFieldOps().getDocumentFieldOrThrow(deletion.path(), SchemaFields.COLLECTION);
+        } catch (IOException unreadable) { return BufferedDeleteReplay.FAILED; }
+      }
+      if (deletion.rootIdentity() != null) {
+        try {
+          if (!deletion.rootIdentity().equals(RootIdentity.capture(root).toString())) {
+            return BufferedDeleteReplay.UNCERTAIN;
+          }
+        } catch (IOException unavailable) {
+          return BufferedDeleteReplay.UNCERTAIN;
+        }
+      }
+      var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, rootWitness);
+      if (verdict == io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT) {
+        if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY) {
+          log.warn("Legacy buffered DELETE skipped because its source exists: {}", file);
+        }
+        if (!rootWitness.admits(root)) return BufferedDeleteReplay.UNCERTAIN;
+        if (!io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
+          var entry = JobQueue.EnqueueEntry.stat(file);
+          // Originless rows did not retain an admitting root. Preserve any existing job's root
+          // rather than replacing it with an inferred parent; a live binding is authoritative.
+          if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
+          if (!jobQueue.enqueueReappearedFile(entry, collection)) {
+            return BufferedDeleteReplay.FAILED;
+          }
+        }
+        return BufferedDeleteReplay.SETTLED;
+      }
+      if (verdict != io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
+        return BufferedDeleteReplay.UNCERTAIN;
+      }
+      target.indexingCoordinator().deleteByIdAndChunks(deletion.path());
+      target.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
+      target.commitOps().maybeRefreshBlocking();
+      // The filesystem is not locked by the writer fence. Check again after the durable effect;
+      // on a crash the retained receipt performs this same admission on the next boot.
+      if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
+          == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
+        if (!rootWitness.admits(root)) return BufferedDeleteReplay.FAILED;
+        var entry = JobQueue.EnqueueEntry.stat(file);
+        if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
+        return jobQueue.enqueueReappearedFile(entry, collection)
+            ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
+      }
+      return confirmedAbsent(deletion.path(), root)
+          ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
+    });
+  }
+
+  /**
+   * The root {@link #replayBufferedFileDelete} judges a buffered file delete under: the receipt's
+   * root, else the watched root that holds the path; an explicit file's own folder when the root
+   * names the file itself.
+   */
+  public Path bufferedDeleteRoot(io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
+    Path file = Path.of(deletion.path());
+    Path root = deletion.root() == null ? pruneRootFor(deletion.path()) : Path.of(deletion.root());
+    return root.equals(file.toAbsolutePath().normalize()) ? file.toAbsolutePath().getParent() : root;
+  }
+
+  /**
+   * A buffered file delete's replay outcome. {@code UNCERTAIN} means nothing was changed because
+   * the root or the source could not be proved; {@code FAILED} means a write or proof failed.
+   */
+  public enum BufferedDeleteReplay { SETTLED, UNCERTAIN, FAILED }
+
   /** A replayed prune's result, and the number of files it removed that were queued again. */
   public record ReplayedPrune(
       io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result, int requeued) {}
@@ -601,13 +687,6 @@ public final class WorkerIngestService {
   private boolean acceptWatcherDeleteUnderLease(
       String normalizedPath, Runnable directEffect, boolean requireConfirmedAbsence,
       boolean skipUnlessConfirmedAbsent, Path requiredRoot, RootIdentity expectedRootIdentity) {
-    if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
-      if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
-        switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
-        return true;
-      }
-      throw IngestSwitchBufferOps.switchingUnavailable();
-    }
     return withFileMutationFence(() -> {
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
@@ -632,13 +711,128 @@ public final class WorkerIngestService {
               "Candidate reconciliation could not confirm file absence");
         }
       }
-      journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
+      Path root = requiredRoot == null ? Path.of(normalizedPath).getParent() : requiredRoot;
+      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
+        journalWatcherDelete(normalizedPath, root, expectedRootIdentity);
+        return true;
+      }
+      if (ingestLifecycle == null || !ingestLifecycle.isAcceptingWrites()) {
+        if (switchBufferOps.buildingGenerationForFileAdmission() != null) {
+          journalWatcherDelete(normalizedPath, root, expectedRootIdentity);
+          return true;
+        }
+        deferWatcherRootReconciliation(root, expectedRootIdentity);
+        return true;
+      }
+      journalAndProjectWatcherDeleteToServing(normalizedPath, root, expectedRootIdentity);
       directEffect.run();
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
       }
       return true;
     });
+  }
+
+  private static final String WATCHER_RECONCILE = WatcherRootReconciliation.OPERATION;
+
+  private void deferWatcherRootReconciliation(Path root, RootIdentity expectedRootIdentity) {
+    try {
+      var subscription = rootWatcherRegistry.subscription(root);
+      RootIdentity identity = expectedRootIdentity != null ? expectedRootIdentity
+          : subscription != null ? subscription.rootIdentity() : RootIdentity.capture(root);
+      identity.requireCurrent(root);
+      var debt = new WatcherRootReconciliation(root.toAbsolutePath().normalize().toString(),
+          identity.toString(), subscription == null ? null : subscription.collection());
+      if (!(jobQueue instanceof SwitchBufferCapableQueue journal)
+          || !journal.putSwitchBuffer(debt.key(), WATCHER_RECONCILE, debt.encode())) {
+        throw IngestSwitchBufferOps.switchBufferUnavailable();
+      }
+    } catch (IOException unavailable) {
+      throw WorkerServiceException.unavailable("Watcher reconciliation root identity is unavailable");
+    }
+  }
+
+  /**
+   * The retiring watcher has stopped before this runs. Its registry still owns root removals,
+   * collection attribution and identity proof, so replay does not re-register a removed root.
+   * The exact obligation is retained on any failure, including a crash before cleanup.
+   */
+  public void reconcileReloadedWatcherRootsFrom(WorkerIngestService retiring) {
+    RootWatcherRegistry ownRegistry = rootWatcherRegistry;
+    // A failed earlier attempt may already have handed the roots on; borrow their current owner.
+    setRootWatcherRegistry(retiring.rootWatcherRegistry.current());
+    try {
+      reconcilePendingWatcherRoots();
+    } finally {
+      setRootWatcherRegistry(ownRegistry);
+    }
+  }
+
+  private boolean canApplyWatcherReceipts() {
+    return ingestLifecycle != null && ingestLifecycle.isAcceptingWrites()
+        && !switchBufferOps.isSwitching();
+  }
+
+  public void reconcilePendingWatcherRoots() {
+    try (var ignoredMutation = mutationLease()) {
+      reconcilePendingWatcherRootsUnderLease();
+    }
+  }
+
+  private void reconcilePendingWatcherRootsUnderLease() {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal) || !canApplyWatcherReceipts()) {
+      return;
+    }
+    for (var receipt : journal.listSwitchBufferOpsStrict()) {
+      if (!WATCHER_RECONCILE.equals(receipt.op())) continue;
+      var debt = WatcherRootReconciliation.decode(receipt.payload());
+      Path root = Path.of(debt.root());
+      if (!receipt.key().equals(debt.key())
+          || receipt.generation() != null && !receipt.generation().isBlank()) {
+        throw new IllegalArgumentException("Invalid watcher reconciliation receipt");
+      }
+      var subscription = rootWatcherRegistry.subscription(root);
+      if (subscription == null) continue; // Startup waits for the declared root's registration.
+      // An unavailable or replaced root keeps its receipt for its return; it never fails the
+      // caller (a reload, a start or another root's watch), and nothing is applied to it.
+      try (var ignoredEvent = rootWatcherRegistry.enterEvent(subscription)) {
+        if (ignoredEvent == null) continue;
+        if (!debt.rootIdentity().equals(subscription.rootIdentity().toString())) {
+          log.warn("Watcher reconciliation for {} waits: its root is another folder now", root);
+          continue;
+        }
+        SyncDirectoryResponse result = syncDirectory(SyncDirectoryRequest.newBuilder()
+            .setRootPath(root.toString()).setForce(false).build(), CallContext.none());
+        if (!result.getError().isBlank() || result.getSkipped()
+            || result.getDeleteDetectionUnverified()) {
+          subscription.rootIdentity().requireCurrent(root);
+          throw WorkerServiceException.unavailable("Watcher reconciliation is incomplete");
+        }
+        subscription.rootIdentity().requireCurrent(root);
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.WATCHER_DELETE);
+        ingestLifecycle.commitOps().maybeRefreshBlocking();
+        subscription.rootIdentity().requireCurrent(root);
+        if (journal.removeReplayedSwitchBufferOps(List.of(receipt)) != 1) {
+          throw WorkerServiceException.unavailable("Watcher reconciliation receipt changed");
+        }
+      } catch (IOException unavailable) {
+        log.warn("Watcher reconciliation for {} waits for its root: {}", root,
+            unavailable.getMessage());
+      }
+    }
+  }
+
+  /**
+   * A closing reload's successor takes over every root this service watched or held for its
+   * volume, so the reload leaves the watch list as it was; removed roots stay removed.
+   */
+  public void handWatchedRootsTo(WorkerIngestService successor) {
+    try (var ignoredMutation = successor.mutationLease()) {
+      rootWatcherRegistry.handOverTo(successor.rootWatcherRegistry, (registry, root, collection) ->
+          successor.rootOnAnotherVolume(root.toString()) != null
+              ? registry.watchWhenVolumeReturns(root, collection)
+              : registry.watch(root.toString(), collection));
+    }
   }
 
   /**
@@ -899,6 +1093,33 @@ public final class WorkerIngestService {
   private static void requireWatcherRootCurrent(
       RootWatcherRegistry.Subscription witness) {
     requireCandidateRootIdentity(witness.root(), witness.rootIdentity());
+  }
+
+  private void journalWatcherDelete(String path, Path root, RootIdentity expectedRootIdentity) {
+    try {
+      RootWatcherRegistry.Subscription subscription = rootWatcherRegistry.subscription(root);
+      RootIdentity identity = expectedRootIdentity != null ? expectedRootIdentity
+          : subscription != null ? subscription.rootIdentity() : RootIdentity.capture(root);
+      identity.requireCurrent(root);
+      switchBufferOps.journalWatcherDelete(path, root, identity.toString(),
+          subscription == null ? null : subscription.collection());
+    } catch (IOException unavailable) {
+      throw WorkerServiceException.unavailable("Watcher delete root identity is unavailable");
+    }
+  }
+
+  private void journalAndProjectWatcherDeleteToServing(String path, Path root,
+      RootIdentity expectedRootIdentity) {
+    if (switchBufferOps.buildingGenerationForFileAdmission() == null) return;
+    if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
+        || !active.isAcceptingWrites()) {
+      throw WorkerServiceException.unavailable("Serving projection is unavailable during migration");
+    }
+    journalWatcherDelete(path, root, expectedRootIdentity);
+    if (active != ingestLifecycle) {
+      active.indexingCoordinator().deleteByIdAndChunks(path);
+      active.commitOps().commitAndTrack(CommitReason.WATCHER_DELETE);
+    }
   }
 
   private void journalAndProjectDeleteToServing(String normalizedId, CommitReason reason) {
@@ -2042,7 +2263,10 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
+      var binding = rootWatcherRegistry.subscription(parsedRoot(rootPath));
+      return binding == null
+          ? syncOps.execute(rootPath, force, provenance, ctx::cancelled)
+          : syncOps.execute(rootPath, force, provenance, ctx::cancelled, binding.collection());
     }
   }
 
@@ -3381,6 +3605,13 @@ public final class WorkerIngestService {
             held != null
                 ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
                 : rootWatcherRegistry.watch(rootPath, request.getCollection());
+        if (result.watching()) {
+          // A watch that reaches a service which cannot apply receipts (a deferred view whose
+          // writer upgrade already ran its reconcile before this subscription existed) queues
+          // them for whichever writer is current when the watcher's reconcile thread runs them.
+          if (canApplyWatcherReceipts()) reconcilePendingWatcherRoots();
+          else rootWatcherRegistry.applyPendingReceiptsLater();
+        }
         return io.justsearch.ipc.WatchRootResponse.newBuilder()
             .setWatching(result.watching())
             .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
@@ -3400,6 +3631,15 @@ public final class WorkerIngestService {
       try {
         boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
         forgetRemovedRoot(request.getRootPath());
+        if (jobQueue instanceof SwitchBufferCapableQueue journal) {
+          String key = "watcher-reconcile:" + Path.of(request.getRootPath()).toAbsolutePath().normalize();
+          var obsolete = journal.listSwitchBufferOpsStrict().stream()
+              .filter(receipt -> key.equals(receipt.key()) && WATCHER_RECONCILE.equals(receipt.op()))
+              .toList();
+          if (journal.removeReplayedSwitchBufferOps(obsolete) != obsolete.size()) {
+            throw WorkerServiceException.unavailable("Removed-root reconciliation cleanup changed");
+          }
+        }
         return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
       } finally {
         markReplayUncertainForWatchChangeDuringMigration();
