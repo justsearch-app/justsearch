@@ -1,0 +1,38 @@
+18:52:41.104 [main] INFO com.tngtech.archunit.ArchConfiguration -- Reading ArchUnit properties from file:/home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/modules/app-services/build/resources/test/archunit.properties
+password publication step 2: start-to-pause=24438 ms
+18:53:06.474 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-14322121648667192332/encryption/keystore.replica.json
+password publication step 3: start-to-pause=24262 ms
+18:53:32.037 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-14322121648667192332/encryption/keystore.replica.json
+recovery publication step 2: start-to-pause=24148 ms
+18:53:57.351 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-14322121648667192332/encryption/keystore.replica.json
+recovery publication step 3: not paused; elapsed=13147 ms
+Child output: 
+
+Test run finished after 90073 ms
+[         3 containers found      ]
+[         0 containers skipped    ]
+[         3 containers started    ]
+[         0 containers aborted    ]
+[         3 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         0 tests successful      ]
+[         1 tests failed          ]
+
+
+Failures (1):
+  JUnit Jupiter:KeystoreReplicaRepairTest:killBetweenPublicationsRepairsCurrentWrapsOnRestart()
+    MethodSource [className = 'io.justsearch.app.services.encryption.KeystoreReplicaRepairTest', methodName = 'killBetweenPublicationsRepairsCurrentWrapsOnRestart', methodParameterTypes = '']
+    => java.util.concurrent.TimeoutException: killBetweenPublicationsRepairsCurrentWrapsOnRestart() timed out after 90 seconds
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       Suppressed: java.lang.InterruptedException: sleep interrupted
+         java.base/java.lang.Thread.sleepNanos0(Native Method)
+         java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+         java.base/java.lang.Thread.sleep(Thread.java:540)
+         io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.killBetweenPublicationsRepairsCurrentWrapsOnRestart(KeystoreReplicaRepairTest.java:160)
+         java.base/java.lang.reflect.Method.invoke(Method.java:565)
+         [...]

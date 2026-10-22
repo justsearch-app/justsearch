@@ -381,7 +381,8 @@ final class WorkerStatusSamplerTest {
 
   private static WorkerOperationalView workerView(MigrationGenerationView migration) {
     return WorkerOperationalViewBuilder.builder()
-        .core(new CoreIndexView(true, 10, 0, "SERVING", 0, 0))
+        .core(new CoreIndexView(true, 10, migration.pendingJobsCount() + migration.processingJobsCount(),
+            migration.processingJobsCount() > 0 || migration.pendingReadyJobsCount() > 0 ? "INDEXING" : "IDLE", 0, 0))
         .failure(FailureTrackingView.empty())
         .migration(migration)
         .compatibility(CompatibilityStatusView.empty())

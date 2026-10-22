@@ -1,0 +1,281 @@
+Rust/JS fatal-report summary repair
+Candidate baseline: ad2b22ae5feb8e7835b0e098b552cbf6f41a7bc7
+Current main comparison: 947be754dc59485c01e34c53fe62f78a8bdc7d55
+PR merge base: 4f4e20514ff82dd9d698661ef09dc646ee643311
+
+Shared real-report fixtures are read directly from modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/. No second fixture corpus is added.
+Production change: recognize native Out of Memory Error and redact its source location like Internal Error. Existing 64KiB/64-line/256-character limits, regular-file filtering and mtime ordering remain.
+
+Direct pre-fix Rust selection
+test result: FAILED. 5 passed; 3 failed; 0 ignored; 0 measured; 216 filtered out; finished in 0.04s
+
+Candidate full Rust run
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.00s
+test result: ok. 224 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.22s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 0.00s
+test result: FAILED. 138 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.04s
+
+Current main full Rust run
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 212 filtered out; finished in 0.00s
+test result: ok. 213 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 133 filtered out; finished in 0.00s
+test result: FAILED. 127 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.97s
+
+Final candidate with exactly the seven known failures excluded
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.00s
+test result: ok. 224 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.09s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 0.00s
+test result: ok. 138 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 9.96s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Baseline failures, unchanged; only libtest thread PIDs are normalized:
+updater_probe::handoff_tests::dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt' (PID) panicked at src/bin/../updater_handoff_tests.rs:436:54:
+called `Result::unwrap()` on an `Err` value: "registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required"
+
+updater_probe::handoff_tests::handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fallback
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fallback' (PID) panicked at src/bin/../updater_handoff_tests.rs:414:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+updater_probe::handoff_tests::held_crash_before_commit_still_launches_installer
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::held_crash_before_commit_still_launches_installer' (PID) panicked at src/bin/../updater_handoff_tests.rs:289:5:
+assertion `left == right` failed: held crash before commit must proceed to install: Err("registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required")
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+updater_probe::handoff_tests::launch_failure_resumes_one_child_and_one_supervisor_on_each_stop_path
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::launch_failure_resumes_one_child_and_one_supervisor_on_each_stop_path' (PID) panicked at src/bin/../updater_handoff_tests.rs:371:9:
+assertion failed: fixture.run(&UpdateCoordinator::default()).await.unwrap_err().contains("supervision was resumed")
+
+updater_probe::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer' (PID) panicked at src/bin/../updater_p5_oracle.rs:15:9:
+registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required
+
+updater_probe::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer' (PID) panicked at src/bin/../updater_handoff_tests.rs:477:9:
+registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required
+
+updater_probe::handoff_tests::unbound_owned_engine_is_reaped_before_launch_and_witness_survives_reconciliation
+identical panic body on candidate and main:
+thread 'updater_probe::handoff_tests::unbound_owned_engine_is_reaped_before_launch_and_witness_survives_reconciliation' (PID) panicked at src/bin/../updater_handoff_tests.rs:324:54:
+called `Result::unwrap()` on an `Err` value: "registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required"
+
+before ad2b22ae5: node --test scripts/dev/test-engine-recovery.mjs
+✔ E1/E3: shared real HotSpot header internal.txt appears in recovery data (3.263016ms)
+✖ E1/E3: shared real HotSpot header native-oom.txt appears in recovery data (1.083928ms)
+✔ E1/E3: shared real HotSpot header sigsegv.txt appears in recovery data (0.480202ms)
+✔ E1/E3: shared real HotSpot header realtime-signal.txt appears in recovery data (0.451156ms)
+✖ E1/E3: newest native OOM wins over older SIGILL, bounded-out text and heaps (0.804215ms)
+✖ E1/E3: native OOM redacts source paths and keeps the byte bound (0.553076ms)
+✔ E6: a first spawn failure retains the actual missing-Java obstacle (1.85377ms)
+✔ dev-runner admission policy ends initial discovery instead of scheduling a delayed generation (8.446903ms)
+✔ E4/E17: the default supervisor retries after exhaustion without any healthy incarnation (0.990314ms)
+✔ E3/E5: terminal manual restart has one owner and quit wins before admission (0.416494ms)
+✔ E5: an update hold refuses terminal restart and initial quit admits no process (0.209862ms)
+✔ E5: quit before the first admission starts no Engine (0.140064ms)
+✔ E3: restarting a terminal actor reaches a different binding without another supervisor (0.676359ms)
+✔ E18: headless restart instructions exclude locked profiles and describe shell-independent quarantine (0.68848ms)
+✔ E4: the 30-minute retry delay is overridable only by a flagged harness (0.26796ms)
+✔ E19: the exhausting hang remains visible even when its ordered close is not charged again (12.700638ms)
+✔ E4: a delayed generation passes a numeric requested port to the real spawn boundary (1.042016ms)
+✔ E1: JS spawn preparation retains the oldest and newest heap dumps and all fatal logs (6.964902ms)
+✔ E3: manual restart after exhaustion and a refused delayed spawn starts one fresh generation (0.877431ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 16
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 84.110934
+
+✖ failing tests:
+
+test at scripts/dev/test-engine-recovery.mjs:15:3
+✖ E1/E3: shared real HotSpot header native-oom.txt appears in recovery data (1.083928ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'hs_err_pid-real.log'
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/dev/test-engine-recovery.mjs:21:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'hs_err_pid-real.log',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/dev/test-engine-recovery.mjs:27:1
+✖ E1/E3: newest native OOM wins over older SIGILL, bounded-out text and heaps (0.804215ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hs_err_pid-older.log'
+  - 'hs_err_pid-newest.log'
+                ^
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/dev/test-engine-recovery.mjs:42:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hs_err_pid-older.log',
+    expected: 'hs_err_pid-newest.log',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/dev/test-engine-recovery.mjs:48:1
+✖ E1/E3: native OOM redacts source paths and keeps the byte bound (0.553076ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'Out of Memory Error [path]'
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/dev/test-engine-recovery.mjs:56:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'Out of Memory Error [path]',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+
+after: node --test scripts/dev/test-engine-recovery.mjs
+✔ E1/E3: shared real HotSpot header internal.txt appears in recovery data (2.673787ms)
+✔ E1/E3: shared real HotSpot header native-oom.txt appears in recovery data (0.566508ms)
+✔ E1/E3: shared real HotSpot header sigsegv.txt appears in recovery data (0.487251ms)
+✔ E1/E3: shared real HotSpot header realtime-signal.txt appears in recovery data (0.479202ms)
+✔ E1/E3: newest native OOM wins over older SIGILL, bounded-out text and heaps (0.666173ms)
+✔ E1/E3: native OOM redacts source paths and keeps the byte bound (0.843468ms)
+✔ E6: a first spawn failure retains the actual missing-Java obstacle (2.259304ms)
+✔ dev-runner admission policy ends initial discovery instead of scheduling a delayed generation (4.381287ms)
+✔ E4/E17: the default supervisor retries after exhaustion without any healthy incarnation (0.944281ms)
+✔ E3/E5: terminal manual restart has one owner and quit wins before admission (0.401621ms)
+✔ E5: an update hold refuses terminal restart and initial quit admits no process (0.210721ms)
+✔ E5: quit before the first admission starts no Engine (0.130194ms)
+✔ E3: restarting a terminal actor reaches a different binding without another supervisor (0.662335ms)
+✔ E18: headless restart instructions exclude locked profiles and describe shell-independent quarantine (0.411958ms)
+✔ E4: the 30-minute retry delay is overridable only by a flagged harness (0.160399ms)
+✔ E19: the exhausting hang remains visible even when its ordered close is not charged again (11.865612ms)
+✔ E4: a delayed generation passes a numeric requested port to the real spawn boundary (0.973365ms)
+✔ E1: JS spawn preparation retains the oldest and newest heap dumps and all fatal logs (6.723836ms)
+✔ E3: manual restart after exhaustion and a refused delayed spawn starts one fresh generation (0.743024ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.777448
+
+
+Before JS published-state boundary
+node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case recovery-newest-fatal-report
+supervisor-conformance: NARROWED to `recovery-newest-fatal-report` — 50 case(s) not run.
+[timing warning] ENOENT: no such file or directory, open '/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/tmp/supervisor-conformance/dev-runner-recovery-newest-fatal-report-6QRzki/supervisor-1947664.stdout.log'
+FAIL  adapter:dev-runner :: recovery-newest-fatal-report
+        AssertionError [ERR_ASSERTION]: published recovery data must choose the newest fatal report, including native OOM
++ actual - expected
+
++ 'hs_err_pid-older.log'
+- 'hs_err_pid-newest.log'
+              ^
+
+    at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/recovery-scenario.mjs:67:14)
+    at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/run.mjs:537:23)
+    at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/run.mjs:575:5)
+    at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/run.mjs:585:1
+[dev-runner] warn: compact chat model not found at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+[dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before gitHead=ad2b22ae5 headDistStamp=?
+[dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+
+
+supervisor-conformance: 0/1 checks passed
+failed: recovery-newest-fatal-report
+
+
+Before Rust published-state boundary
+node scripts/supervisor-conformance/run.mjs --adapter tauri --case recovery-newest-fatal-report
+supervisor-conformance: NARROWED to `recovery-newest-fatal-report` — 60 case(s) not run.
+[timing warning] ENOENT: no such file or directory, open '/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/tmp/supervisor-conformance/tauri-recovery-newest-fatal-report-CKBayd/supervisor-2022439.stdout.log'
+FAIL  adapter:tauri :: recovery-newest-fatal-report
+        AssertionError [ERR_ASSERTION]: published recovery data must choose the newest fatal report, including native OOM
++ actual - expected
+
++ 'hs_err_pid-older.log'
+- 'hs_err_pid-newest.log'
+              ^
+
+    at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/recovery-scenario.mjs:67:14)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processTimers (node:internal/timers:615:9)
+    at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/run.mjs:537:23)
+    at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/run.mjs:575:5)
+    at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/before/scripts/supervisor-conformance/run.mjs:585:1
+
+
+supervisor-conformance: 0/1 checks passed
+failed: recovery-newest-fatal-report
+
+
+node scripts/supervisor-conformance/run.mjs --self-test
+supervisor-conformance: 35/35 checks passed
+
+node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+PASS  adapter:dev-runner :: recovery-newest-fatal-report
+supervisor-conformance: 51/51 checks passed
+
+node scripts/supervisor-conformance/run.mjs --adapter tauri
+PASS  adapter:tauri :: recovery-newest-fatal-report
+supervisor-conformance: 61/61 checks passed
+
+Related Vitest (16 files):
+
+
+ Test Files  16 passed (16)
+      Tests  127 passed (127)
+   Start at  14:01:27
+   Duration  3.84s (transform 4.28s, setup 226ms, import 5.40s, tests 3.70s, environment 2.12s)
+
+
+Four D4 artifacts were written by the unmodified scripts/governance/gates/test-intent/run-evidence.mjs in a disposable shared clone; each producer returned 0. Before checkout registration is confined to that clone.
+engine-recovery-summary-preserved.json: the three pre-existing recovery-data checks pass unchanged.
+engine-recovery-fatal-headers-rust.json: the three new checks pass after and all fail by assertion on ad2b22ae5.
+engine-recovery-jvm-folder-headers.json and engine-recovery-heap-retention-headers.json: existing repaired checks pass after and retain assertion fail-before against their original revisions.
+Node scripts are outside product test-intent scope; the actual TAP and both boundary transcripts above supplement the official Rust D4 records.
+No Java source/fixture changes or Gradle calls. No commits or acceptance records are written.

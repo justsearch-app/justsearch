@@ -1,0 +1,23 @@
+Local candidate checks, baseline 1016257d2f200a6fd39bc1b4e88d20595e66223f.
+Command: js-gradle-slot ./gradlew :modules:app-services:test --tests '*KeystoreDurabilityTest*' --tests '*KeystoreReplicaRepairTest*' :modules:app-services:pmdTest --continue --init-script "$TMPDIR/followup.init.gradle" -Djava.io.tmpdir="$TMPDIR"
+Exit 0. BUILD SUCCESSFUL in 1m 18s; test and pmdTest executed.
+Scratch init removes only the machine-global AgentTestTmpDir argument provider from this Test task, sets java.io.tmpdir=$TMPDIR and captures runtime classpath/Java launcher. No configuration-cache warning in this run. JAVA_TOOL_OPTIONS unset.
+SUITE {"errors": "0", "failures": "0", "hostname": "elias-systemproductname", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "12", "time": "33.828", "timestamp": "2026-10-21T16:48:31.059Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "18.736"}
+password publication step 1: start-to-pause=1485 ms
+password publication step 2: start-to-pause=1416 ms
+password publication step 3: start-to-pause=1859 ms
+password publication step 4: start-to-pause=1685 ms
+recovery publication step 1: start-to-pause=1594 ms
+recovery publication step 2: start-to-pause=1912 ms
+recovery publication step 3: start-to-pause=1630 ms
+recovery publication step 4: start-to-pause=1438 ms
+Observed TempDir under TMPDIR: True
+SUITE {"errors": "0", "failures": "0", "hostname": "elias-systemproductname", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "8", "time": "28.144", "timestamp": "2026-10-21T16:49:04.889Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "12.336"}
+password publication step 2: start-to-pause=2276 ms
+password publication step 3: start-to-pause=1330 ms
+recovery publication step 2: start-to-pause=1155 ms
+recovery publication step 3: start-to-pause=1188 ms
+Observed TempDir under TMPDIR: True
+PMD violations: 0

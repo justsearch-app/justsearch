@@ -66,31 +66,52 @@ impl ReadyEpoch {
     pub(crate) fn parse(value: &str) -> Option<Self> {
         // Engine Instant serialization is UTC, with up to nanosecond precision.
         let bytes = value.as_bytes();
-        if !(20..=30).contains(&bytes.len()) || !value.is_ascii()
-            || bytes[4] != b'-' || bytes[7] != b'-' || bytes[10] != b'T'
-            || bytes[13] != b':' || bytes[16] != b':' || bytes.last() != Some(&b'Z') {
+        if !(20..=30).contains(&bytes.len())
+            || !value.is_ascii()
+            || bytes[4] != b'-'
+            || bytes[7] != b'-'
+            || bytes[10] != b'T'
+            || bytes[13] != b':'
+            || bytes[16] != b':'
+            || bytes.last() != Some(&b'Z')
+        {
             return None;
         }
-        if bytes.len() > 20 && (bytes[19] != b'.' || bytes.len() < 22
-            || !bytes[20..bytes.len()-1].iter().all(u8::is_ascii_digit)) {
+        if bytes.len() > 20
+            && (bytes[19] != b'.'
+                || bytes.len() < 22
+                || !bytes[20..bytes.len() - 1].iter().all(u8::is_ascii_digit))
+        {
             return None;
         }
         let number = |start: usize, end: usize| -> Option<u32> {
             let text = &value[start..end];
-            text.bytes().all(|b| b.is_ascii_digit()).then(|| text.parse().ok()).flatten()
+            text.bytes()
+                .all(|b| b.is_ascii_digit())
+                .then(|| text.parse().ok())
+                .flatten()
         };
         let year = number(0, 4)?;
         let month = number(5, 7)?;
         let day = number(8, 10)?;
         let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
         let days = match month {
-            2 => if leap { 29 } else { 28 },
+            2 => {
+                if leap {
+                    29
+                } else {
+                    28
+                }
+            }
             4 | 6 | 9 | 11 => 30,
             1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
             _ => return None,
         };
-        if !(1..=days).contains(&day) || number(11, 13)? > 23
-            || number(14, 16)? > 59 || number(17, 19)? > 59 {
+        if !(1..=days).contains(&day)
+            || number(11, 13)? > 23
+            || number(14, 16)? > 59
+            || number(17, 19)? > 59
+        {
             return None;
         }
         Some(Self(value.into()))
@@ -101,9 +122,30 @@ pub(crate) fn essential_ready(port: u16, timeout: Duration) -> Option<ReadyEpoch
     essential_status(&observe(port, "/api/status", timeout, true)?)
 }
 
+pub(crate) fn not_ready_reason(port: u16, timeout: Duration) -> Option<String> {
+    let status = observe(port, "/api/status", timeout, true)?;
+    let index = status.pointer("/readiness/engineComponents/index")?;
+    let state = index.get("state")?.as_str()?;
+    let reason = index
+        .get("reasonCode")
+        .or_else(|| index.get("reason"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("readiness not reported");
+    // Readiness reason codes are identifiers; free-form paths/messages do not belong in recovery data.
+    let safe = |text: &str| {
+        text.chars()
+            .filter(|c| c.is_ascii_alphanumeric() || "._- ".contains(*c))
+            .take(256)
+            .collect::<String>()
+    };
+    Some(format!("Index: {} ({})", safe(state), safe(reason)))
+}
+
 fn essential_status(status: &serde_json::Value) -> Option<ReadyEpoch> {
     let index = status.pointer("/readiness/engineComponents/index")?;
-    if index.get("state")?.as_str()? != "READY" { return None; }
+    if index.get("state")?.as_str()? != "READY" {
+        return None;
+    }
     ReadyEpoch::parse(index.get("stateSince")?.as_str()?)
 }
 
@@ -156,16 +198,34 @@ mod tests {
             "index": {"state": "READY", "stateSince": epoch}
         }}});
         assert_eq!(essential_status(&status), ReadyEpoch::parse(epoch));
-        for state in ["ABSENT", "STARTING", "RELOADING", "FAILED", "UNAVAILABLE", "UNKNOWN"] {
+        for state in [
+            "ABSENT",
+            "STARTING",
+            "RELOADING",
+            "FAILED",
+            "UNAVAILABLE",
+            "UNKNOWN",
+        ] {
             status["readiness"]["engineComponents"]["index"]["state"] = serde_json::json!(state);
             assert_eq!(essential_status(&status), None);
         }
         status["readiness"]["engineComponents"]["index"]["state"] = serde_json::json!("READY");
-        for invalid in ["", "yesterday", "2026-02-30T12:00:00Z", "2026-09-21T24:00:00Z", "2026-09-21", "2026-09-21T12:00:00.Z"] {
-            status["readiness"]["engineComponents"]["index"]["stateSince"] = serde_json::json!(invalid);
+        for invalid in [
+            "",
+            "yesterday",
+            "2026-02-30T12:00:00Z",
+            "2026-09-21T24:00:00Z",
+            "2026-09-21",
+            "2026-09-21T12:00:00.Z",
+        ] {
+            status["readiness"]["engineComponents"]["index"]["stateSince"] =
+                serde_json::json!(invalid);
             assert_eq!(essential_status(&status), None, "{invalid}");
         }
         assert_eq!(essential_status(&serde_json::json!({})), None);
-        assert_ne!(ReadyEpoch::parse(epoch), ReadyEpoch::parse("2026-09-21T12:01:00Z"));
+        assert_ne!(
+            ReadyEpoch::parse(epoch),
+            ReadyEpoch::parse("2026-09-21T12:01:00Z")
+        );
     }
 }

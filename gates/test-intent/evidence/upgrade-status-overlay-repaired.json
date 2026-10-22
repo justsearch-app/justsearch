@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ad6a79c6598c774d738564f4beda504b23434af3173ac1586b35e96892e6f1f"
+  },
+  "createdAt": "2026-10-21T19:20:53.754Z",
+  "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+  "tree": "00fed3c4edae8c7b5d6df5eb4f1723498e6206a4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/IndexingOverlay.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-2955561-1792610448658.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2030
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#does not present retry waiting as active work in a blocking overlay",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8e22e733169b5ef3b79d9f3161bf93d32428796b3718c7be4e6e04fc336044e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IndexingOverlayHost — numbers come from the one projection (813) does not present retry waiting as active work in a blocking overlay",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+    "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/IndexingOverlay.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-2955561-1792610451993.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1588,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-vitest-2955561-1792610451993.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#does not present retry waiting as active work in a blocking overlay",
+        "classification": "assertion",
+        "detail": "IndexingOverlayHost — numbers come from the one projection (813) does not present retry waiting as active work in a blocking overlay:  AssertionError: expected { '_$litType$': 1, …(2) } to be Symbol(lit-nothing) // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/upgrade-status/tmp/builder/test-intent-before-9Qb5Jh/modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts:168:20\n    at file:///home/elias/"
+      }
+    ]
+  },
+  "digest": "sha256:be96a01e4786ae4f6163bcf497c3669149cc58ac3b41f17dde041ac9be236a5b"
+}

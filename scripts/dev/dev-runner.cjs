@@ -1160,6 +1160,8 @@ function buildSupervisorState({
   readyAt = null,
   updatedAt,
   phase = null,
+  retryAt = null,
+  notReady = null,
 }) {
   return {
     schemaVersion: 1,
@@ -1177,6 +1179,8 @@ function buildSupervisorState({
     maxRestartAttempts: policy?.maxRestartAttempts ?? null,
     // Recorded, not inferred: an `exhausted` reached under a 1.5 s stability window means something
     // different from one reached under 300 s, and only the file can tell a later reader which it was.
+    retryAt,
+    notReady,
     policyProfile: policy?.harnessActive ? 'harness' : 'product',
     ...(policy?.overridden?.length ? { policyOverrides: policy.overridden } : {}),
     lastExit,
@@ -2820,8 +2824,14 @@ async function runAdmittedStart(opts, ctx) {
   // Lane F stage B item B8: one incarnation of the Engine. A supervised restart calls this again
   // with the SAME log streams, the same run id and the same lease — 7.6's dev-runner sentence — so
   // what survives the child is everything except the child.
-  const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1, startup = {}) => spawnEngineInJob(
-    spawnBackend.command,
+  const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1, startup = {}) => {
+    const executable = harnessActive && Number(process.env.JUSTSEARCH_SUPERVISOR_HARNESS_FAIL_SPAWN_AT) === n
+      ? path.join(dataDir, 'missing-java') : spawnBackend.command;
+    if (path.isAbsolute(executable) && !fs.existsSync(executable)) {
+      throw new Error(`Engine executable not found: ${executable}`);
+    }
+    return spawnEngineInJob(
+    executable,
     spawnBackend.args,
     {
       cwd: spawnBackend.cwd,
@@ -2890,6 +2900,7 @@ async function runAdmittedStart(opts, ctx) {
     { recordDir: path.join(runDir, 'engine-jobs'), label: `engine-${n}`, ...startup,
       onStartupFailure: details => persistEngineStartupFailure(runPath, runJson ?? startingRun, n, details) },
   );
+  };
 
   // Spec F §5.2 (step 9): the Engine is spawned, observed and stopped by the actuator
   // (lib/engine-actuator.cjs) under the run loop (lib/engine-supervisor.cjs `createSupervisionLoop`).
@@ -3079,6 +3090,7 @@ async function runAdmittedStart(opts, ctx) {
 
   const actuator = engineActuator.createEngineActuator({
     dataDir,
+    heapDumpDir: logsDir,
     runId,
     policy: supervisionPolicy,
     spawnChild: (n, port, incarnationEnv, startup) => {
@@ -3095,6 +3107,8 @@ async function runAdmittedStart(opts, ctx) {
   const supervision = engineSupervisor.createSupervisionLoop({
     actuator,
     policy: supervisionPolicy,
+    // A failed CLI start must return its discovery error, rather than wait for desktop recovery.
+    stopOnInitialExhaustion: true,
     requestedApiPort: apiPortRequested,
     timeouts: { initialPortMs: portEmitTimeoutMs, initialReadyMs: backendReadyTimeoutMs },
     // Harness-only host input exercises the production request path after readiness.
@@ -3103,6 +3117,17 @@ async function runAdmittedStart(opts, ctx) {
     },
     log: narrate,
     io: {
+      takeRecoveryCommand: () => {
+        if (!harnessActive) return null;
+        const file = path.join(dataDir, 'shell-control.json');
+        try { const command = JSON.parse(fs.readFileSync(file, 'utf8')); fs.unlinkSync(file); return command; }
+        catch { return null; }
+      },
+      recoveryCommandResult: (command, result) => {
+        const target = path.join(dataDir, 'shell-control-result.json');
+        fs.writeFileSync(`${target}.tmp`, JSON.stringify({ nonce: command.nonce, result }));
+        fs.renameSync(`${target}.tmp`, target);
+      },
       readManifest: readDiscoveredManifest,
       readRawManifest,
       probeHealth: (port, ms) => checkHttp200(`http://127.0.0.1:${port}/api/health`, ms, true),
@@ -3115,12 +3140,12 @@ async function runAdmittedStart(opts, ctx) {
     },
     publish: async (snapshot) => {
       manifestInstanceId = snapshot.instanceId;
-      await publishSupervisorRecord(buildSupervisorState({
+      await publishSupervisorRecord({ ...buildSupervisorState({
         ...snapshot,
         runId,
         policy: supervisionPolicy,
         updatedAt: nowIso(),
-      }));
+      }), ...require('./lib/engine-recovery.cjs').recoveryData(dataDir) });
     },
     hooks: {
       // X09-F4: a replacement's pid is in run.json before its discovery begins, so a stop during

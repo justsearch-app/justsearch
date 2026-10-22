@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { buildSquashMessagePreview } from '../ci/preview-squash-message.mjs';
 import {
   decodeChecksExit,
   isUnregistered,
@@ -190,7 +191,7 @@ run('open PR snapshot remains pending and exposes queue-state transitions', () =
 run('exact-SHA run selection rejects other events and chooses the newest match', () => {
   const selected = selectWorkflowRun([
     { databaseId: 1, headSha: 'abc', event: 'push', createdAt: '2026-01-01T00:00:00Z' },
-    { databaseId: 2, headSha: 'abc', event: 'merge_group', createdAt: '2026-01-03T00:00:00Z' },
+    { databaseId: 2, headSha: 'abc', event: 'pull_request', createdAt: '2026-01-03T00:00:00Z' },
     { databaseId: 3, headSha: 'abc', event: 'push', createdAt: '2026-01-02T00:00:00Z' },
     { databaseId: 4, headSha: 'def', event: 'push', createdAt: '2026-01-04T00:00:00Z' },
   ], 'abc', 'push');
@@ -248,25 +249,75 @@ run('parseEnqueueArgs accepts only a PR number and optional repository slug', ()
   assert.throws(() => parseEnqueueArgs(['933', '--repo', 'invalid']), /owner\/repo/);
 });
 
-run('enqueue validates preview and managed record before requesting the ordinary merge queue', () => {
+const snapshot = { headRefOid: 'a'.repeat(40), title: 'Validated title', body: 'Body\r\nwith lines', isDraft: false, mergeable: 'MERGEABLE' };
+const snapshotResult = (value = snapshot) => ({ status: 0, stdout: JSON.stringify(value) });
+run('enqueue binds squash auto-merge to the validated head, title and body', () => {
   const calls = [];
   const code = enqueuePullRequest('gh-bin', 933, 'justsearch-app/justsearch', {
-    nodeBin: 'node-bin',
-    previewScript: 'preview-script',
-    reviewRecordScript: 'review-script',
-    run: (command, args, options) => {
-      calls.push({ command, args, options });
-      return { status: 0 };
-    },
-    writeError: () => {},
+    nodeBin: 'node-bin', previewScript: 'preview-script', reviewRecordScript: 'review-script',
+    run: (command, args) => {
+      calls.push({ command, args });
+      return args[0] === 'pr' && args[1] === 'view' ? snapshotResult() : { status: 0 };
+    }, writeError: () => {},
   });
   assert.equal(code, 0);
-  assert.deepEqual(calls, [
-    { command: 'node-bin', args: ['preview-script', '--pr', '933', '--repo', 'justsearch-app/justsearch'], options: { stdio: 'inherit', windowsHide: true } },
-    { command: 'node-bin', args: ['review-script', 'check', '--pr', '933', '--repo', 'justsearch-app/justsearch'], options: { stdio: 'inherit', windowsHide: true } },
-    { command: 'gh-bin', args: ['pr', 'merge', '933', '--repo', 'justsearch-app/justsearch'], options: { stdio: 'inherit', windowsHide: true } },
-  ]);
+  assert.deepEqual(calls.map((c) => c.args[1]), ['view', '--pr', 'check', 'view', 'merge']);
+  const preview = buildSquashMessagePreview({
+    repo: { squash_merge_commit_title: 'PR_TITLE', squash_merge_commit_message: 'PR_BODY' },
+    pr: { ...snapshot, number: 933 },
+  });
+  assert.deepEqual(preview.errors, []);
+  assert.equal(preview.proposedCommit.title, 'Validated title (#933)');
+  assert.deepEqual(calls.at(-1).args, ['pr', 'merge', '933', '--squash', '--auto', '--match-head-commit', snapshot.headRefOid, '--subject', preview.proposedCommit.title, '--body', preview.proposedCommit.body, '--repo', 'justsearch-app/justsearch']);
 });
+for (const update of [{ headRefOid: 'b'.repeat(40) }, { title: 'edited' }, { body: 'edited' }, { isDraft: true }, { mergeable: 'CONFLICTING' }, { mergeable: 'UNKNOWN' }]) {
+  run(`enqueue refuses changed snapshot ${JSON.stringify(update)}`, () => {
+    let reads = 0; const calls = [];
+    const code = enqueuePullRequest('gh', 1, null, {
+      run: (_command, args) => {
+        calls.push(args);
+        return args[1] === 'view' ? snapshotResult(reads++ ? { ...snapshot, ...update } : snapshot) : { status: 0 };
+      }, writeError: () => {},
+    });
+    assert.equal(code, 2);
+    assert.ok(!calls.some((args) => args[1] === 'merge'));
+  });
+}
+for (const update of [{ isDraft: true }, { mergeable: 'CONFLICTING' }]) run('enqueue refuses draft/conflict before validation', () => {
+  const calls = [];
+  assert.equal(enqueuePullRequest('gh', 1, null, { run: (_command, args) => { calls.push(args); return snapshotResult({ ...snapshot, ...update }); }, writeError: () => {} }), 2);
+  assert.equal(calls.length, 1);
+});
+await runAsync('run-wait-sha follows the newer main run that contains a superseded commit', async () => {
+  const messages = [];
+  const code = await runWaitSha('gh', 'abc', 1, {}, {
+    loadJson: (_bin, args) => args[0] === 'api'
+      ? (assert.match(args[1], /abc\.\.\.def$/), { value: { status: 'ahead' } })
+      : { value: [
+        { databaseId: 1, headSha: 'abc', event: 'push', status: 'completed', conclusion: 'cancelled', createdAt: '2026-01-01' },
+        { databaseId: 2, headSha: 'def', event: 'push', status: 'completed', conclusion: 'success', createdAt: '2026-01-02' },
+      ] },
+    emit: (_prefix, value) => { messages.push(value.message); return value.key; },
+  });
+  assert.equal(code, 0);
+  assert.match(messages[0], /following covering run 2/);
+});
+for (const conclusion of ['success', 'failure']) {
+  await runAsync(`run-wait-sha follows a covering run when the original is absent (${conclusion})`, async () => {
+    const messages = [];
+    const code = await runWaitSha('gh', 'abc', 1, {}, {
+      loadJson: (_bin, args) => args[0] === 'api'
+        ? { value: { status: args[1].endsWith('...def') ? 'ahead' : 'diverged' } }
+        : { value: [
+          { databaseId: 3, headSha: 'unrelated', event: 'push', status: 'completed', conclusion: 'success', createdAt: '2026-01-03' },
+          { databaseId: 2, headSha: 'def', event: 'push', status: 'completed', conclusion, createdAt: '2026-01-02' },
+        ] },
+      emit: (_prefix, value) => { messages.push(value.message); return value.key; },
+    });
+    assert.equal(code, conclusion === 'success' ? 0 : 1);
+    assert.match(messages[0], /following covering run 2/);
+  });
+}
 
 for (const [label, results, expected] of [
   ['preview refusal', [{ status: 1 }], 1],
@@ -284,12 +335,12 @@ for (const [label, results, expected] of [
       reviewRecordScript: 'review-script',
       run: (command, args) => {
         calls.push({ command, args });
-        return queue.shift() ?? { status: 0 };
+        return args[1] === 'view' ? snapshotResult() : queue.shift() ?? { status: 0 };
       },
       writeError: () => {},
     });
     assert.equal(code, expected);
-    assert(!calls.some((call) => call.command === 'gh-bin'), JSON.stringify(calls));
+    assert(!calls.some((call) => call.args[1] === 'merge'), JSON.stringify(calls));
   });
 }
 

@@ -137,3 +137,97 @@ curl -s -H "X-JustSearch-Session: $SESSION_TOKEN" \
   manifest it validated); which tools a lite
   deployment exposes is governed separately (see the MCP production server reference).
 - This is a launch mode, not a separate build — the same `ui-headless.jar` runs every mode.
+
+## Restart after a crash
+
+Headless runs one Engine JVM. It has no desktop supervisor, cooldown retry, or
+"Restart JustSearch" button. Run it under an OS supervisor if it must recover
+unattended. Exit **2** means another process holds the data directory; leave that
+stopped and resolve the lock instead of repeatedly launching another Engine.
+
+In the source checkout, build the installed launcher with
+`./gradlew :modules:ui:installDist -PskipWebBuild=true` (a backend-only build,
+as in the [UI guide](use-ui.md)). For a Linux user service, save this as
+`~/.config/systemd/user/justsearch.service`, replacing the absolute paths:
+
+```ini
+[Unit]
+Description=JustSearch headless Engine
+
+[Service]
+Type=simple
+Environment="JUSTSEARCH_MODE=headless"
+Environment="JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data"
+Environment="JUSTSEARCH_HOME=/absolute/path/to/ai-assets"
+Environment="JAVA_OPTS=-Djustsearch.prod=true -XX:ErrorFile=\"/absolute/path/to/engine-data/crashes/hs_err_pid%%p.log\" -XX:+ExitOnOutOfMemoryError"
+WorkingDirectory=/absolute/path/to/justsearch
+ExecStartPre="/usr/bin/mkdir" -p "/absolute/path/to/engine-data/crashes"
+ExecStart="/absolute/path/to/justsearch/modules/ui/build/install/ui/bin/ui"
+Restart=on-failure
+SuccessExitStatus=143
+RestartPreventExitStatus=2
+RestartSec=30
+
+[Install]
+WantedBy=default.target
+```
+
+Run `systemctl --user daemon-reload` and
+`systemctl --user enable --now justsearch.service`. A clean exit stays stopped.
+The launcher returns 143 on SIGTERM; `SuccessExitStatus=143` makes
+`systemctl --user stop justsearch.service` leave it inactive rather than failed.
+For unattended operation after logout and across boots, run
+`loginctl enable-linger <user>` for the account running the service.
+
+Use `journalctl --user -u justsearch.service` for exit status and restart history.
+Exit status 2 means the data folder is held by another process.
+The Engine's own messages are in
+`build/headless-data/logs/engine.log` under `WorkingDirectory`
+(`/absolute/path/to/justsearch/build/headless-data/logs/engine.log` above), even
+with `JUSTSEARCH_DATA_DIR` set: logging initializes before that environment
+setting is mirrored to the JVM's `justsearch.data.dir` property.
+
+`-Djustsearch.prod=true` selects production mode. `WorkingDirectory` must point
+at a source checkout: the Gradle-installed distribution lacks the `SSOT/`
+catalogs needed for search. This is a known limitation of the Gradle install.
+The crash directory is created before each start; JVM fatal reports land there
+as `hs_err_pid<PID>.log`. Headless does not keep heap dumps.
+
+In a systemd unit, `%%p` passes the JVM's literal `%p` placeholder. The quoted
+`Environment` assignments and escaped quotes inside `JAVA_OPTS` preserve paths
+containing spaces. Command paths and arguments in `ExecStartPre` and `ExecStart`
+are quoted too. `WorkingDirectory` takes one path, including literal spaces;
+leave that value unquoted and do not escape its spaces.
+
+On Windows, save this wrapper as `run-justsearch.ps1`. It restarts after a
+non-zero Engine exit other than 2, waiting 30 seconds and allowing at most three
+restarts in a rolling 30-minute window; on exit 0 or 2, or when the budget is
+spent, it stops with the Engine's last exit code.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$env:JUSTSEARCH_DATA_DIR = 'C:\JustSearch\data'
+$env:JUSTSEARCH_HOME = 'C:\JustSearch\assets'
+$restarts = @()
+while ($true) {
+    & 'C:\Program Files\JustSearch\justsearch-headless.ps1' -Mode headless
+    $engineExit = $LASTEXITCODE
+    if ($engineExit -eq 0 -or $engineExit -eq 2) { exit $engineExit }
+    $now = [DateTime]::UtcNow
+    $restarts = @($restarts | Where-Object { $_ -gt $now.AddMinutes(-30) })
+    if ($restarts.Count -ge 3) { exit $engineExit }
+    $restarts += $now
+    Start-Sleep -Seconds 30
+}
+```
+
+Run the wrapper at logon or startup through Task Scheduler with
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path with spaces\run-justsearch.ps1"`.
+Select **Do not start a new instance** and leave Task Scheduler's
+restart-on-failure setting off; the wrapper owns retries.
+The Windows launcher does not set a crash-log location, so JVM fatal logs land
+in its working directory.
+
+Poison-file quarantine belongs inside the Engine and does not depend on the
+shell. Its implementation is a separate change; these OS restart policies do
+not themselves identify or quarantine a crashing file.

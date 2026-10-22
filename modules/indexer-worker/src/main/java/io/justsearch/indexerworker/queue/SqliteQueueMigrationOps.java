@@ -385,6 +385,12 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V23 to V24: Added transactional job counts and claim/readiness indexes");
       }
+      case 25 -> {
+        // Payload semantics changed without a table-layout change. Publishing this version in
+        // the same transaction prevents an older reader from treating JSON DELETE as a path or
+        // acknowledging a root-reconciliation obligation it cannot apply.
+        log.info("V24 to V25: Required origin-aware DELETE and watcher-reconciliation readers");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

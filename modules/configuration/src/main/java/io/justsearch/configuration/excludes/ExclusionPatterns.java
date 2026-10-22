@@ -39,7 +39,7 @@ public final class ExclusionPatterns {
   /** Reads the live resolved policy, including operator overrides, on each admission. */
   public static ExclusionPatterns current() {
     ConfigStore store = ConfigStore.globalOrNull();
-    String raw = store == null ? "" : store.get().ui().excludePatterns();
+    String raw = store == null ? "" : store.currentSnapshot().ui().excludePatterns();
     Cached observed = cached;
     if (java.util.Objects.equals(raw, observed.raw())) return observed.patterns();
     synchronized (ExclusionPatterns.class) {

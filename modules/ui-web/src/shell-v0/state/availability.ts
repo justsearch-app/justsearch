@@ -150,11 +150,11 @@ export function projectAvailability(
       // (runtime.mode / index.pendingJobs); there is no numeric ETA in the snapshot, so we say the
       // CONDITION, never a fabricated "~Ns".
       const progress = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples);
-      if (!progress.activity.confirmed || progress.phase === 'indexing' || progress.phase === 'enriching') {
+      if (!progress.activity.confirmed || progress.phase === 'indexing' || progress.phase === 'waiting' || progress.phase === 'error' || progress.phase === 'enriching') {
         return {
           kind: 'unavailable',
           reason: [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — '),
-          transient: progress.activity.confirmed,
+          transient: progress.activity.confirmed && progress.phase !== 'error',
         };
       }
       return unavailableFor('no_documents', false);

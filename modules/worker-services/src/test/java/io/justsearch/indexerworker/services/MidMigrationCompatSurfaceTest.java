@@ -86,10 +86,11 @@ final class MidMigrationCompatSurfaceTest extends io.justsearch.adapters.lucene.
         "and names the reason the Head maps to index.schema_mismatch");
     assertTrue(status.getCompatibility().getReindexRequired());
     assertEquals(
-        1,
+        2,
         status.getCore().getDocCount(),
-        "documents indexed still counts GREEN while one is being built — that is the build's"
-            + " progress, and reporting Blue there would hide it");
+        "documents indexed counts the serving BLUE generation during a build");
+    assertEquals(1, status.getMigration().getBuildingDocCount(),
+        "GREEN build progress is reported separately");
     assertEquals(
         2, status.getCore().getSearchableDocCount(), "while searchable counts what Blue serves");
   }

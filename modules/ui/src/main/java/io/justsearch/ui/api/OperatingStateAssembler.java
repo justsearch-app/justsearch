@@ -460,12 +460,14 @@ final class OperatingStateAssembler {
   }
 
   /**
-   * Spec E §1.7: IDLE needs an empty queue and, for each enrichment stage that is enabled and
-   * available, nothing pending. A disabled or unavailable stage is skipped: nothing will drain it.
+   * IDLE needs no runnable file jobs and, for each enrichment stage that is enabled and
+   * available, nothing pending. Retry-only backlog is retained without implying activity.
+   * A disabled or unavailable stage is skipped: nothing will drain it.
    */
   private static boolean idle(WorkerOperationalView worker) {
     CoreIndexView core = worker.core();
-    if (core.pendingJobs() > 0) return false;
+    if ("FAILED".equals(core.indexState())) return true;
+    if (StatusLifecycleHandler.hasActiveIndexWork(worker)) return false;
     if (Boolean.TRUE.equals(core.vduAvailable()) && core.pendingVduCount() > 0) return false;
     EnrichmentProgressView e = worker.enrichment();
     if (e == null) return true;

@@ -42,12 +42,11 @@ failures inside the omnibus job took about 17-18 minutes to become actionable.
 The public repository's standard GitHub-hosted CI lane runs automatically on `pull_request`
 and `push` to `main`, and it may also be dispatched manually with `workflow_dispatch`.
 
-Every workflow that produces a required status check also declares `merge_group`.
-PRs and pushes to `main` run the full required set. Merge-queue runs check governance,
-build and secrets on the combined tree. Other required jobs report successful skips;
-matrix jobs keep their expanded check names by skipping every step. Runtime, unit and
-Windows tests do not rerun on the combined tree. Measured axe, Integration tests and
-CI wall-clock attribution run only on manual dispatch.
+[ADR-0053](0053-one-pr-ci-run-and-squash-auto-merge.md) supersedes the event-selection and
+publication rules: PRs run affected lanes, main and dispatch run the full suite, and validated
+squash auto-merge needs only the PR run. Every required context still reports on every PR.
+Measured axe stays advisory, running on PRs with affected frontend inputs, pushes to main
+and manual dispatch to gather stability evidence before any promotion to required.
 
 The CI workflow is organized as stable **fact lanes**:
 
@@ -60,9 +59,7 @@ The CI workflow is organized as stable **fact lanes**:
 Each lane name describes the fact it proves. Main branch protection requires the current stable
 check names declared in `scripts/ci/workflow-signal-policy.v1.json`. The same policy file declares
 whether GitHub must require each pull-request branch to be up to date before merging. That setting
-is `false` while the native merge queue is active: the queue checks a merge group
-against current `main`, so forcing every PR branch through a separate update-and-retest cycle
-would duplicate the queue's integration check and restore the serial re-CI tax.
+is `false`: a green PR may merge against an older main without a separate update-and-retest cycle.
 
 Self-hosted, benchmark, installer, and other specialty workflows remain manually dispatched
 unless a later ADR explicitly changes their trigger posture.
@@ -210,12 +207,12 @@ installed.
 
 The `jseval Python suite` job added by tempdoc 930 chunk D runs `scripts/jseval/tests` on a
 hosted Linux runner. It landed advisory: the job reported on every push, pull request, and
-merge group, but it was absent from `scripts/ci/workflow-signal-policy.v1.json`, so nothing
+combined-tree event, but it was absent from `scripts/ci/workflow-signal-policy.v1.json`, so nothing
 blocked a merge on it. A measurement harness that stands behind public claims is exactly the
 kind of fact a lane is for, and an advisory lane proves only that someone chose to read it.
 
 The lane is promoted to a required status check. The evidence for promotion is stability, not
-intent: across the 13 completed `main` push and `merge_group` runs from the lane's landing
+intent: across the 13 completed historical main and combined-tree runs from the lane's landing
 commit `18e2833f` (2026-09-05T06:46Z) through `3dc054e3` (2026-09-05T08:23Z) it passed 13 times
 and failed zero times, with a median wall-clock of 384s and an observed max of 432s under a
 20-minute job timeout. The one non-success observation is a whole-run concurrency cancellation
@@ -237,8 +234,7 @@ would be absent from every attribution and would warn `missing-required-lane` fo
 required lane therefore means adding it to that `needs:` list in the same change.
 
 `main`'s required status checks are a repository setting outside this repo's diff, held in
-classic branch protection (`repos/<owner>/<repo>/branches/main/protection`) rather than in the
-`main-merge-queue` ruleset, whose only rule is `merge_queue`. A maintainer updates that setting
+classic branch protection (`repos/<owner>/<repo>/branches/main/protection`) with no separate publication ruleset. A maintainer updates that setting
 after this change lands; `scripts/ci/check-branch-protection.mjs` reports the declared-versus-
 live gap in the interval and is the only guard that can see it, because the default pull-request
 token cannot read branch-protection settings.
@@ -247,7 +243,7 @@ token cannot read branch-protection settings.
 
 The original Decision's Windows-hosted build/unit bullet is historical.
 `.github/workflows/ci.yml` runs the no-model `build` job on `ubuntu-latest`;
-`unit-tests` uses its lane matrix (currently Linux), with separate Windows
+`unit-tests-search-worker` and `unit-tests-platform-contracts` are fixed Linux jobs, with separate Windows
 native-test lanes. Required-check names and workflow triggers remain declared
 in the workflow-signal policy.
 [ADR-0052](0052-weekly-codeql-on-hosted-runners.md) amends the specialty-workflow
