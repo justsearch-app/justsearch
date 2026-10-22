@@ -165,6 +165,24 @@ it.each(['health', 'brain', 'health-recommended', 'activation'] as const)(
   }, 10_000,
 );
 
+it.each(['health', 'brain'] as const)('%s clears a refused rebuild when navigating away and back', async surface => {
+  const el = document.createElement(surface === 'brain' ? 'jf-brain-surface' : 'jf-health-surface') as BrainSurface | HealthSurface;
+  el.apiBase = base; el.host_ = host();
+  if (surface === 'brain') vi.spyOn(el as unknown as { refreshAll(): Promise<void> }, 'refreshAll').mockResolvedValue();
+  document.body.append(el); await pump(el);
+  await clickRebuild(el, false);
+  await vi.waitFor(() => expect(el.bulkError?.message).toBe(message));
+  await pump(el);
+  expect(el.shadowRoot!.textContent).toContain(message);
+
+  // Navigation retains the instance, but an old refusal must not return with it.
+  el.remove();
+  document.body.append(el); await pump(el);
+  expect.soft(el.bulkError).toBeNull();
+  expect(el.shadowRoot!.textContent).not.toContain(message);
+  expect(el.shadowRoot!.textContent).not.toContain(code);
+});
+
 it.each(['cancel', 'accept-gaps'] as const)('Library %s keeps an immediate decision refusal code', async action => {
   gapDecision = action === 'accept-gaps'; feed(gapDecision ? 'AWAITING_ACCEPTANCE' : 'MIGRATING');
   const el = document.createElement('jf-library-surface') as LibrarySurface;

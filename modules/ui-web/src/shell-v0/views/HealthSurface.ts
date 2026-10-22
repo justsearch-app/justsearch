@@ -589,6 +589,7 @@ export class HealthSurface extends JfElement {
   protected override settleTransients(): void {
     this.loading = false;
     this.error = null;
+    this.bulkError = null;
   }
 
   override disconnectedCallback(): void {

@@ -1174,6 +1174,7 @@ export class BrainSurface extends JfElement {
   protected override settleTransients(): void {
     this.refreshing = false;
     this.runtimeError = null;
+    this.bulkError = null;
     this.busy = {};
     // An un-answered consent prompt is transient too: a surface hidden mid-question must not come
     // back holding a modal (nor leak its scroll-lock).
