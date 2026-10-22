@@ -163,7 +163,7 @@ final class ReconfigureHandlerTest {
 
   private static SettingsV2 settings(String operationKey) {
     return new SettingsV2(
-        new UiSettingsV2("system", false, "comfort", false, "open", null, false, "simple", false,
+        new UiSettingsV2("system", false, "comfort", false, "open", null, "simple", false,
             List.of(), false),
         null, null, null, new SettingsWitness(0, null), operationKey, null, null);
   }
