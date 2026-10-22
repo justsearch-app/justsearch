@@ -389,3 +389,32 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     }
   });
 });
+
+// Upgrade U15/U16: the root row consumes the same retry-wait verdict as the status deck.
+it('library rows describe retry waiting without claiming active indexing', async () => {
+  __resetAiStateForTest();
+  const retry = Date.now() + 60_000;
+  __feedForTest({ status: { worker: {
+    core: { indexState: 'WAITING', pendingJobs: 8, indexedDocuments: 37, indexHealthy: true },
+    failure: { nextRetryAtMs: retry },
+  } } as unknown as StatusSnapshot });
+  __tickClockForTest();
+  const el = document.createElement('jf-library-surface') as LibrarySurface;
+  el.host_ = { ...stubHost, utilities: { formatRelativeTime: () => 'just now' } } as unknown as PluginHostApi;
+  document.body.appendChild(el);
+  await el.updateComplete;
+  try {
+    const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
+      indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
+    el.roots = [root];
+    await el.updateComplete;
+    const text = el.shadowRoot?.querySelector('.card-meta')?.textContent ?? '';
+    expect(text).toContain('Waiting to retry');
+    expect(text).toContain('8 remaining');
+    expect(text).toContain(new Date(retry).toLocaleString());
+    expect(text).not.toContain('Indexing');
+  } finally {
+    el.remove();
+    __resetAiStateForTest();
+  }
+});

@@ -7,6 +7,7 @@ display, start Xwayland, or remove X sockets/locks.
 import ctypes as c
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
@@ -78,26 +79,46 @@ def run(test, executable):
         xvfb = None
         child = None
         d = None
+        xvfb_env = dict(env)
+        # Software rendering alone still lets GLVND load NVIDIA during GLX init.
+        mesa = "/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+        if Path(mesa).exists():
+            xvfb_env["__EGL_VENDOR_LIBRARY_FILENAMES"] = mesa
         try:
             for number in range(191, 291):
-                if Path(f"/tmp/.X11-unix/X{number}").exists() or Path(f"/tmp/.X{number}-lock").exists():
-                    continue
-                candidate = subprocess.Popen(["Xvfb", f":{number}", "-screen", "0", "1280x800x24",
-                                              "-nolisten", "tcp"], env=env,
-                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                for _ in range(100):
-                    if candidate.poll() is not None or Path(f"/tmp/.X11-unix/X{number}").exists():
-                        break
-                    time.sleep(0.01)
+                socket = Path(f"/tmp/.X11-unix/X{number}")
                 lock = Path(f"/tmp/.X{number}-lock")
-                if (candidate.poll() is None and Path(f"/tmp/.X11-unix/X{number}").exists()
-                        and lock.exists() and lock.read_text().strip() == str(candidate.pid)):
-                    xvfb = candidate
-                    env["DISPLAY"] = f":{number}"
-                    break
-                if candidate.poll() is None:
-                    candidate.terminate()
-                candidate.wait(timeout=5)
+                if socket.exists() or lock.exists():
+                    continue
+                with tempfile.TemporaryFile(mode="w+t") as errors:
+                    candidate = subprocess.Popen(["Xvfb", f":{number}", "-screen", "0", "1280x800x24",
+                                                  "-nolisten", "tcp"], env=xvfb_env,
+                                                 stdout=subprocess.DEVNULL, stderr=errors)
+                    for _ in range(100):
+                        if candidate.poll() is not None or socket.exists():
+                            break
+                        time.sleep(0.01)
+                    status = candidate.poll()
+                    if (status is None and socket.exists() and lock.exists()
+                            and lock.read_text().strip() == str(candidate.pid)):
+                        xvfb = candidate
+                        env["DISPLAY"] = f":{number}"
+                        break
+                    if status is None:
+                        candidate.terminate()
+                    stopped = candidate.wait(timeout=5)
+                    if status is None and stopped != -signal.SIGTERM:
+                        status = stopped
+                    errors.seek(0)
+                    detail = errors.read().strip()
+                if status is not None and status < 0:
+                    raise RuntimeError(f"private Xvfb :{number} died from signal "
+                                       f"{signal.Signals(-status).name} ({-status}): {detail}")
+                if (socket.exists() or lock.exists()
+                        or (status is not None and "already active" in detail.lower())):
+                    continue
+                reason = "startup timed out" if status is None else f"exited with status {status}"
+                raise RuntimeError(f"private Xvfb :{number} {reason}: {detail}")
             if xvfb is None:
                 raise RuntimeError("no private Xvfb display available")
             os.environ["DISPLAY"] = env["DISPLAY"]
@@ -122,7 +143,8 @@ def run(test, executable):
                     x.XNextEvent(d, event)
                     if c.c_int.from_buffer(event).value == 33 and c.c_ulong.from_buffer(event, 40).value == active:
                         count += 1
-                        (root / "activations").write_text(str(count))
+                        (root / "activations.tmp").write_text(str(count))
+                        os.replace(root / "activations.tmp", root / "activations")
                 time.sleep(0.005)
             return child.returncode
         finally:

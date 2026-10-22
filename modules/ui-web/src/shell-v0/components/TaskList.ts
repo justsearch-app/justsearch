@@ -245,7 +245,7 @@ export class TaskList extends JfElement {
         this.readyTimer = null;
         this.showingReady = false;
       }, READY_DISMISS_MS);
-    } else if (isActivePhase(next.phase) && this.showingReady) {
+    } else if ((isActivePhase(next.phase) || next.phase === 'waiting' || next.phase === 'error') && this.showingReady) {
       // Work resumed inside the window — the completion claim is no longer true, so withdraw it.
       this.clearReadyTimer();
       this.showingReady = false;
@@ -467,12 +467,12 @@ export class TaskList extends JfElement {
   private isEmpty(): boolean {
     return (
       this.tasks.length === 0 && !(this.queueCounts &&
-        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !isActivePhase(this.progress.phase) && !this.showingReady
+        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !isActivePhase(this.progress.phase) && this.progress.phase !== 'waiting' && this.progress.phase !== 'error' && !this.showingReady
     );
   }
 
   private renderTask(t: Task): TemplateResult {
-    const status = indexingTaskStatus(t, this.progress.activity);
+    const status = indexingTaskStatus(t, this.progress.activity, this.progress.phase);
     const confirmed = status === t.status;
     return html`
       <div class="task" data-testid="task-${t.id}">
@@ -633,7 +633,7 @@ export class TaskList extends JfElement {
     // Collapse the `queued` bulk to a count only (the flood cure); list the rest, capped.
     const detail = this.tasks.filter((t) => t.status !== 'queued');
     const { shown, overflow } = capWithOverflow(detail, MAX_DETAIL_ROWS);
-    const speaks = this.showingReady || isActivePhase(this.progress.phase);
+    const speaks = this.showingReady || isActivePhase(this.progress.phase) || this.progress.phase === 'waiting' || this.progress.phase === 'error';
     // 813 §20 — what the disclosure has to show: per-file rows, per-stage enrichment detail, or the
     // denominator-less extraction backlog. Any one of them makes the affordance meaningful.
     const stageRows = this.progress.enrichingStages;

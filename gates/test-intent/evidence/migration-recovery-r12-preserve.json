@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T00:38:25.183Z",
+  "revision": "6f5da7167bd292bb8f48049b11daa350605768f1",
+  "tree": "be2d0040a866042721c4faba6c8cd400d188bbba",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.RefusedCleanupConditionalDeleteTest.conditionalDeleteRetiresAWhenTheParentIsListable\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4149
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java#conditionalDeleteRetiresAWhenTheParentIsListable",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:397b3c235968518b158ac0fbc44c461a97e9d7c97b02fcc525b75f30612eff24",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "conditionalDeleteRetiresAWhenTheParentIsListable()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6f5da7167",
+    "revision": "6f5da7167bd292bb8f48049b11daa350605768f1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.RefusedCleanupConditionalDeleteTest.conditionalDeleteRetiresAWhenTheParentIsListable\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5519
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java#conditionalDeleteRetiresAWhenTheParentIsListable",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d2f5bcc91ee6a2de4839ea785fb7050227d4e5ea1a7532507987a562f7429708"
+}

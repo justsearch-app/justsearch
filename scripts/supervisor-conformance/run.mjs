@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { skipPrFlake } from '../ci/pr-flakes.mjs';
 /**
  * The supervisor conformance harness (design 7.1 "Conformance", lane F stage B item B7).
  *
@@ -513,7 +514,7 @@ async function runAdapter(name) {
   if (!process.env.CI) {
     try { removeFixtureDirectory(recordsRoot); } catch (err) { timingWarning(err); }
   }
-  for (const testCase of cases.flatMap(c => Array.from({ length: repeat }, () => c))) {
+  for (const testCase of cases.filter(c => !skipPrFlake('scripts/supervisor-conformance/run.mjs', c.id)).flatMap(c => Array.from({ length: repeat }, () => c))) {
     let timings;
     try { timings = caseTimings({ adapter: name, testCase, policy, root: recordsRoot }); }
     catch (err) { timingWarning(err); }
