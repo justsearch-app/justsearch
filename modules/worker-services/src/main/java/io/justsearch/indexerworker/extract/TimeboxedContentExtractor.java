@@ -185,6 +185,16 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
 
   /** Extracts a bounded artifact with timeout enforcement. */
   public ExtractionArtifact extractArtifact(Path file) throws IOException, ExtractionException {
+    return extractArtifact(file, timeout.toMillis(), true);
+  }
+
+  /** Same sandbox and parser path; bounded probe failures are summarized by the batch owner. */
+  public ExtractionArtifact probeArtifact(Path file) throws IOException, ExtractionException {
+    return extractArtifact(file, Math.min(timeout.toMillis(), 5_000), false);
+  }
+
+  private ExtractionArtifact extractArtifact(Path file, long maximumWaitMs, boolean report)
+      throws IOException, ExtractionException {
     Objects.requireNonNull(file, "file");
 
     // The task reports its own completion: Future.isDone() is TRUE the moment cancel() succeeds,
@@ -215,13 +225,13 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
     }
 
     try {
-      return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      return future.get(Math.min(timeout.toMillis(), maximumWaitMs), TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
       ensureOpen();
       // Best-effort cancellation
       future.cancel(true);
-      replaceIfWedged(current, taskReturned);
-      recordTimeout(file);
+      replaceIfWedged(current, taskReturned, report);
+      if (report) recordTimeout(file);
       throw new ExtractionTimeoutException(
           "Extraction timed out after " + timeout.toSeconds() + "s for: " + file.getFileName(), e);
     } catch (InterruptedException e) {
@@ -291,7 +301,7 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
    * on {@code submit} forever — the "one bad file stops all extraction" defect. Called only on the
    * timeout path, so a healthy run keeps exactly one executor for the extractor's whole life.
    */
-  private void replaceIfWedged(ExecutorService current, AtomicBoolean taskReturned) {
+  private void replaceIfWedged(ExecutorService current, AtomicBoolean taskReturned, boolean report) {
     if (taskReturned.get()) {
       return;
     }
@@ -303,14 +313,14 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
       // this unusable executor so every later submission receives a typed refusal instead of
       // queueing forever behind the wedged task.
       shutdownAndCancelQueued(current);
-      log.warn("Extraction executor replacement refused: {}", refused.getMessage());
+      if (report) log.warn("Extraction executor replacement refused: {}", refused.getMessage());
       return;
     }
     if (executor.compareAndSet(current, replacement)) {
       // shutdownNow() re-interrupts and prevents new work reaching the wedged thread; it does NOT
       // stop the running task (nothing can), so the thread leaks by design until the JVM exits.
       shutdownAndCancelQueued(current);
-      log.warn(
+      if (report) log.warn(
           "Extraction executor thread wedged past the timeout; replaced with generation {}",
           executorGeneration.get());
     } else {

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
@@ -123,8 +124,10 @@ public final class JobBatchWriter {
     return writeFailures.retryDelayMs();
   }
 
-  long prepareRetry() {
-    return writeFailures.prepareRetry();
+  void useOwnedPaths(EngineOwnedPaths paths) { writeFailures.useOwnedPaths(paths); }
+
+  long prepareRetry(BooleanSupplier canary) {
+    return writeFailures.prepareRetry(canary);
   }
 
   void finishBatch(long retryAtMs) {
@@ -279,7 +282,7 @@ public final class JobBatchWriter {
                         contentExtractor.extractionPolicy(), ex.provenance()),
                     writeFailures.retryAtMs())));
       } else {
-        writeFailures.failure(e, systemic -> {
+        writeFailures.failure(e, ex.filePath(), systemic -> {
           var outcome = journal.outcome(
               IngestionOutcomeClass.WRITE_FAILED,
               IngestionReasonCodes.WRITE_FAILED,

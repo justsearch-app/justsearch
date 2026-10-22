@@ -429,6 +429,9 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
     try {
       return decode(responseBytes, requestId);
+    } catch (SandboxServiceUnavailableException unavailable) {
+      // A valid response about shared storage does not corrupt the protocol or retire its owner.
+      throw unavailable;
     } catch (SandboxExtractionException malformed) {
       throw discardAndClassify(slot, child, REASON_PROTOCOL, malformed);
     }
@@ -457,6 +460,9 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
             "Sandbox parser timed out", null);
       }
       if (response.status() == ExtractionStatus.FAILED) {
+        if (SandboxExtractionResponse.SERVICE_UNAVAILABLE.equals(response.reasonCode())) {
+          throw new SandboxServiceUnavailableException("Sandbox storage or service is unavailable", null);
+        }
         throw new ContentExtractor.ExtractionException("Sandbox parser failed");
       }
       return artifact.validateContentBoundsOnly(policy.maxExtractedChars());

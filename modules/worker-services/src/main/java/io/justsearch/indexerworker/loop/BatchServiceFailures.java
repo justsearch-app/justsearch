@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
@@ -9,13 +10,14 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Single-threaded service history, separate for the writer and identity store. A successful peer
  * makes unknown failures document-specific. Without one, only explicit infrastructure signals prove an outage;
- * unknown runtime failures get three grace batches before using the durable file retry ladder.
+ * unknown failures get three grace batches, then a shared extraction canary before the file ladder.
  * History is constant-size and resets on service success or worker restart. Restart grants three
  * new grace batches but never resets persisted attempts or exhaustion.
  */
@@ -33,12 +35,21 @@ final class BatchServiceFailures {
   private long lastLogNs;
   private long unreportedFailures;
   private Throwable sample;
+  private boolean canaryFailed;
+  private EngineOwnedPaths ownedPaths;
+
+  void useOwnedPaths(EngineOwnedPaths paths) { ownedPaths = paths; }
+
+  boolean ownsFailure(Throwable failure, java.nio.file.Path source) {
+    return ownedPaths != null && ownedPaths.ownsFailure(failure, source);
+  }
 
   void begin() {
     pending.clear();
     succeeded = false;
     delayMs = 0;
     sample = null;
+    canaryFailed = false;
     active = true;
   }
 
@@ -48,10 +59,15 @@ final class BatchServiceFailures {
     nextDelayMs = 1_000;
   }
 
+  void failure(Throwable failure, java.nio.file.Path source, Consumer<Boolean> record) {
+    if (ownsFailure(failure, source)) unavailable(failure, record);
+    else if (EngineOwnedPaths.sourceFailure(failure, source)) record.accept(false);
+    else failure(failure, record);
+  }
+
   void failure(Throwable failure, Consumer<Boolean> record) {
     noteFailure(failure);
-    if (active && failure instanceof RuntimeException
-        && !(failure instanceof IllegalArgumentException)) {
+    if (active && !(failure instanceof IllegalArgumentException) && !(failure instanceof Error)) {
       pending.add(new Failure(failure, record, false));
     } else {
       record.accept(false);
@@ -88,13 +104,20 @@ final class BatchServiceFailures {
 
   // Classify both services before persisting outcomes so their rows and the loop share one deadline.
   long prepareRetry() {
-    return prepareRetry(0);
+    return prepareRetry(0, () -> true);
   }
 
   long prepareRetry(long minimumDelayMs) {
+    return prepareRetry(minimumDelayMs, () -> true);
+  }
+
+  long prepareRetry(BooleanSupplier canary) { return prepareRetry(0, canary); }
+
+  private long prepareRetry(long minimumDelayMs, BooleanSupplier canary) {
     active = false;
     boolean ambiguous = pending.stream().anyMatch(f -> !f.unavailable() && !provenOutage(f.error()));
     if (!succeeded && ambiguous) ambiguousBatches = Math.min(4, ambiguousBatches + 1);
+    if (!succeeded && ambiguous && ambiguousBatches > 3) canaryFailed = !canary.getAsBoolean();
     if (pending.stream().anyMatch(this::systemic)) {
       delayMs = Math.max(nextDelayMs, Math.min(MAX_DELAY_MS, minimumDelayMs));
       nextDelayMs = Math.min(MAX_DELAY_MS, delayMs * 2);
@@ -103,7 +126,7 @@ final class BatchServiceFailures {
   }
 
   private boolean systemic(Failure failure) {
-    return failure.unavailable() || provenOutage(failure.error())
+    return failure.unavailable() || provenOutage(failure.error()) || canaryFailed
         || (!succeeded && ambiguousBatches <= 3);
   }
 

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
@@ -157,6 +158,15 @@ public final class JobBatchExtractor {
     return extracted;
   }
 
+  void useOwnedPaths(EngineOwnedPaths paths) {
+    identityFailures.useOwnedPaths(paths);
+    extractionFailures.useOwnedPaths(paths);
+  }
+
+  long prepareRetry(BooleanSupplier canary) {
+    return Math.max(identityFailures.prepareRetry(canary), extractionFailures.prepareRetry(canary));
+  }
+
   long prepareRetry() {
     return Math.max(identityFailures.prepareRetry(), extractionFailures.prepareRetry());
   }
@@ -204,6 +214,7 @@ public final class JobBatchExtractor {
 
     long startTime = System.currentTimeMillis();
     FileEnvelope envelope = null;
+    boolean extracting = false;
 
     try {
       SourceAdmission admission = ingestionAuthority.admit(claim);
@@ -271,7 +282,7 @@ public final class JobBatchExtractor {
           // This receiver rejects every document independently of its content.
           identityFailures.unavailable(identityError, recordFailure);
         } else {
-          identityFailures.failure(identityError, recordFailure);
+          identityFailures.failure(identityError, filePath, recordFailure);
         }
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
@@ -313,7 +324,9 @@ public final class JobBatchExtractor {
       String sourceSha256 = SourceContentHash.sha256(filePath);
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
+        extracting = true;
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
+        extracting = false;
         extractionFailures.success();
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
         artifact = rawArtifact.validate(contentExtractor.extractionPolicy(), sourcePathHash);
@@ -397,101 +410,49 @@ public final class JobBatchExtractor {
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
-    } catch (ExtractionTimeoutException e) {
-      log.warn("Extraction timeout for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "PARSER_TIMEOUT",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.PARSER_TIMEOUT,
-                      IngestionReasonCodes.PARSER_TIMEOUT,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (SandboxExtractionException e) {
-      log.warn("Extraction sandbox failed for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "SANDBOX_FAILED",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.SANDBOX_FAILED,
-                      IngestionReasonCodes.SANDBOX_FAILED,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (ContentExtractor.ExtractionException e) {
-      log.warn("Content extraction failed for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "PARSER_FAILED(terminal)",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.PARSER_FAILED,
-                      IngestionReasonCodes.PARSER_FAILED,
-                      IngestionRetryPolicy.NONE,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (IOException e) {
-      log.error("IO error processing: {}", filePath, e);
-      FileEnvelope envelopeForLedger = envelope;
-      // Task t-20261013-ef3c41: an I/O failure on a source that exists but cannot be opened for
-      // reading (locked by another program, access denied), or whose folder is gone, is not a
-      // fault in the file: retry with growing back-off and no exhaustion, keeping its content.
-      IngestionOutcome ioOutcome = sourceAccessOutcome(claim, e);
-      journal.recordOutcomeSafely(
-          filePath,
-          "IO_FAILED",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  ioOutcome != null
-                      ? ioOutcome
-                      : journal.outcome(
-                          IngestionOutcomeClass.IO_FAILED,
-                          IngestionReasonCodes.IO_ERROR,
-                          IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                          failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (RuntimeException | Error e) {
+    } catch (IOException | ContentExtractor.ExtractionException | RuntimeException | Error e) {
       if (e instanceof VirtualMachineError fatal) throw fatal;
-      // The loop already recovers non-VM Errors. Attribute them to this unit so its bounded
-      // retry policy applies and an early bad document cannot starve the rest of the batch.
-      log.error("Failed to process: {}", filePath, e);
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "PARSER_FAILED(retryable)",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.PARSER_FAILED,
-                      IngestionReasonCodes.PARSER_FAILED,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
+      FileEnvelope admittedEnvelope = envelope;
+      IngestionOutcomeClass outcomeClass = extractionFailureClass(e);
+      IngestionOutcome original = extractionOutcome(claim, e, outcomeClass);
+      Consumer<Boolean> record = systemic -> journal.recordOutcomeSafely(filePath,
+          systemic ? "WRITE_FAILED(shared_service)" : outcomeClass.name(), () -> {
+            var entry = ledgerEntry(filePath, admittedEnvelope, collection, null, provenance);
+            if (systemic) jobQueue.deferClaim(claim,
+                journal.outcome(IngestionOutcomeClass.WRITE_FAILED, IngestionReasonCodes.WRITE_FAILED,
+                    IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, failureDetail(e)),
+                entry, extractionFailures.retryAtMs());
+            else jobQueue.markClaimFailed(claim, original, entry);
+          });
+      if (extractionFailures.ownsFailure(e, filePath)) extractionFailures.unavailable(e, record);
+      else if (extracting && !EngineOwnedPaths.sourceFailure(e, filePath)
+          && !(e instanceof IOException io && sourceAccessOutcome(claim, io) != null)) {
+        extractionFailures.failure(e, record);
+      } else record.accept(false);
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
     }
+  }
+
+  private static IngestionOutcomeClass extractionFailureClass(Throwable failure) {
+    if (failure instanceof IOException) return IngestionOutcomeClass.IO_FAILED;
+    if (failure instanceof ExtractionTimeoutException) return IngestionOutcomeClass.PARSER_TIMEOUT;
+    if (failure instanceof SandboxExtractionException) return IngestionOutcomeClass.SANDBOX_FAILED;
+    return IngestionOutcomeClass.PARSER_FAILED;
+  }
+
+  private IngestionOutcome extractionOutcome(JobQueue.IndexJob claim, Throwable failure,
+      IngestionOutcomeClass outcomeClass) {
+    if (failure instanceof IOException io) {
+      IngestionOutcome source = sourceAccessOutcome(claim, io);
+      if (source != null) return source;
+    }
+    return journal.outcome(outcomeClass,
+        outcomeClass == IngestionOutcomeClass.IO_FAILED ? IngestionReasonCodes.IO_ERROR : outcomeClass.name(),
+        outcomeClass == IngestionOutcomeClass.PARSER_FAILED && failure instanceof ContentExtractor.ExtractionException
+            ? IngestionRetryPolicy.NONE : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+        failureDetail(failure));
   }
 
   /**

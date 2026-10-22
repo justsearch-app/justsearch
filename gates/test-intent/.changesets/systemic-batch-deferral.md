@@ -510,6 +510,78 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#readonlyCommittedQueueOutcomesKeepOwnersAndUseGrowingPause"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O7 shared snapshot storage missing/read-only in the real parent and real parser child never charges healthy >1MiB sources beyond grace, preserves WAITING and seconds-scale deadlines and recovers. O8 untyped all-file infrastructure failure is diagnosed by one bounded extraction canary. K1/K4 poison with healthy infrastructure is charged/terminal FAILED; healthy peers progress and all-poison input has a passing real canary.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator's complete round-nine provenance/canary decision and case table while preserving U17/U19, schemas, typed lifecycle signals and existing acceptance records.",
+          "choice": "Use one EngineOwnedPaths classifier for resolved data/index roots and java.io.tmpdir (including snapshot, spool, canary and parser temp files), retaining lexical and canonical roots. Walk exception causes and FileSystemException paths; exact source-path failures take precedence even when a source is below temp/data. Never parse messages. Writer and identity callbacks use the same classifier as extraction. Existing SQLite availability codes and Lucene Directory tags remain necessary for pathless native errors; typed closed/closing guards remain. Carry child-side provenance across the existing response reasonCode as SERVICE_UNAVAILABLE before the child discards causes; parent decodes it as SandboxServiceUnavailableException, without a protocol/schema version change. General extraction failures are classified after peer outcomes rather than charged immediately. After three unsuccessful ambiguous batches, probe one built-in tiny RTF through the same timebox/sandbox/parser before charging. RTF materializes a snapshot even at tiny size and routes to process isolation when routing is enabled. Share the memoized probe result across the batch's services, never probe a successful service batch, and never write its artifact to the index. The probe is bounded by min(normal timeout, five seconds), reuses one tiny source until loop close, and uses the existing executor replacement/child cleanup semantics. A probe failure keeps rows free with existing 1/2/4/8-second pause/deadline extension and minute summaries; a pass retains each original per-file outcome/ladder/terminal policy. Probe timeouts suppress the timebox's separate repeated timeout/replacement warnings; the batch summary owns that diagnostic. Healthy-peer poison is per-file without probing, as required by the never-in-a-healthy-batch rule; all-poison batches demonstrate a passing real snapshot/parser canary and terminal FAILED/attempt1. Known unreadable source errors bypass ambiguous grace and retain retry-until-available. Service grace, probe memo and backoff are in memory and reset on restart; persisted attempts, deadlines and claims are unchanged. File-type-specific parser-resource outages can still be charged if the RTF canary passes, the residual explicitly accepted in the orchestrator decision. Source: ~/.cache/justsearch-upgrade-reports/deferral-round9-decision.md, read in full; its words are orchestrator decisions, not owner-words. A valid SERVICE_UNAVAILABLE child response passes through before the legacy malformed-protocol catch; it does not recycle a healthy child or lose its typed signal. The real >1MiB snapshot checks measure both rows claimed together at the persisted deadline (no earlier, within one second after D), then allow the normal two five-second parse budgets for completion. A builder-chosen nine-second total completion bound mixed the eight-second pause with >1second of real parsing; it was replaced with this stronger deadline-specific eligibility/claim oracle, not by weakening existing matrix recovery checks. The first candidate also exposed the new SSU being caught as malformed protocol; that source defect is repaired and the full suites run again. Final claim instrumentation delegates to the actual opened SqliteJobQueue instead of spying/copying an owning store: its switch-buffer helper captures the original receiver, so a spy can falsely report a closed connection through public status. Only this fixture changed after the final production full run. The producer verifies the retained evidence self-digest and unchanged production/other test hashes, retains88 passed executions, and freshly executes the corrected8 before and after with both modules compile/PMD. All96 targets pass without skips; the original five fixture-status failures remain explicitly recorded in the full-run evidence, not relabelled.",
+          "label": "agent choice under the adopted orchestrator design"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-provenance-canary.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EngineOwnedPathsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The shared path classifier recognizes data, external index and parser/temp storage independent of reason text; exact source failures remain per-file even under temp/data roots, relative paths and message-only IOException do not invent ownership.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator's complete round-nine provenance/canary decision and case table while preserving U17/U19, schemas, typed lifecycle signals and existing acceptance records.",
+          "choice": "Use one EngineOwnedPaths classifier for resolved data/index roots and java.io.tmpdir (including snapshot, spool, canary and parser temp files), retaining lexical and canonical roots. Walk exception causes and FileSystemException paths; exact source-path failures take precedence even when a source is below temp/data. Never parse messages. Writer and identity callbacks use the same classifier as extraction. Existing SQLite availability codes and Lucene Directory tags remain necessary for pathless native errors; typed closed/closing guards remain. Carry child-side provenance across the existing response reasonCode as SERVICE_UNAVAILABLE before the child discards causes; parent decodes it as SandboxServiceUnavailableException, without a protocol/schema version change. General extraction failures are classified after peer outcomes rather than charged immediately. After three unsuccessful ambiguous batches, probe one built-in tiny RTF through the same timebox/sandbox/parser before charging. RTF materializes a snapshot even at tiny size and routes to process isolation when routing is enabled. Share the memoized probe result across the batch's services, never probe a successful service batch, and never write its artifact to the index. The probe is bounded by min(normal timeout, five seconds), reuses one tiny source until loop close, and uses the existing executor replacement/child cleanup semantics. A probe failure keeps rows free with existing 1/2/4/8-second pause/deadline extension and minute summaries; a pass retains each original per-file outcome/ladder/terminal policy. Probe timeouts suppress the timebox's separate repeated timeout/replacement warnings; the batch summary owns that diagnostic. Healthy-peer poison is per-file without probing, as required by the never-in-a-healthy-batch rule; all-poison batches demonstrate a passing real snapshot/parser canary and terminal FAILED/attempt1. Known unreadable source errors bypass ambiguous grace and retain retry-until-available. Service grace, probe memo and backoff are in memory and reset on restart; persisted attempts, deadlines and claims are unchanged. File-type-specific parser-resource outages can still be charged if the RTF canary passes, the residual explicitly accepted in the orchestrator decision. Source: ~/.cache/justsearch-upgrade-reports/deferral-round9-decision.md, read in full; its words are orchestrator decisions, not owner-words. A valid SERVICE_UNAVAILABLE child response passes through before the legacy malformed-protocol catch; it does not recycle a healthy child or lose its typed signal. The real >1MiB snapshot checks measure both rows claimed together at the persisted deadline (no earlier, within one second after D), then allow the normal two five-second parse budgets for completion. A builder-chosen nine-second total completion bound mixed the eight-second pause with >1second of real parsing; it was replaced with this stronger deadline-specific eligibility/claim oracle, not by weakening existing matrix recovery checks. The first candidate also exposed the new SSU being caught as malformed protocol; that source defect is repaired and the full suites run again. Final claim instrumentation delegates to the actual opened SqliteJobQueue instead of spying/copying an owning store: its switch-buffer helper captures the original receiver, so a spy can falsely report a closed connection through public status. Only this fixture changed after the final production full run. The producer verifies the retained evidence self-digest and unchanged production/other test hashes, retains88 passed executions, and freshly executes the corrected8 before and after with both modules compile/PMD. All96 targets pass without skips; the original five fixture-status failures remain explicitly recorded in the full-run evidence, not relabelled.",
+          "label": "agent choice under the adopted orchestrator design"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-provenance-canary.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EngineOwnedPathsTest.java"
+      ],
+      "repaired": false
     }
   ]
 }
@@ -663,6 +735,65 @@ The new status rule deliberately supersedes round six's allowance for fresh work
 during a service pause. Fresh rows remain counted as ready, while loop ownership supplies the
 separate WAITING state and resume deadline. Foreground duty-cycle pauses and cutover pauses do not
 publish this service-outage deadline. The replacement parser pool is probed with the fixed healthy source before publication, retaining the original nine-second completion oracle. The first baseline showed four pool states safely deferring but timing out while a cold replacement child started; those results are preliminary environment/fixture failures, not repair proof. Final exact-source checks rerun on the same cached baseline; two extra queue probes now assert pacing before waiting for the new pause. The first full module run executed1975 worker-services and1508 indexer-worker cases. Its only failures were the known JDK launcher-NOTE oracle and one additional fixture that made the connection read-only before polling, so the repaired poll guard correctly prevented reaching its intended outcome-write boundary. Production sources remain byte-identical. After isolating READONLY at the outcome call, the evidence producer rechecks all four methods in that changed test file before and after, reruns both modules' main/test compile and PMD, and retains the unaffected83 targeted results and full-module execution under source/self-digest guards. The unchanged37-case matrix is reused, including its32 baseline preservation passes. No acceptance record below was changed.
+
+## Round nine: provenance and bounded canary
+
+The orchestrator decision in `~/.cache/justsearch-upgrade-reports/deferral-round9-decision.md`
+was read in full. The table below preserves its cases and links each to product checks. The
+orchestrator's wording is delegated design, not owner-words. U17/U19 remain owner-adopted on
+2026-10-20 with the exact adoption "i agree, proceed accordingly". No acceptance record changes.
+
+Engine-owned roots are collected in
+[EngineOwnedPaths](../../../modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/EngineOwnedPaths.java).
+The loop supplies resolved data/index roots and JVM temp; child extraction uses its JVM temp root.
+Jobs, identity and reverse-path stores are below data; explicitly configured index roots may be
+elsewhere. Source-path errors take precedence. Missing roots retain lexical provenance; existing
+symlink roots also retain canonical provenance. Native SQLite errors have no filesystem path and
+retain native availability typing/codes. Lucene's pathless Directory IO retains its boundary tag;
+its existing explicit outside-index-path guard still prevents analyzer/document IO from being
+mislabelled merely because IndexWriter is on the stack. A raw IOException without a usable path
+is ambiguous, never classified from message text. The same canary handles that remainder.
+
+The child currently flattens parser exceptions into a response. It now checks the same path
+classifier before flattening and sends SERVICE_UNAVAILABLE in the existing reason field; the
+parent preserves that as SSU. This closes the actual process boundary as well as D8's in-process
+case. The source bytes are immutable fixture files, generated once and reused. Snapshot scratch
+is the damaged resource, never a source file. Simulated full-storage reasons are checked by the
+path classifier; tests do not fill the user's SSD.
+
+A successful peer proves a file-specific failure without a canary. Otherwise unknown extraction
+failures now share the existing three-batch grace; one tiny built-in RTF (snapshot + sandbox +
+parse, no index write) decides after grace. One memo per batch/pause step is shared across service
+histories. It is bounded at five seconds or the smaller configured parse timeout, and does not
+reset failed-service grace/backoff. A failed probe leaves all rows free and paused at 1/2/4/8 s;
+a passing one restores the original per-file outcome. The existing forward-only backlog extension,
+WAITING signal, cooperative stop and minute summaries remain. Removing the duplicated extraction
+catch/outcome blocks consolidates these policies. Lifecycle flags/types remain at their locks.
+The memo/counters reset on restart while durable queue attempts/deadlines/claim ownership survive.
+Residual accepted by the orchestrator: a file-type-specific component outage with a passing RTF
+canary remains a visible per-file failure, retaining source data and re-enqueue recovery.
+
+| Case (verbatim from orchestrator decision) | Expected | Product check |
+| --- | --- | --- |
+| O1: Index writer closed, closing, swapped mid-runtime-switch or tragically failed | outage (I6: tragic close stays ERROR plus the fatal-exit callback) | [SharedServiceAvailabilityTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java): writer lifecycle states; [KnowledgeServerTerminalWriterBindingTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerTerminalWriterBindingTest.java) fatal callback plus [IndexStatusOpsLoopFailureTest](../../../modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusOpsLoopFailureTest.java) status preservation |
+| O2: Index folder missing, read-only or full | outage | [VerifierReadOnlyWriterTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java), SharedServiceAvailabilityTest writer storage states |
+| O3: Identity or path store closed, its database read-only, locked or missing | outage | [SharedServiceAvailabilityTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java): IDENTITY/PATH states |
+| O4: jobs.db itself read-only or locked for a sustained period | paced 1-8 s, summarized logs, no row lost or charged | [ServiceOutageBoundaryTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java): persistentJobsReadonlyAfterFourthBatchRetainsOutagePacingAndBoundedLogs and queue-control/outcome checks |
+| O5: Sandbox closed, closing or unable to spawn a child; timebox executor closed or saturated | outage | [SharedServiceAvailabilityTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java): timebox/pool/reader states |
+| O6: Extractor registry closed or retired | outage | [SharedServiceAvailabilityTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java): registry closed/empty/closing states |
+| O7: Parser snapshot or temp folder missing, read-only or full (D8) | outage, by provenance | [ExtractionInfrastructureTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java): engineOwnedSnapshotFailureNeverChargesHealthySources, parent + real child; [EngineOwnedPathsTest](../../../modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EngineOwnedPathsTest.java): full-storage path reasons |
+| O8: An unknown infrastructure failure that hits every file in a batch, not covered by O1-O7 | the canary decides; canary fails, so outage | [ExtractionInfrastructureTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java): untypedInfrastructureFailureIsProvenByTheSameExtractionCanary |
+| K1: A poison file that crashes, hangs or repeatedly kills the parser child, mixed with healthy files | the healthy files are indexed; the poison file moves along the per-file ladder to terminal FAILED and never loops uncounted (the canary passes) | [ExtractionInfrastructureTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java): poisonOnlyAndMixedBatchesTerminateWithHealthyInfrastructure(mixed/one); existing PersistentExtractionSandboxTest crash/hang recovery checks |
+| K2: A source file that is unreadable, missing or vanishes during the batch | per-file policy (IO_FAILED or retry-until-available) | [UnreadableSourceRetryTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java), existing IndexingLoop stale-source checks, EngineOwnedPathsTest source precedence |
+| K3: A parser that rejects one file in a healthy batch | only that file is charged | [ExtractionInfrastructureTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java): mixed poison case; IndexingLoopTest.badFileDoesNotBlockGoodFileInSameBatch |
+| K4: A batch of only poison or only unreadable files, with healthy infrastructure | per-file charges after grace; the canary passes, so no outage | [ExtractionInfrastructureTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java): poisonOnlyAndMixedBatchesTerminateWithHealthyInfrastructure(all); UnreadableSourceRetryTest |
+| K5: Status: INDEXING while rows are processing; WAITING during an outage pause or when the whole backlog is in backoff | as stated | [ServiceOutageBoundaryTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java): actual early pause; [UpgradeStatusRestartTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UpgradeStatusRestartTest.java): due/processing/recovery |
+| K6: U19 and every earlier accepted check (I1-I9, I11, the 37-case matrix, the capped 64-row backlog) | unchanged | All 87 prior targeted executions in [round-nine execution evidence](../evidence/systemic-batch-deferral-provenance-canary.json), including [VerifierCappedBacklogStatusTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java) and queue ladder/revive tests |
+
+The large-input checks pin the actual recovery claim to the shared deadline D through D+1second and require both rows in that claim, then bound normal parsing separately (two five-second timeboxes). The initial builder nine-second total completion bound mixed eight seconds of pause with more than one second of parsing; existing37-state nine-second completion checks remain unchanged. The initial child-response path also caught the new SSU as malformed protocol and recycled a healthy child, masking the fixture fault; that implementation defect is fixed by typed pass-through and all touched-module checks are run again. Preliminary warmup-only failures used an invalid/minimal RTF; a direct actual-provider probe proved the final font-table/paragraph marker returns SUCCESS_FULL. Only exact-source intended baseline assertions count as repair proof.
+
+Execution results, exact before baseline b4e2f6183, hashes and commands are recorded by the
+round-nine evidence producer. Final result: all96 targeted executions pass without skips, including the unchanged37-state matrix and all87 earlier targets. Exact-source baseline b4e2f6183 has seven intended assertions and one mixed-poison preservation pass: the five outage cases charge healthy rows; isolated/all-poison cases lack the required canary. The final four real snapshot faults and untyped O8 keep attempts0, report WAITING and claim both rows1–5ms after D; single/all poison have one passing canary and terminal FAILED/attempt1. The fixed large corpus and JVM roots are reused. Both modules main/test compile and four PMD reports complete with zero violations. Full-module evidence plus the isolated fixture correction has3494 reported JUnit entries, one known launcher-NOTE environment failure and46 skipped entries; all skip names are recorded rather than counted as passes. Public status on the real queue is tested by delegation, avoiding a copied owning-store spy whose constructor callbacks pointed at a closed original. The final producer checks all production and other test hashes before reusing88 pass results and re-executes the corrected8-case file before/after. The original full run with five fixture-status failures remains in the machine record. Linux only; physical ENOSPC is not induced (path-provenance full-storage reasons are checked), and broad Engine/UI/system suites are not rerun. Independent acceptance remains required.
 
 ## Acceptance records
 

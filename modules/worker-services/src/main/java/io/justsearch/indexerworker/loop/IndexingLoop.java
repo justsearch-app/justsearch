@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
@@ -122,6 +123,7 @@ public class IndexingLoop implements Closeable {
   /** Tempdoc 885 item 3: the duty-cycle policy that replaced the breath-hold pause. */
   private final IndexingPacing indexingPacing;
   private final TimeboxedContentExtractor contentExtractor;
+  private final ExtractionCanary canary;
   // Tempdoc 516 Slice 4c: embeddingProvider / embeddingServiceForLifecycle / embeddingEvents
   // / embeddingCompatController are now owned by EmbeddingProviderLifecycle. The lifecycle's
   // own field declarations preserve the trust + JMM semantics (volatile + the lifecycle lock).
@@ -378,6 +380,7 @@ public class IndexingLoop implements Closeable {
     this.contentExtractor = contentExtractor != null
         ? contentExtractor
         : ExtractionSandboxFactory.inProcessStructured(ocrRegistration, timeboxRegistration, extractionCatalog);
+    this.canary = new ExtractionCanary(this.contentExtractor);
     this.pipelineCatalog = pipelineCatalog;
     this.outcomeWriteFailureCounter =
         ingestionOutcomeCatalog == null
@@ -470,6 +473,9 @@ public class IndexingLoop implements Closeable {
             this::recordStageMs,
             () -> detailedTracing,
             (long delta) -> indexedSinceCommit += delta);
+    var ownedPaths = new EngineOwnedPaths(resolvedConfigSupplier.get());
+    this.extractor.useOwnedPaths(ownedPaths);
+    this.writer.useOwnedPaths(ownedPaths);
     // Tempdoc 516 Slice 4d (W6): construct the scheduler. Encoder/service suppliers read
     // IndexingLoop's volatile fields so the async-load swap-on-the-fly semantics persist.
     this.backfillScheduler =
@@ -1011,6 +1017,7 @@ public class IndexingLoop implements Closeable {
     Span batchSpan = Span.getInvalid();
     boolean fatal = false;
     writer.beginBatch();
+    canary.beginBatch();
     try {
       batchSpan = maybeSpan("indexing.batch");
       batchSpan.setAttribute("batch.polled", (long) jobs.size());
@@ -1030,7 +1037,7 @@ public class IndexingLoop implements Closeable {
       // A stopped/failed batch may not visit every polled claim. Written claims retain their
       // existing commit owner; the remainder return only after synchronous batch execution exits.
       if (!fatal) {
-        long delayMs = Math.max(writer.prepareRetry(), extractor.prepareRetry());
+        long delayMs = Math.max(writer.prepareRetry(canary), extractor.prepareRetry(canary));
         retryAtMs = System.currentTimeMillis() + delayMs;
         try {
           writer.finishBatch(retryAtMs);
@@ -1421,6 +1428,7 @@ public class IndexingLoop implements Closeable {
     // Retain all later component resources if OCR still owns a task or child. The enclosing
     // service/server keeps this extractor reachable and can retry close after actual exit.
     if (contentExtractor != null) {
+      try { canary.close(); } catch (IOException cleanup) { log.warn("Could not remove extraction canary", cleanup); }
       try { contentExtractor.close(); }
       catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
     }
