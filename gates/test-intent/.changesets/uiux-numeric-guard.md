@@ -1502,3 +1502,14 @@ PRs in 28 days (11.1%, above one in ten), a non-failing delivery finding.
   "note": "NG1/F1/NX1 fail: %-5 verifies against 5 (real CPU scorers, Ask, Delegate, both windows and cold reload); 0x10 still verifies against 0 and 10. D8/GN1 regress: date parts, unit ranges and m²-only prose lose marks; an unrelated $5 in a passage vetoes its supported 1883 claim. The 330 literal pairs and the leading-decimal repair pass. Evidence: /home/elias/.cache/am/1ahxvgxn/evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "7qhrmqrm",
+  "verdict": "reject",
+  "digest": "sha256:66d26e42edd0775c1f5608dba08b141339d0a85adc6d67426efbe3a10f1488e0",
+  "note": "Reject: the literal checks execute (39/39; NX2 11 assertion failures before, 11 passes after), but omit boundaries required by D8/F1/NX1/NX2. A supported spaced unit range (5 kg - 10 kg) loses its mark; -10 kg verifies against 5 kg -10 kg; 1 verifies against undecided 1.2.3e4; currency deletion invents 15 from 1$5 (real cosine API); percent after a unit is lost (5 against 5kg%). Real private Ask/Delegate/API and Chromium evidence confirms applicable failures. NG6 also fails in the pre-existing old Delegate cosine frame: zero marks but Grounded 1 of 1. Evidence: /home/elias/dev/justsearch/tmp/verify/wp4.5/verifier-3/verification-report.md. NG8 production Ask and NG9 shipped-model counts remain unverified; scorer-only timing meets D10."
+}
+```
