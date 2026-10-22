@@ -6673,10 +6673,20 @@ export class UnifiedChatView extends JfElement {
         this.noteRefusedWhileLocked(text);
       } else if (refusal) {
         this.noteChatRefused(text, refusal);
-      } else if (!(err instanceof Error && err.name === 'AbortError')) {
+      } else if (err instanceof Error && err.name === 'AbortError') {
+        if (shapeId === 'core.extract') this.errorMessage = 'Extraction stopped. No completed result was added to the conversation.';
+      } else {
         this.errorMessage = friendlyStreamError(err);
       }
     } finally {
+      // Error events, transport loss, EOF, timeouts and cancellation all settle here. Extraction
+      // chunks can be rejected attempts or partial JSON; only onDone may commit an accepted result.
+      if (shapeId === 'core.extract') {
+        this.streamingText = '';
+        this.reasoning.finalize();
+        this.stopRenderTick();
+        setAiActivity({ state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null });
+      }
       this.isStreaming = false;
       this.abortController = null;
     }

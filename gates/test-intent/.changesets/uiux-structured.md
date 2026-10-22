@@ -609,6 +609,112 @@ All checks are durable. UI expectations add Structured behavior; the Engine entr
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/UnifiedChatView.terminalOutput.test.ts"
       ]
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts"
+      ],
+      "repaired": true,
+      "behaviour": "XT9/XD2: Structured completion/failure and general notices retain a focused toast action within the three-toast cap. Displace the next eligible toast; after the arrival expires, restore the sibling in its cached DOM with live announcements off. All timers and subscriptions settle at teardown. Durable checks; previous accepted tests and entries are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT9",
+          "quote": "S14.9 [XT9] (S3.8, ch. 10) The schema box has a label and is reachable by keyboard; multi-line editing never sends by accident; it is readable in both themes, under forced colours and at narrow width with the document pane open, and does not hide the transcript's last turn. Its text survives switching mode or conversation in the same tab; on reload as decision D3b. One tab's schema is never shown in or sent by another tab.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XD2",
+          "quote": "XT9: when a Structured request completes or fails, assistive technology is told once, politely (reuse the live-region mechanism Search v3 already uses; no new announcer), and focus does not move unasked.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A toast containing focus (or hovered, if the host already treats hover as engagement) must not be displaced; displace the next eligible one, or hold the new notice until one is free, without repeating announcements (keep your cache/silencing repairs). Check the general toast case too: any notice, not only Structured ones.",
+          "location": "task t-20261019-bd718f request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-interruption-focus-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts"
+      ]
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts"
+      ],
+      "repaired": true,
+      "behaviour": "XT7/XN1: terminate real ReadableStream delivery after rejected and partial extraction chunks by connection error, EOF without terminal, timeout and user cancellation. Only a failure/stopped reason remains, never JSON or an assistant context row. Preserve Free chat and Ask partial-answer behaviour on connection loss. Await each stream and reactive work; do not change accepted checks. Durable checks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT7",
+          "quote": "S14.7 [XT7] (S3.6, ch. 8) Stop during a Structured run stops it; the turn shows as stopped live and after reload (the WP1.2 rule). If the Engine dies after a rejected attempt or during an attempt, after restart the turn shows as not completed, never as a completed extraction, and nothing re-runs without the user's action. Partial JSON is never shown as complete.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XN1",
+          "quote": "XN1 The old window's Structured option works as today, except the shared Engine repairs of S14.3 and S14.4.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A rejected or partial Structured answer must never stay visible as an answer after any failure path, including connection loss, aborts and timeouts; text the user sees afterward is only the failure note. Normal (non-Structured) answers keep their current behaviour on connection loss.",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3: after reload Retry/Edit prepare the instruction using the current schema and stated inputs and wait for send.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3b: schema is per-window memory only; reload discards it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D7: no-file extraction reads typed text and this conversation.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D10: validate parse and schema conformance in the shared Engine with its existing networknt dependency.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D11: refuse omitted Extract inputs rather than silently skipping or cutting.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-interruption-focus-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts"
+      ]
     }
   ]
 }
@@ -619,6 +725,8 @@ Repair entries appended by builder session 5ha3t9t3 on 2026-10-22. Original entr
 Follow-up entries appended by builder session r3qplcrx on 2026-10-22. Existing entries and acceptance records are retained. Both new test files are durable; evidence records ten assertion failures before, thirteen passes after, including three preservation controls. Independent acceptance is pending.
 
 Third repair entries appended by builder session 84aj3121 on 2026-10-22. The existing entries and acceptance records are retained; new checks use baseline 289dff32f and default dependency linking. Independent acceptance is pending.
+
+Fourth-verifier repair entries appended by builder session z9p1afsx on 2026-10-22. Evidence uses f8002f421 and default dependency linking. Existing entries and acceptance records are retained; independent acceptance is pending.
 
 ## Acceptance records
 

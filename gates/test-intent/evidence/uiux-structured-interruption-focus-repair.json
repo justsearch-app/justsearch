@@ -1,0 +1,115 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T16:44:31.170Z",
+  "revision": "f8002f4213a052199b4f738d2a360c3e1c9a8535",
+  "tree": "58daa5b0c3f9c0c0279be5795e4ad02848d3936b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts\" \"src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fourth-repair/test-intent-vitest-41086-1792687458914.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3117
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c902d5f509215e5a5c68fc64a57c05984fdf66208589f607e1d3ae2ffb70ad1e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XD2 keeps the focused toast action when Extraction complete. overflows the stack",
+          "status": "passed"
+        },
+        {
+          "name": "XD2 keeps the focused toast action when Extraction failed: invalid JSON overflows the stack",
+          "status": "passed"
+        },
+        {
+          "name": "XD2 keeps the focused toast action when An unrelated notice overflows the stack",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7546e61d8b3e5afe75e4e67e8c7b9c0032fc13644fd5c1aa492fbe1e62e0383b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT7 Structured connection leaves only a failure note, never rejected or partial JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured eof leaves only a failure note, never rejected or partial JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured timeout leaves only a failure note, never rejected or partial JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured abort leaves only a failure note, never rejected or partial JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 preserves none partial answer behaviour on connection loss",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 preserves documents partial answer behaviour on connection loss",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f8002f421",
+    "revision": "f8002f4213a052199b4f738d2a360c3e1c9a8535",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts\" \"src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fourth-repair/test-intent-vitest-41086-1792687464752.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6000,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fourth-repair/test-intent-vitest-41086-1792687464752.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts",
+        "classification": "assertion",
+        "detail": "XD2 keeps the focused toast action when Extraction complete. overflows the stack:  AssertionError: arrival must not displace a toast containing keyboard focus: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fourth-repair/test-intent-before-z1iUSm/modules/ui-web/src/shell-v0/components/advisory/Advisory | XD2 keeps the focused toast action when Extraction failed: invalid JSON overflows the stack:  AssertionError: arri"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts",
+        "classification": "assertion",
+        "detail": "XT7 Structured connection leaves only a failure note, never rejected or partial JSON:  AssertionError: interrupted Structured output must leave no answer bubble: expected '{\"city\":42,\"fact\":\"REJECTED_CRASH_CIT…' to be '' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fourth-repair/test-intent-before-z1iUSm/modules/ui-web/src/shell- | XT7 Structured eof leaves only a failure note, never rejected or partial JSON:  AssertionError: interrupted St"
+      }
+    ]
+  },
+  "digest": "sha256:539297b7633c9d6c668100c48ae2d6bfe8177c4315afe9c305267f02ed94d588"
+}

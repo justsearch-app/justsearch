@@ -106,6 +106,7 @@ export class AdvisoryToastHost extends JfElement {
   private storeUnsubscribe: (() => void) | null = null;
   private uiModeUnsubscribe: (() => void) | null = null;
   private seenKeys = new Set<string>();
+  private focusedToastKey: string | null = null;
   // Tempdoc 602 R4 — keys currently animating out, so the supersede prune in
   // onSnapshot does not double-dismiss a toast already being removed.
   private exiting = new Set<string>();
@@ -311,6 +312,7 @@ export class AdvisoryToastHost extends JfElement {
       if (t.timeoutId !== null) clearTimeout(t.timeoutId);
     }
     this.visible = [];
+    this.focusedToastKey = null;
     super.disconnectedCallback();
   }
 
@@ -482,19 +484,24 @@ export class AdvisoryToastHost extends JfElement {
   }
 
   override updated(): void {
-    const firstShown = Math.max(0, this.visible.length - MAX_VISIBLE_TOASTS);
-    for (const [i, toast] of this.visible.entries()) {
-      if (i >= firstShown && toast.announcement === 'pending') toast.announcement = 'announced';
+    const shownKeys = new Set(
+      [...this.shadowRoot!.querySelectorAll<HTMLElement>('.toast')].map(el => el.dataset.key),
+    );
+    for (const toast of this.visible) {
+      if (shownKeys.has(toast.record.key) && toast.announcement === 'pending') toast.announcement = 'announced';
       // Silence only after displacement, keeping ordinary polite regions stable while visible.
-      else if (i < firstShown && toast.announcement === 'announced') toast.announcement = 'silent';
+      else if (!shownKeys.has(toast.record.key) && toast.announcement === 'announced') toast.announcement = 'silent';
     }
   }
 
   override render(): TemplateResult | typeof nothing {
     if (this.visible.length === 0) return nothing;
-    // `visible` is append-ordered (oldest first) and the slot stacks downward, so cap the REVERSED
-    // list — a burst must never push the just-arrived toast out of view — then restore render order.
-    const capped = capWithOverflow([...this.visible].reverse(), MAX_VISIBLE_TOASTS);
+    // Prefer newest arrivals, while keeping a toast containing keyboard focus mounted. Bubbling
+    // focus events also cover controls with their own shadow root (such as the dismiss button).
+    const newestFirst = [...this.visible].reverse();
+    const focusedIndex = newestFirst.findIndex(toast => toast.record.key === this.focusedToastKey);
+    if (focusedIndex >= 0) newestFirst.unshift(...newestFirst.splice(focusedIndex, 1));
+    const capped = capWithOverflow(newestFirst, MAX_VISIBLE_TOASTS);
     const overflow = capped.overflow;
     const shownKeys = new Set(capped.shown.map(t => t.record.key));
     return html`${overflow > 0
@@ -587,6 +594,8 @@ export class AdvisoryToastHost extends JfElement {
           <div
             class="toast"
             data-key=${t.record.key}
+            @focusin=${() => { this.focusedToastKey = t.record.key; this.requestUpdate(); }}
+            @focusout=${() => { this.focusedToastKey = null; this.requestUpdate(); }}
             @click=${() => this.handleClick(t.record)}
           >
             <jf-system-notice tone=${tone} live=${t.announcement === 'silent' ? 'off' : live}>
