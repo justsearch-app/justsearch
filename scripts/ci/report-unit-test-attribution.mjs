@@ -407,7 +407,9 @@ function main() {
     let requiredClasses = [];
     if (opts.requireWindowsClasses) {
       const policy = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
-      requiredClasses = policy.windowsParts.find((part) => part.jobId === 'windows-native-contracts')?.requiredClasses;
+      requiredClasses = policy.windowsParts
+        .filter(part => !opts.lane || part.jobId === opts.lane)
+        .flatMap(part => part.requiredClasses ?? []);
       if (!Array.isArray(requiredClasses) || !requiredClasses.length) throw new Error('Windows requiredClasses policy is empty');
     }
     const report = buildReport({ root, lane: opts.lane, top: opts.top, runner: runnerInfo(opts), requiredClasses });

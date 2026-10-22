@@ -20,6 +20,7 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.indexerworker.services.ProjectionDocumentMapper;
@@ -631,6 +632,13 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         effects.set(i, observeCommittedProjection(active, effects.get(i)));
       }
+      for (var op : selected) {
+        if ("DELETE".equals(op.op())) {
+          var deletion = SwitchBufferDelete.decode(op.payload());
+          if (deletion.origin() != SwitchBufferDelete.Origin.EXPLICIT
+              && !settleConditionalNativeDelete(queue, active, deletion)) return false;
+        }
+      }
       Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
       List<Integer> deleteIndexes = new ArrayList<>();
       for (int i = 0; i < effects.size(); i++) {
@@ -698,8 +706,10 @@ public final class KnowledgeServerMigrationOps {
         expectedKey = "path:" + id;
       }
       case "DELETE" -> {
-        id = op.payload();
-        expectedKey = "path:" + id;
+        var deletion = SwitchBufferDelete.decode(op.payload());
+        // Conditional filesystem receipts cannot authorise another admission's removal.
+        id = deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT ? deletion.path() : null;
+        expectedKey = "path:" + deletion.path();
       }
       case "DELETE_PREFIX" -> expectedKey = "prefix:" + op.payload();
       case "DELETE_COLLECTION" -> {
@@ -763,7 +773,7 @@ public final class KnowledgeServerMigrationOps {
   private static boolean nativeDeleteMatches(CommittedNativeEffect deletion,
       CommittedNativeEffect document) {
     return switch (deletion.op().op()) {
-      case "DELETE" -> deletion.id().equals(document.id());
+      case "DELETE" -> deletion.id() != null && deletion.id().equals(document.id());
       case "PROJECTION" -> !deletion.upsert() && deletion.id().equals(document.id());
       case "DELETE_PREFIX" -> document.path() != null && document.path().startsWith(
           io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(deletion.op().payload()));
@@ -840,6 +850,17 @@ public final class KnowledgeServerMigrationOps {
         && active.indexCountOps().countCollectionExcludingAcceptedSurvivorsStrict(scope, files, projections) == 0;
   }
 
+  private static boolean settleConditionalNativeDelete(JobQueue queue, RunningRuntime active,
+      SwitchBufferDelete deletion) {
+    Path indexPath = active.openedIndexPath();
+    if (indexPath == null || indexPath.getParent() == null
+        || indexPath.getParent().getParent() == null) return false;
+    var authority = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+        indexPath.getParent().getParent(), indexPath, active, null, null, 0L);
+    return authority.replayBufferedFileDelete(active, deletion)
+        == WorkerIngestService.BufferedDeleteReplay.SETTLED;
+  }
+
   private static boolean settleCommittedNativeFiles(JobQueue queue, RunningRuntime active,
       String generation, Logger log, List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
     if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
@@ -863,24 +884,32 @@ public final class KnowledgeServerMigrationOps {
               || upsert.sourceSha256() == null
               || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
                   upsert.sourceSha256(), indexed)) return false;
-        } else if (!op.key().equals("path:" + op.payload())) {
+        } else if (!op.key().equals("path:" + SwitchBufferDelete.decode(op.payload()).path())) {
           return false;
         }
       }
       boolean deleted = false;
       for (var op : selected) {
         if ("DELETE".equals(op.op())) {
-          active.indexingCoordinator().deleteByIdAndChunks(op.payload());
-          if (queue.deleteByExactPath(op.payload()) < 0) return false;
-          deleted = true;
+          var deletion = SwitchBufferDelete.decode(op.payload());
+          if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
+            active.indexingCoordinator().deleteByIdAndChunks(deletion.path());
+            if (queue.deleteByExactPath(deletion.path()) < 0) return false;
+            deleted = true;
+          } else {
+            if (!settleConditionalNativeDelete(queue, active, deletion)) return false;
+          }
         }
       }
       if (deleted) {
         active.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
         active.commitOps().maybeRefreshBlocking();
         for (var op : selected) {
-          if ("DELETE".equals(op.op()) && active.indexCountOps()
-              .countByIdAndChunksStrict(op.payload()) != 0) return false;
+          if ("DELETE".equals(op.op())) {
+            var deletion = SwitchBufferDelete.decode(op.payload());
+            if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT
+                && active.indexCountOps().countByIdAndChunksStrict(deletion.path()) != 0) return false;
+          }
         }
       }
       if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
@@ -1107,9 +1136,30 @@ public final class KnowledgeServerMigrationOps {
         case "DELETE" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(payload);
-              mutatedLucene = true;
-              context.jobQueue().deleteByExactPath(payload);
+              var deletion = SwitchBufferDelete.decode(payload);
+              if (!op.key().equals("path:" + deletion.path())) {
+                throw new IllegalArgumentException("Buffered DELETE key mismatch");
+              }
+              if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
+                context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(deletion.path());
+                if (context.jobQueue().deleteByExactPath(deletion.path()) < 0) {
+                  throw new IllegalStateException("Buffered exact queue deletion failed");
+                }
+                mutatedLucene = true;
+              } else {
+                WorkerIngestService authority = context.publisher() != null
+                    ? context.publisher() : replayService(context);
+                var replayed = authority.replayBufferedFileDelete(context.ingestLifecycle(), deletion);
+                if (replayed == WorkerIngestService.BufferedDeleteReplay.UNCERTAIN
+                    && refusedSourceRecovery) {
+                  // Nothing was changed on surviving A. Its own root reconciliation removes the
+                  // file's rows once the root returns and proves the file absent.
+                  context.log().info("Refused candidate leaves an unproved DELETE to root "
+                      + "reconciliation on the surviving generation: key={}", op.key());
+                } else if (replayed != WorkerIngestService.BufferedDeleteReplay.SETTLED) {
+                  allApplied = false;
+                }
+              }
             } catch (Exception e) {
               allApplied = false;
               context
@@ -1866,7 +1916,11 @@ public final class KnowledgeServerMigrationOps {
           }
           if ("DELETE".equals(op.op())) {
             String generation = op.generation() == null ? "" : op.generation();
-            exactDeletes.computeIfAbsent(generation, ignored -> new HashMap<>()).put(op.payload(), index);
+            var deletion = SwitchBufferDelete.decode(op.payload());
+            if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
+              exactDeletes.computeIfAbsent(generation, ignored -> new HashMap<>())
+                  .put(deletion.path(), index);
+            }
           } else {
             deletes.put(op, index);
           }

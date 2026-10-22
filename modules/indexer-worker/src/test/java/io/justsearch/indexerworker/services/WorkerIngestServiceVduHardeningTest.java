@@ -561,7 +561,10 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
 
       SqliteJobQueue.SwitchBufferOp op = requireSwitchOp("path:" + docId);
       assertEquals("DELETE", op.op());
-      assertEquals(docId, op.payload());
+      var deletion = io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(op.payload());
+      assertEquals(docId, deletion.path());
+      assertEquals(io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT,
+          deletion.origin());
     }
 
     @Test

@@ -63,6 +63,33 @@ final class RootWatcherRegistryTest {
   }
 
   @Test
+  void handoverKeepsWatchedRootsAndNeverRevivesAnUnwatchedOne() throws Exception {
+    Path kept = Files.createDirectory(tempDir.resolve("handover-kept"));
+    Path removedBefore = Files.createDirectory(tempDir.resolve("handover-removed-before"));
+    Path removedAfter = Files.createDirectory(tempDir.resolve("handover-removed-after"));
+    RootWatcherRegistry retiring = new RootWatcherRegistry();
+    assertTrue(retiring.watch(kept.toString(), "docs").watching());
+    assertTrue(retiring.watch(removedBefore.toString(), "docs").watching());
+    assertTrue(retiring.watch(removedAfter.toString(), "notes").watching());
+    long mark = retiring.removalMark();
+    assertTrue(retiring.unwatch(removedBefore.toString()));
+    RootWatcherRegistry next = new RootWatcherRegistry();
+
+    retiring.handOverTo(next, (registry, root, collection) ->
+        registry.watch(root.toString(), collection));
+
+    assertEquals(java.util.Set.of(kept, removedAfter), next.watchedRoots());
+    assertEquals("notes", next.subscription(removedAfter).collection());
+    assertTrue(retiring.unwatch(removedAfter.toString()), "a late unwatch reaches the successor");
+    assertEquals(java.util.Set.of(kept), next.watchedRoots());
+    assertFalse(retiring.watchUnlessRemovedSince(removedAfter, "notes", mark).watching(),
+        "a root removed after the handover is never revived through the retired registry");
+    assertFalse(retiring.watchUnlessRemovedSince(removedBefore, "docs", mark).watching());
+    assertEquals(java.util.Set.of(kept), next.watchedRoots());
+    assertEquals(next, retiring.current());
+  }
+
+  @Test
   void watchRejectsNonDirectoryRoot() throws Exception {
     Path file = Files.writeString(tempDir.resolve("not-a-dir.txt"), "x");
     RootWatcherRegistry registry = new RootWatcherRegistry();

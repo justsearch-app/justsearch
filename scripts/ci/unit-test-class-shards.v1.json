@@ -1,0 +1,142 @@
+{
+  "kind": "justsearch-unit-test-class-shards.v1",
+  "note": "Hosted candidate attribution from 2026-10-21. Measured slow classes are balanced explicitly; unlisted and future classes use floorMod(String.hashCode(), count). Nested classes stay with their outer class. Local test tasks remain complete.",
+  "modules": {
+    "ui": {
+      "count": 2,
+      "classes": {
+        "io.justsearch.app.engine.GameDetectionSettingsApiTest": 0,
+        "io.justsearch.ui.HeadlessAppComponentRegistryCoverageTest": 1,
+        "io.justsearch.ui.HeadlessAppInitialIndexDeadlineTest": 1,
+        "io.justsearch.ui.HeadlessAppQuitBudgetTest": 1,
+        "io.justsearch.ui.HeadlessAppUpgradeShutdownWiringTest": 1,
+        "io.justsearch.ui.HeadlessAppVduShutdownTest": 0,
+        "io.justsearch.ui.SseAdmissionShutdownTest": 1,
+        "io.justsearch.ui.api.StatusGpuStaleSourceTest": 1,
+        "io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest": 0,
+        "io.justsearch.ui.api.StatusPublicationCompletenessTest": 1,
+        "io.justsearch.ui.api.StatusReadDeadlineHttpTest": 1,
+        "io.justsearch.ui.api.StatusStateFieldsTest": 1,
+        "io.justsearch.ui.api.UiModeIntentHttpContractTest": 0,
+        "io.justsearch.ui.api.UpgradeLifecycleContractTest": 1,
+        "io.justsearch.ui.api.VduProcedureExecutorLifetimeTest": 1,
+        "io.justsearch.ui.api.VerifierStatus2Test": 1,
+        "io.justsearch.ui.api.VerifierStatus5Test": 0
+      }
+    },
+    "app-services": {
+      "count": 3,
+      "classes": {
+        "io.justsearch.app.api.runtime.child.GpuSwitchBarrierTest": 0,
+        "io.justsearch.app.services.GenerativeSettingsComponentOwnerTest": 0,
+        "io.justsearch.app.services.ai.install.AiInstallAcquisitionFreezeSeamTest": 2,
+        "io.justsearch.app.services.ai.install.DownloadLoopbackTest": 2,
+        "io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest": 2,
+        "io.justsearch.app.services.chat.ChatResumeTest": 1,
+        "io.justsearch.app.services.chat.SelfTestProcessOwnershipTest": 1,
+        "io.justsearch.app.services.encryption.EncryptionEnvelopeTest": 0,
+        "io.justsearch.app.services.encryption.MemoryUnlockAvailabilityTest": 0,
+        "io.justsearch.app.services.encryption.UnlockDeferredScanTest": 1,
+        "io.justsearch.app.services.gpl.GplStageReportWriteOnlyTest": 0,
+        "io.justsearch.app.services.registry.executor.PreparedInvocationCodecTest": 2,
+        "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest": 1,
+        "io.justsearch.app.services.vdu.AutomaticVduBreakerTest": 2,
+        "io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest": 0,
+        "io.justsearch.app.services.vdu.AutomaticVduRecoveryTest": 2,
+        "io.justsearch.app.services.vdu.VduImageLimitsTest": 1,
+        "io.justsearch.app.services.worker.FilterNormalizationServiceTest": 0
+      }
+    },
+    "app-launcher": {
+      "count": 3,
+      "classes": {
+        "io.justsearch.app.launcher.AttributesUseRuleTest": 0,
+        "io.justsearch.app.launcher.BoundaryRulesTest": 0,
+        "io.justsearch.app.launcher.ClosurePropertyTest": 1,
+        "io.justsearch.app.launcher.ExecutorArchitectureTest": 0,
+        "io.justsearch.app.launcher.IndexWriterOwnershipTest": 2,
+        "io.justsearch.app.launcher.LayeringEnforcementTest": 2,
+        "io.justsearch.app.launcher.LibraryResolveHashOnlyCallerPin": 2,
+        "io.justsearch.app.launcher.OperationStoreArchitectureTest": 1,
+        "io.justsearch.app.launcher.OrtRunChokePointTest": 1,
+        "io.justsearch.app.launcher.Slf4jOnlyRuleTest": 0,
+        "io.justsearch.app.launcher.UnreferencedCodeTest": 0,
+        "io.justsearch.app.launcher.VramDetectorAccessTest": 2,
+        "io.justsearch.applauncher.LauncherDataVersionMarkerTest": 1
+      }
+    },
+    "app-engine": {
+      "count": 2,
+      "classes": {
+        "io.justsearch.app.engine.EngineForegroundPacingTest": 1,
+        "io.justsearch.app.engine.EngineGpuResidencyWitnessTest": 1,
+        "io.justsearch.app.engine.EngineIndexBasePathLockTest": 1,
+        "io.justsearch.app.engine.EngineIndexingJobsFlowTest": 0,
+        "io.justsearch.app.engine.EngineIndexingWorkflowTest": 1,
+        "io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest": 1,
+        "io.justsearch.app.engine.EnginePruneReappearedFileTest": 1,
+        "io.justsearch.app.engine.EngineReadWhileWriteTest": 0,
+        "io.justsearch.app.engine.EngineRootRetirementTest": 1,
+        "io.justsearch.app.engine.EngineRootTerminalWriterFailureTest": 1,
+        "io.justsearch.app.engine.EngineRuntimeReloadTest": 1,
+        "io.justsearch.app.engine.EngineSandboxFailureWorkflowTest": 0,
+        "io.justsearch.app.engine.EngineShutdownSequenceTest": 1,
+        "io.justsearch.app.engine.EngineVduMigrationReplayTest": 0,
+        "io.justsearch.app.engine.EngineVduRecoveryTest": 0,
+        "io.justsearch.app.engine.HeadRerankAdmissionInProcessTest": 0,
+        "io.justsearch.app.engine.HeadSearchDeadlineInProcessTest": 0,
+        "io.justsearch.app.engine.KnowledgeServerHealthMonitorCapacityTest": 1,
+        "io.justsearch.app.engine.ReservedSeatQueueTest": 0,
+        "io.justsearch.app.engine.VduGenerationDoesNotSlowIndexingTest": 0
+      }
+    },
+    "indexer-worker": {
+      "count": 2,
+      "classes": {
+        "io.justsearch.indexerworker.queue.IndexingJobsChangeStreamTest": 1,
+        "io.justsearch.indexerworker.queue.JobQueueMigrationTest": 1,
+        "io.justsearch.indexerworker.server.DeferredForcedIngestTest": 1,
+        "io.justsearch.indexerworker.server.HeldBootPersonsRebuildTest": 1,
+        "io.justsearch.indexerworker.server.IndexConfigurationProjectionTest": 0,
+        "io.justsearch.indexerworker.server.KnowledgeServerAvailabilityTest": 1,
+        "io.justsearch.indexerworker.server.KnowledgeServerLiveMigrationTest": 0,
+        "io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest": 1,
+        "io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest": 0,
+        "io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest": 0,
+        "io.justsearch.indexerworker.server.KnowledgeServerRecordedIngestionTest": 0,
+        "io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest": 1,
+        "io.justsearch.indexerworker.server.LostBrakeStateBootTest": 1,
+        "io.justsearch.indexerworker.server.LostRootVolumeRecordTest": 0,
+        "io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest": 0,
+        "io.justsearch.indexerworker.server.PreOpenSchemaMismatchBootTest": 1,
+        "io.justsearch.indexerworker.server.ResumedMigrationMismatchBootTest": 0,
+        "io.justsearch.indexerworker.server.ops.LiveMigrationCutoverTest": 1,
+        "io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest": 1,
+        "io.justsearch.indexerworker.splade.SeatForEveryGpuRunTest": 1,
+        "io.justsearch.reranker.SplitRerankUnderOneLeaseTest": 0
+      }
+    },
+    "worker-services": {
+      "count": 2,
+      "classes": {
+        "io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest": 0,
+        "io.justsearch.adapters.lucene.runtime.ChunkCompletenessReopenCostTest": 0,
+        "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest": 1,
+        "io.justsearch.indexerworker.extract.ContentExtractorTest": 0,
+        "io.justsearch.indexerworker.extract.PdfOcrEngineTest": 1,
+        "io.justsearch.indexerworker.extract.PersistentExtractionSandboxStopCodeTest": 1,
+        "io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest": 0,
+        "io.justsearch.indexerworker.extract.PolicyDrivenFormatCapabilityTest": 0,
+        "io.justsearch.indexerworker.extract.PreparedExtractionConsumerTest": 1,
+        "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest": 1,
+        "io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest": 0,
+        "io.justsearch.indexerworker.loop.BackfillSchedulerTightLoopTest": 1,
+        "io.justsearch.indexerworker.services.SearchLegCauseContractTest": 1,
+        "io.justsearch.indexerworker.services.WorkerMethvinWatcherTest": 1,
+        "io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseTest": 1,
+        "io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest": 0,
+        "io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest": 0
+      }
+    }
+  }
+}
