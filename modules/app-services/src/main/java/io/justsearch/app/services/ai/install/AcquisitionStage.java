@@ -40,6 +40,9 @@ final class AcquisitionStage {
   private final PlacementStage placement;
   private final AcquisitionScheduler.Listener listener;
   private final AcquisitionScheduler.PauseGate pauseGate;
+  /** Kept archives this run already hashed, so placement does not hash a multi-GB ZIP again. */
+  private final java.util.Set<String> verifiedKeptArchives =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   AcquisitionStage(
       Path modelsDir,
@@ -86,7 +89,7 @@ final class AcquisitionStage {
     return new AcquisitionScheduler(
         items,
         (item, startTier, progress) -> fetchOne(byTargetPath.get(item.id()), item, startTier, progress),
-        item -> placement.place(byTargetPath.get(item.id())),
+        item -> placement.place(byTargetPath.get(item.id()), verifiedKeptArchives.remove(item.id())),
         new MemoryLedger(attempts, id -> byTargetPath.get(id).url()),
         listener,
         cancelRequested,
@@ -112,13 +115,13 @@ final class AcquisitionStage {
     Path partialFile = InstallPlanner.partialPathFor(targetFile);
     try {
       if (dl.extract()) {
-        ArchiveExtractionState.requireSafePath(targetFile);
-        ArchiveExtractionState.requireSafePath(partialFile);
+        ArchiveExtractionState.requireSafeFile(targetFile);
+        ArchiveExtractionState.requireSafeFile(partialFile);
       }
       Files.createDirectories(targetFile.getParent());
       if (dl.extract()) {
-        ArchiveExtractionState.requireSafePath(targetFile);
-        ArchiveExtractionState.requireSafePath(partialFile);
+        ArchiveExtractionState.requireSafeFile(targetFile);
+        ArchiveExtractionState.requireSafeFile(partialFile);
       }
     } catch (IOException e) {
       return new ResumableFetch.Outcome(
@@ -129,6 +132,7 @@ final class AcquisitionStage {
       listener.onItemVerifying(item);
       try {
         DownloadExecutor.verify(targetFile, dl.sizeBytes(), dl.sha256());
+        verifiedKeptArchives.add(dl.targetPath());
         return new ResumableFetch.Outcome(true, false, null, null, 0, null);
       } catch (Exception mismatch) {
         // Status is deliberately cheap; only an install run hashes a kept archive. A corrupt

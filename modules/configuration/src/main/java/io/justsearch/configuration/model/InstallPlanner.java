@@ -159,6 +159,26 @@ public final class InstallPlanner {
   public static InstallPlan plan(
       ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
       Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware) {
+    return plan(registry, hardware, intent, declined, modelsDir, homeDir, policyExcludedHardware,
+        false);
+  }
+
+  /**
+   * The plan an install run executes. Unlike status planning, an extracted archive installed before
+   * receipts existed is planned as extraction-only work: the run hashes its kept ZIP once, and a
+   * match records a receipt after confirming the outputs, while a mismatch downloads and applies
+   * the registry's archive. Status stays cheap and keeps such an install installed.
+   */
+  public static InstallPlan planInstallRun(
+      ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
+      Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware) {
+    return plan(registry, hardware, intent, declined, modelsDir, homeDir, policyExcludedHardware,
+        true);
+  }
+
+  private static InstallPlan plan(
+      ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
+      Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware, boolean installRun) {
     DownloadProfile excludedProfile = policyExcludedHardware == null
         ? DownloadProfile.CPU : policyExcludedHardware.downloadProfile();
     Set<String> declinedIds = declined == null ? Set.of() : declined;
@@ -312,7 +332,8 @@ public final class InstallPlanner {
         Path targetFile = installBaseDir.resolve(sf.filename());
         boolean archivePresent = isAlreadyInstalled(
             targetFile, sf.sizeBytes(), sf.sha256(), !sf.extract() && candidateOwned);
-        if (archivePresent && (!sf.extract() || ArchiveExtractionState.isApplied(targetFile, sf.sha256()))) {
+        if (archivePresent && (!sf.extract()
+            || ArchiveExtractionState.isApplied(targetFile, sf.sha256(), installRun))) {
           continue;
         }
         boolean extractionOnly = sf.extract() && archivePresent;

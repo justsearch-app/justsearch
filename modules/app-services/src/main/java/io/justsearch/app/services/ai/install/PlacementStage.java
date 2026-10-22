@@ -47,6 +47,14 @@ final class PlacementStage {
    *     the package failed and moves to the next item.
    */
   String place(InstallPlan.PlannedDownload dl) {
+    return place(dl, false);
+  }
+
+  /**
+   * @param keptArchiveVerified the acquisition stage hashed the kept archive at the target in this
+   *     run; it is applied without hashing it again
+   */
+  String place(InstallPlan.PlannedDownload dl, boolean keptArchiveVerified) {
     if (dl == null || dl.targetPath() == null || dl.targetPath().isBlank()) {
       return "Failed to finalize: missing target path";
     }
@@ -57,9 +65,13 @@ final class PlacementStage {
     Path partialFile = InstallPlanner.partialPathFor(targetFile);
     try {
       if (dl.extract()) {
-        io.justsearch.configuration.model.ArchiveExtractionState.requireSafePath(targetFile);
+        io.justsearch.configuration.model.ArchiveExtractionState.requireSafeFile(targetFile);
       }
-      if (Files.exists(targetFile, LinkOption.NOFOLLOW_LINKS)) {
+      if (keptArchiveVerified && dl.extract()) {
+        if (!Files.isRegularFile(targetFile, LinkOption.NOFOLLOW_LINKS)) {
+          return "Failed to finalize: refusing to replace non-regular target " + targetFile;
+        }
+      } else if (Files.exists(targetFile, LinkOption.NOFOLLOW_LINKS)) {
         if (Files.isSymbolicLink(targetFile)
             || !Files.isRegularFile(targetFile, LinkOption.NOFOLLOW_LINKS)) {
           return "Failed to finalize: refusing to replace non-regular target " + targetFile;

@@ -54,6 +54,49 @@ class ArchiveInstallPreservationTest {
     Files.write(kept(archive.filename()), sources.get(archive.downloadUrl()));
   }
 
+  AcquisitionScheduler.Summary run(InstallPlan plan) throws Exception {
+    ResumableFetch.Transfer transfer = (url, partial, decision, progress, tier) -> {
+      transfers.incrementAndGet();
+      try {
+        byte[] bytes = sources.get(url);
+        Files.write(partial, bytes);
+        progress.onProgress(bytes.length, bytes.length);
+        return true;
+      } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    };
+    return new AcquisitionStage(models(), transfer,
+        TransportRetryPolicy.defaultPolicy().withMaxAttempts(1), InstallAttemptMemory.load(home),
+        () -> false, System::nanoTime, new PlacementStage(models()), new AcquisitionScheduler.Listener() {}, null)
+        .scheduler(plan.downloads()).run();
+  }
+
+  /** A home reached through a symlinked folder above it is the user's choice and is followed. */
+  Path linkedHome() throws IOException {
+    Path real = Files.createDirectories(home.resolve("real-home"));
+    return Files.createSymbolicLink(home.resolve("linked-home"), real);
+  }
+
+  @Test @EnabledOnOs(OS.LINUX)
+  void symlinkedAncestorFreshInstallSucceeds() throws Exception {
+    home = linkedHome();
+    var archive = source("pack.zip", Map.of("library.dll", "payload"));
+    assertEquals(0, run(plan(registry(archive))).failed());
+    assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
+    assertEquals(1, transfers.get());
+    assertTrue(plan(registry(archive)).downloads().isEmpty());
+  }
+
+  @Test @EnabledOnOs(OS.LINUX)
+  void symlinkedAncestorHealthyLegacyInstallStaysInstalled() throws Exception {
+    home = linkedHome();
+    var archive = source("pack.zip", Map.of("library.dll", "payload"));
+    keep(archive);
+    Files.writeString(runtime().resolve("library.dll"), "payload");
+    var installed = plan(registry(archive));
+    assertTrue(installed.downloads().isEmpty(), "a healthy install must not become incomplete");
+    assertTrue(InstallCompleteness.compute(installed, null).installedFully());
+  }
+
   @Test void healthyLegacyInstallHasNoIncompleteStatusAndDoesNotTouchUnchangedOutputs() throws Exception {
     var archive = source("healthy.zip", Map.of("library.dll", "expected"));
     keep(archive);

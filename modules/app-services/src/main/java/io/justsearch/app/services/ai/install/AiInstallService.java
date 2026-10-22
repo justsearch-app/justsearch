@@ -1265,7 +1265,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Compute download plan
     InstallPlan plan =
-        plan(registry, installHardware);
+        planInstallRun(registry, installHardware);
     log.info(
         "Install plan: profile={}, downloads={}, skipped={}, alreadyInstalled={}, totalBytes={}",
         plan.profile(),
@@ -2060,6 +2060,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private InstallPlan plan(ModelRegistry registry, InstallHardware hardware) {
     return InstallPlanner.plan(registry, hardware.effective(), installIntent(), declinedPackages(),
         modelsDir, homeDir, hardware.policyExcluded());
+  }
+
+  private InstallPlan planInstallRun(ModelRegistry registry, InstallHardware hardware) {
+    return InstallPlanner.planInstallRun(registry, hardware.effective(), installIntent(),
+        declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
   }
 
   private HardwareProfile detectHardwareProfile() {

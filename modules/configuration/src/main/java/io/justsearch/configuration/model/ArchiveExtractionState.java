@@ -8,8 +8,10 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipFile;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -20,7 +22,7 @@ public final class ArchiveExtractionState {
 
   private ArchiveExtractionState() {}
 
-  public record Entry(String name, long size) {}
+  public record Entry(String name, long size, long crc) {}
   public record Receipt(String sha256, List<Entry> entries) {}
 
   public static Path receiptPath(Path archive) {
@@ -33,28 +35,36 @@ public final class ArchiveExtractionState {
     return receipt.resolveSibling(receipt.getFileName() + ".pending");
   }
 
-  /** Central-directory metadata only: status must never hash a multi-GB ZIP. */
-  public static boolean isApplied(Path archive, String expectedSha256) {
+  /**
+   * Central-directory metadata only: status must never hash a multi-GB ZIP. With {@code
+   * requireReceipt} false, a healthy install from before receipts counts as applied.
+   */
+  public static boolean isApplied(Path archive, String expectedSha256, boolean requireReceipt) {
     try {
-      requireSafePath(archive);
-      requireSafePath(receiptPath(archive));
+      Path root = destination(archive.toAbsolutePath().normalize().getParent());
+      archive = root.resolve(archive.getFileName());
+      requireContained(root, archive);
+      requireContained(root, pendingPath(archive));
       if (Files.exists(pendingPath(archive), LinkOption.NOFOLLOW_LINKS)) return false;
       List<Entry> entries;
       try (ZipFile zip = new ZipFile(archive.toFile())) {
-        entries = entries(zip, archive.getParent(), archive);
+        entries = entries(zip, root, archive);
       }
       Path receipt = receiptPath(archive);
+      requireContained(root, receipt);
       if (Files.exists(receipt, LinkOption.NOFOLLOW_LINKS)) {
         Receipt recorded = JSON.readValue(Files.readAllBytes(receipt), Receipt.class);
         if (recorded == null || expectedSha256 == null
             || !expectedSha256.equalsIgnoreCase(recorded.sha256())
             || !entries.equals(recorded.entries())) return false;
+      } else if (requireReceipt) {
+        return false;
       }
       // Healthy pre-receipt installs stay installed. A pending marker prevents an interrupted
       // first apply from entering this compatibility path.
       for (Entry entry : entries) {
-        Path output = outputPath(archive.getParent(), entry.name(), archive);
-        requireSafePath(output);
+        Path output = outputPath(root, entry.name(), archive);
+        requireContained(root, output);
         if (!Files.isRegularFile(output, LinkOption.NOFOLLOW_LINKS)
             || Files.size(output) != entry.size()) return false;
       }
@@ -72,10 +82,10 @@ public final class ArchiveExtractionState {
       var entry = entries.nextElement();
       Path output = outputPath(target, entry.getName(), archive);
       if (entry.isDirectory()) continue;
-      if (entry.getSize() < 0 || !names.add(output)) {
+      if (entry.getSize() < 0 || entry.getCrc() < 0 || !names.add(output)) {
         throw new IOException("Invalid or duplicate archive entry: " + entry.getName());
       }
-      result.add(new Entry(entry.getName(), entry.getSize()));
+      result.add(new Entry(entry.getName(), entry.getSize(), entry.getCrc()));
     }
     return List.copyOf(result);
   }
@@ -94,31 +104,98 @@ public final class ArchiveExtractionState {
     return resolved;
   }
 
-  /** Reject links and Windows junction/reparse redirects before creating, reading or replacing. */
-  public static void requireSafePath(Path path) throws IOException {
-    Path absolute = path.toAbsolutePath().normalize();
-    Path cursor = absolute.getRoot();
-    for (Path part : absolute) {
+  /**
+   * Real path of an existing destination directory. Links above it (a symlinked home, a Windows
+   * junction or 8.3 short name) are the user's or the OS's and are followed; a link at it is refused.
+   */
+  public static Path destination(Path directory) throws IOException {
+    Path absolute = directory.toAbsolutePath().normalize();
+    if (isRedirect(absolute)) throw new IOException("Refusing redirected archive path: " + absolute);
+    return absolute.toRealPath();
+  }
+
+  /** Refuses a link or junction at any existing component from {@code root} down to {@code path}. */
+  public static void requireContained(Path root, Path path) throws IOException {
+    Path normalized = path.toAbsolutePath().normalize();
+    if (!normalized.startsWith(root)) {
+      throw new IOException("Refusing archive path outside its destination: " + path);
+    }
+    Path cursor = root;
+    for (Path part : root.relativize(normalized)) {
       cursor = cursor.resolve(part);
-      if (!Files.exists(cursor, LinkOption.NOFOLLOW_LINKS)) continue;
-      BasicFileAttributes attrs = Files.readAttributes(
-          cursor, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-      if (attrs.isSymbolicLink() || attrs.isOther() || !cursor.toRealPath().equals(cursor)) {
-        throw new IOException("Refusing redirected archive path: " + cursor);
+      if (isRedirect(cursor)) throw new IOException("Refusing redirected archive path: " + cursor);
+    }
+  }
+
+  /** {@link #requireContained} for a file directly inside a destination that may not exist yet. */
+  public static void requireSafeFile(Path file) throws IOException {
+    Path absolute = file.toAbsolutePath().normalize();
+    if (!Files.exists(absolute.getParent(), LinkOption.NOFOLLOW_LINKS)) return;
+    Path root = destination(absolute.getParent());
+    requireContained(root, root.resolve(absolute.getFileName()));
+  }
+
+  private static boolean isRedirect(Path path) throws IOException {
+    if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return false;
+    // Windows junctions and other reparse points read as "other" when links are not followed.
+    BasicFileAttributes attrs = Files.readAttributes(
+        path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    return attrs.isSymbolicLink() || attrs.isOther();
+  }
+
+  /**
+   * Fails when another archive's receipt in this destination lists one of {@code entries}' outputs
+   * with a different CRC, so two archives cannot overwrite each other on alternate runs.
+   */
+  public static void requireNoOverlap(Path archive, Path target, List<Entry> entries)
+      throws IOException {
+    Path receipts = receiptPath(archive).getParent();
+    requireContained(archive.getParent(), receipts);
+    if (!Files.isDirectory(receipts, LinkOption.NOFOLLOW_LINKS)) return;
+    Map<Path, Entry> ours = new HashMap<>();
+    for (Entry entry : entries) ours.put(outputPath(target, entry.name(), archive), entry);
+    String own = receiptPath(archive).getFileName().toString();
+    List<Path> others;
+    try (var files = Files.list(receipts)) {
+      others = files.filter(p -> p.getFileName().toString().endsWith(".json")
+          && !p.getFileName().toString().equals(own)).sorted().toList();
+    }
+    for (Path other : others) {
+      requireContained(archive.getParent(), other);
+      Receipt recorded;
+      try {
+        recorded = JSON.readValue(Files.readAllBytes(other), Receipt.class);
+      } catch (IOException | RuntimeException unreadable) {
+        continue; // an unreadable receipt claims nothing
+      }
+      if (recorded == null || recorded.entries() == null) continue;
+      String otherArchive = other.getFileName().toString().replaceFirst("\\.json$", "");
+      for (Entry theirs : recorded.entries()) {
+        Entry mine;
+        try {
+          mine = ours.get(outputPath(target, theirs.name(), archive));
+        } catch (IOException invalid) {
+          continue;
+        }
+        if (mine != null && mine.crc() != theirs.crc()) {
+          throw new IOException(archive.getFileName() + " would overwrite " + mine.name()
+              + ", which " + otherArchive + " installed with different content");
+        }
       }
     }
   }
 
+  /** Callers pass the archive under its real destination ({@link #destination}). */
   public static void begin(Path archive) throws IOException {
     Path pending = pendingPath(archive);
-    requireSafePath(pending);
+    requireContained(archive.getParent(), pending);
     AtomicFileWrites.replaceStrict(pending, new byte[] {1});
   }
 
   public static void complete(Path archive, String sha256, List<Entry> entries) throws IOException {
     Path receipt = receiptPath(archive);
-    requireSafePath(receipt);
-    requireSafePath(pendingPath(archive));
+    requireContained(archive.getParent(), receipt);
+    requireContained(archive.getParent(), pendingPath(archive));
     AtomicFileWrites.replaceStrict(receipt, JSON.writeValueAsBytes(new Receipt(sha256, entries)));
     Files.deleteIfExists(pendingPath(archive));
   }

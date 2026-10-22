@@ -223,9 +223,11 @@ class ArchiveInstallRepairTest {
     var archive = source("receipt.zip", Map.of("library.dll", "expected"));
     keep(archive);
     // Interrupt the real atomic publisher immediately before its rename. Its temp must disappear.
-    Path receiptTarget = receipt("receipt.zip");
+    // Apply works on the destination's real path, which may spell the temp folder differently.
+    Path receiptTarget = Path.of("cuda12", ".archive-receipts", "receipt.zip.json");
     try (var files = mockStatic(Files.class, invocation -> {
-      if (invocation.getMethod().getName().equals("move") && receiptTarget.equals(invocation.getArgument(1))) {
+      if (invocation.getMethod().getName().equals("move")
+          && invocation.getArgument(1) instanceof Path to && to.endsWith(receiptTarget)) {
         throw new java.io.InterruptedIOException("interrupted receipt publication");
       }
       return invocation.callRealMethod();
@@ -244,7 +246,8 @@ class ArchiveInstallRepairTest {
     var initial = plan(registry(archive));
     Path partial = runtime().resolve("library.dll.partial");
     try (var files = mockStatic(Files.class, invocation -> {
-      if (invocation.getMethod().getName().equals("newOutputStream") && partial.equals(invocation.getArgument(0))) {
+      if (invocation.getMethod().getName().equals("newOutputStream")
+          && invocation.getArgument(0) instanceof Path to && to.endsWith(Path.of("cuda12", "library.dll.partial"))) {
         return new java.io.FilterOutputStream((OutputStream) invocation.callRealMethod()) {
           @Override public void write(byte[] bytes, int offset, int length) throws IOException {
             out.write(bytes, offset, Math.min(2, length));
@@ -380,16 +383,115 @@ class ArchiveInstallRepairTest {
     assertFalse(Files.exists(models().resolve("outside.dll")));
   }
 
-  @Test @EnabledOnOs(OS.LINUX)
-  void archiveAcquisitionRejectsRedirectedParentBeforeWritingStagingBytes() throws Exception {
+  @EnabledOnOs(OS.LINUX)
+  @ParameterizedTest @ValueSource(strings = {"destination", "staging"})
+  void archiveAcquisitionRefusesLinkAtOrBelowDestinationBeforeWritingStagingBytes(String kind) throws Exception {
     var archive = source("redirected.zip", Map.of("library.dll", "expected"));
     Path outside = home.resolve("outside");
     Files.createDirectories(outside);
     Files.createDirectories(models());
-    Files.createSymbolicLink(runtime(), outside);
+    Files.writeString(outside.resolve("victim"), "old");
+    switch (kind) {
+      case "destination" -> Files.createSymbolicLink(runtime(), outside);
+      case "staging" -> {
+        Files.createDirectories(runtime());
+        Files.createSymbolicLink(runtime().resolve("redirected.zip.partial"), outside.resolve("victim"));
+      }
+    }
     assertEquals(1, run(plan(registry(archive))).failed());
     assertEquals(0, transfers.get());
-    try (var files = Files.list(outside)) { assertEquals(0, files.count()); }
+    assertEquals("old", Files.readString(outside.resolve("victim")));
+    try (var files = Files.list(outside)) { assertEquals(1, files.count()); }
+  }
+
+  @Test @EnabledOnOs(OS.LINUX)
+  void repairThroughSymlinkedAncestorUsesKeptZip() throws Exception {
+    Path real = Files.createDirectories(home.resolve("real-home"));
+    home = Files.createSymbolicLink(home.resolve("linked-home"), real);
+    var archive = source("pack.zip", Map.of("library.dll", "payload"));
+    assertEquals(0, run(plan(registry(archive))).failed());
+    Files.delete(runtime().resolve("library.dll"));
+    var repair = plan(registry(archive));
+    assertEquals(1, repair.downloads().size());
+    assertEquals(0, run(repair).failed());
+    assertEquals(1, transfers.get());
+    assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
+    assertTrue(Files.isRegularFile(real.resolve("models/cuda12/.archive-receipts/pack.zip.json")));
+    assertTrue(plan(registry(archive)).downloads().isEmpty());
+  }
+
+  /** Install runs plan through their own entry point; reflection keeps this class compiling on the before-state. */
+  InstallPlan installRunPlan(ModelRegistry registry) throws Exception {
+    var entry = java.util.Arrays.stream(InstallPlanner.class.getMethods())
+        .filter(method -> method.getName().equals("planInstallRun")).findFirst();
+    assertTrue(entry.isPresent(), "install runs must verify archives installed before receipts");
+    return (InstallPlan) entry.get().invoke(null, registry, hardware, InstallIntent.DEFAULT,
+        java.util.Set.of(), models(), home, null);
+  }
+
+  @Test void legacyInstallWithChangedEqualLengthArchiveIsUpdatedByTheNextInstallRun() throws Exception {
+    var old = source("changed.zip", Map.of("library.dll", "aaaa"));
+    keep(old);
+    Files.writeString(runtime().resolve("library.dll"), "aaaa");
+    var next = source("changed.zip", Map.of("library.dll", "bbbb"));
+    assertEquals(old.sizeBytes(), next.sizeBytes());
+    assertTrue(plan(registry(next)).downloads().isEmpty(), "status keeps the legacy install and never hashes ZIPs");
+    var install = installRunPlan(registry(next));
+    assertEquals(1, install.downloads().size(), "a new SHA must not be hidden by a legacy install");
+    assertEquals(0, run(install).failed());
+    assertEquals(1, transfers.get());
+    assertArrayEquals(sources.get(next.downloadUrl()), Files.readAllBytes(kept("changed.zip")));
+    assertEquals("bbbb", Files.readString(runtime().resolve("library.dll")));
+    assertTrue(installRunPlan(registry(next)).downloads().isEmpty());
+  }
+
+  @Test void installRunHashesHealthyLegacyArchiveOnceAndRecordsReceiptWithoutRewriting() throws Exception {
+    var archive = source("legacy.zip", Map.of("library.dll", "expected"));
+    keep(archive);
+    Files.writeString(runtime().resolve("library.dll"), "expected");
+    FileTime old = FileTime.fromMillis(1_000_000_000_000L);
+    Files.setLastModifiedTime(runtime().resolve("library.dll"), old);
+    var status = plan(registry(archive));
+    assertTrue(status.downloads().isEmpty());
+    assertTrue(InstallCompleteness.compute(status, null).installedFully());
+    var install = installRunPlan(registry(archive));
+    assertEquals(1, install.downloads().size());
+    assertEquals(0, install.remainingBytes());
+    var zipReads = new AtomicInteger();
+    try (var files = mockStatic(Files.class, invocation -> {
+      if (invocation.getMethod().getName().equals("newInputStream")
+          && invocation.getArgument(0) instanceof Path read && read.endsWith("legacy.zip")) {
+        zipReads.incrementAndGet();
+      }
+      return invocation.callRealMethod();
+    })) {
+      assertEquals(0, run(install).failed());
+    }
+    assertEquals(1, zipReads.get(), "the kept ZIP is hashed once per install run");
+    assertEquals(0, transfers.get());
+    assertEquals(old, Files.getLastModifiedTime(runtime().resolve("library.dll")));
+    assertTrue(Files.isRegularFile(receipt("legacy.zip")));
+    assertTrue(installRunPlan(registry(archive)).downloads().isEmpty());
+  }
+
+  @Test void overlappingArchiveWithDifferentContentFailsVisiblyInsteadOfAlternating() throws Exception {
+    var first = source("first.zip", Map.of("shared.dll", "short", "first.dll", "1"));
+    var second = source("second.zip", Map.of("shared.dll", "much longer", "second.dll", "2"));
+    var registry = registry(first, second);
+    for (int pass = 0; pass < 3; pass++) {
+      var repair = plan(registry);
+      assertEquals(pass == 0 ? 2 : 1, repair.downloads().size());
+      assertEquals(1, run(repair).failed(), "the conflicting archive fails on every run");
+      assertEquals("short", Files.readString(runtime().resolve("shared.dll")), "outputs never alternate");
+      assertTrue(Files.isRegularFile(receipt("first.zip")));
+      assertFalse(Files.exists(receipt("second.zip")));
+    }
+    var failure = assertThrows(IOException.class,
+        () -> AiInstallService.extractZipInPlace(kept("second.zip"), runtime()));
+    assertTrue(failure.getMessage().contains("first.zip") && failure.getMessage().contains("second.zip"),
+        failure.getMessage());
+    assertFalse(Files.exists(runtime().resolve("second.dll")), "the refused archive writes nothing");
+    assertEquals(2, transfers.get());
   }
 
   @EnabledOnOs(OS.LINUX)
