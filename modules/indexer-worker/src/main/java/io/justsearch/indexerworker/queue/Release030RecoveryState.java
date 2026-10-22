@@ -50,8 +50,16 @@ public final class Release030RecoveryState {
     return "true".equals(state.getProperty("prepared"));
   }
 
+  /** A restored/replaced database cannot borrow another database's preparation receipt. */
+  public boolean preparedFor(String databaseIdentity) {
+    return prepared() && databaseIdentity.equals(state.getProperty("database"));
+  }
+
   /** Called after the atomic boundary backfill/retry repair and before the first job claim. */
-  public void prepared(Collection<Path> roots) throws IOException {
+  public void prepared(Collection<Path> roots, String databaseIdentity) throws IOException {
+    state.clear();
+    state.setProperty("format", "1");
+    state.setProperty("database", databaseIdentity);
     for (Path root : roots) state.setProperty(ROOT + PathNormalizer.normalizeKey(root), "pending");
     state.setProperty("prepared", "true");
     save();
@@ -67,6 +75,16 @@ public final class Release030RecoveryState {
   public void completed(Path root) throws IOException {
     state.setProperty(ROOT + PathNormalizer.normalizeKey(root), "done");
     save();
+  }
+
+  /** Failed evidence is durable debt, with a cooldown across ticks and process restarts. */
+  public void deferred(Path root, long now) throws IOException {
+    state.setProperty("retry|" + PathNormalizer.normalizeKey(root), Long.toString(now + 60_000L));
+    save();
+  }
+
+  public boolean ready(Path root, long now) {
+    return now >= Long.parseLong(state.getProperty("retry|" + PathNormalizer.normalizeKey(root), "0"));
   }
 
   public void finish() throws IOException {

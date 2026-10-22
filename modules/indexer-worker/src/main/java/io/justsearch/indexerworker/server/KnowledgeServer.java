@@ -1835,7 +1835,7 @@ public final class KnowledgeServer implements Closeable {
       appServices = newAppServices();
       wireAppServicesPostConstruction(appServices);
       seedRootVolumesAfterUpgrade();
-      if (!unfinishedMigration) prepareRelease030Recovery();
+      prepareRelease030Recovery();
 
       // 3.6 Embedding compatibility — MUST resolve BEFORE anything can commit (tempdoc 819 A).
       // This used to live in initDeferredModels() (async, behind multi-second ONNX composition),
@@ -7112,12 +7112,12 @@ public final class KnowledgeServer implements Closeable {
   private void prepareRelease030Recovery() throws IOException, SQLException {
     if (!bootRootBindingsBound || !(jobQueue instanceof SqliteJobQueue queue)
         || !(appServices instanceof DefaultWorkerAppServices services)) return;
-    var state = indexGenerationManager.readStateBestEffort();
-    // Interrupted index migration belongs to its existing replay path, not this repair.
-    if (state == null || !"IDLE".equals(state.migration_state())) return;
     release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
     if (release030Recovery == null) return;
-    if (!release030Recovery.prepared()) {
+    var state = indexGenerationManager.readStateBestEffort();
+    // Native cutover stays in its own path; keep the debt scheduled until preparation is safe.
+    if (state == null || !"IDLE".equals(state.migration_state())) return;
+    if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) {
       List<Path> roots = new ArrayList<>(bootRootBindings.stream().map(RootBinding::path).toList());
       var collections = startupConfiguration.collections();
       for (var collection : collections.items()) roots.addAll(collection.roots());
@@ -7125,8 +7125,8 @@ public final class KnowledgeServer implements Closeable {
       // outstanding user work. Some launch modes deliberately do not install that source.
       var help = collections.bundledHelp();
       if (help != null && Files.isDirectory(help.path())) roots.add(help.path());
-      queue.prepareRelease030Recovery(roots);
-      release030Recovery.prepared(roots);
+      String identity = queue.prepareRelease030Recovery(roots);
+      release030Recovery.prepared(roots, identity);
     }
     queue.prepareRelease030ExplicitFiles(services.ingestService()::seedRelease030ExplicitFile);
   }
@@ -7134,12 +7134,12 @@ public final class KnowledgeServer implements Closeable {
   private void recoverRelease030RootsSafely() {
     if (closeStarted || release030Recovery == null
         || !(jobQueue instanceof SqliteJobQueue queue)
-        || !(appServices instanceof DefaultWorkerAppServices services)
-        || !(ingestLifecycle instanceof RunningRuntime runtime)
-        || !runtime.isAcceptingWrites()) return;
+        || !(appServices instanceof DefaultWorkerAppServices services)) return;
     var state = indexGenerationManager.readStateBestEffort();
     if (state == null || !"IDLE".equals(state.migration_state())) return;
     try {
+      if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) prepareRelease030Recovery();
+      if (!(ingestLifecycle instanceof RunningRuntime runtime) || !runtime.isAcceptingWrites()) return;
       boolean explicitReady = queue.prepareRelease030ExplicitFiles(
           services.ingestService()::seedRelease030ExplicitFile);
       for (Path root : release030Recovery.pendingRoots()) {
@@ -7151,10 +7151,12 @@ public final class KnowledgeServer implements Closeable {
           release030Recovery.completed(root); // A removed root no longer authorizes a walk.
           continue;
         }
+        if (!release030Recovery.ready(root, System.currentTimeMillis())) continue;
         var result = services.ingestService().recoverRelease030Root(root, release030Collection(root),
             () -> closeStarted || Thread.currentThread().isInterrupted());
         if (result.getError().isBlank() && !result.getSkipped()
             && !result.getDeleteDetectionUnverified()) release030Recovery.completed(root);
+        else if (result.getDeleteDetectionUnverified()) release030Recovery.deferred(root, System.currentTimeMillis());
       }
       if (explicitReady && release030Recovery.pendingRoots().isEmpty()) {
         release030Recovery.finish();

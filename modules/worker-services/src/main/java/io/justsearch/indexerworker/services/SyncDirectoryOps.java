@@ -67,6 +67,16 @@ final class SyncDirectoryOps {
   private final ConfirmedDeletionMarker deletionMarker;
   private final int pathScanCap;
   private final int pathCharCap;
+  private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
+
+  void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
+    userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
+  }
+
+  private boolean excludedRecoveryPath(Path file, Path root) {
+    return IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root);
+  }
+
   /**
    * Builds the presence authority for one prune of a root (task t-20261013-ef3c41). The default
    * knows no registration or recorded volume; the ingest service supplies both.
@@ -559,7 +569,7 @@ final class SyncDirectoryOps {
 
     try {
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
-      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled);
+      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled, upgradeRecovery);
 
       SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
       if (pruneAbort != null) {
@@ -678,7 +688,7 @@ final class SyncDirectoryOps {
   }
 
   private PruneOps.PruneResult pruneOrphansForSync(Path root, boolean force,
-      java.util.function.BooleanSupplier cancelled) {
+      java.util.function.BooleanSupplier cancelled, boolean upgradeRecovery) {
     if (pruneOps == null) {
       return new PruneOps.PruneResult(0, PruneOps.Completion.COMPLETE);
     }
@@ -688,7 +698,16 @@ final class SyncDirectoryOps {
     // is present and listable. The guard is
     // re-checked at every batch boundary, so a drive unplugged mid-prune stops it instead of
     // reading as "every file is gone".
-    PruneOps.PresenceGuard guard = pruneGuardFactory.apply(root);
+    PruneOps.PresenceGuard original = pruneGuardFactory.apply(root);
+    PruneOps.PresenceGuard guard = !upgradeRecovery ? original : new PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() { return original.rootCurrent(); }
+      @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
+        // Excluded rows are retained, without borrowing uncertainty as deletion authority or
+        // requiring their contents to become readable before eligible recovery can complete.
+        return excludedRecoveryPath(file, root)
+            ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : original.presence(file);
+      }
+    };
     // Tempdoc 885 item 3: the throttle callback the prune already invokes every N documents is now
     // the pacing tick. It always returns false — under a duty cycle the prune is slowed, never
     // abandoned half-done as it was when user activity aborted it.
@@ -736,7 +755,8 @@ final class SyncDirectoryOps {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (dir.equals(root)) return FileVisitResult.CONTINUE;
               String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-              if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+              if (IngestionSkipPolicy.isSkippedDirectoryName(name)
+                  || (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(dir, root))) {
                 return FileVisitResult.SKIP_SUBTREE;
               }
               return FileVisitResult.CONTINUE;
@@ -746,6 +766,9 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+              if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
+                return FileVisitResult.CONTINUE;
+              }
               if (!Files.isReadable(file)) {
                 walkIncomplete[0] = true;
                 return FileVisitResult.CONTINUE;
@@ -795,6 +818,9 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
               if (stopped()) return FileVisitResult.TERMINATE;
+              if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
+                return FileVisitResult.CONTINUE;
+              }
               walkIncomplete[0] = true;
               log.debug(
                   "Skipping inaccessible path: {} ({})",

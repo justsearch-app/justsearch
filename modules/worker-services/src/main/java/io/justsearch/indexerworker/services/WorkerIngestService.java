@@ -262,6 +262,7 @@ public final class WorkerIngestService {
         confirmedDeletionMarker);
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
+    this.syncOps.setUserExclusions(this::isUserExcluded);
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -1039,6 +1040,7 @@ public final class WorkerIngestService {
       // Never replace a known volume with the drive currently occupying its path.
       if (rootVolumes.recordedFor(parent).isEmpty()
           && rootVolumes.recordedFileFolder(parent).isEmpty()) {
+        if (!indexedFilesOnDrive(parent)) return false;
         rootWitness.recordExplicitFileFolder(parent);
       }
       return rootWitness.admitsFile(parent);

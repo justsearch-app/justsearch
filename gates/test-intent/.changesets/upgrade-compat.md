@@ -80,7 +80,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "kind": "delegated-choice",
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-c2e24a request",
-          "delegationScope": "Implementation choices for the agreed compatibility and v13 queue recovery scenarios; no queue schema change and no interrupted-index-migration repair.",
+          "delegationScope": "Implementation choices for the agreed compatibility and v13 queue recovery scenarios; no queue schema change; full native interrupted-migration retirement remains deferred.",
           "choice": "Grandfather exact paths from the v13 queue under current exclusions, never parents; attach root boundaries and selectively repair write/exhausted retries before claims; retain a per-root checkpoint in data/upgrade-030-recovery.properties until durable reconciliation is complete. Automatic non-forced system initial scans and durable background internal sync discovery outside recorded/migration paths retain terminal failures and future parser/I/O waits on non-recorded jobs, including a root's return after first-boot unavailability. Explicit/forced scans, interactive sync, direct watcher upserts and sync replay keep normal admission.",
           "label": "agent choice"
         },
@@ -232,6 +232,78 @@ New isolated scenario tests retain the gate's independent verification requireme
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Test the five C1 findings through real boot, a held issued claim, v13 backup restore and production SQLITE_CORRUPT triage, native interrupted fixtures before/after an IDLE trigger, and excluded versus included unreadable paths. Ten parameterized cases must fail at their intended assertions on round-1 code and pass after. Excluded indexed rows are retained without blocking completion; included unreadable rows retain searchable content and durable debt with bounded full-walk retries through restart.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U7",
+          "quote": "Jobs 0.3.0 left PENDING or PROCESSING (including a root with more than 200k indexed files and about 700k queued jobs) are not marked done unread: every never-indexed file is indexed or queued with its root after the upgrade, and an indexed file with a queued update shows the new content in search.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U8",
+          "quote": "A queued explicitly added file outside any watched root is kept and indexed, without granting broader ingestion authority.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U18",
+          "quote": "Upgrade repair: 0.3.0 rows waiting on long write-failure retries and retry-exhausted rows become claimable on the first start and get indexed; parser-timeout and I/O-failure rows keep their retry times. A crash during the repair leaves it idempotent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "this guard belongs in this PR, because it is a data-loss path that the upgrade opens.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Minimal hold on unprepared legacy claims and later preparation when native migration reaches IDLE; full native migration retirement stays deferred.",
+          "choice": "Retain the durable sidecar and scheduled recovery through native MIGRATING/SWITCHING; hold null-boundary legacy claims until atomic preparation and reset the claim cursor afterward.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Treat each as a claim to test: write the failing test first (on your round-1 code), then fix it, then show it passes.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "The five C1 claims, preserving round-1 behavior and avoiding queue schema changes.",
+          "choice": "Seed exact-file folders only on indexed disk evidence, and hold refused exact paths before claim even when the platform exposes no volume ID; include PROCESSING and retry-exhausted exact paths in admission debt; bind preparation to a transactional SQLite application_id generation plus database file identity; exclude paths before readability/prune uncertainty, and persist a one-minute cooldown for incomplete included-root walks. No parent ingestion authority is added.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round2.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java"
+      ],
+      "repaired": true
     }
   ]
 }

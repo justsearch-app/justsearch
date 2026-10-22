@@ -751,6 +751,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  /** Release-v13 claims remain queued until their policy boundaries have been prepared. */
+  private boolean requiresRelease030Boundary;
+  private boolean release030ExplicitFilesPrepared = true;
+  private Set<String> unadmittedRelease030ExplicitFiles = Set.of();
+
   /**
    * Initializes the database schema and runs migrations.
    *
@@ -767,6 +772,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (SqliteQueueMigrationOps.getSchemaVersion(connection) == 13) {
       Release030RecoveryState.capture(dbPath);
     }
+    var recovery = Release030RecoveryState.load(dbPath);
+    requiresRelease030Boundary = recovery != null && !recovery.preparedFor(release030RecoveryIdentity());
+    release030ExplicitFilesPrepared = recovery == null;
     // Create base tables if they don't exist
     try (Statement stmt = connection.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
@@ -1145,7 +1153,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   /** Run once before workers claim v13 work. The checkpoint is retained until every root walks. */
-  public void prepareRelease030Recovery(List<Path> roots) throws SQLException {
+  public String prepareRelease030Recovery(List<Path> roots) throws SQLException {
     lockTimed();
     try {
       ensureOpen();
@@ -1182,18 +1190,44 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 OR (state='PENDING' AND last_outcome_class='WRITE_FAILED')
               """);
         }
+        // Existing SQLite header slot, not a schema/table/version change. Commit the fresh
+        // generation with the boundary/retry repair, then bind the forced sidecar to it.
+        int identity = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
+        try (var update = connection.createStatement()) {
+          update.execute("PRAGMA application_id=" + identity);
+        }
         return 0;
       });
+      requiresRelease030Boundary = false;
+      release030ExplicitFilesPrepared = false;
+      claimCursor = null;
+      return release030RecoveryIdentity();
     } finally {
       unlockAfterChanges();
     }
+  }
+
+  /** Header generation and physical file witness; backups/replacements invalidate preparation. */
+  public String release030RecoveryIdentity() throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      try (var query = connection.createStatement(); var row = query.executeQuery("PRAGMA application_id")) {
+        if (!row.next()) throw new SQLException("Missing queue database identity");
+        var attributes = Files.readAttributes(dbPath, java.nio.file.attribute.BasicFileAttributes.class);
+        Object fileKey = attributes.fileKey();
+        return row.getInt(1) + "@" + (fileKey == null ? attributes.creationTime() : fileKey);
+      } catch (IOException unavailable) {
+        throw new SQLException("Queue database identity is unreadable", unavailable);
+      }
+    } finally { lock.unlock(); }
   }
 
   /** Bounded iteration over exact legacy files outside roots; never expands their parents. */
   public boolean prepareRelease030ExplicitFiles(java.util.function.Predicate<Path> admission)
       throws SQLException {
     String cursor = "";
-    boolean allAdmitted = true;
+    Set<String> unadmitted = new HashSet<>();
     while (true) {
       List<Path> paths = new ArrayList<>();
       lockTimed();
@@ -1201,18 +1235,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         ensureOpen();
         try (var query = connection.prepareStatement("""
             SELECT path FROM jobs WHERE path>? AND ingestion_root=path
-              AND state='PENDING' ORDER BY path LIMIT 256
+              AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED') ORDER BY path LIMIT 256
             """)) {
           query.setString(1, cursor);
           try (var rows = query.executeQuery()) {
             while (rows.next()) paths.add(Path.of(rows.getString(1)));
           }
         }
+        if (paths.isEmpty()) {
+          unadmittedRelease030ExplicitFiles = Set.copyOf(unadmitted);
+          release030ExplicitFilesPrepared = true;
+          claimCursor = null;
+          return unadmitted.isEmpty();
+        }
       } finally {
         unlockAfterChanges();
       }
-      if (paths.isEmpty()) return allAdmitted;
-      for (Path path : paths) allAdmitted &= admission.test(path);
+      for (Path path : paths) {
+        if (!admission.test(path)) unadmitted.add(PathNormalizer.normalizeKey(path));
+      }
       cursor = PathNormalizer.normalizeKey(paths.getLast());
     }
   }
@@ -1915,6 +1956,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     claimableWalks.clear();
                     checkedWalkVersion=walkVersion;
                   }
+                  if (requiresRelease030Boundary && row.ingestionRoot() == null) continue;
+                  // A platform without volume IDs cannot turn refused legacy evidence into
+                  // absence. Keep the exact path unclaimed until its admission is confirmed.
+                  if (row.key().path().equals(row.ingestionRoot())
+                      && (!release030ExplicitFilesPrepared
+                          || unadmittedRelease030ExplicitFiles.contains(row.key().path()))) continue;
                   if (activeClaims.containsKey(row.key().path()) || !pendingWalkAllowsClaim(row,claimableWalks)) continue;
                   var decision = recordedClaimDecision(row.scanId(), row.walkEpoch(), row.plannedHash());
                   if (decision == RecordedClaimDecision.DENY) continue;
