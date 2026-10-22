@@ -1,7 +1,7 @@
 {
   "kind": "justsearch-public-ci-local-repro.v1",
   "version": 1,
-  "note": "Versioned local reproduction inventory for every required public check. local-subset entries are deterministic candidate-side approximations, not substitutes for the full hosted required set on PRs and pushes to main; merge-queue work is governance, build and secrets; hosted-only entries state why no honest local analogue exists.",
+  "note": "Versioned local reproduction inventory for every required public check. local-subset entries are deterministic candidate-side approximations, not substitutes for the selected hosted required lanes on PRs and the full suite on main; hosted-only entries state why no honest local analogue exists.",
   "contexts": [
     {
       "check": "Public claims",
@@ -18,7 +18,7 @@
         "node scripts/ci/check-root-readme.mjs",
         "node scripts/governance/run-all-tests.mjs",
         "node scripts/governance/run.mjs --self-test --mode gate",
-        "node --test scripts/lib/engine-discovery.test.mjs",
+        "node scripts/ci/run-node-tests.mjs scripts/lib/engine-discovery.test.mjs",
         "node scripts/governance/run.mjs --gate test-intent --mode gate",
         "node scripts/ci/check-readme-benchmark-numbers.mjs",
         "node scripts/docs/check-frontend-stack-claims.mjs",

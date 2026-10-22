@@ -173,6 +173,7 @@ halves share objects.
 - [ADR-0050: GPU co-residence by prevention, measured profiles and explicit degradation](decisions/0050-gpu-co-residence-by-prevention.md): The chat model and the ONNX encoders share one consumer GPU by not overlapping bulk GPU work with chat generation or a foreground game, by fixed per-card profiles built from measured and capped footprints, and by unloading the chat model under external pressure; a search that cannot get semantic results in time returns keyword results with a reason instead of timing out.
 - [ADR-0051: Held process lifetimes and owner-recorded exits](decisions/0051-held-process-lifetimes-and-owner-exit-records.md): Every service process is bound to its owner's lifetime, so nothing outlives the process that started it: on Windows through the owner's kill-on-close job, on Linux through PR_SET_PDEATHSIG set by the bound-exec helper. The chat server is no longer adopted across Engine restarts; every stop is recorded by its owner with a reason before it happens, and instruments classify exits from those records instead of from exit codes.
 - [ADR-0052: Weekly CodeQL on hosted runners](decisions/0052-weekly-codeql-on-hosted-runners.md): CodeQL code scanning runs weekly on GitHub-hosted runners and stays dispatchable by hand; it is advisory and never gates a merge.
+- [ADR-0053: One PR CI run and validated squash auto-merge](decisions/0053-one-pr-ci-run-and-squash-auto-merge.md): Select PR lanes by their inputs, merge after that run, and run the full suite serially on main.
 
 <!-- generated:end -->
 

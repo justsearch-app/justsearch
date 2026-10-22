@@ -35,7 +35,7 @@ import { enforceConfigSurface } from '../gates/config-surface/enforcer.mjs';
 import { enforceNpmAudit } from '../gates/npm-audit/enforcer.mjs';
 import { enforceTestEfficacy } from '../gates/test-efficacy/enforcer.mjs';
 import { enforceAtomForkRatchet } from '../gates/atom-fork-ratchet/enforcer.mjs';
-import { REQUIRED_ADVISORY_TARGETS, sha256 } from '../../ci/lib/github-advisory-report.mjs';
+import { GITHUB_ADVISORY_REPORT_SCHEMA, REQUIRED_ADVISORY_TARGETS, sha256 } from '../../ci/lib/github-advisory-report.mjs';
 import { explainRule } from './explain.mjs';
 
 const tmpDirs = [];
@@ -117,7 +117,7 @@ await firesFor('npm-audit (a FLOOR)', 'npm-audit/declared-regression-without-rep
   });
   const root = scaffold({
     'tmp/github-advisories.json': JSON.stringify({
-      schema: 'github-advisory-report.v1',
+      schema: GITHUB_ADVISORY_REPORT_SCHEMA,
       source: { provider: 'github-global-security-advisories', api_version: '2026-03-10' },
       targets: REQUIRED_ADVISORY_TARGETS.map((target) => ({
         target_id: target.targetId,
@@ -126,7 +126,7 @@ await firesFor('npm-audit (a FLOOR)', 'npm-audit/declared-regression-without-rep
         lockfile_sha256: sha256(lockfiles[target.lockfile]),
         package_versions: 1,
         advisories: target.targetId === 'root'
-          ? [{ ghsa_id: 'GHSA-35JH-R3H4-6JHM', severity: 'high', html_url: 'https://github.com/advisories/GHSA-35jh-r3h4-6jhm' }]
+          ? [{ ghsa_id: 'GHSA-35JH-R3H4-6JHM', severity: 'high', html_url: 'https://github.com/advisories/GHSA-35jh-r3h4-6jhm', affected: [{ package: 'example', version: '1.0.0' }] }]
           : [],
       })),
     }),
