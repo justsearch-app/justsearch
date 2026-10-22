@@ -6,14 +6,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** D8/F1/NX1: a lexical value is consumed whole, or cannot support verification (NG2). */
+/** Historical literal corpus under NX3; replaced form rules are sourced to the owner amendment. */
 class NumericConsistencyTokenizationTest {
   @Test
   void comparesNx2FormerlyWithheldDecidedForms() {
     String[][] forms = {
         {"$5", "true"},
-        {"-$5", "false"},
-        {"$-5", "false"},
+        {"-$5", "true"},
+        {"$-5", "true"},
         {"5€", "true"},
         {"€ 5", "true"},
         {"1:5", "true"},
@@ -29,41 +29,42 @@ class NumericConsistencyTokenizationTest {
   }
 
   @Test
-  void rejectsNx2UndecidedClaimsAndMissingParts() {
+  void checksFormerNx2RejectionsUnderNx3() {
+    // NX3: "The guard checks plain numbers only." Nonplain claims never withhold.
     String[][] pairs = {
-        {"The rate is %-5.", "The rate is 5."},
-        {"Oran %-5.", "Oran 5."},
-        {"The rate is % -5.", "The rate is -5."},
-        {"The rate is %5.", "The rate is 5."},
-        {"The rate is %-5.", "The rate is %-5."},
-        {"The rate is % -5.", "The rate is % -5."},
-        {"The value is 0x10.", "The values are 0 and 10."},
-        {"The value is 0x10.", "The value is 0x10."},
-        {"The value is 0.", "The value is 0x10."},
-        {"The value is 10.", "The value is 0x10."},
-        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10."},
-        {"The date is 21/10/2026.", "The parts are 21 and 2026."},
-        {"The date is 21.10.2026.", "The parts are 21 and 2026."},
-        {"The fraction is 3/4.", "The parts are 3 and 4."},
-        {"The interval is 5kg-10kg.", "The value is 5 kg."},
-        {"The price is $5.", "The price is 15."},
-        {"The price is $-5.", "The price is 5."},
-        {"The time is 1:30.", "The value is 1."},
-        {"The version is v1.2.3.", "The values are 1 and 2."},
-        {"The value is 1.5.", "The values are 1 and 5."},
-        {"Opened in 1883.", "Opened in 18830; the value is 0x10."},
-        {"The area is 5m².", "The area is 50 m²."},
-        {"The value is 0b101.", "The values are 0 and 101."},
-        {"The value is 101.", "The value is 0b101."},
-        {"The rate is ％-٥.", "The rate is 5."},
-        {"The value is 1.", "The value is 1e3."},
-        {"The value is 3.", "The value is 1e3."},
-        {"The value is 1.", "The value is 1/2."},
-        {"The value is 2.", "The value is 1/2."}
+        {"The rate is %-5.", "The rate is 5.", "true"},
+        {"Oran %-5.", "Oran 5.", "true"},
+        {"The rate is % -5.", "The rate is -5.", "true"},
+        {"The rate is %5.", "The rate is 5.", "true"},
+        {"The rate is %-5.", "The rate is %-5.", "true"},
+        {"The rate is % -5.", "The rate is % -5.", "true"},
+        {"The value is 0x10.", "The values are 0 and 10.", "true"},
+        {"The value is 0x10.", "The value is 0x10.", "true"},
+        {"The value is 0.", "The value is 0x10.", "true"},
+        {"The value is 10.", "The value is 0x10.", "true"},
+        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10.", "true"},
+        {"The date is 21/10/2026.", "The parts are 21 and 2026.", "true"},
+        {"The date is 21.10.2026.", "The parts are 21 and 2026.", "true"},
+        {"The fraction is 3/4.", "The parts are 3 and 4.", "true"},
+        {"The interval is 5kg-10kg.", "The value is 5 kg.", "true"},
+        {"The price is $5.", "The price is 15.", "true"},
+        {"The price is $-5.", "The price is 5.", "true"},
+        {"The time is 1:30.", "The value is 1.", "true"},
+        {"The version is v1.2.3.", "The values are 1 and 2.", "true"},
+        {"The value is 1.5.", "The values are 1 and 5.", "false"},
+        {"Opened in 1883.", "Opened in 18830; the value is 0x10.", "false"},
+        {"The area is 5m².", "The area is 50 m².", "true"},
+        {"The value is 0b101.", "The values are 0 and 101.", "true"},
+        {"The value is 101.", "The value is 0b101.", "true"},
+        {"The rate is ％-٥.", "The rate is 5.", "true"},
+        {"The value is 1.", "The value is 1e3.", "true"},
+        {"The value is 3.", "The value is 1e3.", "true"},
+        {"The value is 1.", "The value is 1/2.", "true"},
+        {"The value is 2.", "The value is 1/2.", "true"}
     };
     assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
       var guard = new NumericConsistency(List.of(NumericConsistency.claim(pair[0])), List.of(pair[1]));
-      assertFalse(guard.supports(0, 0), java.util.Arrays.toString(pair));
+      assertEquals(Boolean.parseBoolean(pair[2]), guard.supports(0, 0), java.util.Arrays.toString(pair));
     }));
   }
 
@@ -130,16 +131,17 @@ class NumericConsistencyTokenizationTest {
   }
 
   @Test
-  void rejectsDroppedDecimalSignsAndSuffixes() {
+  void skipsFormerNx1ClaimForms() {
     List<List<String>> pairs = List.of(
-        List.of(".5", "5"), List.of("-.5", "5"), List.of("+.5%", "5%"),
-        List.of(".5", "-.5"), List.of(".5%", ".5"), List.of("−.5", "5"),
-        List.of(".٥", "5"), List.of("-.５%", "5%"), List.of(".𝟝", "5"),
-        List.of(".5-.7", "5 and 7"), List.of("-.5--.7", "5 and 7"),
-        List.of("10-.5", "10 and 5"), List.of("5", "5%%"));
+        List.of(".5", "5", "false"), List.of("-.5", "5", "false"), List.of("+.5%", "5%", "true"),
+        List.of(".5", "-.5", "true"), List.of(".5%", ".5", "true"), List.of("−.5", "5", "false"),
+        List.of(".٥", "5", "false"), List.of("-.５%", "5%", "true"), List.of(".𝟝", "5", "false"),
+        List.of(".5-.7", "5 and 7", "false"), List.of("-.5--.7", "5 and 7", "false"),
+        List.of("10-.5", "10 and 5", "false"), List.of("5", "5%%", "true"));
     assertAll(pairs.stream().map(pair -> () -> {
-      assertFalse(supports(pair.get(0), pair.get(1)), pair.toString());
-      assertFalse(supports(pair.get(1), pair.get(0)), "reverse: " + pair);
+      assertTrue(supports(pair.get(0), pair.get(1)), pair.toString());
+      // NX3 skips nonplain reverse claims; a plain 5 still cannot be a decimal subvalue.
+      assertEquals(Boolean.parseBoolean(pair.get(2)), supports(pair.get(1), pair.get(0)), "reverse: " + pair);
     }));
   }
 
@@ -158,7 +160,7 @@ class NumericConsistencyTokenizationTest {
   }
 
   @Test
-  void withholdsUnagreedNotationRatherThanSplittingIt() {
+  void doesNotWithholdFormerlyUnsupportedClaims() {
     List<String> unsupported = List.of(
         "--5", "++5", "+-5", "-+5", "- .5", "+ .5", "5-", "5+", "5 % %", "5%%", "%5",
         "5‰", "5‱",
@@ -170,9 +172,8 @@ class NumericConsistencyTokenizationTest {
         "5–", "5—", "5- ", "5--", "-\u200b5", "5\u200b%", ".\u200b5", "5\u20e3",
         "➖5", "➕5", "+/-5", "-/+5", "-,.5", "JDK-15");
     assertAll(unsupported.stream().map(value -> () -> {
-      assertFalse(supports(value, "1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3"), value);
-      assertFalse(supports(value, value), "even identical unsupported notation: " + value);
-      assertFalse(supports("5", value), "cannot extract a supporting subvalue: " + value);
+      assertTrue(supports(value, "1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3"), value);
+      assertTrue(supports(value, value), "NX3 never withholds a skipped claim: " + value);
     }));
   }
 

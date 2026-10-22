@@ -2,8 +2,140 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx2
+author-session: uiux-numeric-guard-nx3
 ---
+
+# NX3 literal table (recorded before implementation)
+
+Started 2026-10-22 11:16 CEST; estimate 2–4 h; return at 17:16 CEST (the brief’s 6 h limit).
+Before 062011106. Full quantity/sign/date checking is shelved: a future separate task would
+first evaluate maintained Java recognizers and their shipping licenses.
+
+Source: NX3 (owner decision, 2026-10-22): “The guard checks plain numbers only.”
+“A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked.”
+“The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent).”
+Eligible means the numeric guard permits scoring's existing verdict, never that the pair is automatically verified.
+
+| ID | Claim literal | Passage literal | Claim handling | Eligible |
+| --- | --- | --- | --- | --- |
+| NG1 | Vespera Observatory opened in 2099. | Vespera Observatory opened in 1883. | plain-checked: 2099 | Reject |
+| NG1 | Vespera Observatory opened in 1923. | Vespera Observatory opened in 1883. | plain-checked: 1923 | Reject |
+| NG3 | The value is 99. | The value is 2099. | plain-checked: 99 | Reject |
+| NG3 | The value is 1.5. | The value is 15. | plain-checked: 1.5 | Reject |
+| NG3 | The value is 1,200. | The value is 1200. | plain-checked: 1200 | Accept |
+| NG7 | افتتح المرصد في ٢٠٩٩. | Opened in 1883. | plain-checked: 2099 | Reject |
+| X1 | The rate is %-5. | The rate is 5. | skipped | Accept |
+| X1 | Oran %-5. | Oran 5. | skipped | Accept |
+| X1 | The rate is % -5. | The rate is -5. | skipped | Accept |
+| X2 | The value is 0x10. | The values are 0 and 10. | skipped | Accept |
+| X3 | The opening date is 21/10/2026. | The opening date is 21/10/2026. | skipped | Accept |
+| X3 | The accepted range is 5kg-10kg. | The accepted range is 5kg-10kg. | skipped | Accept |
+| X3 | The area is measured in m². | The area is measured in m². | skipped | Accept |
+| X3 | Vespera Observatory opened in 1883. | Vespera Observatory opened in 1883. Admission costs $5. | plain-checked: 1883 | Accept |
+| X4 | Admission costs $5. | Admission costs $5. | skipped | Accept |
+| X4 | The meeting starts at 1:30. | The meeting starts at 1:30. | skipped | Accept |
+| X4 | The installed version is v1.2.3. | The installed version is v1.2.3. | skipped | Accept |
+| Y1 | The accepted range is -10 kg. | The accepted range is 5 kg -10 kg. | skipped | Accept |
+| Y2 | The price is 15. | The price is 1$5. | plain-checked: 15 | Reject |
+| Y3 | The value is 1. | The value is 1.2.3e4. | plain-checked: 1 | Reject |
+| Y3 | The value is 1. | The value is 1:30e4. | plain-checked: 1 | Accept (whole number beside colon) |
+| Y4 | The value is 5kg%. | The value is 5. | skipped | Accept |
+| Y4 | The value is 5. | The value is 5kg%. | plain-checked: 5 | Accept |
+
+Boundary interpretation: apply the explicit whitespace-boundary definition. The touching-only
+exclusion skips `5kg`, `$5`, `5%` and `5-10`; whitespace-separated `5 kg`, `$ 5`, `5 %`
+and `5 - 10` retain their standalone digit runs. The builder asked for clarification;
+this is the stated formal-rule interpretation pending any correction, not an additional quantity recognizer.
+
+| ID | Claim literal | Passage literal | Claim handling | Eligible |
+| --- | --- | --- | --- | --- |
+| Y1 | The accepted range is 5 kg - 10 kg. | The accepted range is 5 kg - 10 kg. | plain-checked: 5, 10 | Accept |
+| Y1 | The accepted range is 5 kg - 10 kg. | The accepted range is 5 and 10 kg. | plain-checked: 5, 10 | Accept |
+| NG4 | `15. literal` | The value is 15. | plain-checked: 15 (code, not a list ordinal) | Accept |
+| GN1/NG3 | The value is 15... | The value is 15. | plain-checked: 15 | Accept |
+| NG3 | The value is 5 kg. | No number here. | plain-checked: 5 | Reject |
+| NG3 | The value is $ 5. | No number here. | plain-checked: 5 | Reject |
+| NG3 | The value is 5 %. | No number here. | plain-checked: 5 | Reject |
+| NG3 | The label is 5: good. | No number here. | plain-checked: 5 | Reject |
+| NG3 | The range is 5 - 10. | Only 5. | plain-checked: 5, 10 | Reject |
+| NG3 | The value is 12,34. | No number here. | skipped | Accept |
+| NG3 | The values are 1 2. | No number here. | skipped | Accept |
+
+The old NX2/NX1/D8 tables below are historical. NX3 replaces their form decisions wherever
+they conflict. Compatible numeric-free, reference, threshold, scored-count and reselection
+expectations retain their existing intent; the old sign/quantity/unsupported-form vetoes do not.
+
+
+
+
+Additional literal NX3 pairs:
+
+| ID | Claim literal | Passage literal | Claim handling | Eligible |
+| --- | --- | --- | --- | --- |
+| NX3 | The value is %-5. | No number here. | skipped | Accept |
+| NX3 | The value is % -5. | No number here. | skipped | Accept |
+| NX3 | The value is %5. | No number here. | skipped | Accept |
+| NX3 | The value is 0x10. | No number here. | skipped | Accept |
+| NX3 | The value is 0b101. | No number here. | skipped | Accept |
+| NX3 | The value is 5kg-10kg. | No number here. | skipped | Accept |
+| NX3 | The value is 21/10/2026. | No number here. | skipped | Accept |
+| NX3 | The value is 2026-10-21. | No number here. | skipped | Accept |
+| NX3 | The value is 21.10.2026. | No number here. | skipped | Accept |
+| NX3 | The value is $5. | No number here. | skipped | Accept |
+| NX3 | The value is -$5. | No number here. | skipped | Accept |
+| NX3 | The value is $-5. | No number here. | skipped | Accept |
+| NX3 | The value is 5€. | No number here. | skipped | Accept |
+| NX3 | The value is 1:30. | No number here. | skipped | Accept |
+| NX3 | The value is v1.2.3. | No number here. | skipped | Accept |
+| NX3 | The value is 1.2.3e4. | No number here. | skipped | Accept |
+| NX3 | The value is 1e3. | No number here. | skipped | Accept |
+| NX3 | The value is 5kg%. | No number here. | skipped | Accept |
+| NX3 | The value is -15. | No number here. | skipped | Accept |
+| NX3 | The value is +15. | No number here. | skipped | Accept |
+| NX3 | The value is 15%. | No number here. | skipped | Accept |
+| NX3 | The value is 5°. | No number here. | skipped | Accept |
+| NX3 | The value is .5. | No number here. | skipped | Accept |
+| NX3 | The value is -.5. | No number here. | skipped | Accept |
+| NX3 | The value is +.5%. | No number here. | skipped | Accept |
+| NX3 | The value is 1/2. | No number here. | skipped | Accept |
+| NX3 | The value is 1..5. | No number here. | skipped | Accept |
+| NX3 | The value is 1_500. | No number here. | skipped | Accept |
+| NX3 | The value is 5th. | No number here. | skipped | Accept |
+| NX3 | The value is 5². | No number here. | skipped | Accept |
+| NX3 | The value is ١٫٥. | No number here. | skipped | Accept |
+| NX3 | The value is 値は１５です. | No number here. | skipped | Accept |
+| NX3 | The value is m². | No number here. | skipped | Accept |
+| NX3 | The value is cm³. | No number here. | skipped | Accept |
+| NX3 | The value is 0.5. | The value is .5. | plain-checked: 0.5 | Accept |
+| NX3 | The value is 15. | The value is -15. | plain-checked | Accept |
+| NX3 | The value is 15. | The value is 15%. | plain-checked | Accept |
+| NX3 | The value is 5. | The value is 5kg%. | plain-checked | Accept |
+| NX3 | The value is 5. | The value is $5. | plain-checked | Accept |
+| NX3 | The value is 10. | The range is 5kg-10kg. | plain-checked | Accept |
+| NX3 | The value is 21. | The date is 21/10/2026. | plain-checked | Accept |
+| NX3 | The value is 1. | The time is 1:30e4. | plain-checked | Accept |
+| NX3 | The value is 10. | The value is 0x10. | plain-checked | Accept |
+| NX3 | The value is 1200. | The value is $1,200%. | plain-checked | Accept |
+| NX3 | The value is 99. | The value is 2099. | plain-checked | Reject |
+| NX3 | The value is 15. | The value is 1.5. | plain-checked | Reject |
+| NX3 | The value is 1.5. | The value is 15. | plain-checked | Reject |
+| NX3 | The price is 15. | The price is 1$5. | plain-checked | Reject |
+| NX3 | The value is 1. | The value is 1.2.3e4. | plain-checked | Reject |
+| NX3 | The value is 5. | The value is .5. | plain-checked | Reject |
+| NX3 | The value is 200. | The value is 1,200. | plain-checked | Reject |
+| NX3 | Opened in 1883 with a rate of 5kg%. | Opened in 18830. | plain-checked | Reject |
+| NG3/NG7 | The value is 15. | The value is 15. | plain-checked: 15 | Accept |
+| NG3/NG7 | The value is 0015. | The value is 15. | plain-checked: 15 | Accept |
+| NG3/NG7 | The value is 1.5. | The value is 1.5. | plain-checked: 1.5 | Accept |
+| NG3/NG7 | The value is 1.50. | The value is 1.50. | plain-checked: 1.50 | Accept |
+| NG3/NG7 | The value is 1,500. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1 500. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1 500. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1 500. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1,500,000. | The value is 1500000. | plain-checked: 1500000 | Accept |
+| NG3/NG7 | The value is ١٥. | The value is 15. | plain-checked: 15 | Accept |
+| NG3/NG7 | The value is １５. | The value is 15. | plain-checked: 15 | Accept |
+| NG3/NG7 | The value is 𝟙𝟝. | The value is 15. | plain-checked: 15 | Accept |
 
 # NX2 repair contract recorded before tests and implementation
 
@@ -736,7 +868,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java"
       ],
       "class": "New",
-      "behaviour": "The real cross-encoder best-of loop, with deterministic ONNX outputs, rejects every incompatible literal pair, reselects a compatible passage across sub-batches, and retains the original threshold and scored count.",
+      "behaviour": "Plain-number claim rejections, same-threshold reselection and non-promotion through the real cross-encoder selection loop; NX3 governs the numeric form scope.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -772,9 +904,24 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "scenario": "NG7",
           "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-original-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-original-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#rejectsLiteralIncompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#reselectsCompatibleWindowAcrossSubBatches",
@@ -787,7 +934,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java"
       ],
       "class": "New",
-      "behaviour": "Compatible literal pairs and numeric-free sentences retain exact matches, scores, thresholds and counts; citation markers and structural ordinals introduce no numeric claim.",
+      "behaviour": "NX3-compatible and skipped claim forms retain their exact existing scorer verdicts; numeric-free corpus, reference markers, ordinals, scores, thresholds and counts retain their oracles.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -816,9 +963,24 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "scenario": "GN1",
           "quote": "Sentences without numbers get exactly the same matches as before on a fixed corpus.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesLiteralCompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold",
@@ -830,7 +992,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java"
       ],
       "class": "New",
-      "behaviour": "Raw cosine matcher results reject the missing values on supplied and indexed passages, including long-document windows; reselection addresses the compatible source. Code, tables, arrays, mathematical brackets and Unicode retain their numeric claims through segmentation. Rejections remain scored.",
+      "behaviour": "Raw cosine results reject missing plain values on supplied/indexed windows and reselect only a compatible source clearing the unchanged threshold. Numeric data in code, arrays, tables and mathematical brackets is retained when plain under NX3.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -873,9 +1035,24 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "scenario": "NG7",
           "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-original-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-original-repaired.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsBothCounterexamplesOnSuppliedAndLookupPaths",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsMissingYearInLongLookupDocument",
@@ -918,9 +1095,24 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "scenario": "GN1",
           "quote": "Sentences without numbers get exactly the same matches as before on a fixed corpus.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesReferencesOrdinalsAndNumberFreeCorpus",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold",
@@ -1078,74 +1270,6 @@ and its existing native runtime; no dependency lock or frontend manifest changes
     },
     {
       "items": [
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java"
-      ],
-      "class": "New",
-      "behaviour": "NX1 consumes each leading-decimal value whole; F1 keeps minus and percentage notation. NX2 replaces the previously over-withheld currency, part and unit-range rows; the remaining undecided forms stay withheld as claims and supply no passage values. Original thresholds and scored counts remain unchanged.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG1",
-          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG2",
-          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG3",
-          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG7",
-          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
-          "delegationLocation": "task t-20261019-bd718f request",
-          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
-          "choice": "NX1: A value written with a leading decimal point is a decimal: \".5\" is the value 0.5 (the agreed leading-zero rule makes \".5\" and \"0.5\" the same value) and never 5; \"-.5\" is -0.5 and \"+.5%\" is 0.5% (a plus sign is no sign; the minus and the percent are kept per F1). Reject \".5\" vs \"5\", \"-.5\" vs \"5\", \"+.5%\" vs \"5%\", \".5\" vs \"-.5\", \".5%\" vs \".5\"; accept \".5\" vs \"0.5\" and \"+.5%\" vs \"0.5%\". The same must hold for every way a number's leading characters can be lost to tokenization: every value is read whole or not at all.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
-          "delegationLocation": "task t-20261019-bd718f request",
-          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
-          "choice": "NX2: - Only the claim decides withholding. A claim sentence withholds verification only when it contains a numeric form that no agreed rule decides. A form in the passage that no rule decides contributes no values and never withholds or vetoes a claim; each claim value must still be found among the passage's decided values (D8 containment). Example: a supported \"1883\" keeps its mark when the passage also contains an unrelated undecided form.\n- An undecided form is consumed whole, on either side: its digit pieces never become separate values (for example \"0x10\" never yields 0 and 10).\n- Sign or percent written in a position no rule decides (\"%-5\", \"% -5\", \"%5\") makes the claim withhold; it is never read as the bare number.\n- Forms D8 already decides are compared, never withheld: date parts (three groups such as 21/10/2026, 2026-10-21, 21.10.2026: each part is a value; two slash groups such as 3/4 stay undecided); range endpoints, with or without units (5kg-10kg, 5–10 kg: 5 and 10; a range dash is not a minus); units are ignored, including currency symbols ($5, 5 €: 5) and unit exponents (m², cm³ are units, not numbers; a sentence whose only digits are unit exponents counts as numeric-free under GN1); clock times (1:30: parts 1 and 30, like date parts); dotted strings with two or more dots (v1.2.3: parts 1, 2 and 3; a single dot stays a decimal point).\n- Record every form this decides as literal accepted/rejected pairs in the table before implementing, including the verifier's counterexamples X1-X4.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-nx1-repaired.json",
-      "newChecks": [
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsLeadingDecimalsAndWithholdsUnsupportedNotation",
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsExplicitNx1EquivalencesWithoutChangingScoresOrThresholds",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#repairsLeadingDecimalsOnRawCosineSuppliedAndLookupPaths",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#withholdsUnsupportedNotationAfterMarkdownSegmentation",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#rejectsDroppedDecimalSignsAndSuffixes",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#acceptsOnlyExplicitNx1Equivalences",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#withholdsUnagreedNotationRatherThanSplittingIt",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java#rejectsLeadingDecimalCounterexamplesThroughRealModel"
-      ],
-      "repaired": true
-    },
-    {
-      "items": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java"
       ],
       "class": "New",
@@ -1171,22 +1295,38 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "scenario": "NG7",
           "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#preservesAgreedWholeValuesAndPunctuation"
       ]
     },
     {
       "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java",
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java"
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java"
       ],
       "class": "New",
-      "behaviour": "NX2: prefix percent and undecided lexical forms cannot lose leading characters or supply digit pieces; decided date/time/version parts, prices and unit ranges retain exact matches. Unit-only exponent prose is numeric-free. Independent decided passage values survive unrelated undecided notation. Raw cosine assertions exercise supplied and indexed passages; real CPU scorer reproduces X1/X2; scores, thresholds and scored counts are unchanged.",
+      "behaviour": "NX3 checks only standalone plain claim numbers; all touching forms are skipped with empty metadata, never vetoing. Passage whole-value containment ignores decoration without joining digit runs or extracting decimal subvalues. Literal X1–X4/Y1–Y4 cases exercise both scorers, raw cosine supplied/index paths, native CPU model, unchanged scores/thresholds and scored counts. Historical NX1/NX2 veto expectations change only where NX3 supersedes them.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1212,8 +1352,96 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
+          "scenario": "NG4",
+          "quote": "Reference literals such as [4], list numbering and the answer's own markers are not treated as stated values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
           "scenario": "NG6",
           "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-repaired.json",
+      "newChecks": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#skipsTouchingFormsWithoutWithholding",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#acceptsWholePassageValuesWhateverTouchesThem",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#requiresEveryPlainValueEvenBesideSkippedForms",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#followsExplicitWhitespaceAndPunctuationBoundaries",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#comparesNx2FormerlyWithheldDecidedForms",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#checksFormerNx2RejectionsUnderNx3",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#extractsNx2DecidedValuesBesideUndecidedForms",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#ignoresNx2UnitExponents",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#skipsFormerNx1ClaimForms",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#doesNotWithholdFormerlyUnsupportedClaims",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#appliesNx3VerifierCounterexamples",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#checksFormerNx2RejectionsUnderNx3",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#retainsNx2DecidedFormsAndUnrelatedPassageNotation",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#retainsNx2UnitOnlyExactMatches",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#skipsFormerNx1ClaimsWithoutChangingScores",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java#skipsFormerNx2FormsThroughRealModel",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java#skipsLeadingDecimalsThroughRealModel",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#appliesNx3VerifierCounterexamples",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#checksFormerNx2RejectionsUnderNx3",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#retainsNx2DecidedFormsAndUnrelatedPassageNotation",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#retainsNx2UnitOnlyExactMatches",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#skipsLeadingDecimalsOnRawCosineSuppliedAndLookupPaths",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#skipsNonPlainFormsAfterMarkdownSegmentation"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Plain grouping, leading zeros, digit normalization, code/reference distinctions and unchanged numeric-free keys retain their literal expectations. Existing .5-to-0.5 equivalences remain eligible while NX3 skips nonplain claim forms.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG4",
+          "quote": "Reference literals such as [4], list numbering and the answer's own markers are not treated as stated values.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -1231,35 +1459,97 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
-          "delegationLocation": "task t-20261019-bd718f request",
-          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
-          "choice": "NX1: A value written with a leading decimal point is a decimal: \".5\" is the value 0.5 (the agreed leading-zero rule makes \".5\" and \"0.5\" the same value) and never 5; \"-.5\" is -0.5 and \"+.5%\" is 0.5% (a plus sign is no sign; the minus and the percent are kept per F1). Reject \".5\" vs \"5\", \"-.5\" vs \"5\", \"+.5%\" vs \"5%\", \".5\" vs \"-.5\", \".5%\" vs \".5\"; accept \".5\" vs \"0.5\" and \"+.5%\" vs \"0.5%\". The same must hold for every way a number's leading characters can be lost to tokenization: every value is read whole or not at all.",
-          "label": "agent choice"
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
-          "delegationLocation": "task t-20261019-bd718f request",
-          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
-          "choice": "NX2: - Only the claim decides withholding. A claim sentence withholds verification only when it contains a numeric form that no agreed rule decides. A form in the passage that no rule decides contributes no values and never withholds or vetoes a claim; each claim value must still be found among the passage's decided values (D8 containment). Example: a supported \"1883\" keeps its mark when the passage also contains an unrelated undecided form.\n- An undecided form is consumed whole, on either side: its digit pieces never become separate values (for example \"0x10\" never yields 0 and 10).\n- Sign or percent written in a position no rule decides (\"%-5\", \"% -5\", \"%5\") makes the claim withhold; it is never read as the bare number.\n- Forms D8 already decides are compared, never withheld: date parts (three groups such as 21/10/2026, 2026-10-21, 21.10.2026: each part is a value; two slash groups such as 3/4 stay undecided); range endpoints, with or without units (5kg-10kg, 5–10 kg: 5 and 10; a range dash is not a minus); units are ignored, including currency symbols ($5, 5 €: 5) and unit exponents (m², cm³ are units, not numbers; a sentence whose only digits are unit exponents counts as numeric-free under GN1); clock times (1:30: parts 1 and 30, like date parts); dotted strings with two or more dots (v1.2.3: parts 1, 2 and 3; a single dot stays a decimal point).\n- Record every form this decides as literal accepted/rejected pairs in the table before implementing, including the verifier's counterexamples X1-X4.",
-          "label": "agent choice"
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
       "newChecks": [
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#comparesNx2FormerlyWithheldDecidedForms",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#rejectsNx2UndecidedClaimsAndMissingParts",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#extractsNx2DecidedValuesBesideUndecidedForms",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#ignoresNx2UnitExponents",
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#rejectsNx2PrefixPercentAndUndecidedPieces",
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#retainsNx2DecidedFormsAndUnrelatedPassageNotation",
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#retainsNx2UnitOnlyExactMatches",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsNx2PrefixPercentAndUndecidedPieces",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#retainsNx2DecidedFormsAndUnrelatedPassageNotation",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#retainsNx2UnitOnlyExactMatches",
-        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java#rejectsNx2CounterexamplesThroughRealModel"
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#preservesPlainDigitNormalizationAndGrouping",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#preservesPunctuationReferencesAndCode",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#acceptsOnlyExplicitNx1Equivalences",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsExplicitNx1EquivalencesWithoutChangingScoresOrThresholds"
+      ]
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX2 regressions Y2/Y3: never join 1$5 into 15 or extract 1 from 1.2.3e4. This unchanged check fails on assigned immediate baseline 062011106 and passes on known-good d36738d92. The other NX3 repair checks use d36738d92 as requested.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG4",
+          "quote": "Reference literals such as [4], list numbering and the answer's own markers are not treated as stated values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A number touching anything else (a letter, unit, currency sign, percent, degree sign, plus or minus, slash, dash, colon, another digit group, a second decimal point) is not plain: it is skipped. It never withholds a verdict and never counts as checked."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "The passage side is generous: a claim's plain number counts as present when the passage contains that same value as a whole number anywhere, whatever touches it there (in a unit, range, date, currency, sign or percent). A whole number is still never a piece of a longer number (99 is not in 2099; 15 is not in 1.5; 1,200 equals 1200 under the agreed grouping)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f agreement",
+          "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-whole-values-repaired.json",
+      "newChecks": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#rejectsSubvaluesAndCurrencyJoining"
       ],
       "repaired": true
     }
@@ -1478,6 +1768,67 @@ Test-intent coverage/evidence is complete. Independent acceptance remains stale
 and must be supplied by the verifier; the historical rejection is retained.
 The gate also reports reconsider-rate: 1 third-reviewer tie-break among 9 audited
 PRs in 28 days (11.1%, above one in ten), a non-failing delivery finding.
+
+## NX3 builder observations (2026-10-22; no acceptance verdict)
+
+Only NumericConsistency.java changed in production: 258 → 158 lines. Both scorers still
+share it; no score/threshold, best-window loop, scored count, key, persistence or UI-gate
+code changed. The five durable test files above retain prior literal inputs and change only
+form expectations superseded by NX3. Code/ordinal and ellipsis preservation controls were added.
+
+Fresh script-written evidence (no candidate check skipped):
+
+| Artifact under gates/test-intent/evidence/ | Observed result |
+| --- | --- |
+| uiux-numeric-guard-nx3-repaired.json | 24 candidate passes; 23 assertion failures on d36738d92; whole-value check passes there (known-good) |
+| uiux-numeric-guard-nx3-whole-values-repaired.json | The unchanged whole-value check passes candidate and assertion-fails on assigned immediate baseline 062011106 for Y2/Y3 |
+| uiux-numeric-guard-nx3-preserved.json | 11 candidate passes |
+| uiux-numeric-guard-nx3-original-repaired.json | 7 candidate passes, 7 assertion failures on 76efc1c10 |
+
+The first combined evidence command exited 1 because the whole-value check already passes
+on d36738d92; no expectation was changed. Its entry uses the separate 062011106 evidence.
+The original artifact is retained unedited and also records that known-good pass. All earlier
+76efc1c10/NX1/NX2 JSON/XML evidence remains byte-for-byte unchanged.
+
+Actual Gradle scorer suite: 42 tests, zero failures/errors/skips. Final preservation selection:
+75 tests pass on 062011106 and on the candidate, zero skips. It includes the fixed numeric-free
+corpus, 37 WP4.4 source/passage checks, Ask live-payload/file-store reload controls, Delegate
+mapping, HTTP-handler counts and MCP formatting. Both fixed numeric-free checks also pass
+on known-good 76efc1c10. These are component checks, not a claim of live browser/Engine coverage.
+
+The unchanged F5 six-fixture scorer protocol used the same read-only CPU model/fixture hashes,
+two warm-ups and five timed suite sums, one Gradle worker and the same 2000 ms deadline.
+Median: 161234513 ns before, 160337003 ns after; ratio 0.994434 (within 10%). All six fixtures
+remain scored in every run. Raw XML is uiux-numeric-guard-nx3-performance-{before,after}.xml.
+This is scorer timing only; NG8 production Ask timing/timeout coverage and NG9 production
+rag-qa verified counts remain unverified because the stack was unavailable.
+
+pmdMain succeeds for reranker, worker-services, app-services, app-agent and ui (four tasks
+executed, one from cache). Frontend lint/typecheck succeed; full Vitest passes 561 files /
+7273 tests; root UI gates pass 28/28. No frontend source, package.json or lockfile changed.
+
+`js-gradle-slot ./gradlew build -x test -PskipWebBuild=true` exits 1: UI integration tests
+run despite excluding the unit-test task. RuntimeReloadHttpIntegrationTest has seven
+fixture-constructor timeouts (33 UI integration cases: 7 failures, 1 skip). The exact suite
+also fails all 7 on untouched 062011106. It passes all 7 on origin/main pinned at
+7dc1f3eb45274805bc6612b71b679413bbe617ff, which includes fixture repair 98b2507d4
+(`test(ui): model both built-in reload subscriptions (#895)`). This unrelated fixture was
+not edited in this assignment. The orchestrator must bring in the existing main repair
+before claiming a green full build. Logs/XML: tmp/nx3/build.log, reload-before.log,
+reload-origin-main.log, and the corresponding retained result directories.
+
+The test-intent gate validates all sources, coverage and evidence, and fails only for stale
+independent acceptance. No acceptance record was written or altered. Initial source-location
+format errors were corrected to the canonical task-agreement location, preserving the owner
+quotes. Independent acceptance is left to the verifier/orchestrator.
+
+Not checked here: full live/cold Engine/browser NG1/NG6 combinations; production NG8/NG9;
+full browser rendering of legacy records (GN3). Y5 is explicitly out of scope and untouched.
+Shared resources were Gradle cache/slot locks and read-only local models; no owner app,
+dev stack or GPU was used or stopped. All manual before/known-good/origin-main shared clones
+under the assigned TMPDIR are removed; evidence runner worktrees cleaned themselves up.
+No frontend dependency directory, external corpus, model directory or installer was copied into comparison trees. No commit/push.
+Detailed builder report: tmp/nx3/builder-report.md.
 
 ## Acceptance records
 

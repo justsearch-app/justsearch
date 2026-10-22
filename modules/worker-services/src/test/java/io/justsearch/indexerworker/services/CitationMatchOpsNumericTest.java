@@ -41,6 +41,48 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
+  void appliesNx3VerifierCounterexamples() throws Exception {
+    // F4: observe raw matcher results on supplied and indexed passages, never the UI gate.
+    String[][] pairs = {
+        {"The rate is %-5.", "The rate is 5.", "true"},
+        {"Oran %-5.", "Oran 5.", "true"},
+        {"The rate is % -5.", "The rate is -5.", "true"},
+        {"The value is 0x10.", "The values are 0 and 10.", "true"},
+        {"The opening date is 21/10/2026.", "The opening date is 21/10/2026.", "true"},
+        {"The accepted range is 5kg-10kg.", "The accepted range is 5kg-10kg.", "true"},
+        {"The area is measured in m².", "The area is measured in m².", "true"},
+        {"Vespera Observatory opened in 1883.", "Vespera Observatory opened in 1883. Admission costs $5.", "true"},
+        {"Admission costs $5.", "Admission costs $5.", "true"},
+        {"The meeting starts at 1:30.", "The meeting starts at 1:30.", "true"},
+        {"The installed version is v1.2.3.", "The installed version is v1.2.3.", "true"},
+        {"The accepted range is -10 kg.", "The accepted range is 5 kg -10 kg.", "true"},
+        {"The accepted range is 5 kg - 10 kg.", "The accepted range is 5 kg - 10 kg.", "true"},
+        {"The accepted range is 5 kg - 10 kg.", "The accepted range is 5 and 10 kg.", "true"},
+        {"The price is 15.", "The price is 1$5.", "false"},
+        {"The value is 1.", "The value is 1.2.3e4.", "false"},
+        {"The value is 1.", "The value is 1:30e4.", "true"},
+        {"The value is 5kg%.", "The value is 5.", "true"},
+        {"The value is 5.", "The value is 5kg%.", "true"}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      index(DOC_A, pair[1]);
+      assertAll(List.of(true, false).stream().map(supplied -> () -> {
+        var result = execute(pair[0], List.of(DOC_A), supplied ? List.of(pair[1]) : List.of(), 0.5);
+        int expected = Boolean.parseBoolean(pair[2]) ? 1 : 0;
+        assertEquals(expected, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
+        assertEquals(expected, result.getSentencesMatched());
+        assertEquals(1, result.getSentencesScored());
+        if (expected == 1) {
+          assertEquals(1.0, result.getMatches(0).getSimilarity(), 0.0);
+          assertEquals(DOC_A, result.getMatches(0).getParentDocId());
+        }
+        assertEquals(0, execute(pair[0], List.of(DOC_A), List.of("alternative: " + pair[1]), 0.9)
+            .getMatchesCount(), "containment cannot raise a score");
+      }));
+    }));
+  }
+
+  @Test
   void preservesSpacedPercentRanges() {
     String[][] pairs = {
         {"The interval is 5 %-10%.", "The values are 5% and 10%."},
@@ -55,43 +97,44 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
-  void rejectsNx2PrefixPercentAndUndecidedPieces() throws Exception {
+  void checksFormerNx2RejectionsUnderNx3() throws Exception {
+    // NX3: "The guard checks plain numbers only." Nonplain claims never withhold.
     String[][] pairs = {
-        {"The rate is %-5.", "The rate is 5."},
-        {"Oran %-5.", "Oran 5."},
-        {"The rate is % -5.", "The rate is -5."},
-        {"The rate is %5.", "The rate is 5."},
-        {"The rate is %-5.", "The rate is %-5."},
-        {"The rate is % -5.", "The rate is % -5."},
-        {"The value is 0x10.", "The values are 0 and 10."},
-        {"The value is 0x10.", "The value is 0x10."},
-        {"The value is 0.", "The value is 0x10."},
-        {"The value is 10.", "The value is 0x10."},
-        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10."},
-        {"The date is 21/10/2026.", "The parts are 21 and 2026."},
-        {"The date is 21.10.2026.", "The parts are 21 and 2026."},
-        {"The fraction is 3/4.", "The parts are 3 and 4."},
-        {"The interval is 5kg-10kg.", "The value is 5 kg."},
-        {"The price is $5.", "The price is 15."},
-        {"The price is $-5.", "The price is 5."},
-        {"The time is 1:30.", "The value is 1."},
-        {"The version is v1.2.3.", "The values are 1 and 2."},
-        {"The value is 1.5.", "The values are 1 and 5."},
-        {"Opened in 1883.", "Opened in 18830; the value is 0x10."},
-        {"The area is 5m².", "The area is 50 m²."},
-        {"The value is 0b101.", "The values are 0 and 101."},
-        {"The value is 101.", "The value is 0b101."},
-        {"The rate is ％-٥.", "The rate is 5."},
-        {"The value is 1.", "The value is 1e3."},
-        {"The value is 3.", "The value is 1e3."},
-        {"The value is 1.", "The value is 1/2."},
-        {"The value is 2.", "The value is 1/2."}
+        {"The rate is %-5.", "The rate is 5.", "true"},
+        {"Oran %-5.", "Oran 5.", "true"},
+        {"The rate is % -5.", "The rate is -5.", "true"},
+        {"The rate is %5.", "The rate is 5.", "true"},
+        {"The rate is %-5.", "The rate is %-5.", "true"},
+        {"The rate is % -5.", "The rate is % -5.", "true"},
+        {"The value is 0x10.", "The values are 0 and 10.", "true"},
+        {"The value is 0x10.", "The value is 0x10.", "true"},
+        {"The value is 0.", "The value is 0x10.", "true"},
+        {"The value is 10.", "The value is 0x10.", "true"},
+        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10.", "true"},
+        {"The date is 21/10/2026.", "The parts are 21 and 2026.", "true"},
+        {"The date is 21.10.2026.", "The parts are 21 and 2026.", "true"},
+        {"The fraction is 3/4.", "The parts are 3 and 4.", "true"},
+        {"The interval is 5kg-10kg.", "The value is 5 kg.", "true"},
+        {"The price is $5.", "The price is 15.", "true"},
+        {"The price is $-5.", "The price is 5.", "true"},
+        {"The time is 1:30.", "The value is 1.", "true"},
+        {"The version is v1.2.3.", "The values are 1 and 2.", "true"},
+        {"The value is 1.5.", "The values are 1 and 5.", "false"},
+        {"Opened in 1883.", "Opened in 18830; the value is 0x10.", "false"},
+        {"The area is 5m².", "The area is 50 m².", "true"},
+        {"The value is 0b101.", "The values are 0 and 101.", "true"},
+        {"The value is 101.", "The value is 0b101.", "true"},
+        {"The rate is ％-٥.", "The rate is 5.", "true"},
+        {"The value is 1.", "The value is 1e3.", "true"},
+        {"The value is 3.", "The value is 1e3.", "true"},
+        {"The value is 1.", "The value is 1/2.", "true"},
+        {"The value is 2.", "The value is 1/2.", "true"}
     };
     assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
       index(DOC_A, pair[1]);
       assertAll(List.of(true, false).stream().map(supplied -> () -> {
         var result = execute(pair[0], List.of(DOC_A), supplied ? List.of(pair[1]) : List.of(), 0.5);
-        assertEquals(0, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
+        assertEquals(Boolean.parseBoolean(pair[2]) ? 1 : 0, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
         assertEquals(1, result.getSentencesScored());
       }));
     }));
@@ -195,7 +238,7 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
-  void repairsLeadingDecimalsOnRawCosineSuppliedAndLookupPaths() throws Exception {
+  void skipsLeadingDecimalsOnRawCosineSuppliedAndLookupPaths() throws Exception {
     index(DOC_A, "The voltage is 5% and 5.");
     index(DOC_B, "alternative: The voltage is 0.5% and 0.5 and -0.5.");
     assertAll(List.of(true, false).stream().map(supplied -> () -> {
@@ -203,14 +246,14 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
         String sentence = "The voltage is " + value + ".";
         var rejected = execute(sentence, List.of(DOC_A),
             supplied ? List.of("The voltage is 5% and 5.") : List.of(), 0.5);
-        assertEquals(0, rejected.getMatchesCount(), "raw mismatch: " + sentence + ", supplied=" + supplied);
+        assertEquals(1, rejected.getMatchesCount(), "NX3 skipped claim: " + sentence + ", supplied=" + supplied);
         assertEquals(1, rejected.getSentencesScored());
         var selected = execute(sentence, List.of(DOC_A, DOC_B), supplied
             ? List.of("The voltage is 5% and 5.", "alternative: The voltage is 0.5% and 0.5 and -0.5.")
             : List.of(), 0.7);
         assertEquals(1, selected.getMatchesCount());
-        assertEquals(1, selected.getMatches(0).getSourceIndex());
-        assertEquals(DOC_B, selected.getMatches(0).getParentDocId());
+        assertEquals(0, selected.getMatches(0).getSourceIndex());
+        assertEquals(DOC_A, selected.getMatches(0).getParentDocId());
         assertEquals(1, selected.getSentencesScored());
         assertEquals(0, execute(sentence, List.of(DOC_B), supplied
             ? List.of("alternative: The voltage is 0.5% and 0.5 and -0.5.") : List.of(), 0.9)
@@ -220,12 +263,12 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
-  void withholdsUnsupportedNotationAfterMarkdownSegmentation() {
+  void skipsNonPlainFormsAfterMarkdownSegmentation() {
     assertAll(List.of("The value is `1e3`.", "The value is 1/2.",
-        "| Value --5 |\n| --- |\n| The value is --5. |", "القيمة ١٫٥.", "The value is 5%%.")
+        "| Value --5 |\n| --- |\n| The value is --5. |", "القيمة ١٫٥.", "The value is 5%%.", "値は１５です。")
         .stream().map(answer -> () -> {
       var result = execute(answer, List.of(DOC_A), List.of("Values are 1, 2, 3, 5 and -5 and 5%."), 0.5);
-      assertEquals(0, result.getMatchesCount(), answer);
+      assertEquals(result.getSentencesTotal(), result.getMatchesCount(), answer);
       assertEquals(result.getSentencesTotal(), result.getSentencesScored());
     }));
   }
@@ -264,7 +307,7 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   void retainsNumericClaimsInCodeTablesArraysAndMathematicsAfterSegmentation() {
     for (String answer : List.of("The array is `[4]`.", "The constant is `2099`.",
         "The array is [4, 7].", "The equation is x = [4].",
-        "| Year 2099 |\n| --- |\n| Value is 2099. |", "افتتح المرصد في ٢٠٩٩.", "値は１５です。")) {
+        "| Year 2099 |\n| --- |\n| Value is 2099. |", "افتتح المرصد في ٢٠٩٩.")) {
       var result = execute(answer, List.of(DOC_A), List.of("The passage contains no numeric value."), 0.5);
       assertEquals(0, result.getMatchesCount(), "claims must survive segmentation: " + answer);
       assertEquals(result.getSentencesTotal(), result.getSentencesScored());

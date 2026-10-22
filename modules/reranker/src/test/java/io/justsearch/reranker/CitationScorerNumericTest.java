@@ -47,6 +47,41 @@ class CitationScorerNumericTest {
   }
 
   @Test
+  void appliesNx3VerifierCounterexamples() {
+    // NX3: "The guard checks plain numbers only." Touching forms are skipped on the claim side.
+    String[][] pairs = {
+        {"The rate is %-5.", "The rate is 5.", "true"},
+        {"Oran %-5.", "Oran 5.", "true"},
+        {"The rate is % -5.", "The rate is -5.", "true"},
+        {"The value is 0x10.", "The values are 0 and 10.", "true"},
+        {"The opening date is 21/10/2026.", "The opening date is 21/10/2026.", "true"},
+        {"The accepted range is 5kg-10kg.", "The accepted range is 5kg-10kg.", "true"},
+        {"The area is measured in m².", "The area is measured in m².", "true"},
+        {"Vespera Observatory opened in 1883.", "Vespera Observatory opened in 1883. Admission costs $5.", "true"},
+        {"Admission costs $5.", "Admission costs $5.", "true"},
+        {"The meeting starts at 1:30.", "The meeting starts at 1:30.", "true"},
+        {"The installed version is v1.2.3.", "The installed version is v1.2.3.", "true"},
+        {"The accepted range is -10 kg.", "The accepted range is 5 kg -10 kg.", "true"},
+        {"The accepted range is 5 kg - 10 kg.", "The accepted range is 5 kg - 10 kg.", "true"},
+        {"The accepted range is 5 kg - 10 kg.", "The accepted range is 5 and 10 kg.", "true"},
+        {"The price is 15.", "The price is 1$5.", "false"},
+        {"The value is 1.", "The value is 1.2.3e4.", "false"},
+        {"The value is 1.", "The value is 1:30e4.", "true"},
+        {"The value is 5kg%.", "The value is 5.", "true"},
+        {"The value is 5.", "The value is 5kg%.", "true"}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      var result = score(pair[0], List.of(pair[1]), 0.5);
+      var expected = Boolean.parseBoolean(pair[2])
+          ? List.of(new CitationScorer.ScoredMatch(0, pair[0], 0, "doc0", 0.976f))
+          : List.of();
+      assertEquals(expected, result.matches(), java.util.Arrays.toString(pair));
+      assertEquals(1, result.sentencesScored());
+      assertEquals(List.of(), score(pair[0], List.of(pair[1]), 0.99).matches());
+    }));
+  }
+
+  @Test
   void preservesSpacedPercentRanges() {
     String[][] pairs = {
         {"The interval is 5 %-10%.", "The values are 5% and 10%."},
@@ -61,41 +96,44 @@ class CitationScorerNumericTest {
   }
 
   @Test
-  void rejectsNx2PrefixPercentAndUndecidedPieces() {
+  void checksFormerNx2RejectionsUnderNx3() {
+    // NX3: "The guard checks plain numbers only." Nonplain claims never withhold.
     String[][] pairs = {
-        {"The rate is %-5.", "The rate is 5."},
-        {"Oran %-5.", "Oran 5."},
-        {"The rate is % -5.", "The rate is -5."},
-        {"The rate is %5.", "The rate is 5."},
-        {"The rate is %-5.", "The rate is %-5."},
-        {"The rate is % -5.", "The rate is % -5."},
-        {"The value is 0x10.", "The values are 0 and 10."},
-        {"The value is 0x10.", "The value is 0x10."},
-        {"The value is 0.", "The value is 0x10."},
-        {"The value is 10.", "The value is 0x10."},
-        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10."},
-        {"The date is 21/10/2026.", "The parts are 21 and 2026."},
-        {"The date is 21.10.2026.", "The parts are 21 and 2026."},
-        {"The fraction is 3/4.", "The parts are 3 and 4."},
-        {"The interval is 5kg-10kg.", "The value is 5 kg."},
-        {"The price is $5.", "The price is 15."},
-        {"The price is $-5.", "The price is 5."},
-        {"The time is 1:30.", "The value is 1."},
-        {"The version is v1.2.3.", "The values are 1 and 2."},
-        {"The value is 1.5.", "The values are 1 and 5."},
-        {"Opened in 1883.", "Opened in 18830; the value is 0x10."},
-        {"The area is 5m².", "The area is 50 m²."},
-        {"The value is 0b101.", "The values are 0 and 101."},
-        {"The value is 101.", "The value is 0b101."},
-        {"The rate is ％-٥.", "The rate is 5."},
-        {"The value is 1.", "The value is 1e3."},
-        {"The value is 3.", "The value is 1e3."},
-        {"The value is 1.", "The value is 1/2."},
-        {"The value is 2.", "The value is 1/2."}
+        {"The rate is %-5.", "The rate is 5.", "true"},
+        {"Oran %-5.", "Oran 5.", "true"},
+        {"The rate is % -5.", "The rate is -5.", "true"},
+        {"The rate is %5.", "The rate is 5.", "true"},
+        {"The rate is %-5.", "The rate is %-5.", "true"},
+        {"The rate is % -5.", "The rate is % -5.", "true"},
+        {"The value is 0x10.", "The values are 0 and 10.", "true"},
+        {"The value is 0x10.", "The value is 0x10.", "true"},
+        {"The value is 0.", "The value is 0x10.", "true"},
+        {"The value is 10.", "The value is 0x10.", "true"},
+        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10.", "true"},
+        {"The date is 21/10/2026.", "The parts are 21 and 2026.", "true"},
+        {"The date is 21.10.2026.", "The parts are 21 and 2026.", "true"},
+        {"The fraction is 3/4.", "The parts are 3 and 4.", "true"},
+        {"The interval is 5kg-10kg.", "The value is 5 kg.", "true"},
+        {"The price is $5.", "The price is 15.", "true"},
+        {"The price is $-5.", "The price is 5.", "true"},
+        {"The time is 1:30.", "The value is 1.", "true"},
+        {"The version is v1.2.3.", "The values are 1 and 2.", "true"},
+        {"The value is 1.5.", "The values are 1 and 5.", "false"},
+        {"Opened in 1883.", "Opened in 18830; the value is 0x10.", "false"},
+        {"The area is 5m².", "The area is 50 m².", "true"},
+        {"The value is 0b101.", "The values are 0 and 101.", "true"},
+        {"The value is 101.", "The value is 0b101.", "true"},
+        {"The rate is ％-٥.", "The rate is 5.", "true"},
+        {"The value is 1.", "The value is 1e3.", "true"},
+        {"The value is 3.", "The value is 1e3.", "true"},
+        {"The value is 1.", "The value is 1/2.", "true"},
+        {"The value is 2.", "The value is 1/2.", "true"}
     };
     assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
       var result = score(pair[0], List.of(pair[1]), 0.5);
-      assertEquals(List.of(), result.matches(), java.util.Arrays.toString(pair));
+      var expected = Boolean.parseBoolean(pair[2])
+          ? List.of(new CitationScorer.ScoredMatch(0, pair[0], 0, "doc0", 0.976f)) : List.of();
+      assertEquals(expected, result.matches(), java.util.Arrays.toString(pair));
       assertEquals(1, result.sentencesScored());
     }));
   }
@@ -175,15 +213,8 @@ class CitationScorerNumericTest {
         new Pair("The value is 99.", "The value is 2099."),
         new Pair("The value is 2099.", "The value is 99."),
         new Pair("The value is 1.5.", "The value is 15."),
-        new Pair("The value is -15.", "The value is 15."),
-        new Pair("The value is 15.", "The value is -15."),
-        new Pair("The value is 15%.", "The value is 15."),
-        new Pair("The value is 15.", "The value is 15%."),
         new Pair("The value is 1.50.", "The value is 1.5."),
-        new Pair("The value is 12,34.", "The value is 1234."),
         new Pair("The value is 1.500.", "The value is 1500."),
-        new Pair("The interval is 10-20.", "The endpoint is 10."),
-        new Pair("The date is 2026-10-21.", "The parts are 21 and 2026."),
         new Pair("افتتح المرصد في ٢٠٩٩.", "Opened in 1883."),
         new Pair("The array is `[4]`.", "The array is empty."),
         new Pair("The array is [4, 7].", "The array contains 4."),
@@ -201,6 +232,13 @@ class CitationScorerNumericTest {
   @Test
   void preservesLiteralCompatiblePairs() {
     List<Pair> pairs = List.of(
+        new Pair("The value is -15.", "The value is 15."),
+        new Pair("The value is 15.", "The value is -15."),
+        new Pair("The value is 15%.", "The value is 15."),
+        new Pair("The value is 15.", "The value is 15%."),
+        new Pair("The value is 12,34.", "The value is 1234."),
+        new Pair("The interval is 10-20.", "The endpoint is 10."),
+        new Pair("The date is 2026-10-21.", "The parts are 21 and 2026."),
         new Pair("The value is −15.", "The value is -15."),
         new Pair("The value is 15 %.", "The value is 15%."),
         new Pair("The value is 0015 kg.", "The value is 15 m."),
@@ -230,7 +268,7 @@ class CitationScorerNumericTest {
   }
 
   @Test
-  void repairsLeadingDecimalsAndWithholdsUnsupportedNotation() {
+  void skipsFormerNx1ClaimsWithoutChangingScores() {
     List<Pair> pairs = List.of(
         new Pair("The voltage is .5.", "The voltage is 5."),
         new Pair("The voltage is -.5.", "The voltage is 5."),
@@ -243,7 +281,8 @@ class CitationScorerNumericTest {
         new Pair("The voltage is ١٫٥.", "The values are 1 and 5."));
     assertAll(pairs.stream().map(pair -> () -> {
       var result = score(pair.sentence(), List.of(pair.passage()), 0.5);
-      assertEquals(List.of(), result.matches(), pair.toString());
+      assertEquals(List.of(new CitationScorer.ScoredMatch(0, pair.sentence(), 0, "doc0", 0.976f)),
+          result.matches(), pair.toString());
       assertEquals(1, result.sentencesScored(), pair.toString());
     }));
   }
