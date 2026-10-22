@@ -710,3 +710,14 @@ XA1 repair entries appended by builder session b0s1b46m on 2026-10-22; earlier e
   "note": "Accept test expectations: scenarios and delegated WX1/WX2 justify the changed oracles; independent repair checks pass candidate and fail baseline assertions. Product acceptance fails S32.7 (unlabelled confirmation input) and stale authorization prompts in other windows; live switching/refusal and rebuild decisions remain unverified."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp32-verifier-dnwld5tp",
+  "verdict": "reject",
+  "digest": "sha256:12361695a758767e4f1ca6eb4fface0be9acae0b584e9bd8dfaa22197078c615",
+  "note": "Reject provenance: five entries cite XA1 as owner-adopted, but the verification brief explicitly identifies it as a delegated orchestrator decision. Cite delegation plus the XA1 choice using delegated-choice. Repair checks pass candidate and fail baseline assertions as required; this rejection does not dispute that behavior."
+}
+```
