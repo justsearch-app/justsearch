@@ -360,3 +360,14 @@ The builder has not authored an acceptance record.
   "note": "Accept expectation provenance and execution only. HC1-HC6/HC8, HN1-HN5 and delegated D1 support these New checks; no existing expectation is weakened. Scratch reruns: 19 repair checks fail by assertion on the required before states, all 30 candidate checks pass, and 11 preservation checks pass before. The 25 coverage checks also pass known-good 161163579. Product verification is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-24a4_h0d-20261022",
+  "verdict": "accept",
+  "digest": "sha256:3bcab66a349bd8784a84954db643536cd2bc30c3acbb607d0f0423fecd0e1f15",
+  "note": "Accept test expectation provenance and execution only. HC1-HC6/HC8, HN1-HN5 and delegated D1 support the seven New entries, including the sidebar exits; no existing expectation is weakened. Independent scratch run-evidence reruns passed all seven sets, with assertion failures on each required before-state for the repairs and passes for the preservation checks. Offline Vitest launcher uses the installed module to handle dereferenced .bin copies and limits workers to two. Live product verdict is reported separately."
+}
+```
