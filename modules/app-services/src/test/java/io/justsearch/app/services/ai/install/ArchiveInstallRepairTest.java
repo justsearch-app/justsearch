@@ -244,10 +244,10 @@ class ArchiveInstallRepairTest {
   @Test void diskFullDuringPartialWriteIsReportedAndRetryUsesKeptZip() throws Exception {
     var archive = source("diskfull.zip", Map.of("library.dll", "expected"));
     var initial = plan(registry(archive));
-    Path partial = runtime().resolve("library.dll.partial");
+    Path staging = runtime().resolve(".archive-staging");
     try (var files = mockStatic(Files.class, invocation -> {
       if (invocation.getMethod().getName().equals("newOutputStream")
-          && invocation.getArgument(0) instanceof Path to && to.endsWith(Path.of("cuda12", "library.dll.partial"))) {
+          && invocation.getArgument(0) instanceof Path to && to.getParent().endsWith(Path.of("cuda12", ".archive-staging"))) {
         return new java.io.FilterOutputStream((OutputStream) invocation.callRealMethod()) {
           @Override public void write(byte[] bytes, int offset, int length) throws IOException {
             out.write(bytes, offset, Math.min(2, length));
@@ -264,12 +264,15 @@ class ArchiveInstallRepairTest {
       assertEquals(1, run(initial).failed());
     }
     assertTrue(Files.isRegularFile(kept("diskfull.zip")));
-    assertTrue(Files.size(partial) > 0, "disk-full failure leaves only an incomplete sibling");
+    try (var staged = Files.list(staging)) {
+      assertTrue(staged.allMatch(file -> file.toFile().length() > 0), "disk-full failure leaves only an incomplete staged file");
+    }
     assertFalse(Files.exists(runtime().resolve("library.dll")));
     assertNull(InstallAttemptMemory.load(home).get(initial.downloads().getFirst().targetPath()));
     assertEquals(1, plan(registry(archive)).downloads().size());
     assertEquals(0, run(plan(registry(archive))).failed());
     assertEquals(1, transfers.get());
+    assertFalse(Files.exists(staging), "the next apply cleans the interrupted apply's staged file");
   }
 
   @ParameterizedTest @ValueSource(ints = {0, 1, 2, 3, 4})
@@ -313,8 +316,7 @@ class ArchiveInstallRepairTest {
     var observedMidApply = new java.util.concurrent.atomic.AtomicBoolean();
     try (var files = mockStatic(Files.class, invocation -> {
       if (invocation.getMethod().getName().equals("newOutputStream")
-          && invocation.getArgument(0).toString().endsWith(".partial")
-          && !invocation.getArgument(0).toString().endsWith(".zip.partial")) {
+          && invocation.getArgument(0) instanceof Path to && to.getParent().endsWith(".archive-staging")) {
         assertFalse(Files.exists(runtime().resolve("ort-native-version.txt")), "ORT must see no marker during payload writes");
         observedMidApply.set(true);
       }
@@ -383,31 +385,32 @@ class ArchiveInstallRepairTest {
     assertFalse(Files.exists(models().resolve("outside.dll")));
   }
 
-  @EnabledOnOs(OS.LINUX)
-  @ParameterizedTest @ValueSource(strings = {"destination", "staging"})
-  void archiveAcquisitionRefusesLinkAtOrBelowDestinationBeforeWritingStagingBytes(String kind) throws Exception {
+  @Test @EnabledOnOs(OS.LINUX)
+  void archiveAcquisitionRefusesLinkBelowDestinationBeforeWritingStagingBytes() throws Exception {
     var archive = source("redirected.zip", Map.of("library.dll", "expected"));
     Path outside = home.resolve("outside");
     Files.createDirectories(outside);
-    Files.createDirectories(models());
     Files.writeString(outside.resolve("victim"), "old");
-    switch (kind) {
-      case "destination" -> Files.createSymbolicLink(runtime(), outside);
-      case "staging" -> {
-        Files.createDirectories(runtime());
-        Files.createSymbolicLink(runtime().resolve("redirected.zip.partial"), outside.resolve("victim"));
-      }
-    }
+    Files.createDirectories(runtime());
+    Files.createSymbolicLink(runtime().resolve("redirected.zip.partial"), outside.resolve("victim"));
     assertEquals(1, run(plan(registry(archive))).failed());
     assertEquals(0, transfers.get());
     assertEquals("old", Files.readString(outside.resolve("victim")));
     try (var files = Files.list(outside)) { assertEquals(1, files.count()); }
   }
 
-  @Test @EnabledOnOs(OS.LINUX)
-  void repairThroughSymlinkedAncestorUsesKeptZip() throws Exception {
+  /** A link above the pack folder, or the pack folder itself moved to another disk, is followed. */
+  @EnabledOnOs(OS.LINUX)
+  @ParameterizedTest @ValueSource(strings = {"ancestor", "destination"})
+  void repairThroughSymlinkedAncestorOrDestinationUsesKeptZip(String kind) throws Exception {
     Path real = Files.createDirectories(home.resolve("real-home"));
-    home = Files.createSymbolicLink(home.resolve("linked-home"), real);
+    Path receipts = real.resolve("models/cuda12/.archive-receipts");
+    if (kind.equals("ancestor")) {
+      home = Files.createSymbolicLink(home.resolve("linked-home"), real);
+    } else {
+      Files.createDirectories(models());
+      Files.createSymbolicLink(runtime(), Files.createDirectories(real.resolve("models/cuda12")));
+    }
     var archive = source("pack.zip", Map.of("library.dll", "payload"));
     assertEquals(0, run(plan(registry(archive))).failed());
     Files.delete(runtime().resolve("library.dll"));
@@ -416,7 +419,7 @@ class ArchiveInstallRepairTest {
     assertEquals(0, run(repair).failed());
     assertEquals(1, transfers.get());
     assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
-    assertTrue(Files.isRegularFile(real.resolve("models/cuda12/.archive-receipts/pack.zip.json")));
+    assertTrue(Files.isRegularFile(receipts.resolve("pack.zip.json")));
     assertTrue(plan(registry(archive)).downloads().isEmpty());
   }
 
@@ -536,19 +539,100 @@ class ArchiveInstallRepairTest {
   }
 
   @EnabledOnOs(OS.LINUX)
-  @ParameterizedTest @ValueSource(strings = {"partial", "receipt"})
-  void replacementRejectsSymlinkRedirection(String kind) throws Exception {
+  @ParameterizedTest @ValueSource(strings = {".archive-staging", ".archive-old", ".archive-receipts"})
+  void replacementRejectsSymlinkedStateFolder(String folder) throws Exception {
     var archive = source("links.zip", Map.of("nested/library.dll", "new"));
     keep(archive);
     Path outside = home.resolve("outside");
     Files.createDirectories(outside);
     Files.writeString(outside.resolve("library.dll"), "old");
     Files.createDirectories(runtime().resolve("nested"));
-    switch (kind) {
-      case "partial" -> Files.createSymbolicLink(runtime().resolve("nested/library.dll.partial"), outside.resolve("library.dll"));
-      case "receipt" -> Files.createSymbolicLink(runtime().resolve(".archive-receipts"), outside);
-    }
+    Files.writeString(runtime().resolve("nested/library.dll"), "old output");
+    Files.createSymbolicLink(runtime().resolve(folder), outside);
     assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("links.zip"), runtime()));
     assertEquals("old", Files.readString(outside.resolve("library.dll")));
+    try (var files = Files.list(outside)) { assertEquals(1, files.count(), "nothing written or removed outside"); }
+  }
+
+  @Test void interruptedApplyLeftoversInTheExtractorFoldersAreCleanedByTheNextApply() throws Exception {
+    var archive = source("pack.zip", Map.of("library.dll", "payload"));
+    keep(archive);
+    // Leftovers of an apply interrupted after staging and after moving an old file aside.
+    Files.createDirectories(runtime().resolve(".archive-staging"));
+    Files.writeString(runtime().resolve(".archive-staging/0d6f1c4e-interrupted"), "half");
+    Files.createDirectories(runtime().resolve(".archive-old"));
+    Files.writeString(runtime().resolve(".archive-old/5b2a9e70-interrupted"), "old dll");
+    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    assertFalse(Files.exists(runtime().resolve(".archive-staging")), "stale staged file cleaned");
+    assertFalse(Files.exists(runtime().resolve(".archive-old")), "stale moved-aside file cleaned");
+    assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
+  }
+
+  @Test void unlistedFileNamedLikeStagingOfANewOutputSurvives() throws Exception {
+    var archive = source("pack.zip", Map.of("library.dll", "payload"));
+    keep(archive);
+    Path unlisted = runtime().resolve("library.dll.partial");
+    Files.writeString(unlisted, "user-owned");
+    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    assertTrue(Files.exists(unlisted), "a file no archive lists was deleted");
+    assertEquals("user-owned", Files.readString(unlisted));
+    assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
+  }
+
+  @Test @EnabledOnOs(OS.LINUX)
+  void heldOpenChangedFileIsMovedAsideInsideDestinationWithoutTruncation() throws Exception {
+    var archive = source("held.zip", Map.of("library.dll", "new-bytes-longer"));
+    keep(archive);
+    Path target = runtime().resolve("library.dll");
+    Files.writeString(target, "old-bytes");
+    var moves = new java.util.ArrayList<Path>();
+    try (var held = Files.newInputStream(target);
+        var files = mockStatic(Files.class, invocation -> {
+          if (invocation.getMethod().getName().equals("move") && invocation.getArgument(0) instanceof Path from
+              && from.endsWith(Path.of("cuda12", "library.dll"))) {
+            moves.add(invocation.getArgument(1));
+          }
+          return invocation.callRealMethod();
+        })) {
+      AiInstallService.extractZipInPlace(kept("held.zip"), runtime());
+      assertEquals("new-bytes-longer", Files.readString(target));
+      assertEquals("old-bytes", new String(held.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8),
+          "the old file is moved aside, never truncated or rewritten in place");
+    }
+    assertEquals(1, moves.size());
+    assertTrue(moves.getFirst().getParent().endsWith(Path.of("cuda12", ".archive-old")),
+        "move-aside stays inside the destination, on its volume: " + moves.getFirst());
+    try (var files = Files.list(runtime())) {
+      assertEquals(java.util.Set.of("held.zip", "library.dll", ".archive-receipts"),
+          files.map(file -> file.getFileName().toString()).collect(java.util.stream.Collectors.toSet()));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"second.zip", ".archive-staging/x.dll", ".archive-old/x.dll",
+      ".archive-receipts/first.zip.json", "a.dll.partial"})
+  void entryNamedLikeReservedOrKeptArchivePathFailsItsArchiveWithoutWriting(String name) throws Exception {
+    var second = source("second.zip", Map.of("two.dll", "2"));
+    var entries = new LinkedHashMap<String, String>();
+    entries.put("a.dll", "a");
+    entries.put(name, "{\"sha256\":\"x\",\"entries\":[]}");
+    var first = source("first.zip", entries);
+    var registry = registry(second, first);
+    assertEquals(1, run(plan(registry)).failed(), "the colliding archive fails visibly");
+    assertArrayEquals(sources.get(second.downloadUrl()), Files.readAllBytes(kept("second.zip")));
+    assertEquals("2", Files.readString(runtime().resolve("two.dll")));
+    assertTrue(Files.isRegularFile(receipt("second.zip")));
+    assertFalse(Files.exists(runtime().resolve("a.dll")), "the refused archive writes nothing");
+    assertFalse(Files.exists(receipt("first.zip")), "and publishes no receipt");
+    assertEquals(1, plan(registry).downloads().size());
+  }
+
+  @Test void entryNameTheFilesystemCannotRepresentFailsItsArchiveNotTheRun() throws Exception {
+    var bad = source("nul.zip", Map.of("bad\u0000name.dll", "x"));
+    var good = source("good.zip", Map.of("good.dll", "g"));
+    var summary = assertDoesNotThrow(() -> run(plan(registry(bad, good))));
+    assertEquals(1, summary.failed());
+    assertEquals("g", Files.readString(runtime().resolve("good.dll")));
+    assertFalse(Files.exists(receipt("nul.zip")));
   }
 }

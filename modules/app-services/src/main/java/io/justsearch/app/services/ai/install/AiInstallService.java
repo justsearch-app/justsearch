@@ -3024,10 +3024,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   /**
-   * Apply archive entries by size and CRC, replacing changed files through complete siblings.
-   * A pending apply survives failure; the extraction receipt is published only after all outputs.
-   * Identical entries retain their modification times. Version markers are removed before changed
-   * payloads and published last. Traversal and redirected destination paths are rejected.
+   * Apply archive entries by size and CRC, replacing changed files through the extractor's staging
+   * and move-aside folders inside the destination. A pending apply survives failure; the extraction
+   * receipt is published only after all outputs. Identical entries retain their modification times.
+   * Version markers are removed before changed payloads and published last. Traversal and links
+   * below the destination are rejected.
    *
    * @param zipFile the archive to extract
    * @param targetDir the directory entries are extracted into (entries are

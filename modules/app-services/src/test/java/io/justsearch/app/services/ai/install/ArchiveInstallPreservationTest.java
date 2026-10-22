@@ -70,15 +70,24 @@ class ArchiveInstallPreservationTest {
         .scheduler(plan.downloads()).run();
   }
 
-  /** A home reached through a symlinked folder above it is the user's choice and is followed. */
-  Path linkedHome() throws IOException {
+  /**
+   * A home reached through a symlinked folder above the pack folder, or the pack folder itself moved
+   * to another disk and linked back, is the user's choice and is followed.
+   */
+  void link(String kind) throws IOException {
     Path real = Files.createDirectories(home.resolve("real-home"));
-    return Files.createSymbolicLink(home.resolve("linked-home"), real);
+    if (kind.equals("ancestor")) {
+      home = Files.createSymbolicLink(home.resolve("linked-home"), real);
+    } else {
+      Files.createDirectories(models());
+      Files.createSymbolicLink(runtime(), Files.createDirectories(real.resolve("cuda12")));
+    }
   }
 
-  @Test @EnabledOnOs(OS.LINUX)
-  void symlinkedAncestorFreshInstallSucceeds() throws Exception {
-    home = linkedHome();
+  @EnabledOnOs(OS.LINUX)
+  @ParameterizedTest @ValueSource(strings = {"ancestor", "destination"})
+  void symlinkedAncestorOrDestinationFreshInstallSucceeds(String kind) throws Exception {
+    link(kind);
     var archive = source("pack.zip", Map.of("library.dll", "payload"));
     assertEquals(0, run(plan(registry(archive))).failed());
     assertEquals("payload", Files.readString(runtime().resolve("library.dll")));
@@ -86,9 +95,10 @@ class ArchiveInstallPreservationTest {
     assertTrue(plan(registry(archive)).downloads().isEmpty());
   }
 
-  @Test @EnabledOnOs(OS.LINUX)
-  void symlinkedAncestorHealthyLegacyInstallStaysInstalled() throws Exception {
-    home = linkedHome();
+  @EnabledOnOs(OS.LINUX)
+  @ParameterizedTest @ValueSource(strings = {"ancestor", "destination"})
+  void symlinkedAncestorOrDestinationHealthyLegacyInstallStaysInstalled(String kind) throws Exception {
+    link(kind);
     var archive = source("pack.zip", Map.of("library.dll", "payload"));
     keep(archive);
     Files.writeString(runtime().resolve("library.dll"), "payload");
@@ -110,6 +120,20 @@ class ArchiveInstallPreservationTest {
     AiInstallService.extractZipInPlace(kept("healthy.zip"), runtime());
     assertEquals(old, Files.getLastModifiedTime(runtime().resolve("library.dll")));
     assertEquals(0, transfers.get());
+  }
+
+  @Test void unlistedFilesNamedLikeTemporariesOfAnExistingOutputSurvive() throws Exception {
+    var archive = source("pack.zip", Map.of("library.dll", "payload"));
+    keep(archive);
+    Files.writeString(runtime().resolve("library.dll"), "old output");
+    for (String name : List.of("library.dll.partial", "library.dll.archive-old-user-owned")) {
+      Files.writeString(runtime().resolve(name), "user-owned");
+    }
+    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    AiInstallService.extractZipInPlace(kept("pack.zip"), runtime());
+    for (String name : List.of("library.dll.partial", "library.dll.archive-old-user-owned")) {
+      assertEquals("user-owned", Files.readString(runtime().resolve(name)), name);
+    }
   }
 
   @ParameterizedTest @ValueSource(strings = {"../outside.dll", "/absolute.dll"})

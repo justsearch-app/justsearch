@@ -17,7 +17,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
-/** An AI home reached through a junction above it installs and reports status as before. */
+/** An AI home reached through a junction above it, or a junctioned pack folder, installs and reports status as before. */
 @Tag("windows")
 @EnabledOnOs(OS.WINDOWS)
 class ArchiveInstallWindowsPreservationTest {
@@ -25,9 +25,12 @@ class ArchiveInstallWindowsPreservationTest {
   Path home;
 
   @BeforeEach void junctionHome() throws Exception {
-    Path real = Files.createDirectories(root.resolve("real-home"));
     home = root.resolve("linked-home");
-    Process maker = new ProcessBuilder("cmd.exe", "/c", "mklink", "/J", home.toString(), real.toString())
+    junction(home, Files.createDirectories(root.resolve("real-home")));
+  }
+
+  static void junction(Path link, Path target) throws Exception {
+    Process maker = new ProcessBuilder("cmd.exe", "/c", "mklink", "/J", link.toString(), target.toString())
         .redirectErrorStream(true).start();
     if (!maker.waitFor(15, TimeUnit.SECONDS)) {
       maker.destroyForcibly();
@@ -62,5 +65,25 @@ class ArchiveInstallWindowsPreservationTest {
     var installed = InstallPlanner.plan(registry, HardwareProfile.cpuOnly(), home.resolve("models"));
     assertTrue(installed.downloads().isEmpty(), "a healthy install must not become incomplete");
     assertTrue(InstallCompleteness.compute(installed, null).installedFully());
+  }
+
+  @Test void junctionedPackFolderInstallsAndStaysInstalled() throws Exception {
+    Path real = Files.createDirectories(root.resolve("other-disk/cuda12"));
+    Files.createDirectories(home.resolve("models"));
+    junction(runtime(), real);
+    try {
+      byte[] bytes = ArchiveInstallRepairTest.zip(Map.of("library.dll", "payload"));
+      String sha = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+      var archive = new SupportingFile("pack.zip", sha, bytes.length, "https://example.invalid/pack.zip", true);
+      var registry = new ModelRegistry(2, "archive repair", List.of(
+          new ModelPackage("runtime", "Runtime", "test", "cuda12", List.of(), List.of(archive), 0, null)));
+      Files.write(runtime().resolve("pack.zip"), bytes);
+      AiInstallService.extractZipInPlace(runtime().resolve("pack.zip"), runtime());
+      assertEquals("payload", Files.readString(real.resolve("library.dll")));
+      var installed = InstallPlanner.plan(registry, HardwareProfile.cpuOnly(), home.resolve("models"));
+      assertTrue(installed.downloads().isEmpty(), "a healthy install must not become incomplete");
+    } finally {
+      Files.deleteIfExists(runtime());
+    }
   }
 }

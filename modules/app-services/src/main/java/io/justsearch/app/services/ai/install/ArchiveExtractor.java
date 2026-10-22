@@ -42,8 +42,8 @@ final class ArchiveExtractor {
   static void apply(
       Path archive, Path target, String verifiedSha256, Collection<String> listedArchives)
       throws IOException {
-    // Containment is checked against real paths resolved once here: links above either directory
-    // are followed, links at or below them are refused.
+    // Containment is checked against real paths resolved once here: links at or above either
+    // directory are followed, links below them are refused.
     Path archiveRoot = ArchiveExtractionState.destination(archive.toAbsolutePath().normalize().getParent());
     archive = archiveRoot.resolve(archive.getFileName());
     ArchiveExtractionState.requireContained(archiveRoot, archive);
@@ -54,15 +54,24 @@ final class ArchiveExtractor {
         archive.getFileName() + ".ort-marker");
     try (ZipFile zip = new ZipFile(archive.toFile())) {
       inventory = ArchiveExtractionState.entries(zip, root, archive);
+      // An entry may not replace another archive the registry keeps in this folder.
+      Path folder = archive.getParent();
+      for (var item : inventory) {
+        Path output = ArchiveExtractionState.outputPath(root, item.name(), archive);
+        if (listedArchives != null && listedArchives.stream()
+            .anyMatch(name -> folder.resolve(name).equals(output))) {
+          throw new IOException("Refusing zip entry that aliases a kept archive: " + item.name());
+        }
+      }
       ArchiveExtractionState.begin(archive);
       ArchiveExtractionState.requireNoOverlap(archive, root, inventory, listedArchives);
+      cleanup(root);
       List<ZipEntry> changed = new ArrayList<>();
       List<ZipEntry> markers = new ArrayList<>();
       for (var item : inventory) {
         ZipEntry entry = zip.getEntry(item.name());
         Path output = ArchiveExtractionState.outputPath(root, entry.getName(), archive);
         ArchiveExtractionState.requireContained(root, output);
-        cleanup(root, output);
         if (isMarker(output)) markers.add(entry);
         if (!matches(output, entry)) changed.add(entry);
         else executable(output, output.getFileName().toString());
@@ -102,9 +111,7 @@ final class ArchiveExtractor {
       if (!carriesOrtMarker && Files.isRegularFile(savedMarker, LinkOption.NOFOLLOW_LINKS)) {
         ArchiveExtractionState.requireContained(root, sharedMarker);
         if (!Files.exists(sharedMarker, LinkOption.NOFOLLOW_LINKS)) {
-          Path partial = partial(sharedMarker);
-          ArchiveExtractionState.requireContained(root, partial);
-          Files.deleteIfExists(partial);
+          Path partial = staged(root, ArchiveExtractionState.STAGING);
           Files.write(partial, Files.readAllBytes(savedMarker), StandardOpenOption.CREATE_NEW);
           replace(root, partial, sharedMarker);
         }
@@ -112,6 +119,7 @@ final class ArchiveExtractor {
     }
     ArchiveExtractionState.complete(archive, verifiedSha256, inventory);
     try { Files.deleteIfExists(savedMarker); } catch (IOException heldOpen) { /* next apply */ }
+    cleanup(root);
   }
 
   private static boolean isMarker(Path file) {
@@ -135,9 +143,7 @@ final class ArchiveExtractor {
     ArchiveExtractionState.requireContained(root, output);
     Files.createDirectories(output.getParent());
     ArchiveExtractionState.requireContained(root, output);
-    Path partial = partial(output);
-    ArchiveExtractionState.requireContained(root, partial);
-    Files.deleteIfExists(partial);
+    Path partial = staged(root, ArchiveExtractionState.STAGING);
     try (var input = zip.getInputStream(entry);
         var out = Files.newOutputStream(partial, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
       input.transferTo(out);
@@ -147,10 +153,11 @@ final class ArchiveExtractor {
     replace(root, partial, output);
   }
 
-  /** Replaces a file directly inside a destination; links at or below the destination are refused. */
+  /** Replaces a file directly inside a destination; links below the destination are refused. */
   static void replace(Path partial, Path output) throws IOException {
     Path root = ArchiveExtractionState.destination(output.toAbsolutePath().normalize().getParent());
     replace(root, root.resolve(partial.getFileName()), root.resolve(output.getFileName()));
+    cleanup(root);
   }
 
   /** Move-aside allows Windows to keep an old loaded DLL mapped without truncating either file. */
@@ -160,7 +167,6 @@ final class ArchiveExtractor {
     moveAside(root, output);
     ArchiveExtractionState.requireContained(root, output);
     Files.move(partial, output);
-    cleanup(root, output);
   }
 
   private static void moveAside(Path root, Path output) throws IOException {
@@ -169,28 +175,34 @@ final class ArchiveExtractor {
     if (!Files.isRegularFile(output, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("Refusing non-regular archive target: " + output);
     }
-    // Unique sibling, so a DLL still held open from an earlier pass cannot block another repair.
-    Path old = output.resolveSibling(output.getFileName() + ".archive-old-" + java.util.UUID.randomUUID());
-    Files.move(output, old);
+    // Unique name in the destination's own folder, on the same volume: Windows can rename a loaded
+    // DLL there, and one still held open from an earlier pass cannot block another repair.
+    Files.move(output, staged(root, ArchiveExtractionState.OLD));
   }
 
-  private static Path partial(Path file) {
-    return file.resolveSibling(file.getFileName() + ".partial");
+  /** A new file name in one of the extractor's own folders directly inside {@code root}. */
+  private static Path staged(Path root, String folder) throws IOException {
+    Path dir = root.resolve(folder);
+    ArchiveExtractionState.requireContained(root, dir);
+    Files.createDirectories(dir);
+    ArchiveExtractionState.requireContained(root, dir);
+    return dir.resolve(java.util.UUID.randomUUID().toString());
   }
 
-  private static void cleanup(Path root, Path output) throws IOException {
-    ArchiveExtractionState.requireContained(root, output.getParent());
-    if (!Files.isDirectory(output.getParent(), LinkOption.NOFOLLOW_LINKS)) return;
-    try (var files = Files.list(output.getParent())) {
-      for (Path file : files.filter(p -> p.getFileName().toString()
-          .startsWith(output.getFileName() + ".archive-old-")).toList()) {
-        // Deleting the link itself is safe; never traverse or recursively remove a target.
-        try { Files.deleteIfExists(file); } catch (IOException heldOpen) { /* next apply */ }
-      }
-    } catch (IOException unavailable) { /* moved-aside cleanup is best-effort */ }
-    Path partial = partial(output);
-    ArchiveExtractionState.requireContained(root, partial);
-    Files.deleteIfExists(partial);
+  /** Empties the extractor's own folders and nothing else; files still held open wait for the next apply. */
+  private static void cleanup(Path root) throws IOException {
+    for (String folder : List.of(ArchiveExtractionState.STAGING, ArchiveExtractionState.OLD)) {
+      Path dir = root.resolve(folder);
+      ArchiveExtractionState.requireContained(root, dir);
+      if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) continue;
+      try (var files = Files.list(dir)) {
+        for (Path file : files.toList()) {
+          // Deleting the link itself is safe; never traverse or recursively remove a target.
+          try { Files.deleteIfExists(file); } catch (IOException heldOpen) { /* next apply */ }
+        }
+      } catch (IOException unavailable) { /* moved-aside cleanup is best-effort */ }
+      try { Files.deleteIfExists(dir); } catch (IOException notEmpty) { /* next apply */ }
+    }
   }
 
   private static void executable(Path file, String name) throws IOException {

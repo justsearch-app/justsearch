@@ -20,6 +20,9 @@ import tools.jackson.databind.json.JsonMapper;
 public final class ArchiveExtractionState {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   public static final String DIRECTORY = ".archive-receipts";
+  /** The extractor's own folders inside a destination: staged entries and moved-aside outputs. */
+  public static final String STAGING = ".archive-staging";
+  public static final String OLD = ".archive-old";
 
   private ArchiveExtractionState() {}
 
@@ -88,6 +91,13 @@ public final class ArchiveExtractionState {
       }
       result.add(new Entry(entry.getName(), entry.getSize(), entry.getCrc()));
     }
+    for (Path output : names) {
+      String name = output.getFileName().toString();
+      if (name.endsWith(".partial")
+          && names.contains(output.resolveSibling(name.substring(0, name.length() - 8)))) {
+        throw new IOException("Refusing archive entry named like another entry's staging file: " + name);
+      }
+    }
     return List.copyOf(result);
   }
 
@@ -95,10 +105,16 @@ public final class ArchiveExtractionState {
     Path root = target.toAbsolutePath().normalize();
     // Reject both ZIP separators on every host, including Windows absolute names on Unix.
     String portable = name.replace('\\', '/');
-    Path resolved = root.resolve(portable).normalize();
+    Path resolved;
+    try {
+      resolved = root.resolve(portable).normalize();
+    } catch (java.nio.file.InvalidPathException unrepresentable) {
+      throw new IOException("Refusing zip entry the filesystem cannot name: " + name, unrepresentable);
+    }
     if (portable.startsWith("/") || portable.matches("^[A-Za-z]:.*")
         || !resolved.startsWith(root) || resolved.equals(root)
         || resolved.startsWith(root.resolve(DIRECTORY))
+        || resolved.startsWith(root.resolve(STAGING)) || resolved.startsWith(root.resolve(OLD))
         || resolved.equals(archive.toAbsolutePath().normalize())) {
       throw new IOException("Refusing zip entry that escapes or aliases install state: " + name);
     }
@@ -106,13 +122,12 @@ public final class ArchiveExtractionState {
   }
 
   /**
-   * Real path of an existing destination directory. Links above it (a symlinked home, a Windows
-   * junction or 8.3 short name) are the user's or the OS's and are followed; a link at it is refused.
+   * Real path of an existing destination directory, resolved once. Links at or above it (a variant
+   * folder moved to another disk, a symlinked home, a Windows junction or 8.3 short name) are the
+   * user's or the OS's and are followed; {@link #requireContained} refuses links below it.
    */
   public static Path destination(Path directory) throws IOException {
-    Path absolute = directory.toAbsolutePath().normalize();
-    if (isRedirect(absolute)) throw new IOException("Refusing redirected archive path: " + absolute);
-    return absolute.toRealPath();
+    return directory.toAbsolutePath().normalize().toRealPath();
   }
 
   /** Refuses a link or junction at any existing component from {@code root} down to {@code path}. */
