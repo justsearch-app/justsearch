@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 public final class Release030RecoveryState {
   private static final Logger log = LoggerFactory.getLogger(Release030RecoveryState.class);
   private static final String ROOT = "root|";
+  private static final String QUARANTINED = "quarantined-root|";
   private final Path file;
   private final Properties state;
 
@@ -27,7 +28,15 @@ public final class Release030RecoveryState {
   }
 
   static void capture(Path database) throws IOException {
-    if (load(database) != null) return;
+    var existing = load(database);
+    if (existing != null) {
+      if (existing.prepared()) {
+        existing.state.remove("prepared");
+        existing.state.remove("database");
+        existing.save(); // A restored actual v13 snapshot must prepare again.
+      }
+      return;
+    }
     Properties state = new Properties();
     state.setProperty("format", "1");
     new Release030RecoveryState(path(database), state).save();
@@ -49,7 +58,27 @@ public final class Release030RecoveryState {
       state.setProperty("format", "1");
       state.setProperty("uncertain", "true");
     }
-    return new Release030RecoveryState(file, state);
+    var recovery = new Release030RecoveryState(file, state);
+    int invalidKeys = 0;
+    for (String key : List.copyOf(state.stringPropertyNames())) {
+      if (!key.startsWith(ROOT)) continue;
+      try {
+        if (Path.of(key.substring(ROOT.length())).isAbsolute()) continue;
+      } catch (java.nio.file.InvalidPathException invalid) {
+        // A valid properties escape can still decode to an invalid filesystem path.
+      }
+      var encoded = new StringBuilder();
+      var hex = java.util.HexFormat.of();
+      for (int i = 0; i < key.length(); i++) encoded.append(hex.toHexDigits(key.charAt(i)));
+      state.setProperty(QUARANTINED + encoded, state.getProperty(key));
+      state.remove(key);
+      invalidKeys++;
+    }
+    if (invalidKeys > 0) {
+      recovery.save(); // Move only invalid keys aside, once; retain their uninterpretable debt.
+      log.warn("Quarantined {} invalid 0.3.0 recovery root keys; valid roots will continue", invalidKeys);
+    }
+    return recovery;
   }
 
   public boolean prepared() {
@@ -64,7 +93,12 @@ public final class Release030RecoveryState {
   /** Called after the atomic boundary backfill/retry repair and before the first job claim. */
   public void prepared(Collection<Path> roots, String databaseIdentity) throws IOException {
     boolean uncertain = "true".equals(state.getProperty("uncertain"));
+    var quarantine = new Properties();
+    for (String key : state.stringPropertyNames()) {
+      if (key.startsWith(QUARANTINED)) quarantine.setProperty(key, state.getProperty(key));
+    }
     state.clear();
+    state.putAll(quarantine);
     state.setProperty("format", "1");
     state.setProperty("database", databaseIdentity);
     for (Path root : roots) {
@@ -113,8 +147,11 @@ public final class Release030RecoveryState {
     }
   }
 
-  public void finish() throws IOException {
-    if (prepared() && pendingRoots().isEmpty()) Files.deleteIfExists(file);
+  public boolean finish() throws IOException {
+    if (!prepared() || !pendingRoots().isEmpty()
+        || state.stringPropertyNames().stream().anyMatch(key -> key.startsWith(QUARANTINED))) return false;
+    Files.deleteIfExists(file);
+    return true;
   }
 
   private void save() throws IOException {

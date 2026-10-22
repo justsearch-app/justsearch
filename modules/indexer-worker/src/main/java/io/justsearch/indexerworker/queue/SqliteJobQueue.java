@@ -752,13 +752,95 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   /** Release-v13 claims remain queued until their policy boundaries have been prepared. */
+  static final String RELEASE030 = "release030/";
   private boolean requiresRelease030Boundary;
   private boolean release030ExplicitFilesPrepared = true;
   private final Set<Path> release030ExactFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+  private final Set<Path> release030IndependentDebt = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
   @Override
   public boolean isRelease030ExactFile(Path file) {
-    return file != null && release030ExactFiles.contains(file.toAbsolutePath().normalize());
+    if (file == null || (release030ExplicitFilesPrepared
+        && !release030ExactFiles.contains(file.toAbsolutePath().normalize()))) return false;
+    lockTimed();
+    try {
+      ensureOpen();
+      // Startup legacy replay precedes boundary repair. The durable v13 identity protects
+      // queued exact paths already, while claims remain held until their boundaries are ready.
+      if (!release030ExplicitFilesPrepared) return hasRelease030ReplayAdmission(file);
+      try (var query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE path=? AND ingestion_root=path AND unit_revision LIKE 'release030/%'")) {
+        query.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = query.executeQuery()) { return row.next(); }
+      }
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Legacy admission identity is unreadable", unreadable);
+    } finally { lock.unlock(); }
+  }
+
+  /** Retain original unfinished work and exhausted debt already satisfied on retained Green. */
+  public boolean hasRelease030ReplayAdmission(Path file) throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement("""
+          SELECT 1 FROM jobs WHERE path=? AND unit_revision LIKE 'release030/%'
+            AND (state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')
+              OR unit_revision LIKE 'release030/debt/%')
+          """)) {
+        query.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = query.executeQuery()) { return row.next(); }
+      }
+    } finally { lock.unlock(); }
+  }
+
+  /** Original exhausted, never-indexed exact admissions retain debt without holding Green. */
+  public boolean hasRelease030IndependentDebt() throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      // DONE still proves why this retained native candidate may have timed out: the file can
+      // return and finish on Green while FAILED, before the next boot retries cutover.
+      try (var query = connection.createStatement(); var row = query.executeQuery(
+          "SELECT 1 FROM jobs WHERE unit_revision LIKE 'release030/debt/%' LIMIT 1")) {
+        return row.next();
+      }
+    } finally { lock.unlock(); }
+  }
+
+  public JobQueue.JobStateCounts nativeCutoverCountsStrict() {
+    lockTimed();
+    try {
+      var counts = jobStateCountsStrict();
+      var paths = new ArrayList<>(release030IndependentDebt);
+      long pending = 0, ready = 0, processing = 0, failed = 0;
+      for (int start = 0; start < paths.size(); start += 256) {
+        var batch = paths.subList(start, Math.min(start + 256, paths.size()));
+        String parameters = String.join(",", java.util.Collections.nCopies(batch.size(), "?"));
+        try (var query = connection.prepareStatement("""
+            SELECT state, COALESCE(retry_after,0) FROM jobs WHERE unit_revision LIKE 'release030/debt/%'
+              AND path IN (""" + parameters + ")")) {
+          for (int i = 0; i < batch.size(); i++) query.setString(i + 1, PathNormalizer.normalizeKey(batch.get(i)));
+          try (var rows = query.executeQuery()) {
+            long now = System.currentTimeMillis();
+            while (rows.next()) {
+              switch (rows.getString(1)) {
+                case "PENDING" -> { pending++; if (rows.getLong(2) <= now) ready++; }
+                case "PROCESSING" -> processing++;
+                case "FAILED", "RETRY_EXHAUSTED" -> failed++;
+                default -> { }
+              }
+            }
+          }
+        }
+      }
+      return new JobQueue.JobStateCounts(counts.pendingCount() - pending,
+          Math.max(0L, counts.pendingReadyCount() - ready), counts.processingCount() - processing,
+          counts.doneCount(), counts.failedCount() - failed);
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Native cutover debt is unreadable", unreadable);
+    } finally { lock.unlock(); }
   }
 
   /**
@@ -776,11 +858,24 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     // before any DDL, leaving the migration itself lossless (including every saved retry field).
     if (SqliteQueueMigrationOps.getSchemaVersion(connection) == 13) {
       Release030RecoveryState.capture(dbPath);
+      // Mark a known v13 database before its existing atomic migration. Its new v17 unit
+      // revisions carry this generation, including a backup or kill before queue repair.
+      int generation;
+      try (var query = connection.createStatement(); var row = query.executeQuery("PRAGMA application_id")) {
+        if (!row.next()) throw new SQLException("Missing queue database identity");
+        generation = row.getInt(1);
+      }
+      if (generation == 0) {
+        try (var update = connection.createStatement()) {
+          update.execute("PRAGMA application_id=" + ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE));
+        }
+      }
     }
     var recovery = Release030RecoveryState.load(dbPath);
     requiresRelease030Boundary = recovery != null && !recovery.preparedFor(release030RecoveryIdentity());
     release030ExplicitFilesPrepared = recovery == null;
     release030ExactFiles.clear();
+    release030IndependentDebt.clear();
     // Create base tables if they don't exist
     try (Statement stmt = connection.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
@@ -1162,10 +1257,28 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /** Run once before workers claim v13 work. The checkpoint is retained until every root walks. */
   public String prepareRelease030Recovery(List<Path> roots) throws SQLException {
+    return prepareRelease030Recovery(roots, ignored -> false);
+  }
+
+  public String prepareRelease030Recovery(List<Path> roots, java.util.function.Predicate<Path> absentFromBlue)
+      throws SQLException {
     lockTimed();
     try {
       ensureOpen();
       inTransaction(() -> {
+        int generation;
+        try (var query = connection.createStatement(); var row = query.executeQuery("PRAGMA application_id")) {
+          if (!row.next()) throw new SQLException("Missing queue database identity");
+          generation = row.getInt(1);
+        }
+        String originalPrefix = RELEASE030 + "job/" + generation + "/";
+        boolean firstPreparation;
+        try (var query = connection.prepareStatement("SELECT 1 FROM jobs WHERE unit_revision LIKE ? LIMIT 1")) {
+          query.setString(1, originalPrefix + "%");
+          try (var row = query.executeQuery()) { firstPreparation = row.next(); }
+        }
+        int identity = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
+        if (identity == generation) identity = generation == Integer.MAX_VALUE ? 1 : generation + 1;
         // Longest boundary wins for nested roots. SQL compares normalized path components,
         // not LIKE patterns (a person's folder may contain '_' or '%').
         try (var update = connection.prepareStatement("""
@@ -1190,17 +1303,44 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           // folder is admitted. Terminal failed rows need no recovery or cutover certificate.
           update.executeUpdate("UPDATE jobs SET ingestion_root=path WHERE ingestion_root IS NULL "
               + "AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')");
-          update.executeUpdate("""
-              UPDATE jobs SET state='PENDING', attempts=0, retry_after=NULL, first_failed_at=NULL,
-                error_message=NULL, last_outcome_class=NULL, last_reason_code=NULL,
-                last_retry_policy=NULL, last_diagnostic_summary=NULL, last_outcome_at=NULL
-              WHERE state='RETRY_EXHAUSTED'
-                OR (state='PENDING' AND last_outcome_class='WRITE_FAILED')
-              """);
+        }
+        if (firstPreparation) {
+          String cursor = "";
+          while (true) {
+            List<String> paths = new ArrayList<>();
+            try (var query = connection.prepareStatement("""
+                SELECT path FROM jobs WHERE path>? AND ingestion_root=path
+                  AND state='RETRY_EXHAUSTED' AND unit_revision LIKE ?
+                ORDER BY path LIMIT 256
+                """)) {
+              query.setString(1, cursor);
+              query.setString(2, originalPrefix + "%");
+              try (var rows = query.executeQuery()) { while (rows.next()) paths.add(rows.getString(1)); }
+            }
+            if (paths.isEmpty()) break;
+            try (var update = connection.prepareStatement(
+                "UPDATE jobs SET unit_revision=replace(unit_revision,'release030/job/','release030/debt/') WHERE path=?")) {
+              for (String path : paths) {
+                if (!absentFromBlue.test(Path.of(path))) continue;
+                update.setString(1, path); update.executeUpdate();
+              }
+            }
+            cursor = paths.getLast();
+          }
+          // Only a constant prefix and the integer header generation enter this statement.
+          String cohort = RELEASE030 + "%/" + generation + "/%";
+          try (var update = connection.createStatement()) {
+            update.executeUpdate("""
+                UPDATE jobs SET state='PENDING', attempts=0, retry_after=NULL, first_failed_at=NULL,
+                  error_message=NULL, last_outcome_class=NULL, last_reason_code=NULL,
+                  last_retry_policy=NULL, last_diagnostic_summary=NULL, last_outcome_at=NULL
+                WHERE state='RETRY_EXHAUSTED' AND unit_revision LIKE '%s'
+                  OR (state='PENDING' AND last_outcome_class='WRITE_FAILED' AND unit_revision LIKE '%s')
+                """.formatted(cohort, cohort));
+          }
         }
         // Existing SQLite header slot, not a schema/table/version change. Commit the fresh
         // generation with the boundary/retry repair, then bind the forced sidecar to it.
-        int identity = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
         try (var update = connection.createStatement()) {
           update.execute("PRAGMA application_id=" + identity);
         }
@@ -1241,12 +1381,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try {
         ensureOpen();
         try (var query = connection.prepareStatement("""
-            SELECT path FROM jobs WHERE path>? AND ingestion_root=path
+            SELECT path,unit_revision FROM jobs WHERE path>? AND ingestion_root=path
+              AND unit_revision LIKE 'release030/%'
               AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED') ORDER BY path LIMIT 256
             """)) {
           query.setString(1, cursor);
           try (var rows = query.executeQuery()) {
-            while (rows.next()) paths.add(Path.of(rows.getString(1)));
+            while (rows.next()) {
+              Path path = Path.of(rows.getString(1));
+              paths.add(path);
+              if (rows.getString(2).startsWith(RELEASE030 + "debt/")) release030IndependentDebt.add(path);
+            }
           }
         }
         if (paths.isEmpty()) {
@@ -3654,15 +3799,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
-      // Only a database captured by the 0.3.0 repair can identify unowned rows as legacy.
-      // A main-built database retains its ordinary failure budget, even for unbound rows.
-      try (var query = connection.createStatement(); var identity = query.executeQuery("PRAGMA application_id")) {
-        if (!identity.next()) throw new SQLException("Missing queue database identity");
-        if (!requiresRelease030Boundary && identity.getInt(1) == 0) return 0L;
-      }
+      // Only the original v13 admissions are exempt; a stale sidecar or a later admission
+      // in the same database cannot lend its cohort to a genuinely new terminal failure.
       try (Statement stmt = connection.createStatement();
           ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM jobs WHERE ingestion_root IS NULL "
-              + "AND state IN ('FAILED','RETRY_EXHAUSTED')")) {
+              + "AND state IN ('FAILED','RETRY_EXHAUSTED') AND unit_revision LIKE 'release030/%'")) {
         return rs.next() ? rs.getLong(1) : 0L;
       }
     } catch (SQLException failure) {

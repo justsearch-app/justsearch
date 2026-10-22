@@ -318,7 +318,7 @@ New isolated scenario tests retain the gate's independent verification requireme
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "C2 findings 1\u20134: an isolated queued update becomes searchable across restart; a never-indexed missing exact file remains recoverable and indexes after return; the authentic MIGRATING and SWITCHING fixtures complete through public resume without manual state changes and retain the original terminal failure; nonnumeric/overflowed root cooldowns retain old search and cannot starve another root. A partial native Green missing an unavailable exact file must preserve Blue search until that exact file returns, then complete normally. Every repair case fails at its intended assertion on da5d6059d. The enqueue merge preservation case passes before and after.",
+      "behaviour": "C2 findings 1–4: an isolated queued update becomes searchable across restart; a never-indexed missing exact file remains recoverable and indexes after return; the authentic MIGRATING and SWITCHING fixtures complete through public resume without manual state changes and retain the original terminal failure; nonnumeric/overflowed root cooldowns retain old search and cannot starve another root. A partial native Green missing an unavailable exact file must preserve Blue search until that exact file returns, then complete normally. Every repair case fails at its intended assertion on da5d6059d. The enqueue merge preservation case passes before and after.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -453,6 +453,63 @@ New isolated scenario tests retain the gate's independent verification requireme
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java"
+      ],
+      "class": "New",
+      "behaviour": "C3: later admissions cannot borrow original exact-path authority, including same-path re-enqueue and replacement modern databases accompanied by an old sidecar. Original missing never-indexed exhausted debt does not block real native MIGRATING/SWITCHING cutover; an actual deadline failure can recover on restart, including when the file finishes before restart. Existing explicit content is explicitly queued in these native archives (their original rows are DONE). Indexed exhausted content stays protected. Invalid decoded root keys are durably isolated while other roots recover. Ten cases: eight repair assertions fail on eae494706; indexed-content and unavailable-admission-read preservation checks pass before and after.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U8",
+          "quote": "A queued explicitly added file outside any watched root is kept and indexed, without granting broader ingestion authority.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U12",
+          "quote": "0.3.0's failed and retry-exhausted rows, including one whose path is under no root, do not block the upgrade, and no cutover depends on them.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U18",
+          "quote": "Upgrade repair: 0.3.0 rows waiting on long write-failure retries and retry-exhausted rows become claimable on the first start and get indexed; parser-timeout and I/O-failure rows keep their retry times. A crash during the repair leaves it idempotent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "The exception must apply only to rows admitted by 0.3.0 (identify them durably at preparation time, for example by their unit revision, generation or a marker set in the same transaction), never to anything enqueued later.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round4: test the three C3 claims on eae494706; preserve rounds1–3 and U19; do not change queue schema. Resume with remaining work autonomously within the delegated scope.",
+          "choice": "Use the existing v17 unit_revision backfill to prefix revisions born from an actual v13 database, with its saved application_id generation. This tags the original cohort in the existing single atomic schema-migration transaction and existing revision-write pass: no schema, DDL or version change and no extra full-queue revision rewrite. Preparation selectively repairs only that original generation; a different modern database cannot acquire provenance from an old sidecar, a null boundary or a nonzero header. A normal enqueue mints a fresh revision, immediately revoking even cached exact-path authority. Validate the current saved revision; an unreadable admission SELECT throws into the per-job retry handler and never authorizes absence. Keep both unitRevision and preserveRetryWaits in the merged enqueue path. Native replay of an old unscoped buffered UPSERT preserves an already durable unfinished original admission or original exhausted debt completed on retained Green, rather than renewing away its retry state or provenance; new strong/recorded admissions retain normal behavior. Only original RETRY_EXHAUSTED exact files proven absent from Blue by a strict physical DOC_ID count become cutover-independent, durably in their revision. Read failure or indexed content retains the existing protection. Keep the real row, state, retries and checkpoint; subtract only this original debt in native monitor/drain, replay pending barrier and final publication fences, while replay still waits for every PROCESSING row. Unowned terminal failure exemptions are per original saved revision, never database-wide, so ordinary/recorded failure budgets remain intact. A FAILED native migration with its retained candidate, current database-bound checkpoint and original debt retries the same candidate on boot with existing certification/budget/publication guards. DONE debt remains identifiable when a file returned before restart. Deadline tests use the real CutoverContext duration0 and actual transitions, never manual saved-state or timestamp edits. Invalid decoded root keys are moved once to reversible UTF16-hex quarantined-root keys retaining their values; atomic save precedes one count-only warning. Preserve quarantine across preparation and never delete its checkpoint; healthy roots still finish independently. No inferred volume identity or parent authority. Keep the original private single-step migration entry point for the unchanged supported-version fixture checks; it delegates with no v13 witness, while the atomic real-v13 ladder carries its actual generation. Retain the original single Statement retry repair and all unchanged crash interception points, scoped only by a constant and the integer cohort generation. No scale regeneration because the recovery walk is unchanged. The integration task budget is60min rather than30min with unchanged assertions and method timeouts, a1GiB spawned-Engine heap cap, fixed JVM temporary directories and sequential slotted Gradle calls.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round4.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java"
+      ],
+      "repaired": true
     }
   ]
 }

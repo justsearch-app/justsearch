@@ -18,6 +18,7 @@ import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.queue.SwitchBufferDelete;
@@ -268,7 +269,10 @@ public final class KnowledgeServerMigrationOps {
           continue;
         }
 
-        long depth = context.jobQueue().queueDepth();
+        JobQueue.JobStateCounts independent = !context.liveCutover().recorded()
+            && context.jobQueue() instanceof SqliteJobQueue sqlite ? sqlite.nativeCutoverCountsStrict() : null;
+        long depth = independent == null ? context.jobQueue().queueDepth()
+            : independent.pendingCount() + independent.processingCount();
         if (ms == IndexGenerationManager.MigrationState.MIGRATING) {
           if (depth > context.migrationSwitchingQueueDepthThreshold()) {
             Thread.sleep(1_000);
@@ -303,7 +307,7 @@ public final class KnowledgeServerMigrationOps {
 
         boolean drained = depth == 0;
         if (!drained) {
-          JobQueue.JobStateCounts counts = context.jobQueue().jobStateCounts();
+          JobQueue.JobStateCounts counts = independent == null ? context.jobQueue().jobStateCounts() : independent;
           drained = counts.processingCount() == 0 && counts.pendingReadyCount() == 0;
           if (drained && counts.pendingBackoffCount() > 0) {
             context.log().info(
@@ -325,8 +329,8 @@ public final class KnowledgeServerMigrationOps {
           try {
             // U12: terminal pre-boundary rows are retained, but cannot veto this cutover.
             // Newly admitted migration work has a boundary and still counts against the limit.
-            failedJobs = Math.max(0L, context.jobQueue().failureSummary().failedCount()
-                - context.jobQueue().unownedFailureCount());
+            failedJobs = Math.max(0L, (independent == null ? context.jobQueue().failureSummary().failedCount()
+                : independent.failedCount()) - context.jobQueue().unownedFailureCount());
           } catch (Exception e) {
             context.log().warn(
                 "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
@@ -1653,7 +1657,15 @@ public final class KnowledgeServerMigrationOps {
         // cannot move here; they stay durable queue work that surviving A's writer runs between
         // attempts. Only a claimed row could still publish a late write.
         if (refusedSourceRecovery) return counts.processingCount() == 0;
-        if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
+        long pending = counts.pendingCount();
+        if (context.replayGeneration() != null
+            && !IndexGenerationManager.isRecordedGenerationIdentity(context.replayGeneration())
+            && context.jobQueue() instanceof SqliteJobQueue queue) {
+          pending = queue.nativeCutoverCountsStrict().pendingCount();
+        }
+        // Keep the full in-flight barrier: no direct delete may overtake a writing debt job.
+        // Only original never-indexed exhausted work waiting in the queue is independent.
+        if (counts.processingCount() == 0 && pending == 0) return true;
         if (System.nanoTime() >= deadline) return false;
         Thread.sleep(50);
       }
@@ -1707,10 +1719,15 @@ public final class KnowledgeServerMigrationOps {
           // The caller waits for that row and verifies Green's indexed source witness.
           continue;
         }
+        if ((op.generation() == null || op.generation().isBlank())
+            && (context.replayGeneration() == null
+                || !IndexGenerationManager.isRecordedGenerationIdentity(context.replayGeneration()))
+            && context.jobQueue() instanceof SqliteJobQueue queue
+            && queue.hasRelease030ReplayAdmission(Path.of(upsert.path()))) continue;
         int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
         enqueued += accepted;
         if (accepted != 1) complete = false;
-      } catch (RuntimeException unavailable) {
+      } catch (java.sql.SQLException | RuntimeException unavailable) {
         complete = false;
         context.log().warn("Buffered UPSERT enqueue failed; retaining replay versions", unavailable);
       }
