@@ -182,6 +182,7 @@ export class LibrarySurface extends JfElement {
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
     otherSources: { state: true },
+    bulkOutcome: { state: true },
     gapDecision: { state: true },
     gapDecisionBusy: { state: true },
     gapDecisionError: { state: true },
@@ -211,6 +212,8 @@ export class LibrarySurface extends JfElement {
   declare reindexOutcome: string | null;
   declare reindexOutcomeError: boolean;
   declare reindexOutcomeBusy: boolean;
+  private bulkOutcomeKey: string | null = null;
+  declare bulkOutcome: OperationOutcomeView | null;
   private reindexOutcomeKey: string | null = null;
   private reindexReadSerial = 0;
   private lastReindexReadAtMs = 0;
@@ -315,6 +318,7 @@ export class LibrarySurface extends JfElement {
     this.addBusy = false;
     this.removingHashes = new Set();
     this.actionMessage = null;
+    this.bulkOutcome = null;
     this.reindexOutcome = null;
     this.reindexOutcomeError = false;
     this.reindexOutcomeBusy = false;
@@ -924,6 +928,13 @@ export class LibrarySurface extends JfElement {
     const key = ['MIGRATING', 'SWITCHING', 'AWAITING_ACCEPTANCE'].includes(migration?.migrationState ?? '')
       && /^g-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(building)
       ? building.slice(2) : null;
+    if (key && key !== this.bulkOutcomeKey) {
+      this.bulkOutcomeKey = key;
+      this.bulkOutcome = null;
+      this.gapRequestSerial++;
+      this.gapLoading = false;
+      this.lastGapReadAtMs = 0;
+    }
     if (key !== this.reindexCancelKey) {
       this.reindexCancelKey = key;
       this.reindexCancelBusy = false;
@@ -940,8 +951,10 @@ export class LibrarySurface extends JfElement {
       this.gapLoading = false;
       this.lastGapReadAtMs = 0;
     }
-    if (gapKey && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
-      void this.loadGapDecision(gapKey);
+    if (this.bulkOutcomeKey && !this.gapLoading
+        && !['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')
+        && Date.now() - this.lastGapReadAtMs >= 4_000) {
+      void this.loadGapDecision(this.bulkOutcomeKey);
     }
   }
 
@@ -954,8 +967,9 @@ export class LibrarySurface extends JfElement {
       if (!response.ok) throw new Error(`Could not read migration gaps (HTTP ${response.status})`);
       const outcome: OperationOutcomeView = parseWireContract(operationOutcomeViewSchema,
         await response.json(), '/api/operation-history/{operationKey}');
-      if (serial !== this.gapRequestSerial || key !== this.observedGapKey) return;
-      if (outcome.phase !== 'awaiting_acceptance') {
+      if (serial !== this.gapRequestSerial || key !== this.bulkOutcomeKey) return;
+      this.bulkOutcome = outcome;
+      if (key !== this.observedGapKey || outcome.phase !== 'awaiting_acceptance') {
         this.gapDecision = null;
         return;
       }
@@ -1024,6 +1038,7 @@ export class LibrarySurface extends JfElement {
       if (this.isConnected && key === this.reindexCancelKey
           && attemptSerial === this.reindexCancelAttemptSerial) {
         this.reindexCancelRecorded = true;
+        await this.loadGapDecision(key);
       }
     } catch (failure) {
       if (this.isConnected && key === this.reindexCancelKey
@@ -1383,7 +1398,7 @@ export class LibrarySurface extends JfElement {
         this.reindexOutcome = 'Reindex completed for the recorded request. Current indexing activity is shown below.';
         this.reindexOutcomeKey = null;
       } else if (outcome.state === 'failed') {
-        this.reindexOutcome = `${outcome.message ?? 'Reindex did not complete. Check folder availability and retry Reindex; failed files can also be retried below.'}${outcome.result?.code ? ` Code: ${outcome.result.code}` : ''}`;
+        this.reindexOutcome = `Reindex did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Reindex; failed files can also be retried below.`;
         this.reindexOutcomeKey = null;
       } else {
         this.reindexOutcome = `Reindex accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
@@ -1724,6 +1739,10 @@ export class LibrarySurface extends JfElement {
     return html`
       ${this.renderHeader()}
       ${this.renderReindexDecision()}
+      ${this.bulkOutcome?.state === 'failed' && this.bulkOutcome.message ? html`
+        <div class="action-message" role="alert">${this.bulkOutcome.message}
+          <small>Code: ${this.bulkOutcome.result?.code ?? this.bulkOutcome.reason}</small>
+        </div>` : nothing}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
         ${this.reindexOutcome}
@@ -1867,7 +1886,7 @@ export class LibrarySurface extends JfElement {
   }
 
   private renderReindexDecision(): TemplateResult | typeof nothing {
-    if (!this.reindexCancelKey) return nothing;
+    if (!this.reindexCancelKey || ['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')) return nothing;
     const decision = this.gapDecision;
     const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
     const confirmed = this.indexingActivity.confirmed;

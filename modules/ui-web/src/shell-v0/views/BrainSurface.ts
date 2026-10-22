@@ -30,6 +30,8 @@ import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabInte
 import '../components/OpButton.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
+import '../components/OperationOutcomeDetail.js';
+import type { OpSuccessEventDetail } from '../components/OpButton.js';
 import { OperationClient, OperationError, getOperationClient } from '../operations/OperationClient.js';
 import { getOperation } from '../../api/registry/OperationCatalogClient.js';
 import { isTauriRuntime } from '../../utils/tauriRuntime.js';
@@ -575,6 +577,7 @@ export class BrainSurface extends JfElement {
     systemStatus: { state: true },
     expanded: { state: true },
     runtimeError: { state: true },
+    bulkOutcomeKey: { state: true },
     busy: { state: true },
     refreshing: { state: true },
     // Tempdoc 518 Appendix F W3.2 — mode-transition timeline.
@@ -611,6 +614,7 @@ export class BrainSurface extends JfElement {
   declare systemStatus: UnifiedAiState['status'];
   declare expanded: Record<string, boolean>;
   declare runtimeError: string | null;
+  declare bulkOutcomeKey: string;
   declare busy: Record<string, boolean>;
   declare refreshing: boolean;
   /** Active composition tab id: 'runtime' (own body) or a member surface id. */
@@ -657,6 +661,7 @@ export class BrainSurface extends JfElement {
     // collapsed by default. Install AI / Search Quality Features collapsed
     // unless install is in flight.
     this.expanded = { runtime: true };
+    this.bulkOutcomeKey = '';
     this.runtimeError = null;
     this.busy = {};
     this.refreshing = false;
@@ -1523,9 +1528,12 @@ export class BrainSurface extends JfElement {
   private async activateInstalledModels(): Promise<void> {
     await this.withBusy('install-activation', async () => {
       this.runtimeError = null;
-      await this.invokeOp('core.activate-installed-models', {
+      const data = await this.invokeOp('core.activate-installed-models', {
         source: 'installer_model_activation',
       });
+      if (data && typeof data === 'object' && 'operationKey' in data) {
+        this.bulkOutcomeKey = String(data.operationKey ?? '');
+      }
       await this.refreshAll();
     });
   }
@@ -1669,8 +1677,10 @@ export class BrainSurface extends JfElement {
   private renderAlerts(): TemplateResult | typeof nothing {
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
-    if (!this.runtimeError && !downloadsDisabled && !onlineDisabled) return nothing;
+    if (!this.runtimeError && !downloadsDisabled && !onlineDisabled && !this.bulkOutcomeKey) return nothing;
     return html`
+      ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
+        operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}
       ${this.runtimeError
         ? html`<jf-error-alert
             tone="error"
@@ -2426,7 +2436,10 @@ export class BrainSurface extends JfElement {
           context="button"
           operation-id="core.rebuild-index"
           api-base=${this.apiBase}
-          @op-success=${() => void this.refreshAll()}
+          @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
+            this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? '');
+            void this.refreshAll();
+          }}
           style="width: 100%; margin-top: 0.75rem"
         ></jf-operation>
       </div>

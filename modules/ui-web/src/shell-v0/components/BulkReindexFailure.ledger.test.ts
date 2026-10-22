@@ -28,11 +28,11 @@ it('shows the recorded refusal sentence and code in the shared Activity and agen
   expect(fetchMock).toHaveBeenCalledWith(`http://127.0.0.1:33221/api/operation-history/${key}`);
 });
 
-it('does not read a receipt for unrelated operations or successful rebuilds', () => {
+it('does not read a receipt for unrelated operations or unrecorded rebuilds', () => {
   const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
   for (const [operationId, outcome] of [['core.reindex', 'FAILURE'], ['core.bulk-reindex', 'SUCCESS']]) {
     const host = document.createElement('div'); document.body.append(host);
-    render(renderEventRow(projectBackend({ id: `operation:${key}`, kind: 'operation', occurredAt: '2026-10-22T09:00:00Z',
+    render(renderEventRow(projectBackend({ id: operationId === 'core.reindex' ? `operation:${key}` : 'operation:legacy', kind: 'operation', occurredAt: '2026-10-22T09:00:00Z',
       originator: 'user', operationId, outcome })), host);
     expect(host.querySelector('jf-operation-outcome-detail')).toBeNull();
   }

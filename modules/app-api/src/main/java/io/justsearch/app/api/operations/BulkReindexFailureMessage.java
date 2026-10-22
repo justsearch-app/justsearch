@@ -24,7 +24,7 @@ public final class BulkReindexFailureMessage {
       case "BULK_CAPTURE_FAILED" -> "The rebuild or migration could not finish collecting files; this request did not replace the existing index, so check source folder availability before starting a new rebuild.";
       case "INGEST_RECOVERY_ATTEMPTS_EXHAUSTED" -> "The rebuild or migration stopped after too many recovery attempts; this request did not replace the existing index, so check index health before starting a new rebuild.";
       case "ACTIVATION_PRECOMMIT_REFUSED" -> "The rebuild or migration stopped before activating the new index and settings; this request did not replace the existing index, so review settings and index health before retrying activation.";
-      default -> "The rebuild or migration did not complete; check index health before retrying.";
+      default -> null;
     };
   }
 }

@@ -304,7 +304,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // tempdoc 558 Deepening 3 — structured outcome (operation rows: SUCCESS/FAILURE/UNDONE; absent
     // elsewhere). Conditional-spread so an absent outcome stays absent (exactOptionalPropertyTypes-safe).
     ...(e.outcome ? { outcome: e.outcome } : {}),
-    ...(e.kind === 'operation' && e.outcome === 'FAILURE'
+    ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')
       && /^operation:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(e.id)
       ? { operationOutcomeKey: e.id.slice('operation:'.length) } : {}),

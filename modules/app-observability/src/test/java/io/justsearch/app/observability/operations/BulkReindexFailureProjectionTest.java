@@ -121,7 +121,7 @@ final class BulkReindexFailureProjectionTest {
       var wire = JSON.valueToTree(store.outcome(unknown.key()));
       assertAll(
           () -> assertEquals("FUTURE_FAILURE", wire.path("result").path("code").asText()),
-          () -> assertTrue(wire.path("message").asText().contains("did not complete")),
+          () -> assertTrue(wire.path("message").isMissingNode()),
           () -> assertFalse(wire.path("message").asText().contains("searchable")));
     }
   }
