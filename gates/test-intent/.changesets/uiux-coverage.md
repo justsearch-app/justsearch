@@ -219,3 +219,14 @@ The builder has not authored an acceptance record.
   "note": "Accept expectation provenance only: HC1-HC6/HC8, HN1-HN5 and delegated D1 support the New checks; no existing expectation is weakened. Independent execution: 12 repair assertions fail before, all 22 checks pass the candidate, and 10 preservation checks pass before. Scratch run-evidence passes using the retained npx wrapper to bypass the dependency copier launcher defect. Overall product verification fails HC5 for the FULLTEXT_FALLBACK saved-record counterexample and HC8 at 360px/200% text with the sidebar expanded."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-mb30mucs-20261022",
+  "verdict": "accept",
+  "digest": "sha256:e6ba456fbefebf3ac01786784a8b5b97417fa98a2fa2950ea90bbe948c0d0c75",
+  "note": "Accept expectation provenance and execution only. HC1-HC6/HC8, HN1-HN5 and delegated D1 support these New checks; none weakens an existing expectation. Independent scratch reruns: all 25 candidate checks passed, 12 original repairs failed by assertion on 1016257d2, three source-panel repairs failed by assertion on ea2b423b3, and all 10 preservation checks passed before. Offline npx wrapper bypassed the dependency-copier launcher defect. Live product verdict is reported separately."
+}
+```
