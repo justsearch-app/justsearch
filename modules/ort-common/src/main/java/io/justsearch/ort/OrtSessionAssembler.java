@@ -155,24 +155,21 @@ public final class OrtSessionAssembler {
   }
 
   /**
-   * Static tensor shape + element type for a named output, read from the ONNX graph declaration
-   * without running inference.
+   * Output tensor shape and element type resolved by ONNX Runtime without running inference.
    *
-   * @param shape declared shape; a dimension of {@code -1} means dynamic (batch/sequence axes are
-   *     typically dynamic; the trailing embedding-dimension axis is typically static)
+   * @param shape resolved shape; {@code -1} means an unknown axis, including dynamic axes and
+   *     conflicting declarations
    * @param type ONNX Runtime's Java element type (e.g. {@code FLOAT}, {@code FLOAT16})
    */
   public record ProbedTensorInfo(long[] shape, OnnxJavaType type) {}
 
   /**
-   * Reads a single output tensor's declared shape/dtype without loading weights. Missing dimensions
-   * or unreadable declarations fall back to {@link OrtSession#getOutputInfo()} so graph inference
-   * preserves the old resolved values. Used by {@link ModelCapabilityResolver}
-   * (tempdoc 710 Wave 2 Move 1) as a boot-time probe for the embedding-dimension capability fact
-   * (when the graph's trailing output axis is statically known) and as a sanity check for the
-   * declared precision capability against the graph's actual output element type. Both uses are
-   * best-effort: a dynamic shape or a non-tensor output yields {@link Optional#empty()} rather
-   * than failing the caller.
+   * Reads a single output tensor's resolved shape/dtype through the session probe. Even fully
+   * static declarations can conflict with graph inference, so declarations cannot replace
+   * {@link OrtSession#getOutputInfo()}. Name and custom-metadata probes remain session-free.
+   * Used by {@link ModelCapabilityResolver} only when the embedding dimension is undeclared in
+   * the manifest, embedded metadata and config. A missing or non-tensor output yields
+   * {@link Optional#empty()}.
    *
    * @param outputName name of the output to inspect; if absent from the graph, returns {@link
    *     Optional#empty()}
@@ -180,14 +177,6 @@ public final class OrtSessionAssembler {
    */
   public static Optional<ProbedTensorInfo> probeOutputTensorInfo(
       OrtEnvironment env, Path modelPath, String outputName) throws OrtException {
-    try {
-      var metadata = OnnxExternalData.readMetadata(modelPath);
-      if (!metadata.unresolvedOutputs().contains(outputName)) {
-        return Optional.ofNullable(metadata.tensors().get(outputName));
-      }
-    } catch (IOException | IllegalArgumentException e) {
-      log.debug("ONNX output declaration unresolved for {}; falling back to session probe", modelPath, e);
-    }
     try (SessionOptions probeOpts = new SessionOptions()) {
       probeOpts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.NO_OPT);
       probeOpts.setInterOpNumThreads(1);

@@ -1,17 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
-import ai.onnxruntime.OnnxJavaType;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -23,9 +20,8 @@ import java.util.Set;
 public final class OnnxExternalData {
   private OnnxExternalData() {}
 
-  /** Graph declarations, without reading weights or opening a runtime session. */
+  /** Graph names and model properties, without reading weights or opening a runtime session. */
   record Metadata(Set<String> inputs, Set<String> outputs,
-      Map<String, OrtSessionAssembler.ProbedTensorInfo> tensors, Set<String> unresolvedOutputs,
       Map<String, String> properties) {}
 
   static Metadata readMetadata(Path model) throws IOException {
@@ -35,8 +31,7 @@ public final class OnnxExternalData {
       inspector.message(Kind.MODEL, Files.size(model), 0);
       if (!inspector.graph) throw new IOException("ONNX graph missing");
       inspector.inputs.removeAll(inspector.initializers);
-      return new Metadata(inspector.inputs, inspector.outputs, inspector.tensors,
-          inspector.unresolvedOutputs, inspector.properties);
+      return new Metadata(inspector.inputs, inspector.outputs, inspector.properties);
     }
   }
 
@@ -60,12 +55,9 @@ public final class OnnxExternalData {
     private boolean graph;
     private long metadataBytes;
     private int fields;
-    private boolean unresolvedTensor;
-    private final Set<String> unresolvedOutputs = new LinkedHashSet<>();
     private final Set<String> inputs = new LinkedHashSet<>();
     private final Set<String> outputs = new LinkedHashSet<>();
     private final Set<String> initializers = new LinkedHashSet<>();
-    private final Map<String, OrtSessionAssembler.ProbedTensorInfo> tensors = new LinkedHashMap<>();
     private final Map<String, String> properties = new LinkedHashMap<>();
 
     private Inspector(InputStream input) {
@@ -138,99 +130,13 @@ public final class OnnxExternalData {
 
     private void readValue(long end, boolean inputValue) throws IOException {
       String name = "";
-      OrtSessionAssembler.ProbedTensorInfo tensor = null;
-      unresolvedTensor = false;
-      boolean typed = false;
       while (position < end) {
         long tag = tag(end);
         if (tag == 10) name = string(end);
-        else if (tag == 18) { tensor = readType(messageEnd(end)); typed = true; }
         else skipField(tag, end);
       }
       if (name.isEmpty()) throw new IOException("Unnamed ONNX value");
       if (!(inputValue ? inputs : outputs).add(name)) throw new IOException("Duplicate ONNX value");
-      if (!inputValue && (unresolvedTensor || !typed)) unresolvedOutputs.add(name);
-      if (!inputValue && tensor != null) tensors.put(name, tensor);
-    }
-
-    private OrtSessionAssembler.ProbedTensorInfo readType(long end) throws IOException {
-      OrtSessionAssembler.ProbedTensorInfo tensor = null;
-      boolean supported = false;
-      while (position < end) {
-        long tag = tag(end);
-        if (tag == 10) { tensor = readTensorType(messageEnd(end)); supported = true; }
-        else {
-          if (tag == 34 || tag == 42) supported = true; // sequence/map, not TensorInfo
-          skipField(tag, end);
-        }
-      }
-      if (!supported) unresolvedTensor = true;
-      return tensor;
-    }
-
-    private OrtSessionAssembler.ProbedTensorInfo readTensorType(long end) throws IOException {
-      int type = 0;
-      long[] shape = null;
-      while (position < end) {
-        long tag = tag(end);
-        if (tag == 8) {
-          long value = varint(end);
-          if (value < 0 || value > Integer.MAX_VALUE) throw new IOException("Invalid ONNX tensor type");
-          type = (int) value;
-        }
-        else if (tag == 18) shape = readShape(messageEnd(end));
-        else skipField(tag, end);
-      }
-      // An absent shape can be resolved by ORT's graph inference. Do not guess scalar here.
-      if (shape == null || type == 0) {
-        unresolvedTensor = true;
-        return null;
-      }
-      // ONNX protobuf enum values differ from ORT Java's OnnxTensorType values.
-      OnnxJavaType javaType = switch (type) {
-        case 1 -> OnnxJavaType.FLOAT;
-        case 2 -> OnnxJavaType.UINT8;
-        case 3 -> OnnxJavaType.INT8;
-        case 4, 5 -> OnnxJavaType.INT16;
-        case 6, 12 -> OnnxJavaType.INT32;
-        case 7, 13 -> OnnxJavaType.INT64;
-        case 8 -> OnnxJavaType.STRING;
-        case 9 -> OnnxJavaType.BOOL;
-        case 10 -> OnnxJavaType.FLOAT16;
-        case 11 -> OnnxJavaType.DOUBLE;
-        case 16 -> OnnxJavaType.BFLOAT16;
-        default -> OnnxJavaType.UNKNOWN;
-      };
-      return new OrtSessionAssembler.ProbedTensorInfo(shape, javaType);
-    }
-
-    private long[] readShape(long end) throws IOException {
-      List<Long> dimensions = new ArrayList<>();
-      while (position < end) {
-        long tag = tag(end);
-        if (tag != 10) { skipField(tag, end); continue; }
-        long dimensionEnd = messageEnd(end);
-        Long value = null;
-        while (position < dimensionEnd) {
-          long dimensionTag = tag(dimensionEnd);
-          if (dimensionTag == 8) value = varint(dimensionEnd);
-          else if (dimensionTag == 18) {
-            string(dimensionEnd);
-            value = -1L;
-            // ORT can resolve a symbolic output axis from its producing node. Names/metadata
-            // remain readable; a caller asking for this tensor's shape needs the old probe.
-            unresolvedTensor = true;
-          }
-          else skipField(dimensionTag, dimensionEnd);
-        }
-        if (value == null) {
-          unresolvedTensor = true;
-          value = -1L;
-        }
-        if (dimensions.size() >= 1024) throw new IOException("ONNX rank limit exceeded");
-        dimensions.add(value);
-      }
-      return dimensions.stream().mapToLong(Long::longValue).toArray();
     }
 
     private String readTensorName(long end) throws IOException {
