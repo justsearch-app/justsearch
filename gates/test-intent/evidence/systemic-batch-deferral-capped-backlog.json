@@ -1,0 +1,390 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1881a49a76b2d1c17b3a174b065fe49f8d7d80660a654c2539607b56992beb12"
+  },
+  "createdAt": "2026-10-22T08:14:26.617Z",
+  "revision": "2a936a7e115cfa1d835a74f6feb3b96b534f879e",
+  "tree": "bbe7e41fe62be4dc9cf51d5b5d4313d060499189",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:worker-core:compileJava :modules:worker-core:compileTestJava :modules:worker-core:pmdMain :modules:worker-core:pmdTest :modules:worker-core:test :modules:worker-services:compileJava :modules:worker-services:compileTestJava :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:worker-services:test :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:test --max-workers=1 --no-parallel -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round6/fixed-temp.gradle",
+      "cwd": ".",
+      "exitCode": 1,
+      "durationMs": 1027341,
+      "output": "Reusing configuration cache.\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:ai-backend:compileJava UP-TO-DATE\n> Task :modules:ort-common:compileJava UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:worker-core:compileJava UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava UP-TO-DATE\n> Task :modules:ort-common:compileTestFixturesJava UP-TO-DATE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:compileTestJava UP-TO-DATE\n> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE\n> Task :modules:adapters-lucene:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:classes UP-TO-DATE\n> Task :modules:adapters-lucene:jar UP-TO-DATE\n> Task :modules:ai-backend:processResources UP-TO-DATE\n> Task :modules:ai-backend:classes UP-TO-DATE\n> Task :modules:ai-backend:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ort-common:jar UP-TO-DATE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:worker-core:pmdMain UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:configuration:testFixturesJar UP-TO-DATE\n> Task :modules:ort-common:processTestFixturesResources NO-SOURCE\n> Task :modules:ort-common:testFixturesClasses UP-TO-DATE\n> Task :modules:ort-common:testFixturesJar UP-TO-DATE\n> Task :modules:worker-core:jar UP-TO-DATE\n> Task :modules:worker-core:processTestResources NO-SOURCE\n> Task :modules:worker-core:testClasses UP-TO-DATE\n> Task :modules:worker-core:pmdTest UP-TO-DATE\n> Task :modules:worker-core:test UP-TO-DATE\n> Task :modules:worker-core:jacocoTestReport SKIPPED\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE\n> Task :modules:ipc-common:extractProto UP-TO-DATE\n> Task :modules:ipc-common:generateProto UP-TO-DATE\n> Task :modules:ipc-common:compileJava UP-TO-DATE\n> Task :modules:reranker:compileJava UP-TO-DATE\n> Task :modules:worker-services:compileJava UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:adapters-lucene:compileTestFixturesJava UP-TO-DATE\n> Task :modules:telemetry:compileTestFixturesJava UP-TO-DATE\n> Task :modules:worker-services:compileTestFixturesJava UP-TO-DATE\n> Task :modules:worker-services:compileTestJava UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources UP-TO-DATE\n> Task :modules:ipc-common:processResources UP-TO-DATE\n> Task :modules:ipc-common:classes UP-TO-DATE\n> Task :modules:ipc-common:jar UP-TO-DATE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:reranker:jar UP-TO-DATE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:pmdMain UP-TO-DATE\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:testFixturesJar UP-TO-DATE\n> Task :modules:worker-services:jar UP-TO-DATE\n> Task :modules:worker-services:processTestResources UP-TO-DATE\n> Task :modules:worker-services:testClasses UP-TO-DATE\n> Task :modules:worker-services:processTestFixturesResources NO-SOURCE\n> Task :modules:worker-services:testFixturesClasses UP-TO-DATE\n> Task :modules:worker-services:testFixturesJar UP-TO-DATE\n> Task :modules:worker-services:pmdTest UP-TO-DATE\n\n> Task :modules:worker-services:test\n\nPersistentExtractionSandboxTest > argFileEncodingRoundTripsThroughTheJdkParser() FAILED\n    org.opentest4j.AssertionFailedError at PersistentExtractionSandboxTest.java:554\n\n\n> Task :modules:worker-services:test\n\n> Task :modules:worker-services:test FAILED\n> Task :modules:worker-services:jacocoTestReport SKIPPED\n\n> Task :modules:indexer-worker:compileJava\n\n> Task :modules:app-agent:compileJava UP-TO-DATE\n> Task :modules:app-config:compileJava UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava UP-TO-DATE\n> Task :modules:app-inference:compileJava UP-TO-DATE\n> Task :modules:app-util:compileJava UP-TO-DATE\n> Task :modules:infra-core:compileJava UP-TO-DATE\n> Task :modules:prompt-support:compileJava UP-TO-DATE\n> Task :modules:app-observability:compileJava UP-TO-DATE\n> Task :modules:app-services:compileJava UP-TO-DATE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:indexer-worker:classes\n\n> Task :modules:indexer-worker:compileTestJava\n\n> Task :modules:indexer-worker:pmdMain\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:app-agent:jar UP-TO-DATE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-config:jar UP-TO-DATE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-inference:jar UP-TO-DATE\n> Task :modules:app-observability:processResources UP-TO-DATE\n> Task :modules:app-observability:classes UP-TO-DATE\n> Task :modules:app-observability:jar UP-TO-DATE\n> Task :modules:app-services:processResources UP-TO-DATE\n> Task :modules:app-services:classes UP-TO-DATE\n> Task :modules:app-services:jar UP-TO-DATE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-util:jar UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar UP-TO-DATE\n> Task :modules:indexer-worker:jar\n> Task :modules:indexer-worker:processTestResources UP-TO-DATE\n> Task :modules:indexer-worker:testClasses\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:infra-core:jar UP-TO-DATE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:prompt-support:jar UP-TO-DATE\n> Task :modules:indexer-worker:pmdTest\n\n> Task :modules:indexer-worker:test\n\n\n> Task :modules:indexer-worker:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/build/reports/problems/problems-report.html\n97 actionable tasks: 7 executed, 90 up-to-date\nConfiguration cache entry reused.\n\ngradle-slot: slot 2 after 0s\nNOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/jvm/after\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nNOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/jvm/after\nWARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)\nWARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\nWARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n\n1972 tests completed, 1 failed, 17 skipped\nNOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/jvm/after\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:5253: warning: [UnusedVariable] The binding variable 'producer' is never read.\n      if (!(old.services instanceof DefaultWorkerAppServices producer)\n                                                             ^\n    (see https://errorprone.info/bugpattern/UnusedVariable)\n  Did you mean 'if (!(old.services instanceof DefaultWorkerAppServices)'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:3932: warning: [UnusedVariable] The parameter 'ignoredContract' is never read.\n      InstallContract ignoredContract, Path ignoredModelsDir) {\n                      ^\n    (see https://errorprone.info/bugpattern/UnusedVariable)\n  Did you mean 'sourceReleasableDeviceBytes(hardware, modelsDir));'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:3931: warning: [UnusedVariable] The parameter 'ignoredHardware' is never read.\n  private Long sourceReleasableDeviceBytes(HardwareProfile ignoredHardware,\n                                                           ^\n    (see https://errorprone.info/bugpattern/UnusedVariable)\n  Did you mean 'sourceReleasableDeviceBytes(contract, modelsDir));'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:3932: warning: [UnusedVariable] The parameter 'ignoredModelsDir' is never read.\n      InstallContract ignoredContract, Path ignoredModelsDir) {\n                                            ^\n    (see https://errorprone.info/bugpattern/UnusedVariable)\n  Did you mean 'sourceReleasableDeviceBytes(hardware, contract));'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2134: warning: [FutureReturnValueIgnored] Return value of methods returning Future must be checked. Ignoring returned Futures suppresses exceptions thrown from the code that completes the Future.\n    deferredModelInit.whenComplete((ignored, failure) -> {\n                                  ^\n    (see https://errorprone.info/bugpattern/FutureReturnValueIgnored)\n  Did you mean 'deferredModelInit = deferredModelInit.whenComplete((ignored, failure) -> {' or 'var unused = deferredModelInit.whenComplete((ignored, failure) -> {' or to remove this line?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2332: warning: [FutureReturnValueIgnored] Return value of methods returning Future must be checked. Ignoring returned Futures suppresses exceptions thrown from the code that completes the Future.\n      initialization.whenComplete((ignored, failure) -> releaseAcceptedIndexRecovery(accepted));\n                                 ^\n    (see https://errorprone.info/bugpattern/FutureReturnValueIgnored)\n  Did you mean 'initialization = initialization.whenComplete((ignored, failure) -> releaseAcceptedIndexRecovery(accepted));' or 'var unused = initialization.whenComplete((ignored, failure) -> releaseAcceptedIndexRecovery(accepted));' or to remove this line?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2642: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n            || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()\n                                            ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2643: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n            || deferredModelInit != null && !deferredModelInit.isDone()\n                                         ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (deferredModelInit != null && !deferredModelInit.isDone())'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2708: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n        && io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code()\n        ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (expected.state() == io.justsearch.core.component.ComponentState.UNAVAILABLE'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2730: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n      if (current == null || current.retiring || !ownerlessInitial && !attachedOwner || plan == null\n                                                                   ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean 'if (current == null || current.retiring || (!ownerlessInitial && !attachedOwner) || plan == null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2794: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n        && encoderRecoveryReservation != expected) {\n        ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean 'if (!running || closeStarted || (encoderRecoveryReservation != null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2927: warning: [EnumOrdinal] You should almost never invoke the Enum.ordinal() method or depend on the enum values by index.\n    if (expected.phase.ordinal() >= EncoderRecoveryPhase.RETIRED.ordinal()) return;\n                              ^\n    (see https://errorprone.info/bugpattern/EnumOrdinal)\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:2927: warning: [EnumOrdinal] You should almost never invoke the Enum.ordinal() method or depend on the enum values by index.\n    if (expected.phase.ordinal() >= EncoderRecoveryPhase.RETIRED.ordinal()) return;\n                                                                        ^\n    (see https://errorprone.info/bugpattern/EnumOrdinal)\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:3589: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n          && recoveryStartContext.recoveryAttempt() ? null : recordedIngestionAttachment;\n          ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean 'attachment = closeStarted || encoderRecoveryReservation != null || (recoveryStartContext != null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:6897: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n            && !acceptedIndexRecoveryServing()\n            ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean 'if (closeStarted || (recoveryStartContext != null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:7460: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n        || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()) return;\n                                        ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())) return;'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:7524: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n        || state.previous_generation() != null && !generation.equals(state.previous_generation())\n                                               ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (state.previous_generation() != null && !generation.equals(state.previous_generation()))'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:8620: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n          && recoveryStartContext.recoveryAttempt()) return false;\n          ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean 'if (closeStarted || encoderRecoveryReservation != null || (recoveryStartContext != null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:8661: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n          && recoveryStartContext.recoveryAttempt() || recordedCandidateInPlace) return false;\n          ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean 'if (closeStarted || encoderRecoveryReservation != null || (recoveryStartContext != null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:8778: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n            || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()\n                                            ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:8974: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n        && recoveryStartContext.recoveryAttempt()) return;\n        ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:8981: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n          || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()\n                                          ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:9074: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n          || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()\n                                          ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())'?\n/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:9118: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit\n          || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()\n                                          ^\n    (see https://errorprone.info/bugpattern/OperatorPrecedence)\n  Did you mean '|| (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())'?\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\n24 warnings\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\nNOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/jvm/after\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nWARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)\nWARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\nWARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:worker-services:test'.\n> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/modules/worker-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 17m 7s\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:33e14b3510d81586d162ce964b45bc4c3f4181a427adcfe2dfe9b00a9f86cce1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:33e14b3510d81586d162ce964b45bc4c3f4181a427adcfe2dfe9b00a9f86cce1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:33e14b3510d81586d162ce964b45bc4c3f4181a427adcfe2dfe9b00a9f86cce1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2b508cb7d33296b638cabaef6726b97c9f6414ed497f6c6d59ccd67f30404cd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closedLuceneRuntimeDefersBeyondGraceAndRecoversThroughTheRunningLoop()",
+          "status": "passed"
+        },
+        {
+          "name": "stopDuringCappedOutagePauseWakesWithoutInterruptingOrChargingRows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:691e8bf0db70e10a5eafc43361679e3a14dfbeb52fe47782dff3382dd95c26fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successResetsAmbiguousGrace()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedSystemicFaultsStayBoundedWithoutChargingAttempts()",
+          "status": "passed"
+        },
+        {
+          "name": "writerOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly()",
+          "status": "passed"
+        },
+        {
+          "name": "isolatedWriterFailureUsesLadderAndDoesNotStarveLaterFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "documentArgumentFailureUsesLadderEvenWithoutSuccessfulPeers()",
+          "status": "passed"
+        },
+        {
+          "name": "isolatedIdentityFailureUsesLadderAndDoesNotStarveLaterFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(1: 1, false, java.lang.IllegalStateException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(2: 1, false, java.lang.NullPointerException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(3: 3, false, java.lang.IllegalStateException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(4: 3, false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: document IO)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(5: 3, false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: missing_uid_field)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(6: 3, true, java.lang.IllegalStateException: poison identity)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(1: false, java.lang.IllegalStateException: shared writer unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(2: false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: draining)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(3: true, java.lang.IllegalStateException: identity store unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "provenOutageBacksOffCapsLogsAndResets(false)",
+          "status": "passed"
+        },
+        {
+          "name": "provenOutageBacksOffCapsLogsAndResets(true)",
+          "status": "passed"
+        },
+        {
+          "name": "identityOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc9ba0030ad9918ae26af5de375a8a2c18e8f5eda39499c14119b1ef879c3e40",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableIdentityReceiverNeverChargesTheBatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueRetryLadderTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueRetryLadderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:706cb3673c22f9dd1eb7a3ea036b7d0edcf8a8d9983d59db7fef7aa674062bde",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the per-outcome observer is notified with the outcome class name",
+          "status": "passed"
+        },
+        {
+          "name": "past the 7-day bound the job becomes RETRY_EXHAUSTED, and a rescan resets it",
+          "status": "passed"
+        },
+        {
+          "name": "the queue meters count admissions and claims",
+          "status": "passed"
+        },
+        {
+          "name": "a parser failure is terminal on the first attempt",
+          "status": "passed"
+        },
+        {
+          "name": "three IO_FAILED outcomes stay PENDING with retry_after set, past the attempts cap",
+          "status": "passed"
+        },
+        {
+          "name": "the backoff ladder runs 1 min, 10 min, 1 h, 6 h, 24 h — not a 17-minute cap",
+          "status": "passed"
+        },
+        {
+          "name": "the untyped markFailed path still honours the attempts cap",
+          "status": "passed"
+        },
+        {
+          "name": "an exhausted row counts as failed in BOTH count projections",
+          "status": "passed"
+        },
+        {
+          "name": "error_message carries the exception text, not a fixed literal",
+          "status": "passed"
+        },
+        {
+          "name": "listFailedJobs reports each row's real terminal state, not a blanket FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "a retry reports the state it actually replaced, not a hardcoded FAILED",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:52e26f6f1326f03405036a0db4aff50e1ffc4ff88516ac5bf3d80c6af9b1680b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backOffIsCountedAndGrowsRatherThanRetryingEverySecond()",
+          "status": "passed"
+        },
+        {
+          "name": "anUnreadableSourceIsNeverExhaustedAndKeepsGrowingPastTheWindow()",
+          "status": "passed"
+        },
+        {
+          "name": "theFailedFilesSurfaceListsItAsIndexedSourceUnreadableAcrossARestart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java#outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a6415b231089f8bdc3a5d2b068c27b7e8af013075b6562adf226290f937baa3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(writer)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(identity)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(draining)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(mixed)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UpgradeStatusRestartTest.java#reopenedQueueReportsWaitingAndDueWorkThenProcessingAndCompletion",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UpgradeStatusRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:092691c22a4e28e6589e4eabd929856f02e24b0afb920c02701bdded9d5f6a33",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reopenedQueueReportsWaitingAndDueWorkThenProcessingAndCompletion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java#readOnlyStoreRemainsUncountedBeyondAmbiguousGrace",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:baef42169e9e2429f6aa863a631b81751c1a5089630cbdab6c3a8674a06a4b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readOnlyStoreRemainsUncountedBeyondAmbiguousGrace()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc8c8256f3b78aa154c3fc0949d2412d5cfcb7eb95e5409ac6827c5ce7747f97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc8c8256f3b78aa154c3fc0949d2412d5cfcb7eb95e5409ac6827c5ce7747f97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2a936a7e1",
+    "revision": "2a936a7e115cfa1d835a74f6feb3b96b534f879e",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/systemic-batch-deferral-before-outage-extension.patch",
+        "contentDigest": "sha256:6932009cebcaa3502682361d0f2f0872fd84ae7f3d3c8b9c19bec9ac8245b028"
+      }
+    ],
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.VerifierCappedBacklogStatusTest.previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause\" --tests \"io.justsearch.indexerworker.loop.VerifierCappedBacklogStatusTest.extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards\" --max-workers=1 --no-parallel -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round6/fixed-temp.gradle",
+        "cwd": "tmp/builder/before-2a936a7e1",
+        "exitCode": 1,
+        "durationMs": 13573,
+        "output": "Reusing configuration cache.\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:ai-backend:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE\n> Task :modules:ipc-common:extractProto UP-TO-DATE\n> Task :modules:ipc-common:generateProto UP-TO-DATE\n> Task :modules:ipc-common:compileJava UP-TO-DATE\n> Task :modules:ort-common:compileJava UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:reranker:compileJava UP-TO-DATE\n> Task :modules:worker-core:compileJava UP-TO-DATE\n> Task :modules:worker-services:compileJava UP-TO-DATE\n> Task :modules:indexer-worker:compileJava UP-TO-DATE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:indexer-worker:jar UP-TO-DATE\n> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE\n> Task :modules:adapters-lucene:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:classes UP-TO-DATE\n> Task :modules:adapters-lucene:jar UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:adapters-lucene:compileTestFixturesJava UP-TO-DATE\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar UP-TO-DATE\n> Task :modules:ai-backend:processResources UP-TO-DATE\n> Task :modules:ai-backend:classes UP-TO-DATE\n> Task :modules:ai-backend:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:app-agent:compileJava UP-TO-DATE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:app-agent:jar UP-TO-DATE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:app-config:compileJava UP-TO-DATE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-config:jar UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava UP-TO-DATE\n> Task :modules:app-inference:compileJava UP-TO-DATE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-inference:jar UP-TO-DATE\n> Task :modules:app-util:compileJava UP-TO-DATE\n> Task :modules:infra-core:compileJava UP-TO-DATE\n> Task :modules:prompt-support:compileJava UP-TO-DATE\n> Task :modules:app-observability:compileJava UP-TO-DATE\n> Task :modules:app-observability:processResources UP-TO-DATE\n> Task :modules:app-observability:classes UP-TO-DATE\n> Task :modules:app-observability:jar UP-TO-DATE\n> Task :modules:app-services:compileJava UP-TO-DATE\n> Task :modules:app-services:processResources UP-TO-DATE\n> Task :modules:app-services:classes UP-TO-DATE\n> Task :modules:app-services:jar UP-TO-DATE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-util:jar UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:configuration:testFixturesJar UP-TO-DATE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar UP-TO-DATE\n> Task :modules:ort-common:compileTestFixturesJava UP-TO-DATE\n\n> Task :modules:indexer-worker:compileTestJava\n\n> Task :modules:indexer-worker:processTestResources UP-TO-DATE\n> Task :modules:indexer-worker:testClasses\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:infra-core:jar UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources UP-TO-DATE\n> Task :modules:ipc-common:processResources UP-TO-DATE\n> Task :modules:ipc-common:classes UP-TO-DATE\n> Task :modules:ipc-common:jar UP-TO-DATE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ort-common:jar UP-TO-DATE\n> Task :modules:ort-common:processTestFixturesResources NO-SOURCE\n> Task :modules:ort-common:testFixturesClasses UP-TO-DATE\n> Task :modules:ort-common:testFixturesJar UP-TO-DATE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:prompt-support:jar UP-TO-DATE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:reranker:jar UP-TO-DATE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar UP-TO-DATE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar UP-TO-DATE\n\n> Task :modules:indexer-worker:test\n\nVerifierCappedBacklogStatusTest > extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards() FAILED\n    org.opentest4j.AssertionFailedError at VerifierCappedBacklogStatusTest.java:102\n\n\n> Task :modules:indexer-worker:test\n\nVerifierCappedBacklogStatusTest > previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause() FAILED\n    org.opentest4j.AssertionFailedError at VerifierCappedBacklogStatusTest.java:61\n\n> Task :modules:indexer-worker:test FAILED\n> Task :modules:indexer-worker:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/before-2a936a7e1/build/reports/problems/problems-report.html\n82 actionable tasks: 2 executed, 80 up-to-date\nConfiguration cache entry reused.\n\ngradle-slot: slot 2 after 0s\nNOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/jvm/before\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nNOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/jvm/before\nWARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)\nWARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\nWARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n\n2 tests completed, 2 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:indexer-worker:test'.\n> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/before-2a936a7e1/modules/indexer-worker/build/reports/tests/test/index.html\n\nBUILD FAILED in 13s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause",
+        "classification": "assertion",
+        "detail": "previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: I7 includes earlier outage batches, not just rows in the current batch ==> expected: <WAITING> but was: <INDEXING>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards",
+        "classification": "assertion",
+        "detail": "extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: earlier writer outages extend to the pause deadline ==> expected: <1792655838451> but was: <1792655829451>"
+      }
+    ]
+  },
+  "digest": "sha256:05fad45be2fd6ce18950eb93f34e0efd05062b20174f9c148b760e35367e8567"
+}

@@ -739,8 +739,20 @@ public class IndexingLoop implements Closeable {
         // Batch processing: extract all → batch embed → build+write
         long retryAtMs = processBatch(jobs);
         // Row deadlines alone do not throttle an outage while fresh backlog remains ready.
-        if ((writer.deferredBatch() || extractor.deferredBatch())
-            && !sleepAfterError(Math.max(0, retryAtMs - System.currentTimeMillis()))) break;
+        if (writer.deferredBatch() || extractor.deferredBatch()) {
+          // Earlier batches may have shorter deadlines than this growing service pause.
+          try {
+            jobQueue.extendServiceOutageDeferrals(retryAtMs);
+          } catch (RuntimeException extendFailure) {
+            // A queue that rejects this update rejected the deferrals too; still pause in full.
+            long nowNs = System.nanoTime();
+            if (lastExtendFailureLogNs == 0L || nowNs - lastExtendFailureLogNs >= 60_000_000_000L) {
+              lastExtendFailureLogNs = nowNs;
+              log.warn("Could not extend service-outage deferrals; pausing anyway", extendFailure);
+            }
+          }
+          if (!sleepAfterError(Math.max(0, retryAtMs - System.currentTimeMillis()))) break;
+        }
 
         // Time-based commit strategy (every 10s or when buffer is full)
         long now = System.currentTimeMillis();
@@ -936,6 +948,7 @@ public class IndexingLoop implements Closeable {
   private static final long HEARTBEAT_INTERVAL_MS = LivenessWindows.HEARTBEAT_INTERVAL_MS;
 
   private long lastHeartbeatMs = 0L;
+  private long lastExtendFailureLogNs = 0L;
 
   /** Beat now: signal this loop still owns its PROCESSING rows (best-effort, never throws). */
   private void heartbeat() {

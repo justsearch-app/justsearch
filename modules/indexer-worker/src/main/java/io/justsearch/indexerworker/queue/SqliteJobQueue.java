@@ -2375,6 +2375,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     deferWithOutcome(path, outcome, entry, null, 0L);
   }
 
+  @Override
+  public void extendServiceOutageDeferrals(long retryAtMs) {
+    lock.lock();
+    try {
+      ensureOpen();
+      // The policy distinguishes service grace/outages from the counted file retry ladders.
+      // The outcome class excludes other uncounted deferrals (stale sources/cloud placeholders).
+      try (var update = connection.prepareStatement("""
+          UPDATE jobs SET retry_after = ?
+          WHERE state = 'PENDING' AND retry_after < ?
+            AND last_retry_policy = 'DEFER_WITHOUT_ATTEMPT'
+            AND last_outcome_class IN ('WRITE_FAILED', 'WRITE_UNAVAILABLE_DRAINING')
+          """)) {
+        update.setLong(1, retryAtMs);
+        update.setLong(2, retryAtMs);
+        executeMutation(update::executeUpdate);
+      }
+    } catch (SQLException failure) {
+      throw new OutcomeWriteException("Could not extend service-outage deferrals", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
   private void deferWithOutcome(Path path, IngestionOutcome outcome,
       JobQueue.IngestionLedgerEntry entry, IndexJob claim, long retryAtMs) {
     lock.lock();

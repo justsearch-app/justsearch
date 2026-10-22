@@ -672,6 +672,9 @@ public interface JobQueue extends Closeable {
     return deferClaim(claim, outcome, entry);
   }
 
+  /** Extend earlier pending service-outage deferrals to this pause's deadline, preserving file retries. */
+  default void extendServiceOutageDeferrals(long retryAtMs) {}
+
   /**
    * Marks multiple jobs as successfully completed in a single batch operation.
    *
