@@ -431,3 +431,14 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
   "note": "I7 fails: during a capped real SQLite outage, 48 of 64 deferred rows are ready while zero process and status reports INDEXING."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a162b5-e897-7ed3-a4aa-a16e63f4a1cc",
+  "verdict": "reject",
+  "digest": "sha256:97b45cdcdd7c91157e53cb97df372b30efba7f623b547e4a4a65fec88f27c2ca",
+  "note": "U17 fails: a real closed SqliteDocumentIdentityStore charges both healthy rows and schedules minute-scale retries after three grace batches."
+}
+```
