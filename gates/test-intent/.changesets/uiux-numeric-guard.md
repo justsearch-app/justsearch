@@ -2078,3 +2078,14 @@ Component/frontend checks do not substitute for those running-system checks.
   "note": "Expectations accepted under NX3; 48 named checks rerun with zero skips. Five selected repairs assertion-fail on 062011106 and seven on 76efc1c10. This accepts test intent, not the implementation: independent grouped-value and Unicode-form checks fail. Evidence: /home/elias/.cache/am/8dh3rho2/evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp45-nx3a-5_kbpd38",
+  "verdict": "reject",
+  "digest": "sha256:d9670d02a88feb1cb62e41c8caaeb58577e72e3966cf10f9a0d342a8f70857f1",
+  "note": "Reject source provenance: four NX3a warrants in entries 11 and 14 are owner-adopted-scenario, but the supplied agreement labels NX3a agent-adopted under delegation. Use delegated-choice with the delegation and scope. The three fresh repair checks pass after and assertion-fail before; implementation separately fails grouping and compatibility-code cases."
+}
+```
