@@ -780,3 +780,14 @@ EX1 preservation follow-up (baseline 4a7f96624): the existing Worker/index/queue
   "note": "Reject provenance: five entries cite XA1 as owner-adopted, but the verification brief explicitly identifies it as a delegated orchestrator decision. Cite delegation plus the XA1 choice using delegated-choice. Repair checks pass candidate and fail baseline assertions as required; this rejection does not dispute that behavior."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp32-verifier4-v6o7bin7",
+  "verdict": "accept",
+  "digest": "sha256:ddc6c1528dcb94b26738f2159a12e7d75e8f0742000ef76478efe3d6567c8649",
+  "note": "Independent review of before-state tests, agreed sources and diff; EX1 only adapts the fake to completion-aware deletion and keeps every assertion; actual completed, buffered and error Worker replies checked. Five XA1 citations correctly identify a delegated choice. Scratch run-evidence repairs fail by assertions on their historical before states; preservation checks pass. This accepts test intent only: product verification fails S32.2 because override Preview and Apply differ from the list the editor says they use. See verifier-4 evidence report."
+}
+```
