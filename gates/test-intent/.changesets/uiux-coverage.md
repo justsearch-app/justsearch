@@ -290,3 +290,14 @@ The builder has not authored an acceptance record.
   "note": "Accept expectation provenance and execution only. HC1-HC6/HC8, HN1-HN5 and delegated D1 support these New checks; none weakens an existing expectation. Independent scratch reruns: all 25 candidate checks passed, 12 original repairs failed by assertion on 1016257d2, three source-panel repairs failed by assertion on ea2b423b3, and all 10 preservation checks passed before. Offline npx wrapper bypassed the dependency-copier launcher defect. Live product verdict is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-92qvagay-20261022",
+  "verdict": "accept",
+  "digest": "sha256:093245073f455c208ae5d8d01eb8e9f89eda88d8f6976dc6f20f9880a3181266",
+  "note": "Accept expectation provenance and execution only. HC1-HC6/HC8, HN1-HN5 and delegated D1 support these New checks; no existing expectation is weakened. Scratch reruns: 19 repair checks fail by assertion on the required before states, all 30 candidate checks pass, and 11 preservation checks pass before. The 25 coverage checks also pass known-good 161163579. Product verification is reported separately."
+}
+```
