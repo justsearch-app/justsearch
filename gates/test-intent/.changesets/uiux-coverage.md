@@ -170,3 +170,14 @@ The builder has not authored an acceptance record.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-imyhj10i-20261022",
+  "verdict": "accept",
+  "digest": "sha256:c5a4d5ffe60d6d7331a864f236f1de14f60afdf8e990703b2d730e6339a83bb3",
+  "note": "Accept expectation provenance only: HC1-HC6/HC8, HN1-HN5 and delegated D1 support the New checks; no existing expectation is weakened. Independent execution: 12 repair assertions fail before, all 22 checks pass the candidate, and 10 preservation checks pass before. Scratch run-evidence passes using the retained npx wrapper to bypass the dependency copier launcher defect. Overall product verification fails HC5 for the FULLTEXT_FALLBACK saved-record counterexample and HC8 at 360px/200% text with the sidebar expanded."
+}
+```
