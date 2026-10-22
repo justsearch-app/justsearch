@@ -71,15 +71,21 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     index(building, doc("b1", "/docs/a.txt", null));
     commit(building);
 
-    CoreStatus core =
-        buildStatus(building.indexCountOps(), serving.indexCountOps()).getCore();
+    var status = buildStatus(building.indexCountOps(), serving.indexCountOps());
+    CoreStatus core = status.getCore();
+    assertEquals(1, status.getMigration().getBuildingDocCount());
+    assertEquals(4, status.getMigration().getActiveDocCount());
 
     assertEquals(
         3,
         core.getSearchableDocCount(),
         "searchable must describe what a search can return NOW — the serving generation");
     assertEquals(
-        1, core.getDocCount(), "docCount keeps its meaning: the ingest reader's non-chunk total");
+        4, core.getDocCount(), "indexed count follows searchable parents in the serving generation");
+    // Reopen the serving generation with the queue history unchanged.
+    serving.close();
+    serving = open("serving");
+    assertEquals(4, buildStatus(building.indexCountOps(), serving.indexCountOps()).getCore().getDocCount());
     assertNotEquals(
         core.getDocCount(),
         core.getSearchableDocCount(),
@@ -160,6 +166,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
       IndexCountOps ingestCountOps, IndexCountOps searchCountOps) {
     JobQueue jobQueue = mock(JobQueue.class);
     when(jobQueue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+    when(jobQueue.completedCount()).thenReturn(91L);
     when(jobQueue.pendingBytes()).thenReturn(JobQueue.PendingBytes.EMPTY);
 
     IndexStatusOps ops =

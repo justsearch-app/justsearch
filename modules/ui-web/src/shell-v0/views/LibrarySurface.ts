@@ -177,6 +177,7 @@ export class LibrarySurface extends JfElement {
     activeTab: { state: true },
     provisional: { state: true },
     indexingActivity: { state: true },
+    retryWaiting: { state: true },
     enrichmentStages: { state: true },
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
@@ -246,6 +247,7 @@ export class LibrarySurface extends JfElement {
    * snapshot arrives, which the seam reads as "coverage unknown" (no percent).
    */
   declare indexingActivity: ReturnType<typeof selectIndexingProgress>['activity'];
+  declare retryWaiting: boolean;
   declare enrichmentStages: EnrichmentApplicability | null;
   /**
    * 809 finding 1 — the enrichment backfill still owes work, so a drained folder is keyword-searchable
@@ -324,6 +326,7 @@ export class LibrarySurface extends JfElement {
     this.activeTab = 'folders';
     this.provisional = false;
     this.indexingActivity = selectIndexingProgress(null, false, 0, []).activity;
+    this.retryWaiting = false;
     this.enrichmentStages = null;
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
@@ -636,6 +639,7 @@ export class LibrarySurface extends JfElement {
         s.enrichSettleSamples,
       );
       this.indexingActivity = progress.activity;
+      this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
       // row cannot render an unqualified "✓ … Verified just now" over an index with no vectors.
@@ -733,6 +737,7 @@ export class LibrarySurface extends JfElement {
         enrichmentStages: this.enrichmentStages,
         enrichmentPending: this.enrichmentPending,
         enrichmentBlocked: this.enrichmentBlocked,
+        retryWaiting: this.retryWaiting,
         // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
         // re-queue window, when the wire row reports the failures as in-flight instead.
         lastKnownFailed: this.lastKnownFailed[pathHash],
@@ -1500,6 +1505,7 @@ export class LibrarySurface extends JfElement {
       enrichmentStages: this.enrichmentStages,
       enrichmentPending: this.enrichmentPending,
       enrichmentBlocked: this.enrichmentBlocked,
+        retryWaiting: this.retryWaiting,
       // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });
