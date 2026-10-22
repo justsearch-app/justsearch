@@ -40,13 +40,13 @@ export function workflowJobs(text) {
 // Production credit requires both PR and push execution. Dispatch-only and
 // arbitrary conditions cannot substitute for those events.
 export function runsOnPrAndPush(condition) {
-  return !condition || condition === "github.event_name != 'merge_group'";
+  return !condition || condition === 'always()' || /^needs\.changes\.outputs\.[a-z]+ != 'false'$/.test(condition);
 }
 
 // Recognize only a fail-closed aggregate on PRs and pushes: every dependency
 // must be exactly success, with no other commands or tolerated failures.
 export function aggregateDependencies(job) {
-  if (!['always()', "always() && github.event_name != 'merge_group'"].includes(job.if)
+  if (job.if !== 'always()'
       || job['continue-on-error'] || job.runs.length !== 1) return [];
   const match = /^\[([\w, -]+)\]$/.exec(job.needs ?? '');
   if (!match) return [];
@@ -56,7 +56,8 @@ export function aggregateDependencies(job) {
   if (checks.length !== dependencies.length || job.runs[0].step?.if || job.runs[0].step?.['continue-on-error']) return [];
   const checked = [];
   for (const check of checks) {
-    const test = /^test "\$([A-Z_]+)" = success$/.exec(check);
+    const test = /^test "\$([A-Z_]+)" = success$/.exec(check)
+      ?? /^\[\[ "\$([A-Z_]+)" = success \|\| "\$\1" = skipped \]\]$/.exec(check);
     if (!test) return [];
     const binding = new RegExp(`^          ${test[1]}: \\$\\{\\{ needs\\.([\\w-]+)\\.result \\}\\}\\s*$`, 'm').exec(job.text);
     if (!binding) return [];
@@ -142,8 +143,7 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
     const enforcedRuns = job.runs.filter((r) => {
       if (r.step?.['continue-on-error']) return false;
       const condition = r.step?.if;
-      if (runsOnPrAndPush(condition) || condition === 'always()'
-          || condition === "always() && github.event_name != 'merge_group'") return true;
+      if (runsOnPrAndPush(condition)) return true;
       const matrix = /^matrix\.(\w+) == ['"]([\w-]+)['"]$/.exec(condition);
       return matrix && new RegExp(`${matrix[1]}: ['"]?${matrix[2]}['"]?\\s*$`, 'm').test(job.text);
     });

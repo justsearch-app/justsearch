@@ -49,16 +49,25 @@ if (files.length < MIN_EXPECTED_FILES) {
 }
 
 let passed = 0;
+let skipped = 0;
 const failures = [];
 
 for (const file of files) {
   const rel = path.relative(process.cwd(), file);
+  if (process.env.JUSTSEARCH_PR_CI === 'true' && path.basename(file) === 'test-dev-runner-stop-census.mjs') {
+    skipped++;
+    console.log(`SKIP main-only: ${rel}`);
+    continue;
+  }
   if (VERBOSE) console.log(`RUN   ${rel}`);
   const started = Date.now();
   const res = spawnSync(process.execPath, [file], { encoding: 'utf8' });
   const tookMs = Date.now() - started;
   if (res.status === 0) {
     passed++;
+    for (const line of (res.stdout || '').split(/\r?\n/)) {
+      if (line.startsWith('SKIP PR flake:')) console.log(line);
+    }
     if (VERBOSE) console.log(`PASS  ${rel} (${tookMs}ms)`);
   } else {
     failures.push({ rel, res });
@@ -69,7 +78,7 @@ for (const file of files) {
   }
 }
 
-console.log(`\ndev-runner: ${passed}/${files.length} test files passed`);
+console.log(`\ndev-runner: ${passed}/${files.length - skipped} selected test files passed (${skipped} main-only files skipped)`);
 if (failures.length) {
   console.log(`failed: ${failures.map((f) => f.rel).join(', ')}`);
   process.exit(1);

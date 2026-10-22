@@ -310,7 +310,9 @@ final class IndexStatusOps {
   /** Builds the full {@link StatusResponse} for the indexStatus RPC. */
   StatusResponse buildStatusResponse() {
     // --- Pre-computation (shared across sub-messages) ---
-    long queueDepth = jobQueue.queueDepth();
+    JobQueue.JobStateCounts counts = jobQueue.jobStateCounts();
+    // One queue observation owns both the state and all backlog slices.
+    long queueDepth = counts.pendingCount() + counts.processingCount();
     JobQueue.FailureSummary failures = jobQueue.failureSummary();
 
     // Task t-20261013-ef3c41: a count that has never been read successfully is unknown, not 0. The
@@ -326,23 +328,9 @@ final class IndexStatusOps {
       activeDocCount = active.orElse(0L);
     }
 
-    // "Documents indexed" counts the generation being WRITTEN while one exists — during a rebuild
-    // that is Green, and reporting Blue there would hide the build's progress. When nothing is being
-    // written (the exhausted-brake state, and the deferred window before the writer upgrade) it falls
-    // back to the reader that SERVES search, not to a job-queue counter: `completedCount()` counts
-    // DONE rows in jobs.db, which are ingest jobs and are pruned, so it has no relationship to corpus
-    // size. Live validation caught it reporting 5 while 205 documents were searchable.
-    IndexCountOps writtenOrServedCountOps = ingestCountOps != null ? ingestCountOps : activeCountOps;
-    long docCount;
-    boolean docCountUnknown = false;
-    if (writtenOrServedCountOps != null) {
-      java.util.OptionalLong written =
-          parentDocCountOrLastKnown(writtenOrServedCountOps, lastKnownWrittenDocCount);
-      docCountUnknown = written.isEmpty();
-      docCount = written.orElse(0L);
-    } else {
-      docCount = jobQueue.completedCount();
-    }
+    // The user count describes the serving generation, never DONE jobs or a half-built index.
+    long docCount = activeDocCount;
+    boolean docCountUnknown = activeCountOps == null || activeDocCountUnknown;
 
     // searchableDocCount answers "how many documents can a DEFAULT-scope search return", so it must
     // be counted on the reader that SERVES search — the same one activeDocCount reads. During a
@@ -365,15 +353,17 @@ final class IndexStatusOps {
 
     long buildingDocCount = 0;
     if (ingestCountOps != null && ingestCountOps != activeCountOps) {
-      buildingDocCount = docCount;
+      buildingDocCount = parentDocCountOrLastKnown(ingestCountOps, lastKnownWrittenDocCount).orElse(0L);
     }
 
     boolean loopFailed = indexingLoop != null && indexingLoop.hasFailed();
     String state;
     if (loopFailed) {
       state = IndexingLoop.LoopState.FAILED.name();
-    } else if (queueDepth > 0) {
+    } else if (counts.processingCount() > 0 || counts.pendingReadyCount() > 0) {
       state = "INDEXING";
+    } else if (queueDepth > 0) {
+      state = "WAITING";
     } else if (failures != null && failures.failedCount() > 0) {
       state = "ERROR";
     } else {
@@ -385,7 +375,6 @@ final class IndexStatusOps {
     IndexGenerationManager.State stateSnapshot =
         indexGenerationManager == null ? null : indexGenerationManager.readStateBestEffort();
 
-    JobQueue.JobStateCounts counts = jobQueue.jobStateCounts();
     long processingJobsCount = counts.processingCount();
 
     // --- Build sub-messages ---

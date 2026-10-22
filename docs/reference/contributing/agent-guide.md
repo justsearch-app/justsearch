@@ -346,12 +346,10 @@ The public repository has two CI postures:
 
 - The standard hosted `CI` workflow runs automatically on pull requests and
   pushes to `main`, and can also be dispatched manually. ADR-0044 owns this
-  public hosted lane. PRs and pushes to `main` run the full required set.
-  Merge-queue runs check governance, build and secrets on the combined tree;
-  runtime, unit and Windows tests do not rerun there.
-  Advisory Measured axe runs on PRs, pushes to main and manual dispatch, gathering stability
-  evidence before promotion to required. Integration tests and CI wall-clock attribution
-  run only on manual dispatch.
+  public hosted lane, amended by ADR-0053. PRs run affected lanes; main and manual dispatch
+  run the full suite, including the slow tiers. Every required name reports on every PR.
+  Measured axe stays advisory; on PRs it runs for affected frontend inputs, and it runs
+  on pushes to main and manual dispatch.
 - Self-hosted, release, and benchmark/specialty workflows stay manually dispatched unless a
   later ADR changes their trigger policy. ADR-0026 remains the historical basis for that posture.
   CodeQL runs weekly on Mondays at 04:17 UTC and can also be dispatched manually (ADR-0052).
@@ -361,9 +359,11 @@ license and notices, no-model build, unit tests, secret scan, and the
 `jseval Python suite` (required since 2026-09-05, ADR-0044 amendment). A red
 check should name the fact that failed rather than one generic build bucket.
 
-The public unit-test signal runs in four lanes: `Unit tests (app-ui-ui)`,
-`Unit tests (app-ui-services)`, `Unit tests (search-worker)`, and
-`Unit tests (platform-contracts)`. `Unit tests (app-ui)` aggregates the first two lanes.
+The public unit-test signal uses nine execution shards across UI, services, search-worker
+and platform-contracts. `Unit tests (app-ui)`, `Unit tests (search-worker)` and
+`Unit tests (platform-contracts)` aggregate their selected shards, accepting intentional skips
+and failing on a shard failure or cancellation. The expensive source sets use disjoint
+class partitions from `scripts/ci/unit-test-class-shards.v1.json`; local `test` tasks remain complete.
 Each execution lane publishes a unit-test attribution report from Gradle/JUnit XML. Use those reports to
 identify slow modules, slow suites, skipped counts, and hosted runner image
 identity before proposing another workflow split. Do not split the lanes solely
@@ -548,7 +548,7 @@ owner must be the sole writer from dry-run through read-back; do not manually
 edit the managed comment concurrently. Run `pr-review-record.mjs check --pr <N>` and
 `preview-squash-message.mjs --pr <N>` after the final push and review edit so
 findings can be corrected. The validated enqueue gateway repeats both live checks
-immediately before its queue request. The first command verifies the rich record;
+immediately before enabling auto-merge. The first command verifies the rich record;
 the second rejects review structure, template residue, provider prose, task boxes,
 and operational state from the public commit.
 
@@ -592,7 +592,7 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
   required checks green" is vacuous; seconds after a push it can read the
   superseded run's cached state; and a check you are in the middle of
   *promoting* to required is not yet in the required set, so it is skipped.
-  Before enqueueing, confirm `mergeStateStatus` is `CLEAN`, that the checks
+  Before enqueueing, confirm the PR is mergeable, that the checks
   belong to the current `headRefOid`, and that `gh pr checks <N> --required`
   lists every context you expect.
 - **`origin/main` moves under a long task.** Background re-fetches advance the
@@ -601,53 +601,24 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
   silently give a rebuilt commit a parent that already contains a later PR —
   which reverts that PR on push. Re-fetch immediately before every comparison
   and verify `git log -1 --format=%P` after any soft reset.
-**Publishing goes through the live GitHub merge queue (tempdoc 829 R4, executed
-2026-08-14).** The repo transferred to an organization, ruleset `main-merge-queue`
-gates `main` (SQUASH method, `merge_group` wired into `ci.yml`, validated end-to-end
-by PR #468 — merge-group CI + CLA no-op green, PR_TITLE/PR_BODY squash contract
-confirmed), and branch protection's `strict` (require-branches-up-to-date-before-
-merging) is now **false** — the queue integrates each entry against the current
-`main` itself, so batch-publishing disjoint PRs no longer serializes through
-`update-branch → wait-for-CI → merge` cycles (tempdoc 721's re-CI-tax finding no
-longer applies once a PR is enqueued). Practical sequence:
 
-- **Wait for the PR's own required checks, tolerating a registration race** — a
-  push's checks take a few seconds to appear; `gh pr checks <N> --watch` called
-  immediately can return `"no checks reported"` (nonzero exit — **not** a CI
-  failure; keep waiting), same as before the queue.
-- **Validate the candidate-side boundary before pushing** — `node
-  scripts/ci/run-publish-preflight.mjs --check` proves that every required
-  status context is classified in the versioned local-reproduction inventory.
-  `--list` shows which contexts have a deterministic local subset and which are
-  honestly hosted-only; `--run` executes the local subsets. The execution mode
-  requires a clean candidate—including no staged, unstaged, or non-ignored
-  untracked files—so commit the complete candidate first. This lets the secret
-  lane scan committed Git content without inspecting ignored build output made
-  by earlier lanes. Hosted-only never waives the corresponding GitHub check.
-- **Enqueue with `node scripts/dev/run-gh.mjs enqueue <N>`.** The repository-owned
-  gateway checks the live `PR_TITLE` / `PR_BODY` squash projection and exact managed
-  review record, then issues the ordinary strategy-free queue request. Direct
-  `gh pr merge` and the generic `run-gh.mjs pr merge` passthrough bypass that proof. Under the queue the accepted request
-  does not merge directly; it adds the PR to the queue. The queue runs its own
-  `merge-group` governance, build and secrets pass against the PR merged with the
-  latest `main` and merges (squash) autonomously on success.
-- **A queue rejection is a real signal, not a flake to blind-retry.** If the entry
-  drops out of the queue and the PR stays open/unmerged, the merge-group run
-  failed — pull that run (merge_group event, or the PR's checks tab) and
-  investigate before re-enqueuing.
-- **The review-record check and squash preview are the pre-publication
-  checkpoints.** The queue merges unattended, so there is no second human look
-  at the comment freshness or title/body before publication. The enqueue gateway
-  runs both and refuses the queue request on any finding. Its checks and queue
-  request remain a short sole-writer window rather than an atomic GitHub transaction.
-- **Confirm the merge landed before any cleanup** — use `node
-  scripts/dev/run-gh.mjs merge-wait <N>`. It performs the bounded queue poll,
-  emits only state transitions, and returns the landed SHA on `MERGED`.
-- **Check main's *final* HEAD is green** — after the queue merges, watch push-CI on
-  the landed SHA with `run-wait-sha`. A completed non-success result, including
-  cancellation, is not green. If a later main push supersedes and cancels that
-  run, inspect it and explicitly wait on main's newest SHA. Keep this post-merge
-  check: merge-group success has not guaranteed same-SHA main success historically.
+`node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
+record, then enables squash auto-merge bound to the validated head, title and body. A new push
+requires a new enqueue. The PR runs the union of lanes that consume its changed files; all
+required names report, including intentional skips. Unknown inputs run every lane. Strict stays
+off, so an older green base needs no update push. There is no merge queue.
+
+After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
+suite, including Integration tests, Windows stop-census, supervisor conformance and Measured axe.
+Its running CI is never cancelled; only the newest pending commit runs, and the wait command
+follows a newer run that covers the requested commit. If main fails in your change's area, open
+a fix or revert PR at once through the normal path. Report a failure in a test listed in
+`scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.
+
+Validate the local reproduction inventory with `node scripts/ci/run-publish-preflight.mjs --check`
+before pushing. Confirm the merge with `node scripts/dev/run-gh.mjs merge-wait N` before cleanup.
+The gateway's reads and write remain a short sole-writer window: avoid concurrent edits to the
+review record and PR metadata while enqueue runs. Direct merge commands bypass its validation.
 
 **Axis 2 — whether a change deserves its own PR (judgment, your call).** Squash
 fixes *intra*-PR noise; it does nothing about *inter*-PR noise — one trivial PR

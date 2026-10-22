@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from pathlib import Path
 
 import httpx
 
 from . import suite_stats
+from .readiness import wait_index_idle
 
 log = logging.getLogger(__name__)
 
@@ -136,13 +136,11 @@ def _setup_test_corpus(api_base_url: str) -> tuple[str, str, str]:
                 or not invocation.get("structuredData", {}).get("operationKey")):
             raise RuntimeError(f"Ingest operation was not accepted: {invocation}")
 
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            status = client.get("/api/status").json()
-            if (status.get("indexState") == "IDLE"
-                    and status.get("pendingJobs", 1) == 0):
-                break
-            time.sleep(0.5)
+        readiness = wait_index_idle(
+            api_base_url, expected_doc_count_min=2, timeout_sec=60, poll_interval_sec=0.5,
+        )
+        if not readiness.passed:
+            raise RuntimeError(f"UI perf indexing did not settle: {readiness.failure_reasons}")
 
         # Verify searchable
         resp = client.post(

@@ -136,6 +136,15 @@ public final class ConfigStore {
     }
   }
 
+  /**
+   * Reads only the immutable configuration snapshot, without pairing it with runtime references.
+   * Policy checks under an index/file fence use this read so they cannot queue behind a settings
+   * writer. Unlike {@link #get()}, this read does not pair the snapshot with runtime references.
+   */
+  public ResolvedConfig currentSnapshot() {
+    return current.get();
+  }
+
   /** Returns the process publication lock supplied at construction time. */
   public ReentrantReadWriteLock publicationLock() {
     return publicationLock;

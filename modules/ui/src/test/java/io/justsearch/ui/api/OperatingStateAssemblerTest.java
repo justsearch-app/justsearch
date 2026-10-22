@@ -343,7 +343,7 @@ final class OperatingStateAssemblerTest {
   private static WorkerOperationalView worker(long pending) {
     WorkerOperationalView fallback = WorkerOperationalView.fallback("SERVING");
     return WorkerOperationalViewBuilder.builder(fallback)
-        .core(new CoreIndexView(true, 10, pending, "SERVING", 0, 0))
+        .core(new CoreIndexView(true, 10, pending, pending > 0 ? "INDEXING" : "IDLE", 0, 0))
         .build();
   }
 }

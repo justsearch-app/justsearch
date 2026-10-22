@@ -4,6 +4,7 @@ import path from 'node:path';
 import test, { before, after } from 'node:test';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { casesForAdapter, engineRow } from './contract.mjs';
+import { PR_FLAKES } from '../ci/pr-flakes.mjs';
 
 const source = path.resolve(import.meta.dirname, '../..');
 const tmp = path.join(source, 'tmp');
@@ -16,10 +17,11 @@ before(() => {
   fixture = fs.mkdtempSync(path.join(tmp, 'conformance-reporting-'));
   execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', source, fixture]);
   execFileSync('git', ['-C', fixture, 'checkout', '--quiet', '--detach', 'HEAD']);
-  for (const file of ['run.mjs', 'timings.mjs', 'timings-preload.cjs', 'lifecycle.mjs', 'updater-hold.mjs',
+  for (const file of ['run.mjs', 'contract.mjs', 'timings.mjs', 'timings-preload.cjs', 'lifecycle.mjs', 'updater-hold.mjs',
     'adapters/dev-runner.mjs', 'adapters/tauri.mjs']) {
     fs.copyFileSync(path.join(source, 'scripts/supervisor-conformance', file), path.join(fixture, 'scripts/supervisor-conformance', file));
   }
+  fs.copyFileSync(path.join(source, 'governance/supervision-contract.v1.json'), path.join(fixture, 'governance/supervision-contract.v1.json'));
   fs.copyFileSync(path.join(source, '.github/workflows/ci.yml'), path.join(fixture, '.github/workflows/ci.yml'));
   fs.copyFileSync(path.join(source, 'scripts/ci/test-windows-contract-diagnostics.mjs'), path.join(fixture, 'scripts/ci/test-windows-contract-diagnostics.mjs'));
   fs.symlinkSync(path.join(source, 'node_modules'), path.join(fixture, 'node_modules'), 'junction');
@@ -74,9 +76,11 @@ before(() => {
 after(() => { if (fixture) fs.rmSync(fixture, { recursive: true, force: true }); });
 
 const suiteDir = () => path.join(fixture, 'tmp/supervisor-conformance');
-function run({ adapter = 'tauri', fault = '', fail = false, ci = '', keep = '', cleanup = adapter } = {}) {
+function run({ adapter = 'tauri', fault = '', fail = false, ci = '', keep = '', cleanup = adapter, pr = 'false' } = {}) {
   return spawnSync(process.execPath, ['--import', loader, path.join(fixture, 'scripts/supervisor-conformance/run.mjs'), '--adapter', adapter], {
-    cwd: fixture, encoding: 'utf8', env: { ...process.env, CI: ci, SUPERVISOR_CONFORMANCE_KEEP: keep,
+    cwd: fixture, encoding: 'utf8',
+    // These fixtures exercise every case, independent of the enclosing CI mode.
+    env: { ...process.env, JUSTSEARCH_PR_CI: pr, CI: ci, SUPERVISOR_CONFORMANCE_KEEP: keep,
       TEST_FAULT: fault, TEST_CASE_FAIL: fail ? '1' : '', TEST_CLEANUP: cleanup },
   });
 }
@@ -86,6 +90,19 @@ function complete(result, adapter, failures = 0) {
   assert.equal((result.stdout.match(/^(PASS|FAIL)  adapter:/gm) ?? []).length, count(adapter), result.stdout + result.stderr);
   assert.match(result.stdout, new RegExp('supervisor-conformance: ' + (count(adapter) - failures) + '/' + count(adapter) + ' checks passed'));
 }
+
+test('explicit PR mode logs every omitted conformance case and runs the rest', () => {
+  reset();
+  const result = run({ pr: 'true' });
+  const excluded = PR_FLAKES.filter(row => row.runner === 'supervisor');
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  for (const row of excluded) {
+    assert.ok(result.stdout.includes(`SKIP PR flake: ${row.source}: ${row.identifier}`), row.identifier);
+  }
+  const selected = count('tauri') - excluded.length;
+  assert.equal((result.stdout.match(/^PASS  adapter:/gm) ?? []).length, selected, result.stdout);
+  assert.match(result.stdout, new RegExp(`supervisor-conformance: ${selected}/${selected} checks passed`));
+});
 
 for (const cleanup of ['tauri', 'updater', 'dev-runner']) {
   test(`${cleanup}: failed deletion preserves base handling and runs every following case`, () => {
