@@ -75,11 +75,12 @@ test('PRs scope fixed jobs and main runs every slow tier', () => {
     assert.ok(!jobs[id].strategy, `${id}: literal check names must report even when skipped`);
   }
   for (const id of ['app-ui', 'unit-tests-search-worker', 'unit-tests-platform-contracts', 'windows-native-tests', 'secret-scan', 'public-claims']) assert.equal(jobs[id].if, 'always()', id);
-  for (const id of ['integration-tests']) assert.equal(jobs[id].if, mainOnly, id);
+  for (const id of ['integration-tests', 'module-integration-tests']) assert.equal(jobs[id].if, mainOnly, id);
   assert.equal(jobs['measured-axe'].needs, 'changes');
   assert.equal(jobs['measured-axe'].if, "needs.changes.outputs.frontend != 'false'");
   assert.equal(jobs['measured-axe'].name, 'Measured axe (advisory)');
   assert.notEqual(jobs['integration-tests']['continue-on-error'], true);
   assert.equal(jobs['ci-walltime'].if, `always() && (${mainOnly})`);
   assert.ok(jobs['ci-walltime'].needs.includes('integration-tests'));
+  assert.ok(jobs['ci-walltime'].needs.includes('module-integration-tests'));
 });

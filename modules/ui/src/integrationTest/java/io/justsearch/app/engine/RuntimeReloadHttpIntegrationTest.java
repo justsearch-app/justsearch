@@ -47,13 +47,22 @@ final class RuntimeReloadHttpIntegrationTest {
   @Test
   void idleHttpReloadRetiresBuiltInSubscriptionAndReconnects() throws Exception {
     try (var f = new Fixture()) {
-      assertEquals(1, f.holders(), "the idle built-in observer must really retain a serving view");
+      assertEquals(2, f.holders(), "the idle rows and outcomes subscriptions each retain a serving view");
+      var firstView = get(f.server, "servingView");
       assertReloadSuccess(f.post());
       f.awaitSubscriptions(2);
+      assertEquals(2, f.subscriptions.get(), "rows must reconnect after the first reload");
+      assertEquals(2, f.outcomeSubscriptions.get(), "outcomes must reconnect after the first reload");
+      assertEquals(0, f.holders(firstView), "neither subscription may retain the first view");
+      var secondView = get(f.server, "servingView");
       assertReloadSuccess(f.post());
       f.awaitSubscriptions(3);
+      assertEquals(3, f.subscriptions.get(), "rows must reconnect after the second reload");
+      assertEquals(3, f.outcomeSubscriptions.get(), "outcomes must reconnect after the second reload");
+      assertEquals(0, f.holders(firstView), "neither subscription may reacquire the first view");
+      assertEquals(0, f.holders(secondView), "neither subscription may retain the second view");
       assertEquals(2, f.opens.get());
-      assertEquals(1, f.holders(), "the observer reconnects to the replacement, without leaking A");
+      assertEquals(2, f.holders(), "only the rows and outcomes subscriptions retain the replacement view");
     }
   }
 
@@ -208,6 +217,7 @@ final class RuntimeReloadHttpIntegrationTest {
     final RunningRuntime initial = mock(RunningRuntime.class);
     final AtomicInteger opens = new AtomicInteger();
     final AtomicInteger subscriptions = new AtomicInteger();
+    final AtomicInteger outcomeSubscriptions = new AtomicInteger();
     final EngineKnowledgeClient client;
     final IndexingJobsBridgeWiring.Output bridge;
     final Javalin http;
@@ -254,6 +264,20 @@ final class RuntimeReloadHttpIntegrationTest {
       doCallRealMethod().when(ingest).setRuntimeReloadTrigger(any());
       ingest.setRuntimeReloadTrigger(reason -> swap());
       doNothing().when(ingest).setRuntimeReloadTrigger(any());
+      var outcomeConsumer = new java.util.concurrent.atomic.AtomicReference<
+          java.util.function.Consumer<IndexingJobsFrame>>();
+      doAnswer(call -> {
+        var sink = call.<java.util.function.Consumer<IndexingJobsFrame>>getArgument(0);
+        var context = call.<io.justsearch.indexerworker.services.CallContext>getArgument(1);
+        outcomeConsumer.set(sink);
+        context.onCancel(() -> outcomeConsumer.compareAndSet(sink, null));
+        if (context.cancelled()) return null;
+        outcomeSubscriptions.incrementAndGet();
+        // Like the worker, acknowledge registration only after installing the consumer.
+        sink.accept(IndexingJobsFrame.newBuilder().setSeq(1)
+            .setSnapshot(IndexingJobsSnapshot.getDefaultInstance()).build());
+        return null;
+      }).when(ingest).subscribeIndexingJobOutcomes(any(), any());
       doAnswer(call -> {
         int seq = subscriptions.incrementAndGet();
         call.<java.util.function.Consumer<IndexingJobsFrame>>getArgument(1).accept(
@@ -274,24 +298,37 @@ final class RuntimeReloadHttpIntegrationTest {
     }
 
     HttpResponse<String> post() throws Exception {
-      return transport.send(HttpRequest.newBuilder(
+      long started = System.nanoTime();
+      try {
+        return transport.send(HttpRequest.newBuilder(
           URI.create("http://127.0.0.1:" + http.port() + "/api/admin/runtime/reload"))
           .timeout(Duration.ofSeconds(12)).header("Content-Type", "application/json")
           .POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.ofString());
+      } finally {
+        System.out.printf("Runtime reload POST elapsed: %d ms%n",
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+      }
     }
 
     int holders() throws Exception {
       synchronized (get(server, "servingViewMonitor")) {
-        return (int) get(get(server, "servingView"), "holders");
+        return holders(get(server, "servingView"));
+      }
+    }
+
+    int holders(Object view) throws Exception {
+      synchronized (get(server, "servingViewMonitor")) {
+        return (int) get(view, "holders");
       }
     }
 
     void awaitSubscriptions(int count) throws Exception {
       long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
-      while ((bridge.bridge().latestSnapshotSeq() < count || holders() != 1)
+      while ((bridge.bridge().latestSnapshotSeq() < count || outcomeSubscriptions.get() < count || holders() != 2)
           && System.nanoTime() < until) Thread.sleep(5);
       assertTrue(bridge.bridge().latestSnapshotSeq() >= count, "bridge must publish a fresh snapshot");
-      assertEquals(1, holders(), "only the idle subscription retains the replacement view");
+      assertTrue(outcomeSubscriptions.get() >= count, "outcomes must install a fresh subscription");
+      assertEquals(2, holders(), "only the idle rows and outcomes subscriptions retain the replacement view");
     }
 
     @Override public void close() throws Exception {
