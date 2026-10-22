@@ -843,3 +843,14 @@ builder.
   "note": "Verified 9370e8d37: pointer repairs and split suite complete; 14 failures match main; promoted helper branch unexercised, separate forward proof passes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-pointer",
+  "verdict": "accept",
+  "digest": "sha256:9b325acacd48724b62bcacc9f3be7561de7576a2548117f8eea4dbd9780f9d69",
+  "note": "Verified 6a777c80f on Linux: 27 pointer cases, 50 isolated oracle checks, CI lint, and clarified V4 trace (tracked read-only bootstrap copies; Engine private models; no weights or main/home access). Builder fail-before evidence not independently reproduced."
+}
+```
