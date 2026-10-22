@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: hxq51l9r
+author-session: 5ha3t9t3
 ---
 
 # Test-intent entries
@@ -303,10 +303,84 @@ All checks are durable. UI expectations add Structured behavior; the Engine entr
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#puts the ONE scroller inside the content surface"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/InvalidExtractionSchemaTest.java"
+      ],
+      "class": "New",
+      "behaviour": "XD2: invalid required/properties/type structures, including nested and draft-07 schemas, fail with a reason naming the offending field; no completed answer or assistant context is saved, live or after reopening the store. Preserve valid nested/boolean schemas, local references, and supported explicit drafts.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT3",
+          "quote": "S14.3 [XT3] (ch. 4, new; broken today) Only output that parses as JSON and conforms to the schema (required fields present, declared types) is reported as a completed extraction. Malformed output with matching braces, valid JSON that violates the schema, and a schema the backend cannot apply each end in a retry or a visible failure with a reason. Holds in both windows (shared Engine). Decision D10.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XD2",
+          "quote": "XT3 \"a schema the backend cannot apply\" includes a schema whose structure is invalid JSON Schema (for example \"required\" not an array of strings, \"properties\" not an object, an unknown \"type\" value). Such a schema is refused before or at the request with a reason naming the problem; nothing is saved as a completed extraction. Validating the schema's own structure (against the JSON Schema meta-schema of the draft the backend applies, or the equivalent structural checks) is enough; choose the cheapest that covers these cases and say why.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D10 and XD2: validate the schema itself against the applied draft’s bundled meta-schema in the shared Engine. Use the installed validator and its packaged drafts; keep user-schema external loads blocked.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-schema-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/InvalidExtractionSchemaTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structuredOutcome.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "XD2: each Structured completion/failure is announced exactly once through the existing message store and real toast renderer, politely (role=status, aria-live=polite), including two identical consecutive outcomes; failures include the reason. Rerendering does not repeat it and terminal handling leaves schema focus in place. Stream promises, message subscriptions and toast timers are closed before teardown.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT9",
+          "quote": "S14.9 [XT9] (S3.8, ch. 10) The schema box has a label and is reachable by keyboard; multi-line editing never sends by accident; it is readable in both themes, under forced colours and at narrow width with the document pane open, and does not hide the transcript's last turn. Its text survives switching mode or conversation in the same tab; on reload as decision D3b. One tab's schema is never shown in or sent by another tab.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XD2",
+          "quote": "XT9: when a Structured request completes or fails, assistive technology is told once, politely (reuse the live-region mechanism Search v3 already uses; no new announcer), and focus does not move unasked.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "XD2: reuse Search v3’s existing window message/live-region channel to politely announce Structured completion and failure without moving focus. The failure remains visible in the transcript.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-outcomes-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structuredOutcome.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
+
+Repair entries appended by builder session 5ha3t9t3 on 2026-10-22. Original entries and verifier records are retained. These additions require independent acceptance on the final digest.
 
 ## Acceptance records
 

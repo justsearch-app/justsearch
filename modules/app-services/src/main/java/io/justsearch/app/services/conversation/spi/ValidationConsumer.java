@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import io.justsearch.agent.api.conversation.ConversationContext;
@@ -20,6 +21,11 @@ public final class ValidationConsumer implements StreamConsumer {
   private static final SchemaRegistry SCHEMAS = SchemaRegistry.withDefaultDialect(
       SpecificationVersion.DRAFT_2020_12,
       builder -> builder.schemaLoader(loader -> loader.block(iri -> true)));
+  // The dependency bundles the standard drafts and their meta-schemas. Only this trusted
+  // registry loads them; user schemas still cannot load external references through SCHEMAS.
+  private static final SchemaRegistry META_SCHEMAS = SchemaRegistry.withDefaultDialect(
+      SpecificationVersion.DRAFT_2020_12,
+      builder -> builder.schemaLoader(loader -> loader.fetchRemoteResources(false)));
 
   @Override public String id() { return ID; }
 
@@ -37,6 +43,12 @@ public final class ValidationConsumer implements StreamConsumer {
       JsonNode node = MAPPER.readTree(text);
       if (node == null || !node.isObject()) throw new IllegalArgumentException("Schema must be a JSON object");
       schema = SCHEMAS.getSchema(node);
+      var problems = META_SCHEMAS.getSchema(SchemaLocation.of(schema.getSchemaContext().getDialect().getId()))
+          .validate(node);
+      if (!problems.isEmpty()) {
+        throw new IllegalArgumentException(problems.stream().map(error -> error.getInstanceLocation() + ": " + error.getMessage())
+            .sorted().reduce((a, b) -> a + "; " + b).orElseThrow());
+      }
     } catch (RuntimeException e) {
       throw new IllegalArgumentException("Cannot apply extraction schema: " + e.getMessage(), e);
     }

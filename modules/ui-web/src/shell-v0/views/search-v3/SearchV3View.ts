@@ -2956,6 +2956,14 @@ export class SearchV3View extends JfElement {
           // transcript re-read after a model swap still names the one that wrote each answer.
           this.currentModelLabel,
         );
+        if (schema !== undefined && (status === 'complete' || status === 'failed' || status === 'refused')) {
+          // The existing window message channel supplies the polite live region. Failures also
+          // stay in the transcript; this notice must not interrupt speech or take keyboard focus.
+          emitEphemeralToast({
+            message: status === 'complete' ? 'Extraction complete.' : `Extraction failed: ${detail}`,
+            severity: 'info',
+          });
+        }
       }
       // Only THIS dispatch's terminal may clear the window's busy state: a later ask has already
       // installed its own controller, and clearing it here would strand a live stream with a Send
