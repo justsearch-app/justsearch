@@ -45,3 +45,14 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-reload-b99be3af6",
+  "verdict": "accept",
+  "digest": "sha256:baba939abc8116002eb7b4e7b2d7124b0863a3dea115c336dbea9fd79e8cdeae",
+  "note": "Base fails 7/7 at Fixture start().get (unstubbed outcomes never registers); candidate 7/7 x5; two production mutations (outcomes keeps old-view hold; outcomes never re-subscribes) both caught; no assertion weakened or deadline raised."
+}
+```
