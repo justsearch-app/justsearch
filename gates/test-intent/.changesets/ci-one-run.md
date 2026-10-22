@@ -261,3 +261,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder cann
   "note": "Re-accepted after an independent read: the stale created_at choice is removed, the out-of-date pending sentence is gone, and entries 1 and 3 now also cite the owner's 'yes' and 'agreed to all' for their direct scopes. Each choice lies within its delegation."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "agent-verifier-_9c1al7j",
+  "verdict": "accept",
+  "digest": "sha256:29e3fa15fc7f5ffd5a004e28a71287e1d7711f96cb4c1ecd5910efa41d9438c8",
+  "note": "Audit: classes fit the diffs; moved action-ledger assertions kept (5 mutations fail); base task inventory all owned; PR-only skips run on main; scenario and delegation scopes hold; ADR-0044/0026 conflict named and superseded by owner's later yes. Weak: no cited evidence that the four Gradle pr-flakes are flaky; scenario task field is ci-one-run, not the task id."
+}
+```
