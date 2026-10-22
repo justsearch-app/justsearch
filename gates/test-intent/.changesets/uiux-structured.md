@@ -394,3 +394,14 @@ Repair entries appended by builder session 5ha3t9t3 on 2026-10-22. Original entr
   "note": "Test intent only: sources and changed expectations match the agreed scenarios and delegated decisions. Independent Java evidence: 10 assertion failures before, 10 passes after; UI evidence: new checks fail by assertion before and pass after. Product verdict remains fail for S14.3 invalid schema acceptance and S14.9 accessibility/narrow pane findings; this record is not product sign-off."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "fq5j5k0c",
+  "verdict": "accept",
+  "digest": "sha256:f35330851a224518e61f299a44931d94fefdd6c48d68ec175eb849111947b879",
+  "note": "Test intent only. Reviewed before-state tests, agreed scenarios and delegation, then diffs; changed expectations are warranted. Independent Java evidence: 18 candidate cases pass; 10 original and 7 schema-repair assertion failures before, with one preservation case passing before. Independent UI evidence: 19 named candidate cases pass with assertion fail-before. Product verdict remains fail for XD2 duplicate exposed failure announcements and old-window rejected output displayed and reused as context. This record is not product sign-off."
+}
+```
