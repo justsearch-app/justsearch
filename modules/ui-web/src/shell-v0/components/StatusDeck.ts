@@ -26,6 +26,7 @@ import './StatusBadge.js';
 import { type NoticeTone } from '../utils/statusTone.js';
 import {
   subscribeAiState,
+  hasLiveDocumentCount,
   statusWithoutVerdictFlavor,
   type AiState,
 } from '../state/aiStateStore.js';
@@ -513,7 +514,9 @@ export class StatusDeck extends JfElement {
     const lastKnown = provisional && settled !== null;
     // Size honesty: only show a last-known size that was actually observed; otherwise '…'.
     const lastKnownSize = lastKnown && settled!.indexSizeBytes != null;
-    const docsDisp = provisional
+    const currentCount = hasLiveDocumentCount(this.aiState);
+    const lastKnownDocs = lastKnown && !currentCount;
+    const docsDisp = currentCount ? projectFact('core.files', this.aiState).value ?? '—' : provisional
       ? settled
         ? formatCount(settled.documentCount)
         : '…'
@@ -561,11 +564,12 @@ export class StatusDeck extends JfElement {
       case 'core.running-job': {
         // Tempdoc 609 §R (T1.3) — the running-job chip: hidden when idle; when work runs it shows the
         // count and (if the job knows its origin) is an operable control returning to that surface.
-        const running = this.runningTasks ?? [];
+        const running = (this.runningTasks ?? []).filter(task =>
+          !progress.activity.confirmed || progress.phase === 'indexing' || !task.id.startsWith('idxjob:'));
         if (running.length === 0) return nothing;
         const target = running.find((t) => t.originSurfaceId)?.originSurfaceId;
         const count = running.length;
-        const lastKnown = running.some(task => indexingTaskStatus(task, progress.activity) !== task.status);
+        const lastKnown = running.some(task => indexingTaskStatus(task, progress.activity, progress.phase) !== task.status);
         const text = (count === 1 ? running[0]!.label : `${count} running`) + (lastKnown ? ' — indexing last observed' : '');
         if (!target) {
           return html`<span class="group" role="img" aria-label="${name}: ${text}">
@@ -591,11 +595,11 @@ export class StatusDeck extends JfElement {
         return html`<span
           class="group"
           role="img"
-          aria-label="${name}: ${docsDisp}${lastKnown ? ' (last known)' : ''}"
-          title=${lastKnown ? 'Last known — updating' : nothing}
+          aria-label="${name}: ${docsDisp}${lastKnownDocs ? ' (last known)' : ''}"
+          title=${lastKnownDocs ? 'Last known — updating' : nothing}
         >
           ${icon({ name: 'file-text', size: 11 })}
-          <span class="val ${lastKnown ? 'stale' : ''}">${docsDisp}</span>
+          <span class="val ${lastKnownDocs ? 'stale' : ''}">${docsDisp}</span>
         </span>`;
       case 'core.size':
         return html`<span

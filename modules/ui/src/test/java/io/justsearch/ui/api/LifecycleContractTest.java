@@ -563,6 +563,44 @@ final class LifecycleContractTest {
   // test that exercises the readiness-envelope wiring path with a synthetic monitor result;
   // the same pattern can backfill telemetry coverage if needed.
 
+  @Test
+  void retryWaitingIsPublicWithoutClaimingActiveWorkOrStalledThroughput() throws Exception {
+    UiSettingsStore settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY,
+        tempDir.resolve("waiting-settings.json"));
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    KnowledgeClient workerClient = mock(KnowledgeClient.class);
+    stubWorkerReady(bootstrap);
+    BootstrapLeaseFixtures.bind(bootstrap, workerClient);
+    long retry = System.currentTimeMillis() + 120_000;
+    WorkerOperationalView base = testWorkerView(true, 37, 8, null, null, 8, 0, 0, "STALLED");
+    WorkerOperationalView waiting = WorkerOperationalViewBuilder.builder(base)
+        .core(new CoreIndexView(false, 37, 8, "WAITING", 0, 0))
+        .failure(new FailureTrackingView(2, null, null, 0, retry, 0, Map.of())).build();
+    when(workerClient.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(waiting);
+    LocalApiServer server = serverBuilder(settings).onlineAiService(OnlineAiService.unavailable())
+        .knowledgeServer(bootstrap)
+        .perSourceSearch(mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class)).build();
+    try {
+      sampleStatus(server);
+      var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+          URI.create("http://127.0.0.1:" + server.getPort() + "/api/status")).GET().build(),
+          HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, response.statusCode());
+      JsonNode json = MAPPER.readTree(response.body());
+      assertEquals("WAITING", json.at("/worker/core/indexState").asText());
+      assertEquals(8, json.at("/worker/core/pendingJobs").asLong());
+      assertEquals(37, json.at("/worker/core/indexedDocuments").asLong());
+      assertEquals(retry, json.at("/worker/failure/nextRetryAtMs").asLong());
+      assertEquals("READY", json.at("/components/index/state").asText(),
+          "terminal file failures do not make the waiting Worker control plane unavailable");
+      assertEquals("IDLE", json.at("/operating/indexing/state").asText());
+      assertFalse(StatusLifecycleHandler.hasActiveIndexWork(waiting));
+      assertNull(StatusLifecycleHandler.throughputReadinessReason(waiting));
+    } finally {
+      server.stop();
+    }
+  }
+
   /** Creates a WorkerOperationalView with specific key fields and defaults for everything else. */
   private static WorkerOperationalView testWorkerView(
       boolean indexHealthy, long indexedDocuments, long pendingJobs,
@@ -583,7 +621,8 @@ final class LifecycleContractTest {
       long pendingReadyJobsCount,
       String throughputWindowState) {
     return WorkerOperationalViewBuilder.builder()
-        .core(new CoreIndexView(indexHealthy, indexedDocuments, pendingJobs, "SERVING", 0, 0))
+        .core(new CoreIndexView(indexHealthy, indexedDocuments, pendingJobs,
+            processingJobsCount > 0 || pendingReadyJobsCount > 0 ? "INDEXING" : "IDLE", 0, 0))
         .failure(FailureTrackingView.empty())
         .migration(MigrationGenerationViewBuilder.builder()
             .pendingJobsCount(pendingJobsCount)

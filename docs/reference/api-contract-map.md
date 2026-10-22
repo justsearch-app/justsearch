@@ -321,9 +321,14 @@ fires. The pattern is named-question, not generic-dashboard (419 C3 explicit non
   the existing `gpu.recentUtilizationPercent` sparkline renders next to it.
 
 **Corpus counts — two distinct numbers (post tempdoc 811 C-4, 2026-08-06):**
-- `worker.core.indexedDocuments: long` — every non-chunk document in the index (total docs minus
+- `worker.core.indexState: string` — `INDEXING` for ready or processing jobs, `WAITING` for
+  retry-only backlog, `IDLE` when empty, `ERROR` for terminal failures with no unfinished work,
+  `FAILED` for fatal loop failure. Waiting uses the existing `worker.failure.nextRetryAtMs` and
+  total `worker.core.pendingJobs`; see [retry waiting and counts](contracts/health-readiness-contract.v1.md#retry-waiting-and-indexed-counts).
+- `worker.core.indexedDocuments: long` — every non-chunk parent document in the serving index (total docs minus
   chunk docs). Describes the INDEX. Consumed by Health (`core.files`), jseval readiness, and
-  sandbox evidence; its meaning is unchanged and must stay unchanged.
+  sandbox evidence. Building-generation progress is reported separately through
+  `worker.migration.buildingIndexedDocuments`, and completed queue rows never substitute for this count.
 - `worker.core.searchableDocuments: long` — the population a DEFAULT-scope search can actually
   return: `indexedDocuments` minus the collections the default scope excludes (today exactly
   `agent-history`). Derived in `IndexStatusOps#countDefaultScopeDocs` from
