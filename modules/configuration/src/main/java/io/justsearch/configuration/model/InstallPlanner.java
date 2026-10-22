@@ -191,15 +191,17 @@ public final class InstallPlanner {
     long totalBytes = 0;
     long resumableBytes = 0;
     // Every archive the registry extracts into each directory, planned or not: an apply retires the
-    // receipts of archives no longer listed there (a renamed pack), and only those.
-    Map<Path, List<String>> archivesByDir = new HashMap<>();
+    // receipts of archives no longer listed there (a renamed pack), and only those. Keys are
+    // normalized so lexically different spellings of one directory share one list.
+    Map<Path, Map<String, String>> archivesByDir = new HashMap<>();
     for (ModelPackage pkg : registry.packages()) {
       Path dir = installBaseDir(pkg, pkg.selectVariant(profile), modelsDir, homeDir);
       for (SupportingFile sf : pkg.supportingFiles()) {
         if (!sf.extract()) continue;
-        Path archive = dir.resolve(sf.filename());
-        archivesByDir.computeIfAbsent(archive.getParent(), k -> new ArrayList<>())
-            .add(archive.getFileName().toString());
+        Path archive = dir.resolve(sf.filename()).toAbsolutePath().normalize();
+        archivesByDir.computeIfAbsent(archive.getParent(), k -> new HashMap<>())
+            .put(archive.getFileName().toString(),
+                java.util.Objects.requireNonNullElse(sf.sha256(), ""));
       }
     }
 
@@ -365,7 +367,9 @@ public final class InstallPlanner {
                 sf.required(),
                 staged,
                 extractionOnly,
-                sf.extract() ? archivesByDir.get(targetFile.getParent()) : null));
+                sf.extract()
+                    ? archivesByDir.get(targetFile.toAbsolutePath().normalize().getParent())
+                    : null));
         if (!extractionOnly) {
           totalBytes += sf.sizeBytes();
           resumableBytes += staged;

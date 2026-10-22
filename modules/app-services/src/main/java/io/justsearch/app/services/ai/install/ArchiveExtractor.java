@@ -4,15 +4,15 @@ package io.justsearch.app.services.ai.install;
 import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.model.ArchiveExtractionState;
-import io.justsearch.configuration.persistence.AtomicFileWrites;
+import io.justsearch.configuration.model.InstallPlanner;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -36,11 +36,12 @@ final class ArchiveExtractor {
   }
 
   /**
-   * @param listedArchives file names of the archives the current registry extracts into this
-   *     destination; receipts of others are retired. Null keeps every receipt in the overlap rule.
+   * @param listedArchives file name and SHA-256 of each archive the current registry extracts into
+   *     this destination; receipts of others are retired. Null keeps every receipt in the overlap
+   *     rule and treats this archive as the destination's only one.
    */
   static void apply(
-      Path archive, Path target, String verifiedSha256, Collection<String> listedArchives)
+      Path archive, Path target, String verifiedSha256, Map<String, String> listedArchives)
       throws IOException {
     // Containment is checked against real paths resolved once here: links at or above either
     // directory are followed, links below them are refused.
@@ -50,21 +51,29 @@ final class ArchiveExtractor {
     Files.createDirectories(target);
     Path root = ArchiveExtractionState.destination(target);
     List<ArchiveExtractionState.Entry> inventory;
-    Path savedMarker = ArchiveExtractionState.receiptPath(archive).resolveSibling(
-        archive.getFileName() + ".ort-marker");
+    Path sharedMarker = root.resolve("ort-native-version.txt");
+    Path hiddenMarker = ArchiveExtractionState.hiddenMarkerPath(root);
+    ArchiveExtractionState.requireContained(root, sharedMarker);
     try (ZipFile zip = new ZipFile(archive.toFile())) {
       inventory = ArchiveExtractionState.entries(zip, root, archive);
-      // An entry may not replace another archive the registry keeps in this folder.
-      Path folder = archive.getParent();
-      for (var item : inventory) {
-        Path output = ArchiveExtractionState.outputPath(root, item.name(), archive);
-        if (listedArchives != null && listedArchives.stream()
-            .anyMatch(name -> folder.resolve(name).equals(output))) {
-          throw new IOException("Refusing zip entry that aliases a kept archive: " + item.name());
+      // An entry may not land on or below an archive the registry lists in this folder, or on its
+      // download temporaries.
+      if (listedArchives != null) {
+        for (var item : inventory) {
+          Path output = ArchiveExtractionState.outputPath(root, item.name(), archive);
+          for (String name : listedArchives.keySet()) {
+            Path listed = archiveRoot.resolve(name);
+            Path partial = InstallPlanner.partialPathFor(listed);
+            if (output.startsWith(listed) || output.startsWith(partial)
+                || output.startsWith(DownloadResume.sidecarFor(partial))) {
+              throw new IOException("Refusing zip entry that aliases a registry target: " + item.name());
+            }
+          }
         }
       }
       ArchiveExtractionState.begin(archive);
-      ArchiveExtractionState.requireNoOverlap(archive, root, inventory, listedArchives);
+      ArchiveExtractionState.requireNoOverlap(archive, root, inventory,
+          listedArchives == null ? null : listedArchives.keySet());
       cleanup(root);
       List<ZipEntry> changed = new ArrayList<>();
       List<ZipEntry> markers = new ArrayList<>();
@@ -76,50 +85,46 @@ final class ArchiveExtractor {
         if (!matches(output, entry)) changed.add(entry);
         else executable(output, output.getFileName().toString());
       }
-      // ORT's marker is the final publication even when a pack carries both marker kinds.
-      markers.sort(java.util.Comparator.comparing(e -> e.getName().endsWith("ort-native-version.txt")));
-      Path sharedMarker = root.resolve("ort-native-version.txt");
-      boolean carriesOrtMarker = markers.stream().anyMatch(e ->
-          Path.of(e.getName().replace('\\', '/')).getFileName().toString().equals("ort-native-version.txt"));
-      ArchiveExtractionState.requireContained(archiveRoot, savedMarker);
-      // Supplemental CUDA archives also invalidate ORT while changing its dependencies. Preserve
-      // the marker outside runtime discovery so an interrupted supplemental apply can restore it.
-      if (!changed.isEmpty() && !carriesOrtMarker) {
-        ArchiveExtractionState.requireContained(root, sharedMarker);
-        if (Files.isRegularFile(sharedMarker, LinkOption.NOFOLLOW_LINKS)) {
-          AtomicFileWrites.replaceStrict(savedMarker, Files.readAllBytes(sharedMarker));
-          moveAside(root, sharedMarker);
-        }
-      }
-      // Even an unchanged version string is invalid while same-version DLL bytes are changing.
+      ArchiveExtractionState.requireContained(root, hiddenMarker);
+      // Even an unchanged version string is invalid while same-version DLL bytes are changing, and
+      // supplemental CUDA archives change ORT's dependencies. ORT's marker waits outside runtime
+      // discovery until every archive here has a receipt; the other markers publish last.
       if (!changed.isEmpty()) {
+        hide(root, sharedMarker, hiddenMarker);
         for (ZipEntry marker : markers) {
-          Path output = ArchiveExtractionState.outputPath(root, marker.getName(), archive);
-          moveAside(root, output);
+          moveAside(root, ArchiveExtractionState.outputPath(root, marker.getName(), archive));
         }
       }
       for (ZipEntry entry : changed) {
         Path output = ArchiveExtractionState.outputPath(root, entry.getName(), archive);
         if (!isMarker(output)) write(root, zip, entry, output);
       }
-      // Marker publication is last, after every payload entry, including same-version repairs.
       if (!changed.isEmpty()) {
         for (ZipEntry marker : markers) {
-          write(root, zip, marker, ArchiveExtractionState.outputPath(root, marker.getName(), archive));
-        }
-      }
-      if (!carriesOrtMarker && Files.isRegularFile(savedMarker, LinkOption.NOFOLLOW_LINKS)) {
-        ArchiveExtractionState.requireContained(root, sharedMarker);
-        if (!Files.exists(sharedMarker, LinkOption.NOFOLLOW_LINKS)) {
-          Path partial = staged(root, ArchiveExtractionState.STAGING);
-          Files.write(partial, Files.readAllBytes(savedMarker), StandardOpenOption.CREATE_NEW);
-          replace(root, partial, sharedMarker);
+          Path output = ArchiveExtractionState.outputPath(root, marker.getName(), archive);
+          write(root, zip, marker, output.equals(sharedMarker) ? hiddenMarker : output);
         }
       }
     }
     ArchiveExtractionState.complete(archive, verifiedSha256, inventory);
-    try { Files.deleteIfExists(savedMarker); } catch (IOException heldOpen) { /* next apply */ }
+    // ORT's marker shows only while every archive the registry lists here has a receipt.
+    boolean ready = listedArchives == null || listedArchives.entrySet().stream().allMatch(listed ->
+        ArchiveExtractionState.hasReceipt(archiveRoot.resolve(listed.getKey()), listed.getValue()));
+    if (!ready) {
+      hide(root, sharedMarker, hiddenMarker);
+    } else if (Files.isRegularFile(hiddenMarker, LinkOption.NOFOLLOW_LINKS)) {
+      if (Files.exists(sharedMarker, LinkOption.NOFOLLOW_LINKS)) Files.delete(hiddenMarker);
+      else replace(root, hiddenMarker, sharedMarker);
+    }
     cleanup(root);
+  }
+
+  /** Moves a visible ORT marker where runtime discovery does not look, replacing an older one. */
+  private static void hide(Path root, Path sharedMarker, Path hiddenMarker) throws IOException {
+    if (Files.isRegularFile(sharedMarker, LinkOption.NOFOLLOW_LINKS)) {
+      Files.createDirectories(hiddenMarker.getParent());
+      replace(root, sharedMarker, hiddenMarker);
+    }
   }
 
   private static boolean isMarker(Path file) {

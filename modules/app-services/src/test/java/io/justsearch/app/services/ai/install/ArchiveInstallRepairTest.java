@@ -610,7 +610,8 @@ class ArchiveInstallRepairTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"second.zip", ".archive-staging/x.dll", ".archive-old/x.dll",
-      ".archive-receipts/first.zip.json", "a.dll.partial"})
+      ".archive-receipts/first.zip.json", "a.dll.partial", "second.zip/x.dll", "second.zip.partial",
+      "second.zip.partial.resume", "first.zip.partial"})
   void entryNamedLikeReservedOrKeptArchivePathFailsItsArchiveWithoutWriting(String name) throws Exception {
     var second = source("second.zip", Map.of("two.dll", "2"));
     var entries = new LinkedHashMap<String, String>();
@@ -634,5 +635,75 @@ class ArchiveInstallRepairTest {
     assertEquals(1, summary.failed());
     assertEquals("g", Files.readString(runtime().resolve("good.dll")));
     assertFalse(Files.exists(receipt("nul.zip")));
+  }
+
+  static Map<String, String> ortPack() {
+    var entries = new LinkedHashMap<String, String>();
+    entries.put("ort-native-version.txt", OrtCudaHelper.EXPECTED_ORT_NATIVE_VERSION);
+    for (String library : List.of("ort", "ort-jni", "ort-shared", "ort-cuda")) {
+      entries.put(NativeTargets.current().libraryName(library), "lib");
+    }
+    return entries;
+  }
+
+  OrtCudaHelper.OrtNativePackStatus ortStatus() {
+    return OrtCudaHelper.evaluateOrtNativePack(runtime(), null).status();
+  }
+
+  @ParameterizedTest @ValueSource(booleans = {true, false})
+  void ortMarkerStaysHiddenWhileAnotherListedArchiveFailsAndShowsOnceItIsRepaired(boolean failingFirst) throws Exception {
+    var ort = source("ort-native.zip", ortPack());
+    var cudnn = source("cudnn.zip", Map.of("cudnn.dll", "cudnn"));
+    var registry = failingFirst ? registry(cudnn, ort) : registry(ort, cudnn);
+    Files.createDirectories(runtime().resolve("cudnn.dll")); // cudnn's apply fails
+    assertEquals(1, run(plan(registry)).failed(), "cudnn's failure is reported");
+    assertFalse(Files.exists(runtime().resolve("ort-native-version.txt")), "no marker while cudnn has no receipt");
+    assertNotEquals(OrtCudaHelper.OrtNativePackStatus.SET, ortStatus());
+    Files.delete(runtime().resolve("cudnn.dll"));
+    assertEquals(0, run(plan(registry)).failed());
+    assertEquals(OrtCudaHelper.OrtNativePackStatus.SET, ortStatus(), "the repaired pack shows its marker");
+    assertTrue(plan(registry).downloads().isEmpty());
+    assertEquals(2, transfers.get());
+  }
+
+  @Test void repairingOneOfTwoFailedSupplementalArchivesKeepsTheOrtMarkerHidden() throws Exception {
+    var ort = source("ort-native.zip", ortPack());
+    assertEquals(0, run(plan(registry(source("a.zip", Map.of("a.dll", "old")),
+        source("b.zip", Map.of("b.dll", "old")), ort))).failed());
+    assertEquals(OrtCudaHelper.OrtNativePackStatus.SET, ortStatus());
+    var registry = registry(source("a.zip", Map.of("a.dll", "changed-a")),
+        source("b.zip", Map.of("b.dll", "changed-b")), ort);
+    for (String output : List.of("a.dll", "b.dll")) {
+      Files.delete(runtime().resolve(output));
+      Files.createDirectory(runtime().resolve(output));
+    }
+    assertEquals(2, run(plan(registry)).failed());
+    assertFalse(Files.exists(runtime().resolve("ort-native-version.txt")));
+    Files.delete(runtime().resolve("a.dll"));
+    assertEquals(1, run(plan(registry)).failed());
+    assertEquals("changed-a", Files.readString(runtime().resolve("a.dll")));
+    assertFalse(Files.exists(runtime().resolve("ort-native-version.txt")), "b.zip is still incomplete");
+    assertNotEquals(OrtCudaHelper.OrtNativePackStatus.SET, ortStatus());
+    Files.delete(runtime().resolve("b.dll"));
+    assertEquals(0, run(plan(registry)).failed());
+    assertEquals(OrtCudaHelper.OrtNativePackStatus.SET, ortStatus());
+    assertEquals(5, transfers.get());
+  }
+
+  @ParameterizedTest @ValueSource(strings = {"./cuda12", "cuda12/", "cuda12/."})
+  void destinationsSpelledDifferentlyShareReceiptsAndTheOverlapRule(String spelling) throws Exception {
+    var first = source("first.zip", Map.of("shared.dll", "short", "first.dll", "1"));
+    var second = source("second.zip", Map.of("shared.dll", "much longer", "second.dll", "2"));
+    var registry = new ModelRegistry(2, "spellings", List.of(
+        new ModelPackage("first", "First", "test", "cuda12", List.of(), List.of(first), 0, null),
+        new ModelPackage("second", "Second", "test", spelling, List.of(),
+            List.of(second), 0, null)));
+    for (int pass = 0; pass < 3; pass++) {
+      assertEquals(1, run(plan(registry)).failed(), "the conflicting archive fails on every run");
+      assertEquals("short", Files.readString(runtime().resolve("shared.dll")), "outputs never alternate");
+      assertTrue(Files.isRegularFile(receipt("first.zip")), "one spelling never retires the other's receipt");
+      assertFalse(Files.exists(receipt("second.zip")));
+    }
+    assertEquals(2, transfers.get());
   }
 }

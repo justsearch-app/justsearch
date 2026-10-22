@@ -39,6 +39,26 @@ public final class ArchiveExtractionState {
     return receipt.resolveSibling(receipt.getFileName() + ".pending");
   }
 
+  /** Where ORT's version marker waits, outside runtime discovery, while it must stay hidden. */
+  public static Path hiddenMarkerPath(Path destination) {
+    return destination.resolve(DIRECTORY).resolve("ort-native-version.txt");
+  }
+
+  /** A completed apply of {@code expectedSha256} is recorded for {@code archive}; outputs are not read. */
+  public static boolean hasReceipt(Path archive, String expectedSha256) {
+    try {
+      requireContained(archive.getParent(), receiptPath(archive));
+      requireContained(archive.getParent(), pendingPath(archive));
+      if (Files.exists(pendingPath(archive), LinkOption.NOFOLLOW_LINKS)
+          || !Files.isRegularFile(receiptPath(archive), LinkOption.NOFOLLOW_LINKS)) return false;
+      Receipt recorded = JSON.readValue(Files.readAllBytes(receiptPath(archive)), Receipt.class);
+      return recorded != null && expectedSha256 != null
+          && expectedSha256.equalsIgnoreCase(recorded.sha256());
+    } catch (IOException | RuntimeException invalid) {
+      return false;
+    }
+  }
+
   /**
    * Central-directory metadata only: status must never hash a multi-GB ZIP. With {@code
    * requireReceipt} false, a healthy install from before receipts counts as applied.
@@ -84,8 +104,8 @@ public final class ArchiveExtractionState {
     var entries = zip.entries();
     while (entries.hasMoreElements()) {
       var entry = entries.nextElement();
-      Path output = outputPath(target, entry.getName(), archive);
       if (entry.isDirectory()) continue;
+      Path output = outputPath(target, entry.getName(), archive);
       if (entry.getSize() < 0 || entry.getCrc() < 0 || !names.add(output)) {
         throw new IOException("Invalid or duplicate archive entry: " + entry.getName());
       }

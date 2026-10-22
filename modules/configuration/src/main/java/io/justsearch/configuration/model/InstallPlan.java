@@ -2,6 +2,7 @@
 package io.justsearch.configuration.model;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * A computed download plan — what to download given the registry, hardware, and current state.
@@ -77,10 +78,11 @@ public record InstallPlan(
    *     needs the answer at its own granularity, and each one deriving it separately is how the
    *     headline total came to disagree with the rows beneath it. Zero everywhere nothing is staged.
    * @param extractionOnly true when a kept archive needs applying; contributes no transfer bytes
-   * @param destinationArchives for an archive, the file names of every archive the current registry
-   *     extracts into its directory. Receipts there of other archives are retired when it applies, so
-   *     a renamed pack does not conflict with the one it replaced. Null when unknown: every receipt
-   *     takes part in the overlap rule.
+   * @param destinationArchives for an archive, the file name and SHA-256 of every archive the current
+   *     registry extracts into its directory. Receipts there of other archives are retired when it
+   *     applies, so a renamed pack does not conflict with the one it replaced; entries may not land on
+   *     these targets or their download temporaries; ORT's marker shows only when all have a receipt.
+   *     Null when unknown: every receipt takes part in the overlap rule.
    */
   public record PlannedDownload(
       String packageId,
@@ -93,11 +95,11 @@ public record InstallPlan(
       boolean required,
       long stagedBytes,
       boolean extractionOnly,
-      List<String> destinationArchives) {
+      Map<String, String> destinationArchives) {
 
     public PlannedDownload {
       if (stagedBytes < 0) stagedBytes = 0;
-      if (destinationArchives != null) destinationArchives = List.copyOf(destinationArchives);
+      if (destinationArchives != null) destinationArchives = Map.copyOf(destinationArchives);
     }
 
     /** Compatibility constructor: every receipt in the destination takes part in the overlap rule. */

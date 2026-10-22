@@ -160,4 +160,15 @@ class ArchiveInstallPreservationTest {
     assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(kept("links.zip"), runtime()));
     assertEquals("old", Files.readString(outside.resolve("library.dll")));
   }
+
+  @Test void directoryEntriesAreSkipped() throws Exception {
+    var entries = new LinkedHashMap<String, String>();
+    entries.put("./", "");
+    entries.put("dir/", "");
+    entries.put("dir/a.dll", "a");
+    entries.put("b.dll", "b");
+    assertEquals(0, run(plan(registry(source("dirs.zip", entries)))).failed());
+    assertEquals("a", Files.readString(runtime().resolve("dir/a.dll")));
+    assertEquals("b", Files.readString(runtime().resolve("b.dll")));
+  }
 }
