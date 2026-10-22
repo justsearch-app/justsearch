@@ -371,3 +371,14 @@ Round five repairs verifier D4 I7 without modifying #892 status logic. Its equiv
   "note": "U17/U19 and entries 1–7 pass independent checks, but I7 fails because indexState reports INDEXING during the capped outage pause with zero rows processing."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16264-47fb-7912-9eba-53a30f2ddd51",
+  "verdict": "reject",
+  "digest": "sha256:d38f885f634e520ea12e3c42b478fcb75f1dcd48f23db507c6958f0c035bb69c",
+  "note": "I7 fails: during a capped real SQLite outage, 48 of 64 deferred rows are ready while zero process and status reports INDEXING."
+}
+```
