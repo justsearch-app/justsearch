@@ -83,6 +83,7 @@ export interface ToolCall {
   status: ToolCallStatus;
   output?: string;
   success?: boolean;
+  errorCode?: string;
   rejectReason?: string;
   executionId?: string;
   /**
@@ -1160,6 +1161,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       status: 'completed',
       success,
       output: (result?.output as string) ?? (data.output as string) ?? '',
+      errorCode: (result?.errorCode as string) ?? (data.errorCode as string) ?? undefined,
       executionId: (result?.executionId as string) ?? (data.executionId as string) ?? undefined,
       structuredData:
         (result?.structuredData as Record<string, unknown>) ??
