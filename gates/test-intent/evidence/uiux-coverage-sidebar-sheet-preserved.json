@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T16:11:09.156Z",
+  "revision": "bac257782c699e13b25cc77543a0d846e0354ff6",
+  "tree": "2b8957341ddb01a0992284dfcf51b15e6b9d1257",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/e0maobpb/tmp/test-intent-vitest-3724982-1792685466423.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2732
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts#HC8 the expanded inline sidebar keeps its Escape and has no backdrop",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e96885a2b26157f1b81b1ee65072abb1a14a1b1ed4fd73e0a81298f6a5d16146",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HC8 the expanded inline sidebar keeps its Escape and has no backdrop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts#HC8 an IME Escape leaves the sidebar sheet open",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sidebarSheet.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e96885a2b26157f1b81b1ee65072abb1a14a1b1ed4fd73e0a81298f6a5d16146",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HC8 an IME Escape leaves the sidebar sheet open",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3351cde6778034239d5e1b6606e167264bdd766fc256b4d0fa6515963748b4f8"
+}

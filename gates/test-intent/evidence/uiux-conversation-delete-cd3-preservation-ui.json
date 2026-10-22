@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T03:14:22.585Z",
+  "revision": "c1cd13378d6a79a9aad776beeee28071e1c1c4a3",
+  "tree": "b32c151ecf93e8dbbf2cbd17d9553a8adccf7ae4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationDeletionRefresh.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4143355-1792638861655.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 929
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#an authoritative list permits an intentionally restored backup identity",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c13e5e0dd7fcffbdbf38c62fd38df0c9446c1934545b2a89c7262dd0e63ab637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an authoritative list permits an intentionally restored backup identity",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:eddf4e2e133836232e37e0497c817aa04b271bafc135f130b284f03c4d9f3578"
+}

@@ -1,0 +1,181 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T14:45:58.236Z",
+  "revision": "1016257d2f200a6fd39bc1b4e88d20595e66223f",
+  "tree": "110a3a254df3c31abac1bf5c269cadfe6206e2d0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-coverage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/u6l0buyh/tmp/test-intent-vitest-865251-1792593955855.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2380
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HC3 HC4 HN1 preserve complete and legacy prose frames and marks without extra notes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HC3 HC4 HN1 preserve complete and legacy prose frames and marks without extra notes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN2 keeps the producer gate for EMBEDDING_COSINE live and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN2 keeps the producer gate for EMBEDDING_COSINE live and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN2 keeps the producer gate for NONE live and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN2 keeps the producer gate for NONE live and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN2 keeps the producer gate for UNKNOWN live and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN2 keeps the producer gate for UNKNOWN live and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN2 keeps the producer gate for null live and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN2 keeps the producer gate for null live and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN2 keeps the producer gate for  live and cold",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN2 keeps the producer gate for  live and cold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN3 HN5 keep agent turns without Ask coverage notes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN3 HN5 keep agent turns without Ask coverage notes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN3 HN5 keep halted turns without Ask coverage notes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN3 HN5 keep halted turns without Ask coverage notes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN3 HN5 keep refused turns without Ask coverage notes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN3 HN5 keep refused turns without Ask coverage notes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts#HN3 HN5 keep failed turns without Ask coverage notes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5102010e3c582dbb27aadab070f8e9cf8f0569c94cceaa8656c716bacff45bd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2a coverage honesty HN3 HN5 keep failed turns without Ask coverage notes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:647e28a22d5eb5f8dba814ff58eef34d7899124fe77d40716bc997aff043d39a"
+}

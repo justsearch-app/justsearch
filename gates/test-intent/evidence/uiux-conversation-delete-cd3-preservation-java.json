@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T14:33:31.648Z",
+  "revision": "5a71c91bff14601f36a391f80c478df4588018b2",
+  "tree": "e18b31a9032dbd84ac32d0d1d4f5e22d5b5129ce",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ConversationRestoreAfterDeleteTest.explicitBackupImportCanRestoreAndExtendADeletedConversation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7091
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationRestoreAfterDeleteTest.java#explicitBackupImportCanRestoreAndExtendADeletedConversation",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationRestoreAfterDeleteTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6dc4f0b4d6f59e9e219f8eba968ceee8df8f58123218e0951323a8bd4c80bc94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitBackupImportCanRestoreAndExtendADeletedConversation()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a5e2d6c70562d056ab3cb02a7fb3379014629ff57baf01b336f7d43313df9271"
+}

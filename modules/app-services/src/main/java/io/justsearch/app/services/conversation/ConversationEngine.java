@@ -269,7 +269,14 @@ public final class ConversationEngine {
       boolean background,
       OperationScopeFactory scopeFactory) {
     Objects.requireNonNull(scopeFactory, "scopeFactory");
-    try (var work = admission == null ? null : admission.attach(engineContext)) {
+    Map<String, Object> safeBody = body == null ? Map.of() : body;
+    String conversationId = catalog.findById(shapeId).map(shape -> persistenceKey(shape, safeBody)).orElse(null);
+    if (conversationId == null && safeBody.get("conversationId") instanceof String id && !id.isBlank()) {
+      conversationId = id;
+    }
+    var writers = conversationStore.conversationWork();
+    try (var ignoredWriting = writers == null ? null : writers.start(conversationId);
+        var work = admission == null ? null : admission.attach(engineContext)) {
       EngineContext context = work == null ? engineContext : work.context();
       if (work != null) work.cancellationReason().ifPresent(reason -> {
         throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
@@ -413,6 +420,7 @@ public final class ConversationEngine {
       return;
     }
 
+    conversationStore.createSession(recordKey, shape.id().value());
     conversationStore.appendMessage(recordKey, shape.id().value(), threadUserMessage(body));
     // Tempdoc 863 §4.A.5 (F2) — the run's own id, observed on the sink. It rides onto the persisted
     // answer so the thread projection can suppress the run plane's copy of THIS run's answer only
@@ -623,6 +631,7 @@ public final class ConversationEngine {
       if (retrievalRecordId != null && conversationStore != null
           && (!injectorRun.retrievalMetadata.isEmpty() || standalone != null || "core.extract".equals(shape.id().value()))
           && injectorRun.terminalError != null) {
+        conversationStore.createSession(retrievalRecordId, shape.id().value());
         conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
         persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
@@ -633,7 +642,8 @@ public final class ConversationEngine {
     ctx.appendMessages(injectorRun.messages);
     // Slice 496 §3.B: persist injected messages (which include the user's input)
     // for PERSISTENT shapes so the conversation store has the full thread.
-    if (sessionId != null && conversationStore != null) {
+    if (sessionId != null && conversationStore != null && !injectorRun.messages.isEmpty()) {
+      conversationStore.createSession(sessionId, shape.id().value());
       for (Map<String, Object> msg : injectorRun.messages) {
         conversationStore.appendMessage(sessionId, shape.id().value(), msg);
       }
@@ -641,6 +651,7 @@ public final class ConversationEngine {
       // Tempdoc 561 P-A/P-B: record the CLEAN user turn (the user's actual question), NOT the
       // context-augmented injector message — RAGContext injects "Documents:\n<retrieved>\n\nQuestion:
       // <q>" for the LLM, which must never become the thread's user bubble.
+      conversationStore.createSession(threadId, shape.id().value());
       conversationStore.appendMessage(threadId, shape.id().value(), threadUserMessage(body));
     }
 
@@ -1300,6 +1311,7 @@ public final class ConversationEngine {
       List<ReasoningTrace> reasoning, Consumer<SseEvent> sink) {
     if (recordId != null && conversationStore != null) {
       if (!questionRecorded) {
+        conversationStore.createSession(recordId, shape.id().value());
         conversationStore.appendMessage(recordId, shape.id().value(), threadUserMessage(body));
       }
       Map<String, Object> outcome = new LinkedHashMap<>(retrievalMetadata);

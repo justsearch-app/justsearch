@@ -16,6 +16,7 @@
  * Side-effect registers <jf-sv3-main>.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { coverageHonesty, coverageNote, groundingCoverage } from '../../components/chat/evidenceProjection.js';
 import { JfElement } from '../../primitives/JfElement.js';
 // The product's ONE reading-position authority (tempdoc 565 §21), and this surface is its SECOND
 // adopter — 565 §21 deferred "the general multi-surface authority … to the 2nd adopter", so the
@@ -799,6 +800,14 @@ export class Sv3Main extends JfElement {
       .sv3-citations {
         display: block;
         margin: var(--space-2) 0 0;
+        overflow-wrap: anywhere;
+      }
+      .coverage-note {
+        margin: var(--space-2) 0 0;
+        color: var(--secondary-label);
+        font-size: var(--font-size-sv3-sm);
+        line-height: 1.5;
+        overflow-wrap: anywhere;
       }
       .answer-empty {
         color: var(--secondary-label);
@@ -2002,9 +2011,19 @@ export class Sv3Main extends JfElement {
                     ></jf-markdown-block>`}
               </div>
             `}
-        ${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.citations(turn)}
+        ${this.coverageNote(turn)}${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.citations(turn)}
       </div>
     `;
+  }
+
+  /** The shared Ask coverage note; ordinary turn text, outside streaming announcements. */
+  private coverageNote(turn: Sv3Turn): TemplateResult | typeof nothing {
+    if (turn.kind !== 'ask' || turn.status !== 'complete' || turn.evidence === null) return nothing;
+    const evidence = turn.evidence;
+    const note = coverageNote(groundingCoverage(
+      evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal,
+    ));
+    return note === null ? nothing : html`<p class="coverage-note" data-testid="sv3-turn-coverage">${note}</p>`;
   }
 
   /**
@@ -2702,6 +2721,7 @@ export class Sv3Main extends JfElement {
       .retrievalMode=${turn.evidence.retrievalMode}
       .groundingIncomplete=${turn.evidence.groundingIncomplete ?? false}
       .sourceCoverage=${[...(turn.evidence.sourceCoverage ?? [])]}
+      .groupByCoverage=${turn.kind === 'ask'}
       @citation-select=${this.onCitationSelect}
     ></jf-citations-panel>`;
   }

@@ -101,6 +101,7 @@ final class CitationInclusionPersistenceTest {
     assistant.put("citations", done.donePayloadEntries().get("citations"));
 
     var store = new FileConversationStore(storeRoot);
+    store.createSession("session-849", "rag-ask");
     store.appendMessage("session-849", "rag-ask", assistant);
 
     List<Map<String, Object>> history = store.loadHistory("session-849");

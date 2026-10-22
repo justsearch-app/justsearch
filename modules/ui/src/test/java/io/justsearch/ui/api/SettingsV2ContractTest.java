@@ -40,7 +40,7 @@ final class SettingsV2ContractTest {
   void generateFixtureAndVerifyRoundTrip() throws Exception {
     SettingsV2 original = new SettingsV2(
         new UiSettingsV2("dark", true, "compact", true, "reveal", 400,
-            true, "advanced", true, List.of("*.tmp", "node_modules/**"), true),
+            "advanced", true, List.of("*.tmp", "node_modules/**"), true),
         new LlmSettingsV2("llama-server.exe", 8192, 2048, 35, "C:/models/chat.gguf", null),
         List.of("C:/docs", "D:/papers"),
         "read_write", new io.justsearch.app.api.settings.SettingsWitness(0, null), null, null,
@@ -69,7 +69,6 @@ final class SettingsV2ContractTest {
     assertEquals(original.ui().vimMode(), roundTripped.ui().vimMode());
     assertEquals(original.ui().defaultAction(), roundTripped.ui().defaultAction());
     assertEquals(original.ui().inspectorWidth(), roundTripped.ui().inspectorWidth());
-    assertEquals(original.ui().pauseIndexingDuringAi(), roundTripped.ui().pauseIndexingDuringAi());
     assertEquals(original.ui().mode(), roundTripped.ui().mode());
     assertEquals(original.ui().hasSeenTrustLoopNudge(), roundTripped.ui().hasSeenTrustLoopNudge());
     assertEquals(original.ui().excludePatterns(), roundTripped.ui().excludePatterns());

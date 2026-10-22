@@ -69,6 +69,7 @@ import {
   claimsFromRecord,
   matchesFromRecord,
   readScorer,
+  coverageFactsFromRecord,
 } from '../../components/chat/recordEvidence.js';
 import type { Sv3ContextUsage, Sv3TurnEvidence } from './sv3-sessions.js';
 // Tempdoc 610 §E.4 — the ONE reading of the terminal's own occupancy report, next to the meter it
@@ -401,6 +402,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   let retrievalModeCause = '';
   /** The producer the LAST `rag.citation_matches` envelope named; `null` until one says (847 §2.5). */
   let scorer: string | null = null;
+  let coverage: ReturnType<typeof coverageFactsFromRecord> = {};
   const claims = new Map<number, ClaimAcc>();
   /**
    * The evidence record is rebuilt WHOLE on every contributing event and handed over as one value,
@@ -415,6 +417,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       retrievalMode,
       retrievalModeReason,
       retrievalModeCause,
+      ...coverage,
     });
 
   /**
@@ -487,6 +490,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       // numbers — whose supported and unsupported bands interleave at a 0.0049 margin (836 §9.7) —
       // with cross-encoder-calibrated grounding tiers.
       scorer = readScorer(p);
+      coverage = coverageFactsFromRecord(p);
       // The panel answers to the same verdict as the marks: an unadmitted producer's matches carry
       // no per-source tier, so the sources list and the answer text say the same thing (847 §2.3).
       matches = matchesFromRecord(p);

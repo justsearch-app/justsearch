@@ -97,6 +97,7 @@ import {
   sv3PaneIsInline,
   sv3PaneOccupiedWidth,
   SV3_GRIP_KEY_STEP_PX,
+  SV3_MAIN_MIN_PX,
   SV3_PANE_DEFAULT_PX,
   SV3_SIDEBAR_COLLAPSED_PX,
   SV3_SIDEBAR_DEFAULT_PX,
@@ -188,6 +189,7 @@ import {
 // conversation, so identity, existence, title and its markdown export come from here — this window
 // mints none of them.
 import {
+  rememberServerConversation,
   branchConversation,
   clearContextFloor,
   compactContext,
@@ -669,6 +671,37 @@ export class SearchV3View extends JfElement {
           transition: none;
         }
       }
+      /* Reuse the icon rail when the two regions cannot fit. Its controls are fixed-size icons;
+         text zoom must not double the empty rail or the gutters at the expense of the answer. */
+      :host([sidebar-narrow]) {
+        --sidebar-width-icon: var(--space-12);
+        --sidebar-content-inset: var(--space-2);
+        --floating-content-inset: var(--space-3);
+      }
+      /* Reopening the sidebar in a narrow window is a sheet, like the citation pane. The column
+         keeps exactly the icon rail's reservation, so opening the sheet never squeezes it. */
+      :host([sidebar-narrow]:not([sidebar-collapsed])) jf-sv3-sidebar {
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        max-width: 100%;
+        z-index: var(--z-overlay);
+      }
+      :host([sidebar-narrow]:not([sidebar-collapsed])) .column {
+        margin-inline-start: var(--sidebar-width-icon);
+      }
+      :host([sidebar-narrow]) button.sidebar-grip {
+        display: none;
+      }
+      .sidebar-backdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        padding: 0;
+        background: var(--dialog-backdrop);
+        cursor: default;
+        z-index: var(--z-overlay);
+      }
     `,
   ];
 
@@ -682,6 +715,7 @@ export class SearchV3View extends JfElement {
     askStopping: { state: true },
     sidebarWidthPx: { state: true },
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
+    sidebarNarrow: { type: Boolean, reflect: true, attribute: 'sidebar-narrow' },
     resizing: { type: Boolean, reflect: true },
     paneDocPath: { state: true },
     paneCitation: { state: true },
@@ -733,6 +767,8 @@ export class SearchV3View extends JfElement {
    */
   declare sidebarWidthPx: number;
   declare sidebarCollapsed: boolean;
+  private declare sidebarNarrow: boolean;
+  private sidebarSheetInvoker: HTMLElement | null = null;
   /** A drag is in progress — the transitions stand down so the panel tracks the pointer exactly. */
   declare resizing: boolean;
   /**
@@ -937,6 +973,7 @@ export class SearchV3View extends JfElement {
     this.askStopping = null;
     this.sidebarWidthPx = SV3_SIDEBAR_DEFAULT_PX;
     this.sidebarCollapsed = false;
+    this.sidebarNarrow = false;
     this.resizing = false;
     this.paneDocPath = null;
     this.paneCitation = null;
@@ -1006,6 +1043,7 @@ export class SearchV3View extends JfElement {
     // subscription fires immediately with whatever is already loaded; the fetch refreshes it.
     setConversationApiBase(this.apiBase || '');
     this.convListUnsubscribe = subscribeConversationList((state, change) => {
+      this.forgetDeletedConversations(state.deletedIds);
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
       // The ROWS as well as the projection (852 S3): the version pager is read from the store's own
       // parent pointers, which `mergeStoreConversations` deliberately does not carry across.
@@ -1186,6 +1224,7 @@ export class SearchV3View extends JfElement {
     if (typeof ResizeObserver !== 'function') return;
     this.boxObserver = new ResizeObserver(() => {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
+      this.reflowSidebar();
     });
     this.boxObserver.observe(this);
   }
@@ -1282,6 +1321,9 @@ export class SearchV3View extends JfElement {
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has('sessions')) this.upgradeOpenPaneAnchor();
+    if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
+      this.reflowSidebar();
+    }
     // Here rather than in the store's callback: by now a first connect has also restored the saved
     // draft, which `followSharedQuery` must see before it writes the composer.
     const move = this.search.takeSharedMove();
@@ -2065,7 +2107,8 @@ export class SearchV3View extends JfElement {
    * rail, and an overlaid pane occupies nothing at all.
    */
   private sidebarOccupiedWidth(): number {
-    return this.sidebarCollapsed ? SV3_SIDEBAR_COLLAPSED_PX : this.sidebarWidthPx;
+    return this.sidebarCollapsed || this.sidebarNarrow
+      ? SV3_SIDEBAR_COLLAPSED_PX : this.sidebarWidthPx;
   }
 
   private paneOccupiedWidth(available: number): number {
@@ -2105,6 +2148,18 @@ export class SearchV3View extends JfElement {
       this.sidebarOccupiedWidth(),
     );
     this.applyPaneWidth(this.paneWidthPx);
+    this.reflowSidebar();
+  }
+
+  /** A temporary presentation choice never overwrites the reader's saved preference. Reopening
+   *  the sidebar while narrow overlays it; returning to a wide box restores the saved choice. */
+  private reflowSidebar(): void {
+    const available = this.availableWidth();
+    const narrow = available - this.paneOccupiedWidth(available)
+      < this.sidebarWidthPx + SV3_MAIN_MIN_PX;
+    if (narrow === this.sidebarNarrow) return;
+    this.sidebarNarrow = narrow;
+    this.sidebarCollapsed = narrow || readStoredSv3SidebarCollapsed();
   }
 
   /** A chosen width is adopted AND remembered; the two are one act (818 L13). */
@@ -2284,8 +2339,21 @@ export class SearchV3View extends JfElement {
     storeSv3SidebarCollapsed(collapsed);
   }
 
-  private onSidebarToggle(): void {
+  private onSidebarToggle(event: Event): void {
+    this.sidebarSheetInvoker = this.sidebarNarrow && this.sidebarCollapsed
+      ? (event.composedPath()[0] ?? null) as HTMLElement | null
+      : null;
     this.setSidebarCollapsed(!this.sidebarCollapsed);
+  }
+
+  /** Dismissing a temporary sheet is not a new sidebar preference. */
+  private async dismissSidebarSheet(): Promise<void> {
+    if (!this.sidebarNarrow || this.sidebarCollapsed) return;
+    this.sidebarCollapsed = true;
+    const invoker = this.sidebarSheetInvoker;
+    this.sidebarSheetInvoker = null;
+    await this.updateComplete;
+    if (invoker?.isConnected) invoker.focus();
   }
 
   /* ── The citation pane (tempdoc 822 Phase F8) ─────────────────────────────────────────────── */
@@ -2379,7 +2447,7 @@ export class SearchV3View extends JfElement {
   }
 
   private readonly onHostKeydown = (event: KeyboardEvent): void => {
-    // ESCAPE ORDER — rename > pane > palette > composer flip. The MOST LOCAL transient state wins:
+    // ESCAPE ORDER — rename > pane > sidebar sheet > palette > composer flip. The MOST LOCAL transient state wins:
     // an Escape belongs to the smallest thing the reader is currently inside, and only after that
     // to the regions around it. Stopping the event at the winner is what makes the order true
     // rather than approximately true — unstopped, the SAME keystroke would also hide the palette
@@ -2400,6 +2468,12 @@ export class SearchV3View extends JfElement {
       event.preventDefault();
       event.stopPropagation();
       this.closePane();
+      return;
+    }
+    if (event.key === 'Escape' && !event.isComposing && this.sidebarNarrow && !this.sidebarCollapsed) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.dismissSidebarSheet();
       return;
     }
     if (!isPaletteChord(event)) return;
@@ -2996,6 +3070,7 @@ export class SearchV3View extends JfElement {
       },
       {
         onDelta: (text) => {
+          if (text) rememberServerConversation(ref.sessionId);
           this.sessions = appendTurnDelta(this.sessions, ref, text);
         },
         onEvidence: (evidence) => {
@@ -3755,7 +3830,7 @@ export class SearchV3View extends JfElement {
     // re-derived after the await — the reader's press is what is being answered, and by the time the
     // store answers it has already deleted the conversation regardless of what has started since.
     if (removeSession(this.sessions, id, gate) === this.sessions) return;
-    void this.deleteThroughStore(id, gate);
+    void this.deleteThroughStore(id);
   }
 
   /**
@@ -3778,7 +3853,8 @@ export class SearchV3View extends JfElement {
    * Nothing leaves the list until the store says it left — including the conversation the reader
    * pressed delete on, which is why removing it on screen happens HERE and not at the press.
    */
-  private async deleteThroughStore(id: string, gate: Sv3RunGate): Promise<void> {
+  private async deleteThroughStore(id: string): Promise<void> {
+    const labels = new Map(this.sessions.sessions.map(s => [s.id, this.conversationLabel(s.id)]));
     let cascaded: readonly string[] = [];
     let declined = false;
     const result = await deleteConversationWithCascade(id, async (childIds) => {
@@ -3795,27 +3871,35 @@ export class SearchV3View extends JfElement {
       declined = !consented;
       return consented;
     });
+    this.forgetDeletedConversations(result.ok ? [id, ...cascaded] : result.deletedIds ?? []);
     if (!result.ok) {
       // A DECLINED cascade is NOT a failure — the reader was asked and said no — and it is the ONE
       // silent case. A plain refusal and a consented cascade that then broke halfway are both real
       // failures and both must say so; the store function's return cannot tell the three apart
       // (`{ok:false, childIds}` covers two of them), which is why the reader's own answer is tracked
-      // here instead of inferred from it. Nothing was removed on screen, so there is nothing to put
-      // back — the re-list is for the CHILDREN a half-broken cascade may really have deleted.
-      if (!declined) emitEphemeralToast({ message: DELETE_FAILED, severity: 'warning' });
-      void loadConversations();
+      // here instead of inferred from it. Successfully deleted children have already left the window;
+      // the refresh reconciles the remaining server rows.
+      if (!declined) {
+        const progress = result.deletedIds?.length
+          ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. Deleted: ${result.deletedIds.map(gone => `“${labels.get(gone) ?? gone}”`).join(', ')}. ` : '';
+        const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${this.conversationLabel(result.failedId)}”. ` : '';
+        emitEphemeralToast({ message: progress + failed + (result.error ?? DELETE_FAILED), severity: 'warning' });
+      }
+      if (result.deletedIds?.length || !['STORE_LOCKED', 'CONVERSATION_BUSY'].includes(result.errorCode ?? '')) {
+        void loadConversations();
+      }
       return;
     }
-    // The store deleted it, so now the screen follows. Removing the open conversation routes through
-    // New session first, so the window leaves the transcript the way every other exit from it does —
-    // an emptied pane and nothing claimed — rather than a partial teardown free to forget a pointer.
-    // The children go with it: the list must not keep offering conversations the store no longer has.
-    for (const gone of [id, ...cascaded]) {
-      // The STATE half only: the sidebar places the keyboard after a discard (tempdoc 831), so this
-      // window must not move focus on this path — see {@link startFreshSession}.
-      if (this.sessions.activeId === gone) this.startFreshSession();
+  }
+
+  /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
+  private forgetDeletedConversations(ids: readonly string[]): void {
+    for (const gone of ids) {
+      if (this.sessions.activeId === gone) this.resetToHero();
+      if (readLastViewedConversation() === gone) clearLastViewedConversation();
       if (this.renamingId === gone) this.renamingId = null;
-      this.sessions = removeSession(this.sessions, gone, gate);
+      // Server confirmation wins even over stale local run state: the content is already gone.
+      this.sessions = { ...this.sessions, sessions: this.sessions.sessions.filter(s => s.id !== gone) };
     }
   }
 
@@ -4009,6 +4093,13 @@ export class SearchV3View extends JfElement {
     const session = this.activeSession;
     const contexts = this.turnContexts();
     return html`
+      ${this.sidebarNarrow && !this.sidebarCollapsed ? html`<button
+        type="button"
+        class="sidebar-backdrop"
+        data-testid="sv3-sidebar-backdrop"
+        aria-label="Close the sidebar"
+        @click=${this.dismissSidebarSheet}
+      ></button>` : nothing}
       <jf-sv3-sidebar
         .groups=${sessionGroups}
         .renamingId=${this.renamingId}

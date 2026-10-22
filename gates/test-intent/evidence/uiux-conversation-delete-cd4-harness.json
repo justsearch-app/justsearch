@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T03:14:48.017Z",
+  "revision": "c1cd13378d6a79a9aad776beeee28071e1c1c4a3",
+  "tree": "244263246ab259e5c2a0d1eb5a8050dc2510ce15",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4146949-1792638882149.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2447
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a thread read already in flight cannot restore deleted interaction events",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b456f55307a6132d2639bac8f5ac28f2f25fb184ae41c8f3efd65c5722433f7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a thread read already in flight cannot restore deleted interaction events",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5a71c91bf",
+    "revision": "5a71c91bff14601f36a391f80c478df4588018b2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/UnifiedChatView.deletion.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4146949-1792638885749.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2098,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-4146949-1792638885749.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a thread read already in flight cannot restore deleted interaction events",
+        "classification": "assertion",
+        "detail": "a thread read already in flight cannot restore deleted interaction events:  AssertionError: expected [ { id: 'old-turn', …(5) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-k8CBtB/modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts:91:28\n    at file:///home/elias/dev/"
+      }
+    ]
+  },
+  "digest": "sha256:80f913de182eff21e62ddfbd4dd1ba275e0f759e3773a8abb1fa281a239a2b23"
+}

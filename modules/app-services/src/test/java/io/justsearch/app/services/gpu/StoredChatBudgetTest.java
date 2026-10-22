@@ -99,9 +99,9 @@ final class StoredChatBudgetTest {
     var constructor = placement.getDeclaredConstructor(Path.class);
     constructor.setAccessible(true);
     var place = placement.getDeclaredMethod("place",
-        io.justsearch.configuration.model.InstallPlan.PlannedDownload.class);
+        io.justsearch.configuration.model.InstallPlan.PlannedDownload.class, boolean.class);
     place.setAccessible(true);
-    assertNull(place.invoke(constructor.newInstance(models), download),
+    assertNull(place.invoke(constructor.newInstance(models), download, false),
         "the real installer placement must verify and promote the local partial");
     Path model = target.toRealPath();
     var variant = new io.justsearch.configuration.model.ModelVariant(model.getFileName().toString(),

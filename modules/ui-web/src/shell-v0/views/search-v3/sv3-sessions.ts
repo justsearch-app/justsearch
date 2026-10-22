@@ -83,6 +83,9 @@ export interface Sv3TurnEvidence {
    * fact, not two copies that can disagree about the same answer.
    */
   readonly groundingIncomplete?: boolean;
+  /** The Ask check's own counts, when reported. Zero is a fact; absence is not completion. */
+  readonly sentencesTotal?: number;
+  readonly sentencesScored?: number;
   /**
    * Tempdoc 865 PR-1 (F1) — the per-source examination facts, when the producer reported any.
    *
@@ -932,6 +935,8 @@ function reconcileEvidence(
     // record field by field, so a field that is not named here is silently gone.
     sourceCoverage:
       prior.sourceCoverage !== undefined ? prior.sourceCoverage : recorded.sourceCoverage,
+    sentencesTotal: prior.sentencesTotal ?? recorded.sentencesTotal,
+    sentencesScored: prior.sentencesScored ?? recorded.sentencesScored,
   };
 }
 

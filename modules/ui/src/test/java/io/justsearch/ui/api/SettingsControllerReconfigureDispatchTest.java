@@ -361,7 +361,7 @@ final class SettingsControllerReconfigureDispatchTest {
     String previousKey = OperationKeys.generate(Clock.systemUTC());
     String operationKey = OperationKeys.generate(Clock.systemUTC());
     return new SettingsV2(
-        new UiSettingsV2("dark", true, "compact", true, "reveal", 431, true, "advanced",
+        new UiSettingsV2("dark", true, "compact", true, "reveal", 431, "advanced",
             true, List.of("*.tmp", "node_modules/**"), true),
         new LlmSettingsV2("llama-server.exe", 8192, 2048, 35, "C:/models/chat.gguf",
             "C:/models/llama.dll"),

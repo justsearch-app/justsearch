@@ -53,6 +53,14 @@ package io.justsearch.core.scheduling;
  */
 public final class GpuSchedulingGauge {
 
+  private final IndexingHold indexingHold;
+
+  public GpuSchedulingGauge() { this(new IndexingHold()); }
+  public GpuSchedulingGauge(IndexingHold indexingHold) {
+    this.indexingHold = java.util.Objects.requireNonNull(indexingHold, "indexingHold");
+  }
+  public IndexingHold indexingHold() { return indexingHold; }
+
   private volatile boolean mainGpuActive;
   private volatile boolean energyReduced;
 

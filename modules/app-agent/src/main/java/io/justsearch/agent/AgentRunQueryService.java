@@ -251,10 +251,31 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
     // Resume from the agent that was active at interruption, not the original initialAgentId
     String resumeAgentId = snapshot.get("activeAgentId") instanceof String s ? s : null;
 
-    sessionRunner.run(
+    runSnapshot(snapshot,
         resumedRequest(snapshot, resumeMessages, selectedTools, maxIterations, agentProfiles,
             resumeAgentId),
         eventConsumer, engineContext);
+  }
+
+  /** A loaded snapshot is not authority to start after its source has been deleted. */
+  private void runSnapshot(Map<String, Object> snapshot, AgentRequest request,
+      Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
+    io.justsearch.agent.api.conversation.ConversationWork.Lease writing = null;
+    synchronized (runStore) {
+      var current = snapshot.get("sessionId") instanceof String id ? runStore.readSnapshot(id) : null;
+      if (current != null) {
+        writing = runStore.conversationWork().start(
+            current.get("conversationId") instanceof String id ? id : null);
+      }
+    }
+    if (writing == null) {
+      errorEmitter.emitError(eventConsumer, "The source run no longer exists or is locked.",
+          AgentErrorCode.UNSUPPORTED_RESUME_STATE, AgentErrorClass.PERMANENT, RetryAction.ABORT, null);
+      return;
+    }
+    try (var ignoredWriting = writing) {
+      sessionRunner.run(request, eventConsumer, engineContext);
+    }
   }
 
   /**
@@ -372,7 +393,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
             ? (List<Map<String, Object>>) l : List.of();
     List<AgentProfile> agentProfiles = rawProfiles.stream().map(AgentProfile::fromMap).toList();
     String agentId = snapshot.get("activeAgentId") instanceof String s ? s : null;
-    sessionRunner.run(
+    runSnapshot(snapshot,
         resumedRequest(snapshot, forked, selectedTools, maxIterations, agentProfiles, agentId),
         eventConsumer, engineContext);
   }
