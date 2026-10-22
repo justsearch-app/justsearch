@@ -19,6 +19,7 @@ import {
   __resetAiStateForTest,
   __feedForTest,
   __tickClockForTest,
+  getAiState,
   type StatusSnapshot,
   type InferenceSnapshot,
 } from '../state/aiStateStore.js';
@@ -60,6 +61,49 @@ describe('HealthSurface — recommendedActions panel', () => {
     });
     __tickClockForTest();
   }
+
+  it('shows the serving document count and retry deadline while the queue waits', async () => {
+    const retry = Date.now() + 3_600_000;
+    feedReady({ worker: {
+      core: { indexedDocuments: 37, searchableDocuments: 37, pendingJobs: 8,
+        indexState: 'WAITING', indexHealthy: true },
+      migration: { pendingJobsCount: 8, pendingReadyJobsCount: 0, processingJobsCount: 0,
+        activeIndexedDocuments: 37, buildingIndexedDocuments: 2 },
+      failure: { nextRetryAtMs: retry },
+    } });
+    const el = await mount();
+    try {
+      const text = el.shadowRoot?.textContent ?? '';
+      expect(text).toContain('Waiting to retry');
+      expect(text).toContain(new Date(retry).toLocaleString());
+      const files = [...(el.shadowRoot?.querySelectorAll('.card') ?? [])]
+        .find(card => card.querySelector('.card-label')?.textContent?.trim() === 'Files');
+      expect(files?.querySelector('.card-value')?.textContent?.trim()).toBe(formatCount(37));
+      expect(text).toContain('8 files');
+      expect(text).not.toContain('Up to date');
+    } finally { teardown(el); }
+  });
+
+  it('uses the current serving count during migration instead of cached or building counts', async () => {
+    feedReady({ worker: { core: { indexedDocuments: 11, searchableDocuments: 11,
+      indexState: 'IDLE', indexHealthy: true } } });
+    feedReady({ worker: {
+      core: { indexedDocuments: 37, searchableDocuments: 37, pendingJobs: 3,
+        indexState: 'INDEXING', indexHealthy: true },
+      migration: { migrationState: 'MIGRATING', activeGenerationId: 'blue', buildingGenerationId: 'green',
+        servingSearchGenerationId: 'blue', servingIngestGenerationId: 'green',
+        activeIndexedDocuments: 37, buildingIndexedDocuments: 2 },
+    } });
+    expect(getAiState().stability.kind).toBe('provisional');
+    expect(getAiState().lastSettledIndex?.documentCount).toBe(11);
+    const el = await mount();
+    try {
+      const files = [...(el.shadowRoot?.querySelectorAll('.card') ?? [])]
+        .find(card => card.querySelector('.card-label')?.textContent?.trim() === 'Files');
+      expect(files?.querySelector('.card-value')?.textContent?.trim()).toBe(formatCount(37));
+      expect(files?.textContent).not.toContain('Last known');
+    } finally { teardown(el); }
+  });
 
   it('tempdoc 644: renders per-engine realized state (GPU/CPU pills) in the AI Engine card', async () => {
     __feedForTest({

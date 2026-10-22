@@ -1025,7 +1025,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // The producer reports per-document failures as ERROR (or INDEXING while other units run).
     // Keep that corpus diagnostic without declaring the live Worker control plane offline.
     // Fatal loop failure has precedence and is reported as FAILED, which remains refused.
-    return ("ERROR".equals(core.indexState()) || "INDEXING".equals(core.indexState()))
+    return ("ERROR".equals(core.indexState()) || "INDEXING".equals(core.indexState())
+        || "WAITING".equals(core.indexState()))
         && view.failure() != null && view.failure().failedJobs() > 0;
   }
 
@@ -1616,12 +1617,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   static boolean hasActiveIndexWork(WorkerOperationalView workerView) {
-    if (workerView == null) {
+    if (workerView == null || workerView.core() == null) {
       return false;
     }
-    return workerView.migration().processingJobsCount() > 0
-        || workerView.migration().pendingJobsCount() > 0
-        || workerView.migration().pendingReadyJobsCount() > 0;
+    // The Worker has already classified queue eligibility and fatal-loop precedence.
+    return "INDEXING".equals(workerView.core().indexState());
   }
 
   /**
@@ -1647,7 +1647,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // lands (see InferenceRuntimeView's dropped `queue` field). The activity gate degrades
     // by one signal in the interim; the remaining (worker processing-jobs, GPL training, and
     // onlineAi.isAvailable) terms still cover the dominant false-positive cases.
-    if (workerView != null) {
+    if (hasActiveIndexWork(workerView)) {
       gate += Math.max(0L, workerView.migration().processingJobsCount());
     }
     if (gplCoordinatorSupplier != null) {

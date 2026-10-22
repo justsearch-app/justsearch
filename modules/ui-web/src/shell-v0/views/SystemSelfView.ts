@@ -278,7 +278,7 @@ export class SystemSelfView extends JfElement {
                 (t) => html`
                   <div class="row" data-testid="self-view-task">
                     <span class="label">${t.label}</span>
-                    <span class="badge badge-${indexingTaskStatus(t, activity) === t.status ? t.status : 'stale'}">${indexingTaskStatus(t, activity)}</span>
+                    <span class="badge badge-${indexingTaskStatus(t, activity, progress.phase) === t.status ? t.status : 'stale'}">${indexingTaskStatus(t, activity, progress.phase)}</span>
                   </div>
                 `,
               )}

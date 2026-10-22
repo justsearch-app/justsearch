@@ -527,6 +527,21 @@ public final class WritePathOps {
       }
       session.readPathOps.projectDocValues(searcher, globalDocId, DocumentFieldOps.ENRICHMENT_FIELDS, current);
       if (!matchesEnrichmentInput(input.fields(), current, updates)) return false;
+      // Reuse the RMW fields and the already-compared parent proof: no new index reads.
+      var allows = session.sourceProcessingPolicy;
+      if (allows != null) {
+        String source = asString(fields.get(SchemaFields.PATH));
+        String projection = asString(fields.get(SchemaFields.PROJECTION_SOURCE_ID));
+        if ((projection == null || projection.isBlank()) && (source == null || source.isBlank())
+            && input.parentId() != null && !input.parentId().isBlank()) {
+          source = input.parentFields().get(SchemaFields.PATH);
+          if (source == null || source.isBlank()) source = input.parentId();
+          projection = input.parentFields().get(SchemaFields.PROJECTION_SOURCE_ID);
+        }
+        if (projection != null && !projection.isBlank()) source = null;
+        else if (source == null || source.isBlank()) source = docId;
+        if (!allows.test(source)) return false;
+      }
     }
 
     if (updates.containsKey(SchemaFields.CONTENT)

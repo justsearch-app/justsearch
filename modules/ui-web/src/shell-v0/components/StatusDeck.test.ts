@@ -5,7 +5,7 @@ import './StatusDeck.js';
 import type { StatusDeck } from './StatusDeck.js';
 import { __resetStatusPollForTest } from '../utils/statusPoll.js';
 import { __resetInferencePollForTest } from '../utils/inferencePoll.js';
-import { __resetAiStateForTest, isSnapshotLive, type AiState } from '../state/aiStateStore.js';
+import { __resetAiStateForTest, __feedForTest, __tickClockForTest, getAiState, isSnapshotLive, type AiState } from '../state/aiStateStore.js';
 import { known, UNKNOWN } from '../state/known.js';
 import { updateShellContext, __resetShellContextForTest } from '../state/shellContextState.js';
 import { EPHEMERAL_TOAST_EVENT } from './advisory/ephemeralToast.js';
@@ -654,4 +654,37 @@ describe('StatusDeck (slice 461)', () => {
       expect(pillText(el)).toBe('Backend disconnected');
     });
   });
+});
+
+it('announces retry waiting with its backlog and deadline', async () => {
+  const retry = Date.now() + 60_000;
+  const el = make();
+  el.aiState = makeAiState({ status: { worker: {
+    core: { indexState: 'WAITING', pendingJobs: 8, indexedDocuments: 37, indexHealthy: true },
+    failure: { nextRetryAtMs: retry }, migration: { pendingJobsCount: 8, processingJobsCount: 0 },
+  } } as unknown as AiState['status'] });
+  await el.updateComplete;
+  const announcement = el.shadowRoot?.querySelector('[data-testid="indexing-announcer"]')?.textContent;
+  expect(announcement).toContain('Waiting to retry');
+  expect(announcement).toContain('8 files');
+  expect(announcement).toContain(new Date(retry).toLocaleString());
+});
+
+it('uses a fresh serving count during migration instead of the retained count', async () => {
+  __feedForTest({ status: { worker: { core: { indexedDocuments: 11, searchableDocuments: 11,
+    indexState: 'IDLE', indexHealthy: true } } } as unknown as AiState['status'] });
+  __tickClockForTest();
+  __feedForTest({ status: { worker: {
+    core: { indexedDocuments: 37, searchableDocuments: 37, pendingJobs: 3, indexState: 'INDEXING', indexHealthy: true },
+    migration: { migrationState: 'MIGRATING', activeGenerationId: 'blue', buildingGenerationId: 'green',
+      servingSearchGenerationId: 'blue', servingIngestGenerationId: 'green', buildingIndexedDocuments: 2 },
+  } } as unknown as AiState['status'] });
+  __tickClockForTest();
+  expect(getAiState().stability.kind).toBe('provisional');
+  expect(getAiState().lastSettledIndex?.documentCount).toBe(11);
+  const el = make();
+  await el.updateComplete;
+  const files = el.shadowRoot?.querySelector('[aria-label^="Documents indexed:"]');
+  expect(files?.querySelector('.val')?.textContent?.trim()).toBe(formatCount(37));
+  expect(files?.getAttribute('aria-label')).not.toContain('last known');
 });
