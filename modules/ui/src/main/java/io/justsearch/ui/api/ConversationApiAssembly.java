@@ -476,6 +476,9 @@ final class ConversationApiAssembly {
                     }
                   };
                 });
+    if (b.runtimeManifestPublisher != null) {
+      chatController.setEngineInstanceId(b.runtimeManifestPublisher.instanceId());
+    }
     if (b.HeadAssembly != null && b.HeadAssembly.agentRunStore() != null
         && b.HeadAssembly.agentHistoryIndexer() != null) {
       var deletion = new io.justsearch.app.services.conversation.ConversationDeletion(
