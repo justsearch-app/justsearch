@@ -2041,10 +2041,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: Integration tests (system-tests tier)
     runs-on: windows-latest
-    # Must stay above the Gradle task timeout (modules/system-tests/build.gradle.kts, 30 min),
-    # or the job is killed first and the artifact-upload step below never runs. 30 min + the
-    # measured 1m26s of checkout/setup/post steps (run 31716264505) leaves ~3.5 min of margin.
-    timeout-minutes: 35
+    # Must stay above the Gradle task timeout (modules/system-tests/build.gradle.kts, 50 min)
+    # so artifact uploads can run. 60 min covers that cap plus ~7 min setup (run 39772670475)
+    # with ~3 min left for uploads and post steps.
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v7

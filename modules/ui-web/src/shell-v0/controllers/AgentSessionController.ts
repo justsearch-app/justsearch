@@ -18,6 +18,7 @@ import {
   type RunNotFoundDetail,
 } from '../../api/streams.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { rememberServerConversation } from '../state/conversationListStore.js';
 import { createOperationKey } from '../../api/operationKey.js';
 import { LivenessWatchdog } from '../streaming/LivenessWatchdog.js';
 import { STREAM_WATCHDOG_STALE_MS } from '../../api/generated/stream-liveness-constants.js';
@@ -847,9 +848,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * the full run by default; the view's scrubber calls {@link replaySeek}/{@link replayStepForward}.
    */
   async loadReplay(sessionId: string): Promise<void> {
+    const conversationId = this.conversationId;
     this.replayMode = true;
     this.sessionId = sessionId;
     this.replayEvents = await this.fetchSessionEvents(sessionId);
+    const started = this.replayEvents.find((event) => event.eventType === RUN_STARTED_EVENT);
+    const owner = (started?.payload as { conversationId?: unknown } | undefined)?.conversationId;
+    const serverId = typeof owner === 'string' && owner ? owner : conversationId;
+    if (serverId && this.replayEvents.length > 0) rememberServerConversation(serverId);
     this.replaySeek(this.replayEvents.length);
   }
 
@@ -1006,6 +1012,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   onChunk(payload: CoreAgentRunChunkPayload): void {
+    if (!this.replayMode && payload.text && this.conversationId) rememberServerConversation(this.conversationId);
     // Tempdoc 859 §A §1.2 — the `endThinking()` that used to live here is now the chokepoint's
     // `markOutput()`. It was the ONLY text-side region close, and closing on the first prose token
     // is also why reasoning that resumed after a tool call never got a block of its own.
@@ -1301,6 +1308,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.lastStreamedAnswer = '';
     this.commitStreamingText();
     const finalResp = payload.finalResponse;
+    if (!this.replayMode && finalResp?.trim() && this.conversationId) rememberServerConversation(this.conversationId);
     if (finalResp?.trim() && finalResp.trim() !== streamedSoFar) {
       this.conversation = [
         ...this.conversation,
