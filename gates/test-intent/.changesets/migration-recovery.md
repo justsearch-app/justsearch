@@ -683,6 +683,49 @@ builder.
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java#conditionalDeleteRetiresAWhenTheParentIsListable"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Round 13, failing on beec1cb30 and passing after. The ordinary promotion replay (drainSwitchBufferStrict) and the promoted-pointer recovery (settleCommittedNativeFileWitnesses) judge an accepted watcher DELETE receipt by the path's confirmed state, as refusal cleanup does. The target holds root/nested/source.txt; nested is replaced by a folder that can be traversed but not listed, with a folder at source.txt, while the watched root vouches: on either route the replay does not settle, keeps the receipt, queues nothing, and the target keeps the file's text after any queued job runs through the real batch extractor (before: the replay queued the folder as a reappeared source, settled and acknowledged the receipt, and the normal policy then removed the text). Accepted residual: the path can still change between this current-state check and the replay's own filesystem probe, because the filesystem is not fenced.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M10",
+          "quote": "A result is confirmed only when the watched root is present, readable and on its recorded volume, and every parent folder from the root down to the path can be read. Anything else is uncertain, which means fail-closed.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r13-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#ordinaryPromotionKeepsADeleteBeneathAnUnlistableParent",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#promotedPointerKeepsADeleteBeneathAnUnlistableParent"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 13 preservation, passing on beec1cb30 and after. The same layout with a listable parent is a confirmed non-regular source on both routes: the replay settles the receipt, queues the folder once, and the normal policy removes the replaced file's text.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "The file's state includes its kind. For a path that is no longer a regular file, A's policy-terminal outcome for that current state settles it, with no bytes needed. A must not keep serving the replaced file's old content, unless the normal product (outside migration) also keeps it for a path that became a directory.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r13-preserve.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#ordinaryPromotionRetiresAFolderBeneathAListableParent",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java#promotedPointerRetiresAFolderBeneathAListableParent"
+      ]
     }
   ]
 }

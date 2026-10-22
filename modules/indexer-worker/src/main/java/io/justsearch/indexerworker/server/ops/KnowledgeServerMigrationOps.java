@@ -879,6 +879,9 @@ public final class KnowledgeServerMigrationOps {
         || indexPath.getParent().getParent() == null) return false;
     var authority = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
         indexPath.getParent().getParent(), indexPath, active, null, null, 0L);
+    // A path that cannot be confirmed beneath a vouching root keeps its receipt, as an
+    // unproved root does.
+    if (uncertainBeneathItsRoot(authority, deletion)) return false;
     return authority.replayBufferedFileDelete(active, deletion)
         == WorkerIngestService.BufferedDeleteReplay.SETTLED;
   }
@@ -1169,26 +1172,28 @@ public final class KnowledgeServerMigrationOps {
                   throw new IllegalStateException("Buffered exact queue deletion failed");
                 }
                 mutatedLucene = true;
-              } else if (refusedSourceRecovery
-                  && uncertainBeneathItsRoot(context.publisher(), deletion)) {
-                // The root vouches, but the path's own state cannot be confirmed (a folder on the
-                // way cannot be listed): nothing is admitted or removed on A, Green and the
-                // receipt stay until the path can be judged.
-                allApplied = false;
-                context.log().warn("Refused candidate keeps a DELETE whose path cannot be "
-                    + "confirmed beneath its root: key={}", op.key());
               } else {
                 WorkerIngestService authority = context.publisher() != null
                     ? context.publisher() : replayService(context);
-                var replayed = authority.replayBufferedFileDelete(context.ingestLifecycle(), deletion);
-                if (replayed == WorkerIngestService.BufferedDeleteReplay.UNCERTAIN
-                    && refusedSourceRecovery) {
-                  // Nothing was changed on surviving A. Its own root reconciliation removes the
-                  // file's rows once the root returns and proves the file absent.
-                  context.log().info("Refused candidate leaves an unproved DELETE to root "
-                      + "reconciliation on the surviving generation: key={}", op.key());
-                } else if (replayed != WorkerIngestService.BufferedDeleteReplay.SETTLED) {
+                if (uncertainBeneathItsRoot(authority, deletion)) {
+                  // The root vouches, but the path's own state cannot be confirmed (a folder on
+                  // the way cannot be listed): nothing is admitted or removed on the target, and
+                  // the receipt stays until the path can be judged.
                   allApplied = false;
+                  context.log().warn("Buffered DELETE kept: its path cannot be confirmed "
+                      + "beneath its root: key={}", op.key());
+                } else {
+                  var replayed =
+                      authority.replayBufferedFileDelete(context.ingestLifecycle(), deletion);
+                  if (replayed == WorkerIngestService.BufferedDeleteReplay.UNCERTAIN
+                      && refusedSourceRecovery) {
+                    // Nothing was changed on surviving A. Its own root reconciliation removes the
+                    // file's rows once the root returns and proves the file absent.
+                    context.log().info("Refused candidate leaves an unproved DELETE to root "
+                        + "reconciliation on the surviving generation: key={}", op.key());
+                  } else if (replayed != WorkerIngestService.BufferedDeleteReplay.SETTLED) {
+                    allApplied = false;
+                  }
                 }
               }
             } catch (Exception e) {
@@ -1892,21 +1897,23 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /**
-   * Refusal cleanup only: whether a conditional (watcher or legacy) DELETE's path is {@link
-   * CleanupPathKind#UNCERTAIN} to {@link #observeForCleanup} while the folder that answers for it,
-   * the root its replay judges it under, still vouches. A withdrawn or uncertain root is not this
-   * case: its replay leaves the delete to that root's reconciliation.
+   * Whether a conditional (watcher or legacy) DELETE's path is {@link CleanupPathKind#UNCERTAIN}
+   * to {@link #observeForCleanup} while the folder that answers for it, the root its replay judges
+   * it under, still vouches through {@code authority}. Every replay route then keeps the receipt
+   * and touches nothing. A withdrawn or uncertain root is not this case: its replay keeps its own
+   * handling. The path can still change between this check and the replay; a filesystem is not
+   * fenced.
    */
-  private static boolean uncertainBeneathItsRoot(WorkerIngestService publisher,
+  private static boolean uncertainBeneathItsRoot(WorkerIngestService authority,
       SwitchBufferDelete deletion) {
-    if (publisher == null || publisher.rootCheck() == null) return false;
+    if (authority == null || authority.rootCheck() == null) return false;
     Path file = Path.of(deletion.path()).toAbsolutePath().normalize();
-    Path root = publisher.bufferedDeleteRoot(deletion);
-    if (observeForCleanup(publisher, file, root).kind() != CleanupPathKind.UNCERTAIN) return false;
+    Path root = authority.bufferedDeleteRoot(deletion);
+    if (observeForCleanup(authority, file, root).kind() != CleanupPathKind.UNCERTAIN) return false;
     boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
     Path folder = asRoot ? root.toAbsolutePath().normalize() : file.getParent();
-    return folder != null && (asRoot ? publisher.rootCheck().vouches(folder)
-        : publisher.rootCheck().vouchesForFile(folder));
+    return folder != null && (asRoot ? authority.rootCheck().vouches(folder)
+        : authority.rootCheck().vouchesForFile(folder));
   }
 
   /**
