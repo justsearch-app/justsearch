@@ -145,3 +145,14 @@ All scenario and EB1 choices below are agent-adopted under the quoted design del
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp5.2b-t5uoot23",
+  "verdict": "accept",
+  "digest": "sha256:de191bf6009c85b4f4ffd8d0ecdc93bb82f5cbf8cd671c71a8f2753b972a6cb7",
+  "note": "Intent sources match EC1-EC5 and EB1. Independent scratch evidence reproduces assertion fail-before and pass-after; real HTTP/browser scenarios pass. Existing Java suite dependency failure and skipped corpus metric remain unverified."
+}
+```
