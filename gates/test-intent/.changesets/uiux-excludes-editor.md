@@ -1067,3 +1067,14 @@ CE1 entries appended by builder session 8b7469qf. Official evidence uses default
   "note": "Independent review of before-state tests, agreed sources and diff; EX1 only adapts the fake to completion-aware deletion and keeps every assertion; actual completed, buffered and error Worker replies checked. Five XA1 citations correctly identify a delegated choice. Scratch run-evidence repairs fail by assertions on their historical before states; preservation checks pass. This accepts test intent only: product verification fails S32.2 because override Preview and Apply differ from the list the editor says they use. See verifier-4 evidence report."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp32-verifier5-k3794ri4",
+  "verdict": "accept",
+  "digest": "sha256:4c9d3591865257cf3d7cb548b5e8a32d10a334347c8197eeae56fb568dad902a",
+  "note": "Sources, before-state tests and diff independently reviewed. OV1 repairs fail assertions before and pass after; preservation checks pass. Expectations follow S32, AX, WX and delegated XA1/OV1. Test intent accepted; product verdict fails F1 reflow and F2 Enter on Cancel."
+}
+```
