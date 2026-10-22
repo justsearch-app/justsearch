@@ -2,8 +2,63 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx3
+author-session: uiux-numeric-guard-nx3a
 ---
+
+# NX3a literal table (recorded before implementation)
+
+Observed start 2026-10-22 13:10:33 UTC; estimate 1–2 h; return by 16:10:33 UTC
+(the assignment's 3 h deadline). Before-state e9f080f32.
+
+Source (agent-drafted, owner-adopted), clarification NX3a:
+“Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as "：", "，", "．" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: "1٫5" is the decimal 1.5 (5 is not in it), "1：30" is a time and is skipped, "5，000" is the grouped 5000.”
+“A grouped number is read the same whatever follows it after whitespace: "1,200 5kg bags" contains 1200 (and a non-plain 5kg).”
+
+This table overrides the historical NX3 rows for Arabic/full-width separators and
+compatibility characters (including superscript digits, which NFKC turns into digits).
+Eligible means the existing scorer verdict remains eligible, never a granted match.
+
+| ID | Claim literal | Passage literal | Claim handling | Eligible |
+| --- | --- | --- | --- | --- |
+| NG1/NG3/NG7 | The voltage measured 5 volts. | The voltage measured 1٫5 volts. | plain-checked: 5 | Reject |
+| NG1/NG3/NG7 | The voltage measured 1.5 volts. | The voltage measured 1٫5 volts. | plain-checked: 1.5 | Accept |
+| NG1/NG3/NG7 | The voltage measured ١٫٥ volts. | The voltage measured 1.5 volts. | plain-checked: 1.5 | Accept |
+| NG1/NG3/NG7 | The voltage measured ١٫٥ volts. | The voltage measured 5 volts. | plain-checked: 1.5 | Reject |
+| NG1/NG3/NG7 | The voltage measured 5 volts. | The voltage measured ١٫٥ volts. | plain-checked: 5 | Reject |
+| NG1/NG3/NG7 | The voltage measured 5 volts. | The voltage measured ٫5 volts. | plain-checked: 5 | Reject |
+| NG1/NG3/NG7 | The voltage measured 5 volts. | The voltage measured １．５ volts. | plain-checked: 5 | Reject |
+| NG1/NG3/NG7 | The voltage measured １．５ volts. | The voltage measured 1.5 volts. | plain-checked: 1.5 | Accept |
+| NG1/NG3/NG7 | The voltage measured １．５ volts. | The voltage measured 5 volts. | plain-checked: 1.5 | Reject |
+| NG1/NG3/NG7 | The voltage measured 1.5 volts. | The voltage measured １．５ volts. | plain-checked: 1.5 | Accept |
+| NG1/NG3/NG7 | The meeting starts at 1：30. | No number here. | skipped | Accept |
+| NG1/NG3/NG7 | The meeting starts at １：３０. | No number here. | skipped | Accept |
+| NG1/NG3/NG7 | The shipment contains 5，000 bags. | The shipment contains 5000 bags. | plain-checked: 5000 | Accept |
+| NG1/NG3/NG7 | The shipment contains 5，000 bags. | No number here. | plain-checked: 5000 | Reject |
+| NG1/NG3/NG7 | The shipment contains ٥٬٠٠٠ bags. | The shipment contains 5000 bags. | plain-checked: 5000 | Accept |
+| NG1/NG3/NG7 | The shipment contains 5000 bags. | The shipment contains ٥٬٠٠٠ bags. | plain-checked: 5000 | Accept |
+| NG1/NG3/NG7 | The shipment contains 5000 bags. | The shipment contains 5，000 bags. | plain-checked: 5000 | Accept |
+| NG1/NG3/NG7 | The shipment contains 200 bags. | The shipment contains 1٬200 bags. | plain-checked: 200 | Reject |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1,200 5kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1,200 50kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1,200 500kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1 200 5kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1 200 5kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1 200 5kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1٬200 5kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains １，２００ 5kg bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1,200 5kg bags. | The shipment contains 1200 bags. | plain-checked: 1200 | Accept |
+| NG1/NG3/NG7 | The shipment contains 1,200 5kg bags. | No number here. | plain-checked: 1200 | Reject |
+| NG1/NG3/NG7 | The shipment contains 200 bags. | The shipment contains 1,200 5kg bags. | plain-checked: 200 | Reject |
+| NG1/NG3/NG7 | The shipment contains 1200 bags. | The shipment contains 1,200.5 5kg bags. | plain-checked: 1200 | Reject |
+| NG1/NG3/NG7 | The shipment contains 1200.5 bags. | The shipment contains 1,200.5 5kg bags. | plain-checked: 1200.5 | Accept |
+| NG1/NG3/NG7 | The value is 5². | The value is 52. | plain-checked: 52 | Accept |
+| NG1/NG3/NG7 | The value is 5². | The value is 5. | plain-checked: 52 | Reject |
+| NG3/NG7 | The value is ١٬٥٠٠. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1 500. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1 500. | The value is 1500. | plain-checked: 1500 | Accept |
+| NG3/NG7 | The value is 1․5. | The value is 1.5. | plain-checked: 1.5 | Accept |
+| NG1/NG3/NG7 | The voltage is ١٫٥. | The values are 1 and 5. | plain-checked: 1.5 | Reject |
+| NG1/NG3/NG7 | القيمة ١٫٥. | Values are 1, 2, 3, 5 and -5 and 5%. | plain-checked: 1.5 | Reject |
 
 # NX3 literal table (recorded before implementation)
 
@@ -921,7 +976,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-original-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-original-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#rejectsLiteralIncompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#reselectsCompatibleWindowAcrossSubBatches",
@@ -980,7 +1035,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesLiteralCompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold",
@@ -1052,7 +1107,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-original-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-original-repaired.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsBothCounterexamplesOnSuppliedAndLookupPaths",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsMissingYearInLongLookupDocument",
@@ -1112,7 +1167,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesReferencesOrdinalsAndNumberFreeCorpus",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold",
@@ -1312,7 +1367,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#preservesAgreedWholeValuesAndPunctuation"
       ]
@@ -1384,9 +1439,23 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "kind": "owner-words",
           "location": "task t-20261019-bd718f agreement",
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as \"：\", \"，\", \"．\" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: \"1٫5\" is the decimal 1.5 (5 is not in it), \"1：30\" is a time and is skipped, \"5，000\" is the grouped 5000.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "A grouped number is read the same whatever follows it after whitespace: \"1,200 5kg bags\" contains 1200 (and a non-plain 5kg).",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#skipsTouchingFormsWithoutWithholding",
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#acceptsWholePassageValuesWhateverTouchesThem",
@@ -1474,7 +1543,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#preservesPlainDigitNormalizationAndGrouping",
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#preservesPunctuationReferencesAndCode",
@@ -1547,9 +1616,76 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3-whole-values-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-whole-values-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#rejectsSubvaluesAndCurrencyJoining"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3a normalizes compatibility forms and Arabic decimal/group separators on both sides; grouped values retain identity before subsequent whitespace-separated quantities. Literal counterexamples and neighbours assert claim metadata, cross-encoder verdicts/scores/coverage, and raw cosine supplied/indexed matches (F4).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as \"：\", \"，\", \"．\" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: \"1٫5\" is the decimal 1.5 (5 is not in it), \"1：30\" is a time and is skipped, \"5，000\" is the grouped 5000.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "A grouped number is read the same whatever follows it after whitespace: \"1,200 5kg bags\" contains 1200 (and a non-plain 5kg).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-repaired.json",
+      "newChecks": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyPlainTest.java#appliesNx3aNormalizationAndGroupedBoundaries",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#appliesNx3aNormalizationAndGroupedBoundaries",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#appliesNx3aNormalizationAndGroupedBoundaries"
       ],
       "repaired": true
     }
@@ -1829,6 +1965,73 @@ dev stack or GPU was used or stopped. All manual before/known-good/origin-main s
 under the assigned TMPDIR are removed; evidence runner worktrees cleaned themselves up.
 No frontend dependency directory, external corpus, model directory or installer was copied into comparison trees. No commit/push.
 Detailed builder report: tmp/nx3/builder-report.md.
+
+## NX3a builder observations (2026-10-22; no acceptance verdict)
+
+Production changes are confined to NumericConsistency.java (158 → 164 lines):
+NFKC and Arabic separator normalization precede numeric parsing on both sides;
+a grouped value can end at whitespace before a later quantity. Scorer loops,
+thresholds, sentence keys, counts, persistence and UI code are unchanged.
+The new literal table contains 39 pairs, including the two historical Arabic
+skip pairs now rejected under NX3a. No input was discarded to preserve that old oracle.
+
+All three new methods assertion-fail on unchanged e9f080f32 with zero skips:
+plain 5 against 1٫5 yields support; full-width time/grouping metadata is wrong;
+1200 against 1,200 5kg loses support, while its 200 subvalue incorrectly gains it.
+Cross-encoder failure returns a 0.9760000109672546 match instead of an empty list;
+raw cosine returns one match instead of zero on both supplied and indexed paths.
+Retained XML and production-helper identity: tmp/nx3a/before-repair-final-results/
+and tmp/nx3a/before-production-identity.json. The helper-only before sweep has
+38 failed assertions; all 16 helper methods pass afterward.
+
+Focused candidate selection: 85 tests, zero failures/errors/skips. Preservation:
+75 tests before and after, zero failures/errors/skips, including exact numeric-free
+matches (GN1), NG4–NG6, WP4.4 passage/source checks, file-store history, Delegate
+mapping, HTTP-handler counts and MCP output.
+
+Fresh run-evidence.mjs output (default dependency-link mode; no copy option):
+
+| NX3a artifact suffix | Candidate | Assertion fail-before |
+| --- | --- | --- |
+| original-repaired.json | 7 pass | 7 on 76efc1c10 |
+| preserved.json | 11 pass | preservation checked separately on e9f080f32 |
+| repaired.json | 26 pass | 26 on d36738d92 |
+| whole-values-repaired.json | 1 pass | 1 on 062011106 (existing historical repair) |
+
+The existing six-fixture CPU scorer protocol used identical model/fixture hashes,
+two warm-ups, five timed suite sums and one Gradle worker. Median: 282989260 ns
+before, 203356547 ns after; ratio 0.718602, within the 10% bound. All six fixtures
+remain scored in every run. Raw XML is uiux-numeric-guard-nx3a-performance-{before,after}.xml.
+This is scorer timing; differing shared-machine load does not establish a speedup.
+
+All Gradle calls ran through js-gradle-slot (the containing script holds the slot
+for its child Gradle calls). pmdMain passes for reranker, worker-services,
+app-services, app-agent and ui. build -x test -PskipWebBuild=true succeeds in
+2m 32s, 332 actionable tasks; optional integration skips are not claimed as passes.
+Frontend lint/typecheck pass, full Vitest passes 563 files / 7285 tests, and
+all 28 root UI gates pass. No frontend source, manifest or lockfile changed.
+
+Durable tests added/rewritten: NumericConsistencyPlainTest (NG1/NG3/NG7),
+CitationScorerNumericTest (NG1/NG2/NG3/NG6/NG7), CitationMatchOpsNumericTest
+(the same scenarios; F4 observes raw results), NumericConsistencyTokenizationTest
+(NG3/NG7; compatibility cases move from the superseded skip list to the table).
+The first candidate's sole reranker failure was a stale Arabic skip expectation;
+that exact pair and its Worker counterpart remain in the new rejection table.
+
+Every earlier JSON/XML artifact and every acceptance record remains unchanged.
+Test-intent validates sources, coverage and evidence; only independent acceptance
+is stale. The builder has written no acceptance record and made no commit/push.
+The manual shared clone under the assigned TMPDIR and all evidence-runner
+checkouts are removed. No dependency/model/corpus/installer was copied.
+Shared resources: Gradle caches and slot locks; read-only CPU model files.
+No owner app, dev stack or GPU was used or stopped. One initial queued command
+was canceled (143) to move the before run into its isolated clone; both completed
+comparison runners have retained logs. Queue waits account for most elapsed time.
+
+Still unverified under this assignment's unavailable-stack constraint: full
+live/cold Engine/browser NG1/NG6 combinations, browser legacy-record rendering
+(GN3), production Ask timing/coverage (NG8), and production Ask rag-qa counts (NG9).
+Component/frontend checks do not substitute for those running-system checks.
 
 ## Acceptance records
 

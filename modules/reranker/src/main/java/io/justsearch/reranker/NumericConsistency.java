@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import java.text.Normalizer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -12,12 +13,15 @@ import java.util.regex.Pattern;
  */
 public final class NumericConsistency {
   private static final String SEPARATORS = ", \\u00a0\\u202f";
-  // Consume adjacent digit groups and decimal points together; never resume inside a decimal.
-  private static final Pattern NUMBER = Pattern.compile("(?:[0-9]+|\\.[0-9]+)(?:[.,\\p{Zs}][0-9]+)*");
+  private static final String GROUPED_NUMBER =
+      "[0-9]{1,3}(?:(?:,[0-9]{3})+|(?: [0-9]{3})+)(?:\\.[0-9]+)?";
+  // A complete grouped value ends at whitespace; later quantities cannot change its value.
+  // Otherwise consume adjacent digit groups and decimal points whole, never decimal pieces.
+  private static final Pattern NUMBER = Pattern.compile(GROUPED_NUMBER + "(?=\\p{Zs})"
+      + "|(?:[0-9]+|\\.[0-9]+)(?:[.,\\p{Zs}][0-9]+)*");
   private static final Pattern UNGROUPED_NUMBER = Pattern.compile("[0-9]+(?:\\.[0-9]+)*");
   private static final Pattern PLAIN_NUMBER = Pattern.compile(
-      "(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,3}(?: [0-9]{3})+"
-          + "|[0-9]{1,3}(?:\\u00a0[0-9]{3})+|[0-9]{1,3}(?:\\u202f[0-9]{3})+)(?:\\.[0-9]+)?|\\.[0-9]+");
+      "[0-9]+(?:\\.[0-9]+)?|" + GROUPED_NUMBER + "|\\.[0-9]+");
   private static final Pattern REFERENCE =
       Pattern.compile("\\[[1-9][0-9]*\\](?:[ \\t]*\\[[1-9][0-9]*\\])*");
   private static final Pattern ORDINAL = Pattern.compile("(?m)^[ \\t]*[0-9]+[.)][ \\t]+");
@@ -112,8 +116,10 @@ public final class NumericConsistency {
 
   private static String normalizeDigits(String text) {
     if (text == null) return "";
-    StringBuilder out = new StringBuilder(text.length());
-    text.codePoints().forEach(cp -> {
+    String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC)
+        .replace('\u066b', '.').replace('\u066c', ',');
+    StringBuilder out = new StringBuilder(normalized.length());
+    normalized.codePoints().forEach(cp -> {
       int digit = Character.digit(cp, 10);
       if (Character.isDigit(cp) && digit >= 0) out.append((char) ('0' + digit));
       else out.appendCodePoint(cp);

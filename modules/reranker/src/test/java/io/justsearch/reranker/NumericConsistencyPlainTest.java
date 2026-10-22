@@ -10,11 +10,62 @@ import org.junit.jupiter.api.Test;
 /** NX3 owner decision: only standalone plain claim numbers participate in containment. */
 class NumericConsistencyPlainTest {
   @Test
+  void appliesNx3aNormalizationAndGroupedBoundaries() {
+    String[][] pairs = {
+        {"The voltage measured 5 volts.", "The voltage measured 1٫5 volts.", "5", "false"},
+        {"The voltage measured 1.5 volts.", "The voltage measured 1٫5 volts.", "1.5", "true"},
+        {"The voltage measured ١٫٥ volts.", "The voltage measured 1.5 volts.", "1.5", "true"},
+        {"The voltage measured ١٫٥ volts.", "The voltage measured 5 volts.", "1.5", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured ١٫٥ volts.", "5", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured ٫5 volts.", "5", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured １．５ volts.", "5", "false"},
+        {"The voltage measured １．５ volts.", "The voltage measured 1.5 volts.", "1.5", "true"},
+        {"The voltage measured １．５ volts.", "The voltage measured 5 volts.", "1.5", "false"},
+        {"The voltage measured 1.5 volts.", "The voltage measured １．５ volts.", "1.5", "true"},
+        {"The meeting starts at 1：30.", "No number here.", "", "true"},
+        {"The meeting starts at １：３０.", "No number here.", "", "true"},
+        {"The shipment contains 5，000 bags.", "The shipment contains 5000 bags.", "5000", "true"},
+        {"The shipment contains 5，000 bags.", "No number here.", "5000", "false"},
+        {"The shipment contains ٥٬٠٠٠ bags.", "The shipment contains 5000 bags.", "5000", "true"},
+        {"The shipment contains 5000 bags.", "The shipment contains ٥٬٠٠٠ bags.", "5000", "true"},
+        {"The shipment contains 5000 bags.", "The shipment contains 5，000 bags.", "5000", "true"},
+        {"The shipment contains 200 bags.", "The shipment contains 1٬200 bags.", "200", "false"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 5kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 50kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 500kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1٬200 5kg bags.", "1200", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains １，２００ 5kg bags.", "1200", "true"},
+        {"The shipment contains 1,200 5kg bags.", "The shipment contains 1200 bags.", "1200", "true"},
+        {"The shipment contains 1,200 5kg bags.", "No number here.", "1200", "false"},
+        {"The shipment contains 200 bags.", "The shipment contains 1,200 5kg bags.", "200", "false"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200.5 5kg bags.", "1200", "false"},
+        {"The shipment contains 1200.5 bags.", "The shipment contains 1,200.5 5kg bags.", "1200.5", "true"},
+        {"The value is 5².", "The value is 52.", "52", "true"},
+        {"The value is 5².", "The value is 5.", "52", "false"},
+        {"The value is ١٬٥٠٠.", "The value is 1500.", "1500", "true"},
+        {"The value is 1 500.", "The value is 1500.", "1500", "true"},
+        {"The value is 1 500.", "The value is 1500.", "1500", "true"},
+        {"The value is 1․5.", "The value is 1.5.", "1.5", "true"},
+        {"The voltage is ١٫٥.", "The values are 1 and 5.", "1.5", "false"},
+        {"القيمة ١٫٥.", "Values are 1, 2, 3, 5 and -5 and 5%.", "1.5", "false"}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      var claim = NumericConsistency.claim(pair[0]);
+      assertEquals(pair[2].isEmpty() ? Set.of() : Set.of(pair[2]), claim.values(), pair[0]);
+      assertEquals(Boolean.parseBoolean(pair[3]), supports(pair[0], pair[1]),
+          java.util.Arrays.toString(pair));
+    }));
+  }
+
+  @Test
   void skipsTouchingFormsWithoutWithholding() {
     for (String form : List.of("%-5", "% -5", "%5", "0x10", "0b101", "5kg-10kg",
         "21/10/2026", "2026-10-21", "21.10.2026", "$5", "-$5", "$-5", "5€",
         "1:30", "v1.2.3", "1.2.3e4", "1e3", "5kg%", "-15", "+15", "15%", "5°",
-        ".5", "-.5", "+.5%", "1/2", "1..5", "1_500", "5th", "5²", "١٫٥",
+        ".5", "-.5", "+.5%", "1/2", "1..5", "1_500", "5th",
         "値は１５です", "m²", "cm³")) {
       var claim = NumericConsistency.claim("The value is " + form + ".");
       assertEquals(Set.of(), claim.values(), "skipped means no checked values: " + form);

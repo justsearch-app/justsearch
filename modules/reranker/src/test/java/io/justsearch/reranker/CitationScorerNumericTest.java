@@ -47,6 +47,61 @@ class CitationScorerNumericTest {
   }
 
   @Test
+  void appliesNx3aNormalizationAndGroupedBoundaries() {
+    // NX3a: normalize both sides before applying the unchanged plain-number rules.
+    String[][] pairs = {
+        {"The voltage measured 5 volts.", "The voltage measured 1٫5 volts.", "false"},
+        {"The voltage measured 1.5 volts.", "The voltage measured 1٫5 volts.", "true"},
+        {"The voltage measured ١٫٥ volts.", "The voltage measured 1.5 volts.", "true"},
+        {"The voltage measured ١٫٥ volts.", "The voltage measured 5 volts.", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured ١٫٥ volts.", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured ٫5 volts.", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured １．５ volts.", "false"},
+        {"The voltage measured １．５ volts.", "The voltage measured 1.5 volts.", "true"},
+        {"The voltage measured １．５ volts.", "The voltage measured 5 volts.", "false"},
+        {"The voltage measured 1.5 volts.", "The voltage measured １．５ volts.", "true"},
+        {"The meeting starts at 1：30.", "No number here.", "true"},
+        {"The meeting starts at １：３０.", "No number here.", "true"},
+        {"The shipment contains 5，000 bags.", "The shipment contains 5000 bags.", "true"},
+        {"The shipment contains 5，000 bags.", "No number here.", "false"},
+        {"The shipment contains ٥٬٠٠٠ bags.", "The shipment contains 5000 bags.", "true"},
+        {"The shipment contains 5000 bags.", "The shipment contains ٥٬٠٠٠ bags.", "true"},
+        {"The shipment contains 5000 bags.", "The shipment contains 5，000 bags.", "true"},
+        {"The shipment contains 200 bags.", "The shipment contains 1٬200 bags.", "false"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 50kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 500kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1٬200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains １，２００ 5kg bags.", "true"},
+        {"The shipment contains 1,200 5kg bags.", "The shipment contains 1200 bags.", "true"},
+        {"The shipment contains 1,200 5kg bags.", "No number here.", "false"},
+        {"The shipment contains 200 bags.", "The shipment contains 1,200 5kg bags.", "false"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200.5 5kg bags.", "false"},
+        {"The shipment contains 1200.5 bags.", "The shipment contains 1,200.5 5kg bags.", "true"},
+        {"The value is 5².", "The value is 52.", "true"},
+        {"The value is 5².", "The value is 5.", "false"},
+        {"The value is ١٬٥٠٠.", "The value is 1500.", "true"},
+        {"The value is 1 500.", "The value is 1500.", "true"},
+        {"The value is 1 500.", "The value is 1500.", "true"},
+        {"The value is 1․5.", "The value is 1.5.", "true"},
+        {"The voltage is ١٫٥.", "The values are 1 and 5.", "false"},
+        {"القيمة ١٫٥.", "Values are 1, 2, 3, 5 and -5 and 5%.", "false"}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      var result = score(pair[0], List.of(pair[1]), 0.5);
+      var expected = Boolean.parseBoolean(pair[2])
+          ? List.of(new CitationScorer.ScoredMatch(0, pair[0], 0, "doc0", 0.976f))
+          : List.of();
+      assertEquals(expected, result.matches(), java.util.Arrays.toString(pair));
+      assertEquals(1, result.sentencesScored());
+      assertEquals(List.of(), score(pair[0], List.of(pair[1]), 0.99).matches());
+    }));
+  }
+
+  @Test
   void appliesNx3VerifierCounterexamples() {
     // NX3: "The guard checks plain numbers only." Touching forms are skipped on the claim side.
     String[][] pairs = {
@@ -277,8 +332,7 @@ class CitationScorerNumericTest {
         new Pair("The voltage is .5%.", "The voltage is .5."),
         new Pair("The voltage is 1e3.", "The values are 1 and 3."),
         new Pair("The voltage is 1/2.", "The values are 1 and 2."),
-        new Pair("The voltage is --5.", "The voltage is -5."),
-        new Pair("The voltage is ١٫٥.", "The values are 1 and 5."));
+        new Pair("The voltage is --5.", "The voltage is -5."));
     assertAll(pairs.stream().map(pair -> () -> {
       var result = score(pair.sentence(), List.of(pair.passage()), 0.5);
       assertEquals(List.of(new CitationScorer.ScoredMatch(0, pair.sentence(), 0, "doc0", 0.976f)),

@@ -41,6 +41,68 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
+  void appliesNx3aNormalizationAndGroupedBoundaries() throws Exception {
+    // F4: observe raw matcher results on supplied and indexed passages, never the UI gate.
+    String[][] pairs = {
+        {"The voltage measured 5 volts.", "The voltage measured 1٫5 volts.", "false"},
+        {"The voltage measured 1.5 volts.", "The voltage measured 1٫5 volts.", "true"},
+        {"The voltage measured ١٫٥ volts.", "The voltage measured 1.5 volts.", "true"},
+        {"The voltage measured ١٫٥ volts.", "The voltage measured 5 volts.", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured ١٫٥ volts.", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured ٫5 volts.", "false"},
+        {"The voltage measured 5 volts.", "The voltage measured １．５ volts.", "false"},
+        {"The voltage measured １．５ volts.", "The voltage measured 1.5 volts.", "true"},
+        {"The voltage measured １．５ volts.", "The voltage measured 5 volts.", "false"},
+        {"The voltage measured 1.5 volts.", "The voltage measured １．５ volts.", "true"},
+        {"The meeting starts at 1：30.", "No number here.", "true"},
+        {"The meeting starts at １：３０.", "No number here.", "true"},
+        {"The shipment contains 5，000 bags.", "The shipment contains 5000 bags.", "true"},
+        {"The shipment contains 5，000 bags.", "No number here.", "false"},
+        {"The shipment contains ٥٬٠٠٠ bags.", "The shipment contains 5000 bags.", "true"},
+        {"The shipment contains 5000 bags.", "The shipment contains ٥٬٠٠٠ bags.", "true"},
+        {"The shipment contains 5000 bags.", "The shipment contains 5，000 bags.", "true"},
+        {"The shipment contains 200 bags.", "The shipment contains 1٬200 bags.", "false"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 50kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200 500kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1 200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1٬200 5kg bags.", "true"},
+        {"The shipment contains 1200 bags.", "The shipment contains １，２００ 5kg bags.", "true"},
+        {"The shipment contains 1,200 5kg bags.", "The shipment contains 1200 bags.", "true"},
+        {"The shipment contains 1,200 5kg bags.", "No number here.", "false"},
+        {"The shipment contains 200 bags.", "The shipment contains 1,200 5kg bags.", "false"},
+        {"The shipment contains 1200 bags.", "The shipment contains 1,200.5 5kg bags.", "false"},
+        {"The shipment contains 1200.5 bags.", "The shipment contains 1,200.5 5kg bags.", "true"},
+        {"The value is 5².", "The value is 52.", "true"},
+        {"The value is 5².", "The value is 5.", "false"},
+        {"The value is ١٬٥٠٠.", "The value is 1500.", "true"},
+        {"The value is 1 500.", "The value is 1500.", "true"},
+        {"The value is 1 500.", "The value is 1500.", "true"},
+        {"The value is 1․5.", "The value is 1.5.", "true"},
+        {"The voltage is ١٫٥.", "The values are 1 and 5.", "false"},
+        {"القيمة ١٫٥.", "Values are 1, 2, 3, 5 and -5 and 5%.", "false"}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      index(DOC_A, pair[1]);
+      assertAll(List.of(true, false).stream().map(supplied -> () -> {
+        var result = execute(pair[0], List.of(DOC_A), supplied ? List.of(pair[1]) : List.of(), 0.5);
+        int expected = Boolean.parseBoolean(pair[2]) ? 1 : 0;
+        assertEquals(expected, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
+        assertEquals(expected, result.getSentencesMatched());
+        assertEquals(1, result.getSentencesScored());
+        if (expected == 1) {
+          assertEquals(1.0, result.getMatches(0).getSimilarity(), 0.0);
+          assertEquals(DOC_A, result.getMatches(0).getParentDocId());
+        }
+        assertEquals(0, execute(pair[0], List.of(DOC_A), List.of("alternative: " + pair[1]), 0.9)
+            .getMatchesCount(), "containment cannot raise a score");
+      }));
+    }));
+  }
+
+  @Test
   void appliesNx3VerifierCounterexamples() throws Exception {
     // F4: observe raw matcher results on supplied and indexed passages, never the UI gate.
     String[][] pairs = {
@@ -265,7 +327,7 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   @Test
   void skipsNonPlainFormsAfterMarkdownSegmentation() {
     assertAll(List.of("The value is `1e3`.", "The value is 1/2.",
-        "| Value --5 |\n| --- |\n| The value is --5. |", "القيمة ١٫٥.", "The value is 5%%.", "値は１５です。")
+        "| Value --5 |\n| --- |\n| The value is --5. |", "The value is 5%%.", "値は１５です。")
         .stream().map(answer -> () -> {
       var result = execute(answer, List.of(DOC_A), List.of("Values are 1, 2, 3, 5 and -5 and 5%."), 0.5);
       assertEquals(result.getSentencesTotal(), result.getMatchesCount(), answer);
