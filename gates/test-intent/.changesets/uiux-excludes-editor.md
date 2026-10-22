@@ -507,10 +507,195 @@ The before-state is ae50fbc4e. New repair checks run unchanged against it. Exist
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeletionCompletionReceiptTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.accessibility.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "S32.7 / XA1: the shared typed confirmation input has a native associated label including the exact word to type, for Apply and another typed confirmation.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S327",
+          "quote": "Editor, Save, Preview, Apply, the confirmation and the result are operable by keyboard and screen reader (busy and result announced once), in both themes, High Contrast and narrow width.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XA1",
+          "quote": "An authorization prompt (\"Authorize action ...\") that was answered in another window, or whose pending request the Engine no longer knows (expired, answered, 404), disappears from every open window without user action, at the latest when that window next learns the request's state, and never blocks pointer or keyboard input. Answering a stale prompt changes nothing on the server and closes it with a short neutral note. A prompt for a request that is still pending stays and works as before. The S32.7 typed confirmation's input has an accessible name that includes the word to type (all typed confirmations share it).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-xa1-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.accessibility.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "XA1: the real pending bridge, client and native modal withdraw an answered or unknown request on existing activity/status signals; stale approval and denial are neutral and do not POST; a 410 race is neutral; queued stale prompts never surface and do not reset a still-pending prompt. Original caller prompts also recover through the shared status cadence when the bridge detail lookup failed; transient state-read failures keep their prompt usable.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S327",
+          "quote": "Editor, Save, Preview, Apply, the confirmation and the result are operable by keyboard and screen reader (busy and result announced once), in both themes, High Contrast and narrow width.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XA1",
+          "quote": "An authorization prompt (\"Authorize action ...\") that was answered in another window, or whose pending request the Engine no longer knows (expired, answered, 404), disappears from every open window without user action, at the latest when that window next learns the request's state, and never blocks pointer or keyboard input. Answering a stale prompt changes nothing on the server and closes it with a short neutral note. A prompt for a request that is still pending stays and works as before. The S32.7 typed confirmation's input has an accessible name that includes the word to type (all typed confirmations share it).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-xa1-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws the second client prompt when the first client answers and activity arrives (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws an unknown request on the next shared status update (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#answering a stale prompt closes it with a neutral note and sends no approval (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#denying a stale prompt closes with a neutral note and no server change (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#handles a 410 race after the final peek with a neutral note (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#removes queued stale prompts without resetting the live prompt or showing the stale one (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws an original caller prompt after the bridge detail lookup failed (XA1)"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "XA1: invoke and Undo callers through the real Shell/client/toast seam report answered (410), withdrawn, and denied stale approvals with a short neutral note, never retrying the mutation or approving a withdrawn request. Existing expectations are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S327",
+          "quote": "Editor, Save, Preview, Apply, the confirmation and the result are operable by keyboard and screen reader (busy and result announced once), in both themes, High Contrast and narrow width.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XA1",
+          "quote": "An authorization prompt (\"Authorize action ...\") that was answered in another window, or whose pending request the Engine no longer knows (expired, answered, 404), disappears from every open window without user action, at the latest when that window next learns the request's state, and never blocks pointer or keyboard input. Answering a stale prompt changes nothing on the server and closes it with a short neutral note. A prompt for a request that is still pending stays and works as before. The S32.7 typed confirmation's input has an accessible name that includes the word to type (all typed confirmations share it).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-xa1-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a gone approval as a neutral closed request",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a gone approval as a neutral closed request",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a withdrawn approval as a neutral closed request",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a withdrawn approval as a neutral closed request",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a denied-gone approval as a neutral closed request",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a denied-gone approval as a neutral closed request"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "XA1 preservation: a still-pending prompt remains usable after activity/status reconciliation, and a failed state lookup does not prove a request has gone or dismiss its prompt. Both checks pass before and after the repair.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XA1",
+          "quote": "An authorization prompt (\"Authorize action ...\") that was answered in another window, or whose pending request the Engine no longer knows (expired, answered, 404), disappears from every open window without user action, at the latest when that window next learns the request's state, and never blocks pointer or keyboard input. Answering a stale prompt changes nothing on the server and closes it with a short neutral note. A prompt for a request that is still pending stays and works as before. The S32.7 typed confirmation's input has an accessible name that includes the word to type (all typed confirmations share it).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-xa1-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#keeps a still-pending prompt usable after activity and status checks (XA1)",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#does not dismiss a pending prompt on a failed state lookup (XA1)"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Mocks retain the real broker/client exports needed by XA1 and stub the shared status subscription so these existing focused checks do not start status network reads. Every existing input, precondition and expectation is unchanged. XA1 stream/status integration is exercised in pendingAuthorizationWithdrawal.test.ts.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XA1",
+          "quote": "An authorization prompt (\"Authorize action ...\") that was answered in another window, or whose pending request the Engine no longer knows (expired, answered, 404), disappears from every open window without user action, at the latest when that window next learns the request's state, and never blocks pointer or keyboard input. Answering a stale prompt changes nothing on the server and closes it with a short neutral note. A prompt for a request that is still pending stays and works as before. The S32.7 typed confirmation's input has an accessible name that includes the word to type (all typed confirmations share it).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }
 ```
+
+XA1 repair entries appended by builder session b0s1b46m on 2026-10-22; earlier entries and the prior acceptance record are retained.
 
 ## Acceptance records
 

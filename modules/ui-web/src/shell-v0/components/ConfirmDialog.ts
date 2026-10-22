@@ -273,10 +273,11 @@ export class ConfirmDialog extends JfElement {
           ${this.typedConfirmWord
             ? html`
                 <div class="typed-row">
-                  <label>
+                  <label for="typed-confirm-input">
                     Type <code>${this.typedConfirmWord}</code> to confirm:
                   </label>
                   <input
+                    id="typed-confirm-input"
                     type="text"
                     .value=${this.typedInput}
                     @input=${(e: Event) =>

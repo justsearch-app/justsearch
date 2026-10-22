@@ -1,0 +1,331 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T23:52:31.432Z",
+  "revision": "aa5894de175a07aa3cce1b571eb6372053797d39",
+  "tree": "b82db3c637aa354c3860c1b2d760ba8feda3145b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.accessibility.test.ts\" \"src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-vitest-2216186-1792626739511.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5596
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.accessibility.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.accessibility.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4a9b88cf82dc3d111328f58adc2d4d0f83bfb28d83ad392cb4cb6e56d4360353",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "names the shared typed input with the word core.apply-excludes (S32.7, XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "names the shared typed input with the word DELETE (S32.7, XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws the second client prompt when the first client answers and activity arrives (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws the second client prompt when the first client answers and activity arrives (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws an unknown request on the next shared status update (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws an unknown request on the next shared status update (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#answering a stale prompt closes it with a neutral note and sends no approval (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "answering a stale prompt closes it with a neutral note and sends no approval (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#denying a stale prompt closes with a neutral note and no server change (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "denying a stale prompt closes with a neutral note and no server change (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#handles a 410 race after the final peek with a neutral note (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "handles a 410 race after the final peek with a neutral note (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#removes queued stale prompts without resetting the live prompt or showing the stale one (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "removes queued stale prompts without resetting the live prompt or showing the stale one (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a gone approval as a neutral closed request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f089569bb2d56f3ae4c33bc8b661430d3165b775f576cb17a08a9f474de3c1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration XA1: invoke reports a gone approval as a neutral closed request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a gone approval as a neutral closed request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f089569bb2d56f3ae4c33bc8b661430d3165b775f576cb17a08a9f474de3c1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration XA1: undo reports a gone approval as a neutral closed request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a withdrawn approval as a neutral closed request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f089569bb2d56f3ae4c33bc8b661430d3165b775f576cb17a08a9f474de3c1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration XA1: invoke reports a withdrawn approval as a neutral closed request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a withdrawn approval as a neutral closed request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f089569bb2d56f3ae4c33bc8b661430d3165b775f576cb17a08a9f474de3c1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration XA1: undo reports a withdrawn approval as a neutral closed request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a denied-gone approval as a neutral closed request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f089569bb2d56f3ae4c33bc8b661430d3165b775f576cb17a08a9f474de3c1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration XA1: invoke reports a denied-gone approval as a neutral closed request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a denied-gone approval as a neutral closed request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f089569bb2d56f3ae4c33bc8b661430d3165b775f576cb17a08a9f474de3c1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration XA1: undo reports a denied-gone approval as a neutral closed request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws an original caller prompt after the bridge detail lookup failed (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws an original caller prompt after the bridge detail lookup failed (XA1)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "23b7c9499",
+    "revision": "23b7c94990f911cc075a1adf936d965c3531e5d1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.accessibility.test.ts\" \"src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-vitest-2216186-1792626746389.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4868,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-vitest-2216186-1792626746389.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.accessibility.test.ts",
+        "classification": "assertion",
+        "detail": "names the shared typed input with the word core.apply-excludes (S32.7, XA1):  AssertionError: typed confirmation input needs an associated label: expected undefined to be defined\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/components/ConfirmDialog.accessibility.test.ts:21:71 | names the shared typed input with the word DELETE (S32.7, XA1):  AssertionError: typed confirmation input needs an associa"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws the second client prompt when the first client answers and activity arrives (XA1)",
+        "classification": "assertion",
+        "detail": "withdraws the second client prompt when the first client answers and activity arrives (XA1):  AssertionError: answered elsewhere must release the native modal: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws an unknown request on the next shared status update (XA1)",
+        "classification": "assertion",
+        "detail": "withdraws an unknown request on the next shared status update (XA1):  AssertionError: Engine 404 must close without a click: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts:101"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#answering a stale prompt closes it with a neutral note and sends no approval (XA1)",
+        "classification": "assertion",
+        "detail": "answering a stale prompt closes it with a neutral note and sends no approval (XA1):  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts:110:70\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#denying a stale prompt closes with a neutral note and no server change (XA1)",
+        "classification": "assertion",
+        "detail": "denying a stale prompt closes with a neutral note and no server change (XA1):  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts:129:70\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#handles a 410 race after the final peek with a neutral note (XA1)",
+        "classification": "assertion",
+        "detail": "handles a 410 race after the final peek with a neutral note (XA1):  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts:137:70\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#removes queued stale prompts without resetting the live prompt or showing the stale one (XA1)",
+        "classification": "assertion",
+        "detail": "removes queued stale prompts without resetting the live prompt or showing the stale one (XA1):  AssertionError: a withdrawn queued copy must never become the active modal: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationW"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a gone approval as a neutral closed request",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration XA1: invoke reports a gone approval as a neutral closed request:  AssertionError: a stale approval is a neutral closure, not an execution failure: expected 'error' to be 'info' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:26"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a gone approval as a neutral closed request",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration XA1: undo reports a gone approval as a neutral closed request:  AssertionError: a stale approval is a neutral closure, not an execution failure: expected 'error' to be 'info' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:26"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a withdrawn approval as a neutral closed request",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration XA1: invoke reports a withdrawn approval as a neutral closed request:  AssertionError: a stale approval is a neutral closure, not an execution failure: expected 'error' to be 'info' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:26"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a withdrawn approval as a neutral closed request",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration XA1: undo reports a withdrawn approval as a neutral closed request:  AssertionError: a stale approval is a neutral closure, not an execution failure: expected 'error' to be 'info' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:26"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: invoke reports a denied-gone approval as a neutral closed request",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration XA1: invoke reports a denied-gone approval as a neutral closed request:  AssertionError: a stale approval is a neutral closure, not an execution failure: expected 'error' to be 'info' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:26"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#XA1: undo reports a denied-gone approval as a neutral closed request",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration XA1: undo reports a denied-gone approval as a neutral closed request:  AssertionError: a stale approval is a neutral closure, not an execution failure: expected 'error' to be 'info' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:26"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#withdraws an original caller prompt after the bridge detail lookup failed (XA1)",
+        "classification": "assertion",
+        "detail": "withdraws an original caller prompt after the bridge detail lookup failed (XA1):  AssertionError: the original prompt must recover from a failed bridge detail read: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-before-oPVTAq/modules/ui-web/src/shell-v0/operations/pendingAuthori"
+      }
+    ]
+  },
+  "digest": "sha256:380a43fd4f5a5e55160991a383474feaaaa7ffe1d99d9d18314066e77f3f876e"
+}
