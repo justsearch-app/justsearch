@@ -830,3 +830,16 @@ builder.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a161a3-6510-78a3-aec5-e61ab131f87e",
+  "verdict": "accept",
+  "digest": "sha256:44a7a8b33dc66e3ecc47a1818786bc78c89746885c0621f8ea841e5c8a0928d6",
+  "note": "Verified 9370e8d37: pointer repairs and split suite complete; 14 failures match main; promoted helper branch unexercised, separate forward proof passes."
+}
+```
