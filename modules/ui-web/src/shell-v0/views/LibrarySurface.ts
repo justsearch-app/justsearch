@@ -1383,7 +1383,7 @@ export class LibrarySurface extends JfElement {
         this.reindexOutcome = 'Reindex completed for the recorded request. Current indexing activity is shown below.';
         this.reindexOutcomeKey = null;
       } else if (outcome.state === 'failed') {
-        this.reindexOutcome = `Reindex did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Reindex; failed files can also be retried below.`;
+        this.reindexOutcome = `${outcome.message ?? 'Reindex did not complete. Check folder availability and retry Reindex; failed files can also be retried below.'}${outcome.result?.code ? ` Code: ${outcome.result.code}` : ''}`;
         this.reindexOutcomeKey = null;
       } else {
         this.reindexOutcome = `Reindex accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
