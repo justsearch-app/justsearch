@@ -24,6 +24,15 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
   @TempDir Path tempDir;
 
   @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void missingFilesystemUsesTheUnavailableRootReason() {
+    SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, new RecordingQueue(), null);
+    var result = ops.execute(tempDir.resolve("absent-volume").toString(), false, null, () -> false);
+    assertTrue(result.getError().startsWith("ROOT_NOT_DIRECTORY:"), result.getError());
+    assertEquals(0, result.getFilesDeleted());
+  }
+
+  @Test
   void longIndexedPathsReachMemoryBudgetBeforeEntryCountLimit() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("long-indexed-paths"));
     Files.writeString(root.resolve("missing.md"), "text");

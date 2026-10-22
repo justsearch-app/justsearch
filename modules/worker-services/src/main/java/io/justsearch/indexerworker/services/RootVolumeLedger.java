@@ -343,6 +343,11 @@ final class RootVolumeLedger {
    * or under {@code pathPrefix}.
    */
   void forgetUnder(String pathPrefix) throws IOException {
+    forgetUnder(pathPrefix, ignored -> true);
+  }
+
+  /** A surviving nested declaration keeps its own records when its parent is removed. */
+  void forgetUnder(String pathPrefix, java.util.function.Predicate<Path> ownsPath) throws IOException {
     if (!enabled() || pathPrefix == null || pathPrefix.isBlank()) {
       return;
     }
@@ -355,14 +360,15 @@ final class RootVolumeLedger {
             if (folder.startsWith(FILE_FOLDER_PREFIX)) {
               folder = folder.substring(FILE_FOLDER_PREFIX.length());
             }
-            return atOrUnder(folder, prefix);
+            return atOrUnder(folder, prefix) && ownsPath.test(Path.of(folder));
           });
       if (changed) {
         store(entries);
       }
       if (file != null) {
         Properties awaiting = loadPending();
-        if (awaiting.keySet().removeIf(k -> atOrUnder((String) k, prefix))) {
+        if (awaiting.keySet().removeIf(k -> atOrUnder((String) k, prefix)
+            && ownsPath.test(Path.of((String) k)))) {
           write(pendingFile(), awaiting, PENDING_COMMENT);
         }
       }
