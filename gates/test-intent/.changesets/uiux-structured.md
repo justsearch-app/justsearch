@@ -654,3 +654,14 @@ Third repair entries appended by builder session 84aj3121 on 2026-10-22. The exi
   "note": "Test intent only: sources and expectations match the agreed and delegated scenarios. Independent scratch Java and frontend evidence passes with assertion fail-before and preservation controls. Product sign-off is withheld for toast overflow and exhausted-retry display findings; an empty-terminal fault-injection regression is also recorded."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "fu2cgmco",
+  "verdict": "accept",
+  "digest": "sha256:e1cd2654c6f1a87f777629db659676009a4ed6fb508534501ad24e1a975a598c",
+  "note": "Reviewed sources and prior-state expectations; fresh run-evidence passes candidate checks and reproduces assertion fail-before for every repaired check id. Product verification fails separately on old-window connection loss and focused-toast displacement."
+}
+```
