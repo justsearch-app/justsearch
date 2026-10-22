@@ -13,6 +13,7 @@ import io.justsearch.ort.telemetry.AssemblerEvent;
 import io.justsearch.ort.telemetry.AssemblerFailureKind;
 import io.justsearch.ort.telemetry.OrtSessionTelemetryEvents;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -50,6 +51,9 @@ import java.util.Optional;
  * retains the legacy behaviour; the paths are policy-declared on {@link ModelArtifacts}.
  */
 public final class OrtSessionAssembler {
+
+  private static final org.slf4j.Logger log =
+      org.slf4j.LoggerFactory.getLogger(OrtSessionAssembler.class);
 
   private OrtSessionAssembler() {}
 
@@ -121,22 +125,25 @@ public final class OrtSessionAssembler {
   // ---------------------------------------------------------------------------
 
   /**
-   * Input+output name pair from a short-lived probe session. Both sets are {@link
-   * OrtSession#getInputNames()} / {@code getOutputNames()} results; the probe is closed
-   * immediately after reading.
+   * Input/output names in graph order, excluding dense and sparse initializers from inputs.
    */
   public record ProbedNames(java.util.Set<String> inputs, java.util.Set<String> outputs) {}
 
   /**
-   * Reads the ONNX graph's input and output name sets by constructing a lightweight probe
-   * session ({@link ai.onnxruntime.OrtSession.SessionOptions.OptLevel#NO_OPT}, single-threaded).
-   * The probe session is closed immediately — no long-lived allocation. Used by every
+   * Reads the ONNX graph without loading tensor payloads. An unreadable declaration falls back
+   * to the previous single-threaded NO_OPT session probe. Used by every
    * {@code buildAssembly} helper (tempdoc 397 §14.24 FD-ProbeDeletion).
    *
    * @throws OrtException if the probe session cannot be created (e.g., model file missing)
    */
   public static ProbedNames probeModelNames(OrtEnvironment env, Path modelPath)
       throws OrtException {
+    try {
+      var metadata = OnnxExternalData.readMetadata(modelPath);
+      return new ProbedNames(metadata.inputs(), metadata.outputs());
+    } catch (IOException | IllegalArgumentException e) {
+      log.debug("ONNX metadata unreadable for {}; falling back to session probe", modelPath, e);
+    }
     try (SessionOptions probeOpts = new SessionOptions()) {
       probeOpts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.NO_OPT);
       probeOpts.setInterOpNumThreads(1);
@@ -158,8 +165,9 @@ public final class OrtSessionAssembler {
   public record ProbedTensorInfo(long[] shape, OnnxJavaType type) {}
 
   /**
-   * Reads a single output tensor's static shape/dtype metadata via {@link
-   * OrtSession#getOutputInfo()} — no inference run. Used by {@link ModelCapabilityResolver}
+   * Reads a single output tensor's declared shape/dtype without loading weights. Missing dimensions
+   * or unreadable declarations fall back to {@link OrtSession#getOutputInfo()} so graph inference
+   * preserves the old resolved values. Used by {@link ModelCapabilityResolver}
    * (tempdoc 710 Wave 2 Move 1) as a boot-time probe for the embedding-dimension capability fact
    * (when the graph's trailing output axis is statically known) and as a sanity check for the
    * declared precision capability against the graph's actual output element type. Both uses are
@@ -172,6 +180,14 @@ public final class OrtSessionAssembler {
    */
   public static Optional<ProbedTensorInfo> probeOutputTensorInfo(
       OrtEnvironment env, Path modelPath, String outputName) throws OrtException {
+    try {
+      var metadata = OnnxExternalData.readMetadata(modelPath);
+      if (!metadata.unresolvedOutputs().contains(outputName)) {
+        return Optional.ofNullable(metadata.tensors().get(outputName));
+      }
+    } catch (IOException | IllegalArgumentException e) {
+      log.debug("ONNX output declaration unresolved for {}; falling back to session probe", modelPath, e);
+    }
     try (SessionOptions probeOpts = new SessionOptions()) {
       probeOpts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.NO_OPT);
       probeOpts.setInterOpNumThreads(1);
@@ -188,9 +204,9 @@ public final class OrtSessionAssembler {
   }
 
   /**
-   * Reads the ONNX file's {@code metadata_props} custom-metadata map via a short-lived probe
-   * session ({@link ai.onnxruntime.OrtSession.SessionOptions.OptLevel#NO_OPT}, single-threaded) —
-   * mirrors {@link #probeModelNames(OrtEnvironment, Path)}. Used by {@link
+   * Reads ModelProto {@code metadata_props} without loading weights; GraphProto metadata is
+   * distinct and is ignored. Unreadable files fall back to one session probe, as in
+   * {@link #probeModelNames(OrtEnvironment, Path)}. Used by {@link
    * ModelCapabilityResolver} (tempdoc 711 Item 3) as the embedded-metadata rung, one session per
    * {@code resolve} call (not per fact) — every capability fact the resolver checks against
    * embedded metadata reads from the same returned map.
@@ -202,6 +218,11 @@ public final class OrtSessionAssembler {
    */
   public static Map<String, String> probeCustomMetadata(OrtEnvironment env, Path modelPath)
       throws OrtException {
+    try {
+      return OnnxExternalData.readMetadata(modelPath).properties();
+    } catch (IOException | IllegalArgumentException e) {
+      log.debug("ONNX metadata unreadable for {}; falling back to session probe", modelPath, e);
+    }
     try (SessionOptions probeOpts = new SessionOptions()) {
       probeOpts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.NO_OPT);
       probeOpts.setInterOpNumThreads(1);
