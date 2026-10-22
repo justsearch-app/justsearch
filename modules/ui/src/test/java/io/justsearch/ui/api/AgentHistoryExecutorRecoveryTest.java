@@ -53,15 +53,18 @@ class AgentHistoryExecutorRecoveryTest {
           } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         }, store::readEvents);
         assertTrue(firstScan.await(3, TimeUnit.SECONDS));
+        store.writeRunMeta("blocker", Map.of("sessionId", "blocker"));
         assertNotNull(store.appendEvent("blocker", "core.agent-run", "done", Map.of("finalResponse", "blocked")));
         assertTrue(blocked.await(3, TimeUnit.SECONDS));
         int capacity = registry.limits(EngineExecutorSpec.Kind.BACKGROUND).maxQueue();
         for (int i = 0; i < capacity; i++) {
+          store.writeRunMeta("queued-" + i, Map.of("sessionId", "queued-" + i));
           assertNotNull(store.appendEvent("queued-" + i, "core.agent-run", "done", Map.of("finalResponse", "queued")));
         }
         var row = registry.snapshot().registrations().stream()
             .filter(item -> item.spec().name().equals("head.agent-history-indexer")).findFirst().orElseThrow();
         assertEquals(capacity, row.queuedTasks(), "the real executor must be full before the refusal");
+        store.writeRunMeta("overflow", Map.of("sessionId", "overflow"));
         assertNotNull(store.appendEvent("overflow", "core.agent-run", "done", Map.of("finalResponse", "durable recovery marker")));
         assertEquals(1, store.readEvents("overflow").size(), "the refused event is already durable");
         assertFalse(Files.exists(historyDir.resolve("overflow.md")), "the listener must not do disk work inline");
