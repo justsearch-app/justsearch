@@ -814,3 +814,14 @@ WP3.6. Dotted agreed scenario IDs are preserved in agreedScenario; the gate IDs 
   "note": "Fresh execution on 5905ccc40 fails StatusIndexingPauseTest waitingForResume at line 47; current execution evidence does not support acceptance."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "rfgnxk1w-verifier-2",
+  "verdict": "accept",
+  "digest": "sha256:d8ffe0e47e43dd4c3181b1bc7649b8feff1d3bd13bdc924b73bdfc5dfb6be9d7",
+  "note": "Supplied scenarios and delegation ground the retained and new expectations. Fresh named checks pass; repair checks assertion-fail on 0a4a706f3. Test-intent acceptance only: product verification fails the supplied search-during-reload case (F1)."
+}
+```
