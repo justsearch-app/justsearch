@@ -524,3 +524,14 @@ Follow-up entries appended by builder session r3qplcrx on 2026-10-22. Existing e
   "note": "Test intent only. Reviewed before-state tests, agreed scenarios and delegation, then diffs; changed expectations are warranted. Independent Java evidence: 18 candidate cases pass; 10 original and 7 schema-repair assertion failures before, with one preservation case passing before. Independent UI evidence: 19 named candidate cases pass with assertion fail-before. Product verdict remains fail for XD2 duplicate exposed failure announcements and old-window rejected output displayed and reused as context. This record is not product sign-off."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "tno53db9",
+  "verdict": "accept",
+  "digest": "sha256:09542d06615f88d2fd89e9ea08f1e6b2b86790af1bc2710a92d9a97869bdcdd5",
+  "note": "Test intent only: sources and expectations match the agreed and delegated scenarios. Independent scratch Java and frontend evidence passes with assertion fail-before and preservation controls. Product sign-off is withheld for toast overflow and exhausted-retry display findings; an empty-terminal fault-injection regression is also recorded."
+}
+```
