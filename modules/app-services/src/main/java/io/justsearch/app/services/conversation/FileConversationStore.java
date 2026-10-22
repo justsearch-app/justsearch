@@ -172,6 +172,13 @@ public final class FileConversationStore implements ConversationStore {
           msg = new LinkedHashMap<>(msg);
           msg.put("hash", computeHash(msg));
         }
+        // A cancelled extraction was never accepted. Keep its outcome/identity for stopped-note
+        // and branch readers, but never expose its partial JSON as an answer, including old records.
+        if ("assistant".equals(msg.get("role")) && "core.extract".equals(msg.get("shapeId"))
+            && "CANCELLED".equals(msg.get("disposition"))) {
+          msg = new LinkedHashMap<>(msg);
+          msg.put("content", "");
+        }
         history.add(msg);
         index++;
       }
@@ -628,11 +635,9 @@ public final class FileConversationStore implements ConversationStore {
     // trimmed to start at the context floor (floor message inclusive), with the
     // compaction summary (if any) prepended as a synthetic system message. No
     // floor (or a stale floor id) → fail safe to the full history.
-    List<Map<String, Object>> full = loadHistory(sessionId).stream()
-        .filter(m -> !("core.extract".equals(m.get("shapeId")) && Boolean.TRUE.equals(m.get("terminalError"))))
-        .toList();
+    List<Map<String, Object>> full = loadHistory(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
-    if (meta == null) return full;
+    if (meta == null) meta = Map.of();
     // Tempdoc 610 §E.3 — the floor is located in the FULL history, before exclusion: excluding the
     // floor message itself must not move the floor (if the trim looked for it among the kept messages
     // it would miss, fail safe to the whole history, and bring back everything the floor hid).
@@ -655,6 +660,11 @@ public final class FileConversationStore implements ConversationStore {
       java.util.Set<Object> excluded = new java.util.HashSet<>(exList);
       trimmed.removeIf(m -> excluded.contains(m.get("id")));
     }
+    // Locate the floor before excluding outcome carriers: a floor on a stopped answer still
+    // excludes the earlier history, even though that unaccepted answer itself is not prompt input.
+    trimmed.removeIf(m -> "core.extract".equals(m.get("shapeId"))
+        && (Boolean.TRUE.equals(m.get("terminalError"))
+            || ("assistant".equals(m.get("role")) && "CANCELLED".equals(m.get("disposition")))));
     if (summary instanceof String s && !s.isBlank()) {
       Map<String, Object> summaryMsg = new LinkedHashMap<>();
       summaryMsg.put("role", "system");

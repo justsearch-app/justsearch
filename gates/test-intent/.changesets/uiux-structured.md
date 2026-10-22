@@ -715,6 +715,124 @@ All checks are durable. UI expectations add Structured behavior; the Engine entr
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "XT9/XD2: retain a focused toast across the focusout/focusin gap when the next control belongs to that toast, including retargeted custom-element hosts and raw native controls under multiple shadow roots. Preserve focus in both directions, release only on external focus, then restore cached notices silently. Durable tests; existing accepted checks unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT9",
+          "quote": "S14.9 [XT9] (S3.8, ch. 10) The schema box has a label and is reachable by keyboard; multi-line editing never sends by accident; it is readable in both themes, under forced colours and at narrow width with the document pane open, and does not hide the transcript's last turn. Its text survives switching mode or conversation in the same tab; on reload as decision D3b. One tab's schema is never shown in or sent by another tab.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XD2",
+          "quote": "XT9: when a Structured request completes or fails, assistive technology is told once, politely (reuse the live-region mechanism Search v3 already uses; no new announcer), and focus does not move unasked.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Keep a toast retained while focus moves between its own controls (check relatedTarget across shadow roots, or settle after focusin), and release it only when focus leaves the toast.",
+          "location": "task t-20261019-bd718f request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-keyboard-focus-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/StoppedExtractionHistoryTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "XT7/XT10/XN4: older cancelled extraction records keep their cancellation status without unvalidated JSON in displayed history or subsequent effective/model/branch context. Preserve a context floor anchored at the cancelled row. Keep disposition CANCELLED, record id/hash and original saved bytes. Preserve completed extractions and ordinary cancelled Free chat, Ask and summary output/context. Durable checks reopen the real file store and capture an actual ConversationEngine follow-up model request; no global/shared state.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT7",
+          "quote": "S14.7 [XT7] (S3.6, ch. 8) Stop during a Structured run stops it; the turn shows as stopped live and after reload (the WP1.2 rule). If the Engine dies after a rejected attempt or during an attempt, after restart the turn shows as not completed, never as a completed extraction, and nothing re-runs without the user's action. Partial JSON is never shown as complete.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT10",
+          "quote": "S14.10 [XT10] (S3.9) A Structured follow-up sends the conversation's context the way Ask does: excluded messages and the context floor are honoured (S2.0), so \"extract the dates from the answer above\" works.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XN4",
+          "quote": "XN4 Recorded extract turns still parse for /history, /api/thread, MCP and API readers; extract turns saved before the change load as before (a turn whose `turnOpen` was left set by an earlier crash now shows as not completed, per S14.7).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A stopped or otherwise unaccepted Structured answer must never show as an answer in either window, after reload, nor reach later context.",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Keep the CANCELLED record and the \"Stopped by you\" note; do not change how ordinary (non-Structured) stopped answers are shown or used as context. Prefer the smallest change at the point that decides context and display, and check older saved conversations that already contain such text.",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3: after reload Retry/Edit prepare the instruction using the current schema and stated inputs and wait for send.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3b: schema is per-window memory only; reload discards it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D7: no-file extraction reads typed text and this conversation.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D10: validate parse and schema conformance in the shared Engine with its existing networknt dependency.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D11: refuse omitted Extract inputs rather than silently skipping or cutting.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-stopped-history-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/StoppedExtractionHistoryTest.java"
+      ]
     }
   ]
 }
@@ -727,6 +845,8 @@ Follow-up entries appended by builder session r3qplcrx on 2026-10-22. Existing e
 Third repair entries appended by builder session 84aj3121 on 2026-10-22. The existing entries and acceptance records are retained; new checks use baseline 289dff32f and default dependency linking. Independent acceptance is pending.
 
 Fourth-verifier repair entries appended by builder session z9p1afsx on 2026-10-22. Evidence uses f8002f421 and default dependency linking. Existing entries and acceptance records are retained; independent acceptance is pending.
+
+Fifth-verifier repair entries appended by builder session 4mgytu7d on 2026-10-22. Evidence uses 83d72ffb5 with default dependency linking. Earlier entries and acceptance records are retained; independent acceptance is pending.
 
 ## Acceptance records
 

@@ -483,6 +483,19 @@ export class AdvisoryToastHost extends JfElement {
     }
   }
 
+  private onToastFocusOut(event: FocusEvent): void {
+    const toast = event.currentTarget as HTMLElement;
+    let next = event.relatedTarget as Node | null;
+    // Browsers retarget the next control to its host; test DOMs may expose the inner node.
+    while (next !== null) {
+      if (toast.contains(next)) return;
+      const root = next.getRootNode();
+      next = root instanceof ShadowRoot ? root.host : null;
+    }
+    this.focusedToastKey = null;
+    this.requestUpdate();
+  }
+
   override updated(): void {
     const shownKeys = new Set(
       [...this.shadowRoot!.querySelectorAll<HTMLElement>('.toast')].map(el => el.dataset.key),
@@ -595,7 +608,7 @@ export class AdvisoryToastHost extends JfElement {
             class="toast"
             data-key=${t.record.key}
             @focusin=${() => { this.focusedToastKey = t.record.key; this.requestUpdate(); }}
-            @focusout=${() => { this.focusedToastKey = null; this.requestUpdate(); }}
+            @focusout=${this.onToastFocusOut}
             @click=${() => this.handleClick(t.record)}
           >
             <jf-system-notice tone=${tone} live=${t.announcement === 'silent' ? 'off' : live}>
