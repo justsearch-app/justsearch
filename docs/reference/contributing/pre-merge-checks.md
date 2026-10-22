@@ -10,7 +10,7 @@ audience: contributor
 
 Run the check whose **subject** you edited before marking a change ready. Commands are
 `node scripts/ci/<name>.mjs` or `node scripts/governance/run.mjs --gate <id> --mode gate`.
-Hosted CI runs most of them again on the pull request and in the merge queue
+Hosted CI runs affected checks on the pull request and the full suite on main
 ([ADR-0044](../../decisions/0044-public-hosted-ci-fact-lanes.md)). This table moved here from
 the retired root `CLAUDE.md` when JustSearch adopted agent-system (2026-10-05).
 
@@ -44,3 +44,18 @@ Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candid
 | `scripts/**` · `packaging/**` js · `*.ps1` | `npm run lint:scripts` · `check-ps1-warning-comments` |
 
 Frontend: from `modules/ui-web`, `npm run typecheck` and `npm run test:unit:run`.
+
+## Publication and main verification
+
+`node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
+record, then enables squash auto-merge bound to the validated head, title and body. A new push
+requires a new enqueue. The PR runs the union of lanes that consume its changed files; all
+required names report, including intentional skips. Unknown inputs run every lane. Strict stays
+off, so an older green base needs no update push. There is no merge queue.
+
+After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
+suite, including Integration tests, Windows stop-census, supervisor conformance and Measured axe.
+Its running CI is never cancelled; only the newest pending commit runs, and the wait command
+follows a newer run that covers the requested commit. If main fails in your change's area, open
+a fix or revert PR at once through the normal path. Report a failure in a test listed in
+`scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.

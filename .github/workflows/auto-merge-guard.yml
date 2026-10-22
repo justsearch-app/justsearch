@@ -1,0 +1,23 @@
+name: Auto-merge head guard
+on:
+  pull_request_target:
+    types: [synchronize]
+permissions:
+  pull-requests: write
+  contents: read
+jobs:
+  disable-auto-merge:
+    name: Require enqueue for the new head
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      # Execute only the trusted base's guard, never code from the PR head.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const guardAutoMerge = require('./scripts/ci/auto-merge-guard.cjs');
+            await guardAutoMerge({ github, context, core });

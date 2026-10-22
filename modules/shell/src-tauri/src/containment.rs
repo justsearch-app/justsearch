@@ -801,7 +801,10 @@ mod linux_tests {
             })
             .join()
             .unwrap();
-            std::fs::write(path, child.id().to_string()).unwrap();
+            let path = std::path::PathBuf::from(path);
+            let pending = path.with_extension("tmp");
+            std::fs::write(&pending, child.id().to_string()).unwrap();
+            std::fs::rename(&pending, &path).unwrap();
             // Bounded fixture lifetime even if its test driver fails.
             std::thread::sleep(Duration::from_secs(15));
             let _ = child.kill();
@@ -820,12 +823,18 @@ mod linux_tests {
             .spawn()
             .unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        while !pid_file.is_file() && std::time::Instant::now() < deadline {
+        let pid = loop {
+            if let Some(pid) = std::fs::read_to_string(&pid_file)
+                .ok()
+                .and_then(|s| s.parse::<u32>().ok())
+            {
+                break Some(pid);
+            }
+            if std::time::Instant::now() >= deadline {
+                break None;
+            }
             std::thread::sleep(Duration::from_millis(10));
-        }
-        let pid = std::fs::read_to_string(&pid_file)
-            .ok()
-            .and_then(|s| s.parse::<u32>().ok());
+        };
         // Give the short-lived caller time to exit and deliver a wrongly thread-bound signal.
         std::thread::sleep(Duration::from_millis(150));
         let alive_before = pid.and_then(|pid| crate::linux_process::capture(pid).ok());

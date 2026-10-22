@@ -145,40 +145,38 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
       }
-      targets {
-        all {
-          testTask.configure {
-            jvmArgs(
-              // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
-              "-Dnet.bytebuddy.experimental=true"
-            )
-            // Tempdoc 408 Tier 2: shard indexer-worker tests across 2 JVM forks.
-            // Was the second-slowest single test task (~26s in profile). Tests are
-            // fork-safe: ConfigStore.setGlobal usage is per-test with save/restore
-            // (each fork is its own JVM, isolated), no shared file paths
-            // (@TempDir per test), no port bindings.
-            maxParallelForks = 2
-
-            // Lane F stage A item A18. DevReloadManagerTriggerTest reads the dev MCP server's
-            // SOURCE to check that the tool WRITING the hot-reload trigger and the Java constant
-            // NAMING it still agree — a cross-language pair Gradle cannot see, because a .mjs file
-            // is not on any compile or runtime classpath.
-            //
-            // Without this declaration the pin is worse than useless: renaming the literal in
-            // server.mjs changes no declared input, so the test task stays UP-TO-DATE and replays
-            // its last green result. Verified by observing exactly that — the falsification run
-            // reported BUILD SUCCESSFUL in 596ms against a deliberately broken server.mjs, and only
-            // failed once `cleanTest --no-build-cache` forced execution. A guard that cannot notice
-            // the change it exists to notice is the defect it was written to prevent.
-            inputs
-              .file(rootProject.file("scripts/dev/justsearch-dev-mcp/server.mjs"))
-              .withPropertyName("devMcpServerSource")
-              .withPathSensitivity(PathSensitivity.RELATIVE)
-          }
-        }
-      }
     }
   }
+}
+
+// Keep the complete local suite and its hosted class shards on the same unit configuration.
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  jvmArgs(
+    // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
+    "-Dnet.bytebuddy.experimental=true"
+  )
+  // Tempdoc 408 Tier 2: shard indexer-worker tests across 2 JVM forks.
+  // Was the second-slowest single test task (~26s in profile). Tests are
+  // fork-safe: ConfigStore.setGlobal usage is per-test with save/restore
+  // (each fork is its own JVM, isolated), no shared file paths
+  // (@TempDir per test), no port bindings.
+  maxParallelForks = 2
+
+  // Lane F stage A item A18. DevReloadManagerTriggerTest reads the dev MCP server's
+  // SOURCE to check that the tool WRITING the hot-reload trigger and the Java constant
+  // NAMING it still agree — a cross-language pair Gradle cannot see, because a .mjs file
+  // is not on any compile or runtime classpath.
+  //
+  // Without this declaration the pin is worse than useless: renaming the literal in
+  // server.mjs changes no declared input, so the test task stays UP-TO-DATE and replays
+  // its last green result. Verified by observing exactly that — the falsification run
+  // reported BUILD SUCCESSFUL in 596ms against a deliberately broken server.mjs, and only
+  // failed once `cleanTest --no-build-cache` forced execution. A guard that cannot notice
+  // the change it exists to notice is the defect it was written to prevent.
+  inputs
+    .file(rootProject.file("scripts/dev/justsearch-dev-mcp/server.mjs"))
+    .withPropertyName("devMcpServerSource")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // Opt-in million-row gate. The default suite still excludes its evidence tag.

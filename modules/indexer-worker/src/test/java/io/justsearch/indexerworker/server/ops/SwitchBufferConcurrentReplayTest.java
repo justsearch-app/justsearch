@@ -43,11 +43,11 @@ final class SwitchBufferConcurrentReplayTest {
 
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
-      assertTrue(queue.putSwitchBuffer(originalKey, "DELETE", originalPayload));
+      assertTrue(queue.putSwitchBuffer(originalKey, "DELETE", explicitDelete(originalPayload)));
       long originalTimestamp = queue.listSwitchBufferOps().getFirst().lastUpdatedMs();
       doAnswer(invocation -> {
         // Commit is after snapshot and effect, but before replay removes the snapshot.
-        assertTrue(queue.putSwitchBuffer(nextKey, "DELETE", nextPayload));
+        assertTrue(queue.putSwitchBuffer(nextKey, "DELETE", explicitDelete(nextPayload)));
         // Equal wall-clock timestamps and identical payloads must still be distinct admissions.
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
             var update = connection.prepareStatement(
@@ -73,7 +73,13 @@ final class SwitchBufferConcurrentReplayTest {
       var retained = reopened.listSwitchBufferOps();
       assertEquals(1, retained.size());
       assertEquals(nextKey, retained.getFirst().key());
-      assertEquals(nextPayload, retained.getFirst().payload());
+      assertEquals(nextPayload, io.justsearch.indexerworker.queue.SwitchBufferDelete
+          .decode(retained.getFirst().payload()).path());
     }
   }
+  private static String explicitDelete(String path) {
+    return new io.justsearch.indexerworker.queue.SwitchBufferDelete(path,
+        io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode();
+  }
+
 }

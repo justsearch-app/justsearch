@@ -41,7 +41,7 @@ supervisor.createSupervisionLoop = options => {
         path.join(repo, 'scripts/supervisor-conformance/run.mjs'), '--adapter', 'dev-runner', '--case', id,
       ], {
         cwd: repo, encoding: 'utf8', timeout: 60000,
-        env: { ...process.env, JUSTSEARCH_HOME: work, JUSTSEARCH_DATA_DIR: work,
+        env: { ...process.env, JUSTSEARCH_PR_CI: 'false', JUSTSEARCH_HOME: work, JUSTSEARCH_DATA_DIR: work,
           JUSTSEARCH_RECOVERY_STARTUP_RECEIPT: receipt,
           NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${JSON.stringify(preload)}` },
       });
@@ -89,7 +89,7 @@ supervisor.createSupervisionLoop = options => {
       const result = spawnSync(process.execPath, [path.join(repo, 'scripts/supervisor-conformance/run.mjs'),
         '--adapter', 'dev-runner', '--case', id], {
         cwd: repo, encoding: 'utf8', timeout: 90000,
-        env: { ...process.env, JUSTSEARCH_HOME: work, JUSTSEARCH_DATA_DIR: work,
+        env: { ...process.env, JUSTSEARCH_PR_CI: 'false', JUSTSEARCH_HOME: work, JUSTSEARCH_DATA_DIR: work,
           JUSTSEARCH_RECOVERY_STARTUP_RECEIPT: receipt,
           NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${JSON.stringify(preload)}` },
       });
