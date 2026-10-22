@@ -85,3 +85,14 @@ The archive tests apply a kept ZIP through ArchiveInstallRepairTest.extract, whi
   "note": "Fail-before reproduced independently on d05fb4bba (51/51 AssertionFailedError), 51/51 pass on 2e6160506; expectations match the agreed scenarios; owner-words and delegation locations not checkable by the verifier"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "824061dc-ee40-4286-8d31-ed9583405f82",
+  "verdict": "accept",
+  "digest": "sha256:924447650dfa8873d02656f1d2334837f8a4cb426d0c787fe5fd5816ae83579c",
+  "note": "0c3b067ad: call-site moves only, no assertion changed; compat patch only routes to d05fb4bba's own extractor; reproduced 51/51 AssertionFailedError before, 51/51 pass after"
+}
+```
