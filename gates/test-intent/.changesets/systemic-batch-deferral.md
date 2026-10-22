@@ -248,3 +248,14 @@ Round three compares its two lifecycle checks directly with committed candidate 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16184-919e-7620-a7a1-1301e332461f",
+  "verdict": "reject",
+  "digest": "sha256:4ef650684d31d2595a50cf173ceb958f0dc54f4393e901a87273fe2f3b18c521",
+  "note": "The real unwritable-index outage consumes a healthy file attempt and schedules a minute-scale retry after three free batches, violating U17."
+}
+```
