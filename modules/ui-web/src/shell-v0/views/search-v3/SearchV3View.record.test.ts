@@ -74,6 +74,7 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import {
   __resetConversationListForTest,
   getConversationListState,
+  loadConversations,
   setActiveConversation,
 } from '../../state/conversationListStore.js';
 import { __draftStorageKey, __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
@@ -1040,4 +1041,28 @@ describe('the composer draft and the global activity indicator (A14, A15, G11)',
     // Another surface's activity is not this window's to settle on its way out.
     expect(getAiState().activity.shapeId).toBe('core.free-chat');
   });
+});
+
+it('a streamed answer counts as server content before any list or record read returns it', async () => {
+  const fetchBefore = globalThis.fetch;
+  let absent = false;
+  vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).includes('/history?existsOnly=true')) return new Response(JSON.stringify({ exists: !absent }));
+    return fetchBefore(url, init);
+  }));
+  const el = await mount();
+  await send(el, 'private question');
+  const id = el.sessions.activeId;
+  expect(id).not.toBeNull();
+  stream.emit('chunk', { text: 'private streamed answer' });
+  await settle(el);
+  expect(el.sessions.sessions.find(s => s.id === id)?.turns[0]?.answer).toBe('private streamed answer');
+  stream.emit('done', {}); stream.end();
+  await settle(el);
+  absent = true;
+  await loadConversations();
+  await settle(el);
+  expect(el.sessions.sessions.map(s => s.id)).not.toContain(id);
+  expect(el.sessions.activeId).toBeNull();
+  expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
 });

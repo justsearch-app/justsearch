@@ -34,6 +34,7 @@ class AgentDispositionWiringTest {
         var observer = new FeedbackObserver(registry)) {
       AgentDispositionWiring.register(runs::addEventListener, dataDir, StoreCipher.disabled(),
           new FeedbackCaptureSettings(dataDir), observer);
+      runs.runEvents().writeRunMeta("new-session", Map.of("sessionId", "new-session"));
       assertNotNull(runs.runEvents().appendEvent("new-session", "core.agent-run", "tool_exec_completed",
           toolPayload()));
       assertNotNull(runs.runEvents().appendEvent("new-session", "core.agent-run", "done", donePayload()));
@@ -69,6 +70,7 @@ class AgentDispositionWiringTest {
       }));
       try {
         assertTrue(entered.await(2, TimeUnit.SECONDS));
+        runs.runEvents().writeRunMeta("real-session", Map.of("sessionId", "real-session"));
         assertNotNull(runs.runEvents().appendEvent("real-session", "core.agent-run", "tool_exec_completed",
             toolPayload()));
         assertNotNull(runs.runEvents().appendEvent("real-session", "core.agent-run", "done", donePayload()));
@@ -105,6 +107,7 @@ class AgentDispositionWiringTest {
       var observed = org.mockito.Mockito.spy(observer);
       AgentDispositionWiring.register(runs::addEventListener, dataDir, StoreCipher.disabled(),
           new FeedbackCaptureSettings(dataDir), observed);
+      runs.runEvents().writeRunMeta("session", Map.of("sessionId", "session"));
       for (int i = 0; i < 64; i++) {
         runs.runEvents().appendEvent("session", "core.agent-run", "reasoning_chunk", Map.of("text", "x"));
       }

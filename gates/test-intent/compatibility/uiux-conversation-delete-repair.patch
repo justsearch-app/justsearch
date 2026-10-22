@@ -1,0 +1,21 @@
+--- a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationStore.java
++++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationStore.java
+@@ -75,6 +75,9 @@
+    * if it doesn't exist (first append = session creation).
+    */
+   void appendMessage(String sessionId, String shapeId, Map<String, Object> message);
++
++  /** Before-state signature only; append retains implicit creation. */
++  default void createSession(String sessionId, String shapeId) {}
+ 
+   /**
+    * Tempdoc 734 round-14 F4 — TRUE when the store cannot be read or written right now (encrypted at
+--- /dev/null
++++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationWork.java
+@@ -0,0 +1,6 @@
++package io.justsearch.agent.api.conversation;
++
++/** Before-state exception type only; no writer or deletion behavior. */
++public final class ConversationWork {
++  public static final class Refused extends IllegalStateException {}
++}

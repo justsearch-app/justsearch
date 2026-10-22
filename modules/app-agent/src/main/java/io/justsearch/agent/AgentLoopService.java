@@ -443,7 +443,8 @@ public final class AgentLoopService implements AgentService {
   @Override
   public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, boolean background,
       EngineContext engineContext) {
-    try (var work = engineAdmission == null ? null : engineAdmission.attach(engineContext)) {
+    try (var ignoredWriting = runStore.conversationWork().start(request.conversationId());
+        var work = engineAdmission == null ? null : engineAdmission.attach(engineContext)) {
       runAgentOwned(request, eventConsumer, background,
           work == null ? engineContext : work.context(), work);
     }

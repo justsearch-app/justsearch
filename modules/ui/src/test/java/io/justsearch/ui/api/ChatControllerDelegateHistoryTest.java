@@ -118,6 +118,7 @@ final class ChatControllerDelegateHistoryTest {
   void delegateTurnDoesNotRelabelAMixedConversation() {
     FileConversationStore store = new FileConversationStore(tempDir.resolve("conversations"));
     // The conversation is opened by an ask-tier turn ...
+    store.createSession("uc-mixed", "core.free-chat");
     store.appendMessage("uc-mixed", "core.free-chat", Map.of("role", "user", "content", "hello"));
     store.appendMessage("uc-mixed", "core.free-chat", Map.of("role", "assistant", "content", "hi"));
 
@@ -138,9 +139,12 @@ final class ChatControllerDelegateHistoryTest {
   @DisplayName("863 A-10.1: a branch keeps the shape it inherited; its own appends do not relabel it")
   void aBranchKeepsTheShapeItInherited() {
     FileConversationStore store = new FileConversationStore(tempDir.resolve("conversations"));
+    store.createSession("uc-a", "core.free-chat");
     store.appendMessage("uc-a", "core.free-chat", Map.of("role", "user", "content", "hello"));
     store.appendMessage("uc-a", "core.free-chat", Map.of("role", "assistant", "content", "hi"));
     store.branchFrom("uc-a", store.loadHistory("uc-a").get(1).get("id").toString(), "uc-branch");
+
+    store.createSession("uc-branch", "core.rag-ask");
 
     store.appendMessage("uc-branch", "core.rag-ask", Map.of("role", "user", "content", "and now?"));
 
@@ -154,6 +158,7 @@ final class ChatControllerDelegateHistoryTest {
   @DisplayName("863 F1: every turn's record declares the shape that dispatched it")
   void everyRecordedTurnDeclaresItsShape() {
     FileConversationStore store = new FileConversationStore(tempDir.resolve("conversations"));
+    store.createSession("uc-mixed", "core.free-chat");
     store.appendMessage("uc-mixed", "core.free-chat", Map.of("role", "user", "content", "hello"));
     dispatchDelegateRun(
         store, stubAgent(sink -> sink.accept(new AgentEvent.AgentDone("done", 1, 0, 1))),

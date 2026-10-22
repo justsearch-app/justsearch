@@ -295,6 +295,7 @@ import {
   createConversationId,
   getRecentSessions,
   recordRecentSession,
+  rememberServerConversation,
   branchConversation,
   fetchMessageIds,
   // Tempdoc 610 Phase B — the loaded conversation list + the pure sibling-set
@@ -1013,6 +1014,9 @@ export class UnifiedChatView extends JfElement {
     // Tempdoc 610 Phase B — track the loaded conversation list so the inline
     // version pager can resolve a turn's sibling set; fetch it once on connect.
     this.convListUnsub = subscribeConversationList((s) => {
+      if (s.deletedIds.includes(this.sessionId)) this.newConversation();
+      const lastViewed = readLastViewedConversation();
+      if (lastViewed !== null && s.deletedIds.includes(lastViewed)) clearLastViewedConversation();
       this.conversations = s.conversations;
     });
     void loadConversations();
@@ -2154,6 +2158,7 @@ export class UnifiedChatView extends JfElement {
     this.unifiedThreadRefreshFailed = null;
     void this.refreshUnifiedThread();
     const resumed = await resumeConversation(sessionId, shapeId);
+    if (this.sessionId !== sessionId) return;
     // Tempdoc 629 (LAYER): the conversation store is encrypted + locked. Render a locked notice with an
     // Unlock affordance instead of an empty transcript (§L4: locked must never look deleted).
     this.historyLocked = resumed.locked === true;
@@ -3662,9 +3667,11 @@ export class UnifiedChatView extends JfElement {
   private async refreshUnifiedThread(): Promise<void> {
     if (!this.sessionId) return;
     let failed: { reason: ThreadFetchFailureReason; detail?: string } | null = null;
-    const res = await fetchUnifiedThread(this.apiBase, this.sessionId, undefined, (reason, detail) => {
+    const sessionId = this.sessionId;
+    const res = await fetchUnifiedThread(this.apiBase, sessionId, undefined, (reason, detail) => {
       failed = { reason, detail };
     });
+    if (this.sessionId !== sessionId) return;
     this.unifiedThreadRefreshFailed = failed;
     this.unifiedEvents = res.events;
     this.unifiedLifecycles = res.lifecycles;
@@ -6342,6 +6349,7 @@ export class UnifiedChatView extends JfElement {
     this.rewriteNote = null;
     this.claims = [];
 
+    const streamSessionId = this.sessionId;
     const url = (this.apiBase || '') + '/api/chat/dispatch';
 
     const handlers: Record<string, (payload: unknown) => void> = {
@@ -6358,6 +6366,7 @@ export class UnifiedChatView extends JfElement {
               ? (p.text as string)
               : '';
         if (t) {
+          rememberServerConversation(streamSessionId);
           if (!this.streamingText) setAiActivity({ state: 'streaming' });
           this.streamingText = this.streamingText + t;
         }
@@ -6426,6 +6435,7 @@ export class UnifiedChatView extends JfElement {
           : (donePayload?.finalResponse ?? '');
         msg.content = settledText;
         if (settledText.trim()) {
+          rememberServerConversation(streamSessionId);
           this.thread = [...this.thread, msg];
         } else if (!this.errorMessage) {
           // Nothing streamed and nothing in the payload: the dispatch completed with no answer.
