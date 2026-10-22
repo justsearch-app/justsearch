@@ -35,18 +35,29 @@ public final class ExcludesServiceImpl implements ExcludesService {
   }
 
   @Override
+  public ExcludesPolicy effectivePolicy() {
+    ConfigStore store = ConfigStore.globalOrNull();
+    if (store == null) return new ExcludesPolicy("default", null, List.of());
+    var config = store.get();
+    var source = config.resolution("justsearch.ui.exclude_patterns");
+    return new ExcludesPolicy(source == null ? "unknown" : source.sourceName(),
+        source == null ? null : source.sourceDetail(),
+        ExcludeGlobs.fromRawJsonArray(config.ui().excludePatterns()).patterns());
+  }
+
+  @Override
   public ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception {
     IndexingService indexing = indexingServiceSupplier.get();
-    // Resolved config preserves settings (300), env (400), and -D (500) precedence.
-    ConfigStore store = ConfigStore.globalOrNull();
-    ExcludeGlobs excludes = ExcludeGlobs.fromRawJsonArray(store == null ? "" : store.get().ui().excludePatterns());
-    List<String> savedPatterns = excludes.patterns();
+    // Read patterns and winning-source trace from the same resolved snapshot.
+    ExcludesPolicy policy = effectivePolicy();
+    ExcludeGlobs excludes = ExcludeGlobs.fromPatterns(policy.patterns());
+    List<String> effectivePatterns = policy.patterns();
     if (excludes.isEmpty()) {
       return new ExcludesResult(dryRun, 0, 0, 0, 0, 0, List.of(), false,
-          "No exclude patterns configured", 0, List.of());
+          "No exclude patterns configured", 0, List.of(), policy);
     }
 
-    int[] perPatternCount = new int[savedPatterns.size()];
+    int[] perPatternCount = new int[effectivePatterns.size()];
     int rootsProcessed = 0;
     AtomicInteger deletedByPathJobs = new AtomicInteger();
     AtomicInteger deletedById = new AtomicInteger();
@@ -152,14 +163,14 @@ public final class ExcludesServiceImpl implements ExcludesService {
       }
     }
 
-    List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(savedPatterns.size());
-    for (int i = 0; i < savedPatterns.size(); i++) {
-      perPattern.add(new ExcludesResult.PatternMatch(savedPatterns.get(i), perPatternCount[i]));
+    List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(effectivePatterns.size());
+    for (int i = 0; i < effectivePatterns.size(); i++) {
+      perPattern.add(new ExcludesResult.PatternMatch(effectivePatterns.get(i), perPatternCount[i]));
     }
-    return new ExcludesResult(dryRun, savedPatterns.size(), rootsProcessed, deletedByPathJobs.get(),
+    return new ExcludesResult(dryRun, effectivePatterns.size(), rootsProcessed, deletedByPathJobs.get(),
         deletedById.get(), matchedFiles.get(), perPattern, visited.get() > maxWalkEntries,
         "Disk matches count files; confirmed removals count Worker-confirmed file or folder deletion requests.",
-        confirmedRemovals.get(), unchecked);
+        confirmedRemovals.get(), unchecked, policy);
   }
 
   private static ExcludesResult.UncheckedScope scope(Path path, String status, String reason) {

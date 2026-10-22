@@ -110,8 +110,20 @@ const listResponseSchema = z
   })
   .loose();
 
+const excludesPolicySchema = z.object({
+  source: z.string(), sourceDetail: z.string().nullable(), patterns: z.array(z.string()),
+});
+type ExcludesPolicy = z.infer<typeof excludesPolicySchema>;
+function isOverride(policy: ExcludesPolicy | null): boolean {
+  return policy?.source === 'env_var' || policy?.source === 'jvm_arg';
+}
+function policySource(policy: ExcludesPolicy): string {
+  return `${policy.source === 'jvm_arg' ? 'system property' : 'environment variable'} ${policy.sourceDetail ?? policy.source}`;
+}
+
 // Operation results are untrusted wire data; absent partial-scope fields cannot mean success.
 const excludesResultSchema = z.object({
+  effectivePolicy: excludesPolicySchema.optional(),
   dryRun: z.boolean(), matchedFiles: z.number().int().nonnegative(),
   confirmedRemovals: z.number().int().nonnegative(), capped: z.boolean(),
   perPattern: z.array(z.object({ pattern: z.string(), matches: z.number().int().nonnegative() })),
@@ -175,6 +187,7 @@ export class LibrarySurface extends JfElement {
     excludesError: { state: true },
     excludesNotice: { state: true },
     excludesResult: { state: true },
+    excludesPolicy: { state: true },
     excludesConflict: { state: true },
     addBusy: { state: true },
     removingHashes: { state: true },
@@ -218,6 +231,7 @@ export class LibrarySurface extends JfElement {
   declare private excludesNotice: string;
   declare private excludesResult: ExcludesResult | null;
   declare private excludesConflict: boolean;
+  declare private excludesPolicy: ExcludesPolicy | null;
   private excludesWitness: SettingsWitness | null = null;
   private excludesSavedText: string | null = null;
   private excludesAttempt: SettingsAttempt | null = null;
@@ -332,6 +346,7 @@ export class LibrarySurface extends JfElement {
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
+    this.excludesPolicy = null;
     this.excludesConflict = false;
     this.addBusy = false;
     this.removingHashes = new Set();
@@ -1062,6 +1077,17 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private async loadExcludesPolicy(): Promise<void> {
+    this.excludesPolicy = null;
+    try {
+      const response = await this.doFetch('/api/indexing/excludes', { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      this.excludesPolicy = excludesPolicySchema.parse(await response.json());
+    } catch {
+      // Keep effects unavailable until a later observation succeeds.
+    }
+  }
+
   private async loadExcludes(keepDraft = false): Promise<void> {
     if (this.excludesBusy || this.excludesAttempt) return;
     this.excludesLoadStarted = true;
@@ -1077,6 +1103,7 @@ export class LibrarySurface extends JfElement {
       this.excludesInvalidPatterns = body.ui?.invalidExcludePatterns ?? [];
       this.excludesWitness = body.witness;
       this.excludesLoaded = true;
+      await this.loadExcludesPolicy();
       this.error = null;
     } catch (err) {
       this.excludesLoaded = false;
@@ -1100,7 +1127,11 @@ export class LibrarySurface extends JfElement {
       this.excludesAttempt = null;
       this.excludesSavedText = this.excludesText;
       this.excludesInvalidPatterns = [];
-      this.excludesNotice = 'Patterns saved. Future indexing skips these matches. Existing search results have not been removed.';
+      await this.loadExcludesPolicy();
+      this.excludesNotice = isOverride(this.excludesPolicy)
+        ? 'Patterns saved. The saved list has no effect while the override is set; it takes effect after the override is removed. Existing search results have not been removed.'
+        : this.excludesPolicy ? 'Patterns saved. Future indexing skips these matches. Existing search results have not been removed.'
+          : 'Patterns saved. Effective policy is unavailable; reload before Preview or Apply.';
       return true;
     } catch (err) {
       // An uncertain save retains its exact key and bytes until Save checks the receipt.
@@ -1454,7 +1485,7 @@ export class LibrarySurface extends JfElement {
   }
 
   private async invokeExcludes(apply: boolean): Promise<void> {
-    if (this.excludesBusy || !this.excludesLoaded || this.excludesAttempt
+    if (this.excludesBusy || !this.excludesLoaded || !this.excludesPolicy || this.excludesAttempt
         || this.excludesText !== this.excludesSavedText) return;
     this.excludesBusy = true;
     this.excludesError = null;
@@ -1462,7 +1493,7 @@ export class LibrarySurface extends JfElement {
     this.excludesResult = null;
     try {
       if (apply && !await this.host_.ui.showConfirmDialog(
-        'Apply saved patterns to the watched folders on disk? Matching files and folders will be removed from search. Offline, missing or unreadable scope may remain searchable and will be listed in the result.',
+        `${isOverride(this.excludesPolicy) ? `Apply the effective patterns from ${policySource(this.excludesPolicy)}:\n${this.excludesPolicy.patterns.join('\n') || '(none)'}\n` : 'Apply saved patterns '}to the watched folders on disk? Matching files and folders will be removed from search. Offline, missing or unreadable scope may remain searchable and will be listed in the result.`,
         { confirmLabel: 'Apply', destructive: true, typedConfirmWord: OP_APPLY })) {
         this.excludesNotice = 'Apply cancelled. Nothing was removed.';
         return;
@@ -1472,7 +1503,8 @@ export class LibrarySurface extends JfElement {
         : await this.host_.data.invokeOperation(OP_PREVIEW, {});
       if (!result.success) throw new Error(result.message ?? 'Exclusion operation failed');
       const parsed = excludesResultSchema.safeParse(result.structuredData);
-      if (!parsed.success || parsed.data.dryRun === apply) {
+      if (!parsed.success || parsed.data.dryRun === apply
+          || (isOverride(this.excludesPolicy) && !parsed.data.effectivePolicy)) {
         this.excludesNotice = `${apply ? 'Apply' : 'Preview'} outcome is unconfirmed. Check again before relying on this result.`;
       } else {
         this.excludesResult = parsed.data;
@@ -1887,21 +1919,30 @@ export class LibrarySurface extends JfElement {
               <code>{draft,final}</code> matches either alternative.
               These meanings also apply to patterns saved by earlier versions.
             </p>
-            <p id="excludes-help">Save changes what future indexing skips; it does not remove existing search results.
+            ${isOverride(this.excludesPolicy) && this.excludesPolicy ? html`<div id="excludes-override" data-testid="excludes-override" role="note" tabindex="0"
+              aria-label=${`Exclusion override: ${policySource(this.excludesPolicy)}. Effective patterns: ${this.excludesPolicy.patterns.join(', ') || '(none)'}. Save edits the saved list; it has no effect until the override is removed.`}>
+              <p>Exclusion override: ${policySource(this.excludesPolicy)} controls future indexing, Preview and Apply.
+                Save edits the saved list, which has no effect until the override is removed.</p>
+              <p>Effective patterns:</p><pre>${this.excludesPolicy.patterns.join('\n') || '(none)'}</pre>
+            </div>` : nothing}
+            ${this.excludesLoaded && !this.excludesBusy && !this.excludesPolicy ? html`<p role="alert">Effective exclusion policy is unavailable. Reload saved patterns before Preview or Apply.</p>` : nothing}
+            <p id="excludes-help">${isOverride(this.excludesPolicy) ? html`Preview counts matches on disk using the effective patterns above and removes nothing.
+              Apply uses those patterns to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
+              Missing or offline files cannot be checked.` : html`Save changes what future indexing skips; it does not remove existing search results.
               Preview counts matches on disk using the saved list and removes nothing.
               Apply uses the saved list to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
-              Missing or offline files cannot be checked.</p>
+              Missing or offline files cannot be checked.`}</p>
           </div>
           <div class="actions">
             <jf-button label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && this.excludesText === this.excludesSavedText)}
               .onActivate=${() => void this.handleSaveExcludes()}>Save patterns</jf-button>
             <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
               .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
-            <jf-button label="Preview" .disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
+            <jf-button label="Preview" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
               .onActivate=${() => void this.handlePreviewExcludes()}
               >Preview</jf-button
             >
-            <jf-button label="Apply" .disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
+            <jf-button label="Apply" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
               .onActivate=${() => void this.handleApplyExcludes()}
               >Apply</jf-button
             >
@@ -1919,7 +1960,7 @@ export class LibrarySurface extends JfElement {
         <textarea
           aria-label="Exclude patterns"
           aria-busy=${this.excludesBusy}
-          aria-describedby=${this.excludesError ? 'excludes-help excludes-error' : 'excludes-help'}
+          aria-describedby=${`excludes-help${isOverride(this.excludesPolicy) ? ' excludes-override' : ''}${this.excludesError ? ' excludes-error' : ''}`}
           aria-invalid=${this.excludesError ? 'true' : 'false'}
           ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
           .value=${this.excludesText}
@@ -1940,6 +1981,7 @@ export class LibrarySurface extends JfElement {
     return html`<p>${result.dryRun ? (partial ? 'Partial Preview' : 'Preview complete') : (partial ? 'Partial Apply' : 'Apply complete')}.
       ${result.dryRun ? `${result.matchedFiles} matching files found on disk. Files may not have been indexed. Nothing was removed.`
         : `${result.confirmedRemovals} matching files or folders confirmed no longer searchable. This counts confirmed deletion requests, including matches that were never indexed.`}</p>
+      ${isOverride(result.effectivePolicy ?? null) && result.effectivePolicy ? html`<p>Effective patterns from ${policySource(result.effectivePolicy)}:</p><pre>${result.effectivePolicy.patterns.join('\n') || '(none)'}</pre>` : nothing}
       ${result.capped ? html`<p>Entry cap reached. Remaining disk scope was not checked.</p>` : nothing}
       ${result.uncheckedScopes.length ? html`<ul>${result.uncheckedScopes.map((scope) => html`<li>${scope.status === 'not_checked' ? 'Not checked' : 'Not removed'}: ${scope.path} — ${scope.reason}</li>`)}</ul>
         <p>Some matches may remain searchable. Retry Apply after resolving the listed scope.</p>` : nothing}

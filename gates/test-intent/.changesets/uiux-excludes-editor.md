@@ -747,6 +747,197 @@ The before-state is ae50fbc4e. New repair checks run unchanged against it. Exist
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ex1-preservation.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "OV1 operator override repair: the notice precedes actions, names the winning resolver source and actual patterns (including an empty list), is keyboard reachable, explicitly named for screen readers, and described by the editor. Preview, Apply and typed confirmation name that list even with zero matches. Save writes only the saved list and explains when it takes effect. An unavailable policy blocks effects without discarding the editable saved list.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S322",
+          "quote": "Saving the list and removing already-indexed matches are distinct, visible steps: the user can tell, before acting, whether an action only changes what future indexing skips or also removes documents now; Preview never changes what gets indexed without saying so (decision 2).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "OV1 (orchestrator decision, 2026-10-22, under the user's design delegation): When an operator override (environment variable or system property for the exclusion list) decides the effective list, the editor says so before any action: it names the source and shows the patterns Preview and Apply actually use, and the confirmation names those same patterns. Save still edits the saved list and says it has no effect while the override is set. Without an override nothing changes.\n\n| Case | Expected |\n|---|---|\n| No override | editor, Preview, Apply and confirmation unchanged (must keep) |\n| Environment override only | notice naming the environment source and its patterns; Preview and Apply use and show them; confirmation names them |\n| Environment + system-property override | notice names the winning source (system property, per existing precedence) and its patterns; same as above |\n| Save while overridden | saved list changes; notice says it takes effect only when the override is removed |\n| Override removed after restart | notice gone; saved list governs again (must keep) |\n| Keyboard, screen reader name, 360 px, dark/light | notice reachable and readable (S32.7, must keep) |",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S327",
+          "quote": "Editor, Save, Preview, Apply, the confirmation and the result are operable by keyboard and screen reader (busy and result announced once), in both themes, High Contrast and narrow width.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ov1-ui-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts#OV1 names the env_var policy before actions and in Preview, Apply and confirmation",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts#OV1 names the jvm_arg policy before actions and in Preview, Apply and confirmation",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts#OV1 Save retains the override and explains when the saved list takes effect",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts#OV1 an empty override is still named and is not replaced by the saved list",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts#OV1 refuses Preview and Apply when the effective policy cannot be read"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "OV1 preservation: without an override (including after removal and restart), the editor, help and saved-pattern confirmation keep their prior behavior.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S322",
+          "quote": "Saving the list and removing already-indexed matches are distinct, visible steps: the user can tell, before acting, whether an action only changes what future indexing skips or also removes documents now; Preview never changes what gets indexed without saying so (decision 2).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "OV1 (orchestrator decision, 2026-10-22, under the user's design delegation): When an operator override (environment variable or system property for the exclusion list) decides the effective list, the editor says so before any action: it names the source and shows the patterns Preview and Apply actually use, and the confirmation names those same patterns. Save still edits the saved list and says it has no effect while the override is set. Without an override nothing changes.\n\n| Case | Expected |\n|---|---|\n| No override | editor, Preview, Apply and confirmation unchanged (must keep) |\n| Environment override only | notice naming the environment source and its patterns; Preview and Apply use and show them; confirmation names them |\n| Environment + system-property override | notice names the winning source (system property, per existing precedence) and its patterns; same as above |\n| Save while overridden | saved list changes; notice says it takes effect only when the override is removed |\n| Override removed after restart | notice gone; saved list governs again (must keep) |\n| Keyboard, screen reader name, 360 px, dark/light | notice reachable and readable (S32.7, must keep) |",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ov1-ui-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts#OV1 without an override, including after restart, keeps the saved-list behavior"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionPolicyHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "OV1: the HTTP policy observation does not touch indexing; HTTP read/Preview/Apply agree on source and actual matcher patterns for saved, environment, and environment-plus-system-property cases. Existing precedence and matched-file deletion remain unchanged. Operation responses also carry the winning source and list even when no disk matches exist.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S322",
+          "quote": "Saving the list and removing already-indexed matches are distinct, visible steps: the user can tell, before acting, whether an action only changes what future indexing skips or also removes documents now; Preview never changes what gets indexed without saying so (decision 2).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "OV1 (orchestrator decision, 2026-10-22, under the user's design delegation): When an operator override (environment variable or system property for the exclusion list) decides the effective list, the editor says so before any action: it names the source and shows the patterns Preview and Apply actually use, and the confirmation names those same patterns. Save still edits the saved list and says it has no effect while the override is set. Without an override nothing changes.\n\n| Case | Expected |\n|---|---|\n| No override | editor, Preview, Apply and confirmation unchanged (must keep) |\n| Environment override only | notice naming the environment source and its patterns; Preview and Apply use and show them; confirmation names them |\n| Environment + system-property override | notice names the winning source (system property, per existing precedence) and its patterns; same as above |\n| Save while overridden | saved list changes; notice says it takes effect only when the override is removed |\n| Override removed after restart | notice gone; saved list governs again (must keep) |\n| Keyboard, screen reader name, 360 px, dark/light | notice reachable and readable (S32.7, must keep) |",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ov1-java-repair.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionPolicyHttpTest.java#OV1ReadPreviewAndApplyNameTheWinningPolicyWithoutChangingPrecedence",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionPolicyHttpTest.java#OV1OperationsNameTheEffectivePolicyEvenWithoutDiskMatches"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The fake transport now serves the independent effective-policy observation separately from its existing settings-attempt seam. It tracks the saved patterns from observed settings and completed writes. Every original assertion, fault injection, request count and retained-attempt sequence remains unchanged. The added policy observation does not consume the scripted settings responses.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S322",
+          "quote": "Saving the list and removing already-indexed matches are distinct, visible steps: the user can tell, before acting, whether an action only changes what future indexing skips or also removes documents now; Preview never changes what gets indexed without saying so (decision 2).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "OV1 (orchestrator decision, 2026-10-22, under the user's design delegation): When an operator override (environment variable or system property for the exclusion list) decides the effective list, the editor says so before any action: it names the source and shows the patterns Preview and Apply actually use, and the confirmation names those same patterns. Save still edits the saved list and says it has no effect while the override is set. Without an override nothing changes.\n\n| Case | Expected |\n|---|---|\n| No override | editor, Preview, Apply and confirmation unchanged (must keep) |\n| Environment override only | notice naming the environment source and its patterns; Preview and Apply use and show them; confirmation names them |\n| Environment + system-property override | notice names the winning source (system property, per existing precedence) and its patterns; same as above |\n| Save while overridden | saved list changes; notice says it takes effect only when the override is removed |\n| Override removed after restart | notice gone; saved list governs again (must keep) |\n| Keyboard, screen reader name, 360 px, dark/light | notice reachable and readable (S32.7, must keep) |",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-excludes-editor-ov1-ui-preservation.json"
     }
   ]
 }
@@ -755,6 +946,8 @@ The before-state is ae50fbc4e. New repair checks run unchanged against it. Exist
 XA1 repair entries appended by builder session b0s1b46m on 2026-10-22; earlier entries and the prior acceptance record are retained.
 
 EX1 preservation follow-up (baseline 4a7f96624): the existing Worker/index/queue assertions remain unchanged. The evidence producer compares the adapted check on both trees. A `passed` fail-before classification makes the producer exit 1 because it requires an assertion failure whenever `--before` is supplied; passing on both trees is preservation evidence for this signature Adaptation, not evidence of repaired product behavior. The unchanged-fake failure and original known-good comparison are retained in `tmp/wp32-third-repair/`.
+
+OV1 repair entries appended by builder session 8acrycvp on 2026-10-22; all earlier entries and acceptance records are retained. The official producer used default dependency-link mode with baseline 052c08961. Preservation evidence intentionally exits 1 because its before checks pass; all candidate checks pass.
 
 ## Acceptance records
 

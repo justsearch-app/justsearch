@@ -80,6 +80,7 @@ final class ExcludesHandlerSupport {
       perPattern.add(Map.of("pattern", pm.pattern(), "matches", pm.matches()));
     }
     LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+    if (r.effectivePolicy() != null) out.put("effectivePolicy", r.effectivePolicy());
     out.put("dryRun", r.dryRun());
     out.put("patterns", r.patterns());
     out.put("rootsProcessed", r.rootsProcessed());

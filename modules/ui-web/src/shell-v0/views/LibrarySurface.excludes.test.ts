@@ -25,10 +25,20 @@ function fixture() {
     }
     return json({ ui: { excludePatterns: ['*.log'] }, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } });
   });
+  // Policy observation is independent of the retained settings-attempt transport.
+  let savedPatterns: string[] = [];
+  const fetchPolicy: PluginHostApi['data']['fetch'] = async (path, init) => {
+    if (path === '/api/indexing/excludes') return json({ source: 'settings.json', sourceDetail: null, patterns: savedPatterns });
+    const response = await send(path, init);
+    const body = await response.clone().json();
+    if (body.ui?.excludePatterns) savedPatterns = body.ui.excludePatterns;
+    if (body.state === 'COMPLETE' && init?.body) savedPatterns = JSON.parse(String(init.body)).ui.excludePatterns;
+    return response;
+  };
   const invoke = vi.fn().mockResolvedValue({ success: true, structuredData: result });
   const confirm = vi.fn().mockResolvedValue(true);
   const el = document.createElement('jf-library-surface') as Editor;
-  el.host_ = createMockHostApi({ data: { fetch: send, invokeOperation: invoke }, ui: { showConfirmDialog: confirm } });
+  el.host_ = createMockHostApi({ data: { fetch: fetchPolicy, invokeOperation: invoke }, ui: { showConfirmDialog: confirm } });
   el.refresh = vi.fn().mockResolvedValue(undefined);
   return { el, send, invoke, confirm };
 }

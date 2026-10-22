@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T09:58:46.979Z",
-  "revision": "ae50fbc4e94d5c9f6909b893985af38f1cd10811",
-  "tree": "76029e29ecc28060cc5cbcde60a2db9339daa4ba",
+  "createdAt": "2026-10-22T18:02:35.430Z",
+  "revision": "052c08961f5a24188c5ad902990a3aec0d61549f",
+  "tree": "2f14083293eb38b78d954a14cc1b0cbad844b1fc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.excludes.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp3.2/continuation-tmp/test-intent-vitest-3738656-1792576712762.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.excludes.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ov1/test-intent-vitest-1172256-1792692150987.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4468
+      "durationMs": 1597
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d79894f07f907363c7a4f6f89b9e294afe6c246686ec4135c937923ce218cfa5",
+      "contentDigest": "sha256:2ea4cc206a5b9bdf617fc2cbb75cf44cd82fb3ad28d2e677fa94182c8327b615",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,20 +80,20 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.excludes.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp3.2/continuation-tmp/test-intent-vitest-3738656-1792576720239.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.excludes.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ov1/test-intent-vitest-1172256-1792692153598.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6137,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp3.2/continuation-tmp/test-intent-vitest-3738656-1792576720239.json\n\n"
+        "durationMs": 1679,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ov1/test-intent-vitest-1172256-1792692153598.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts",
         "classification": "assertion",
-        "detail": "S32.1 recovers the real OperationClient 428 only after typed consent:  AssertionError: S32.1: the 428 must recover through typed consent: expected 'Typed confirmation required' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp3.2/evidence-before/test-intent-before-fWDbKT/modules/ui-web/src/shell-v0/views/LibrarySurface.excludes. | S32.1 cancelling typed Apply removes nothing and never saves a draft:  AssertionError: expected \"vi.fn()\" to not be called at "
+        "detail": "S32.1 recovers the real OperationClient 428 only after typed consent:  AssertionError: S32.1: the 428 must recover through typed consent: expected 'Typed confirmation required' to be null\n    at /home/elias/.cache/am/8acrycvp/tmp/test-intent-before-ACXRAq/modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts:58:73\n    at processTicksAndRejections (node:inte | S32.1 cancelling typed Apply removes nothing and never saves a draft:  AssertionError: expected \"vi.fn()\" to not be called at "
       }
     ]
   },
-  "digest": "sha256:ba1384287d6486d896464e2e3942a5914a4d84c191a3604f17ae9f83b8848624"
+  "digest": "sha256:4e21c5ce81e0122f786ff7b3c090d5ae8373329c7c08274b7882056273814350"
 }

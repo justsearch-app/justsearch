@@ -352,6 +352,17 @@ public class IndexingController {
     }
   }
 
+  /** Read the effective exclusions and their source without enumerating roots or walking disk. */
+  public void handleGetExcludes(Context ctx) {
+    try {
+      ctx.json(excludesService.effectivePolicy());
+    } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
+      log.error("Failed to read effective exclusion policy", e);
+      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
+  }
+
   /**
    * Applies exclude patterns by deleting already-indexed documents whose paths match the configured globs.
    *
@@ -374,6 +385,7 @@ public class IndexingController {
       // Map.of() supports max 10 entries; use HashMap for 11+
       java.util.HashMap<String, Object> wire = new java.util.HashMap<>();
       wire.put("status", "ok");
+      wire.put("effectivePolicy", result.effectivePolicy());
       wire.put("dryRun", result.dryRun());
       if (result.message() != null) {
         wire.put("message", result.message());

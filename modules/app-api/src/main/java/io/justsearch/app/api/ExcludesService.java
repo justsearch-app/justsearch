@@ -34,6 +34,18 @@ public interface ExcludesService {
    */
   ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception;
 
+  /** Effective matcher policy and the resolver's winning source; reading it does not walk disk. */
+  default ExcludesPolicy effectivePolicy() {
+    throw new UnsupportedOperationException("Effective exclusion policy unavailable");
+  }
+
+  record ExcludesPolicy(String source, String sourceDetail, List<String> patterns) {
+    public ExcludesPolicy {
+      java.util.Objects.requireNonNull(source, "source");
+      patterns = List.copyOf(patterns);
+    }
+  }
+
   /**
    * Result of an apply (or preview) operation. Mirrors the pre-existing
    * {@code POST /api/indexing/excludes/apply} response shape. Existing fields are retained;
@@ -52,7 +64,16 @@ public interface ExcludesService {
       boolean capped,
       String message,
       int confirmedRemovals,
-      List<UncheckedScope> uncheckedScopes) {
+      List<UncheckedScope> uncheckedScopes,
+      ExcludesPolicy effectivePolicy) {
+
+    /** Retain the existing result constructor for callers without policy metadata. */
+    public ExcludesResult(boolean dryRun, int patterns, int rootsProcessed, int deletedByPathJobs,
+        int deletedById, int matchedFiles, List<PatternMatch> perPattern, boolean capped, String message,
+        int confirmedRemovals, List<UncheckedScope> uncheckedScopes) {
+      this(dryRun, patterns, rootsProcessed, deletedByPathJobs, deletedById, matchedFiles, perPattern,
+          capped, message, confirmedRemovals, uncheckedScopes, null);
+    }
 
     /** Keep the previous source/serialization fields usable by existing callers. */
     public ExcludesResult(boolean dryRun, int patterns, int rootsProcessed, int deletedByPathJobs,
