@@ -297,6 +297,8 @@ import {
   SV3_SOURCE_INDEX_ABSENT,
 } from './sv3-citation-anchor.js';
 import { setAiActivity, subscribeAiState, type AiState } from '../../state/aiStateStore.js';
+import { selectIndexingProgress } from '../../state/indexingProgress.js';
+import '../../components/IndexingControls.js';
 import { projectAvailability } from '../../state/availability.js';
 import { reasonFor } from '../../state/readinessNotice.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
@@ -4013,6 +4015,9 @@ export class SearchV3View extends JfElement {
   }
 
   render(): TemplateResult {
+    const ai = this.aiSnapshot;
+    const indexing = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
+      ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
     const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
@@ -4096,6 +4101,10 @@ export class SearchV3View extends JfElement {
         @sv3-version-select=${this.onVersionSelect}
       >
         <jf-sv3-topbar window-title=${WINDOW_TITLE} data-testid="sv3-topbar"></jf-sv3-topbar>
+        ${indexing.pause?.waiting ? html`<div class="indexing-pause-note" data-testid="sv3-indexing-pause">
+          <p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>
+          <jf-indexing-controls .progress=${indexing} api-base=${this.apiBase}></jf-indexing-controls>
+        </div>` : nothing}
         <jf-sv3-main
           state=${this.composerState}
           .view=${results}

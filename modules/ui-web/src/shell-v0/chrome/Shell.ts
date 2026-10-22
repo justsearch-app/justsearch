@@ -2533,7 +2533,7 @@ export class Shell extends JfElement {
           .store=${this.advisoryStore}
           .operationClient=${this.operationClient}
         ></jf-advisory-toast-host>
-        <jf-task-list slot="bottom-left"></jf-task-list>
+        <jf-task-list slot="bottom-left" api-base=${this.apiBase}></jf-task-list>
         ${this.renderNarrowReadingPane()}
         <jf-pending-effect-queue slot="bottom-right"></jf-pending-effect-queue>
         <!-- center slot: full-screen modals (one shows at a time). -->

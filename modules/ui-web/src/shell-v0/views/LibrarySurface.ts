@@ -34,6 +34,7 @@ import { icon } from '../components/Icon.js';
 // 569 §14 — render the indexed-folder cards through the projection engine (the 2nd real surface).
 import { activeBodyFor, subscribePresentation } from '../state/presentationRuntime.js';
 import { subscribeAiState } from '../state/aiStateStore.js';
+import '../components/IndexingControls.js';
 import { LIBRARY_CARDS_REGION } from '../themes/builtinPresentations.js';
 import '../components/DeclaredSurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -152,6 +153,7 @@ const OP_APPLY = 'core.apply-excludes';
 const LIVE_REFRESH_MIN_MS = 4000;
 
 export class LibrarySurface extends JfElement {
+  private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
@@ -639,6 +641,7 @@ export class LibrarySurface extends JfElement {
         s.enrichSettleSamples,
       );
       this.indexingActivity = progress.activity;
+      this.indexProgress = progress;
       this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
@@ -738,6 +741,7 @@ export class LibrarySurface extends JfElement {
         enrichmentPending: this.enrichmentPending,
         enrichmentBlocked: this.enrichmentBlocked,
         retryWaiting: this.retryWaiting,
+        indexingPaused: this.indexProgress.pause?.state === 'paused',
         // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
         // re-queue window, when the wire row reports the failures as in-flight instead.
         lastKnownFailed: this.lastKnownFailed[pathHash],
@@ -1506,6 +1510,7 @@ export class LibrarySurface extends JfElement {
       enrichmentPending: this.enrichmentPending,
       enrichmentBlocked: this.enrichmentBlocked,
         retryWaiting: this.retryWaiting,
+        indexingPaused: this.indexProgress.pause?.state === 'paused',
       // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });
@@ -1723,6 +1728,10 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
+      ${this.indexProgress.pause ? html`<div data-testid="library-indexing-pause">
+        <p>${this.indexingActivity.summary} — ${this.indexingActivity.detail}</p>
+        <jf-indexing-controls .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
+      </div>` : nothing}
       ${this.renderReindexDecision()}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>

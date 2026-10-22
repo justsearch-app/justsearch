@@ -31,6 +31,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import './IndexingControls.js';
 import './Button.js';
 import {
   listTasks,
@@ -149,6 +150,7 @@ const NO_PROGRESS = selectIndexingProgress(null, false, 0, []);
 
 export class TaskList extends JfElement {
   static properties = {
+    apiBase: { type: String, attribute: 'api-base' },
     tasks: { state: true },
     feedStalled: { state: true },
     progress: { state: true },
@@ -158,6 +160,7 @@ export class TaskList extends JfElement {
   };
 
   declare tasks: readonly Task[];
+  declare apiBase: string;
   /** 595 §4.4 — the live jobs feed (SSE) went quiet while work is in-flight. */
   declare feedStalled: boolean;
   /** 813 §3b — the ONE derivation authority for the aggregate numbers. */
@@ -174,6 +177,7 @@ export class TaskList extends JfElement {
 
   constructor() {
     super();
+    this.apiBase = '';
     this.queueCounts = null;
     this.tasks = listTasks();
     this.feedStalled = false;
@@ -245,7 +249,7 @@ export class TaskList extends JfElement {
         this.readyTimer = null;
         this.showingReady = false;
       }, READY_DISMISS_MS);
-    } else if ((isActivePhase(next.phase) || next.phase === 'waiting' || next.phase === 'error') && this.showingReady) {
+    } else if ((isActivePhase(next.phase) || next.pause || next.phase === 'waiting' || next.phase === 'error') && this.showingReady) {
       // Work resumed inside the window — the completion claim is no longer true, so withdraw it.
       this.clearReadyTimer();
       this.showingReady = false;
@@ -467,7 +471,7 @@ export class TaskList extends JfElement {
   private isEmpty(): boolean {
     return (
       this.tasks.length === 0 && !(this.queueCounts &&
-        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !isActivePhase(this.progress.phase) && this.progress.phase !== 'waiting' && this.progress.phase !== 'error' && !this.showingReady
+        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !this.progress.pause && !isActivePhase(this.progress.phase) && this.progress.phase !== 'waiting' && this.progress.phase !== 'error' && !this.showingReady
     );
   }
 
@@ -659,6 +663,8 @@ export class TaskList extends JfElement {
         </div>
         ${this.progress.activity.detail ? html`<div class="counts">${this.progress.activity.detail}</div>` : nothing}
         ${this.renderAggregate()}
+        ${this.progress.activity.confirmed && (isActivePhase(this.progress.phase) || this.progress.pause || this.progress.phase === 'waiting' || this.progress.phase === 'error')
+          ? html`<jf-indexing-controls allow-pause .progress=${this.progress} api-base=${this.apiBase}></jf-indexing-controls>` : nothing}
         ${this.queueCounts ? html`
           <div class="counts" data-testid="task-queue-totals">
             ${this.progress.live ? '' : 'Last reported: '}${formatCount(this.queueCounts.processing)} processing · ${formatCount(this.queueCounts.failed)} failed

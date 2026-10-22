@@ -63,6 +63,7 @@ import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
 import { reasonFor } from '../state/readinessNotice.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
+import '../components/IndexingControls.js';
 import {
   ENRICHMENT_BLOCKED_LABEL,
   ENRICHMENT_IN_PROGRESS_LABEL,
@@ -1560,6 +1561,7 @@ export class HealthSurface extends JfElement {
   }
 
   override render(): TemplateResult {
+    const progress = this.indexingProgress();
     // Tempdoc 571 §11 / 578 — the §11.8 hand-rolled Health|Logs tab strip is RETIRED: Logs is now a
     // sibling member of the System hub (one <jf-surface-tabs>), so Health renders only its own body.
     // The System host mounts only the active member, so Health's streams are already tab-scoped (the
@@ -1567,6 +1569,10 @@ export class HealthSurface extends JfElement {
     return html`
       ${this.renderHeader()}
       <div class="body">
+        ${progress.pause ? html`<div data-testid="health-indexing-pause">
+          <p>${progress.activity.summary} — ${progress.activity.detail}</p>
+          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
+        </div>` : nothing}
         ${this.error
           ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.error = null)}
               >${this.error}</jf-error-alert

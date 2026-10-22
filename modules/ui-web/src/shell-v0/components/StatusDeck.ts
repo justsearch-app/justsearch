@@ -56,6 +56,7 @@ import { present } from '../display/present.js';
 import { projectFact } from '../display/facts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import './Control.js';
+import './IndexingControls.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
 import { selectIndexingProgress, indexingTaskStatus } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
@@ -122,6 +123,8 @@ const NUM = new Intl.NumberFormat();
 const BANNER_OWNING_SURFACE_ID = 'core.unified-chat-surface';
 
 export class StatusDeck extends JfElement {
+  private indexingWasPaused = false;
+  private indexingResumed = false;
   static properties = {
     apiBase: { type: String, attribute: 'api-base' },
     aiState: { state: true },
@@ -145,7 +148,9 @@ export class StatusDeck extends JfElement {
     container: () => this.renderRoot.querySelector('.adaptive-bar'),
     // 814 §D5 — the measured signature is the label actually RENDERED (which the yield rule can
     // change without `statusLabel` moving), so the adaptive bar re-measures when the chip yields.
-    signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label,
+    signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label + ':' +
+      JSON.stringify([this.status?.operating?.indexing?.state, this.status?.operating?.indexing?.reasons,
+        this.status?.operating?.indexing?.untilEpochMs, this.status?.operating?.indexing?.waitingForResume]),
     reserve: 40,
     // 559 Authority VI per-item policy — same DOM query/order as items(), so the
     // pinned flags align index-for-index with the measured `.item` elements.
@@ -240,6 +245,8 @@ export class StatusDeck extends JfElement {
       align-items: center;
       gap: 0.375rem;
     }
+    .adaptive-bar .policy-pause { white-space: nowrap; }
+    .overflow-menu .policy-pause { max-width: calc(100vw - 3rem); flex-wrap: wrap; }
     .dot {
       width: 0.4rem;
       height: 0.4rem;
@@ -643,6 +650,10 @@ export class StatusDeck extends JfElement {
         </jf-control>`;
       }
       case 'core.queue': {
+        if (progress.pause) return html`<span class="group policy-pause" title=${progress.activity.detail ?? ''}>
+          <span class="val">${progress.activity.summary} — ${progress.activity.detail}</span>
+          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
+        </span>`;
         if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
         const activity = progress.activity;
         if (!activity.confirmed || activity.detail) {
@@ -725,7 +736,12 @@ export class StatusDeck extends JfElement {
     const indexingTransition = this.aiState?.verdict.kind === 'transitioning' &&
       this.aiState.verdict.reasons.some(isIndexingObservation);
     // Migration and holds are one indexing subject, including when its observation expires.
-    const indexingAnnounce = [indexingTransition && progress.activity.confirmed
+    if (progress.activity.confirmed) {
+      if (progress.pause) this.indexingResumed = false;
+      else if (this.indexingWasPaused) this.indexingResumed = true;
+      this.indexingWasPaused = !!progress.pause;
+    }
+    const indexingAnnounce = [this.indexingResumed && progress.activity.confirmed ? 'Indexing resumed.' : '', indexingTransition && progress.activity.confirmed
       ? announce?.text ?? progress.activity.summary : progress.activity.summary,
     progress.activity.detail].filter(Boolean).join(' — ');
     return html`
