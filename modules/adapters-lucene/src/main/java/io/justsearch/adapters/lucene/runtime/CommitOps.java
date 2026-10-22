@@ -2,7 +2,6 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import static io.justsearch.adapters.lucene.runtime.LuceneRuntimeUtils.asString;
-import static io.justsearch.adapters.lucene.runtime.LuceneRuntimeUtils.classifyIOException;
 
 import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.io.IOException;
@@ -111,7 +110,7 @@ public final class CommitOps {
         try {
           LifecycleSnapshot snap = session.snapshot;
           IndexWriter w = snap != null ? snap.writer() : null;
-          if (w == null) throw new IndexWriterUnavailableException("IndexWriter not available");
+          if (w == null || !w.isOpen()) throw new IndexWriterUnavailableException("IndexWriter not available");
           long pendingAtCommit = session.pendingDocs.get();
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
@@ -127,7 +126,7 @@ public final class CommitOps {
           }
           return new CommitResult(elapsedMs, pendingAtCommit);
         } catch (IOException e) {
-          throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
+          throw IndexRuntimeIOException.fromIndexOperation(e, "Commit failed", session);
         }
       }
     } finally {

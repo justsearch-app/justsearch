@@ -361,8 +361,9 @@ public final class JobBatchWriter {
       }
       return false;
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO,
-          "Cannot read serving document fields before lexical projection: " + ex.filePath(), e);
+      throw IndexRuntimeIOException.fromIndexOperation(e,
+          "Cannot read serving document fields before lexical projection: " + ex.filePath(),
+          lexicalSource.openedIndexPath());
     }
   }
 

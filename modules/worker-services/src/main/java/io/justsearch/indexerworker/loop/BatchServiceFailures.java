@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Single-threaded service history, separate for the writer and identity store. A successful peer
- * proves a document failure. Without one, only explicit infrastructure signals prove an outage;
+ * makes unknown failures document-specific. Without one, only explicit infrastructure signals prove an outage;
  * unknown runtime failures get three grace batches before using the durable file retry ladder.
  * History is constant-size and resets on service success or worker restart. Restart grants three
  * new grace batches but never resets persisted attempts or exhaustion.
@@ -82,8 +82,8 @@ final class BatchServiceFailures {
     boolean deferred = unavailable;
     try {
       for (var failure : pending) {
-        boolean systemic = !succeeded
-            && (provenOutage(failure.error()) || ambiguousBatches <= 3);
+        boolean systemic = provenOutage(failure.error())
+            || (!succeeded && ambiguousBatches <= 3);
         failure.record().accept(systemic);
         deferred |= systemic;
       }
@@ -106,8 +106,9 @@ final class BatchServiceFailures {
 
   private static boolean provenOutage(Throwable failure) {
     if (failure instanceof IndexWriterUnavailableException) return true;
-    // DISK_IO can concern one document; CONFIGURATION includes document validation failures.
+    // Untagged DISK_IO can concern a document; the Lucene boundary tags index-owned IO.
     if (failure instanceof IndexRuntimeIOException indexError) {
+      if (indexError.isIndexStorageFailure()) return true;
       return switch (indexError.reason()) {
         case DISK_FULL, LOCKED, CORRUPT_INDEX, SCHEMA_MISMATCH, BACKPRESSURE, DRAINING -> true;
         default -> false;
