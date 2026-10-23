@@ -1,5 +1,5 @@
 [versions]
-spotless = "8.10.3"
+spotless = "8.10.4"
 junit = "5.14.4"
 mockito = "5.22.0"
 "junit-platform" = "1.14.4"
@@ -132,5 +132,5 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 protobuf = { id = "com.google.protobuf", version = "0.10.0" }
 licenseReport = { id = "com.github.jk1.dependency-license-report", version = "3.1.4" }
 dependencyAnalysis = { id = "com.autonomousapps.dependency-analysis", version.ref = "dependencyAnalysis" }
-versions = { id = "com.github.ben-manes.versions", version = "0.64.0" }
+versions = { id = "com.github.ben-manes.versions", version = "0.66.0" }
 
