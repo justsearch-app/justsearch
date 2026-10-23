@@ -7,8 +7,8 @@
  * run is weak signal. This analyzer answers the durable question — "is a lane's
  * wall-clock drifting up / are we at the floor" — by taking the MEDIAN over N runs
  * and flagging only SUSTAINED drift (median above the advisory ceiling). Warn-only:
- * it never fails anything; its workflow may open a single de-duped issue on drift.
- * Tempdoc 668 (post-hoc analyzer + actions:read + issues:write + var gate pattern).
+ * it never fails anything; its workflow reports drift in the run summary.
+ * Tempdoc 668 (post-hoc analyzer + actions:read + var gate pattern).
  *
  * Input: --runs-json <file> = array of per-run summaries
  *   [{ runId, createdAt, jobs: [{ name, wallSeconds }] }, ...]
@@ -124,7 +124,7 @@ export function buildTrendReport({ runs = [], policy = {} }) {
     driftedLanes: drifted,
     warnings: laneReports.filter((lane) => lane.missingRuns > 0).map((lane) => `${lane.job}: missing from ${lane.missingRuns}/${runs.length} runs`),
     // True only on SUSTAINED drift (median over N above ceiling) — the workflow
-    // opens an issue only when this is set, so a single slow run never notifies.
+    // reports drift only when this is set, so a single slow run never notifies.
     sustainedDrift: drifted.length > 0,
   };
 }

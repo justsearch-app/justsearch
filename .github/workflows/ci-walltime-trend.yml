@@ -3,9 +3,10 @@ name: CI wall-clock trend
 # Tempdoc 668. Post-hoc wall-clock TREND analyzer over the last N public CI runs
 # on `main` — the durable "is a lane drifting up / are we at the floor" signal that
 # per-run budgets are too noisy to give. Advisory only: it never fails anything and
-# only opens a SINGLE de-duped issue on SUSTAINED drift (per-lane median over the
-# window above its advisory ceiling).
-# (post-hoc analyzer + actions:read + issues:write + var gate).
+# reports SUSTAINED drift (per-lane median over the window above its advisory
+# ceiling) in the run summary. It does not open issues: development never posts
+# GitHub issues; only the owner files them.
+# (post-hoc analyzer + actions:read + var gate).
 
 # Manual-only, matching the repo's ADR-0026 convention (workflow_dispatch-only,
 # with its cron intentionally not enabled — see ADR-0026 for the self-hosted
@@ -23,7 +24,6 @@ on:
 permissions:
   contents: read
   actions: read
-  issues: write
 
 concurrency:
   group: ci-walltime-trend
@@ -73,17 +73,6 @@ jobs:
             build/ci/ci-walltime-trend.md
           if-no-files-found: warn
 
-      - name: Open or update drift issue
+      - name: Report sustained drift in the run summary
         if: ${{ steps.trend.outputs.sustained_drift == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          title="CI wall-clock: sustained lane drift"
-          body_file=build/ci/ci-walltime-trend.md
-          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
-          if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body-file "$body_file"
-          else
-            gh issue create --title "$title" --body-file "$body_file" --label "ci-walltime" || \
-              gh issue create --title "$title" --body-file "$body_file"
-          fi
+        run: cat build/ci/ci-walltime-trend.md >> "$GITHUB_STEP_SUMMARY"
