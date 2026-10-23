@@ -139,3 +139,14 @@ The transition deadline amendment is the orchestrator's decision under the deleg
 ## Acceptance records
 
 Pending independent acceptance by the orchestrator or verifier; the builder does not accept its own entries.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:79ab37625e3052e19d7a3c0f66b0eb38f7d144397055a33b741c04c66b777435",
+  "note": "Accept unchanged candidate d6e4c1a5e under the orchestrator exclusions: R1/D7 size-only edits with restored mtime are missed by normal startup on both b62fc5921 and candidate (confirmed independently), and are out of scope as a separately tracked pre-existing gap; D7 uses the startup reconciliation rule. R2/P10 legacy nested-root index data loss during parent removal also reproduces on b62fc5921 (confirmed independently), is no worse on candidate, and is out of scope as a separately tracked pre-existing defect; candidate retains child volume proof that baseline loses. Neither excluded behavior is claimed repaired or passing. Retain original A1 migration-replay and A3 real-bind limitations. Review and confirmations: tmp/verify-evidence/verification-report.txt and tmp/verify-evidence/reassessment/. All required candidate module suites passed; generated execution evidence includes assertion fail-before and pass-after."
+}
+```
