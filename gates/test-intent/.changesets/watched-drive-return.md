@@ -161,3 +161,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Classes match the before-state and candidate changes, and cited evidence records assertion fail-before and pass-after. Reject the required sources for entries 1, 2 and 5: delegated-choice requires the owners written delegation, but these quote orchestrator-P1-amendment or an explicitly labelled orchestrator builder assignment. An implementation assignment also does not state each new expectation. Cite the supplied owner-adopted P1 and D/P scenarios with their specific expectations, or the actual owner delegation and its scope. Optional copies of these citations in entries 3, 4 and 6 should also be corrected or omitted. No Gradle rerun; real bind mounts remain unverified under A3."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:3b4265c2ce7d302187489eee9d8cb045bdae3871d2bb52d850650424cc717d6f",
+  "note": "Re-reviewed all six entries under docs/reference/testing/test-intent.md using the exact owner delegation and task-turn locations supplied in the current user turn. Entries 1/5 are the narrow delegated P1 unavailable-classifier defect fix, preserving zero deletions and non-Linux behavior; entry 2 is isolated real-volume fixture/recovery coverage within assigned scenarios; entries 3/6 retain all existing oracles and only add fixture instrumentation; entry 4 retains reverse acquisition cleanup for every owner. Repeated stronger-source conflict search found none. Delegation does not authorize overriding established contracts; strict leases, no deletion on uncertainty, original A1/A2/A3 amendments and explicit R1/R2 exclusions remain. Verified all six before/after item blobs match the prior independent verification and only citation fields changed since HEAD~1. Accept the current digest. Detailed per-entry review: tmp/verify-evidence/citation-review/review.txt. Independent PR 910 audit remains a separate subsequent step."
+}
+```
