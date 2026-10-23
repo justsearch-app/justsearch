@@ -113,3 +113,14 @@ The repair cases fail by assertion before the change; the preservation cases pas
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "73blv3bo",
+  "verdict": "accept",
+  "digest": "sha256:e342dc503dc5145b1307c7bc1cd88de856ec741a975dcdaabf781b292a0bc929",
+  "note": "Test-intent acceptance only: DS/DN sources reviewed; 14 checks pass, 11 fail by assertion before, 3 preservation checks pass before. Real-model system scenarios remain unverified pending the conflicting machine rule."
+}
+```
