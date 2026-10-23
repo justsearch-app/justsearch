@@ -1058,6 +1058,13 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Switch buffer cannot certify final replay", unreadable);
       return new ReplayOutcome(false, List.of());
     }
+    // Conversion replaces a receipt revision. An approval to skip the old exact version
+    // cannot silently turn into permission to apply its replacement's destructive effect.
+    if (!context.approvedGapVersions().isEmpty()
+        && !new java.util.HashSet<>(allOps).containsAll(context.approvedGapVersions())) {
+      context.log().warn("Approved gap receipts changed before replay; retaining snapshot");
+      return new ReplayOutcome(false, List.of());
+    }
     boolean deferredVdu = !allowVdu && allOps.stream().anyMatch(op -> isVduBufferKind(op.op()));
     List<SwitchBufferCapableQueue.SwitchBufferOp> ops = allOps.stream()
         .filter(op -> allowVdu || !isVduBufferKind(op.op())).toList();
