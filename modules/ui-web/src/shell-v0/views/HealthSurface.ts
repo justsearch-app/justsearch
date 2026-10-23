@@ -1465,6 +1465,7 @@ export class HealthSurface extends JfElement {
   }
 
   private showBulkError(error: OpErrorEventDetail): void {
+    if (!this.isConnected) return;
     this.bulkOutcomeKey = '';
     this.bulkError = error;
   }

@@ -43,6 +43,9 @@ async function showsLaterFailure(el: HealthSurface | BrainSurface) {
   await pump(el);
   expect(reads, 'acceptance starts reading the recorded operation outcome').toBe(1);
   expect(el.shadowRoot!.querySelector('jf-operation-outcome-detail')?.shadowRoot?.textContent).not.toContain(message);
+  el.remove(); document.body.append(el); await pump(el);
+  expect(el.bulkOutcomeKey, 'navigation retains the accepted operation identity').toBe(key);
+  expect(reads, 'returning resumes the recorded progress read').toBeGreaterThan(1);
   terminal = true;
   await vi.advanceTimersByTimeAsync(4_000); await pump(el);
   const detail = el.shadowRoot!.querySelector('jf-operation-outcome-detail');

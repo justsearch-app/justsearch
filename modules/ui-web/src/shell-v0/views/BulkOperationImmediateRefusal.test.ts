@@ -35,6 +35,9 @@ let finished = false;
 let gapDecision = false;
 let reads = 0;
 let invocations = 0;
+let holdInvoke = false;
+let pendingInvoke: (() => void) | null = null;
+let invokeRefusal = { message, code };
 
 function operation(id: string): Operation {
   return { id, presentation: { labelKey: id, descriptionKey: '', iconHint: null, category: null },
@@ -52,6 +55,7 @@ function feed(migrationState = 'IDLE') {
 }
 beforeEach(async () => {
   accepted = false; finished = false; gapDecision = false; reads = 0; invocations = 0;
+  holdInvoke = false; pendingInvoke = null; invokeRefusal = { message, code };
   server = createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -63,7 +67,7 @@ beforeEach(async () => {
       invocations++;
       const decision = req.url.includes('core.accept-gaps') ? ['Candidate gap witness is unavailable', 'GAP_ACCEPTANCE_UNAVAILABLE']
         : req.url.includes('core.cancel-reindex') ? ['Rebuild owner is temporarily unavailable', 'REINDEX_CANCEL_UNAVAILABLE']
-        : [message, code];
+        : [invokeRefusal.message, invokeRefusal.code];
       status = accepted ? 200 : 500;
       body = accepted ? { success: true, message: 'Accepted', structuredData: { operationKey: key } }
         : { success: false, message: decision[0], errorClass: 'HANDLER_FAILURE', errorCode: decision[1] };
@@ -73,7 +77,11 @@ beforeEach(async () => {
         : { state: 'running', historySince: 0, ...(gapDecision ? { phase: 'awaiting_acceptance',
           result: { gapListHash: 'a'.repeat(64), gaps: [{ unitId: 'doc', reason: 'PARSER_FAILED' }] } } : {}) };
     }
-    res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body));
+    const respond = () => {
+      res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body));
+    };
+    if (holdInvoke && req.url?.includes('/invoke')) pendingInvoke = respond;
+    else respond();
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -87,6 +95,7 @@ beforeEach(async () => {
   feed();
 });
 afterEach(async () => {
+  pendingInvoke?.(); pendingInvoke = null;
   document.body.replaceChildren(); __resetAiStateForTest(); __resetUiModeForTest();
   __resetForTest(); __clearAggregateRegistry(); __resetBootstrap(); vi.restoreAllMocks(); vi.unstubAllGlobals();
   server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
@@ -117,6 +126,76 @@ async function clickRebuild(el: HealthSurface | BrainSurface, recommended: boole
   await action.updateComplete;
   action.shadowRoot!.querySelector<HTMLButtonElement>('.confirm-row button')!.click();
 }
+
+const bulkControls = ['health', 'brain', 'health-recommended', 'activation'] as const;
+async function startPendingControl(surface: typeof bulkControls[number]) {
+  holdInvoke = true; invokeRefusal = { message: laterMessage, code: laterCode };
+  const brain = surface === 'brain' || surface === 'activation';
+  const el = document.createElement(brain ? 'jf-brain-surface' : 'jf-health-surface') as BrainSurface | HealthSurface;
+  el.apiBase = base; el.host_ = host();
+  if (brain) vi.spyOn(el as unknown as { refreshAll(): Promise<void> }, 'refreshAll').mockResolvedValue();
+  document.body.append(el); await pump(el);
+  if (surface === 'health-recommended') {
+    (el as HealthSurface).recommendedActions = new Map([['index.embedding_legacy|index', { target: 'core.rebuild-index', args: {} }]]);
+  }
+  if (surface === 'activation') {
+    const b = el as BrainSurface;
+    b.expanded = { ...b.expanded, install: true };
+    b.installStatus = { state: 'idle', phase: 'activation_required' } as NonNullable<BrainSurface['installStatus']>;
+  }
+  await pump(el);
+  const invoke = vi.spyOn(getOperationClient(base), 'invokeWithConsent');
+  if (surface === 'activation') await clickButton(el.shadowRoot!.querySelector('jf-button[label="Activate downloaded models"]') as JfButton);
+  else await clickRebuild(el, surface === 'health-recommended');
+  await vi.waitFor(() => expect(pendingInvoke).not.toBeNull());
+  return { el, response: invoke.mock.results[0]!.value as Promise<unknown> };
+}
+function releaseInvoke() {
+  expect(pendingInvoke).not.toBeNull();
+  const respond = pendingInvoke!; pendingInvoke = null; respond();
+}
+
+it.each(bulkControls.flatMap(surface => (['hidden', 'returned'] as const).map(timing => ({ surface, timing }))))(
+  '$surface handles an invoke refusal arriving while $timing', async ({ surface, timing }) => {
+    const { el, response } = await startPendingControl(surface);
+    el.remove();
+    if (timing === 'returned') { document.body.append(el); await pump(el); }
+    releaseInvoke();
+    await expect(response).rejects.toMatchObject({ errorCode: laterCode });
+    for (let i = 0; i < 30; i++) await Promise.resolve();
+    if (timing === 'hidden') {
+      expect.soft(el.bulkError, 'a hidden surface must not acquire a transient refusal').toBeNull();
+      document.body.append(el); await pump(el);
+      expect(el.bulkError).toBeNull();
+      expect(el.shadowRoot!.textContent).not.toContain(laterMessage);
+      expect(el.shadowRoot!.textContent).not.toContain(laterCode);
+    } else {
+      await pump(el);
+      expect(el.bulkError?.message).toBe(laterMessage);
+      expect(el.shadowRoot!.textContent).toContain(laterMessage);
+      expect(el.shadowRoot!.textContent?.split(`Code: ${laterCode}`)).toHaveLength(2);
+    }
+  },
+);
+
+it.each(bulkControls)('%s retains acceptance received while hidden and follows failure after return', async surface => {
+  accepted = true;
+  const { el, response } = await startPendingControl(surface);
+  el.remove(); releaseInvoke();
+  await expect(response).resolves.toMatchObject({ structuredData: { operationKey: key } });
+  for (let i = 0; i < 30; i++) await Promise.resolve();
+  expect(el.bulkOutcomeKey).toBe(key);
+  document.body.append(el); await pump(el);
+  await vi.waitFor(() => expect(reads).toBeGreaterThan(0));
+  expect(el.bulkOutcomeKey).toBe(key);
+  expect(el.bulkError).toBeNull();
+  finished = true;
+  await vi.waitFor(() => {
+    const detail = el.shadowRoot!.querySelector('jf-operation-outcome-detail');
+    expect(detail?.shadowRoot?.textContent).toContain(laterMessage);
+    expect(detail?.shadowRoot?.textContent?.split(`Code: ${laterCode}`)).toHaveLength(2);
+  }, { timeout: 6_000 });
+}, 10_000);
 
 it.each(['health', 'brain', 'health-recommended', 'activation'] as const)(
   '%s shows an immediate refusal and a later failure after retry through its real control', async surface => {
