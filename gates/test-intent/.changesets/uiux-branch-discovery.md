@@ -385,3 +385,14 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
   "note": "Expectations follow delegated intent. Fresh repaired checks assertion-fail before and pass on 753aef44b; named preservation checks pass. Product findings and broader suite limitations are reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1677c-fe67-7811-987f-6a6e3a5c889d",
+  "verdict": "accept",
+  "digest": "sha256:b2181e131c4d08643f3460379b76c22b2acffa81e3b2b2a8f2eb3a310f8237a0",
+  "note": "All nine entries follow delegated WP1.4a scenarios and preserve existing oracles; all three flagged files are covered. Renewed C1/C2 evidence matches the merged candidate test, executes and passes, and assertion-fails on 1730a66d2 for the misordered cursor. Independently reproduced that failure; candidate Shell passes 29/29, related tests 68/68, baseline Shell 22/22; adjacent timing probe passes candidate and assertion-fails baseline. Main-owned Shell additions are unchanged from origin/main and need no entry here. Test-intent acceptance only; no services or Gradle run."
+}
+```
