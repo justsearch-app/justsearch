@@ -106,6 +106,10 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       // genuinely Windows-only methods retain their "windows" tag and OS preconditions.
       val windowsOnly = project.findProperty("windowsOnly")?.toString()?.toBoolean() ?: false
       val isWindowsHost = HostPlatform.isWindows
+      // Linux with glibc: native-heap trimming is a no-op elsewhere (musl, Windows).
+      val isGlibcHost = HostPlatform.isLinux && project.providers.exec {
+        commandLine("sh", "-c", "getconf GNU_LIBC_VERSION 2>/dev/null || true")
+      }.standardOutput.asText.get().trim().startsWith("glibc ")
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
         // Keep the known Linux flake cases visible on main, while PRs prove the remaining cases.
@@ -150,6 +154,12 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         maxHeapSize = "384m"
         jvmArgs("--sun-misc-unsafe-memory-access=warn", "--enable-native-access=ALL-UNNAMED",
             "-XX:+UseCompactObjectHeaders")
+        // Return freed native memory (ONNX Runtime sessions, tokenizers) to the OS, as the Engine
+        // does (modules/ui/build.gradle.kts). Without it, a test JVM that boots the real models per
+        // method kept about 1.1 GiB more after each server close and two such JVMs filled swap.
+        if (isGlibcHost) {
+          jvmArgs("-XX:TrimNativeHeapInterval=30000")
+        }
         systemProperty("junit.jupiter.execution.timeout.default", "30s")
         systemProperty("junit.jupiter.execution.timeout.mode", "disabled_on_debug")
         // Tempdoc 965 J3: inputs the tests read but Gradle did not track, so a cached result could
