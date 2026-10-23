@@ -1019,6 +1019,57 @@ The before-state is ae50fbc4e. New repair checks run unchanged against it. Exist
         "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with input focused",
         "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with dialog focused"
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExclusionApplyPublicationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "EX2 preservation after merging origin/main (#885): this main test spies on deleteDocById to know that explicit Apply reached the normal exclusion delete. On this branch Apply calls deleteDocByIdWithOutcome (WX1/WX2), so the latch never fired and the test failed at line 73 ('explicit Apply reaches the normal exclusion delete'), in CI and locally. Only the spied method name changes; the spy still calls the real method, and every fixture, ordering wait and assertion is unchanged. Local run: fails unadapted for that reason, passes adapted.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S324",
+          "quote": "After a successful Apply, fresh searches in both windows return none of the removed documents (staying out afterwards is WP3.1).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "WX1 Apply's result is stated in what the Engine can guarantee, not in indexed-document counts: it reports how many matching files and folders are confirmed no longer searchable (each deletion request the Worker confirmed), without claiming each was indexed before. Every deletion that returned an error, was refused, was rejected by the circuit breaker, or was never attempted (offline or missing watched folder, unreadable entry, entry cap) is listed as not removed or not checked; a failed or unknown deletion is never counted as removed. The Worker deletion contract is not widened. Apply uses an outcome-carrying variant of the prefix deletion; existing callers of deleteDocsByPathPrefix keep their current behaviour. S32.3's \"reports what it removed\" is read through WX1.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "WX2 (orchestrator decision under the user's delegation, 2026-10-21; agent-adopted, not owner words; refines WX1): the Worker's deleteByPath and deleteById replies gain one additive, optional field that is true only when the deletion was buffered for later application (index switching) instead of applied. Apply reports such matches as \"removal completes when the index rebuild finishes\", never as removed. A reply with a negative job count and no error, or any reply the Engine cannot interpret, counts as unknown, not removed. Existing callers and older readers of these replies are unaffected (the field defaults to false; no existing field changes meaning). Why: only the Worker knows at deletion time whether it buffered; an Engine-side refusal during rebuild would race a switch that starts mid-Apply.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "2. **Editor semantics (WP3.2).** Options: (a) explicit Save; Preview and Apply act on the saved list (Preview disabled while the draft is unsaved); no backend change; (b) Preview evaluates the unsaved draft (operation gains a patterns argument); (c) keep save-then-preview and say so. **Recommend (a).** Honest with no new backend surface; saving only affects future indexing, so previewing after save loses nothing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.2 exclusions editor and Apply",
+          "choice": "3. **Apply scope (WP3.2).** Options: (a) walk the disk as today and report unchecked scope; (b) also walk the index for matches whose files are gone or offline. **Recommend (a).** Gone files are handled by deletion cleanup (#793); offline ones are reported (S32.3). (b) is new machinery for a rare case.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }
@@ -1031,6 +1082,8 @@ EX1 preservation follow-up (baseline 4a7f96624): the existing Worker/index/queue
 OV1 repair entries appended by builder session 8acrycvp on 2026-10-22; all earlier entries and acceptance records are retained. The official producer used default dependency-link mode with baseline 052c08961. Preservation evidence intentionally exits 1 because its before checks pass; all candidate checks pass.
 
 CE1 entries appended by builder session 8b7469qf. Official evidence uses default dependency-link mode and baseline bdb952543. Repair evidence exits 0; preservation evidence exits 1 because all eight before checks pass, with all candidate checks passing. No acceptance record authored. Shared-dialog native keyboard/reflow comparison and private Engine checks are retained under `tmp/wp32-ce1/`.
+
+EX2 entry appended by orchestrator session 8c330fb4 on 2026-10-23 after CI on #909; no acceptance record authored.
 
 ## Acceptance records
 
