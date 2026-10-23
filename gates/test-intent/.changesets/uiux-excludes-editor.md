@@ -1142,3 +1142,14 @@ EX2 entry appended by orchestrator session 8c330fb4 on 2026-10-23 after CI on #9
   "note": "Sources, before-state oracles and diff independently reviewed. New behavior follows S32 and delegated AX/WX/XA1/OV1/CE1; adaptations preserve existing oracles. Independent scratch CE1 repairs fail assertions before and preservation passes; all candidate checks pass. Historical UI comparisons reproduce repair/preservation distinctions. Real private Engine/Worker and headless Library checks confirm the CE1 repair, partial outcomes and saved-policy semantics. This accepts test intent; environment reruns and product verification are reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ug71utrm-verifier-7",
+  "verdict": "accept",
+  "digest": "sha256:40b79a37a3baaad207b39dc11d1f792f5dcdb1a74d9c656c9d2e32bda236cdbf",
+  "note": "EX2 only: whole oracle preserved by exact source comparison and real Apply-port tracing; baseline failed at the intended latch. Candidate repetitions and both unit suites remain UNVERIFIED after queue delays and a corrected verifier-harness error. Acceptance covers intent preservation; execution verdict remains inconclusive. Earlier entries are unchanged and previously accepted per brief."
+}
+```
