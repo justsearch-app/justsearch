@@ -24,6 +24,15 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
   @TempDir Path tempDir;
 
   @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void missingFilesystemUsesTheUnavailableRootReason() {
+    SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, new RecordingQueue(), null);
+    var result = ops.execute(tempDir.resolve("absent-volume").toString(), false, null, () -> false, null, null);
+    assertTrue(result.getError().startsWith("ROOT_NOT_DIRECTORY:"), result.getError());
+    assertEquals(0, result.getFilesDeleted());
+  }
+
+  @Test
   void longIndexedPathsReachMemoryBudgetBeforeEntryCountLimit() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("long-indexed-paths"));
     Files.writeString(root.resolve("missing.md"), "text");
@@ -42,7 +51,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(reads, null, null, queue, null);
 
-    var response = ops.execute(root.toString(), false, null, () -> false);
+    var response = ops.execute(root.toString(), false, null, () -> false, null, null);
 
     assertTrue(response.getSkipped());
     assertTrue(response.getDeleteDetectionUnverified());
@@ -57,7 +66,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
     var checks = new java.util.concurrent.atomic.AtomicInteger();
 
-    var response = ops.execute(root.toString(), true, null, () -> checks.incrementAndGet() > 40);
+    var response = ops.execute(root.toString(), true, null, () -> checks.incrementAndGet() > 40, null, null);
 
     assertEquals("Cancelled", response.getError());
     assertEquals(0, response.getFilesAdded());
@@ -82,7 +91,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     var pacing = io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled();
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, pacing);
 
-    var response = ops.execute(root.toString(), force, null, cancelled::get);
+    var response = ops.execute(root.toString(), force, null, cancelled::get, null, null);
 
     assertEquals("Cancelled", response.getError());
     assertEquals(2_000, response.getFilesAdded());
@@ -105,7 +114,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     // force=true so the walk enqueues every non-skipped file unconditionally (no indexed-path
     // lookup, which would require a real readPathOps).
-    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false);
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false, null, null);
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(List.of(keep), queue.enqueuedPaths, "Only the non-policy-skipped file is enqueued");
@@ -125,7 +134,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
 
-    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false);
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false, null, null);
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(2, queue.enqueuedEntries.size(), "Both files enqueued as sized entries");
@@ -156,7 +165,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     JobQueue.EnqueueProvenance provenance =
         new JobQueue.EnqueueProvenance("agent", "AGENT_LOOP");
 
-    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance, () -> false);
+    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance, () -> false, null, null);
 
     assertEquals("", response.getError());
     assertEquals(2, queue.enqueuedEntries.size());

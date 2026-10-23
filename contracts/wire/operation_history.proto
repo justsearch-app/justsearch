@@ -69,6 +69,9 @@ message OperationHistoryEntry {
 
   // Stable accepted invocation identity. Absent on legacy/uncommitted live observations.
   optional string operation_key = 11 [json_name = "operationKey"];
+
+  // Read-time explanation including its support code; absent when no explanation applies.
+  optional string message = 12 [json_name = "message"];
 }
 
 // Invocation-side provenance — mirrors app-agent-api InvocationProvenance. transport/executor are

@@ -16,11 +16,13 @@ const approveAndExecutePendingMock = vi.fn();
 const peekPendingMock = vi.fn();
 const emitEphemeralToastMock = vi.fn();
 
-vi.mock('./authorizationBroker.js', () => ({
+vi.mock('./authorizationBroker.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./authorizationBroker.js')>(),
   requestAuthorization: (...args: unknown[]) => requestAuthorizationMock(...args),
 }));
 
-vi.mock('./OperationClient.js', () => ({
+vi.mock('./OperationClient.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./OperationClient.js')>(),
   getOperationClient: () => ({
     approveAndExecutePending: (...args: unknown[]) => approveAndExecutePendingMock(...args),
     peekPending: (...args: unknown[]) => peekPendingMock(...args),
@@ -33,6 +35,9 @@ vi.mock('./OperationClient.js', () => ({
 vi.mock('../components/advisory/ephemeralToast.js', () => ({
   emitEphemeralToast: (...args: unknown[]) => emitEphemeralToastMock(...args),
 }));
+
+// The shared status cadence is driven separately in the XA1 seam checks.
+vi.mock('../utils/statusPoll.js', () => ({ subscribeStatus: () => () => {} }));
 
 import { startPendingAuthorizationBridge } from './pendingAuthorizationBridge.js';
 import type { SseEnvelope } from '../streaming/envelope-types.js';

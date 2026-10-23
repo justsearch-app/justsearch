@@ -187,7 +187,10 @@
       "name": "OperationOutcomeView",
       "schema": "SSOT/schemas/operation-outcome-view.v1.json",
       "outFile": "operation-outcome-view.ts",
-      "consumers": ["modules/ui-web/src/shell-v0/views/LibrarySurface.ts"]
+      "consumers": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
+        "modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts"
+      ]
     },
     {
       "name": "InferenceStatusResponse",

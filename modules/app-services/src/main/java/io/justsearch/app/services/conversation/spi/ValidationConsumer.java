@@ -1,40 +1,33 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import com.networknt.schema.SchemaLocation;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.StreamConsumer;
 import io.justsearch.agent.api.conversation.StreamConsumerResult;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Slice 496 §3.C — StreamConsumer that validates the LLM's output against
- * the request's declared JSON schema. Communicates with
- * {@link ValidatingController} via the {@code ConversationContext.attributes()}
- * scratch pad.
- *
- * <p>On {@code onDone}: reads the schema from {@code ctx.requestBody().get("schema")}
- * (a JSON schema string). Attempts to parse the LLM's output as JSON. If parsing
- * fails or the output doesn't look like valid JSON: sets
- * {@code attributes["validation.passed"] = false} and returns a correction-prompt
- * message delta. If valid: sets {@code attributes["validation.passed"] = true}.
- *
- * <p>V1 validation is simple: checks that the output is parseable JSON (starts with
- * { or [). Full JSON Schema validation against the declared schema is a future
- * enhancement — the correction prompt includes the schema so the LLM can self-correct.
- */
+/** Validates extraction output in the Engine, shared by every client. */
 public final class ValidationConsumer implements StreamConsumer {
-
-  private static final Logger LOG = LoggerFactory.getLogger(ValidationConsumer.class);
-
   public static final String ID = "core.validation-consumer";
+  private static final JsonMapper MAPPER = JsonMapper.builder()
+      .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
+  private static final SchemaRegistry SCHEMAS = SchemaRegistry.withDefaultDialect(
+      SpecificationVersion.DRAFT_2020_12,
+      builder -> builder.schemaLoader(loader -> loader.block(iri -> true)));
+  // The dependency bundles the standard drafts and their meta-schemas. Only this trusted
+  // registry loads them; user schemas still cannot load external references through SCHEMAS.
+  private static final SchemaRegistry META_SCHEMAS = SchemaRegistry.withDefaultDialect(
+      SpecificationVersion.DRAFT_2020_12,
+      builder -> builder.schemaLoader(loader -> loader.fetchRemoteResources(false)));
 
-  @Override
-  public String id() {
-    return ID;
-  }
+  @Override public String id() { return ID; }
 
   @Override
   public StreamConsumerResult onChunk(String chunkText, ConversationContext ctx) {
@@ -43,25 +36,42 @@ public final class ValidationConsumer implements StreamConsumer {
 
   @Override
   public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
-    String schema = (String) ctx.requestBody().getOrDefault("schema", "{}");
-    String trimmed = fullText.trim();
-    boolean looksLikeJson = (trimmed.startsWith("{") || trimmed.startsWith("["))
-        && (trimmed.endsWith("}") || trimmed.endsWith("]"));
-
-    ctx.attributes().put("validation.passed", looksLikeJson);
-
-    if (!looksLikeJson) {
-      LOG.debug("ValidationConsumer: output does not look like valid JSON; requesting retry");
-      String correction =
-          "Your output was not valid JSON. Please respond with ONLY valid JSON matching this schema:\n"
-              + schema
-              + "\n\nDo not include any explanation or markdown formatting — just the raw JSON object.";
-      return new StreamConsumerResult(
-          List.of(),
-          List.of(),
-          List.of(Map.of("role", "user", "content", correction)),
-          Map.of());
+    Object raw = ctx.requestBody().getOrDefault("schema", "{}");
+    final com.networknt.schema.Schema schema;
+    try {
+      if (!(raw instanceof String text)) throw new IllegalArgumentException("Schema must be a JSON object");
+      JsonNode node = MAPPER.readTree(text);
+      if (node == null || !node.isObject()) throw new IllegalArgumentException("Schema must be a JSON object");
+      schema = SCHEMAS.getSchema(node);
+      var problems = META_SCHEMAS.getSchema(SchemaLocation.of(schema.getSchemaContext().getDialect().getId()))
+          .validate(node);
+      if (!problems.isEmpty()) {
+        throw new IllegalArgumentException(problems.stream().map(error -> error.getInstanceLocation() + ": " + error.getMessage())
+            .sorted().reduce((a, b) -> a + "; " + b).orElseThrow());
+      }
+    } catch (RuntimeException e) {
+      throw new IllegalArgumentException("Cannot apply extraction schema: " + e.getMessage(), e);
     }
-    return StreamConsumerResult.empty();
+    String problem;
+    try {
+      JsonNode output = MAPPER.readTree(fullText);
+      if (output == null) throw new IllegalArgumentException("Empty JSON output");
+      var errors = schema.validate(output);
+      problem = errors.stream().map(com.networknt.schema.Error::getMessage)
+          .sorted().reduce((a, b) -> a + "; " + b).orElse("");
+    } catch (tools.jackson.core.JacksonException e) {
+      problem = "Output is not valid JSON: " + e.getOriginalMessage();
+    } catch (RuntimeException e) {
+      // A reference or unsupported dialect that cannot be resolved is a failure, not a pass.
+      throw new IllegalArgumentException("Cannot apply extraction schema: " + e.getMessage(), e);
+    }
+    boolean passed = problem.isEmpty();
+    ctx.attributes().put("validation.passed", passed);
+    ctx.attributes().put("validation.reason", problem);
+    if (passed) return StreamConsumerResult.empty();
+    String correction = "Extraction validation failed: " + problem
+        + "\nRespond with ONLY valid JSON matching this schema:\n" + raw;
+    return new StreamConsumerResult(List.of(), List.of(),
+        List.of(Map.of("role", "user", "content", correction)), Map.of());
   }
 }

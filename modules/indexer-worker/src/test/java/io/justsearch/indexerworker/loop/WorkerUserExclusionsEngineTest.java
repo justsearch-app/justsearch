@@ -300,10 +300,15 @@ class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
       var context = CallContext.none().engineContext();
       org.mockito.Mockito.when(indexing.getWatchedRoots(context)).thenReturn(
           List.of(new io.justsearch.app.api.IndexingService.WatchedRoot("docs", root)));
-      org.mockito.Mockito.when(indexing.deleteDocById(org.mockito.ArgumentMatchers.anyString(),
-          org.mockito.ArgumentMatchers.eq(context))).thenAnswer(call -> service.deleteById(
-              io.justsearch.ipc.DeleteByIdRequest.newBuilder().setDocId(call.getArgument(0)).build(),
-              CallContext.none()).getSuccess());
+      org.mockito.Mockito.when(indexing.deleteDocByIdWithOutcome(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.eq(context))).thenAnswer(call -> {
+            var response = service.deleteById(
+                io.justsearch.ipc.DeleteByIdRequest.newBuilder().setDocId(call.getArgument(0)).build(),
+                CallContext.none());
+            return new io.justsearch.app.api.IndexingService.DeletionOutcome(
+                response.getSuccess() && response.getError().isEmpty() && !response.getBuffered(),
+                response.getError());
+          });
       var applied = new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> indexing)
           .applyExcludes(false, context);
       assertEquals(1, applied.matchedFiles());

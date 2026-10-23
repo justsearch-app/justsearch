@@ -1,0 +1,99 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T14:58:24.148Z",
+  "revision": "289dff32f9347dea59aa2d157b60766552db59ca",
+  "tree": "b728a18202369091cb6af1099f6dcd42d95df887",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.overflow.test.ts\" \"src/shell-v0/views/UnifiedChatView.terminalOutput.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-third-repair/test-intent-vitest-1963426-1792681096474.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3572
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.overflow.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.overflow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:88ff834397784d27974779380e02812507ad587a169c448a6794e9de81eb8693",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XD2 announces an overflowed toast only once across repeated cap displacements",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.terminalOutput.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.terminalOutput.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:819d52372a6c77ecfb530a82b5c6df293890008ecc66f91081402274c367a60d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT3 exhausted Structured retries leave only the failure and no rejected answer or context",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 none keeps streamed text when the terminal answer is empty",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 documents keeps streamed text when the terminal answer is empty",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 summarize keeps streamed text when the terminal answer is empty",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "289dff32f",
+    "revision": "289dff32f9347dea59aa2d157b60766552db59ca",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.overflow.test.ts\" \"src/shell-v0/views/UnifiedChatView.terminalOutput.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-third-repair/test-intent-vitest-1963426-1792681101858.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2104,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-third-repair/test-intent-vitest-1963426-1792681101858.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.overflow.test.ts",
+        "classification": "assertion",
+        "detail": "XD2 announces an overflowed toast only once across repeated cap displacements:  AssertionError: one exposed live announcement over the toast lifetime: expected [ …(3) ] to have a length of 1 but got 3\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-structured/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anony"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.terminalOutput.test.ts",
+        "classification": "assertion",
+        "detail": "XT3 exhausted Structured retries leave only the failure and no rejected answer or context:  AssertionError: failed extraction must not leave an ordinary answer bubble: expected '{bad}{\"city\":42}{}{also bad}' not to contain '{bad}'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-third-repair/test-intent-before-QLZMhz/modules/ui-web/src/shell-v0/views/UnifiedCh | XN1 none keeps streamed text when the terminal answer is empty:  AssertionError: expected '' to contain '"
+      }
+    ]
+  },
+  "digest": "sha256:f45f9a38072675cb5b997bed1e61fd6d62af65935112426b85ce0784a718b1da"
+}

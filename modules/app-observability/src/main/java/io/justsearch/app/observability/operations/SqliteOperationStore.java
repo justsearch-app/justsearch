@@ -696,7 +696,7 @@ public final class SqliteOperationStore implements OperationStore {
       // A single SQLite statement observes the selected row and its eviction fence together.
       // Select only the public projection columns: identity and prepared content stay private.
       try (var query = connection.prepareStatement("""
-          SELECT m.history_since_ms, o.state, o.phase, o.accepted_at, o.completed_at,
+          SELECT m.history_since_ms, o.operation_ref, o.state, o.phase, o.accepted_at, o.completed_at,
             o.units_completed, o.units_failed, o.failure_reason, o.result_json, o.gaps_json,
             o.gaps_list_hash
           FROM operations_meta m LEFT JOIN operations o ON o.operation_key = ?
@@ -745,7 +745,11 @@ public final class SqliteOperationStore implements OperationStore {
         state == OperationState.COMPLETE_WITH_GAPS ? "awaiting_acceptance" : row.getString("phase"),
         fence, row.getLong("accepted_at"), nullableLong(row, "completed_at"),
         row.getLong("units_completed"), row.getLong("units_failed"),
-        state == OperationState.CANCELLED ? "cancelled" : row.getString("failure_reason"), result);
+        state == OperationState.CANCELLED ? "cancelled" : row.getString("failure_reason"), result,
+        wireState == OperationOutcomeView.State.FAILED
+            ? io.justsearch.app.api.operations.BulkReindexFailureMessage.forOperation(
+                row.getString("operation_ref"), state == OperationState.CANCELLED
+                    ? "cancelled" : row.getString("failure_reason")) : null);
   }
 
   @Override
