@@ -90,3 +90,14 @@ No acceptance record is authored by the builder.
   "note": "Real built Linux shell (own Engine) under Xvfb and headless kwin_wayland, 3 configs x 4 triggers x 3 launches: base SIGSEGV after the trigger in every config, candidate 72/72 alive with state changed and zero startViewTransition calls; unit tests fail on base for the reason under test and four gate mutations are caught."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-vt-2",
+  "verdict": "accept",
+  "digest": "sha256:ed94ee048bda1faa9270273ce4f17042a294c7df5993416211abc154f25baf69",
+  "note": "Merged candidate re-checked: viewTransition.ts identical to accepted 7affd92eb, branch diff is only the fix, its tests and test-intent files, main's SearchV3View.test.ts change is an unrelated scroll-rule test, 49/49 focused tests pass, and regenerated evidence shows assertion fail-before on merge base bcab79eeb and all eight preservation checks executed and passed."
+}
+```
