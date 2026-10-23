@@ -557,3 +557,14 @@ scenario id is carried in agreedScenario. No independent acceptance is authored 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ipjuyrq4-verifier-2",
+  "verdict": "accept",
+  "digest": "sha256:7ce824ce3d74dda78f4eb986c31a40af2909c3ca57dab13a5fb8ff53cb335072",
+  "note": "Accepted New classifications and delegated-choice sources after baseline/source-first review. Independent run-evidence: 14 Java cases pass, zero skipped; baseline has 12 assertion failures plus 2 preservation passes. Frontend confirmation 34/34. Scope-disclosure finding and pre-existing esbuild suite failure remain separate verification findings; this accepts test intent, not product sign-off."
+}
+```
