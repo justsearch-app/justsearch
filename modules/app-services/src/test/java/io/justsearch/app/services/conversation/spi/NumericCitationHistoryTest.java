@@ -46,6 +46,7 @@ class NumericCitationHistoryTest {
       assertEquals(live.get("sentencesTotal"), live.get("sentencesScored"));
       assertEquals(scorer.name(), live.get("scorer"));
       String session = scorer.name();
+      new FileConversationStore(storeRoot).createSession(session, "rag-ask");
       new FileConversationStore(storeRoot).appendMessage(session, "rag-ask",
           Map.of("role", "assistant", "content", ANSWER, "claimMatches", live));
       var reloaded = new FileConversationStore(storeRoot).loadHistory(session).getFirst();
@@ -73,6 +74,7 @@ class NumericCitationHistoryTest {
     Map<String, Object> oldTurn = Map.of("role", "assistant", "content", ANSWER,
         "claimMatches", oldClaimMatches, "citations", List.of(Map.of("parentDocId", "doc",
             "excerpt", "Vespera Observatory opened in 1883.")));
+    new FileConversationStore(storeRoot).createSession("legacy", "rag-ask");
     new FileConversationStore(storeRoot).appendMessage("legacy", "rag-ask", oldTurn);
     var reloaded = new FileConversationStore(storeRoot).loadHistory("legacy").getFirst();
     assertEquals(oldClaimMatches, reloaded.get("claimMatches"), "stored verification is never recomputed");
