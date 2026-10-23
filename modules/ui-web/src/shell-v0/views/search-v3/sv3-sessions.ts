@@ -735,9 +735,20 @@ export function adoptRunSession(
    * rather than beside it: two rows for one conversation would be the identity fork Phase F6 closed.
    */
   conversationId: string,
+  /** A freshly read turn belonging to this live run, when the record already represents it. */
+  recordTurnId: string | null = null,
 ): Sv3Adoption {
   const existing = sessionById(list, conversationId);
   if (existing !== null) {
+    const recorded = existing.turns.find((t) => t.id === recordTurnId && t.kind === 'agent');
+    if (recorded !== undefined) {
+      return {
+        list: { ...list, sessions: list.sessions.map((s) => s.id === conversationId
+          ? { ...s, turns: s.turns.map((t) => t.id === recorded.id ? { ...t, status: 'streaming' } : t) }
+          : s) },
+        ref: { sessionId: conversationId, turnId: recorded.id },
+      };
+    }
     const turnId = turnIdFor(existing.id, existing.turns.length);
     return {
       list: {

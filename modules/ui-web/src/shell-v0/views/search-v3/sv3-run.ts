@@ -93,7 +93,7 @@ export type Sv3RunSource = Pick<
   // been cut. Every CLOSED region is already an ordered `conversation` entry; this is the one item
   // the array cannot hold, and it is the only item that may wear the live affordance.
   | 'reasoning'
->;
+> & Partial<Pick<AgentSessionController, 'concludedRunId'>>;
 
 /* ── Axis 1: the session ─────────────────────────────────────────────────────────────────────── */
 
@@ -448,6 +448,9 @@ export function projectSv3RunPrompts(
  */
 export function sv3RunSessionStatus(source: Sv3RunSource | null, feed: Sv3RunFeed): Sv3RunSessionStatus {
   if (source === null) return 'absent';
+  // Explicit conclusion ends old gate/approval frames; transport failure alone does not.
+  if (source.concludedRunId != null && source.concludedRunId === source.sessionId
+    && !source.runInFlight && !source.isStreaming) return 'settled';
   // Tempdoc 834 §6.2 — `runPark` is the fourth way the same fact arrives, and the only one that
   // survives a reattach whose announcing frame the ring evicted. Without it a parked run that this
   // tab did not watch park would read as `live`, i.e. as silently idle: streaming, saying nothing.
