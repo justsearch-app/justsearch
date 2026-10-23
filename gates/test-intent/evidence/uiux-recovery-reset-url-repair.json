@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T21:44:06.245Z",
+  "revision": "25ea79f4a990de983916d477b4dd698d84954648",
+  "tree": "f9be7581f0194e88139eca9dad9edb60fc0305bd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-vitest-1697505-1792791829961.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6973
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 keeps Settings closed after Escape during delayed source bootstrap",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 keeps Settings closed after Escape during delayed source bootstrap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 keeps Settings closed after Close during delayed source bootstrap",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 keeps Settings closed after Close during delayed source bootstrap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 forwards a fresh recovery URL to the existing pending focus walk",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 forwards a fresh recovery URL to the existing pending focus walk",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 consumes recovery focus ('in-app boolean') before Back and Forward",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 consumes recovery focus ('in-app boolean') before Back and Forward",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 consumes recovery focus ('URL string') before Back and Forward",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 consumes recovery focus ('URL string') before Back and Forward",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "25ea79f4a",
+    "revision": "25ea79f4a990de983916d477b4dd698d84954648",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-vitest-1697505-1792791838281.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7584,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-vitest-1697505-1792791838281.json\n\nEvidence resource flags: --cache=false --maxWorkers=2 --configLoader runner\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 keeps Settings closed after Escape during delayed source bootstrap",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 keeps Settings closed after Escape during delayed source bootstrap:  AssertionError: a later bootstrap must not replay an already-followed recovery route: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-before-L0hvNH/modules/ui-web/src/shell-v0/chro"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 keeps Settings closed after Close during delayed source bootstrap",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 keeps Settings closed after Close during delayed source bootstrap:  AssertionError: a later bootstrap must not replay an already-followed recovery route: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-before-L0hvNH/modules/ui-web/src/shell-v0/chro"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 forwards a fresh recovery URL to the existing pending focus walk",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 forwards a fresh recovery URL to the existing pending focus walk:  AssertionError: expected \"focusSettingsRecovery\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-before-L0hvNH/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:799:21\n    at runNextTicks (no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 consumes recovery focus ('in-app boolean') before Back and Forward",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 consumes recovery focus ('in-app boolean') before Back and Forward:  AssertionError: expected '#justsearch://surface/core.settings-s…' to be '#justsearch://surface/core.settings-s…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-before-L0hvNH/modules/ui-web/src/shell-v0/chr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 consumes recovery focus ('URL string') before Back and Forward",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 consumes recovery focus ('URL string') before Back and Forward:  AssertionError: expected \"focusSettingsRecovery\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-before-L0hvNH/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:814:21\n    at file:///home/eli"
+      }
+    ]
+  },
+  "digest": "sha256:90cf9e70a38450df233f1f57a3f4dbdc0b749b6f2824eae7201b8dbaa5796818"
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T21:44:19.120Z",
+  "revision": "25ea79f4a990de983916d477b4dd698d84954648",
+  "tree": "81eb9aa672a32262e20ee586f99b5e98a0141c51",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-vitest-1699305-1792791849359.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9757
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 does not focus Reset for a false recovery URL flag",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 does not focus Reset for a false recovery URL flag",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cf6180c5eac4cada06c97e7a183d5182b91da98358ed2fe996ebda819131f419"
+}

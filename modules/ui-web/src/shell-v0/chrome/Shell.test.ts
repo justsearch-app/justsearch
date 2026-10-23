@@ -52,7 +52,7 @@ import {
   resetSearchState,
 } from '../state/searchState.js';
 import { getInspectorState, resetInspectorState } from '../state/inspectorState.js';
-import type { SettingsWindow } from './SettingsWindow.js';
+import { SettingsWindow } from './SettingsWindow.js';
 import type { Surface, SurfaceCatalog } from '../../api/types/surface.js';
 import type { StateSnapshot } from '../router/types.js';
 import type { TransportTag } from '../router/transports.js';
@@ -766,6 +766,76 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
     deactivateProjection();
     window.history.replaceState(null, '', '/');
     vi.unstubAllGlobals();
+  });
+
+  it.each(['Escape', 'Close'])('R2 keeps Settings closed after %s during delayed source bootstrap', async (method) => {
+    let release!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/registry/surfaces')) {
+        return new Promise<Response>((resolve) => { release = resolve; });
+      }
+      return Promise.resolve(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+    }));
+    const shell = await renderShell();
+    const win = windowOf(shell);
+    shell.activateSurface(SETTINGS_ID, { focusSettingsRecovery: true }, 'BUTTON');
+    await settle();
+    expect(win.open).toBe(true);
+    if (method === 'Escape') pressEscape(win);
+    else win.shadowRoot?.querySelector<HTMLButtonElement>('[aria-label="Close Settings"]')?.click();
+    await settle();
+    expect(win.open).toBe(false);
+    release(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+    await settle();
+    expect(win.open, 'a later bootstrap must not replay an already-followed recovery route').toBe(false);
+  });
+
+  it('R2 forwards a fresh recovery URL to the existing pending focus walk', async () => {
+    window.history.replaceState(null, '', `/#justsearch://surface/${SETTINGS_ID}?focusSettingsRecovery=true`);
+    const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');
+    try {
+      const shell = await renderShell();
+      expect(windowOf(shell).open).toBe(true);
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
+  it.each([{ label: 'in-app boolean', flag: true }, { label: 'URL string', flag: 'true' }])('R2 consumes recovery focus ($label) before Back and Forward', async ({ flag }) => {
+    const shell = await renderShell();
+    const win = windowOf(shell);
+    shell.activateSurface('core.library-surface', {}, 'RAIL');
+    await settle();
+    const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');
+    try {
+      shell.activateSurface(SETTINGS_ID, { focusSettingsRecovery: flag }, 'BUTTON');
+      await settle();
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe(`#justsearch://surface/${SETTINGS_ID}`);
+      expect(getJournalState().entries.every((entry) => !entry.url.includes('focusSettingsRecovery'))).toBe(true);
+      window.history.back();
+      await settle();
+      expect(win.open).toBe(false);
+      window.history.forward();
+      await settle();
+      expect(win.open).toBe(true);
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
+  it('R2 does not focus Reset for a false recovery URL flag', async () => {
+    window.history.replaceState(null, '', `/#justsearch://surface/${SETTINGS_ID}?focusSettingsRecovery=false`);
+    const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');
+    try {
+      const shell = await renderShell();
+      expect(windowOf(shell).open).toBe(true);
+      expect(focus).not.toHaveBeenCalled();
+    } finally {
+      focus.mockRestore();
+    }
   });
 
   it('(a) an in-app open pushes ONE entry, and Escape unwinds it with exactly one history.back()', async () => {
