@@ -675,7 +675,16 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         throw failure;
       }
     }
-    return new Result(current(control), execution.response(), control.done.minimalCompletionStage());
+    OperationRecord row = current(control);
+    String message = row.state() == OperationState.FAILED || row.state() == OperationState.CANCELLED
+        ? io.justsearch.app.api.operations.BulkReindexFailureMessage.forOperation(
+            row.descriptor().operationRef(), row.state() == OperationState.CANCELLED
+                ? "cancelled" : row.failureReason()) : null;
+    OperationResult response = execution.response();
+    if (message != null && !response.success()) response = new OperationResult(false, message,
+        response.executionId(), response.structuredData(), response.errorCode(),
+        response.errorDetails(), response.retryable());
+    return new Result(row, response, control.done.minimalCompletionStage());
   }
 
   @Override
@@ -983,7 +992,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (!failed && composition != null) data.put("composition", composition);
     Map<String, Object> errorDetails = failed && composition != null
         ? Map.of("composition", composition) : Map.of();
-    return new OperationResult(!failed, "Operation " + row.state().name(),
+    String message = failed ? io.justsearch.app.api.operations.BulkReindexFailureMessage.forOperation(
+        row.descriptor().operationRef(), row.state() == OperationState.CANCELLED
+            ? "cancelled" : row.failureReason()) : null;
+    return new OperationResult(!failed, message == null ? "Operation " + row.state().name() : message,
         Optional.ofNullable(row.receipt()).map(OperationReceipt::executionId),
         Map.copyOf(data),
         failed ? Optional.ofNullable(row.failureReason()) : Optional.empty(), errorDetails, Optional.empty());

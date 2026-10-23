@@ -96,6 +96,21 @@
         "highContrast" : {
           "type" : [ "boolean", "null" ]
         },
+        "indexingPause" : {
+          "type" : "object",
+          "properties" : {
+            "paused" : {
+              "type" : "boolean"
+            },
+            "reason" : {
+              "type" : [ "string", "null" ]
+            },
+            "untilEpochMs" : {
+              "type" : [ "integer", "null" ]
+            }
+          },
+          "readOnly" : true
+        },
         "inspectorWidth" : {
           "type" : [ "integer", "null" ]
         },
@@ -109,9 +124,6 @@
         },
         "mode" : {
           "type" : [ "string", "null" ]
-        },
-        "pauseIndexingDuringAi" : {
-          "type" : [ "boolean", "null" ]
         },
         "theme" : {
           "type" : [ "string", "null" ]

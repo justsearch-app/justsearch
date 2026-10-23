@@ -99,6 +99,19 @@ const operationHistoryColumns: TableColumn[] = [
     accessor: (row) => row.outcome,
   },
   {
+    id: 'details',
+    header: 'Details',
+    accessor: (row) => row,
+    sortable: false,
+    format: (value) => {
+      const row = value as Record<string, unknown>;
+      return html`<span style="white-space: normal; overflow-wrap: anywhere">
+        ${row.message ?? ''}
+        ${row.diagnosticsLink && !row.message ? html`<small style="display: block">Code: ${row.diagnosticsLink}</small>` : ''}
+      </span>`;
+    },
+  },
+  {
     id: 'startTime',
     header: 'When',
     accessor: (row) => row.startTime,

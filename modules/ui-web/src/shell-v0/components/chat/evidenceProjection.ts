@@ -522,6 +522,9 @@ export function groundingCoverage(
   // Tempdoc 836 S2S3-A.2 — the run's coverage facts, when the producer reported them. Absent for a
   // producer that reports none, which keeps that caller's line exactly as it was.
   honesty: CoverageHonesty | null = null,
+  // A producer may report its count without reporting whether it finished scoring.
+  // That count still owns the denominator; it says nothing about completion.
+  sentencesTotal: number | undefined = honesty?.sentencesTotal,
 ): GroundingCoverage {
   // Tempdoc 847 §2.1e — the N in "N of M" counts SENTENCES, and since 847 a sentence supported by
   // two sources arrives as two citations (one mark per verified ref). Counting citations would read
@@ -561,8 +564,8 @@ export function groundingCoverage(
   // Tempdoc 836 §3.6 — the backend's BreakIterator count is the authority for M when it is
   // reported; the regex counter is the fallback for producers that report nothing.
   const counted =
-    honesty !== null && honesty.sentencesTotal > 0
-      ? honesty.sentencesTotal
+    sentencesTotal !== undefined && sentencesTotal > 0
+      ? sentencesTotal
       : countSentences(answerText);
   const total = Math.max(counted, cited);
   const ready = cited > 0;

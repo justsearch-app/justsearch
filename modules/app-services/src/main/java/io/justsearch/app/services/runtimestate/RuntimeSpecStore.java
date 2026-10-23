@@ -59,6 +59,21 @@ public final class RuntimeSpecStore {
     return apply(snapshot, enabled, record);
   }
 
+  /** User pause is another settings intent, with the same witness, conflict and replay contract. */
+  public OperationResult applyIndexingPause(OperationPreparation prepared,
+      io.justsearch.app.api.settings.IndexingPausePolicy policy, OperationRecordHandle record) {
+    var expected = RuntimeIntentPreparation.validate(prepared);
+    final UiSettingsStore.Snapshot snapshot;
+    try { snapshot = capture(); }
+    catch (OperationPreparationRefused refusal) { return refusal.refusal(); }
+    if (!expected.equals(snapshot.witness())) {
+      return OperationResult.failure("Settings changed since pause intent was prepared",
+          "VERSION_CONFLICT", Map.of(), false);
+    }
+    snapshot.settings().setIndexingPause(policy);
+    return attempts.applySettings(record, expected, snapshot.settings());
+  }
+
   /** Direct ingress looks up a supplied key before reading or preparing a candidate. */
   public OperationAttemptRunner.Result writeIntent(boolean enabled, EngineContext context, String key) {
     return writeIntent(enabled, context, key, () -> {});

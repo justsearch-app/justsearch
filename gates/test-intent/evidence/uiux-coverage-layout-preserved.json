@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T14:03:04.313Z",
+  "revision": "1611635797fa29f89f0a183f09c3c58027ec8167",
+  "tree": "3558366ebd8c51816ab97ea4c73bec01de1c142e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_wz6pu6i/tmp/test-intent-vitest-850422-1792677782451.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1861
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 keeps a saved collapsed choice through reflow and remount",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a77ebb730cbc7026dbb7f02e3fe10274186544d45c70b2a4aedbb790ce344762",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HC8 keeps a saved collapsed choice through reflow and remount",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cbd4f2416cc54d5f0d8c98db32e8ce34ca43479da822ebb053f6f193b0fd1eab"
+}

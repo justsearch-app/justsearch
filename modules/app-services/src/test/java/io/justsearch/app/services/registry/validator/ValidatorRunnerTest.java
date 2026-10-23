@@ -57,6 +57,10 @@ final class ValidatorRunnerTest {
   @BeforeAll
   static void loadFixture() {
     HandlerRegistry handlers = new HandlerRegistry();
+    handlers.register(CoreOperationCatalog.PAUSE_INDEXING,
+        new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(() -> null, true));
+    handlers.register(CoreOperationCatalog.RESUME_INDEXING,
+        new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(() -> null, false));
     handlers.register(CoreOperationCatalog.RECOVER_COMPONENT,
         new RecoverComponentHandler(() -> null));
     // Validator tests inspect registrations without invoking them; both durable bulk profiles

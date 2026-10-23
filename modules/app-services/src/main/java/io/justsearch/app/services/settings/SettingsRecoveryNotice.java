@@ -100,6 +100,7 @@ public final class SettingsRecoveryNotice {
               Instant.now(clock),
               Optional.of(
                   "Your settings file could not be read and was reset to defaults. "
+                      + "Indexing is paused because exclusions may have been lost. Check exclusions before resuming. "
                       + "The original was kept next to it as "
                       + backupName
                       + "."),

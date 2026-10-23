@@ -104,6 +104,11 @@ public final class InProcessWorkerSignalBus implements WorkerSignalBus {
   }
 
   @Override
+  public io.justsearch.core.scheduling.IndexingHold indexingHold() {
+    return gpuScheduling.indexingHold();
+  }
+
+  @Override
   public boolean isMainGpuActive() {
     return gpuScheduling.isMainGpuActive();
   }

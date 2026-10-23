@@ -1552,6 +1552,24 @@ public final class McpToolSurface {
       sb.append("healthy: ").append(status.healthy()).append("\n");
       sb.append("indexState: ").append(status.indexState()).append("\n");
       Map<String, Object> extras = status.extras();
+      if (extras.get("indexingPauseState") instanceof String pauseState
+          && !"RUNNING".equals(pauseState)) {
+        sb.append("indexing: ").append(pauseState.toLowerCase(java.util.Locale.ROOT))
+            .append(" (reason: ").append(extras.get("indexingPauseReason"));
+        if (extras.containsKey("indexingPauseUntilEpochMs")) {
+          sb.append(", untilEpochMs: ").append(extras.get("indexingPauseUntilEpochMs"));
+        }
+        sb.append(")\n");
+        if (status.queueDepth() > 0 || Boolean.TRUE.equals(extras.get("indexingWaitingForResume"))) {
+          sb.append("processing: waiting for Resume\n");
+        }
+        if ("settings_recovery".equals(extras.get("indexingPauseReason"))) {
+          sb.append("Check exclusions: settings recovery may have lost them.\n");
+        }
+      }
+      if (extras.get("indexingAutomaticReasons") instanceof List<?> reasons && !reasons.isEmpty()) {
+        sb.append("automatic indexing reasons: ").append(reasons).append("\n");
+      }
       if (extras.get("embeddingCoveragePercent") instanceof Number n) {
         sb.append("embeddingCoverage: ")
             .append(String.format("%.1f%%", n.doubleValue()))
@@ -2236,7 +2254,8 @@ public final class McpToolSurface {
   /** Both MCP delivery tiers describe the same known facts; absent metadata stays absent. */
   private static Map<String, Object> errorContent(Map<String, Object> failure) {
     var text = new StringBuilder((String) failure.get("error"));
-    if (failure.containsKey("errorCode")) {
+    if (failure.containsKey("errorCode")
+        && !text.toString().endsWith(" (Code: " + failure.get("errorCode") + ")")) {
       text.append("\nError code: ").append(failure.get("errorCode")).append('.');
     }
     if (failure.containsKey("errorClass")) {

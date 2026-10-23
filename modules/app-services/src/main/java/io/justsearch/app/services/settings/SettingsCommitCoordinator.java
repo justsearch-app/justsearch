@@ -598,6 +598,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       committedInstallerGeneration(control, receipt);
       try {
         config.installPrepared(configSwap);
+        store.publishIndexingPause(settings.settings());
         if (componentSwap != null) componentSwap.install();
       } catch (RuntimeException | Error publicationFailure) {
         uncertainInstallerGeneration(control);
@@ -847,15 +848,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
                 "settings-after-file-replace-before-publication", OperationKind.RECONFIGURE,
                 active.key, active.key, active.id, "encoders", 0, 0));
             config.installPrepared(preparedConfig);
+            store.publishIndexingPause(prepared.settings());
             if (preparedForPublish != null) preparedForPublish.install();
             // A recovery reset has no readable prior settings to compare: leaving quarantine is
-            // itself the change. An ordinary commit changes status only when chat enablement does.
+            // itself the change. Authored pause intent includes a changed deadline while paused.
             if (active.recoveryReset()) {
               io.justsearch.core.status.StatusChangeCounter.process().changed();
             } else {
               io.justsearch.core.status.StatusChangeCounter.process().changed(
-                  Boolean.TRUE.equals(active.priorSettings.getChatEnabled()),
-                  Boolean.TRUE.equals(prepared.settings().getChatEnabled()));
+                  java.util.Arrays.asList(Boolean.TRUE.equals(active.priorSettings.getChatEnabled()),
+                      active.priorSettings.getIndexingPause()),
+                  java.util.Arrays.asList(Boolean.TRUE.equals(prepared.settings().getChatEnabled()),
+                      prepared.settings().getIndexingPause()));
             }
           } catch (RuntimeException | Error publicationFailure) {
             // The durable witness already names B. A broken prepared installer must not be
@@ -1164,6 +1168,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           config.validatePrepared(chosenConfig);
           chosen.validate();
           config.installPrepared(chosenConfig);
+          store.publishIndexingPause(snapshot.settings());
           chosen.install();
         } finally { publication.writeLock().unlock(); }
       });
