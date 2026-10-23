@@ -103,6 +103,7 @@ import { inferRoute, type TurnRoute } from '../state/routeHeuristic.js';
 import '../components/RouteChip.js';
 import {
   projectUnifiedThread,
+  compareUnifiedTurnItems,
   projectLiveAgentActivity,
   terminalAssistantIds,
   directionNotAppliedBecause,
@@ -4202,9 +4203,7 @@ export class UnifiedChatView extends JfElement {
       return true; // other progress / handoff / error are ephemeral — never in the record
     });
 
-    const ordered = [...recordItems, ...liveOnly].sort(
-      (a, b) => a.ts - b.ts || a.id.localeCompare(b.id),
-    );
+    const ordered = [...recordItems, ...liveOnly].sort(compareUnifiedTurnItems);
 
     // Tempdoc 577 §2.14 Root I (#19) — the run/session boundary seam: when a thread is RESTORED
     // (the record carries prior turns) and a new run continues live, the seam marks where the

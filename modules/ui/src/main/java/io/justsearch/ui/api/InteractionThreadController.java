@@ -367,6 +367,9 @@ public final class InteractionThreadController {
     if (kind == InteractionEventKind.ERROR && msg.get("errorCode") instanceof String code) {
       attributes.put("errorCode", code);
     }
+    if (kind == InteractionEventKind.ERROR && msg.get("retrievalScoped") instanceof Boolean scoped) {
+      attributes.put("retrievalScoped", scoped);
+    }
     if (citations instanceof List<?> c && !c.isEmpty()) {
       attributes.put("citations", citations);
     }

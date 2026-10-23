@@ -182,6 +182,7 @@ import {
   SV3_EFFORT_DEFAULT,
   isSv3Effort,
   sv3Ask,
+  SV3_MODEL_SHAPE_ID,
   sv3StopAsk,
   type Sv3Effort,
 } from './sv3-ask.js';
@@ -1605,7 +1606,8 @@ export class SearchV3View extends JfElement {
           // files when this window limited the turn, otherwise all files (a reloaded turn included).
           label:
             item.id === 'retry'
-              ? `${item.label} · ${sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
+              ? `${item.label} · ${session.turns.find(turn => turn.id === detail.turnId)?.kind === 'model'
+                ? 'This answer does not search your files.' : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
               : item.label,
           icon: 'git-branch' as const,
           category: 'ai' as const,
@@ -1816,7 +1818,7 @@ export class SearchV3View extends JfElement {
     const lineage = sv3LineageFor(this.turnLineage(), detail.turnId);
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
-    const tier: Sv3ComposerTier = turn?.kind === 'agent' ? 'delegate' : 'ask';
+    const tier = turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
     switch (detail.action) {
       case 'branch':
         if (lineage.branchFromId === null) return;
@@ -1858,14 +1860,14 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Only the
-   * delegate tier is checked here: an ask re-run keeps the path it has always had. The agent needs
-   * the model (its own availability gate — not the ask tier's, which also wants indexed documents)
+   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Model and
+   * delegate reruns check availability here; an Ask rerun keeps its existing path. Both need
+   * the model (their own availability gates, which do not require indexed documents)
    * and no other run in flight on the one shared controller.
    */
-  private canRerun(tier: Sv3ComposerTier): boolean {
-    if (tier !== 'delegate') return true;
-    const unavailable = this.delegateUnavailableReason;
+  private canRerun(tier: Sv3ComposerTier | 'model'): boolean {
+    if (tier !== 'delegate' && tier !== 'model') return true;
+    const unavailable = tier === 'model' ? this.modelAnswerUnavailableReason : this.delegateUnavailableReason;
     if (unavailable !== '') {
       emitEphemeralToast({ message: unavailable, severity: 'warning' });
       return false;
@@ -1893,7 +1895,7 @@ export class SearchV3View extends JfElement {
     sessionId: string,
     fromMsgId: string,
     resend: string | null,
-    tier: Sv3ComposerTier,
+    tier: Sv3ComposerTier | 'model',
     scope: Sv3AskScope | null = null,
   ): Promise<boolean> {
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
@@ -1920,7 +1922,11 @@ export class SearchV3View extends JfElement {
       }
       this.delegate(resend);
     } else {
-      await this.runAsk(resend, scope);
+      if (tier === 'model' && !this.canRerun(tier)) {
+        this.writeDraft(resend);
+        return true;
+      }
+      await this.runAsk(resend, scope, tier === 'model');
     }
     return true;
   }
@@ -2834,6 +2840,30 @@ export class SearchV3View extends JfElement {
     void this.focusComposer();
   }
 
+  /** The model uses the shared model gate, plus the conversation's write lock. No document gate. */
+  private get modelAnswerUnavailableReason(): string {
+    const id = this.sessions.activeId;
+    if (id !== null && this.contextWrites.has(id)) return this.contextNotice(id);
+    if (this.historyLocked) return reasonFor('conversations.locked').wording;
+    return this.delegateUnavailableReason;
+  }
+
+  private onModelAnswer(event: Event): void {
+    const id = (event as CustomEvent<{ turnId?: string }>).detail?.turnId;
+    const turn = this.activeSession?.turns.at(-1);
+    if (turn === undefined || turn.id !== id || this.streaming
+      || this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true) return;
+    if (turn.status !== 'no-evidence'
+      && !(turn.kind === 'model' && ['failed', 'halted', 'refused'].includes(turn.status))) return;
+    const reason = this.modelAnswerUnavailableReason;
+    if (reason !== '') {
+      emitEphemeralToast({ message: reason, severity: 'warning' });
+      return;
+    }
+    void this.runAsk(turn.question, null, true);
+    void this.focusComposer();
+  }
+
   private refuseAsk(): void {
     emitEphemeralToast({ message: this.askUnavailableReason, severity: 'warning' });
   }
@@ -2884,18 +2914,19 @@ export class SearchV3View extends JfElement {
 
   /**
    * The ONE path a question takes. There is no second entry: the composer refuses an unavailable or
-   * busy send before it leaves, so this method is not a second gate re-deciding the same question —
-   * it opens the turn, dispatches through the window's single ask site, and settles that turn.
+   * busy send before it leaves, and the model action checks its own gate. This method
+   * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
-  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null): Promise<void> {
+  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, modelAnswer = false): Promise<void> {
     const question = rawQuestion.trim();
-    if (question === '') return;
+    if (question === '' || this.streaming) return;
+    if (modelAnswer && this.modelAnswerUnavailableReason !== '') return;
     const composer = this.composer;
     const draftRevision = composer?.draftRevision;
     const sessionId = this.sessions.activeId;
     if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
     let context: ReturnType<typeof sv3FollowUpContext> = [];
-    if (sessionId !== null) {
+    if (sessionId !== null && !modelAnswer) {
       this.contextAskPending.add(sessionId);
       try {
         const resolved = await this.followUpContext(sessionId);
@@ -2911,7 +2942,7 @@ export class SearchV3View extends JfElement {
       }
     }
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, question, Date.now(), 'ask', createConversationId());
+    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId());
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
@@ -2919,7 +2950,7 @@ export class SearchV3View extends JfElement {
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
+    if (!modelAnswer && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -2958,7 +2989,7 @@ export class SearchV3View extends JfElement {
     // to stop this turn however the reader reaches it.
     setAiActivity({
       state: 'streaming',
-      shapeId: SV3_ASK_SHAPE_ID,
+      shapeId: modelAnswer ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID,
       startedAtMs: Date.now(),
       canCancel: true,
       cancel: stop,
@@ -2966,7 +2997,7 @@ export class SearchV3View extends JfElement {
     // Every terminal below settles the SAME ref the dispatch opened, so a reader who claims another
     // session mid-stream still gets the answer written where it was asked.
     const settle = (
-      status: 'complete' | 'halted' | 'refused' | 'failed' | 'left',
+      status: 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence' | 'left',
       detail = '',
     ): void => {
       if (status === 'left') {
@@ -3007,6 +3038,7 @@ export class SearchV3View extends JfElement {
         apiBase: this.apiBase,
         question,
         conversationId: ref.sessionId,
+        modelAnswer,
         // The rung AS OF THIS SEND (tempdoc 822 Phase F10). Read here rather than inside the ask
         // client, so the one place a question is dispatched is also the one place its parameters
         // are decided — and a rung changed mid-stream cannot rewrite a request already in flight.
@@ -3063,7 +3095,12 @@ export class SearchV3View extends JfElement {
           void this.refreshRecord(ref.sessionId);
         },
         onLeft: () => settle('left'),
-        onFailed: (message) => settle('failed', message),
+        onFailed: (message, code) => {
+          const noEvidence = !modelAnswer && code === 'NO_CONTENT' && scope === null;
+          settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
+          void loadConversations();
+          void this.refreshRecord(ref.sessionId);
+        },
       },
     );
   }
@@ -4092,6 +4129,8 @@ export class SearchV3View extends JfElement {
         @sv3-citation-open=${this.onCitationOpen}
         @sv3-context-menu=${this.onContextMenu}
         @sv3-context-action=${this.onContextAction}
+        @sv3-model-answer=${this.onModelAnswer}
+        @sv3-model-focus=${this.onFocusComposerEvent}
         @sv3-branch-action=${this.onBranchAction}
         @sv3-version-select=${this.onVersionSelect}
       >
@@ -4101,6 +4140,8 @@ export class SearchV3View extends JfElement {
           .view=${results}
           .turns=${turns}
           .turnScopes=${this.search.scopesByTurn}
+          .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
+          ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}
           .run=${run}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
           .unconfirmedSteerNotes=${this.unconfirmedSteerNotes}
