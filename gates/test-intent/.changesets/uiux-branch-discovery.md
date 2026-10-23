@@ -210,6 +210,43 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerForkDiscoveryTest.java#unfilteredListKeepsDefaultLimitCapOrderAndShapeFilter"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "BF2a preservation: external creation and deletion refresh the old fork pager on base and branch once this window re-reads its list, directly or through the existing storage listener. No push before that read, no reads caused by typing, and no growth or replacement of the recent/sidebar roster. This already holds on c5285b8ca; no product repair was made. Durable check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.2 clarification BF2a, agent-adopted by orchestrator 2026-10-23 under the existing design delegation; no cross-window push channel.",
+          "choice": "\"Both sides\" in S16.2 means the base and the branch. Another open window learns of a new or deleted branch when it next reads its conversation list, the same moment its sidebar does today; this package adds no cross-window push channel. From that moment its pager must be current.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a branch-discovery design and scenarios S16.1–S16.5, preserving BN1–BN4; agent-adopted, not owner-adopted.",
+          "choice": "The pager shows every version of a fork however old it is and however many conversations exist (beyond the list's 100-row cap), with the same members on the base and on each branch, live, after reload and after an Engine restart. With forks at two different turns, a branch of a branch and an empty branch, each turn shows only the versions that fork there; a conversation that is both a branch and a parent pages its parent's fork at its first own turn and its own forks at later turns. These reads do not replace or enlarge the sidebar's recent list.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.2 clarification BF2a, agent-adopted by orchestrator 2026-10-23 under the existing design delegation; no cross-window push channel.",
+          "choice": "Check whether your fork reads already follow every conversation-list read in a window; if not, make them follow with the smallest change, without extra reads per keystroke or per poll. If they already follow, show it with a check and say so.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-branch-discovery-bf2a-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#BF2a refreshes base and branch versions after existing list reads without typing reads"
+      ]
     }
   ]
 }

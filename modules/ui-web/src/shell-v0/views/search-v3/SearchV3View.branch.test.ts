@@ -1649,6 +1649,43 @@ describe('WP1.4a branch discovery', () => {
     expect(getConversationListState().conversations).toHaveLength(20);
   });
 
+  it('BF2a refreshes base and branch versions after existing list reads without typing reads', async () => {
+    oldFork();
+    const forkRequests = (): number => fetchMock.mock.calls.filter(([url]) =>
+      new URL(String(url), 'http://engine.test').searchParams.has('parentSessionId')).length;
+    for (const active of ['old-base', 'old-child-0']) {
+      restoreActiveConversation(active);
+      const el = await mount();
+      const count = active === 'old-base' ? '1 / 121' : '2 / 121';
+      expect(await counts(el)).toContain(count);
+      const recentIds = getConversationListState().conversations.map(c => c.id);
+      const reads = forkRequests();
+      // Another window writes to the server; this window receives no push channel.
+      backend.conversations.push({ ...conversationRow('remote-version', 'remote version', {
+        parentSessionId: 'old-base', branchPointMessageId: storedId(1),
+      }), createdAtMs: 1000 });
+      const composer = await region(el, 'jf-sv3-composer') as Updatable & { draft: string };
+      composer.draft = 'typing in the other window';
+      await settle(el);
+      expect(await counts(el)).toContain(count);
+      expect(forkRequests()).toBe(reads);
+      // This same list read is used by existing opening/sending refresh paths.
+      await loadConversations();
+      await settle(el);
+      expect(await counts(el)).toContain(active === 'old-base' ? '1 / 122' : '2 / 122');
+      expect(forkRequests()).toBeGreaterThan(reads);
+      expect(getConversationListState().conversations.map(c => c.id)).toEqual(recentIds);
+      expect(composer.draft).toBe('typing in the other window');
+      // The existing storage listener is another route to that same list read.
+      backend.conversations = backend.conversations.filter(c => c.sessionId !== 'remote-version');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'jf-conversation-titles' }));
+      await settle(el);
+      expect(await counts(el)).toContain(count);
+      expect(getConversationListState().conversations.map(c => c.id)).toEqual(recentIds);
+      el.remove();
+    }
+  });
+
   it('S16.2 hides counts while pending and failed and preserves typing', async () => {
     twoTurnConversation('old-base');
     backend.conversations.push(conversationRow('child', 'child', { parentSessionId: 'old-base', branchPointMessageId: storedId(1) }));

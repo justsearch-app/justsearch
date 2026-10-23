@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-22T22:16:03.636Z",
-  "revision": "b1e8223b8d93426668555cdbac2f0fd3966b6fe3",
-  "tree": "02bd495b137a29af2ae9f3dbe80d0ad686b7404c",
+  "createdAt": "2026-10-23T01:35:17.863Z",
+  "revision": "c5285b8ca88a2a771536df480c1de46631ae6196",
+  "tree": "d48db020dea9ab21a2b4d75c09624916225e8779",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/tmp/branch-discovery/test-intent-vitest-542524-1792707354291.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s68pylno/tmp/test-intent-vitest-3582335-1792719312485.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9344
+      "durationMs": 5376
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 ignores a stale successful read after a newer deletion refresh",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:bed106ca9c9651158abf60b59276bf2863e762d1aa590a292784897aae938f04",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d982fecdba4e7a114c928063b73373c3e81ea34a8c763f1a2c26ad1e6beb42ac"
+  "digest": "sha256:57f181afff248368c71d3a124d48b7dfbd39d0264d43170338e60c5ddf0b438c"
 }
