@@ -378,10 +378,10 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
   }
 
-  /** Drops every answer and record at or under {@code pathPrefix}: the person removed the root. */
-  void forgetUnder(String pathPrefix) throws IOException {
+  /** Drops cached answers and records owned by the removed root, retaining declared children. */
+  void forgetUnder(String pathPrefix, java.util.function.Predicate<Path> ownsPath) throws IOException {
     forgetAnswers();
-    volumes.forgetUnder(pathPrefix);
+    volumes.forgetUnder(pathPrefix, ownsPath);
   }
 
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked
