@@ -51,6 +51,8 @@ import {
   restoreUnifiedChat,
 } from '../state/unifiedChatState.js';
 
+import { __resetJournalForTest, recordNavigation, getJournalState, canGoBack, navigateBack, navigateForward } from '../state/NavigationJournal.js';
+
 const SV3 = 'core.search-v3-surface';
 /** The shipped chat window — a live surface with a real wire schema, used as the untouched control. */
 const CHAT = 'core.unified-chat-surface';
@@ -79,6 +81,7 @@ function historyHarness(): {
   restore: () => void;
 } {
   let entries: string[] = [];
+  let states: unknown[] = [];
   let index = -1;
   const popstateListeners = new Set<EventListenerOrEventListenerObject>();
 
@@ -99,6 +102,8 @@ function historyHarness(): {
     .mockImplementation((_state: unknown, _title: string, url?: string | URL | null) => {
       entries = entries.slice(0, index + 1);
       entries.push(String(url));
+      states = states.slice(0, index + 1);
+      states.push(_state);
       index = entries.length - 1;
     });
   const replaceSpy = vi
@@ -106,11 +111,14 @@ function historyHarness(): {
     .mockImplementation((_state: unknown, _title: string, url?: string | URL | null) => {
       if (index < 0) {
         entries.push(String(url));
+        states.push(_state);
         index = 0;
         return;
       }
-      entries[index] = String(url);
+      if (url !== undefined && url !== null) entries[index] = String(url);
+      states[index] = _state;
     });
+  const stateSpy = vi.spyOn(window.history, 'state', 'get').mockImplementation(() => states[index] ?? null);
 
   const fire = (): void => {
     for (const handler of popstateListeners) {
@@ -133,11 +141,13 @@ function historyHarness(): {
     },
     seed: (url: string) => {
       entries = [url];
+      states = [null];
       index = 0;
     },
     restore: () => {
       pushSpy.mockRestore();
       replaceSpy.mockRestore();
+      stateSpy.mockRestore();
     },
   };
 }
@@ -153,6 +163,7 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
     __resetSurfaceSchemasForTest();
     __resetBootstrapForTest();
     __resetConversationListForTest();
+    __resetJournalForTest();
     resetUnifiedChatState();
     deactivateProjection();
     history = historyHarness();
@@ -211,6 +222,39 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
     expect(schema?.bindings).toEqual([
       { schemaPath: '/conversationId', storeId: 'sv3.conversation', storeKey: 'conversationId' },
     ]);
+  });
+
+  it('S16.4 app Back returns an original-navigation claim to its branch without looping', async () => {
+    await arriveOn('old-branch');
+    // Shell records the initial address through its router subscription.
+    recordNavigation(SV3, addressFor('old-branch').slice(1), 'Search v3', 'URL_BAR');
+    // Open original uses the same conversation claim as the pager and row navigation.
+    setActiveConversation('old-parent');
+    __flushPendingWriteForTest();
+    expect(canGoBack()).toBe(true);
+    expect(getJournalState().entries.map(e => e.url)).toEqual([
+      addressFor('old-branch').slice(1), addressFor('old-parent').slice(1),
+    ]);
+    const dispatch = vi.fn(async (intent: Intent, options?: { pushHistory?: boolean }) => {
+      if (intent.address.kind === 'navigate') await handler.handle(intent.address, { push: options?.pushHistory });
+    });
+    await navigateBack(dispatch);
+    __flushPendingWriteForTest();
+    expect(getConversationListState().activeId).toBe('old-branch');
+    expect(canGoBack()).toBe(false);
+    await navigateBack(dispatch);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(getJournalState().entries).toHaveLength(2);
+    await navigateForward(dispatch);
+    __flushPendingWriteForTest();
+    expect(getConversationListState().activeId).toBe('old-parent');
+    // Native Back replays via URLSource, and Shell observes that URL navigation as usual.
+    history.back();
+    recordNavigation(SV3, history.current().slice(1), 'Search v3', 'URL_BAR');
+    __flushPendingWriteForTest();
+    expect(getConversationListState().activeId).toBe('old-branch');
+    expect(canGoBack()).toBe(false);
+    expect(getJournalState().entries).toHaveLength(2);
   });
 
   it('a conversation swap moves the hash and adds a history entry', async () => {

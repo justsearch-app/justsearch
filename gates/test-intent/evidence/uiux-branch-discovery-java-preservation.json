@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T23:21:59.951Z",
+  "revision": "b1e8223b8d93426668555cdbac2f0fd3966b6fe3",
+  "tree": "7ad2e0059b999d4a5ba098f7beb5af0817c44156",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ChatControllerForkDiscoveryTest.unfilteredListKeepsDefaultLimitCapOrderAndShapeFilter\" --tests \"io.justsearch.ui.api.ChatControllerConversationJoinTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2968
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerForkDiscoveryTest.java#unfilteredListKeepsDefaultLimitCapOrderAndShapeFilter",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerForkDiscoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8be124059ca517b038299bdd75f9a22041cb268337431e9a94597fe261fb286",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unfilteredListKeepsDefaultLimitCapOrderAndShapeFilter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerConversationJoinTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerConversationJoinTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ad3f39918ef0275ec15a25660803f0a9972695237249bfce1a6c1da406bd14c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an agent-only conversation lists, with honest fields and NO messageCount",
+          "status": "passed"
+        },
+        {
+          "name": "an unavailable agent capability lists the store's conversations and nothing else",
+          "status": "passed"
+        },
+        {
+          "name": "a mixed conversation OUTSIDE the store's window is still its store row, not a synthesized one",
+          "status": "passed"
+        },
+        {
+          "name": "ordering puts a fresh delegate conversation where its timestamp says: first",
+          "status": "passed"
+        },
+        {
+          "name": "limit applies per store, and the merged list is re-limited so the response respects it",
+          "status": "passed"
+        },
+        {
+          "name": "863 A-7: DELETE is unconditional — a conversation with NO store session still loses its runs",
+          "status": "passed"
+        },
+        {
+          "name": "DELETE removes the conversation from BOTH records, so a run-backed row is removable",
+          "status": "passed"
+        },
+        {
+          "name": "a conversation in BOTH records is listed once, as its store row",
+          "status": "passed"
+        },
+        {
+          "name": "a shapeId naming the agent shape INCLUDES them — the filter matches, it does not veto",
+          "status": "passed"
+        },
+        {
+          "name": "a shapeId naming another shape excludes synthesized rows ENTIRELY",
+          "status": "passed"
+        },
+        {
+          "name": "a locked store still lists rather than 423ing, degrading the dedup to the window",
+          "status": "passed"
+        },
+        {
+          "name": "a store-backed row is unchanged — no storeBacked key, and its messageCount stays",
+          "status": "passed"
+        },
+        {
+          "name": "863 A-6: a STAMPED delegate conversation lists once as its STORE row, so rename is available",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ada5bad0d273a7dc905f7dec251f0f9996e24e3ab70c38112a83e3297e457198"
+}
