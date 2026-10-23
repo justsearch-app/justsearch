@@ -2495,3 +2495,14 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   "note": "Expectations accepted under NX3/NX3a/NX3b; corrected NX3a/NX3b warrants faithfully cite delegated choices. Fresh scratch evidence executes all three repair checks: assertion failures on 5e74587b1, pass without skips on 79c03f13c. Independent private-model checks preserve the NX3/NX3a tables. This is test-intent acceptance only; implementation fails NG1/NG3 on V7-F1 (200 accepted against 1 200 000.5.1)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-8-ttp_qiro",
+  "verdict": "accept",
+  "digest": "sha256:dcdb56b82321cc2c67ac63bd2fe8acf3204148eb2da90492d5e3654f517c44dc",
+  "note": "Expectations follow owner NX3 and delegated NX3a-c. Fresh repair evidence fails before by assertion and passes after; all four preservation/history checks execute and pass. Test intent accepted; implementation still fails NX3c extra-whitespace-group neighbours (verifier-8 evidence)."
+}
+```
