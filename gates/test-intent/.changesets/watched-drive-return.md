@@ -216,3 +216,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Reviewed the new entry in documented order: before-state tests and forwarding overloads, agreed scenarios and class table, provisional Adaptation, then candidate diff. The ledger call passes the exact always-true predicate formerly supplied by its overload; all seven sync calls pass the exact null collection formerly supplied by theirs. Inputs, preconditions, assertions, fault injection, tags and conditions are preserved. Remaining production edits only remove these forwarding methods and use existing imports; prior six entries are unchanged. Refreshed evidence retains the same check IDs, overlay set and resolved before revision; all four cases execute/pass without skips and before checks retain intended assertion failures. No must-fix findings. No Gradle rerun; prior A1-A3 limitations remain."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:bb8098375a6a05490044e75d034e644fd0cfd1956f177942c4be77cde794564b",
+  "note": "Accept current digest after reviewing updated Adaptation/signature entry, regenerated evidence and compatibility patch. All seven test-call changes expand the removed five-argument default with null ownsPath; null collection was already explicit, and every oracle/input/condition remains. First six entries unchanged. Applied the before patch to exact b62fc5921 source: it adds only a six-argument shim, rejects non-null owner filters and delegates unchanged arguments to the original five-argument pipeline; removing it restores byte-identical baseline source. No repaired behavior is added. Evidence hashes match current producer/check/patch files; all four cases across three checks execute/pass after with no skips and fail assertions before for the original dead watcher/unavailable status/reason defects, not compilation or shim refusal. Same checks, fixture overlays and resolved baseline as previous run. Prior scope limitations remain. Review: tmp/verify-evidence/sixarg-review/review.txt. Separate PR 910 audit follows."
+}
+```
