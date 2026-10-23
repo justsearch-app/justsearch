@@ -133,7 +133,7 @@ public final class CitationScorer implements Closeable {
    * Scores all sentence-chunk pairs and returns matches above threshold.
    *
    * <p>For each sentence, scores it against all chunks using the cross-encoder and keeps the best
-   * matching chunk if its score exceeds the threshold.
+   * matching chunk containing every claimed numeric value if its score exceeds the threshold.
    *
    * @param sentences answer sentences to match
    * @param chunkTexts source chunk texts
@@ -161,40 +161,80 @@ public final class CitationScorer implements Closeable {
       double threshold,
       long deadlineMs,
       InferenceRequest request) {
+    long startNanos = System.nanoTime();
+    SessionAcquisitionRequest.from(request).remainingNanos();
+    return scoreClaims(sentences.stream().map(NumericConsistency::claim).toList(), chunkTexts,
+        chunkDocIds, threshold, deadlineMs, request, startNanos);
+  }
+
+  /** Scores parsed claims under the same default authority as the plain-text entry point. */
+  public ScoringResult scoreClaims(
+      List<NumericConsistency.Claim> claims,
+      List<String> chunkTexts,
+      List<String> chunkDocIds,
+      double threshold,
+      long deadlineMs) {
+    return scoreClaims(claims, chunkTexts, chunkDocIds, threshold, deadlineMs,
+        InferenceRequest.within(InferenceRequest.Urgency.FOREGROUND,
+            SessionAcquisitionRequest.MAX_TIMEOUT, () -> false));
+  }
+
+  /** Scores parsed numeric claims while preserving the original sentence keys and model inputs. */
+  public ScoringResult scoreClaims(
+      List<NumericConsistency.Claim> claims,
+      List<String> chunkTexts,
+      List<String> chunkDocIds,
+      double threshold,
+      long deadlineMs,
+      InferenceRequest request) {
+    return scoreClaims(claims, chunkTexts, chunkDocIds, threshold, deadlineMs, request,
+        System.nanoTime());
+  }
+
+  private ScoringResult scoreClaims(
+      List<NumericConsistency.Claim> claims,
+      List<String> chunkTexts,
+      List<String> chunkDocIds,
+      double threshold,
+      long deadlineMs,
+      InferenceRequest request,
+      long startNanos) {
     var authority = SessionAcquisitionRequest.from(request);
     authority.remainingNanos();
 
-    long startNanos = System.nanoTime();
     long deadlineNanos =
         deadlineMs > 0 ? startNanos + Math.min(
             java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(deadlineMs),
             SessionAcquisitionRequest.MAX_TIMEOUT.toNanos()) : Long.MAX_VALUE;
 
-    if (sentences.isEmpty() || chunkTexts.isEmpty()) {
-      return new ScoringResult(List.of(), sentences.size(), 0, 0, 0);
+    if (claims.isEmpty() || chunkTexts.isEmpty()) {
+      return new ScoringResult(List.of(), claims.size(), 0, 0, 0);
     }
 
     List<ScoredMatch> matches = new ArrayList<>();
     int sentencesMatched = 0;
     int sentencesScored = 0;
     String[] chunksArray = chunkTexts.toArray(new String[0]);
+    NumericConsistency numeric = new NumericConsistency(claims, chunkTexts);
 
-    for (int si = 0; si < sentences.size(); si++) {
+    for (int si = 0; si < claims.size(); si++) {
       authority.remainingNanos();
       if (deadlineNanos != Long.MAX_VALUE && deadlineNanos - System.nanoTime() <= 0) {
         log.debug(
-            "Citation scoring deadline exceeded after {} of {} sentences", si, sentences.size());
+            "Citation scoring deadline exceeded after {} of {} sentences", si, claims.size());
         break;
       }
 
-      String sentence = sentences.get(si);
+      String sentence = claims.get(si).text();
       if (sentence == null || sentence.isBlank()) {
         continue;
       }
 
+      int sentenceIndex = si;
       try {
         BestOf best =
             scoreSentence(chunksArray, deadlineNanos,
+                ci -> numeric.supports(sentenceIndex, ci),
                 sub -> scoreSentenceAgainstChunks(sentence, sub, deadlineNanos, authority));
         authority.remainingNanos();
         if (!best.complete()) {
@@ -238,11 +278,11 @@ public final class CitationScorer implements Closeable {
         "Citation scoring completed: {} of {} sentences scored against {} passages, {} matches"
             + " in {}ms",
         sentencesScored,
-        sentences.size(),
+        claims.size(),
         chunkTexts.size(),
         matches.size(),
         totalMs);
-    return new ScoringResult(matches, sentences.size(), sentencesMatched, totalMs, sentencesScored);
+    return new ScoringResult(matches, claims.size(), sentencesMatched, totalMs, sentencesScored);
   }
 
   /**
@@ -255,8 +295,8 @@ public final class CitationScorer implements Closeable {
    * amortize), splitting the sweep into sub-batches costs approximately nothing and lets the
    * deadline actually bind.
    */
-  static BestOf scoreSentence(String[] chunks, long deadlineNanos, BatchScorer batchScorer)
-      throws OrtException {
+  static BestOf scoreSentence(String[] chunks, long deadlineNanos,
+      java.util.function.IntPredicate compatible, BatchScorer batchScorer) throws OrtException {
     double bestScore = 0.0;
     int bestIdx = -1;
 
@@ -274,7 +314,7 @@ public final class CitationScorer implements Closeable {
           continue;
         }
         double score = scores.get(i);
-        if (score > bestScore) {
+        if (score > bestScore && compatible.test(ci)) {
           bestScore = score;
           bestIdx = ci;
         }
