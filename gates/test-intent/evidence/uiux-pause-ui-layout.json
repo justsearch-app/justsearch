@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T04:33:27.467Z",
+  "revision": "d7714b374f58ac2bb375af739ce48bff2ea5c0f3",
+  "tree": "c83ebd56e182196e457b0a05bbabc288dd2b00f6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/lmp6r313/tmp/test-intent-vitest-1961264-1792729999579.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2989
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F1 keeps empty-queue Resume visible through an unconfirmed observation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f075e10098b8f28e48bde946f6490e5ab155bb6d16bc34a1cae345185eb1ec8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs F1 keeps empty-queue Resume visible through an unconfirmed observation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f075e10098b8f28e48bde946f6490e5ab155bb6d16bc34a1cae345185eb1ec8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F3 keeps the focused status item outside hidden adaptive overflow",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f075e10098b8f28e48bde946f6490e5ab155bb6d16bc34a1cae345185eb1ec8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs F3 keeps the focused status item outside hidden adaptive overflow",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F5 keeps a mature folder semantic-install caveat and pending glyph through Pause",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f075e10098b8f28e48bde946f6490e5ab155bb6d16bc34a1cae345185eb1ec8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs F5 keeps a mature folder semantic-install caveat and pending glyph through Pause",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d7714b374",
+    "revision": "d7714b374f58ac2bb375af739ce48bff2ea5c0f3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/lmp6r313/tmp/test-intent-vitest-1961264-1792730003807.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3505,
+        "output": "JSON report written to /home/elias/.cache/am/lmp6r313/tmp/test-intent-vitest-1961264-1792730003807.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F1 keeps empty-queue Resume visible through an unconfirmed observation",
+        "classification": "assertion",
+        "detail": "WP3.7 verifier layout and focus repairs F1 keeps empty-queue Resume visible through an unconfirmed observation:  AssertionError: uncertainty must not hide a focused action: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/lmp6r313/tmp/test-intent-before-Qag1tx/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:395:91\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+        "classification": "assertion",
+        "detail": "WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once:  AssertionError: remote resume must not hide the focused control: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/lmp6r313/tmp/test-intent-before-Qag1tx/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:415:98\n    at file:///home/elias/dev/justsearch/.claude/wo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F3 keeps the focused status item outside hidden adaptive overflow",
+        "classification": "assertion",
+        "detail": "WP3.7 verifier layout and focus repairs F3 keeps the focused status item outside hidden adaptive overflow:  AssertionError: a focused item must stay in the visible prefix: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/lmp6r313/tmp/test-intent-before-Qag1tx/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:439:75\n    at runNextTicks (node:internal/process/task_queu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F5 keeps a mature folder semantic-install caveat and pending glyph through Pause",
+        "classification": "assertion",
+        "detail": "WP3.7 verifier layout and focus repairs F5 keeps a mature folder semantic-install caveat and pending glyph through Pause:  AssertionError: expected '\\n        \\n    \\n  \\n        \\n     …' to contain 'semantic search waiting for AI install'\n    at /home/elias/.cache/am/lmp6r313/tmp/test-intent-before-Qag1tx/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:462:32\n    at file:///home/elias/dev/justsearch/.clau"
+      }
+    ]
+  },
+  "digest": "sha256:a5767df550a7caa42b1c1a929e80a57c33c14e8778963cddf65636dabfe6a637"
+}

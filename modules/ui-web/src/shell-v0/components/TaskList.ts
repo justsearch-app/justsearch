@@ -173,6 +173,7 @@ export class TaskList extends JfElement {
   private unsub: (() => void) | null = null;
   private feedUnsub: (() => void) | null = null;
   private aiUnsub: (() => void) | null = null;
+  private focusWithin = false;
   private readyTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -209,6 +210,7 @@ export class TaskList extends JfElement {
   }
 
   disconnectedCallback(): void {
+    this.focusWithin = false;
     super.disconnectedCallback();
     this.unsub?.();
     this.unsub = null;
@@ -435,6 +437,8 @@ export class TaskList extends JfElement {
       color: var(--text-primary);
       text-decoration-style: solid;
     }
+    .title:focus { outline: 2px solid var(--accent-tint); outline-offset: 2px; }
+    @media (forced-colors: active) { .title:focus { outline-color: Highlight; } }
     .files {
       display: flex;
       flex-direction: column;
@@ -458,7 +462,11 @@ export class TaskList extends JfElement {
   `;
 
   updated(): void {
-    if (this.isEmpty()) this.setAttribute('data-empty', '');
+    const empty = this.contentEmpty();
+    if (empty && this.focusWithin && this.progress.activity.confirmed && !this.progress.pause) {
+      this.shadowRoot?.querySelector<HTMLElement>('[data-testid=task-title]')?.focus();
+    }
+    if (empty && !this.focusWithin) this.setAttribute('data-empty', '');
     else this.removeAttribute('data-empty');
   }
 
@@ -468,7 +476,7 @@ export class TaskList extends JfElement {
    * middle clause — before 813 the panel hid at zero TASKS, which made "disappeared" mean "done"
    * while enrichment was still running (§1d).
    */
-  private isEmpty(): boolean {
+  private contentEmpty(): boolean {
     return (
       this.tasks.length === 0 && !(this.queueCounts &&
         (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !this.progress.pause && !isActivePhase(this.progress.phase) && this.progress.phase !== 'waiting' && this.progress.phase !== 'error' && !this.showingReady
@@ -647,9 +655,11 @@ export class TaskList extends JfElement {
     // 595 §4.4 stall carries the same message for the row list, so they share one line.
     const stalled = this.feedStalled || (speaks && !this.showingReady && !this.progress.live);
     return html`
-      <div class="panel">
+      <div class="panel"
+        @focusin=${() => { this.focusWithin = true; }}
+        @focusout=${() => { this.focusWithin = false; this.requestUpdate(); }}>
         <div class="head">
-          <span class="title" data-testid="task-title">${this.headline()}</span>
+          <span class="title" tabindex="-1" data-testid="task-title">${this.headline()}</span>
           ${hasFinished
             ? html`<jf-button
                 size="sm"
@@ -662,6 +672,8 @@ export class TaskList extends JfElement {
             : nothing}
         </div>
         ${this.progress.activity.detail ? html`<div class="counts">${this.progress.activity.detail}</div>` : nothing}
+        ${this.focusWithin && this.contentEmpty() && this.progress.activity.confirmed && !this.progress.pause
+          ? html`<div class="counts">Indexing is already running. The queue is empty.</div>` : nothing}
         ${this.renderAggregate()}
         <jf-indexing-controls .allowPause=${isActivePhase(this.progress.phase) || this.progress.phase === 'waiting' || this.progress.phase === 'error'}
           .progress=${this.progress} api-base=${this.apiBase}></jf-indexing-controls>

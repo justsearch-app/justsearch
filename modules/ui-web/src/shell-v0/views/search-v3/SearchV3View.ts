@@ -548,6 +548,14 @@ export class SearchV3View extends JfElement {
         position: relative;
       }
 
+      /* The notice occupies its own row; hero and dock position within the space below it. */
+      .indexing-pause-note {
+        flex: none;
+        padding: var(--space-3) var(--floating-content-inset);
+      }
+      .indexing-pause-note p { margin: 0 0 var(--space-2); }
+      .column jf-sv3-composer[state='hero'] { inset-block-start: 0; }
+
       /* ── THE DOCK (tempdoc 859 §B) ─────────────────────────────────────────
          The context bar and the composer, in ONE positioned wrapper, floating over the transcript.
          §1-B's finding was that a composer in document flow cuts the transcript off hard at its top
@@ -4106,6 +4114,7 @@ export class SearchV3View extends JfElement {
           ${indexing.pause?.waiting ? html`<p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>` : nothing}
           <jf-indexing-controls .progress=${indexing} api-base=${this.apiBase}></jf-indexing-controls>
         </div>` : nothing}
+        <div class="column">
         <jf-sv3-main
           state=${this.composerState}
           .view=${results}
@@ -4158,6 +4167,7 @@ export class SearchV3View extends JfElement {
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"
         ></jf-sv3-composer>
+        </div>
         </div>
       </div>
       ${this.pane()}

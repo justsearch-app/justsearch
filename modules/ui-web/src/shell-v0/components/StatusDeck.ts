@@ -123,6 +123,7 @@ const NUM = new Intl.NumberFormat();
 const BANNER_OWNING_SURFACE_ID = 'core.unified-chat-surface';
 
 export class StatusDeck extends JfElement {
+  private focusedItem: string | null = null;
   private indexingWasPaused = false;
   private indexingResumed = false;
   static properties = {
@@ -150,7 +151,7 @@ export class StatusDeck extends JfElement {
     // change without `statusLabel` moving), so the adaptive bar re-measures when the chip yields.
     signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label + ':' +
       JSON.stringify([this.status?.operating?.indexing?.state, this.status?.operating?.indexing?.reasons,
-        this.status?.operating?.indexing?.untilEpochMs, this.status?.operating?.indexing?.waitingForResume]),
+        this.status?.operating?.indexing?.untilEpochMs, this.status?.operating?.indexing?.waitingForResume]) + ':' + this.focusedItem,
     reserve: 40,
     // 559 Authority VI per-item policy — same DOM query/order as items(), so the
     // pinned flags align index-for-index with the measured `.item` elements.
@@ -713,12 +714,13 @@ export class StatusDeck extends JfElement {
     const left = listStatusBarItems('left')
       .map((item) => ({
         id: item.id,
-        pinned: item.overflow === 'pinned',
+        pinned: item.overflow === 'pinned' || item.id === this.focusedItem,
         content: this.renderLeftContent(item),
       }))
       .filter((e) => e.content !== nothing);
     const allRight = listStatusBarItems('right').filter((i) => i.source !== 'core');
-    const vis = this.overflow.visibleCount;
+    // A status remeasurement may shorten the visible prefix; retain its focused item until blur.
+    const vis = Math.max(this.overflow.visibleCount, left.findIndex(e => e.id === this.focusedItem) + 1);
     const hiddenCount = Number.isFinite(vis) ? Math.max(0, left.length - vis) : 0;
     // 595 §15.1 (E1) — the ONE a11y announcer for system-health verdict changes.
     // A visually-hidden notice mirrors the verdict headline; aria-live announces it
@@ -770,6 +772,8 @@ export class StatusDeck extends JfElement {
           (e, i) =>
             html`<span
               class="item"
+              @focusin=${() => { this.focusedItem = e.id; }}
+              @focusout=${() => { this.focusedItem = null; this.requestUpdate(); }}
               ?hidden=${i >= vis}
               data-item=${e.id}
               data-pinned=${e.pinned ? 'true' : 'false'}

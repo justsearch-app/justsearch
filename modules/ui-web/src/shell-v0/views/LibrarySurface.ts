@@ -646,7 +646,7 @@ export class LibrarySurface extends JfElement {
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
       // row cannot render an unqualified "✓ … Verified just now" over an index with no vectors.
-      this.enrichmentBlocked = progress.phase === 'blocked';
+      this.enrichmentBlocked = progress.blockedPending > 0;
       // 809 finding 1 — same tick, same store: whether the enrichment backfill is still running, so a
       // row cannot claim the terminal "✓ indexed" while semantic search is still being built.
       this.enrichmentPending = progress.enrichingPending > 0;

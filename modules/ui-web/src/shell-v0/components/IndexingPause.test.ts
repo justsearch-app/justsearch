@@ -382,3 +382,86 @@ describe('CR37 keyboard continuity and recovery', () => {
     });
   }
 });
+
+describe('WP3.7 verifier layout and focus repairs', () => {
+  it('F1 keeps empty-queue Resume visible through an unconfirmed observation', async () => {
+    feed('PAUSED', 0);
+    const task = await mount('jf-task-list');
+    const control = await controls(task);
+    const resume = button(control); resume.focus();
+    const stale = snapshot('PAUSED', 0);
+    stale.meta = { ...stale.meta, workerRpcStale: true } as typeof stale.meta;
+    __feedForTest({ status: stale }); __feedContactForTest(); await settle(task);
+    expect(task.hasAttribute('data-empty'), 'uncertainty must not hide a focused action').toBe(false);
+    expect(control.shadowRoot!.activeElement).toBe(resume);
+    fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' }));
+    resume.click(); await settle(control);
+    expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/core.indexing-resume/invoke'))).toBe(true);
+  });
+
+  it('F2 preserves a sensible focus and announces remote quiet-queue Resume once', async () => {
+    feed('PAUSED', 0);
+    const deck = await mount('jf-status-deck');
+    const task = await mount('jf-task-list');
+    const control = await controls(task);
+    const resume = button(control); resume.focus();
+    const announcer = deck.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const announcements: string[] = [];
+    const observer = new MutationObserver(() => announcements.push(announcer.textContent!.trim()));
+    observer.observe(announcer, { childList: true, subtree: true, characterData: true });
+    try {
+      feed('RUNNING', 0); await settle(task); await settle(deck);
+      feed('RUNNING', 0); await settle(task); await settle(deck);
+      expect(task.hasAttribute('data-empty'), 'remote resume must not hide the focused control').toBe(false);
+      expect(task.shadowRoot!.activeElement).toBe(task.shadowRoot!.querySelector('[data-testid=task-title]'));
+      expect(task.shadowRoot!.textContent).toContain('Indexing is already running');
+      expect(announcements.filter(t => t.includes('Indexing resumed.'))).toHaveLength(1);
+    } finally { observer.disconnect(); }
+  });
+
+  it('F3 keeps the focused status item outside hidden adaptive overflow', async () => {
+    feed('PAUSED');
+    const deck = await mount('jf-status-deck');
+    const control = await controls(deck);
+    const resume = button(control); resume.focus();
+    // The measured cut when the longer unconfirmed description no longer fits.
+    Object.defineProperty(deck.shadowRoot!.querySelector('.adaptive-bar'), 'clientWidth', { value: 1, configurable: true });
+    for (const item of deck.shadowRoot!.querySelectorAll('.item')) Object.defineProperty(item, 'offsetWidth', { value: 50, configurable: true });
+    const overflow = (deck as unknown as { overflow: { visibleCount: number } }).overflow;
+    overflow.visibleCount = 0;
+    const stale = snapshot('PAUSED');
+    stale.meta = { ...stale.meta, workerRpcStale: true } as typeof stale.meta;
+    __feedForTest({ status: stale }); __feedContactForTest(); await settle(deck);
+    overflow.visibleCount = 0;
+    (deck as Mounted & { requestUpdate: () => void }).requestUpdate();
+    await deck.updateComplete;
+    const item = control.closest<HTMLElement>('.item')!;
+    expect(item.hidden, 'a focused item must stay in the visible prefix').toBe(false);
+    expect(control.shadowRoot!.activeElement).toBe(resume);
+    resume.blur(); await settle(deck);
+    await vi.waitFor(() => expect(item.hidden, 'ordinary overflow returns after focus leaves').toBe(true));
+  });
+
+  it('F5 keeps a mature folder semantic-install caveat and pending glyph through Pause', async () => {
+    function observe(state: string): void {
+      const s = snapshot(state, 0);
+      s.worker!.enrichment = { backfillMode: 'idle', embeddingEnabled: false, spladeEnabled: false,
+        nerEnabled: false, embeddingDocCount: 12, embeddingPendingCount: 12 } as never;
+      __feedForTest({ status: s }); __feedContactForTest();
+    }
+    observe('RUNNING');
+    const library = await mount('jf-library-surface');
+    Object.assign(library, { roots: [{ pathHash: 'mature', collection: 'mature', status: 'indexed',
+      indexed: true, fileCount: 3, inFlightCount: 0, failedCount: 0 }], loading: false, error: null,
+      rootsObserved: true });
+    await settle(library);
+    const card = () => library.shadowRoot!.querySelector('.card')!;
+    expect(card().textContent).toContain('semantic search waiting for AI install');
+    expect(card().querySelector('.status-icon.pending')).not.toBeNull();
+    observe('PAUSED'); await settle(library);
+    expect(card().textContent).toContain('semantic search waiting for AI install');
+    expect(card().textContent).toContain('keyword search ready');
+    expect(card().querySelector('.status-icon.pending')).not.toBeNull();
+    expect(card().querySelector('.status-icon.indexed')).toBeNull();
+  });
+});

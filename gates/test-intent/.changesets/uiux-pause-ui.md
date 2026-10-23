@@ -274,12 +274,71 @@ these two product test files are durable. No acceptance record is authored by th
         "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_READ_ONLY where pressed across status polls"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "F1 keeps the empty task-list action visible during uncertainty. F2 transfers focus to the nearby task heading when a remote Resume empties the card, with the existing single announcer. F3 retains the focused item in the adaptive visible prefix and returns it to ordinary overflow after blur. F5 preserves the semantic-install caveat and pending glyph independently of the user pause phase.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 scenarios and CR37, continued in the five layout and focus findings repair brief.",
+          "choice": "F1 \u2014 S37.1/S37.7/CR37 Expected: the control stays and keeps focus.",
+          "quote": "Expected: the control stays and keeps focus.",
+          "location": "task t-20261019-bd718f WP3.7 five layout and focus findings continuation",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 scenarios and CR37, continued in the five layout and focus findings repair brief.",
+          "choice": "F2 \u2014 CR37/S37.7 Expected: focus moves to a sensible nearby place (not BODY) and the change is announced once (S37.7), for example that indexing was resumed elsewhere.",
+          "quote": "Expected: focus moves to a sensible nearby place (not BODY) and the change is announced once (S37.7), for example that indexing was resumed elsewhere.",
+          "location": "task t-20261019-bd718f WP3.7 five layout and focus findings continuation",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 scenarios and CR37, continued in the five layout and focus findings repair brief.",
+          "choice": "F3 \u2014 CR37 Expected: a focused item is never moved into hidden overflow by a status observation.",
+          "quote": "Expected: a focused item is never moved into hidden overflow by a status observation.",
+          "location": "task t-20261019-bd718f WP3.7 five layout and focus findings continuation",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 scenarios and CR37, continued in the five layout and focus findings repair brief.",
+          "choice": "F5 \u2014 S37.4/N37.1 Expected: folder rows keep their real searchability state and caveats while paused.",
+          "quote": "Expected: folder rows keep their real searchability state and caveats while paused.",
+          "location": "task t-20261019-bd718f WP3.7 five layout and focus findings continuation",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-ui-layout.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F1 keeps empty-queue Resume visible through an unconfirmed observation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F3 keeps the focused status item outside hidden adaptive overflow",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F5 keeps a mature folder semantic-install caveat and pending glyph through Pause"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
 
 CR37/CR37a/CR37b continuation: agent-adopted under the same delegation. The original entries above are retained as historical intent; the new entry supersedes recovery Resume wording with the approved tier-aware route. Browser checks under `tmp/pause-ui-cr37b/` are scaffolding; the appended product checks are durable. Schedule and battery remain deferred to WP3.8. The independent verifier must append a fresh acceptance after this continuation.
+
+Five-findings continuation: the four checks appended to `IndexingPause.test.ts` are durable. F4 is checked with real browser geometry and pointer actionability in `tmp/pause-ui-fixes/live.mjs`, together with live checks for F1/F2/F3/F5; these scripts are verification scaffolding. All expectations remain agent-adopted under the original delegation. The previous evidence files are refreshed for the changed test-file digest, with their original before refs. New evidence uses d7714b374. Existing acceptance records are retained for independent renewal.
 
 ## Acceptance records
 
