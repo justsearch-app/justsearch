@@ -7,7 +7,7 @@ author-session: 01a15fc2-b9f6-7a13-9835-bda855d20c35
 
 # Test-intent entries
 
-Round ten is the current rule. Historical entries 1–4, 6–8, 10 and 12–13 are retained and explicitly superseded where classification/fixture evidence changed; their independent acceptance records remain byte-for-byte unchanged. Entries 5, 9 and 11 retain their accepted obligations. Current proof is in entries 14–15. No schema change or commit.
+Round ten is the current rule. Historical entries 1–4, 6–8, 10 and 12–13 are retained and explicitly superseded where classification/fixture evidence changed; their independent acceptance records remain byte-for-byte unchanged. Entries 5, 9 and 11 retain their accepted obligations. Current rule proof is in entries 14–15; round-eleven analyzer coverage and companion recovery are in entries 16–17. No schema change or commit.
 
 Removed expectations: `successResetsAmbiguousGrace` is replaced by `healthyBatchCannotRenewFreeGraceForPoison`; `poisonEventuallyUsesLadder` checks the first batch instead of waiting four batches; snapshot checks expect immediate canaries instead of no canary, and the untyped extraction case expects one probe at each of four pause steps instead of only the fourth. `EngineOwnedPathsTest` is retired with the removed classifier and replaced by real canonical-source/companion/analyzer checks. Mock shared outages now fail their service health probe as well as their normal operation. The direct policy tests explicitly supply failed health or a typed unavailable signal instead of relying on exception reason codes. No ladder, terminal-state, recovery, status or shutdown assertion is relaxed. The copied analyzer fixture now compares Path.getFileName exactly: a portability edit using a bare poison.txt suffix also selected healthy-after-poison.txt. The first baseline exposed that fixture mistake. Eleven unchanged-source baseline executions are retained under hashes; the corrected two-case analyzer class reruns before the single full candidate invocation. Original source, XML and log remain explicitly archived as the preliminary fixture result, never as a passing preservation check.
 
@@ -16,6 +16,10 @@ Round-ten follow-up: the first full candidate exposed an implementation defect i
 The corrected full round-ten run passed all other 107 targeted cases, including the complete37-state matrix; its only indexer failure was the K5 fixture. A native JDBC control showed that SQLITE_LIMIT_LENGTH=260 on a cold connection rejects even a four-character value because decoding the shared schema also exceeds the limit. Loading the schema first admits that short value and still rejects a400-character value. K5 now reads the schema before lowering the limit, retaining every oversized-document, attempt, retry and rollback assertion. The final producer reruns all five PipelineHealthProof cases on exact91dc01358 and the candidate; it retains the other103 targeted passes and full-suite metadata only under unchanged-source and2131 compiled-class hashes. Both failed full invocations and the native diagnostic remain archived, never relabelled.
 
 Final round-ten evidence: exact91dc01358 has17 intended assertion failures and4 preservation passes across21 executions. The candidate has108 targeted passes with no skips, including the37-state matrix and every retained U17/U19 check. Main/test compile and all8 PMD checks pass for worker-core, adapters-lucene, worker-services and indexer-worker. Full module results, with the five-case fixture correction executed freshly and all other2131 class files unchanged, report 4773 tests, 55 skips and the single known argFileEncodingRoundTripsThroughTheJdkParser launcher-NOTE environment failure. Earlier failed full results remain in execution history. Independent acceptance is pending.
+
+Round eleven is a narrow repair of the accepted round-ten rule. The writer probe now maps a tiny document and exhausts every indexed text field through the actual IndexWriter analyzer, including token reset/end/close, before the unchanged Directory check. It adds no document and commits nothing. O10 and clarified K2 appear in the current table and entries16–17. On exact37a3008f8, A1 charges two healthy files once with minute-scale retries and all four field probes incorrectly succeed; these five assertions fail before and pass after. The companion preservation check passes before and after: uncounted during a real closed-writer outage, then one charge in the first recovered batch. See [before](../../../tmp/builder/round11/before.txt) and [after](../../../tmp/builder/round11/after.txt).
+
+Final round-eleven verification:114 targeted executions pass without skips, including all37 matrix states and the retained U17/U19 targets;52 supplied verifier product executions and their environment check pass without skips. Three full modules report4310 JUnit entries,48 platform/model skips and the one known argFileEncodingRoundTripsThroughTheJdkParser launcher-NOTE environment failure. All three modules compile main/test and all6 PMD reports have zero violations. The initial external-verifier compilation lacked the runtime-only KeywordTokenizer jar; its isolated compile classpath was corrected. Two external snapshot checks then stopped at absent fixture names, so only their path names were adapted to the existing immutable >1MiB corpus and rerun. Assertions are unchanged;50 other verifier passes are retained under unchanged compiled-class hashes, and module results under1830 class hashes. Both setup failures and the initial init-script failure remain archived, never relabelled. No production or committed test byte changed during these harness corrections. The acceptance tail remains byte-identical. [Verification detail](../../../tmp/builder/round11/report.md).
 
 | Case | Current check (real running loop unless direct SQL guard) |
 |---|---|
@@ -29,7 +33,8 @@ Final round-ten evidence: exact91dc01358 has17 intended assertion failures and4 
 | O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
-| K2 source IO and aliases | [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
+| O10 open writer with broken shared analysis/mapping | [real retired analyzer and field-by-field tokenization](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field, no write/commit](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java) |
+| K2 failures on the source itself stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
 | K5 document values exceed store limit | [real SQLITE_LIMIT_LENGTH on long document path, normal probe succeeds](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
@@ -736,7 +741,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/extract/VerifierNoOpAgent.java"
       ],
       "class": "New",
-      "behaviour": "Round-ten O8/O9/K1–K5: D9 real unknown child/protocol outages summarize logs and recover at zero attempts; a native identity capacity failure stays free despite passing real extraction; interleaved poison is charged immediately, follows its ladder or terminal FAILED policy; canonical source aliases, source-specific companions and actual document analyzer IO below temp remain per-file; normal canary operations prove a real document-only SQLite value limit and roll back synthetic identity/path rows.",
+      "behaviour": "Round-ten O8/O9/K1–K5: D9 real unknown child/protocol outages summarize logs and recover at zero attempts; a native identity capacity failure stays free despite passing real extraction; interleaved poison is charged immediately, follows its ladder or terminal FAILED policy; canonical source aliases always remain per-file; source-specific companions and actual document analyzer IO below temp are charged when the pipeline is healthy, and may defer during a proven outage (clarified K2); normal canary operations prove a real document-only SQLite value limit and roll back synthetic identity/path rows.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -827,6 +832,88 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java#readOnlyStoreRemainsUncountedBeyondAmbiguousGrace",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10: a real retired shared analyzer with an open writer defers two healthy rows without attempts, within eight seconds, with WAITING status. Every indexed text field is fully tokenized through the actual mapped document and writer analyzer, including failures at incrementToken; the probe changes no document sequence, document count or pending commit state.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request; round-eleven brief and final section of ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md",
+          "choice": "The orchestrator adds O10 and clarifies K2. Reuse the actual field mapper to build a tiny text value for every catalog text field and exhaust each indexed tokenized field through IndexWriter.getAnalyzer(), including reset/end/close, inside the existing writer barrier and dispatch lock. This runs before the unchanged Directory probe, adds no document and commits nothing. Closed analyzer and mapping/tokenization failures make the existing whole-pipeline canary fail; no exception heuristic, policy or queue change is added. Analyzer streams use the production per-field analyzer and do not retain the canary document. A companion failure on a readable source can defer during a genuine writer outage, but is charged in the first recovered batch when the pipeline canary passes. This is an orchestrator decision implemented under delegated autonomy, never owner-words.",
+          "label": "agent choice under orchestrator decision",
+          "delegationScope": "Round-eleven narrow analyzer-probe repair, clarified companion recovery preservation and checks/evidence; no schema, policy or acceptance-record changes."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-write-path.json",
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java#closedSharedAnalyzerCannotBeProvenHealthyByDirectoryOnlyCanary"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Clarified K2 preservation: a readable source with a missing sibling is deferred uncounted alongside a real closed writer, then charged exactly once in the first batch after the runtime is replaced; healthy peers complete with zero attempts. Two actual companion reads prove there is no renewed free grace after recovery.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request; round-eleven brief and final section of ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md",
+          "choice": "The orchestrator adds O10 and clarifies K2. Reuse the actual field mapper to build a tiny text value for every catalog text field and exhaust each indexed tokenized field through IndexWriter.getAnalyzer(), including reset/end/close, inside the existing writer barrier and dispatch lock. This runs before the unchanged Directory probe, adds no document and commits nothing. Closed analyzer and mapping/tokenization failures make the existing whole-pipeline canary fail; no exception heuristic, policy or queue change is added. Analyzer streams use the production per-field analyzer and do not retain the canary document. A companion failure on a readable source can defer during a genuine writer outage, but is charged in the first recovered batch when the pipeline canary passes. This is an orchestrator decision implemented under delegated autonomy, never owner-words.",
+          "label": "agent choice under orchestrator decision",
+          "delegationScope": "Round-eleven narrow analyzer-probe repair, clarified companion recovery preservation and checks/evidence; no schema, policy or acceptance-record changes."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-write-path.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java#companionIsDeferredDuringOutageAndChargedInFirstRecoveredBatch"
       ],
       "repaired": false
     }

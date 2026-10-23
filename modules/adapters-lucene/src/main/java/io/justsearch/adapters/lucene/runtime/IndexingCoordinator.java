@@ -10,6 +10,7 @@ import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +18,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.index.IndexOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +91,7 @@ public final class IndexingCoordinator {
   // Tempdoc 402: write-op dispatch
   // ==========================================================================
 
-  /** Proves writer and Directory health without adding a document or committing pending work. */
+  /** Proves mapping, analysis, writer and Directory health without adding or committing a document. */
   public void probeIngestion() {
     acquireReadLockTimed();
     try {
@@ -98,6 +100,22 @@ public final class IndexingCoordinator {
         var snapshot = session.snapshot;
         var tragic = snapshot.writer().getTragicException();
         if (tragic != null) throw new IndexWriterUnavailableException("IndexWriter failed", tragic);
+        var fields = new HashMap<String, Object>();
+        for (var field : session.fieldMapper.fieldDefs().values()) {
+          if ("text".equals(field.type)) fields.put(field.id, "JustSearch ingestion canary");
+        }
+        for (var field : session.fieldMapper.toDocument(fields, null)) {
+          if (field.fieldType().indexOptions() == IndexOptions.NONE || !field.fieldType().tokenized()) {
+            continue;
+          }
+          try (var tokens = field.tokenStream(snapshot.writer().getAnalyzer(), null)) {
+            tokens.reset();
+            while (tokens.incrementToken()) {
+              // Consume the full stream, including failures deferred until tokenization.
+            }
+            tokens.end();
+          }
+        }
         String name = null;
         try {
           try (var output = snapshot.directory().createTempOutput(
@@ -112,7 +130,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } catch (org.apache.lucene.store.AlreadyClosedException | IOException failure) {
-      throw new IndexWriterUnavailableException("Index storage unavailable", failure);
+      throw new IndexWriterUnavailableException("Index write path unavailable", failure);
     } finally {
       releaseWriteBarrierAndReport();
     }
