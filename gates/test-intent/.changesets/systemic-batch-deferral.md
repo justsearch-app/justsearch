@@ -1218,3 +1218,14 @@ round-nine evidence producer. Final result: all96 targeted executions pass witho
   "note": "Reject: a closed shared analyzer passes the writer probe and charges healthy files, while a missing source companion is deferred uncounted during a writer outage."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a167c6-3f05-7ea1-bd72-d5c18664d77e",
+  "verdict": "reject",
+  "digest": "sha256:8c0bb63dfb279c5b694e14c7acbe74d61725319756a0438628e8f9c6e3ffaab9",
+  "note": "The real writer canary passes a shared invalid-position analyzer, charges healthy files, and retains minute-scale retries after recovery."
+}
+```
