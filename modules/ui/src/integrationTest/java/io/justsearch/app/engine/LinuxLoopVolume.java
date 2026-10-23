@@ -59,7 +59,18 @@ final class LinuxLoopVolume implements AutoCloseable {
 
   void away() throws Exception {
     if (mounted != null) {
-      run("udisksctl", "unmount", "--no-user-interaction", "-b", loop);
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (true) {
+        try {
+          run("udisksctl", "unmount", "--no-user-interaction", "-b", loop);
+          break;
+        } catch (IOException busy) {
+          // A concurrent, strictly held root observation can temporarily keep this mount busy.
+          if (!busy.getMessage().contains("UDisks2.Error.DeviceBusy")
+              || System.nanoTime() >= until) throw busy;
+          Thread.sleep(100);
+        }
+      }
       mounted = null;
     }
     if (loop != null) {

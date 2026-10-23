@@ -7,7 +7,7 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 
 # Test-intent entries
 
-The transition deadline amendment is the orchestrator's decision under the delegated assignment, not a user or owner quote. During reload/migration/cutover, return recovery and every receipt wait; the D1/D2 clocks start when the surviving runtime accepts writes again. Migration and cutover behavior themselves remain unchanged. Real bind mounts are unverified because they require root here; tuple/receipt comparisons cover different bind subtrees in unit tests. The former large addition to the reload test is extracted into its own Linux drive-return test class. The orchestrator's conditional follow-up says to keep a failure also reproduced on main out of the committed suite or disable it with a named finding. The guarded shared clone at unmodified main 7dc1f3eb4 also fails to publish a writable survivor after the existing cutover request and restart, with the same seeded pending receipts. The two migration checks are disabled as REMOUNT-MIGRATION-REPLAY; they retain the refusal/row/data assertions and full reproduction. The row is seeded by the test helper; the existing production writer is unchanged. No migration/replay/promotion behavior is changed.
+The transition deadline amendment is the orchestrator's decision under the delegated assignment, not a user or owner quote. During reload/migration/cutover, return recovery and every receipt wait; the D1/D2 clocks start when the surviving runtime accepts writes again. Migration and cutover behavior themselves remain unchanged. Real bind mounts are unverified because they require root here; tuple/receipt comparisons cover different bind subtrees in unit tests. The former large addition to the reload test is extracted into its own Linux drive-return test class. The orchestrator's conditional follow-up says to keep a failure also reproduced on main out of the committed suite or disable it with a named finding. The guarded shared clone at unmodified main b62fc5921 also fails to publish a writable survivor after the existing cutover request and restart, with the same seeded pending receipts. The two migration checks are disabled as REMOUNT-MIGRATION-REPLAY; they retain the refusal/row/data assertions and full reproduction. The row is seeded by the test helper; the existing production writer is unchanged. No migration/replay/promotion behavior is changed.
 
 ```json
 {
@@ -45,7 +45,7 @@ The transition deadline amendment is the orchestrator's decision under the deleg
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/remount-mount.json",
+      "evidence": "gates/test-intent/evidence/remount-return.json",
       "newChecks": [
         "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#realUnmountReturnsWithHealthyWatcherReceiptsAndOfflineChanges"
       ],
@@ -105,9 +105,10 @@ The transition deadline amendment is the orchestrator's decision under the deleg
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/remount-p1.json",
+      "evidence": "gates/test-intent/evidence/remount-return.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsWalkSkipPolicyTest.java#missingFilesystemUsesTheUnavailableRootReason"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsWalkSkipPolicyTest.java#missingFilesystemUsesTheUnavailableRootReason",
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#unmountedRootIsUnavailableInTheStatusApiUsedByTheUi"
       ],
       "repaired": true
     },

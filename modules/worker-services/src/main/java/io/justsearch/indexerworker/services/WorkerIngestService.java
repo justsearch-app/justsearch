@@ -792,13 +792,7 @@ public final class WorkerIngestService {
     if (!(jobQueue instanceof SwitchBufferCapableQueue journal) || !canApplyWatcherReceipts()) {
       return;
     }
-    String activeGeneration = activeGenerationSupplier().get();
     for (var receipt : journal.listSwitchBufferOpsStrict()) {
-      if (io.justsearch.configuration.PlatformPaths.isLinux() && "DELETE".equals(receipt.op())
-          && (receipt.generation() == null || receipt.generation().isBlank()
-              || receipt.generation().equals(activeGeneration))) {
-        replayReturnedWatcherDelete(journal, receipt, ingestLifecycle);
-      }
       if (!WATCHER_RECONCILE.equals(receipt.op())) continue;
       var debt = WatcherRootReconciliation.decode(receipt.payload());
       Path root = Path.of(debt.root());
@@ -840,12 +834,13 @@ public final class WorkerIngestService {
     }
   }
 
-  private void replayReturnedWatcherDelete(SwitchBufferCapableQueue journal,
+  private void replayReturnedWatcherDelete(Path returnedRoot, SwitchBufferCapableQueue journal,
       SwitchBufferCapableQueue.SwitchBufferOp receipt,
       io.justsearch.adapters.lucene.runtime.RunningRuntime active) {
     var deletion = io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(receipt.payload());
     if (deletion.origin() != io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER) return;
     Path root = Path.of(deletion.root());
+    if (!root.equals(returnedRoot)) return;
     var subscription = rootWatcherRegistry.subscription(root);
     if (subscription == null) return;
     if (!("path:" + deletion.path()).equals(receipt.key())) {
@@ -1153,6 +1148,16 @@ public final class WorkerIngestService {
             subscription.collection(), file -> registry.ownsPath(root, file));
         if (!result.getError().isBlank() || result.getSkipped()
             || result.getDeleteDetectionUnverified()) return;
+      }
+      if (jobQueue instanceof SwitchBufferCapableQueue journal) {
+        String activeGeneration = activeGenerationSupplier().get();
+        for (var receipt : journal.listSwitchBufferOpsStrict()) {
+          if ("DELETE".equals(receipt.op())
+              && (receipt.generation() == null || receipt.generation().isBlank()
+                  || receipt.generation().equals(activeGeneration))) {
+            replayReturnedWatcherDelete(root, journal, receipt, ingestLifecycle);
+          }
+        }
       }
       reconcilePendingWatcherRoots();
       if (registry.isCurrentAndActive(subscription)) registry.recoveryCompleted(subscription);

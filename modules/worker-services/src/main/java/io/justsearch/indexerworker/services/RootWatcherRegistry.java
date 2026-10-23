@@ -208,7 +208,7 @@ public final class RootWatcherRegistry {
     if (collection == null) {
       return false;
     }
-    pendingRecovery.add(normalized);
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) pendingRecovery.add(normalized);
     WatchResult result = watch(normalized.toString(), collection);
     if (result.watching()) {
       log.info("Root watcher resumed: the volume first seen at {} is back", normalized);
@@ -305,6 +305,10 @@ public final class RootWatcherRegistry {
     next.returnIdentities.putAll(returnIdentities);
     next.pendingRecovery.addAll(pendingRecovery);
     for (Subscription watched : List.copyOf(subscriptions.values())) {
+      if (io.justsearch.configuration.PlatformPaths.isLinux() && watcher != null
+          && !watcher.isActive(watched.root(), watched.watcherEpoch())) {
+        next.pendingRecovery.add(watched.root());
+      }
       if (!rewatch.watch(next, watched.root(), watched.collection()).watching()
           && !next.awaitsVolume(watched.root())) {
         next.holdUntilVolumeReturns(watched.root(), watched.collection());

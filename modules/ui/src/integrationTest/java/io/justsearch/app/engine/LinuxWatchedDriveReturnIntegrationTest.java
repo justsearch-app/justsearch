@@ -119,7 +119,10 @@ final class LinuxWatchedDriveReturnIntegrationTest {
         assertTrue(System.nanoTime() - registeredAt < TimeUnit.SECONDS.toNanos(60),
             "live create/modify/delete all arrive faster than one periodic scan");
         volume.releaseDecoy();
+        awaitRecoverySettled(f, root);
+        awaitIndexingIdle(f);
         long descriptors = descriptorCount();
+        var initialTargets = descriptorTargets();
         long watcherThreads = watcherThreadCount();
         assertTrue(watcherThreads > 0);
         for (int cycle = 1; cycle < 5; cycle++) {
@@ -127,6 +130,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
             Files.writeString(root.resolve("readonly-gone.txt"), "mountreadonlygone original");
             f.awaitCount("mountreadonlygone", 1);
           }
+          awaitIndexingIdle(f);
           volume.away();
           awaitPhysicalWatcher(f, root, false, 10);
           if (cycle == 4) {
@@ -143,10 +147,15 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           Object watcher = inherited(f.server.appServices(), "workerWatcher");
           assertEquals(10, ((java.util.Map<?, ?>) inherited(watcher, "watchers")).size());
           awaitRecoverySettled(f, root);
+          awaitIndexingIdle(f);
           volume.releaseDecoy();
           long returnedDescriptors = descriptorCount();
+          var addedTargets = descriptorTargets().entrySet().stream()
+              .filter(entry -> entry.getValue() > initialTargets.getOrDefault(entry.getKey(), 0L))
+              .toList();
           assertTrue(returnedDescriptors <= descriptors,
-              "repeated returns must not retain handles: before=" + descriptors + " after=" + returnedDescriptors);
+              "repeated returns must not retain handles: cycle=" + cycle + " before=" + descriptors
+                  + " after=" + returnedDescriptors + " added=" + addedTargets);
           assertTrue(watcherThreadCount() <= watcherThreads, "repeated returns must not retain dead watcher threads");
         }
         assertFalse(slowScheduler.task.isDone(), "recovery and live events did not use periodic sync");
@@ -165,12 +174,12 @@ final class LinuxWatchedDriveReturnIntegrationTest {
       f.awaitCount("statusmountkept", 1);
       volume.away();
       var unavailable = f.client.syncDirectory(root.toString(), false, CONTEXT);
-      assertTrue(unavailable.getError().startsWith("ROOT_NOT_DIRECTORY:"), unavailable.getError());
       var folders = f.transport.send(HttpRequest.newBuilder(
           URI.create("http://127.0.0.1:" + f.http.port() + "/test/roots")).GET().build(),
           HttpResponse.BodyHandlers.ofString());
       assertEquals(200, folders.statusCode(), folders.body());
       assertTrue(folders.body().contains("\"status\":\"unavailable\""), folders.body());
+      assertTrue(unavailable.getError().startsWith("ROOT_NOT_DIRECTORY:"), unavailable.getError());
       assertTrue(f.client.getWatchedRoots(CONTEXT).getFirst().walkError().startsWith("ROOT_NOT_DIRECTORY"));
       assertEquals(1, f.count("statusmountkept"));
     }
@@ -385,7 +394,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     }
   }
 
-  // REMOUNT-MIGRATION-REPLAY: reproduced on unmodified main 7dc1f3eb4 with these same checks.
+  // REMOUNT-MIGRATION-REPLAY: reproduced on unmodified main b62fc5921 with these same checks.
   // Seed both receipt kinds, unmount/return at either migration barrier, request cutover, restart.
   // Retained WATCHER_RECONCILE/native journal rows prevent a writable survivor; migration is out of scope.
   @org.junit.jupiter.api.Disabled("REMOUNT-MIGRATION-REPLAY: main also cannot resume with these retained journal rows")
@@ -556,6 +565,28 @@ final class LinuxWatchedDriveReturnIntegrationTest {
 
   private static long descriptorCount() throws Exception {
     try (var descriptors = Files.list(Path.of("/proc/self/fd"))) { return descriptors.count(); }
+  }
+
+  private static java.util.Map<String, Long> descriptorTargets() throws Exception {
+    var targets = new java.util.TreeMap<String, Long>();
+    try (var descriptors = Files.list(Path.of("/proc/self/fd"))) {
+      for (Path descriptor : descriptors.toList()) {
+        try { targets.merge(Files.readSymbolicLink(descriptor).toString(), 1L, Long::sum); }
+        catch (java.nio.file.NoSuchFileException closed) { /* a concurrent operation closed it */ }
+      }
+    }
+    return targets;
+  }
+
+  private static void awaitIndexingIdle(Fixture fixture) throws Exception {
+    var loop = (io.justsearch.indexerworker.loop.IndexingLoop)
+        inherited(fixture.server.appServices(), "indexingLoop");
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    while ((fixture.queue().queueDepth() != 0
+        || loop.loopState() != io.justsearch.indexerworker.loop.IndexingLoop.LoopState.IDLE)
+        && System.nanoTime() < until) Thread.sleep(25);
+    assertEquals(0, fixture.queue().queueDepth(), "all recovery admissions finish before resource measurement");
+    assertEquals(io.justsearch.indexerworker.loop.IndexingLoop.LoopState.IDLE, loop.loopState());
   }
 
   private static long watcherThreadCount() {

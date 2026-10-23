@@ -79,6 +79,28 @@ final class LinuxReturnedRootTest {
   }
 
   @Test
+  void handoverOfADeadWatcherKeepsRecoveryWhenTheRootIsAlreadyBack() throws Exception {
+    var active = new AtomicBoolean();
+    var prior = new RootWatcherRegistry(watcher(active));
+    assertTrue(prior.watch(temp.toString(), "notes").watching());
+    active.set(false);
+    var next = new RootWatcherRegistry(watcher(new AtomicBoolean()));
+    prior.handOverTo(next, (registry, path, collection) -> registry.watch(path.toString(), collection));
+    assertTrue(next.isCurrentAndActive(next.subscription(temp)));
+    assertTrue(needsRecovery(next, temp), "registration during handover cannot discard the missed scan");
+    assertTrue(prior.unwatch(temp.toString()));
+    assertFalse(needsRecovery(next, temp), "removal cancels the transferred recovery");
+  }
+
+  private static boolean needsRecovery(RootWatcherRegistry registry, Path root) throws Exception {
+    try {
+      var method = RootWatcherRegistry.class.getDeclaredMethod("recoveryRoots");
+      method.setAccessible(true);
+      return ((java.util.Set<?>) method.invoke(registry)).contains(root);
+    } catch (NoSuchMethodException beforeRepair) { return false; }
+  }
+
+  @Test
   void removalRacingRegistrationWinsAndReAdditionGetsOneFreshWatcher() throws Exception {
     var active = new AtomicBoolean();
     WorkerMethvinWatcher watcher = watcher(active);
