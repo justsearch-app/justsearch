@@ -282,6 +282,7 @@ final class SubstrateDrivenEngineTest {
   @Test
   void compactionSummaryFoldsIntoTheLeadingSystemMessage() {
     var store = new FileConversationStore(retrievalStoreDir);
+    store.createSession("conv-1", SHAPE_ID.value());
     store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "user", "content", "old question"));
     store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "assistant", "content", "old answer"));
     store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "user", "content", "new question"));

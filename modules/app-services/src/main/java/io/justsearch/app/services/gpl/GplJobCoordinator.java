@@ -361,6 +361,16 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
     return terminalLatch.await(timeout, unit);
   }
 
+  private io.justsearch.core.scheduling.IndexingHold.Lease acquireIndexingWork() {
+    var client = knowledgeClientSupplier.get();
+    var hold = client == null ? null : client.indexingHold();
+    try { return hold == null ? null : hold.acquire(); }
+    catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new CancellationException("GPL interrupted while waiting for Resume");
+    }
+  }
+
   // ========== Core job loop ==========
 
   private void runJob() {
@@ -378,7 +388,8 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
     }
 
     // E2E-6: Clear the triple store at job start to avoid duplicate triples on retry.
-    try {
+    var clearLease = acquireIndexingWork();
+    try (clearLease) {
       tripleStore.clear();
     } catch (IOException e) {
       log.warn("GPL job: failed to clear triple store (will append to existing)", e);
@@ -431,6 +442,9 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
                 ids -> knowledgeClientSupplier.get().fetchDocuments(ids, ENGINE_CONTEXT), docIds);
 
         for (DocumentContent doc : fetchResp.getDocumentsList()) {
+          var lease = acquireIndexingWork();
+          try (lease) {
+          try {
           if (!doc.getFound() || doc.getContent().isBlank()) {
             continue;
           }
@@ -484,6 +498,11 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
           }
 
           localProcessed++;
+          } finally {
+            // Publish even blank/absent-document outcomes before acknowledging this document.
+            runSnapshot.set(new GplRunSnapshot(localProcessed, localTotal, startedAt, null));
+          }
+          }
         }
 
         // Publish batch progress as a coherent atomic snapshot
@@ -528,6 +547,8 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
             localProcessed,
             triplesWritten,
             elapsedMs);
+        var reportLease = acquireIndexingWork();
+        try (reportLease) {
         writeStage3aAnalysisReport();
         writeStage3bBranchFusionReport();
         status.set(GplJobStatus.Status.COMPLETED);
@@ -538,6 +559,7 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
           } catch (Exception e) {
             log.warn("GPL job: onJobCompleted callback threw (non-fatal)", e);
           }
+        }
         }
       }
 

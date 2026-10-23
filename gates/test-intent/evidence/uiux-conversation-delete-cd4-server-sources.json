@@ -1,0 +1,247 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T05:11:17.114Z",
+  "revision": "c1cd13378d6a79a9aad776beeee28071e1c1c4a3",
+  "tree": "471a2635f678a9f13580e5e3368f04f9031f6fe8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.record.test.ts\" \"src/shell-v0/controllers/AgentSessionController.deletion.test.ts\" \"src/shell-v0/state/conversationServerIdentity.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-2409589-1792645869473.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3050
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts#server chunk content counts before any list or history read returns it",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a53003f666f764d3269c3718ef9603cee5fe56bc737c12d48fe4681cb80d728c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "server chunk content counts before any list or history read returns it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts#server done content counts before any list or history read returns it",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a53003f666f764d3269c3718ef9603cee5fe56bc737c12d48fe4681cb80d728c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "server done content counts before any list or history read returns it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#a streamed answer counts as server content before any list or record read returns it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06542c1d1cd03b8436410aaeb1abd715f9402734812443f58e681279d348a51a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a streamed answer counts as server content before any list or record read returns it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#legacy agent stream content confirms a server conversation before any record read",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacy agent stream content confirms a server conversation before any record read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a one-shot agent answer confirms server content without any chunk frames",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a one-shot agent answer confirms server content without any chunk frames",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a server replay read confirms content without a conversation list row (pinned=true)",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a server replay read confirms content without a conversation list row (pinned=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a server replay read confirms content without a conversation list row (pinned=false)",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a server replay read confirms content without a conversation list row (pinned=false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a created branch is server-owned even before its first listed row or message",
+      "file": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85dcb039ed6fcb4385c9af1ab499c6559001fcde1c77a566baff92a002d58c79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a created branch is server-owned even before its first listed row or message",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a successful title write confirms a server conversation before its first list reply",
+      "file": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85dcb039ed6fcb4385c9af1ab499c6559001fcde1c77a566baff92a002d58c79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a successful title write confirms a server conversation before its first list reply",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a message-id refresh counts as server content without a preceding list or resume",
+      "file": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85dcb039ed6fcb4385c9af1ab499c6559001fcde1c77a566baff92a002d58c79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a message-id refresh counts as server content without a preceding list or resume",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4cab228fe",
+    "revision": "4cab228fe2900c07aff0941f58973296bd04b75d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.record.test.ts\" \"src/shell-v0/controllers/AgentSessionController.deletion.test.ts\" \"src/shell-v0/state/conversationServerIdentity.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-2409589-1792645873783.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3168,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-2409589-1792645873783.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts#server chunk content counts before any list or history read returns it",
+        "classification": "assertion",
+        "detail": "server chunk content counts before any list or history read returns it:  AssertionError: expected [ { role: 'user', …(2) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts:70:23\n    at processTicksAndRej"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts#server done content counts before any list or history read returns it",
+        "classification": "assertion",
+        "detail": "server done content counts before any list or history read returns it:  AssertionError: expected [ { role: 'user', …(2) }, …(1) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/views/UnifiedChatView.stream-deletion.test.ts:70:23\n    at file:///home"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#a streamed answer counts as server content before any list or record read returns it",
+        "classification": "assertion",
+        "detail": "a streamed answer counts as server content before any list or record read returns it:  AssertionError: expected [ Array(1) ] to not include 'uc-f9ca503a-7441-484d-807b-8eda3041b4…'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#legacy agent stream content confirms a server conversation before any record read",
+        "classification": "assertion",
+        "detail": "legacy agent stream content confirms a server conversation before any record read:  AssertionError: expected 'legacy-conversation' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts:30:47\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a one-shot agent answer confirms server content without any chunk frames",
+        "classification": "assertion",
+        "detail": "a one-shot agent answer confirms server content without any chunk frames:  AssertionError: expected 'one-shot' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts:39:47\n    at file:///home/elias/dev/justsearch/.c"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a server replay read confirms content without a conversation list row (pinned=true)",
+        "classification": "assertion",
+        "detail": "a server replay read confirms content without a conversation list row (pinned=true):  AssertionError: expected 'server-replay' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts:56:47\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a server replay read confirms content without a conversation list row (pinned=false)",
+        "classification": "assertion",
+        "detail": "a server replay read confirms content without a conversation list row (pinned=false):  AssertionError: expected 'server-replay' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts:56:47\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a created branch is server-owned even before its first listed row or message",
+        "classification": "assertion",
+        "detail": "a created branch is server-owned even before its first listed row or message:  AssertionError: expected 'created-branch' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts:20:47\n    at processTicksAndRejections (node:internal/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a successful title write confirms a server conversation before its first list reply",
+        "classification": "assertion",
+        "detail": "a successful title write confirms a server conversation before its first list reply:  AssertionError: expected 'title-written' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts:29:47\n    at file:///home/elias/dev/justsearch/.claude/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a message-id refresh counts as server content without a preceding list or resume",
+        "classification": "assertion",
+        "detail": "a message-id refresh counts as server content without a preceding list or resume:  AssertionError: expected 'saved-content' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-before-pBpiv4/modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts:38:47\n    at file:///home/elias/dev/justsearch/.claude/"
+      }
+    ]
+  },
+  "digest": "sha256:f2795aeed57c096b676c4757dd749de8697ad6c615ac471f121c7323a8ac00ee"
+}

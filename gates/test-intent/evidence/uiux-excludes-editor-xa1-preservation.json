@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T23:52:21.945Z",
+  "revision": "aa5894de175a07aa3cce1b571eb6372053797d39",
+  "tree": "6dc88fc9bee682851384d6e3e17455191d58f697",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-repairs/test-intent-vitest-2216480-1792626740658.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1287
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#keeps a still-pending prompt usable after activity and status checks (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a still-pending prompt usable after activity and status checks (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts#does not dismiss a pending prompt on a failed state lookup (XA1)",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e95147c2b48e010803098b209ab9a730f503a6c78fc214392e4072a1dbe408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "does not dismiss a pending prompt on a failed state lookup (XA1)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:67b51dd3f52937edefc371c50775a2cba19b6f5137682f3e7e3a84745ad27d90"
+}

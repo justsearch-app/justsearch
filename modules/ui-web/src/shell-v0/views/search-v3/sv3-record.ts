@@ -35,7 +35,7 @@ import type { RetrievalCitation } from '../../components/chat/citationTypes.js';
 // The SHARED authorities this projection reads the record's evidence through (tempdoc 847 S1/S3):
 // the `claimMatches` envelope reader carrying the producer gate, and the ONE claim→mark resolver the
 // live path already uses. Nothing about the evidence is derived here.
-import { claimsFromRecord, matchesFromRecord } from '../../components/chat/recordEvidence.js';
+import { claimsFromRecord, matchesFromRecord, coverageFactsFromRecord } from '../../components/chat/recordEvidence.js';
 import { claimsToCitations } from '../../components/chat/citationResolve.js';
 // Tempdoc 859 §5a — the SAME delegate-plane projection the live terminal writes through, so a
 // delegate turn the reader watched and one they came back to hold one value from one function.
@@ -198,6 +198,7 @@ function recordEvidenceOf(item: UnifiedTurnItem): Sv3TurnEvidence | null {
     sources,
     matches: matchesFromRecord(claimMatches),
     marks: claimsToCitations(claimsFromRecord(claimMatches), sources),
+    ...coverageFactsFromRecord(claimMatches),
     retrievalMode: '',
     ...retrieval,
   };
@@ -542,6 +543,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       assistantRecordId: turn.assistantId,
       recordOpenedByUser: turn.openedByUser,
       kind: agent ? 'agent' : 'ask',
+      shapeId: turn.declaredShapeId ?? undefined,
       question: turn.question,
       answer: turn.answers.join('\n\n'),
       // The same messages, kept apart: what a follow-up's context is built from (S2.0).

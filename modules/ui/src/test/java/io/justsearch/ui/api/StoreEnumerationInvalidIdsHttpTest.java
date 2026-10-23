@@ -32,6 +32,7 @@ class StoreEnumerationInvalidIdsHttpTest {
   void validConversationCanBranchReadAndDeleteBesideInvalidFolders() throws Exception {
     Path root = Files.createDirectory(tmp.resolve("conversations"));
     var store = new FileConversationStore(root);
+    store.createSession("valid", "core.free-chat");
     store.appendMessage("valid", "core.free-chat", Map.of("role", "user", "content", "keep"));
     String messageId = (String) store.loadHistory("valid").getFirst().get("id");
     var invalidIds = plantInvalidFolders(root);

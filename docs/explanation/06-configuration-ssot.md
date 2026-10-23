@@ -200,8 +200,23 @@ considered and the winner, which is what `/api/debug/effective-config` reports.
 ## Settings → Effective Runtime (AI)
 There are two layers that matter for “what the UI shows” vs “what is running”:
 
-1. **User settings** (`/api/settings/v2`): persisted UI preferences + AI knobs (e.g., model paths, `gpuLayers`, context window, `maxTokens`, `pauseIndexingDuringAi`, and the desired API port).
+1. **User settings** (`/api/settings/v2`): persisted UI preferences + AI knobs (e.g., model paths, `gpuLayers`, context window, `maxTokens`, and the desired API port).
 2. **Effective runtime config** (used by `InferenceLifecycleManager`): derived from `EnvRegistry`, settings contributions, YAML and defaults, with operator system properties and environment variables retaining their higher ordinals.
+
+The optional `indexingPause` object in `ui/settings.json` records `paused`, `untilEpochMs`
+(null for an indefinite pause), and `reason` (`USER_PAUSED` or `SETTINGS_RECOVERY`). The UI-only
+`core.indexing-pause` and `core.indexing-resume` operations use the accepted settings transaction,
+including its witness, conflict detection and keyed retry. The policy is applied before the indexing
+loop activates, and an expired deadline resumes on the next wall-clock read, including after sleep.
+Reset clears the pause. Corrupt-settings recovery starts paused so exclusions can be checked.
+Older settings without the object load normally; an older app may discard it when saving.
+
+`operating.indexing` reports `PAUSING` until extraction, enrichment, picture reading and GPL have
+finished permitted work and published their acknowledgments, then `PAUSED`, including with an empty
+queue. The user reasons precede automatic hold reasons; `untilEpochMs` is the user's deadline and
+`waitingForResume` reports queued work. Discovery, verified deletion, cleanup and cutover may still
+change counts. Automatic hold reasons retain their existing enrichment/GPU meaning. MCP status
+reports the pause and its reason but offers no pause or resume operation.
 
 In the current app:
 * **The settings→system-property promotions are gone** (tempdoc 883 decision 4 and its §C.5c residue). They predated the ordinal chain and were a precedence lie: a GUI value written as a system property resolves at ordinal 500, so `/api/debug/effective-config` reported it as `jvm_arg` and then had to read a second `*.source=ui_settings` marker sysprop to un-tell that. Every settings-borne key now reaches the resolver exactly once, at ordinal 300, via `ConfigStoreRebuilder.contributeUiSettings` — including the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, whose `/api/debug/effective-config` rows are sourced from the resolver's own provenance and read no marker.

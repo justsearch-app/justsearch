@@ -101,6 +101,9 @@ import org.slf4j.LoggerFactory;
  * die with it.
  */
 public abstract class KnowledgeClient implements Closeable, SearchPort, IndexingService {
+  /** Local scheduling authority; never a mutation exposed over MCP or HTTP. */
+  public io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
+
     private static final Logger log = LoggerFactory.getLogger(KnowledgeClient.class);
 
     /**
@@ -668,6 +671,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             stub -> stub.submitBatch(request), engineContext);
     }
 
+    /** Conversation deletion requires an applied delete, not a buffered migration operation. */
+    public DeleteByIdResponse deleteHistoryTranscript(Path transcript, EngineContext engineContext) {
+        var request = DeleteByIdRequest.newBuilder()
+            .setDocId(transcript.toAbsolutePath().normalize().toString()).setRequireSettled(true).build();
+        return executeIngestRpc("deleteById", RpcDeadlineCategory.STANDARD,
+            stub -> stub.deleteById(request), engineContext);
+    }
+
     /**
      * Deletes a single document by exact ID (normalized path).
      * Used by file watcher to handle DELETE events.
@@ -1056,8 +1067,19 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public IndexingService.PrefixDeletionOutcome deleteDocsByPathPrefixWithOutcome(
+            Path pathPrefix, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocsByPathPrefixWithOutcome(pathPrefix, engineContext);
+    }
+
+    @Override
     public boolean deleteDocById(String docId, EngineContext engineContext) {
         return rootLifecycleOps.deleteDocById(docId, engineContext);
+    }
+
+    @Override
+    public IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocByIdWithOutcome(docId, engineContext);
     }
 
     /**

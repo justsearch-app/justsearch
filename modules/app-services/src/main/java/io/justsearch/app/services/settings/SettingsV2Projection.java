@@ -24,9 +24,9 @@ public final class SettingsV2Projection {
         settings.getTheme(), settings.isHighContrast(), settings.getDensity(),
         settings.isVimMode(), settings.getDefaultAction(),
         settings.getInspectorWidth() > 0 ? settings.getInspectorWidth() : null,
-        settings.isPauseIndexingDuringAi(), settings.getMode(), settings.isTrustLoopNudgeSeen(),
+        settings.getMode(), settings.isTrustLoopNudgeSeen(),
         List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled(),
-        invalidPatterns.isEmpty() ? null : invalidPatterns);
+        invalidPatterns.isEmpty() ? null : invalidPatterns, settings.getIndexingPause());
     var llm = new LlmSettingsV2(
         blankToNull(settings.getServerExecutablePath()), settings.getContextLength(),
         settings.getMaxTokens(), settings.configuredGpuLayers(),

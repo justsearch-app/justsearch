@@ -25,16 +25,17 @@ class ExclusionLimitTest {
     var context = io.justsearch.app.services.TestEngineContexts.durableInternal();
     org.mockito.Mockito.when(indexing.getWatchedRoots(context)).thenReturn(
         List.of(new io.justsearch.app.api.IndexingService.WatchedRoot("docs", root)));
-    org.mockito.Mockito.when(indexing.deleteDocsByPathPrefix(org.mockito.ArgumentMatchers.any(),
+    org.mockito.Mockito.when(indexing.deleteDocsByPathPrefixWithOutcome(org.mockito.ArgumentMatchers.any(),
         org.mockito.ArgumentMatchers.eq(context))).thenAnswer(call -> {
           java.nio.file.Path prefix = call.getArgument(0);
           int before = indexed.size();
           indexed.removeIf(path -> path.startsWith(prefix));
-          return before - indexed.size();
+          return new io.justsearch.app.api.IndexingService.PrefixDeletionOutcome(true, before - indexed.size(), "");
         });
-    org.mockito.Mockito.when(indexing.deleteDocById(org.mockito.ArgumentMatchers.anyString(),
+    org.mockito.Mockito.when(indexing.deleteDocByIdWithOutcome(org.mockito.ArgumentMatchers.anyString(),
         org.mockito.ArgumentMatchers.eq(context))).thenAnswer(call ->
-            indexed.remove(java.nio.file.Path.of((String) call.getArgument(0))));
+            new io.justsearch.app.api.IndexingService.DeletionOutcome(
+                indexed.remove(java.nio.file.Path.of((String) call.getArgument(0))), ""));
     var service = new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> indexing);
     var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
     var installed = new io.justsearch.configuration.resolved.ConfigStore(
@@ -175,6 +176,6 @@ class ExclusionLimitTest {
   }
 
   private static SettingsV2 patch(List<String> patterns) {
-    return new SettingsV2(new UiSettingsV2(null, null, null, null, null, null, null, null, null, patterns, null), null, null, null);
+    return new SettingsV2(new UiSettingsV2(null, null, null, null, null, null, null, null, patterns, null), null, null, null);
   }
 }

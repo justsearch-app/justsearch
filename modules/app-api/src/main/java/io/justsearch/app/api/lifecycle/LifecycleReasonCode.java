@@ -179,6 +179,9 @@ public enum LifecycleReasonCode {
   // operating-state assembler from the bulk-work gate, whose game input the Engine's GPU residency
   // sampler sets from game detection; never held in a reason slot.
   INDEXING_PAUSED_GAME_MODE("indexing.paused_game_mode"),
+  INDEXING_PAUSING_USER("indexing.pausing_user"),
+  INDEXING_PAUSED_USER("indexing.paused_user"),
+  INDEXING_PAUSED_SETTINGS_RECOVERY("indexing.paused_settings_recovery_check_exclusions"),
 
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
@@ -337,6 +340,9 @@ public enum LifecycleReasonCode {
           INDEXING_SLOWED_CHAT_GENERATING,
           INDEXING_PAUSED_GPU_BUSY,
           INDEXING_PAUSED_GAME_MODE,
+          INDEXING_PAUSING_USER,
+          INDEXING_PAUSED_USER,
+          INDEXING_PAUSED_SETTINGS_RECOVERY,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

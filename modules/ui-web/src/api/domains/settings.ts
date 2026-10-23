@@ -19,8 +19,6 @@ export interface UISettings {
   density?: 'compact' | 'comfort' | 'rich' | undefined;
   defaultAction?: 'open' | 'reveal' | 'preview' | undefined;
   inspectorWidth?: number | undefined;
-  // Power-user AI behavior (client-side only; server may ignore)
-  pauseIndexingDuringAi?: boolean | undefined;
   // Progressive disclosure mode (default: simple)
   mode?: 'simple' | 'advanced' | undefined;
   // One-time trust-loop teaching moment (citations)

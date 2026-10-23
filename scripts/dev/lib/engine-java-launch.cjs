@@ -26,7 +26,8 @@ function splitJvmOptions(text = '') {
   return args;
 }
 
-function engineJavaLaunch({ startScript, javaHome, javaOpts = '', uiOpts = '', hotReload = null, platform = process.platform }) {
+function engineJavaLaunch({ startScript, javaHome, javaOpts = '', uiOpts = '', hotReload = null, platform = process.platform,
+  glibc = platform === 'linux' && Boolean(process.report.getReport().header.glibcVersionRuntime) }) {
   const bin = path.dirname(startScript);
   // Gradle generates both launchers on both OSes; the batch defaults are already argv quoted.
   const script = fs.readFileSync(path.join(bin, 'ui.bat'), 'utf8');
@@ -40,7 +41,8 @@ function engineJavaLaunch({ startScript, javaHome, javaOpts = '', uiOpts = '', h
   const unixDefaults = unix?.match(/^DEFAULT_JVM_OPTS=(.*)$/m);
   if (unix && !unixDefaults) throw new Error('Installed Engine launch script has an unsupported shape');
   const defaultArgs = unix ? splitJvmOptions(splitJvmOptions(unixDefaults[1])[0] ?? '') : splitJvmOptions(defaults[1]);
-  const args = [...defaultArgs, ...splitJvmOptions(javaOpts),
+  const nativeHeapArgs = platform === 'linux' && glibc ? ['-XX:TrimNativeHeapInterval=30000'] : [];
+  const args = [...defaultArgs, ...nativeHeapArgs, ...splitJvmOptions(javaOpts),
     ...splitJvmOptions(uiOpts), '-classpath', classpath, entry[1]];
   if (platform === 'win32') return {
     command: path.join(javaHome, 'bin', 'java.exe'), args, shell: false, windowsHide: true,

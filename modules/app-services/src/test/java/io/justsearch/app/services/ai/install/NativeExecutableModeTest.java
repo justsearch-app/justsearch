@@ -25,13 +25,13 @@ class NativeExecutableModeTest {
       }
     }
     Path target = root.resolve("extracted");
-    AiInstallService.extractZipInPlace(archive, target);
+    ArchiveInstallRepairTest.extract(archive, target);
     assertTrue(Files.isExecutable(target.resolve("llama-server")));
     for (String name : new String[] {"libggml.so", "model.gguf", "llama-server.exe"}) {
       assertFalse(Files.isExecutable(target.resolve(name)), name);
     }
     assertTrue(target.resolve("llama-server").toFile().setExecutable(false, false));
-    AiInstallService.extractZipInPlace(archive, target);
+    ArchiveInstallRepairTest.extract(archive, target);
     assertTrue(Files.isExecutable(target.resolve("llama-server")));
     assertFalse(Files.exists(target.resolve("llama-server.partial")));
   }
@@ -44,7 +44,7 @@ class NativeExecutableModeTest {
       zip.closeEntry();
     }
     assertThrows(java.io.IOException.class,
-        () -> AiInstallService.extractZipInPlace(archive, root.resolve("extracted")));
+        () -> ArchiveInstallRepairTest.extract(archive, root.resolve("extracted")));
     assertFalse(Files.exists(root.resolve("escape")));
   }
 }

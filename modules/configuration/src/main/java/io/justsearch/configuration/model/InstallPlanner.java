@@ -10,9 +10,11 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -159,6 +161,26 @@ public final class InstallPlanner {
   public static InstallPlan plan(
       ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
       Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware) {
+    return plan(registry, hardware, intent, declined, modelsDir, homeDir, policyExcludedHardware,
+        false);
+  }
+
+  /**
+   * The plan an install run executes. Unlike status planning, an extracted archive installed before
+   * receipts existed is planned as extraction-only work: the run hashes its kept ZIP once, and a
+   * match records a receipt after confirming the outputs, while a mismatch downloads and applies
+   * the registry's archive. Status stays cheap and keeps such an install installed.
+   */
+  public static InstallPlan planInstallRun(
+      ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
+      Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware) {
+    return plan(registry, hardware, intent, declined, modelsDir, homeDir, policyExcludedHardware,
+        true);
+  }
+
+  private static InstallPlan plan(
+      ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
+      Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware, boolean installRun) {
     DownloadProfile excludedProfile = policyExcludedHardware == null
         ? DownloadProfile.CPU : policyExcludedHardware.downloadProfile();
     Set<String> declinedIds = declined == null ? Set.of() : declined;
@@ -168,6 +190,20 @@ public final class InstallPlanner {
     List<String> alreadyInstalled = new ArrayList<>();
     long totalBytes = 0;
     long resumableBytes = 0;
+    // Every archive the registry extracts into each directory, planned or not: an apply retires the
+    // receipts of archives no longer listed there (a renamed pack), and only those. Keys are
+    // normalized so lexically different spellings of one directory share one list.
+    Map<Path, Map<String, String>> archivesByDir = new HashMap<>();
+    for (ModelPackage pkg : registry.packages()) {
+      Path dir = installBaseDir(pkg, pkg.selectVariant(profile), modelsDir, homeDir);
+      for (SupportingFile sf : pkg.supportingFiles()) {
+        if (!sf.extract()) continue;
+        Path archive = dir.resolve(sf.filename()).toAbsolutePath().normalize();
+        archivesByDir.computeIfAbsent(archive.getParent(), k -> new HashMap<>())
+            .put(archive.getFileName().toString(),
+                java.util.Objects.requireNonNullElse(sf.sha256(), ""));
+      }
+    }
 
     for (ModelPackage pkg : registry.packages()) {
       // Dev-only gate (tempdoc 842): a package flagged devOnly is never part of ANY user install
@@ -280,9 +316,7 @@ public final class InstallPlanner {
       ModelVariant variant = pkg.selectVariant(profile);
       String effectiveTargetDir = effectiveTargetDir(pkg, variant);
       boolean candidateOwned = isOnnxVariant(variant);
-      Path installBaseDir = pkg.installRoot() != null && !pkg.installRoot().isBlank()
-          ? homeDir.resolve(pkg.installRoot()).resolve(effectiveTargetDir)
-          : modelsDir.resolve(effectiveTargetDir);
+      Path installBaseDir = installBaseDir(pkg, variant, modelsDir, homeDir);
       boolean useAbsoluteTargetPath = pkg.installRoot() != null && !pkg.installRoot().isBlank();
 
       boolean packageFullyInstalled = true;
@@ -310,9 +344,13 @@ public final class InstallPlanner {
       // Supporting files are always downloaded (profile-independent)
       for (SupportingFile sf : pkg.supportingFiles()) {
         Path targetFile = installBaseDir.resolve(sf.filename());
-        if (isAlreadyInstalled(targetFile, sf.sizeBytes(), sf.sha256(), candidateOwned)) {
+        boolean archivePresent = isAlreadyInstalled(
+            targetFile, sf.sizeBytes(), sf.sha256(), !sf.extract() && candidateOwned);
+        if (archivePresent && (!sf.extract()
+            || ArchiveExtractionState.isApplied(targetFile, sf.sha256(), installRun))) {
           continue;
         }
+        boolean extractionOnly = sf.extract() && archivePresent;
         String targetPath = useAbsoluteTargetPath
             ? targetFile.toAbsolutePath().toString()
             : joinTargetPath(effectiveTargetDir, sf.filename());
@@ -327,9 +365,15 @@ public final class InstallPlanner {
                 false,
                 sf.extract(),
                 sf.required(),
-                staged));
-        totalBytes += sf.sizeBytes();
-        resumableBytes += staged;
+                staged,
+                extractionOnly,
+                sf.extract()
+                    ? archivesByDir.get(targetFile.toAbsolutePath().normalize().getParent())
+                    : null));
+        if (!extractionOnly) {
+          totalBytes += sf.sizeBytes();
+          resumableBytes += staged;
+        }
         packageFullyInstalled = false;
       }
 
@@ -340,6 +384,15 @@ public final class InstallPlanner {
 
     return new InstallPlan(
         profile, downloads, skipped, totalBytes, alreadyInstalled, resumableBytes);
+  }
+
+  /** The directory a package's selected variant and supporting files install into. */
+  private static Path installBaseDir(
+      ModelPackage pkg, ModelVariant variant, Path modelsDir, Path homeDir) {
+    String effectiveTargetDir = effectiveTargetDir(pkg, variant);
+    return pkg.installRoot() != null && !pkg.installRoot().isBlank()
+        ? homeDir.resolve(pkg.installRoot()).resolve(effectiveTargetDir)
+        : modelsDir.resolve(effectiveTargetDir);
   }
 
   /**

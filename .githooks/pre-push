@@ -12,4 +12,34 @@ input_file="$(mktemp "${TMPDIR:-/tmp}/justsearch-pre-push.XXXXXX")"
 trap 'rm -f "$input_file"' EXIT HUP INT TERM
 cat >"$input_file"
 node "$repo_root/scripts/ci/check-commit-identity-privacy.mjs" --pre-push-input "$input_file" --remote-name "$remote_name" --remote-url "$remote_url"
+
+run_push_gates=0
+while read -r local_ref local_sha remote_ref remote_sha || [ -n "$local_ref" ]; do
+  case "$remote_ref" in
+    refs/heads/main) ;;
+    refs/heads/*)
+      case "$local_sha" in
+        *[!0]*) run_push_gates=1; break ;;
+      esac
+      ;;
+  esac
+done <"$input_file"
+if [ "$run_push_gates" = 1 ]; then
+  if [ "${JUSTSEARCH_SKIP_PUSH_GATES:-}" = 1 ]; then
+    printf >&2 '%s\n' 'pre-push: test-intent and store-recoverability checks skipped (JUSTSEARCH_SKIP_PUSH_GATES=1).'
+  else
+    (
+      cd "$repo_root"
+      # Use CI's commands; test-intent resolves the local merge-base with origin/main or main.
+      if ! node scripts/governance/run.mjs --gate test-intent --mode gate; then
+        printf >&2 '%s\n' 'pre-push: test-intent check failed; push refused.'
+        exit 1
+      fi
+      if ! node scripts/ci/check-store-recoverability.mjs; then
+        printf >&2 '%s\n' 'pre-push: store-recoverability check failed; push refused.'
+        exit 1
+      fi
+    )
+  fi
+fi
 git-lfs pre-push "$@" <"$input_file"

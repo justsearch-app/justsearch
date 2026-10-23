@@ -16,6 +16,7 @@
  * Side-effect registers <jf-sv3-main>.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { coverageHonesty, coverageNote, groundingCoverage } from '../../components/chat/evidenceProjection.js';
 import { JfElement } from '../../primitives/JfElement.js';
 // The product's ONE reading-position authority (tempdoc 565 §21), and this surface is its SECOND
 // adopter — 565 §21 deferred "the general multi-surface authority … to the 2nd adopter", so the
@@ -485,6 +486,8 @@ export class Sv3Main extends JfElement {
          the question, so it sits with it, one step below the bubble's own text. */
       .ask-scope {
         margin: 0;
+        overflow-wrap: anywhere;
+        max-inline-size: 100%;
         color: var(--secondary-label);
         font-size: var(--font-size-sv3-xs);
       }
@@ -587,6 +590,7 @@ export class Sv3Main extends JfElement {
          markdown renderer, so the block-level rhythm is the renderer's and this box no longer
          preserves source whitespace (a 'pre-wrap' around block children would re-introduce the
          template's own newlines as vertical space). */
+      .structured-json { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; font-family: var(--font-mono, monospace); }
       .answer {
         position: relative;
         min-width: 0;
@@ -796,6 +800,14 @@ export class Sv3Main extends JfElement {
       .sv3-citations {
         display: block;
         margin: var(--space-2) 0 0;
+        overflow-wrap: anywhere;
+      }
+      .coverage-note {
+        margin: var(--space-2) 0 0;
+        color: var(--secondary-label);
+        font-size: var(--font-size-sv3-sm);
+        line-height: 1.5;
+        overflow-wrap: anywhere;
       }
       .answer-empty {
         color: var(--secondary-label);
@@ -1303,6 +1315,7 @@ export class Sv3Main extends JfElement {
     view: { attribute: false },
     turns: { attribute: false },
     turnScopes: { attribute: false },
+    structuredNotes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
     unconfirmedSteerNotes: { attribute: false },
@@ -1323,6 +1336,7 @@ export class Sv3Main extends JfElement {
     expandedSources: { state: true },
     turnContexts: { attribute: false },
     turnLineage: { attribute: false },
+    continuationVersions: { attribute: false },
     floorSummary: { attribute: false },
     streaming: { type: Boolean },
     stopping: { attribute: false },
@@ -1343,6 +1357,7 @@ export class Sv3Main extends JfElement {
    * WP1.1 S1.7 — which turns this window limited to chosen files. Window-local: a reloaded turn is
    * not in it, and its Edit then says it searches all files, which is what it will do.
    */
+  declare structuredNotes: ReadonlyMap<string, string>;
   declare turnScopes: ReadonlyMap<string, Sv3AskScope>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
@@ -1429,6 +1444,8 @@ export class Sv3Main extends JfElement {
    * the arithmetic and performs none of it.
    */
   declare turnLineage: readonly Sv3TurnLineage[];
+  /** The versions after the last answer, before a continuation has its own question. */
+  declare continuationVersions: Sv3VersionSet | null;
   /** The compaction summary standing at the floor, or null for a plain rewind / no floor. */
   declare floorSummary: string | null;
   /**
@@ -1584,7 +1601,7 @@ export class Sv3Main extends JfElement {
   private get transcriptArmRendered(): boolean {
     if (this.resultsArmRendered) return false;
     if (this.locksTranscript) return false;
-    return (this.turns ?? []).length > 0 || this.recordNotice;
+    return (this.turns ?? []).length > 0 || this.recordNotice || this.continuationVersions !== null;
   }
 
   constructor() {
@@ -1592,6 +1609,7 @@ export class Sv3Main extends JfElement {
     this.state = COMPOSER_STATE_DEFAULT;
     this.view = SV3_RESULTS_IDLE;
     this.turns = [];
+    this.structuredNotes = new Map();
     this.turnScopes = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
@@ -1607,6 +1625,7 @@ export class Sv3Main extends JfElement {
     this.expandedSources = new Set();
     this.turnContexts = [];
     this.turnLineage = [];
+    this.continuationVersions = null;
     this.floorSummary = null;
     this.streaming = false;
     this.stopping = null;
@@ -1849,6 +1868,7 @@ export class Sv3Main extends JfElement {
               </div>`
             : nothing}
           ${turns.map((turn) => this.turn(turn))}
+          ${this.versionPager(null)}
         </div>
       </div>
       <!-- OUTSIDE the scroller: the card is viewport-positioned from the mark's own rect, so a
@@ -1980,7 +2000,9 @@ export class Sv3Main extends JfElement {
                     // it cannot disagree about what this answer stood on. Without them the block
                     // rendered at the renderer's default `'grounded'` and let an unverified `[n]` the
                     // model wrote pose as a reference on a sourced answer.
-                    html`<jf-markdown-block
+                    turn.shapeId === 'core.extract'
+                      ? html`<pre class="structured-json" data-testid="sv3-turn-json">${turn.answer}</pre>`
+                      : html`<jf-markdown-block
                       class="sv3-markdown"
                       prose
                       data-testid="sv3-turn-markdown"
@@ -1994,9 +2016,19 @@ export class Sv3Main extends JfElement {
                     ></jf-markdown-block>`}
               </div>
             `}
-        ${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.citations(turn)}
+        ${this.coverageNote(turn)}${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.citations(turn)}
       </div>
     `;
+  }
+
+  /** The shared Ask coverage note; ordinary turn text, outside streaming announcements. */
+  private coverageNote(turn: Sv3Turn): TemplateResult | typeof nothing {
+    if (turn.kind !== 'ask' || turn.status !== 'complete' || turn.evidence === null) return nothing;
+    const evidence = turn.evidence;
+    const note = coverageNote(groundingCoverage(
+      evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal,
+    ));
+    return note === null ? nothing : html`<p class="coverage-note" data-testid="sv3-turn-coverage">${note}</p>`;
   }
 
   /**
@@ -2047,6 +2079,7 @@ export class Sv3Main extends JfElement {
            id space by construction (feed ids are the controller's entry/call ids). -->
       <div class="ask-bubble" data-testid="sv3-turn-question" data-item-id=${`${turn.id}:q`}>${turn.question}</div>
       ${this.scopeLine(turn)}
+      ${turn.shapeId === 'core.extract' ? html`<p class="ask-scope">${this.structuredNotes.get(turn.id) ?? 'Structured Retry/Edit opens the instruction with the current composer schema and stated inputs; review and send.'}</p>` : nothing}
       ${canEdit && !this.streaming
         ? html`<jf-control
             class="ask-edit"
@@ -2107,7 +2140,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+        ${turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
       </p>
       <div class="ask-edit-acts">
         <jf-control
@@ -2143,8 +2176,9 @@ export class Sv3Main extends JfElement {
    * Selecting a version CLAIMS that conversation; it is navigation, not a write, so the window's
    * ordinary open path handles it and nothing here is optimistic.
    */
-  private versionPager(turn: Sv3Turn): TemplateResult | typeof nothing {
-    const versions = sv3LineageFor(this.turnLineage, turn.id)?.versions ?? null;
+  private versionPager(turn: Sv3Turn | null): TemplateResult | typeof nothing {
+    const versions = turn === null ? this.continuationVersions
+      : sv3LineageFor(this.turnLineage, turn.id)?.versions ?? null;
     if (versions === null) return nothing;
     const go = (next: number): void => {
       const target = versions.sessions[next];
@@ -2693,6 +2727,7 @@ export class Sv3Main extends JfElement {
       .retrievalMode=${turn.evidence.retrievalMode}
       .groundingIncomplete=${turn.evidence.groundingIncomplete ?? false}
       .sourceCoverage=${[...(turn.evidence.sourceCoverage ?? [])]}
+      .groupByCoverage=${turn.kind === 'ask'}
       @citation-select=${this.onCitationSelect}
     ></jf-citations-panel>`;
   }

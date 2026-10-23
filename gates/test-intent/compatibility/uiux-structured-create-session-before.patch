@@ -1,0 +1,15 @@
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java
+@@ -209,6 +209,12 @@
+   @Override
+   public boolean isLocked() {
+     return cipher.enabled() && cipher.locked();
++  }
++
++  // Before-only signature bridge: historical appendMessage still creates the session itself.
++  // Keep creation deferred to that unchanged path; do not add current outcome/read behavior.
++  public void createSession(String sessionId, String shapeId) {
++    StoreIds.requireValid(sessionId);
+   }
+ 
+   @Override

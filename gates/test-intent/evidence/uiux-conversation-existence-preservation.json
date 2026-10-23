@@ -1,0 +1,226 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T14:43:13.546Z",
+  "revision": "d85fd2c88234e0fde58907c5fdee9c0b19043acc",
+  "tree": "a9092a74785556cfc67df06849369f54af0925ec",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationExistenceCache.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-existence/tmp/wp52b/test-intent-vitest-1609924-1792680192373.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1172
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EC2 EB1 drops a cached identity after an Engine restart with lost markers",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EC2 EB1 drops a cached identity after an Engine restart with lost markers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EC3 removes a cached identity from same-run deletion markers",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EC3 removes a cached identity from same-run deletion markers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 does not cache with unavailable or invalid deletion count undefined",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 does not cache with unavailable or invalid deletion count undefined",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 does not cache with unavailable or invalid deletion count -1",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 does not cache with unavailable or invalid deletion count -1",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 does not cache with unavailable or invalid deletion count 1.5",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 does not cache with unavailable or invalid deletion count 1.5",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 does not cache with unavailable or invalid deletion count 0",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 does not cache with unavailable or invalid deletion count 0",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 does not cache with unavailable or invalid deletion count 9007199254740992",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 does not cache with unavailable or invalid deletion count 9007199254740992",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 does not cache without current Engine identity",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 does not cache without current Engine identity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EC4 retries an inconclusive answer on the next refresh and keeps the conversation",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EC4 retries an inconclusive answer on the next refresh and keeps the conversation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EC5 keeps local drafts and beyond-limit conversations without saving the cache",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EC5 keeps local drafts and beyond-limit conversations without saving the cache",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EB1 discards confirmations if deletion metadata disappears or regresses",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EB1 discards confirmations if deletion metadata disappears or regresses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EC2 EB1 a late pre-restart answer cannot populate the new Engine cache",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EC2 EB1 a late pre-restart answer cannot populate the new Engine cache",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts#EC5 a newer refresh does not reuse an earlier absence for a restored beyond-limit identity",
+      "file": "modules/ui-web/src/shell-v0/state/conversationExistenceCache.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72797480bb1947d7886a7573962a6cda93e47ab3ffedbb222d12c495eceb5b43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EC5 a newer refresh does not reuse an earlier absence for a restored beyond-limit identity",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6939e04856f489a621d69e00fd96e19ddc09f431c2bdbdcc1952f0d82cbc7db7"
+}

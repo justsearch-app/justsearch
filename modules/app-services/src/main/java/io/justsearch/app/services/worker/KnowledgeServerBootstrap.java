@@ -102,8 +102,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * energy state from {@link #energyPoller}.
      * The composition rule ("yield GPU-heavy backfill when either holds") lives in the gauge.
      */
-    private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
-        new io.justsearch.core.scheduling.GpuSchedulingGauge();
+    private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling;
 
     /**
      * Spec E step E1: Switch A, the one bulk-work verdict for this Engine, beside the gauge. The
@@ -214,6 +213,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
+        this.gpuScheduling = new io.justsearch.core.scheduling.GpuSchedulingGauge(
+            java.util.Objects.requireNonNullElseGet(workerHost.indexingHold(),
+                io.justsearch.core.scheduling.IndexingHold::new));
         this.bulkWork = java.util.Objects.requireNonNullElseGet(
             workerHost.bulkWork(), io.justsearch.core.scheduling.BulkWorkGate::new);
         this.userActivity = java.util.Objects.requireNonNullElseGet(
