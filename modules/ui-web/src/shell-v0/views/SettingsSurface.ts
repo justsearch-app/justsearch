@@ -191,6 +191,7 @@ function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
 
 export class SettingsSurface extends JfElement {
   private restoreRecoveryResetFocus = false;
+  private recoveryFocusRequested = false;
 
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -1017,6 +1018,7 @@ export class SettingsSurface extends JfElement {
    *  fixes. Settings data + activeTab are also untouched. */
   protected override settleTransients(): void {
     this.restoreRecoveryResetFocus = false;
+    this.cancelSettingsRecoveryFocus();
     this.saving = false;
     this.deleting = false;
     this.error = null;
@@ -1069,6 +1071,8 @@ export class SettingsSurface extends JfElement {
     // The recovery-only audience exception can disappear on the next status poll.
     // Move focus before the nested operation renderer removes its focused button.
     if (!this.settingsRecovery) {
+      const indexing = this.aiSnapshot?.status?.operating?.indexing;
+      if (indexing && !indexing.reasons.includes('settings_recovery')) this.cancelSettingsRecoveryFocus();
       const reset = this.shadowRoot?.getElementById('settings-reset');
       const focused = this.shadowRoot?.activeElement;
       if (this.viewerAudience === 'USER' && ((focused && reset?.contains(focused))
@@ -1081,6 +1085,7 @@ export class SettingsSurface extends JfElement {
 
   override updated(changed: PropertyValues): void {
     super.updated(changed);
+    if (this.recoveryFocusRequested) void this.focusPendingSettingsRecovery();
     // 569 Move 6 — apply-time RUNTIME conformance: once per applied presentation, audit the
     // declared region's RENDERED DOM (computed-contrast oracle). A failure quarantines the region
     // to the built-in render (degrade-never-fail). No-op when no declaration drives the region.
@@ -1739,7 +1744,23 @@ export class SettingsSurface extends JfElement {
    */
   /** Recovery navigation selects existing controls; it never changes tier or invokes Reset. */
   async focusSettingsRecovery(): Promise<void> {
+    this.recoveryFocusRequested = true;
+    await this.focusPendingSettingsRecovery();
+  }
+
+  /** Focus movement or leaving the Settings window cancels its outstanding route intent. */
+  cancelSettingsRecoveryFocus(): void {
+    this.recoveryFocusRequested = false;
+  }
+
+  private async focusPendingSettingsRecovery(): Promise<void> {
     await this.updateComplete;
+    if (!this.recoveryFocusRequested) return;
+    const indexing = this.aiSnapshot?.status?.operating?.indexing;
+    if (indexing && !indexing.reasons.includes('settings_recovery')) {
+      this.cancelSettingsRecoveryFocus();
+      return;
+    }
     const operation = this.shadowRoot?.querySelector<JfElement>('#settings-reset jf-operation');
     await operation?.updateComplete;
     const opButton = operation?.querySelector<JfElement>('jf-op-button');
@@ -1747,6 +1768,8 @@ export class SettingsSurface extends JfElement {
     const action = opButton?.shadowRoot?.querySelector<JfElement>('jf-action-button');
     await action?.updateComplete;
     const target = action?.shadowRoot?.querySelector('button');
+    if (!target || !this.recoveryFocusRequested) return;
+    this.cancelSettingsRecoveryFocus();
     target?.scrollIntoView({ block: 'nearest' });
     target?.focus();
   }

@@ -156,6 +156,7 @@ export class SettingsWindow extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.recoveryFocusRequested = false;
     this.unsubscribeCatalog?.();
     this.unsubscribeCatalog = null;
     this.cancelIdle?.();
@@ -189,6 +190,8 @@ export class SettingsWindow extends JfElement {
     if (changed.has('open') && this.open) {
       this.modal.open();
     } else if (changed.has('open')) {
+      this.recoveryFocusRequested = false;
+      (this.mounted as SettingsSurface | null)?.cancelSettingsRecoveryFocus?.();
       const skipFocusRestore = this.pendingCloseSkipsFocusRestore;
       this.pendingCloseSkipsFocusRestore = false;
       this.modal.close({ skipFocusRestore });
@@ -196,14 +199,16 @@ export class SettingsWindow extends JfElement {
     if (this.open && this.recoveryFocusRequested && this.mounted) {
       this.recoveryFocusRequested = false;
       const surface = this.mounted as SettingsSurface;
-      void surface.updateComplete.then(() => {
-        if (this.open) void surface.focusSettingsRecovery();
-      });
+      void surface.focusSettingsRecovery();
     }
   }
 
   /** Move focus to the existing recovery destination after the Settings window has rendered. */
   focusSettingsRecovery(): void {
+    if (this.open && this.mounted && this.shadowRoot?.querySelector('dialog')?.open) {
+      void (this.mounted as SettingsSurface).focusSettingsRecovery();
+      return;
+    }
     this.recoveryFocusRequested = true;
     this.requestUpdate();
   }
@@ -300,6 +305,7 @@ export class SettingsWindow extends JfElement {
     return html`
       <dialog
         aria-label=${label}
+        @focusin=${() => (this.mounted as SettingsSurface | null)?.cancelSettingsRecoveryFocus?.()}
         @cancel=${(e: Event) => {
           e.preventDefault();
           this.requestClose();

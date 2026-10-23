@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './SettingsSurface.js';
 import type { SettingsSurface } from './SettingsSurface.js';
+import '../chrome/SettingsWindow.js';
+import type { SettingsWindow } from '../chrome/SettingsWindow.js';
 import type { Operation } from '../../api/types/registry.js';
 import { __resetForTest as resetOperations, __seedForTest as seedOperations } from '../../api/registry/OperationCatalogClient.js';
 import { __resetForTest as resetSurfaces, __seedForTest as seedSurfaces } from '../../api/registry/SurfaceCatalogClient.js';
@@ -26,13 +28,15 @@ let unregister: () => void;
 let originalTier: ReturnType<typeof getViewerAudience>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
-function observe(reason: string | null): void {
-  __feedForTest({ status: {
+function observe(reason: string | null): StatusSnapshot {
+  const status = {
     operating: { indexing: { state: reason ? 'PAUSED' : 'RUNNING', reasons: reason ? [reason] : [],
       untilEpochMs: null, waitingForResume: false } },
     worker: { core: { indexState: 'IDLE', pendingJobs: 0, indexedDocuments: 0, searchableDocuments: 0, indexHealthy: true } },
-  } as unknown as StatusSnapshot });
+  } as unknown as StatusSnapshot;
+  __feedForTest({ status });
   __feedContactForTest();
+  return status;
 }
 async function settle(surface: SettingsSurface): Promise<void> {
   await surface.updateComplete;
@@ -50,6 +54,30 @@ async function mount(): Promise<SettingsSurface> {
   document.body.append(surface);
   await settle(surface);
   return surface;
+}
+async function mountRecoveryWindow(): Promise<{ window: SettingsWindow; surface: SettingsSurface; close: HTMLButtonElement }> {
+  seedSurfaces({ schemaVersion: '1', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: [{
+    id: 'core.settings-surface', audience: 'USER', placement: 'MODAL', mountTag: 'jf-settings-surface',
+    presentation: { labelKey: 'registry-surface.settings-surface.label', descriptionKey: 'registry-surface.settings-surface.description' },
+    consumes: { resources: [], operations: [], prompts: [], diagnosticChannels: [] },
+    provenance: { tier: 'CORE', contributorId: 'core', version: '1.0' },
+  }] });
+  const window = document.createElement('jf-settings-window') as SettingsWindow;
+  window.host_ = createMockHostApi();
+  document.body.append(window);
+  window.open = true;
+  await window.updateComplete;
+  await tick();
+  const surface = window.shadowRoot!.querySelector('jf-settings-surface') as SettingsSurface;
+  await settle(surface);
+  const close = window.shadowRoot!.querySelector<HTMLButtonElement>('button.close')!;
+  // Happy DOM does not perform the native showModal initial-focus step.
+  close.focus();
+  window.focusSettingsRecovery();
+  await window.updateComplete;
+  await settle(surface);
+  expect(invokeButton(surface)).toBeNull();
+  return { window, surface, close };
 }
 function action(surface: SettingsSurface): Rendered | null {
   return surface.shadowRoot!.querySelector('jf-op-button')?.shadowRoot?.querySelector('jf-action-button') ?? null;
@@ -83,6 +111,85 @@ afterEach(async () => {
 });
 
 describe('CR37c settings recovery', () => {
+  it('R2 retains recovery route focus until the first status reveals the hold', async () => {
+    const { surface, close } = await mountRecoveryWindow();
+    expect(deepActiveElement()).toBe(close);
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(invokeButton(surface));
+  });
+
+  it('R2 drops pending recovery focus when the user moves focus, even if they return', async () => {
+    const { surface, close } = await mountRecoveryWindow();
+    const nav = surface.shadowRoot!.querySelector('jf-settings-nav')!;
+    await (nav as Rendered).updateComplete;
+    nav.shadowRoot!.querySelector<HTMLInputElement>('input')!.focus();
+    close.focus();
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(close);
+  });
+
+  it('R2 drops pending recovery focus when Settings closes and is reopened normally', async () => {
+    const { window, surface, close } = await mountRecoveryWindow();
+    window.dismiss(); await window.updateComplete;
+    window.open = true; await window.updateComplete;
+    close.focus();
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(close);
+    window.focusSettingsRecovery(); await window.updateComplete; await settle(surface);
+    expect(deepActiveElement()).toBe(invokeButton(surface));
+  });
+
+  it('R2 drops pending recovery focus when the first status reports no recovery hold', async () => {
+    const surface = await mount();
+    const other = document.createElement('button');
+    document.body.append(other); other.focus();
+    await surface.focusSettingsRecovery();
+    observe(null); await settle(surface);
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(other);
+  });
+
+  it('R2 retains recovery intent through an unconfirmed recovery observation until Reset appears', async () => {
+    const surface = await mount();
+    const other = document.createElement('button');
+    document.body.append(other); other.focus();
+    await surface.focusSettingsRecovery();
+    const status = observe('settings_recovery');
+    __feedForTest({ status: { ...status, meta: { ...status.meta, workerRpcStale: true } } as StatusSnapshot });
+    await settle(surface);
+    expect(invokeButton(surface)).toBeNull();
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(invokeButton(surface));
+  });
+
+  it('R2 never steals focus moved during the existing asynchronous focus walk', async () => {
+    const { window, surface } = await mountRecoveryWindow();
+    observe('settings_recovery'); await settle(surface);
+    const nav = surface.shadowRoot!.querySelector('jf-settings-nav') as Rendered;
+    await nav.updateComplete;
+    const search = nav.shadowRoot!.querySelector<HTMLInputElement>('input')!;
+    window.focusSettingsRecovery(); await window.updateComplete;
+    search.focus(); await settle(surface);
+    expect(deepActiveElement()).toBe(search);
+  });
+
+  it('R2 cancels a repeated recovery route when the user moves focus before the window updates', async () => {
+    const { window, surface } = await mountRecoveryWindow();
+    observe('settings_recovery'); await settle(surface);
+    const nav = surface.shadowRoot!.querySelector('jf-settings-nav') as Rendered;
+    await nav.updateComplete;
+    const search = nav.shadowRoot!.querySelector<HTMLInputElement>('input')!;
+    window.focusSettingsRecovery();
+    search.focus();
+    await window.updateComplete; await settle(surface);
+    expect(deepActiveElement()).toBe(search);
+  });
+
   it('R1 exposes the existing reset in every tier only for the observed recovery hold', async () => {
     const surface = await mount();
     expect(invokeButton(surface)).toBeNull();

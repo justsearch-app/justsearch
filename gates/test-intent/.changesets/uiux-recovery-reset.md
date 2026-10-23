@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-recovery-reset-builder-dtfir3ar
+author-session: uiux-recovery-reset-builder-g80v1dgx
 ---
 
 # Test-intent entries
@@ -19,6 +19,15 @@ The baseline shared clone, logs, private Engine/browser scripts, and R4 screensh
 `tmp/recovery-reset/` are scaffolding. The evidence runner uses its default dependency-link
 mode, with a temporary `npx` launcher adding `--cache=false --maxWorkers=2 --configLoader runner`
 to avoid writes to the shared UI dependency tree. No acceptance record is authored here.
+
+Continuation after independent check of 53aecead5: seven durable R2 checks cover pending
+focus and its cancellation. Four repair checks assertion-fail on 53aecead5; three cancellation
+checks pass before and after. The real-interface reproduction delays the first /api/status
+response from a private Engine; on 53aecead5 Reset appears while focus stays on Close Settings.
+The repaired interface focuses Reset, and preserves user focus after movement or leaving Settings.
+Browser evidence, screenshots and launchers under `tmp/recovery-reset-focus/` are scaffolding.
+The two original evidence files below are refreshed against bcab79eeb for the updated test-file digest.
+No acceptance record is authored by the builder.
 
 ```json
 {
@@ -112,6 +121,79 @@ to avoid writes to the shared UI dependency tree. No acceptance record is author
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (null)",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (user_paused)",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (game_mode)"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "R2 retains the existing recovery route focus intent until Reset renders, including an unconfirmed recovery observation; user focus movement cancels an asynchronous focus walk. A repeated route registers its intent before another window render, so intervening focus movement cancels it.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 recovery routing, including the delayed-first-status focus repair requested after independent checking of 53aecead5.",
+          "choice": "If Reset appears while that intent is still pending, focus moves to it.",
+          "quote": "If Reset appears while that intent is still pending, focus moves to it.",
+          "location": "task t-20261019-bd718f agreement R2 delayed-status focus continuation (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 recovery routing, including the delayed-first-status focus repair requested after independent checking of 53aecead5.",
+          "choice": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
+          "quote": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
+          "location": "task t-20261019-bd718f agreement R2 delayed-status focus continuation (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-focus-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains recovery route focus until the first status reveals the hold",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains recovery intent through an unconfirmed recovery observation until Reset appears",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 never steals focus moved during the existing asynchronous focus walk",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 cancels a repeated recovery route when the user moves focus before the window updates"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "R2 drops pending intent when focus moves (even if it returns), Settings closes and reopens normally, or an observed status explicitly reports no recovery hold.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 recovery routing, including the delayed-first-status focus repair requested after independent checking of 53aecead5.",
+          "choice": "If Reset appears while that intent is still pending, focus moves to it.",
+          "quote": "If Reset appears while that intent is still pending, focus moves to it.",
+          "location": "task t-20261019-bd718f agreement R2 delayed-status focus continuation (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 recovery routing, including the delayed-first-status focus repair requested after independent checking of 53aecead5.",
+          "choice": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
+          "quote": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
+          "location": "task t-20261019-bd718f agreement R2 delayed-status focus continuation (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-focus-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus when the user moves focus, even if they return",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus when Settings closes and is reopened normally",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus when the first status reports no recovery hold"
       ],
       "repaired": false
     }
