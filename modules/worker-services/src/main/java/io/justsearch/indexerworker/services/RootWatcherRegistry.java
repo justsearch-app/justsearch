@@ -62,7 +62,7 @@ public final class RootWatcherRegistry {
    * Set once a reload's replacement registry took over this one's roots. Watch changes that still
    * reach this retired registry go to the successor, so none is lost and no removal is undone.
    */
-  private RootWatcherRegistry successor;
+  private volatile RootWatcherRegistry successor;
   private long handoverMark;
 
   /** How a successor re-registers one handed-over root (a volume check may hold it instead). */
@@ -260,7 +260,7 @@ public final class RootWatcherRegistry {
   }
 
   /** The registry that currently owns this one's roots: itself, or its latest successor. */
-  synchronized RootWatcherRegistry current() {
+  RootWatcherRegistry current() {
     return successor == null ? this : successor.current();
   }
 
@@ -311,6 +311,14 @@ public final class RootWatcherRegistry {
       if (normalized.startsWith(root)) return true;
     }
     return false;
+  }
+
+  /** Active and held declarations both partition an ancestor's scope. */
+  Set<Path> declaredRoots() {
+    if (successor != null) return successor.declaredRoots();
+    var roots = new java.util.HashSet<>(subscriptions.keySet());
+    roots.addAll(awaitingVolume.keySet());
+    return Set.copyOf(roots);
   }
 
   /** Immutable registration snapshot used by a root reconciliation admission. */

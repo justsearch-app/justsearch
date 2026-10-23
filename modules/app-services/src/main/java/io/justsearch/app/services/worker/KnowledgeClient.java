@@ -324,6 +324,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 public void unwatch(String rootPath, EngineContext engineContext) {
                     unwatchRoot(rootPath, engineContext);
                 }
+
+                @Override
+                public void clearAllRoots(EngineContext engineContext) {
+                    var request = io.justsearch.ipc.UnwatchRootRequest.newBuilder().setClearAllRoots(true).build();
+                    var response = executeIngestRpc("unwatchRoot", RpcDeadlineCategory.STANDARD,
+                        stub -> stub.unwatchRoot(request), engineContext);
+                    if (!response.getRootsCleared()) {
+                        throw new IllegalStateException("Worker did not acknowledge clearing all roots");
+                    }
+                }
             };
         // Tempdoc 418 B-H.3 — Worker now owns backpressure (queue-depth aware throttle inside
         // WorkerScanOps) and cancellation (via ServerCallStreamObserver.isCancelled()), so Head

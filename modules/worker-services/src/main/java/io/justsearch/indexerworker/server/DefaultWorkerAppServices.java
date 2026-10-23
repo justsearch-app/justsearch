@@ -693,6 +693,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
     // Tempdoc 419 / T5.3 (ADR-0028): wire the scoped reverse-lookup store. KnowledgeServer
     // constructed it; we just inject so the LookupPathByHash service handler returns real data.
+    this.ingestService.setDeclaredRootsDirectory(resolvedConfig.paths().dataDir());
     this.ingestService.setPathResolutionStore(ctx.pathResolutionStore());
     this.ingestService.setDocumentIdentityStore(ctx.documentIdentityStore());
     this.ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
@@ -944,6 +945,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.preparedWatcherTarget = new WatcherCallbacks.Target(
         greenRuntime, this.ingestService, incumbent.preparedWatcherTarget.deletionMarker(),
         mutationAdmission, mutationOwnerToken);
+    ingestService.setDeclaredRootsDirectory(resolvedConfig.paths().dataDir());
     ingestService.setPathResolutionStore(greenContext.pathResolutionStore());
     ingestService.setDocumentIdentityStore(greenContext.documentIdentityStore());
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);

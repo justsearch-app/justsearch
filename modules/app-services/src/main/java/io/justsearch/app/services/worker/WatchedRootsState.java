@@ -91,7 +91,8 @@ public final class WatchedRootsState {
         synchronized (WatchedRootsState.this) {
           stale = (watchedOnly && !watchedRoots.containsKey(root))
               || retiredRoots.entrySet().stream().anyMatch(entry -> entry.getValue() > revision
-                  && (root.startsWith(entry.getKey()) || entry.getKey().startsWith(root)));
+                  && (root.equals(entry.getKey()) || entry.getKey().startsWith(root)
+                      || (root.startsWith(entry.getKey()) && !watchedRoots.containsKey(root))));
         }
         return stale ? retired.get() : producer.get();
       }
@@ -381,6 +382,23 @@ public final class WatchedRootsState {
     driftCorrected.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
     lastVerifiedAt.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
       io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
+  }
+
+  synchronized void removeRootAndPersist(Path root) {
+    var remaining = new java.util.HashMap<>(watchedRoots);
+    remaining.remove(root);
+    rootsStore.persistRoots(remaining, walkErrors, walkCompleted, collections);
+    var statusBefore = statusContent();
+    retiredRoots.put(root, ++retirementRevision);
+    initializations.remove(root);
+    watchedRoots.remove(root);
+    walkErrors.remove(root);
+    walkCompleted.remove(root);
+    deleteDetectionUnverified.remove(root);
+    driftCorrected.remove(root);
+    lastVerifiedAt.remove(root);
+    collections.remove(root);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   synchronized void removeRootAndNestedAndPersist(Path normalizedRoot) {
