@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:05:44.227Z",
-  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
-  "tree": "2cd7d160389e0057bb94819b1f6dd9eb9ee919f5",
+  "createdAt": "2026-10-23T20:25:56.145Z",
+  "revision": "1573b367b21a217facca0517d5153a1b325e7865",
+  "tree": "f376bd387a6b47d37cabcb3e821e4832d61dd606",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-713093-1792785936663.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-898820-1792787146291.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3597
+      "durationMs": 4210
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
+      "contentDigest": "sha256:10b5990fd6fce9541ee8002ebe439b8ef37d4d9db35866d7ab8c89148364aa5f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
+      "contentDigest": "sha256:10b5990fd6fce9541ee8002ebe439b8ef37d4d9db35866d7ab8c89148364aa5f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -66,11 +66,11 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-713093-1792785941320.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-898820-1792787151842.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2766,
-        "output": "JSON report written to /home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-713093-1792785941320.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
+        "durationMs": 4085,
+        "output": "JSON report written to /home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-898820-1792787151842.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
       }
     ],
     "checks": [
@@ -82,9 +82,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
         "classification": "assertion",
-        "detail": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask:  AssertionError: expected 'core.free-chat' to be 'core.rag-ask' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-JV9ERT/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:161:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-ha"
+        "detail": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask:  AssertionError: expected 'core.free-chat' to be 'core.rag-ask' // Object.is equality\n    at /home/elias/.cache/am/kqzf3_ey/tmp/test-intent-before-lrI67a/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:161:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-ha"
       }
     ]
   },
-  "digest": "sha256:0431102703fd256135cce8945872b1ba20a0ecd3e5dbcbdd47f8b2f54b2c12f1"
+  "digest": "sha256:7547022e9635147f226019340b40ec1033dbbb9f3ee92baf10694aa0b233d352"
 }

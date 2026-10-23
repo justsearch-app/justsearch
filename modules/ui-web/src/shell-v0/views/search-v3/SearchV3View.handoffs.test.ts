@@ -469,3 +469,42 @@ it.each(['retry', 'edit'])('HO5 a reloaded Explain %s keeps its trace and states
   q<HTMLButtonElement>(c, 'sv3-composer-send')!.click();await drain(view);
   expect(dispatches()).toHaveLength(0);
 });
+
+it('merge model action after a no-match hand-off preserves the prepared draft and excludes its selection', async () => {
+  const previous = fetchMock.getMockImplementation()! as (...args: unknown[]) => Promise<unknown>;
+  let first = true;
+  fetchMock.mockImplementation(async (...args: unknown[]) => {
+    if (String(args[0]).includes('/api/chat/dispatch') && first) {
+      first = false;
+      return new Response('event: error\ndata: {"errorCode":"NO_CONTENT","error":"No matching documents found in the index"}\n\n');
+    }
+    return previous(...args);
+  });
+  const selected = {kind: 'search-trace', scope: 'hit', summary: 'sparse #1 0.75'} as const;
+  setPendingSelection(selected);setPendingForceShape('core.rag-ask');
+  await navigate({query: 'no matching files', forceShapeId: 'core.rag-ask'});
+  const view = await mount();await send(view);
+  const c = await composer(view);const draft = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value;
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
+  const model = q<HTMLButtonElement>(main, 'sv3-answer-without-files');expect(model).not.toBeNull();
+  model!.click();await drain(view);
+  expect(dispatches()).toHaveLength(2);
+  const body = JSON.parse((dispatches()[1]![1] as RequestInit).body as string);
+  expect(body.shapeId).toBe('core.free-chat');expect(body).not.toHaveProperty('selection');
+  expect(body).not.toHaveProperty('context');expect(body).not.toHaveProperty('docIds');
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe(draft);
+  expect((view as unknown as {preparedHandoff: unknown}).preparedHandoff).toEqual({shapeId: 'core.rag-ask', selection: selected});
+});
+
+
+it('merge an unscoped Summarize input failure is not a no-matching-files result', async () => {
+  const previous = fetchMock.getMockImplementation()! as (...args: unknown[]) => Promise<unknown>;
+  fetchMock.mockImplementation(async (...args: unknown[]) => String(args[0]).includes('/api/chat/dispatch')
+    ? new Response('event: error\ndata: {"errorCode":"NO_CONTENT","error":"Document has no content"}\n\n') : previous(...args));
+  setPendingSelection({kind: 'search-trace', scope: 'hit', summary: 'sparse #1 0.75'});
+  await navigate({query: 'Explain ranking', forceShapeId: 'core.summarize'});
+  const view = await mount();await send(view);
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
+  expect(q(main, 'sv3-no-evidence')).toBeNull();expect(q(main, 'sv3-answer-without-files')).toBeNull();
+  expect(q(main, 'sv3-turn')?.getAttribute('data-status')).toBe('failed');
+});

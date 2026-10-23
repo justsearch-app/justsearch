@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.reranker.NumericConsistency;
 import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,25 +82,33 @@ public final class AnswerSegmentation {
    * cannot be asked.
    */
   static List<String> splitSentences(String text, Locale locale) {
-    if (text == null || text.isBlank()) {
-      return List.of();
-    }
-    List<String> sentences = new ArrayList<>();
-    for (String block : blockTexts(text)) {
-      segmentBlock(block, locale, sentences);
-    }
-    return sentences;
+    return splitClaims(text, locale).stream().map(NumericConsistency.Claim::text).toList();
   }
 
-  /** Sentence-terminator segmentation WITHIN one block's text. */
-  private static void segmentBlock(String block, Locale locale, List<String> out) {
+  /** Keeps numeric claims in code distinct from reference literals without changing mark keys. */
+  public static List<NumericConsistency.Claim> splitClaims(String text) {
+    return splitClaims(text, Locale.ROOT);
+  }
+
+  private static List<NumericConsistency.Claim> splitClaims(String text, Locale locale) {
+    if (text == null || text.isBlank()) return List.of();
+    List<NumericConsistency.Claim> claims = new ArrayList<>();
+    for (Block block : blockTexts(text)) segmentBlock(block, locale, claims);
+    return claims;
+  }
+
+  private record Block(String text, String numericText) {}
+
+  /** Sentence boundaries are taken only from the original visible text. */
+  private static void segmentBlock(Block block, Locale locale, List<NumericConsistency.Claim> out) {
     BreakIterator bi = BreakIterator.getSentenceInstance(locale);
-    bi.setText(block);
+    bi.setText(block.text());
     int start = bi.first();
     for (int end = bi.next(); end != BreakIterator.DONE; start = end, end = bi.next()) {
-      String sentence = block.substring(start, end).trim();
+      String sentence = block.text().substring(start, end).trim();
       if (carriesClaim(sentence)) {
-        out.add(sentence);
+        out.add(new NumericConsistency.Claim(sentence,
+            NumericConsistency.proseValues(block.numericText().substring(start, end))));
       }
     }
   }
@@ -141,8 +150,8 @@ public final class AnswerSegmentation {
    * <p>Falls back to segmenting the raw answer when the parse fails, so a malformed answer still
    * produces keys rather than none.
    */
-  private static List<String> blockTexts(String markdown) {
-    List<String> blocks = new ArrayList<>();
+  private static List<Block> blockTexts(String markdown) {
+    List<Block> blocks = new ArrayList<>();
     try {
       Parser parser =
           Parser.builder()
@@ -151,25 +160,26 @@ public final class AnswerSegmentation {
       collectBlocks(parser.parse(markdown), blocks);
     } catch (RuntimeException e) {
       log.debug("Markdown parse failed; segmenting the answer as prose: {}", e.getMessage());
-      return List.of(markdown);
+      return List.of(new Block(markdown, markdown));
     }
     return blocks;
   }
 
-  private static void collectBlocks(Node node, List<String> out) {
+  private static void collectBlocks(Node node, List<Block> out) {
     for (Node child = node.getFirstChild(); child != null; child = child.getNext()) {
       if (child instanceof Paragraph || child instanceof Heading || child instanceof TableCell) {
         addBlock(inlineText(child), out);
       } else if (child instanceof FencedCodeBlock fenced) {
-        addBlock(fenced.getLiteral(), out);
+        addBlock(new Block(fenced.getLiteral(), protectCode(fenced.getLiteral())), out);
       } else if (child instanceof IndentedCodeBlock indented) {
-        addBlock(indented.getLiteral(), out);
+        addBlock(new Block(indented.getLiteral(), protectCode(indented.getLiteral())), out);
       } else if (child instanceof HtmlBlock htmlBlock) {
         // A raw HTML container is markup, but the prose INSIDE it is answer text: DOMPurify keeps
         // it and the renderer walks its text nodes like any other (MarkdownBlock.ts:336-341).
         // Skipping the block outright would leave a visible, citable sentence with no key at all —
         // unscored, uncounted, absent from the sources panel.
-        addBlock(visibleHtmlText(htmlBlock.getLiteral()), out);
+        String visible = visibleHtmlText(htmlBlock.getLiteral());
+        addBlock(new Block(visible, visible), out);
       } else if (child instanceof ThematicBreak || child instanceof LinkReferenceDefinition) {
         // Structure, and no text a reader could see grounded.
         continue;
@@ -180,11 +190,17 @@ public final class AnswerSegmentation {
     }
   }
 
-  private static void addBlock(String text, List<String> out) {
-    String trimmed = text == null ? "" : text.strip();
+  private static void addBlock(Block block, List<Block> out) {
+    String trimmed = block.text() == null ? "" : block.text().strip();
     if (!trimmed.isEmpty()) {
-      out.add(trimmed);
+      out.add(new Block(trimmed, block.numericText().strip()));
     }
+  }
+
+  private static String protectCode(String literal) {
+    // Protect ASCII and NFKC-compatible brackets in place, keeping visible sentence offsets.
+    return literal.replace('[', '(').replace(']', ')')
+        .replace('［', '(').replace('］', ')').replace('﹇', '(').replace('﹈', ')');
   }
 
   /**
@@ -211,26 +227,30 @@ public final class AnswerSegmentation {
    * that no run in the DOM can match — a phantom sentence in {@code sentences_total} that always
    * reads as ungrounded — and would break a sentence containing an inline image in two.
    */
-  private static String inlineText(Node block) {
-    StringBuilder sb = new StringBuilder();
-    appendInline(block, sb);
-    return sb.toString().replaceAll("\\s+", " ").strip();
+  private static Block inlineText(Node block) {
+    StringBuilder text = new StringBuilder();
+    StringBuilder numericText = new StringBuilder();
+    appendInline(block, text, numericText);
+    return new Block(text.toString().replaceAll("\\s+", " ").strip(),
+        numericText.toString().replaceAll("\\s+", " ").strip());
   }
 
-  private static void appendInline(Node node, StringBuilder sb) {
+  private static void appendInline(Node node, StringBuilder text, StringBuilder numericText) {
     for (Node child = node.getFirstChild(); child != null; child = child.getNext()) {
-      if (child instanceof Text text) {
-        sb.append(text.getLiteral());
+      if (child instanceof Text literal) {
+        text.append(literal.getLiteral());
+        numericText.append(literal.getLiteral());
       } else if (child instanceof Code code) {
-        sb.append(code.getLiteral());
+        text.append(code.getLiteral());
+        numericText.append(protectCode(code.getLiteral()));
       } else if (child instanceof SoftLineBreak
           || child instanceof HardLineBreak
           || child instanceof HtmlInline
           || child instanceof Image) {
-        sb.append(' ');
+        text.append(' ');
+        numericText.append(' ');
       } else {
-        // Emphasis, strong emphasis, link, custom inline: the label is the text.
-        appendInline(child, sb);
+        appendInline(child, text, numericText);
       }
     }
   }

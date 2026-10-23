@@ -822,7 +822,7 @@ public final class AgentLoopService implements AgentService {
    * for is the one where the session is already gone: a session-scoped latch would be absent exactly
    * when the duplicate arrives.
    */
-  private void recordStopRequest(String sessionId) {
+  private synchronized void recordStopRequest(String sessionId) {
     if (sessionId == null || sessionId.isBlank() || runStore.readSnapshot(sessionId) == null) {
       return;
     }

@@ -3578,6 +3578,82 @@ class AgentLoopServiceTest {
     assertEquals(1, stopNotesOn(runStore, "session_late_cancel").size());
   }
 
+  /** DS6: concurrent cancellation of approval-held runs records Stop once per run. */
+  @Test
+  void concurrentCancellationAtApprovalRecordsOneStop() throws Exception {
+    var runStore = new AgentRunStore(tempDir.resolve("concurrent-stop"));
+    // Exercise the real registry, held approval, journal and competing cancel callers. Repeating
+    // the overlap covers scheduling variation without adding a production-only test hook.
+    try (var callers = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+      for (int trial = 0; trial < 256; trial++) {
+        var tool = new StubTool("danger", RiskTier.MEDIUM, "must-not-run");
+        var ai = new ScriptedAiService(List.of(
+            ScriptedResponse.toolCall("held-call", "core_danger", "{}")));
+        var service = new AgentLoopService(
+            ai, stubCatalog(tool), stubExecutor(tool), stubEmitter(), null, null, runStore, null);
+        var sessionId = new java.util.concurrent.atomic.AtomicReference<String>();
+        var pending = new java.util.concurrent.CountDownLatch(1);
+        var observed = new CopyOnWriteArrayList<AgentEvent>();
+        var loop = new CompletableFuture<Void>();
+        var loopThread = Thread.ofPlatform().start(() -> {
+          try {
+            service.runAgent(new AgentRequest(userMessage("hold this write"), List.of(), 3), event -> {
+              observed.add(event);
+              if (event instanceof AgentEvent.SessionStarted started) sessionId.set(started.sessionId());
+              if (event instanceof AgentEvent.ToolCallPendingApproval) pending.countDown();
+            }, EngineContextTestFixtures.AGENT_LOOP);
+            loop.complete(null);
+          } catch (Throwable error) {
+            loop.completeExceptionally(error);
+          }
+        });
+        try {
+          assertTrue(pending.await(5, java.util.concurrent.TimeUnit.SECONDS), "approval must be held");
+          long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+          while (service.pendingToolApproval(sessionId.get(), "held-call").isEmpty()
+              && !loop.isDone() && System.nanoTime() < deadline) Thread.yield();
+          assertTrue(service.pendingToolApproval(sessionId.get(), "held-call").isPresent());
+          // A held model run already has streamed progress/reasoning in its journal. An empty
+          // fixture hides the read-then-append overlap that occurs while those rows are inspected.
+          for (int row = 0; row < 256; row++) {
+            runStore.appendEvent(sessionId.get(), new AgentEvent.AgentProgress(
+                "model_progress", "Working on the held operation", 1, 3));
+          }
+          var ready = new java.util.concurrent.CountDownLatch(8);
+          var start = new java.util.concurrent.CountDownLatch(1);
+          var cancellations = new ArrayList<java.util.concurrent.Future<?>>();
+          for (int caller = 0; caller < 8; caller++) {
+            cancellations.add(callers.submit(() -> {
+              ready.countDown();
+              if (!start.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                throw new AssertionError("concurrent cancellation was not released");
+              }
+              service.cancelSession(sessionId.get());
+              return null;
+            }));
+          }
+          assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS));
+          start.countDown();
+          for (var cancellation : cancellations) cancellation.get(5, java.util.concurrent.TimeUnit.SECONDS);
+          loop.get(5, java.util.concurrent.TimeUnit.SECONDS);
+          service.cancelSession(sessionId.get()); // retry after the live session has been retired
+          assertEquals(1, stopNotesOn(runStore, sessionId.get()).size(),
+              "concurrent cancellations must leave exactly one durable Stop note, trial " + trial);
+          assertEquals(1, stopNotesOn(new AgentRunStore(tempDir.resolve("concurrent-stop")),
+              sessionId.get()).size(), "reopening the store must keep that single note");
+          assertEquals(0, tool.callCount.get(), "cancelling the held approval must not execute it");
+          assertTrue(service.pendingToolApproval(sessionId.get(), "held-call").isEmpty());
+          assertTrue(observed.stream().anyMatch(event -> event instanceof AgentEvent.AgentError error
+              && AgentErrorCode.CANCELLED.name().equals(error.errorCode())));
+        } finally {
+          service.cancelSession(sessionId.get());
+          loopThread.join(5000);
+          assertFalse(loopThread.isAlive(), "the owned held loop must finish before test teardown");
+        }
+      }
+    }
+  }
+
   /** The reader's-stop notes on a run's journal (review F2 / owner decision 2026-08-26). */
   private static List<Map<String, Object>> stopNotesOn(AgentRunStore runStore, String sessionId) {
     return runStore.readEvents(sessionId).stream()

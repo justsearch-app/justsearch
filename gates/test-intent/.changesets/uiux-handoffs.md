@@ -841,6 +841,53 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Durable model-action/hand-off merge integration and preservation checks. The controller combination fails by assertion in the provisional merge (before-tests.log); the transport check also fails on 1573b367b.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and merge continuation",
+          "delegationScope": "WP1.3b hand-offs merged with main model-answer action and no-evidence notice.",
+          "choice": "An explicit Answer without files action takes precedence over pending hand-off inputs: use core.free-chat with no file scope, selection, schema or context. Normal Send preserves the forced shape and exact selection. A failed Summarize input does not mean no indexed files matched.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-merge-model.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts#merge model action overrides forced hand-off shape and omits its inputs"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Durable model-action/hand-off merge integration and preservation checks. The controller combination fails by assertion in the provisional merge (before-tests.log); the transport check also fails on 1573b367b.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and merge continuation",
+          "delegationScope": "WP1.3b hand-offs merged with main model-answer action and no-evidence notice.",
+          "choice": "An explicit Answer without files action takes precedence over pending hand-off inputs: use core.free-chat with no file scope, selection, schema or context. Normal Send preserves the forced shape and exact selection. A failed Summarize input does not mean no indexed files matched.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-merge-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts#merge ordinary hand-off keeps its forced shape and exact selection",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge an unscoped Summarize input failure is not a no-matching-files result"
+      ],
+      "repaired": false
     }
   ]
 }

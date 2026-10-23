@@ -80,6 +80,9 @@ import { readSv3ContextUsage } from './sv3-context.js';
 /** The one shape this window's ask route dispatches. */
 export const SV3_ASK_SHAPE_ID = 'core.rag-ask';
 
+/** Model answers use the persistent store as their only source of conversation history (D6). */
+export const SV3_MODEL_SHAPE_ID = 'core.free-chat';
+
 /**
  * How much work the next question asks for (tempdoc 822 Phase F10; the §4b ADAPTATION RATIFIED —
  * the spec's per-session provider picker maps to an effort control, because there is ONE local
@@ -203,6 +206,8 @@ export interface Sv3AskRequest {
   readonly conversationId: string;
   /** The composer's effort rung for THIS send; omitted is the default rung, not "no parameters". */
   readonly effort?: Sv3Effort;
+  /** Explicitly answer without retrieval; history comes only from the persistent store. */
+  readonly modelAnswer?: boolean;
   /**
    * WP1.1 — the document PATHS retrieval is limited to (what the backend's `docIds` filter
    * matches). Omitted asks the whole index; the window never sends an empty list for a choice.
@@ -268,7 +273,7 @@ export interface Sv3AskSink {
    * saved.
    */
   onLeft(): void;
-  onFailed(message: string): void;
+  onFailed(message: string, code?: string): void;
 }
 
 /**
@@ -371,20 +376,17 @@ function claimsOf(acc: Map<number, ClaimAcc>, scorer: string | null): Claim[] {
 }
 
 /**
- * Dispatch one grounded ask and drive `sink` from the stream.
- *
- * `docIds` is empty by construction: this window has no committed document set to scope an answer to
- * (the retired search-v2 window's frozen-snapshot law has no counterpart here yet), and an empty
- * array is the backend's documented open-retrieval fallback (`views/unifiedChatRequest.ts:80-84`) rather than a scope this
- * FE invented.
+ * Dispatch an Ask, or the explicit model-answer action, through the same stream lifecycle.
+ * A model answer sends sessionId and its new prompt, with no client history (D6).
+ * An Ask carries its chosen files and the effective follow-up context.
  */
 export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void> {
-  const body = buildRequestBody(req.shapeId ?? (req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract'), req.question, req.conversationId, req.schema ?? '', [
-    ...(req.docIds ?? []),
-  ], req.selection);
+  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : req.shapeId ?? (req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract'), req.question, req.conversationId, req.schema ?? '', [
+    ...(req.modelAnswer ? [] : req.docIds ?? []),
+  ], req.modelAnswer ? undefined : req.selection);
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
-  if (req.schema !== undefined && req.selection == null && (req.docIds?.length ?? 0) > 0) {
+  if (!req.modelAnswer && req.schema !== undefined && req.selection == null && (req.docIds?.length ?? 0) > 0) {
     body.selection = { kind: 'result-set', items: [...new Set(req.docIds)].map(id => ({ id, kind: 'search-hit' })) };
   }
   // The effort rung's parameters, added AFTER the shared builder rather than inside it: the builder
@@ -393,7 +395,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   Object.assign(body, sv3EffortParams(req.effort ?? SV3_EFFORT_DEFAULT));
   // The follow-up's conversation, read by `ExternalContextInjector` (into the prompt) and
   // `QueryRewriteInjector` (to rewrite the question). Same late-add as the fields above.
-  if (req.context !== undefined && req.context.length > 0) {
+  if (!req.modelAnswer && req.context !== undefined && req.context.length > 0) {
     body.context = req.context.map((m) => ({ role: m.role, content: m.content }));
   }
   if (req.turnId !== undefined) body.turnId = req.turnId;
@@ -555,7 +557,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // The shared mapping, reached only AFTER the abort and the refusal have been ruled out above —
     // which is exactly the shipped window's ordering (`views/UnifiedChatView.ts:6019-6024`) and the
     // reason a reader's own Stop is never worded as a failure (inventory E9).
-    sink.onFailed(friendlyStreamError(err));
+    sink.onFailed(friendlyStreamError(err), (err as Error & { code?: string }).code);
     return;
   }
 
