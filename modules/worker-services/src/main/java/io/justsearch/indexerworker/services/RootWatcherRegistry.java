@@ -259,6 +259,15 @@ public final class RootWatcherRegistry {
     return watch(root.toString(), collection);
   }
 
+  /** Admission and root removal share this monitor; a completed removal cannot be undone. */
+  synchronized int admitRecovery(Path root, long mark, java.util.function.BooleanSupplier declared,
+      java.util.function.IntSupplier admission) {
+    if (removedSince(root, mark)) return 0;
+    if (successor != null) return successor.admitRecovery(root, handoverMark, declared, admission);
+    return declared.getAsBoolean() || subscriptions.containsKey(root.toAbsolutePath().normalize())
+        || awaitingVolume.containsKey(root.toAbsolutePath().normalize()) ? admission.getAsInt() : 0;
+  }
+
   /** The registry that currently owns this one's roots: itself, or its latest successor. */
   synchronized RootWatcherRegistry current() {
     return successor == null ? this : successor.current();

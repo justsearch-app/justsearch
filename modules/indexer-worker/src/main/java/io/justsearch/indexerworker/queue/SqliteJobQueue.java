@@ -1423,7 +1423,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try (var insert = connection.prepareStatement("""
             INSERT INTO jobs(path,state,attempts,last_updated,collection,size_bytes,ingestion_root,unit_revision)
               VALUES(?,'PENDING',0,?,?,?,?,lower(hex(randomblob(16))))
-            ON CONFLICT(path) DO UPDATE SET state='PENDING',last_updated=excluded.last_updated,
+            ON CONFLICT(path) DO UPDATE SET state='PENDING',attempts=0,first_failed_at=NULL,
+              retry_after=NULL,error_message=NULL,last_updated=excluded.last_updated,
               size_bytes=excluded.size_bytes,ingestion_root=excluded.ingestion_root,
               unit_revision=excluded.unit_revision
             WHERE jobs.state='DONE' AND jobs.walk_seen_epoch IS NULL

@@ -264,6 +264,15 @@ public final class WorkerIngestService {
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
     this.syncOps.setUserExclusions(this::isUserExcluded);
+    this.syncOps.setRootOwnership((root, file) -> !underNestedRoot(
+        root.toAbsolutePath().normalize(), file.toAbsolutePath().normalize()));
+    this.syncOps.setRecoveryAdmissionFence(root -> {
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      long mark = registry.removalMark();
+      return admission -> registry.admitRecovery(root, mark,
+          () -> exclusionRoots.get().stream().anyMatch(path -> path.toAbsolutePath().normalize()
+              .equals(root.toAbsolutePath().normalize())) || configuredRecoveryRoots.contains(root), admission);
+    });
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -977,6 +986,7 @@ public final class WorkerIngestService {
         roots.add(root.toAbsolutePath().normalize());
       }
     }
+    configuredRecoveryRoots = List.copyOf(roots);
     List<Path> awaiting;
     try {
       awaiting = rootVolumes.awaitSeedingUnlessRecorded(roots);
@@ -1456,6 +1466,7 @@ public final class WorkerIngestService {
   }
 
   private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
+  private volatile java.util.Collection<Path> configuredRecoveryRoots = List.of();
   private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
 
   /**
@@ -2600,7 +2611,25 @@ public final class WorkerIngestService {
    * t-20261013-ef3c41, S2 and S8).
    */
   private io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
-    return RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
+    Path prefix = root.toAbsolutePath().normalize();
+    var guard = RootPresenceGuard.capture(prefix, registeredRootIdentity(prefix), rootVolumes);
+    return new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() { return guard.rootCurrent(); }
+      @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
+        // A parent's volume never supplies absence evidence for a nested root, even offline.
+        return underNestedRoot(prefix, file)
+            ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : guard.presence(file);
+      }
+    };
+  }
+
+  private boolean underNestedRoot(Path root, Path file) {
+    Path owner = pruneRootFor(file.toString());
+    return (!owner.equals(root) && owner.startsWith(root)
+        && (!owner.equals(file) || rootWatcherRegistry.declaresRootCovering(file)))
+        || java.util.stream.Stream.concat(exclusionRoots.get().stream(), configuredRecoveryRoots.stream())
+            .map(path -> path.toAbsolutePath().normalize())
+            .anyMatch(path -> !path.equals(root) && path.startsWith(root) && file.startsWith(path));
   }
 
   /**
@@ -2620,7 +2649,7 @@ public final class WorkerIngestService {
     Path prefix = Path.of(pathPrefix).toAbsolutePath().normalize();
     Path best = null;
     for (Path candidate = prefix; candidate != null; candidate = candidate.getParent()) {
-      if (rootWatcherRegistry.subscription(candidate) != null) {
+      if (rootWatcherRegistry.subscription(candidate) != null || rootWatcherRegistry.awaitsVolume(candidate)) {
         best = candidate;
         break;
       }

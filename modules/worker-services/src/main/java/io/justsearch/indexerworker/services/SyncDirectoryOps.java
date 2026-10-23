@@ -68,6 +68,20 @@ final class SyncDirectoryOps {
   private final int pathScanCap;
   private final int pathCharCap;
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
+  private volatile java.util.function.BiPredicate<Path, Path> rootOwnership = (root, file) -> true;
+  /** Captures root membership/removal evidence before the walk; fences each bounded queue batch. */
+  private volatile java.util.function.Function<Path,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier>> recoveryAdmissionFence =
+          root -> java.util.function.IntSupplier::getAsInt;
+
+  void setRootOwnership(java.util.function.BiPredicate<Path, Path> ownership) {
+    rootOwnership = java.util.Objects.requireNonNull(ownership, "ownership");
+  }
+
+  void setRecoveryAdmissionFence(java.util.function.Function<Path,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier>> fence) {
+    recoveryAdmissionFence = java.util.Objects.requireNonNull(fence, "fence");
+  }
 
   void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
     userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
@@ -564,6 +578,8 @@ final class SyncDirectoryOps {
       return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
     }
 
+    java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission =
+        upgradeRecovery ? recoveryAdmissionFence.apply(root) : java.util.function.IntSupplier::getAsInt;
     int filesAdded = 0;
     int filesDeleted = 0;
 
@@ -599,7 +615,7 @@ final class SyncDirectoryOps {
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
           walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection,
-              admissionMode);
+              admissionMode, recoveryAdmission);
       filesAdded = walk.filesAdded();
       // A recovery checkpoint cannot certify a tree whose unreadable entries were skipped.
       pruneIncomplete |= upgradeRecovery && walk.walkIncomplete();
@@ -738,7 +754,8 @@ final class SyncDirectoryOps {
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
       Path root, boolean force, Set<String> indexedPaths,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
-      String collection, AdmissionMode admissionMode) throws IOException {
+      String collection, AdmissionMode admissionMode,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {
@@ -754,6 +771,7 @@ final class SyncDirectoryOps {
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (dir.equals(root)) return FileVisitResult.CONTINUE;
+              if (!rootOwnership.test(root, dir)) return FileVisitResult.SKIP_SUBTREE;
               String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
               if (IngestionSkipPolicy.isSkippedDirectoryName(name)
                   || (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(dir, root))) {
@@ -818,6 +836,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
               if (stopped()) return FileVisitResult.TERMINATE;
+              if (!rootOwnership.test(root, file)) return FileVisitResult.CONTINUE;
               if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
@@ -844,7 +863,7 @@ final class SyncDirectoryOps {
                 .map(entry -> entry.withinRoot(root))
                 .toList();
             if (admissionMode == AdmissionMode.UPGRADE_RECOVERY) {
-              return jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection);
+              return recoveryAdmission.applyAsInt(() -> jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection));
             }
             if (admissionMode == AdmissionMode.MAINTENANCE) {
               return jobQueue.enqueueMaintenanceScanEntries(admitted, collection, null);

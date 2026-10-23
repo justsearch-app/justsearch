@@ -560,9 +560,63 @@ New isolated scenario tests retain the gate's independent verification requireme
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "C5: four parent sync/upgrade recovery cases retain empty-mount and replacement-volume nested roots' indexed content across restart, preserve their child admissions unchanged, still prune the parent's conclusive deletion, and keep a denied nested folder from blocking the parent's recovery; a root removed after spool discovery admits no recreated jobs; a modified DONE source loses its eight-day-old failure history, survives one transient parser timeout, retries into search and remains searchable after restart. Tests use the authentic small 0.3.0 fixture and the real Worker boot.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U10",
+          "quote": "Files added, modified and conclusively deleted across the upgrade show correctly in search after the upgrade and after another restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Parent-root recovery must never prune data under another registered root (for example an unplugged nested root whose mount folder is empty). Each root's data is judged only by that root's own volume evidence.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Fix C5 findings 1–3 on 7245bedaf; keep all earlier behavior. Finding 4 is main issue #913 and must not be changed; finding 5 is accepted as is. Resume with remaining work autonomously within the delegated scope.",
+          "choice": "Use one nested-root ownership check in the shared sync prune guard and directory walk: retain the child's indexed rows, and skip its subtree instead of admitting its files with the parent boundary. Apply the same ownership rule to failed visits: a denied child mount keeps only the child's debt, without repeatedly walking the healthy parent. Two recovery counterexamples failed at that assertion on the initial candidate before adding the failed-visit guard; both ordinary sync preservation cases passed. This applies to empty mount folders and present replacement-volume bytes, irrespective of whether the child is currently available. Only the child's own recovery may judge or admit its sources using its volume evidence. Recheck current root membership and the walk's removal generation under the watcher registry monitor used by unwatch, holding that monitor only for each bounded admission batch, including registry handover. Capture the fence before the walk; keep the existing six-argument sync helper and let SyncDirectoryOps invoke its own queue inside that fence, so original cooldown spies and real-process admission kill hooks continue to observe the actual operation without test changes. The first full attempt exposed both displaced hooks and was cancelled before Engine suites; preserve its diagnostics and rerun the corrected candidate. Re-admitting an eligible DONE row clears the completed admission's failure history; leave unfinished admissions, parser/I/O waits and finite-walk receipts intact. No schema change or new recovery checkpoint. Exercise the removal race through normal unwatch and delete routes, and a real subsequent parser retry through search and restart. Because the shared prune guard and bounded admission affect recovery cost, generate the scale fixture once, reuse it for a bounded walk/extraction measurement, then delete it. Keep fixed before/after JVM folders, sequential slotted Gradle calls and retained caches. Run packaged HTTP first boot and restart once at the end. Scale evidence is a 40.23-second idempotent root walk on the single generated corpus, with zero unchanged-file extractions and no missing-boundary retirements; it is not a full queue drain. The inherited probe required global checkpoint deletion in the same tick, although readiness is sampled before the walk. Preserve that failed assumption as evidence, reuse the same data without regeneration, invoke the normal completion tick and verify checkpoint release plus all 700042 jobs retained. The remaining 699641 queued jobs make full drain unverified. Do not edit migration states or recovery properties to force completion. Final packaged HTTP first boot and restart both retain the original writable IDLE generation and find new files; preserve retry waits and close both owned Engines.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round6.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1677d-7b3b-7ee2-9d81-841a28e12a29",
+  "verdict": "reject",
+  "digest": "sha256:35fb974d175899ec6fc9b5bd544c7226fa68dfd26b324a01ee8e6b2289c5b970",
+  "note": "Reject: a stale recovery checkpoint grants authority to a modern unowned replacement-queue job and replaces old searchable content over packaged HTTP; the required handoff preservation check also regresses."
+}
+```
