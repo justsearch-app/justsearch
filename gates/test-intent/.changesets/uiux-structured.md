@@ -904,3 +904,14 @@ Fifth-verifier repair entries appended by builder session 4mgytu7d on 2026-10-22
   "note": "Test intent only: reviewed prior-state tests, scenarios and delegated decisions, then diffs. Fresh scratch evidence passes all named checks with assertion fail-before for repaired check ids. Product verification fails separately on focus movement within a retained toast and stopped Structured output. The broad UI Java run also encountered missing esbuild. This is not product sign-off."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "2tt9j1yt",
+  "verdict": "reject",
+  "digest": "sha256:4d56d7e9e7ca9d393500c183002ce6e45bdc5d9ed75a344fc21d415238cd44b6",
+  "note": "Fresh scratch evidence rejects acceptance: six StoppedExtractionHistoryTest cases and StructuredExtractionTest.crashedExtractIsNotACompletedAnswer fail with No such conversation before their assertions after the main merge. Before-state assertion failures reproduce correctly; frontend groups pass. Product verification separately fails old-window Stop: an unaccepted result is later saved and reused."
+}
+```
