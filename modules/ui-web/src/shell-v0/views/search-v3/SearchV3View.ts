@@ -216,6 +216,7 @@ import {
   setMessageExcluded,
   subscribeConversationList,
   type Conversation,
+  type DeleteCascadeResult,
 } from '../../state/conversationListStore.js';
 // The product's ONE confirm dialog. Cascade-delete asks a second question — "and its branches?" —
 // and asking it in a second dialect would be a second dismiss rule for the same gesture.
@@ -3970,14 +3971,17 @@ export class SearchV3View extends JfElement {
   /** Discover, confirm once, and remove only identities the Engine confirms are gone. */
   private async deleteThroughStore(id: string): Promise<void> {
     let tree: DeleteTreeEntry[] = [];
+    const report = (result: DeleteCascadeResult) => {
+      this.forgetDeletedConversations(result.deletedIds ?? []);
+      if (!result.ok && !result.cancelled) {
+        emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
+      }
+    };
     const result = await deleteConversationWithCascade(id, (children, preview) => {
       tree = preview;
       return confirmConversationTree(children, preview);
-    });
-    this.forgetDeletedConversations(result.deletedIds ?? []);
-    if (!result.ok && !result.cancelled) {
-      emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
-    }
+    }, report);
+    report(result);
   }
 
   /** A server-confirmed deletion also retires this window's transcript and restore pointer. */

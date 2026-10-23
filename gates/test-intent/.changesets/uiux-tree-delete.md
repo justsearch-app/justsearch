@@ -444,6 +444,56 @@ Agent choices adopted under the user's quoted delegation; never owner words. All
         "instrumentation"
       ],
       "whatMoved": "The existing list-read fixture also serves the three new direct-child checks. Its result record exposes the childrenOf response marker, and its list helper accepts an empty or actively held ConversationWork authority. The existing fork-membership, filter validation, recency cap, order and shape-filter assertions are unchanged. The three New child-read checks retain their inputs and assertions when consolidated from the provisional separate fixture."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts"
+      ],
+      "class": "New",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "S17.7",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX work; WP1.4b tree deletion S17.1–S17.10 and TN1–TN4, as amended by the agreed challenger pass 2.",
+          "choice": "S17.7 [TD7] (ch. 3) If a delete's response is lost, or the window or Engine stops between two deletes or between a conversation and its runs, then on reconnection the window reads the actual state, reports outcomes it cannot confirm as unconfirmed (neither deleted nor kept) until the list settles them, and does not continue deleting by itself; deleting again finishes leftover runs. An open conversation that was in fact deleted is closed even when the cascade failed.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-reconnect.json",
+      "behaviour": "Engine-only restart with the window kept open reconciles single and interrupted tree deletes through the existing shared status signal; reports deleted/remaining/unconfirmed exactly, closes a deleted open conversation and never resumes deletion. An unreadable identity stays unconfirmed until a later successful read. After settlement, status samples cause no further conversation reads. Durable.",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 Engine-only restart settles single deletion without resuming it",
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 Engine-only restart settles root deletion without resuming it",
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 Engine-only restart closes the deleted open conversation",
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 keeps an unreadable outcome unconfirmed until a later status can settle it"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts"
+      ],
+      "class": "New",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "S17.7",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX work; WP1.4b tree deletion S17.1–S17.10 and TN1–TN4, as amended by the agreed challenger pass 2.",
+          "choice": "S17.7 [TD7] (ch. 3) If a delete's response is lost, or the window or Engine stops between two deletes or between a conversation and its runs, then on reconnection the window reads the actual state, reports outcomes it cannot confirm as unconfirmed (neither deleted nor kept) until the list settles them, and does not continue deleting by itself; deleting again finishes leftover runs. An open conversation that was in fact deleted is closed even when the cascade failed.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-reconnect-preservation.json",
+      "behaviour": "Without an unconfirmed delete, status changes cause no conversation reads or DELETEs. Durable preservation check.",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 status changes cause no conversation reads without an unconfirmed delete"
+      ]
     }
   ]
 }

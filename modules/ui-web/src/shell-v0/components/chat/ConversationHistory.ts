@@ -13,6 +13,7 @@ import {
   loadConversations,
   deleteConversationWithCascade,
   type Conversation,
+  type DeleteCascadeResult,
 } from '../../state/conversationListStore.js';
 import { confirmConversationTree, conversationDeleteOutcome } from './conversationDelete.js';
 import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
@@ -202,13 +203,16 @@ export class ConversationHistory extends JfElement {
   private async onDelete(c: Conversation, e: Event): Promise<void> {
     e.stopPropagation();
     let tree: DeleteTreeEntry[] = [];
+    const report = (result: DeleteCascadeResult) => {
+      if (!result.ok && !result.cancelled) {
+        emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
+      }
+    };
     const result = await deleteConversationWithCascade(c.id, (children, preview) => {
       tree = preview;
       return confirmConversationTree(children, preview);
-    });
-    if (!result.ok && !result.cancelled) {
-      emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
-    }
+    }, report);
+    report(result);
   }
 
   private renderItem(c: Conversation): TemplateResult {

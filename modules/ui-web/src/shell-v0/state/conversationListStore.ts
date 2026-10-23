@@ -8,6 +8,7 @@
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { startUserActivity } from '../utils/userActivity.js';
+import { subscribeStatus } from '../utils/statusPoll.js';
 
 /** Tempdoc 838 — who named a conversation. `null` when it has no name. */
 export type ConversationTitleSource = 'user' | 'auto';
@@ -1441,7 +1442,7 @@ function rememberDeletedConversation(id: string): void {
 }
 
 /** Refresh the roster, then ask the two-store existence boundary about EACH named identity. */
-async function reconcileDelete(tree: readonly DeleteTreeEntry[], confirmed: Set<string>, result: DeleteCascadeResult): Promise<DeleteCascadeResult> {
+async function reconcileDelete(tree: readonly { id: string }[], confirmed: Set<string>, result: DeleteCascadeResult): Promise<DeleteCascadeResult> {
   await loadConversations();
   const deletedIds: string[] = [];
   const remainingIds: string[] = [];
@@ -1456,10 +1457,47 @@ async function reconcileDelete(tree: readonly DeleteTreeEntry[], confirmed: Set<
   return { ...result, deletedIds, remainingIds, unconfirmedIds };
 }
 
+/** Only unresolved observations survive a cascade. Reconnection never retains a delete action. */
+const pendingDeleteReads = new Set<() => Promise<void>>();
+let stopDeleteStatus: (() => void) | null = null;
+
+function watchUnconfirmedDelete(
+  tree: readonly { id: string }[], initial: DeleteCascadeResult,
+  onReconciled?: (result: DeleteCascadeResult) => void,
+): DeleteCascadeResult {
+  if (!initial.unconfirmedIds?.length || typeof window === 'undefined') return initial;
+  let result = initial;
+  let reading = false;
+  const read = async () => {
+    if (reading) return;
+    reading = true;
+    try {
+      const next = await reconcileDelete(tree, new Set(result.deletedIds), result);
+      if (!pendingDeleteReads.has(read)) return;
+      const changed = JSON.stringify([next.deletedIds, next.remainingIds, next.unconfirmedIds])
+        !== JSON.stringify([result.deletedIds, result.remainingIds, result.unconfirmedIds]);
+      result = next;
+      if (!next.unconfirmedIds?.length) {
+        pendingDeleteReads.delete(read);
+        if (pendingDeleteReads.size === 0) { stopDeleteStatus?.(); stopDeleteStatus = null; }
+      }
+      if (changed) onReconciled?.(next);
+    } finally { reading = false; }
+  };
+  pendingDeleteReads.add(read);
+  // The shell already shares this poller. A successful status is an opportunity to settle an
+  // unavailable/locked read; with no unresolved outcomes there is no subscription or extra read.
+  stopDeleteStatus ??= subscribeStatus(snapshot => {
+    if (snapshot) for (const retry of pendingDeleteReads) void retry();
+  });
+  return initial;
+}
+
 /** Without a callback, retain the single-delete boundary. With one, confirm the full tree ONCE. */
 export async function deleteConversationWithCascade(
   sessionId: string,
   onTreeFound?: (childIds: string[], tree: DeleteTreeEntry[]) => Promise<boolean>,
+  onReconciled?: (result: DeleteCascadeResult) => void,
 ): Promise<DeleteCascadeResult> {
   if (onTreeFound) {
     let tree: DeleteTreeEntry[] = [];
@@ -1477,18 +1515,20 @@ export async function deleteConversationWithCascade(
         error: 'Stop the running answer or agent, including any pending decision, before deleting this tree.' };
       const named = new Map(tree.map(row => [row.id, row.parentSessionId]));
       if (current.tree.length !== tree.length || current.tree.some(row => !named.has(row.id) || named.get(row.id) !== row.parentSessionId)) {
-        return reconcileDelete(tree, confirmed, { ok: false, error: 'The conversation tree changed. Review it again before deleting.' });
+        return watchUnconfirmedDelete(tree, await reconcileDelete(tree, confirmed, { ok: false, error: 'The conversation tree changed. Review it again before deleting.' }), onReconciled);
       }
       // Every child precedes its parent, at any depth; stable sort preserves sibling order.
       for (const row of [...tree].sort((a, b) => b.depth - a.depth)) {
         const result = await deleteConversationWithCascade(row.id);
-        if (!result.ok) return reconcileDelete(tree, confirmed, { ...result, failedId: row.id });
+        if (!result.ok) return watchUnconfirmedDelete(tree, await reconcileDelete(tree, confirmed, { ...result, failedId: row.id }), onReconciled);
         confirmed.add(row.id);
       }
       return { ok: true, deletedIds: tree.map(row => row.id), remainingIds: [], unconfirmedIds: [] };
     } catch (failure) {
       const result = { ok: false, error: failure instanceof Error ? failure.message : 'Could not confirm deletion.' };
-      return tree.length > 0 ? reconcileDelete(tree, confirmed, result) : { ...result, unconfirmedIds: [sessionId] };
+      const affected = tree.length > 0 ? tree : [{ id: sessionId }];
+      const outcome = tree.length > 0 ? await reconcileDelete(tree, confirmed, result) : { ...result, unconfirmedIds: [sessionId] };
+      return watchUnconfirmedDelete(affected, outcome, onReconciled);
     }
   }
   try {
@@ -1515,6 +1555,9 @@ export function exportConversationMarkdown(
 }
 
 export function __resetConversationListForTest(): void {
+  pendingDeleteReads.clear();
+  stopDeleteStatus?.();
+  stopDeleteStatus = null;
   state = { conversations: [], deletedIds: [], activeId: null, loading: false };
   listeners.clear();
   serverConversations.clear();
