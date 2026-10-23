@@ -276,7 +276,7 @@ import { strictPolicy } from '../router/recoveryPolicy.js';
 import { createURLSource } from '../router/sources/URLSource.js';
 import { createTauriDeepLinkSource } from '../router/sources/TauriDeepLinkSource.js';
 import { createBackendStreamSource } from '../router/sources/BackendStreamSource.js';
-import { deactivateProjection, flushPendingProjection } from '../router/URLProjector.js';
+import { deactivateProjection, flushPendingNavigationWrite, flushPendingProjection } from '../router/URLProjector.js';
 import {
   fetchAndRegisterSurfaceSchemas,
   registerCoreStores,
@@ -513,8 +513,8 @@ export class Shell extends JfElement {
   // Slice 496 §3.A: bound handler for navigate-with-context events.
   // Tempdoc 609 §R (T1.3) — "return to running job" from an overlay (TaskList / status-bar chip).
   private onNavigateToSurface = (ev: Event): void => {
-    const id = (ev as CustomEvent<NavigateToSurfaceDetail>).detail?.surfaceId;
-    if (id) this.activateSurface(id, {}, 'BUTTON');
+    const detail = (ev as CustomEvent<NavigateToSurfaceDetail>).detail;
+    if (detail?.surfaceId) this.activateSurface(detail.surfaceId, detail.state ?? {}, 'BUTTON');
   };
 
   private onNavigateWithContext = (ev: Event): void => {
@@ -1593,7 +1593,7 @@ export class Shell extends JfElement {
       // Tempdoc 855 §11.1 — the MODAL branch's injected placement lookup (ShellAddress carries no
       // placement). A MODAL target opens as a window OVER the stage instead of replacing it.
       getPlacement: (id) => getSurface(id)?.placement,
-      openModal: (id, _state, info) => {
+      openModal: (id, state, info) => {
         // Phase 0 declares exactly one MODAL surface, and one window hosts it. Guarding on the id
         // keeps a future second MODAL surface from silently opening the Settings window.
         if (id !== SETTINGS_SURFACE_ID) return;
@@ -1605,6 +1605,7 @@ export class Shell extends JfElement {
         // left alone afterwards.
         if (!win.open) this.settingsOpenPushed = info.pushed;
         win.open = true;
+        if (state?.focusSettingsRecovery === true) win.focusSettingsRecovery();
       },
     });
     const invocationHandler = createInvocationHandler({
@@ -1669,6 +1670,9 @@ export class Shell extends JfElement {
     this.intentRouter.subscribe((intent, outcome) => {
       if (intent.address.kind === 'navigate' && (outcome.status === 'dispatched' || outcome.status === 'auto-corrected')) {
         if (!isNavigatingHistoryNow()) {
+          // Settle a claimed conversation before recording the surface that follows it.
+          // A browser traversal has already moved its address and must never push here.
+          if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
           const url = canonicalize(intent.address);
           const label = deriveRichLabel(
             intent.address.target,
@@ -2536,7 +2540,7 @@ export class Shell extends JfElement {
           .store=${this.advisoryStore}
           .operationClient=${this.operationClient}
         ></jf-advisory-toast-host>
-        <jf-task-list slot="bottom-left"></jf-task-list>
+        <jf-task-list slot="bottom-left" api-base=${this.apiBase}></jf-task-list>
         ${this.renderNarrowReadingPane()}
         <jf-pending-effect-queue slot="bottom-right"></jf-pending-effect-queue>
         <!-- center slot: full-screen modals (one shows at a time). -->

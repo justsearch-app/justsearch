@@ -49,6 +49,7 @@ import { takeSearchV3Handoff } from '../../utils/compose.js';
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import type { ShapeId } from '../unifiedChatRequest.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
 import { sv3Tokens } from './sv3-tokens.css.js';
@@ -107,6 +108,7 @@ import {
 } from './sv3-boundaries.js';
 import {
   activeTurns,
+  sv3TurnMessageIds,
   adoptRunSession,
   appendTurnDelta,
   applySv3History,
@@ -161,10 +163,12 @@ import {
   isSv3BranchActionId,
   projectSv3TurnLineage,
   sv3BranchMenuItems,
+  sv3FirstOwnTurnIndex,
   sv3LineageFor,
   type Sv3BranchAction,
   type Sv3TurnLineage,
   type Sv3VersionSelect,
+  type Sv3VersionSet,
 } from './sv3-branch.js';
 // The window's honesty derivations (tempdoc 822 Phase F7): the lock, the corpus, and the ONE remedy
 // channel every region's fix-it control leaves through.
@@ -203,6 +207,8 @@ import {
   generateConversationTitle,
   getConversationListState,
   loadConversations,
+  loadForkConversations,
+  siblingSessionsAt,
   restoreActiveConversation,
   resumeConversation,
   type ResumedConversation,
@@ -300,6 +306,8 @@ import {
   SV3_SOURCE_INDEX_ABSENT,
 } from './sv3-citation-anchor.js';
 import { setAiActivity, subscribeAiState, type AiState } from '../../state/aiStateStore.js';
+import { selectIndexingProgress } from '../../state/indexingProgress.js';
+import '../../components/IndexingControls.js';
 import { projectAvailability } from '../../state/availability.js';
 import { reasonFor } from '../../state/readinessNotice.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
@@ -440,6 +448,35 @@ export class SearchV3View extends JfElement {
         font-family: var(--font-sans);
         font-size: var(--font-size-sv3-sm);
       }
+      .branch-origin {
+        display: flex;
+        align-items: center;
+        padding: var(--space-2) var(--space-4);
+        border-bottom: 1px solid var(--toolbar-border);
+        color: var(--muted-foreground);
+        font-size: var(--font-size-sv3-xs);
+      }
+      .branch-origin span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .branch-origin button {
+        margin-inline-start: var(--space-3);
+        flex-shrink: 0;
+        min-height: 24px;
+        padding: var(--space-1) var(--space-2);
+        border: 1px solid var(--toolbar-border);
+        border-radius: var(--control-radius);
+        background: transparent;
+        color: var(--foreground);
+        font: inherit;
+        cursor: pointer;
+      }
+      .branch-origin button:hover { background: var(--toolbar-control-hover); }
+      .branch-origin button:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+      }
       jf-sv3-sidebar {
         flex: 0 0 var(--sidebar-width);
         width: var(--sidebar-width);
@@ -548,6 +585,14 @@ export class SearchV3View extends JfElement {
            the content region — and, since tempdoc 859 §B, for the DOCKED dock as well. */
         position: relative;
       }
+
+      /* The notice occupies its own row; hero and dock position within the space below it. */
+      .indexing-pause-note {
+        flex: none;
+        padding: var(--space-3) var(--floating-content-inset);
+      }
+      .indexing-pause-note p { margin: 0 0 var(--space-2); }
+      .column jf-sv3-composer[state='hero'] { inset-block-start: 0; }
 
       /* ── THE DOCK (tempdoc 859 §B) ─────────────────────────────────────────
          The context bar and the composer, in ONE positioned wrapper, floating over the transcript.
@@ -850,16 +895,7 @@ export class SearchV3View extends JfElement {
    * own guard (`views/UnifiedChatView.ts:1658-1673`).
    */
   declare compacting: boolean;
-  /**
-   * The shared conversation store's list, AS ROWS (852 S3). This window's own {@link sessions} is a
-   * projection that drops the two fields the version pager is made of — `parentSessionId` and
-   * `branchPointMessageId` — so the pager reads the store's rows directly rather than having those
-   * pointers copied onto a second shape that would then have to be kept in step.
-   *
-   * Held rather than re-fetched: `siblingSessionsAt` is a pure read and the subscription below keeps
-   * this current, which is why a branch created here calls `loadConversations` — the new row is what
-   * makes the fork visible to the pager at all.
-   */
+  /** Recent sidebar rows, retained for row actions. Complete fork reads never enlarge this list. */
   declare conversations: readonly Conversation[];
 
   /** Watches the window box so the pane's presentation follows it (Phase F8). */
@@ -872,6 +908,18 @@ export class SearchV3View extends JfElement {
   private appearanceUnsubscribe: (() => void) | null = null;
   private chatWidthUnsubscribe: (() => void) | null = null;
   private agentUnsubscribe: (() => void) | null = null;
+  private readonly forkReads = new Map<string, {
+    abort: AbortController;
+    rows: readonly Conversation[] | null;
+    versions: readonly string[] | null;
+  }>();
+  private forkListLoading = false;
+
+  private clearForkReads(): void {
+    for (const read of this.forkReads.values()) read.abort.abort();
+    this.forkReads.clear();
+  }
+
   private convListUnsubscribe: (() => void) | null = null;
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
   private recordAbort: AbortController | null = null;
@@ -1061,10 +1109,12 @@ export class SearchV3View extends JfElement {
     // subscription fires immediately with whatever is already loaded; the fetch refreshes it.
     setConversationApiBase(this.apiBase || '');
     this.convListUnsubscribe = subscribeConversationList((state, change) => {
+      if (state.loading || this.conversations !== state.conversations) this.clearForkReads();
+      this.forkListLoading = state.loading;
+      this.requestUpdate();
       this.forgetDeletedConversations(state.deletedIds);
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
-      // The ROWS as well as the projection (852 S3): the version pager is read from the store's own
-      // parent pointers, which `mergeStoreConversations` deliberately does not carry across.
+      // Retain the recent rows separately from the transcript projection for sidebar actions.
       this.conversations = state.conversations;
       // Tempdoc 864 PR C — a REHYDRATION is the ADDRESS being applied (a Back press, a deep link,
       // this tab's own reload pointer), and the address is where this window is. A `claim` is not:
@@ -1161,6 +1211,7 @@ export class SearchV3View extends JfElement {
     releaseSv3MorphSheet();
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
+    this.clearForkReads();
     this.recordAbort?.abort();
     this.recordAbort = null;
     for (const [id, read] of this.historyReads) {
@@ -1346,6 +1397,7 @@ export class SearchV3View extends JfElement {
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has('sessions')) { this.syncActiveAsk(); this.upgradeOpenPaneAnchor(); }
+    this.syncForkReads();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
       this.reflowSidebar();
     }
@@ -1514,6 +1566,7 @@ export class SearchV3View extends JfElement {
     const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
     if (abort.signal.aborted) return false;
     this.historyReads.delete(conversationId);
+    if (history.locked === true && this.sessions.activeId === conversationId) this.noteRefusedWhileLocked();
     const landed = (forWrite || this.sessions.activeId === conversationId)
       && history.failed !== true && history.locked !== true;
     if (landed) {
@@ -1805,14 +1858,100 @@ export class SearchV3View extends JfElement {
 
   /**
    * What each turn can do about branching, derived once per render from the SAME three inputs the
-   * acts below read: the turns on screen, the conversation's `/history`, and the store's own rows.
+   * acts below read: the turns on screen, the conversation's `/history`, and complete fork reads.
    * The trigger's gate and the act's target are therefore one derivation, which is what stops a menu
    * offering a fork the window would then compute differently.
    */
   private turnLineage(): readonly Sv3TurnLineage[] {
     const session = this.activeSession;
     if (session === null) return [];
-    return projectSv3TurnLineage(session.turns, session.history, session.id, this.conversations);
+    return projectSv3TurnLineage(session.turns, session.history, session.id, [],
+      (base, point) => this.forkReads.get(JSON.stringify([base, point]))?.versions ?? null);
+  }
+
+  /** A continuation with no question yet still has a fork point, including on an empty branch. */
+  private continuationFork(): { base: string; point: string } | null {
+    const session = this.activeSession;
+    if (this.historyLocked || session === null || session.history === null) return null;
+    const parent = session.history?.parentSessionId;
+    const point = session.history?.branchPointMessageId;
+    if (parent && point && sv3FirstOwnTurnIndex(session.turns, session.history) >= session.turns.length) {
+      return { base: parent, point };
+    }
+    const last = session.turns.at(-1);
+    const answer = last === undefined ? null : sv3TurnMessageIds(last).assistantMsgId;
+    return answer === null ? null : { base: session.id, point: answer };
+  }
+
+  private continuationVersions(): Sv3VersionSet | null {
+    const fork = this.continuationFork();
+    if (fork === null) return null;
+    const versions = this.forkReads.get(JSON.stringify([fork.base, fork.point]))?.versions;
+    const index = versions?.indexOf(this.activeSession?.id ?? '') ?? -1;
+    return versions && versions.length > 1 && index >= 0 ? { sessions: versions, index } : null;
+  }
+
+  /** Only fork points on the open transcript are read. Requests are parallel and never gate sends. */
+  private syncForkReads(): void {
+    const session = this.activeSession;
+    const needed = new Map<string, { base: string; point: string }>();
+    if (!this.historyLocked && session !== null && session.history !== null) {
+      for (const turn of projectSv3TurnLineage(session.turns, session.history, session.id, [])) {
+        if (turn.forkKey !== null) needed.set(JSON.stringify([turn.forkFromId, turn.forkKey]),
+          { base: turn.forkFromId, point: turn.forkKey });
+      }
+      const parent = session.history?.parentSessionId;
+      const point = session.history?.branchPointMessageId;
+      // Empty branches still need their origin, even before they have a divergent turn.
+      if (parent && point) needed.set(JSON.stringify([parent, point]), { base: parent, point });
+    }
+    // A locked history returns 423 without lineage. The base row of this same lock-safe filter
+    // supplies structural parent pointers without opening content or growing the sidebar.
+    if (this.historyLocked && session !== null && session.history === null
+      && !this.conversations.some(row => row.id === session.id)) {
+      needed.set(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]),
+        { base: session.id, point: EMPTY_PREFIX_SENTINEL });
+    }
+    const continuation = this.continuationFork();
+    if (continuation !== null) needed.set(JSON.stringify([continuation.base, continuation.point]), continuation);
+    for (const [key, read] of this.forkReads) {
+      if (!needed.has(key)) {
+        read.abort.abort();
+        this.forkReads.delete(key);
+      }
+    }
+    if (this.forkListLoading || !this.isConnected) return;
+    for (const [key, { base, point }] of needed) {
+      if (this.forkReads.has(key)) continue;
+      const read = { abort: new AbortController(), rows: null as readonly Conversation[] | null,
+        versions: null as readonly string[] | null };
+      this.forkReads.set(key, read);
+      void loadForkConversations(base, point, read.abort.signal).then(rows => {
+        if (!this.isConnected || this.forkReads.get(key) !== read) return;
+        read.rows = rows;
+        read.versions = rows === null ? null : siblingSessionsAt(rows, base, point);
+        this.requestUpdate();
+      });
+    }
+  }
+
+  private renderBranchOrigin(): TemplateResult | typeof nothing {
+    const session = this.activeSession;
+    if (session === null) return nothing;
+    const ownRead = this.forkReads.get(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]));
+    const metadata = session.history ?? this.conversations.find(row => row.id === session.id)
+      ?? ownRead?.rows?.find(row => row.id === session.id);
+    const parent = metadata?.parentSessionId;
+    const point = metadata?.branchPointMessageId;
+    if (!parent || !point) return nothing;
+    const read = this.forkReads.get(JSON.stringify([parent, point]));
+    const name = (!this.historyLocked && !this.lockedRefusal
+      ? read?.rows?.find(row => row.id === parent)?.firstUserMessage?.trim() : '') || 'Original conversation';
+    return html`<div class="branch-origin" data-testid="sv3-branch-origin">
+      <span>Branched from: ${name}</span>
+      <button type="button" aria-label=${`Open original: ${name}`}
+        @click=${() => { void this.openBranch(parent); }}>Open original</button>
+    </div>`;
   }
 
   private onBranchAction(event: Event): void {
@@ -1993,10 +2132,8 @@ export class SearchV3View extends JfElement {
    * ({@link onSessionSelect}) — project the row, focus it, claim it, load both records — plus the
    * one a row click does not need: RE-LIST.
    *
-   * The re-list is what makes the fork visible. A branch's siblings are read from the store's own
-   * `parentSessionId`/`branchPointMessageId` pointers, and the row carrying them does not exist in
-   * this window's copy of the list until `listSessions` returns it — so without this the pager would
-   * render nothing on the very fork the reader just made.
+   * Re-listing updates recents and invalidates complete fork reads, including older versions
+   * outside the sidebar window. The fork reads finish independently of opening or sending.
    */
   private async openBranch(id: string): Promise<void> {
     const prevId = this.sessions.activeId;
@@ -4243,6 +4380,9 @@ export class SearchV3View extends JfElement {
   }
 
   render(): TemplateResult {
+    const ai = this.aiSnapshot;
+    const indexing = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
+      ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
     const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
@@ -4331,6 +4471,13 @@ export class SearchV3View extends JfElement {
         @sv3-version-select=${this.onVersionSelect}
       >
         <jf-sv3-topbar window-title=${WINDOW_TITLE} data-testid="sv3-topbar"></jf-sv3-topbar>
+        ${indexing.pause?.waiting || !indexing.activity.confirmed || this.shadowRoot?.querySelector('jf-indexing-controls:focus-within')
+          ? html`<div class="indexing-pause-note" data-testid="sv3-indexing-pause">
+          ${indexing.pause?.waiting ? html`<p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>` : nothing}
+          <jf-indexing-controls .progress=${indexing} api-base=${this.apiBase}></jf-indexing-controls>
+        </div>` : nothing}
+        ${this.renderBranchOrigin()}
+        <div class="column">
         <jf-sv3-main
           state=${this.composerState}
           .view=${results}
@@ -4349,6 +4496,7 @@ export class SearchV3View extends JfElement {
           ?detailed=${isAdvancedMode()}
           .turnContexts=${contexts}
           .turnLineage=${this.turnLineage()}
+          .continuationVersions=${this.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
           .stopping=${this.askStopping}
@@ -4387,6 +4535,7 @@ export class SearchV3View extends JfElement {
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"
         ></jf-sv3-composer>
+        </div>
         </div>
       </div>
       ${this.pane()}
