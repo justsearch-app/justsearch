@@ -19,7 +19,14 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 public record OperationOutcomeView(@JsonProperty(required = true) State state, String phase,
     @JsonProperty(required = true) long historySince,
     Long acceptedAt, Long completedAt, Long unitsCompleted, Long unitsFailed,
-    String reason, Result result) {
+    String reason, Result result, String message) {
+  public OperationOutcomeView(State state, String phase, long historySince,
+      Long acceptedAt, Long completedAt, Long unitsCompleted, Long unitsFailed,
+      String reason, Result result) {
+    this(state, phase, historySince, acceptedAt, completedAt, unitsCompleted, unitsFailed,
+        reason, result, null);
+  }
+
   public OperationOutcomeView {
     Objects.requireNonNull(state, "state");
   }

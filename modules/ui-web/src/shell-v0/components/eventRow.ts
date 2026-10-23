@@ -15,6 +15,7 @@
  * `projectUnifiedThread`): it composes none of those, so it stays outside the run-renderers register
  * (565 §12.6) by construction.
  */
+import './OperationOutcomeDetail.js';
 import { html, css, type CSSResult, type TemplateResult } from 'lit';
 import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
 import { formatRelativeIso } from '../../utils/relativeTime.js';
@@ -67,6 +68,7 @@ function renderEventOutcome(outcome: string | undefined): TemplateResult {
  */
 export interface EventRowOptions {
   readonly isNew?: boolean;
+  readonly apiBase?: string;
 }
 
 /** The ONE ledger-row projection over a {@link UnifiedActionEntry}. */
@@ -76,7 +78,10 @@ export function renderEventRow(entry: UnifiedActionEntry, opts: EventRowOptions 
       ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
       : ''}
     <span class="who" data-originator=${entry.originator}>${entry.originator}</span>
-    <span class="label">${entry.label}</span>
+    <span class="label">${entry.label}
+      ${entry.operationOutcomeKey ? html`<jf-operation-outcome-detail
+        operation-key=${entry.operationOutcomeKey} api-base=${opts.apiBase ?? ''}></jf-operation-outcome-detail>` : ''}
+    </span>
     ${renderEventOutcome(entry.outcome)}
     <span class="src">${entry.source === 'backend' ? 'backend' : 'local'}</span>
     ${renderEventWhen(entry.occurredAt)}

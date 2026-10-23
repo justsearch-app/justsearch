@@ -61,6 +61,7 @@ export interface OpSuccessEventDetail {
 export interface OpErrorEventDetail {
   message: string;
   errorClass: string;
+  errorCode?: string;
 }
 
 function deriveLabel(operationId: string): string {
@@ -182,7 +183,8 @@ export class OpButton extends JfElement {
       if (err instanceof OperationError) {
         this.dispatchEvent(
           new CustomEvent<OpErrorEventDetail>('op-error', {
-            detail: { message: err.message, errorClass: err.errorClass },
+            detail: { message: err.message, errorClass: err.errorClass,
+              ...(err.errorCode ? { errorCode: err.errorCode } : {}) },
             bubbles: true,
             composed: true,
           }),

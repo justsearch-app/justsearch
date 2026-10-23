@@ -475,7 +475,7 @@ export class ActionLedgerView extends JfElement {
       ${children.map(
         (child) =>
           html`<div class="scan-child" data-testid="ledger-scan-child">
-            ${renderEventRow(this.withResolvedLabel(child))}
+            ${renderEventRow(this.withResolvedLabel(child), { apiBase: this.apiBase })}
           </div>`,
       )}`;
   }
@@ -573,7 +573,7 @@ export class ActionLedgerView extends JfElement {
             this.renderScanRollup(row)
           : // tempdoc 612 §UX — pass the "new since you looked" mark as an ADDITIVE opt-in to the shared row;
             // History/Timeline render the same row WITHOUT it (they pass no opts), so the marker never leaks.
-            renderEventRow(this.withResolvedLabel(row), { isNew: this.isNewRow(row) }),
+            renderEventRow(this.withResolvedLabel(row), { isNew: this.isNewRow(row), apiBase: this.apiBase }),
     )}`;
   }
 }
