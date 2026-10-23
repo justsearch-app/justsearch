@@ -1100,3 +1100,14 @@ Historical evidence scaffolding appended by builder session 673oohjv: the histor
   "note": "Fresh scratch evidence rejects acceptance: six StoppedExtractionHistoryTest cases and StructuredExtractionTest.crashedExtractIsNotACompletedAnswer fail with No such conversation before their assertions after the main merge. Before-state assertion failures reproduce correctly; frontend groups pass. Product verification separately fails old-window Stop: an unaccepted result is later saved and reused."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "xt733fcy",
+  "verdict": "accept",
+  "digest": "sha256:4743cc6e883a4ebb2146c2567e3edf514681dc7bad2d8b0efe3f4e621f85fce9",
+  "note": "Test intent only: fixture assertions are unchanged; the compatibility bridge preserves historical setup. Fresh evidence passes 24 Java and 55 selected UI cases, with assertion fail-before for repairs. Product sign-off remains inconclusive: the broader UI Java check lacks esbuild, and Delegate live stopped notes are absent on both commits."
+}
+```
