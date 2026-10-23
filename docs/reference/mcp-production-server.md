@@ -46,8 +46,38 @@ MCP server on?" is exactly "which port is the API on?":
   the owner of the server end of that very connection (Linux `/proc/net/tcp`, Windows
   `netstat -ano`). A reused connection needs no new proof, since a process that binds the port
   later cannot take over an established connection; the OS is asked once per connection. When a
-  proof fails, nothing is sent: both clients re-discover the Engine and re-read its manifest credential. The production server retries only pre-execution refusals; if no proven Engine is available it reports `ENGINE_GONE`. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
-  the Roaming folder (so a redirected folder is still found).
+  proof fails, nothing is sent: both clients re-discover the Engine and re-read its manifest
+  credential, and the production server retries only failures known to precede execution
+  (refused before writing, connection refused, token refused); if no proven Engine is available
+  it reports `ENGINE_GONE`. A port pinned with `--port` or `JUSTSEARCH_API_PORT` takes its token
+  only from `JUSTSEARCH_SESSION_TOKEN` (see Session credential), and that token goes only to the
+  Engine of a manifest that names the pinned port, with the same proof; when that proof fails, the
+  pin is refused (and named in the error), never used without it. A manifest whose pid is gone but
+  that still names the pinned port is a refusal too (the error names that manifest file), and so is
+  a pinned port that no manifest names: nothing proves what answers it. When the pinned Engine
+  restarts on the same port with a new manifest, the stdio server's next call re-reads the
+  manifests and proves the new Engine before sending anything, never falling back to another
+  Engine; a call in flight during the restart fails.
+  Neither client sends a request again once it may have reached the Engine: the bridge redoes
+  session setup (`initialize`, notifications) on a newly proven Engine, and sends another
+  request again only if it never had a connection or the Engine answered 400/401/404 for it;
+  otherwise the call fails with an error saying its outcome is unknown. The bridge
+  sends an `Mcp-Session-Id` only on connections to the Engine that opened it (its manifest
+  identity), whether or not that Engine assigned a session id; a
+  connection to any other Engine gets nothing negotiated with the first, and the
+  bridge initializes a new session there first, sent exactly as a first `initialize` is: nothing
+  negotiated with the earlier Engine (session, `MCP-Protocol-Version`, server stream) is carried
+  over, and the version is negotiated again from the new Engine's answer. The bridge keeps all of
+  that per Engine epoch: a new Engine, or a client `initialize`, starts a new one, ends requests
+  still in flight in the old one, and an answer or event of an ended epoch changes nothing. Nothing
+  but an epoch's own `initialize` is sent in it until that has been answered (bounded at 10 s) and
+  the Engine that answered is known: other calls wait for it, or for the epoch that replaces it.
+  Idle pooled connections are closed after 25 s,
+  before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
+  also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  the Roaming folder (so a redirected folder is still found), waiting up to 30 s for the answer;
+  a lookup that times out (`ROAMING_LOOKUP_TIMEOUT`) or fails (`ROAMING_LOOKUP_FAILED`) is
+  listed among the folders tried when no Engine is found.
 - **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
   the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over
   `JUSTSEARCH_DATA_DIR`), then `JUSTSEARCH_DATA_DIR`, then the desktop app's folder, then a dev
@@ -57,9 +87,11 @@ MCP server on?" is exactly "which port is the API on?":
   installed desktop app's folder *before* a dev checkout's `.dev-data` folders, so when both are
   running it connects to the installed app (it prints which folder it used on stderr). To use the
   dev Engine instead, set `JUSTSEARCH_DATA_DIR` to that checkout's data folder (for example
-  `<checkout>/modules/ui-web/.dev-data`) or pass its port with `--port` / `JUSTSEARCH_API_PORT`.
-  The MCPB bridge never looks in a checkout; point it at a dev Engine with `JUSTSEARCH_DATA_DIR` or
-  `JUSTSEARCH_API_PORT`. The backend also prints
+  `<checkout>/modules/ui-web/.dev-data`) or pass its port with `--port` / `JUSTSEARCH_API_PORT`
+  (with `JUSTSEARCH_SESSION_TOKEN`; the pin is used because that checkout's manifest names it).
+  The MCPB bridge never looks in a checkout; point it at a dev Engine with `JUSTSEARCH_DATA_DIR`
+  (a `JUSTSEARCH_API_PORT` pin alone is refused there, since no manifest it reads names the
+  port). The backend also prints
   `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\engine.log`) and serves
   `GET /api/health` once up. (Gradle dev tasks like `runHeadless`/`devAll` default to `33221`,
   which is why older docs and scripts mention that number — the installed app does not use it.)
@@ -168,8 +200,11 @@ Discovery probes are unauthenticated public reads. Reconnection re-reads the man
 when a restarted Engine changes port.
 
 An explicit `--port` or `JUSTSEARCH_API_PORT` override requires `JUSTSEARCH_SESSION_TOKEN`;
-without that variable discovery fails with a message naming it. Such an override is the
-operator's explicit selection and bypasses manifest discovery.
+without that variable discovery fails with a message naming it. The override selects which
+Engine to use, not whether to prove it: the token is sent only to the Engine of a runtime
+manifest that names the pinned port, after the same live identity and socket-owner proof. A
+pinned port that no manifest names, or whose manifest Engine is not proven, is refused, and
+discovery ends with that refusal: it never falls back to another Engine.
 
 Production authenticates every request, including reads and streams, except `OPTIONS` and
 `GET`/`HEAD` on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,

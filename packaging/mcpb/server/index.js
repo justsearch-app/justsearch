@@ -18,8 +18,11 @@
  * instance (GET /api/runtime/live) and /api/health answers 200; there is no default-port
  * guess, so an unrelated service is never picked up. Every request to the Engine goes through
  * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS
- * says its server end is the manifest pid's; when that fails, the bridge selects again (fetching
- * that Engine's own token) and retries once.
+ * says its server end is the manifest pid's; when that fails, the bridge selects again (taking
+ * that Engine's token from its validated manifest) and retries once. A JUSTSEARCH_API_PORT pin
+ * needs JUSTSEARCH_SESSION_TOKEN, and that token goes only to the Engine of a manifest naming the
+ * pinned port, with the same proof; a pin whose manifest is not proven, or that no manifest
+ * names, is refused, so whatever answers the port never gets the token.
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -27,10 +30,11 @@
 
 'use strict';
 
-const { describeTried, engineRequest, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
+const { describeTried, engineRequest, pinRefusals, selectEngine, selectPinned, standardCandidates } = require('./engine-discovery.cjs');
 
-const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
+// Session setup (initialize, notifications/initialized) is cheap; requests wait for it, so it is bounded.
+const INITIALIZE_TIMEOUT_MS = 10000;
 const LOG_PREFIX = '[justsearch-mcpb]';
 
 // ---------------------------------------------------------------------------
@@ -62,27 +66,13 @@ function actionableUnreachableMessage(tried) {
   ].join('\n');
 }
 
-/** The Engine the bridge talks to (engineRequest target). */
-function target() {
-  return { port: state.port, engine: state.engine };
-}
-
-function healthy(port) {
-  return new Promise((resolve) => {
-    const req = engineRequest({ port, engine: null }, { path: '/api/health', timeoutMs: HEALTH_TIMEOUT_MS }, (res) => {
-      res.resume(); // drain
-      resolve(res.statusCode === 200);
-    });
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(false));
-    req.end();
-  });
-}
-
 /**
- * Returns { port, engine } or null; appends one line per location tried to triedOut.
- * Order: JUSTSEARCH_API_PORT pin (engine null: the operator named the port), then validated
- * runtime manifests (engine-discovery.cjs; engine is the selected candidate).
+ * Returns { port, engine, token } or null; appends one line per location tried to triedOut.
+ * Order: JUSTSEARCH_API_PORT pin (the proven Engine of the manifest naming that port, with
+ * JUSTSEARCH_SESSION_TOKEN, which the pin requires), then validated runtime manifests
+ * (engine-discovery.cjs; engine is the selected candidate, token the one in its manifest).
+ * A refused pin ends discovery (null, with the refusal in triedOut): it never falls back to
+ * another Engine, whose data the operator did not choose.
  */
 async function discoverEngine(triedOut) {
   const tried = triedOut || [];
@@ -90,8 +80,14 @@ async function discoverEngine(triedOut) {
   if (Number.isInteger(envPort) && envPort > 0) {
     const token = process.env.JUSTSEARCH_SESSION_TOKEN?.trim();
     if (!token) throw new Error('JUSTSEARCH_API_PORT requires JUSTSEARCH_SESSION_TOKEN from the Engine owner-only runtime/manifest.json.');
-    if (await healthy(envPort)) return { port: envPort, engine: null, token };
-    tried.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
+    const pin = `JUSTSEARCH_API_PORT=${envPort}`;
+    const { selected, tried: named } = await selectPinned(standardCandidates(), envPort);
+    if (selected) {
+      log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${envPort}, pinned by ${pin})`);
+      return { port: envPort, engine: selected, token };
+    }
+    tried.push(...pinRefusals(pin, named));
+    return null;
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
   tried.push(...describeTried(folders.filter((f) => !f.ok)));
@@ -107,15 +103,101 @@ async function discoverEngine(triedOut) {
 // ---------------------------------------------------------------------------
 
 const state = {
-  port: null,
-  engine: null, // the validated manifest candidate behind port (null for a JUSTSEARCH_API_PORT pin)
-  apiToken: null, // desktop session token (X-JustSearch-Session), if enforced
-  sessionId: null, // Mcp-Session-Id from the server, if it assigns one
-  protocolVersion: null, // negotiated during initialize
+  epoch: null, // the current Engine epoch (newEpoch): everything the bridge holds for one Engine
   initializeParams: null, // cached client initialize params (for re-init)
   reinitCounter: 0,
-  getStream: null, // the optional server->client GET /mcp SSE stream
 };
+
+/**
+ * One Engine epoch: everything the bridge holds for the Engine it talks to. target is
+ * { port, engine, token } (engine the validated manifest candidate behind port; token its
+ * session token, from that manifest or JUSTSEARCH_SESSION_TOKEN for a pin, '' in dev mode). Then
+ * what was negotiated with it over /mcp: identity (the Engine of the connection that answered its
+ * initialize; engineRequest writes nothing on a connection to any other), sessionId (null when the
+ * server assigns none), protocolVersion, the server->client stream, and the requests in flight.
+ * status: 'new' (no initialize sent), 'initializing', 'ready' (initialize answered, identity
+ * known) or 'failed'; settled resolves when it becomes ready or fails. Nothing but its initialize
+ * goes out in an epoch before it is ready (readyEpoch).
+ */
+function newEpoch(target) {
+  const epoch = { target, status: 'new', identity: null, sessionId: null, protocolVersion: null, stream: null, pending: new Set() };
+  epoch.settled = new Promise((resolve) => (epoch.settle = resolve));
+  return epoch;
+}
+
+/**
+ * Begin a new epoch on target and drop the current one wholesale: its stream closes and its
+ * requests in flight are destroyed, so no answer or event of an ended epoch reaches the client
+ * or the bridge again. An initialize it had in flight thereby fails, which wakes the requests
+ * waiting for it (readyEpoch), and they move on to the new epoch.
+ */
+function switchEpoch(target) {
+  const old = state.epoch;
+  state.epoch = newEpoch(target);
+  if (old) {
+    if (old.stream) old.stream.destroy();
+    for (const req of old.pending) req.destroy(Object.assign(new Error('the Engine epoch it was sent in ended'), { code: 'EPOCH_ENDED' }));
+  }
+  return state.epoch;
+}
+
+function settleEpoch(epoch, status) {
+  epoch.status = status;
+  epoch.settle();
+  if (status === 'ready') openGetStream(epoch);
+}
+
+/**
+ * Send initialize as the first message of epoch (bounded by INITIALIZE_TIMEOUT_MS); its answers go
+ * to onMessage. Resolves with its result, or null when it got none; the epoch has then failed, as
+ * when this rejects. The caller marks the epoch ready.
+ */
+async function initializeEpoch(epoch, message, onMessage) {
+  epoch.status = 'initializing';
+  let result = null;
+  try {
+    await postToServer(
+      epoch,
+      message,
+      (msg) => {
+        if (msg && msg.id === message.id && msg.result) result = msg.result;
+        onMessage(msg);
+      },
+      INITIALIZE_TIMEOUT_MS,
+    );
+  } catch (e) {
+    settleEpoch(epoch, 'failed');
+    throw e;
+  }
+  if (!result) settleEpoch(epoch, 'failed');
+  else if (typeof result.protocolVersion === 'string') epoch.protocolVersion = result.protocolVersion;
+  return result;
+}
+
+/**
+ * The current epoch once it is ready or has failed, waiting through replacements: a request goes
+ * out only in an epoch whose own initialize was answered. Each wait is bounded by that epoch's
+ * initialize (INITIALIZE_TIMEOUT_MS) or its replacement; in an epoch where no initialize was sent,
+ * there is nothing to wait for.
+ */
+async function readyEpoch() {
+  for (;;) {
+    const epoch = state.epoch;
+    if (epoch.status === 'ready' || epoch.status === 'failed') return epoch;
+    if (epoch.status === 'new') throw new Error('no MCP session with JustSearch: the client has not sent initialize');
+    await epoch.settled;
+  }
+}
+
+/** engineRequest's session for a request of epoch: none until an Engine answered in it. */
+function sessionOf(epoch) {
+  return epoch.identity ? { id: epoch.sessionId, identity: epoch.identity } : null;
+}
+
+function mcpHeaders(epoch, headers) {
+  if (epoch.protocolVersion) headers['mcp-protocol-version'] = epoch.protocolVersion;
+  return headers;
+}
 
 /** Emit one JSON-RPC message to the stdio client (single line, always). */
 function emit(messageObject) {
@@ -150,39 +232,35 @@ function sseFeed(onMessage) {
 }
 
 /**
- * POST one JSON-RPC message to the live /mcp endpoint.
- * Resolves when the HTTP response is fully consumed; JSON-RPC messages found
- * in the response (JSON body or SSE events) are emitted to stdout as they
- * arrive — except when `intercept` is given, which receives them instead.
+ * POST one JSON-RPC message to /mcp in epoch. Resolves when the HTTP response is fully consumed;
+ * JSON-RPC messages found in the response (JSON body or SSE events) go to onMessage (default: to
+ * stdout) as they arrive; none once epoch has ended, since that destroys the request.
  * Rejects with err.retryable = true on transport/session-level failures.
  */
-function postToServer(message, intercept) {
+function postToServer(epoch, message, onMessage = emit, timeoutMs = REQUEST_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(message);
-    const headers = {
+    const headers = mcpHeaders(epoch, {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       'content-length': Buffer.byteLength(body),
-    };
-    if (state.sessionId) headers['mcp-session-id'] = state.sessionId;
-    if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
-    if (state.apiToken) headers['x-justsearch-session'] = state.apiToken;
-
+    });
+    let written = false; // the request had a connection, so it may have reached the server
     const req = engineRequest(
-      target(),
-      { method: 'POST', path: '/mcp', headers, timeoutMs: REQUEST_TIMEOUT_MS },
+      epoch.target,
+      { method: 'POST', path: '/mcp', headers, timeoutMs, body, credential: true, session: sessionOf(epoch) },
       (res) => {
         const status = res.statusCode || 0;
-        const newSession = res.headers['mcp-session-id'];
-        if (typeof newSession === 'string' && newSession.length > 0) {
-          state.sessionId = newSession;
-        }
+        const assigned = res.headers['mcp-session-id'];
+        if (!epoch.identity) epoch.identity = req.connectionIdentity;
+        if (typeof assigned === 'string' && assigned.length > 0) epoch.sessionId = assigned;
 
         if (status === 404 || status === 400 || status === 401) {
-          // Streamable HTTP: 404 = session expired/unknown -> re-initialize.
+          // Streamable HTTP: 404 = session expired/unknown -> re-initialize; 401 = the token was
+          // refused (the Engine restarted): re-discover and re-read its manifest token.
           res.resume();
           const err = new Error(`HTTP ${status} from /mcp (stale session?)`);
-          err.retryable = true;
+          err.retryable = true; // the server answered that it did not take the request
           reject(err);
           return;
         }
@@ -197,11 +275,10 @@ function postToServer(message, intercept) {
           return;
         }
 
-        const deliver = intercept || emit;
         const contentType = String(res.headers['content-type'] || '');
         res.setEncoding('utf8');
         if (contentType.includes('text/event-stream')) {
-          const feed = sseFeed(deliver);
+          const feed = sseFeed(onMessage);
           res.on('data', (chunk) => feed.push(chunk));
           res.on('end', resolve);
         } else {
@@ -210,7 +287,7 @@ function postToServer(message, intercept) {
           res.on('end', () => {
             if (raw.trim().length > 0) {
               try {
-                deliver(JSON.parse(raw));
+                onMessage(JSON.parse(raw));
               } catch (e) {
                 reject(new Error(`unparseable /mcp response body: ${e.message}`));
                 return;
@@ -221,38 +298,40 @@ function postToServer(message, intercept) {
         }
         res.on('error', (e) => {
           const err = new Error(`response stream error: ${e.message}`);
-          err.retryable = true;
+          err.transport = true; // the server had the request: its outcome is unknown
           reject(err);
         });
       }
     );
+    epoch.pending.add(req);
+    req.once('close', () => epoch.pending.delete(req));
+    req.once('socket', () => {
+      written = true;
+    });
     req.on('timeout', () => req.destroy(new Error('request timeout')));
     req.on('error', (e) => {
+      if (e.code === 'NO_TOKEN') return reject(e); // refused before writing: there is no token to send
       const err = new Error(`connection failed: ${e.message}`);
-      // ECONNREFUSED etc: app restarted / port moved; ENGINE_NOT_PROVEN: nothing was sent
-      err.retryable = true;
+      err.transport = true;
+      // Only a request that never had a connection (ECONNREFUSED: app restarted or port moved;
+      // ENGINE_NOT_PROVEN: refused before writing), or was stopped on its connection before
+      // writing because the session belongs to another Engine, is surely unsent and may be
+      // sent after recovery.
+      err.retryable = !written || e.code === 'SESSION_TARGET_CHANGED';
       reject(err);
     });
-    req.write(body);
-    req.end();
   });
 }
 
 /**
- * Best-effort server->client stream (GET /mcp). Optional per spec; if the server answers 405,
- * the stream drops or its connection is not proven, we simply go without it.
+ * Best-effort server->client stream (GET /mcp) of epoch, opened once when it becomes ready and
+ * closed by switchEpoch. Optional per spec; if the server answers 405, the stream drops or its
+ * connection is not proven, we go without it.
  */
-function openGetStream() {
-  if (state.getStream) {
-    state.getStream.destroy();
-    state.getStream = null;
-  }
-  const headers = { accept: 'text/event-stream' };
-  if (state.sessionId) headers['mcp-session-id'] = state.sessionId;
-  if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
+function openGetStream(epoch) {
   const req = engineRequest(
-    target(),
-    { path: '/mcp', headers },
+    epoch.target,
+    { path: '/mcp', headers: mcpHeaders(epoch, { accept: 'text/event-stream' }), session: sessionOf(epoch) },
     (res) => {
       if (res.statusCode !== 200) {
         res.resume();
@@ -265,19 +344,17 @@ function openGetStream() {
     }
   );
   req.on('error', () => {}); // purely best-effort
-  req.end();
-  state.getStream = req;
+  epoch.stream = req;
 }
 
 /**
  * Recover after a transport failure: re-discover the port (the app may have
- * restarted on a different one), then re-establish an MCP session with the
- * cached initialize params so the retried call lands in a valid session.
- * Throws if JustSearch is unreachable.
+ * restarted on a different one), then set up an MCP session in a new epoch there: with
+ * clientInitialize (whose answers go to the client) when that is what failed, otherwise with the
+ * cached initialize params, so the retried call lands in a valid session.
+ * Throws if JustSearch is unreachable or the session could not be set up.
  */
-async function recoverConnection() {
-  state.apiToken = null; // the old token never goes to whatever is found next
-  // Concurrent calls must still prove the old target until discovery replaces it.
+async function recoverConnection(clientInitialize = null) {
   const tried = [];
   const found = await discoverEngine(tried);
   if (found === null) {
@@ -285,61 +362,77 @@ async function recoverConnection() {
     err.tried = tried;
     throw err;
   }
-  const { port } = found;
-  state.port = port;
-  state.engine = found.engine;
-  state.sessionId = null;
-  state.apiToken = found.token; // re-read from the newly proven manifest
-  if (!state.initializeParams) return; // nothing to re-establish yet
+  // The token rotates per app start; it is re-read from the manifest of (and only ever sent to)
+  // the Engine found, in a new epoch that carries nothing of the old one.
+  const epoch = switchEpoch({ port: found.port, engine: found.engine, token: found.token });
+  if (clientInitialize) {
+    if (await initializeEpoch(epoch, clientInitialize, emit)) settleEpoch(epoch, 'ready');
+    return;
+  }
+  if (!state.initializeParams) return; // nothing to re-establish (yet)
 
   state.reinitCounter += 1;
   const reinitId = `justsearch-mcpb-reinit-${state.reinitCounter}`;
-  let reinitResult = null;
-  await postToServer(
-    { jsonrpc: '2.0', id: reinitId, method: 'initialize', params: state.initializeParams },
-    (msg) => {
-      if (msg && msg.id === reinitId && msg.result) reinitResult = msg.result;
-    }
-  );
-  if (!reinitResult) throw new Error('re-initialize got no result');
-  if (typeof reinitResult.protocolVersion === 'string') {
-    state.protocolVersion = reinitResult.protocolVersion;
+  const reinit = { jsonrpc: '2.0', id: reinitId, method: 'initialize', params: state.initializeParams };
+  if (!(await initializeEpoch(epoch, reinit, () => {}))) {
+    throw new Error('re-initialize got no result');
   }
-  await postToServer({ jsonrpc: '2.0', method: 'notifications/initialized' });
-  openGetStream();
-  log(`reconnected to http://127.0.0.1:${state.port}/mcp (new session)`);
+  try {
+    await postToServer(epoch, { jsonrpc: '2.0', method: 'notifications/initialized' }, emit, INITIALIZE_TIMEOUT_MS);
+  } catch (e) {
+    settleEpoch(epoch, 'failed');
+    throw e;
+  }
+  settleEpoch(epoch, 'ready');
+  log(`reconnected to http://127.0.0.1:${epoch.target.port}/mcp (new session)`);
 }
 
-/** Handle one client->server message, with one transparent reconnect+retry. */
+/**
+ * Handle one client->server message, with at most one reconnect and resend. A client initialize
+ * begins a new epoch and is redone on the recovered target after any transport failure; any other
+ * message waits until the current epoch is ready (readyEpoch). It is sent again only when it
+ * surely did not take effect (it never had a connection, or the server answered 400/404 for its
+ * session); when the connection failed after it may have been sent, it fails with an error
+ * saying its outcome is unknown, so a call such as an ingest is never run twice.
+ */
 async function handleClientMessage(message) {
   const isInitialize = message && message.method === 'initialize';
-  if (isInitialize && message.params) {
-    state.initializeParams = message.params;
-    state.sessionId = null; // a fresh client handshake starts a fresh session
-  }
+  const isSetup = isInitialize || (message && message.id === undefined);
+  if (isInitialize && message.params) state.initializeParams = message.params;
 
-  const send = () =>
-    isInitialize
-      ? postToServer(message, (msg) => {
-          if (msg && msg.id === message.id && msg.result) {
-            if (typeof msg.result.protocolVersion === 'string') {
-              state.protocolVersion = msg.result.protocolVersion;
-            }
-            // Session header was captured in postToServer; the standalone
-            // server->client stream can be opened once the session exists.
-            setImmediate(openGetStream);
-          }
-          emit(msg);
-        })
-      : postToServer(message);
+  let epoch = null;
+  const send = async () => {
+    if (isInitialize) {
+      epoch = switchEpoch(state.epoch.target);
+      if (await initializeEpoch(epoch, message, emit)) settleEpoch(epoch, 'ready');
+      return;
+    }
+    epoch = await readyEpoch();
+    if (epoch.status === 'failed') {
+      throw Object.assign(new Error('the MCP session with JustSearch could not be set up'), { retryable: true });
+    }
+    await postToServer(epoch, message);
+  };
 
   try {
     await send();
   } catch (firstError) {
-    if (!firstError.retryable) throw firstError;
-    log(`transport error (${firstError.message}) — re-checking where JustSearch is running...`);
-    await recoverConnection(); // throws if the app is gone
-    await send(); // replay once against the recovered session
+    const ended = epoch !== state.epoch; // the epoch it was sent in is gone, with all it was bound to
+    if (ended && isSetup) throw new Error(`${message.method || 'the message'} was superseded: the session it belonged to ended`);
+    if (!firstError.retryable && !(isSetup && firstError.transport)) {
+      if (!firstError.transport) throw firstError;
+      throw new Error(
+        `the connection to JustSearch failed after ${message.method || 'the request'} may have been sent (${firstError.message}); ` +
+          'its outcome is unknown, so it was not sent again. Check before repeating it.',
+      );
+    }
+    if (!ended) {
+      log(`transport error (${firstError.message}) — re-checking where JustSearch is running...`);
+      // throws if the app is gone; a client initialize is itself the new handshake
+      if (isInitialize) return recoverConnection(message);
+      await recoverConnection();
+    }
+    await send(); // once, in the current epoch
   }
 }
 
@@ -358,18 +451,12 @@ function failRequest(message, text) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const tried = [];
-  const found = await discoverEngine(tried);
-  if (found === null) {
-    process.stderr.write(`${actionableUnreachableMessage(tried)}\n`);
-    process.exit(1);
-  }
-  const { port } = found;
-  state.port = port;
-  state.engine = found.engine;
-  state.apiToken = found.token;
-  log(`bridging stdio <-> http://127.0.0.1:${port}/mcp${state.apiToken ? ' (session token attached)' : ''}`);
-
+  // stdin is read from the start, so closing it stops the bridge even during discovery; messages
+  // that arrive before an Engine is found wait for it, in order.
+  let markReady;
+  const ready = new Promise((resolve) => {
+    markReady = resolve;
+  });
   let stdinBuffer = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => {
@@ -386,24 +473,36 @@ async function main() {
         log(`ignoring unparseable stdin line: ${line.slice(0, 200)}`);
         continue;
       }
-      handleClientMessage(message).catch((err) => {
-        const unreachable = Array.isArray(err.tried);
-        const text = unreachable
-          ? 'JustSearch is not running. Launch the JustSearch desktop app and retry (install: https://github.com/justsearch-app/justsearch/releases).'
-          : `JustSearch bridge error: ${err.message}`;
-        failRequest(message, text);
-        if (unreachable) {
-          process.stderr.write(`${actionableUnreachableMessage(err.tried)}\n`);
-          process.exit(1);
-        }
-        log(`error handling ${message.method || 'message'}: ${err.message}`);
-      });
+      ready
+        .then(() => handleClientMessage(message))
+        .catch((err) => {
+          const unreachable = Array.isArray(err.tried);
+          const text = unreachable
+            ? 'JustSearch is not running. Launch the JustSearch desktop app and retry (install: https://github.com/justsearch-app/justsearch/releases).'
+            : `JustSearch bridge error: ${err.message}`;
+          failRequest(message, text);
+          if (unreachable) {
+            process.stderr.write(`${actionableUnreachableMessage(err.tried)}\n`);
+            process.exit(1);
+          }
+          log(`error handling ${message.method || 'message'}: ${err.message}`);
+        });
     }
   });
   process.stdin.on('end', () => {
     log('stdin closed — exiting');
     process.exit(0);
   });
+
+  const tried = [];
+  const found = await discoverEngine(tried);
+  if (found === null) {
+    process.stderr.write(`${actionableUnreachableMessage(tried)}\n`);
+    process.exit(1);
+  }
+  const { target } = switchEpoch({ port: found.port, engine: found.engine, token: found.token });
+  log(`bridging stdio <-> http://127.0.0.1:${found.port}/mcp${target.token ? ' (session token attached)' : ''}`);
+  markReady();
 }
 
 main().catch((err) => {
