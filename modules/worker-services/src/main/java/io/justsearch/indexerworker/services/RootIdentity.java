@@ -105,6 +105,8 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
    * Nothing in production sets it.
    */
   static final AtomicBoolean VOLUME_IDENTITY_UNAVAILABLE = new AtomicBoolean();
+  /** Test-only lookup: native directory identity checks still run on the real filesystem. */
+  static volatile java.util.function.Function<Path, String> VOLUME_IDENTITY_LOOKUP;
 
   /**
    * The volume this root lives on, comparable across restarts, or {@code null} when stable volume
@@ -115,6 +117,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     if (VOLUME_IDENTITY_UNAVAILABLE.get()) {
       return null;
     }
+    if (VOLUME_IDENTITY_LOOKUP != null) return VOLUME_IDENTITY_LOOKUP.apply(realPath);
     if (stableFileIdentity instanceof WindowsFileIdentity windows) {
       return "windows-volume:" + Long.toHexString(windows.volumeSerialNumber());
     }

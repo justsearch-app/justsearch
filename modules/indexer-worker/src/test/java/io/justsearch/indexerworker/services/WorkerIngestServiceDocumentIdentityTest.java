@@ -362,6 +362,8 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
             0L);
     service.setDocumentIdentityStore(identityStore);
 
+    // A rename notification describes an existing destination, not two deleted paths.
+    Files.writeString(Path.of(newPath), parentContent);
     UpdatePathsResponse result = rename(service, oldPath, newPath);
 
     assertNotNull(result);

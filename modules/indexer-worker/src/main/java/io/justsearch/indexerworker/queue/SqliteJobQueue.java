@@ -1278,12 +1278,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           query.setString(1, originalPrefix + "%");
           try (var row = query.executeQuery()) { firstPreparation = row.next(); }
         }
+        // A stale checkpoint is not provenance for a different modern database. Preserve its
+        // unscoped work as bounded, durable quarantine, distinct from the v13 admission cohort.
+        // The prefix survives checkpoint cleanup/restart and grants no exact-file authority.
+        try (var update = connection.createStatement()) {
+          update.executeUpdate("""
+              UPDATE jobs SET unit_revision='release030-unscoped/' || unit_revision
+              WHERE ingestion_root IS NULL AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')
+                AND unit_revision NOT LIKE 'release030/%' AND unit_revision NOT LIKE 'release030-unscoped/%'
+              """);
+        }
         int identity = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
         if (identity == generation) identity = generation == Integer.MAX_VALUE ? 1 : generation + 1;
         // Longest boundary wins for nested roots. SQL compares normalized path components,
         // not LIKE patterns (a person's folder may contain '_' or '%').
         try (var update = connection.prepareStatement("""
             UPDATE jobs SET ingestion_root=? WHERE ingestion_root IS NULL
+              AND unit_revision LIKE 'release030/%'
               AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')
               AND (path=? OR (path>=? AND path<?))
             """)) {
@@ -1303,6 +1314,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           // Outside every current root, only the exact legacy path is grandfathered. No parent
           // folder is admitted. Terminal failed rows need no recovery or cutover certificate.
           update.executeUpdate("UPDATE jobs SET ingestion_root=path WHERE ingestion_root IS NULL "
+              + "AND unit_revision LIKE 'release030/%' "
               + "AND state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED')");
         }
         if (firstPreparation) {

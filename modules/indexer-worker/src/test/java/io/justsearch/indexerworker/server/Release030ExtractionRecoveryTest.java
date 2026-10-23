@@ -21,6 +21,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** U9: actual sandbox calls, not a queue-depth approximation of work saved. */
 @Timeout(120)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030ExtractionRecoveryTest {
   @Test
   void recoveryWalkExtractsChangedFilesAndSkipsUnchangedReleaseFiles(@TempDir Path temporary)

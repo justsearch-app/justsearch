@@ -12,6 +12,7 @@ The old test explicitly pins the temporary bad behaviour of #739 and directs thi
 The orchestrator's choices are delegated choices, not owner words.
 The evidence runner uses a private copy solely to invoke js-gradle-slot, place JVM temporaries under TMPDIR, and create the before state as a shared clone; assertion/result parsing and digest generation are unchanged. It also batches the selected Gradle tasks once per tree and includes the unchanged exclusion-preservation class (adapted mock default dispatch on the candidate) and PMD tasks. The source runner is unchanged. One combined evidence run executes repaired and preservation checks on both states; its nonzero aggregate verdict for preservation checks passing before is expected and reported, while each entry validates its own check outcomes.
 New isolated scenario tests retain the gate's independent verification requirement.
+The Round 7 review follow-up restores real lookup by default and uses explicit, per-test volume injection. Its producer reruns changed behavioral checks on the warm cached baseline, and carries forward earlier executed before receipts only after verifying byte equivalence of the original check source apart from the injection annotation and raw child initialization; every reused receipt retains its original baseline and evidence digest. All selected candidate checks, compile and PMD run in combined two-mode Gradle calls. The initial PMD violations are retained as failures; after removing redundant annotation qualifiers, a final compile/PMD plus fresh two-mode admission run corrects them and re-executes the cached baseline. The early configuration failure and cancelled queued attempt are retained and are not passes. The final readmission producer runs both-mode compile/PMD/tests and verifies fail-before through direct JUnit against hash-frozen compiled pre-fix queue classes; its execution context records that distinction, without rebuilding or claiming a committed baseline.
 
 ```json
 {
@@ -127,7 +128,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java#issue739CompatibleReleaseIndexStaysWritableAndSearchableAcrossRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java#issue739LegacyJobsAreReadAndSelectiveWriteRepairSurvivesRestart",
@@ -172,7 +173,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CompatibilityTest.java#knownShapeChangesRemainMismatchesAndUncertaintyStaysDistinct",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CrashRecoveryTest.java#killedQueueMigrationPreservesEveryReleasedSavedJobField"
@@ -307,7 +308,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java"
       ],
@@ -318,7 +319,7 @@ New isolated scenario tests retain the gate's independent verification requireme
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "C2 findings 1–4: an isolated queued update becomes searchable across restart; a never-indexed missing exact file remains recoverable and indexes after return; the authentic MIGRATING and SWITCHING fixtures complete through public resume without manual state changes and retain the original terminal failure; nonnumeric/overflowed root cooldowns retain old search and cannot starve another root. A partial native Green missing an unavailable exact file must preserve Blue search until that exact file returns, then complete normally. Every repair case fails at its intended assertion on da5d6059d. The enqueue merge preservation case passes before and after.",
+      "behaviour": "C2 findings 1\u20134: an isolated queued update becomes searchable across restart; a never-indexed missing exact file remains recoverable and indexes after return; the authentic MIGRATING and SWITCHING fixtures complete through public resume without manual state changes and retain the original terminal failure; nonnumeric/overflowed root cooldowns retain old search and cannot starve another root. A partial native Green missing an unavailable exact file must preserve Blue search until that exact file returns, then complete normally. Every repair case fails at its intended assertion on da5d6059d. The enqueue merge preservation case passes before and after.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -371,7 +372,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java"
       ],
@@ -407,7 +408,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CorruptRecoveryValueTest.java"
       ],
@@ -500,12 +501,12 @@ New isolated scenario tests retain the gate's independent verification requireme
           "kind": "delegated-choice",
           "delegationQuote": "The exception must apply only to rows admitted by 0.3.0 (identify them durably at preparation time, for example by their unit revision, generation or a marker set in the same transaction), never to anything enqueued later.",
           "delegationLocation": "task t-20261020-c2e24a request",
-          "delegationScope": "Round4: test the three C3 claims on eae494706; preserve rounds1–3 and U19; do not change queue schema. Resume with remaining work autonomously within the delegated scope.",
+          "delegationScope": "Round4: test the three C3 claims on eae494706; preserve rounds1\u20133 and U19; do not change queue schema. Resume with remaining work autonomously within the delegated scope.",
           "choice": "Use the existing v17 unit_revision backfill to prefix revisions born from an actual v13 database, with its saved application_id generation. This tags the original cohort in the existing single atomic schema-migration transaction and existing revision-write pass: no schema, DDL or version change and no extra full-queue revision rewrite. Preparation selectively repairs only that original generation; a different modern database cannot acquire provenance from an old sidecar, a null boundary or a nonzero header. A normal enqueue mints a fresh revision, immediately revoking even cached exact-path authority. Validate the current saved revision; an unreadable admission SELECT throws into the per-job retry handler and never authorizes absence. Keep both unitRevision and preserveRetryWaits in the merged enqueue path. Native replay of an old unscoped buffered UPSERT preserves an already durable unfinished original admission or original exhausted debt completed on retained Green, rather than renewing away its retry state or provenance; new strong/recorded admissions retain normal behavior. Only original RETRY_EXHAUSTED exact files proven absent from Blue by a strict physical DOC_ID count become cutover-independent, durably in their revision. Read failure or indexed content retains the existing protection. Keep the real row, state, retries and checkpoint; subtract only this original debt in native monitor/drain, replay pending barrier and final publication fences, while replay still waits for every PROCESSING row. Unowned terminal failure exemptions are per original saved revision, never database-wide, so ordinary/recorded failure budgets remain intact. A FAILED native migration with its retained candidate, current database-bound checkpoint and original debt retries the same candidate on boot with existing certification/budget/publication guards. DONE debt remains identifiable when a file returned before restart. Deadline tests use the real CutoverContext duration0 and actual transitions, never manual saved-state or timestamp edits. Invalid decoded root keys are moved once to reversible UTF16-hex quarantined-root keys retaining their values; atomic save precedes one count-only warning. Preserve quarantine across preparation and never delete its checkpoint; healthy roots still finish independently. No inferred volume identity or parent authority. Keep the original private single-step migration entry point for the unchanged supported-version fixture checks; it delegates with no v13 witness, while the atomic real-v13 ladder carries its actual generation. Retain the original single Statement retry repair and all unchanged crash interception points, scoped only by a constant and the integer cohort generation. No scale regeneration because the recovery walk is unchanged. The integration task budget is60min rather than30min with unchanged assertions and method timeouts, a1GiB spawned-Engine heap cap, fixed JVM temporary directories and sequential slotted Gradle calls.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round4.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-admission-quality.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java"
       ],
@@ -555,7 +556,7 @@ New isolated scenario tests retain the gate's independent verification requireme
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round5.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java"
       ],
@@ -593,14 +594,181 @@ New isolated scenario tests retain the gate's independent verification requireme
           "kind": "delegated-choice",
           "delegationQuote": "Parent-root recovery must never prune data under another registered root (for example an unplugged nested root whose mount folder is empty). Each root's data is judged only by that root's own volume evidence.",
           "delegationLocation": "task t-20261020-c2e24a request",
-          "delegationScope": "Fix C5 findings 1–3 on 7245bedaf; keep all earlier behavior. Finding 4 is main issue #913 and must not be changed; finding 5 is accepted as is. Resume with remaining work autonomously within the delegated scope.",
+          "delegationScope": "Fix C5 findings 1\u20133 on 7245bedaf; keep all earlier behavior. Finding 4 is main issue #913 and must not be changed; finding 5 is accepted as is. Resume with remaining work autonomously within the delegated scope.",
           "choice": "Use one nested-root ownership check in the shared sync prune guard and directory walk: retain the child's indexed rows, and skip its subtree instead of admitting its files with the parent boundary. Apply the same ownership rule to failed visits: a denied child mount keeps only the child's debt, without repeatedly walking the healthy parent. Two recovery counterexamples failed at that assertion on the initial candidate before adding the failed-visit guard; both ordinary sync preservation cases passed. This applies to empty mount folders and present replacement-volume bytes, irrespective of whether the child is currently available. Only the child's own recovery may judge or admit its sources using its volume evidence. Recheck current root membership and the walk's removal generation under the watcher registry monitor used by unwatch, holding that monitor only for each bounded admission batch, including registry handover. Capture the fence before the walk; keep the existing six-argument sync helper and let SyncDirectoryOps invoke its own queue inside that fence, so original cooldown spies and real-process admission kill hooks continue to observe the actual operation without test changes. The first full attempt exposed both displaced hooks and was cancelled before Engine suites; preserve its diagnostics and rerun the corrected candidate. Re-admitting an eligible DONE row clears the completed admission's failure history; leave unfinished admissions, parser/I/O waits and finite-walk receipts intact. No schema change or new recovery checkpoint. Exercise the removal race through normal unwatch and delete routes, and a real subsequent parser retry through search and restart. Because the shared prune guard and bounded admission affect recovery cost, generate the scale fixture once, reuse it for a bounded walk/extraction measurement, then delete it. Keep fixed before/after JVM folders, sequential slotted Gradle calls and retained caches. Run packaged HTTP first boot and restart once at the end. Scale evidence is a 40.23-second idempotent root walk on the single generated corpus, with zero unchanged-file extractions and no missing-boundary retirements; it is not a full queue drain. The inherited probe required global checkpoint deletion in the same tick, although readiness is sampled before the walk. Preserve that failed assumption as evidence, reuse the same data without regeneration, invoke the normal completion tick and verify checkpoint release plus all 700042 jobs retained. The remaining 699641 queued jobs make full drain unverified. Do not edit migration states or recovery properties to force completion. Final packaged HTTP first boot and restart both retain the original writable IDLE generation and find new files; preserve retry waits and close both owned Engines.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round6.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WorkerBootFixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityExtension.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentityExtension.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/LinuxRootUnsupportedArchitectureTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/LinuxRootVolumeSafetyTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
+        "modules/indexer-worker/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension",
+        "modules/worker-services/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NoVolumeIdentitySeamTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "signature"
+      ],
+      "whatMoved": "Review follow-up: restore both real Linux disk UUID and tmpfs tests with their original assertions and a /dev/disk/by-uuid JUnit assumption; retain the separate injected variants. Restore the real unsupported-ABI portable-witness test and retain its injected companion. Also restore the original real-host prune replay missing-record check with unchanged assertions and a native-comparable-evidence assumption; retain its injected companion separately. Remove module-wide autodetection resources/service registration and the injection hidden in WorkerBootFixture. Register controlled volume evidence explicitly on only the affected upgrade tests and the deferred-writer handoff method, restore the previous lookup after each test, and install it explicitly in the two raw crash drivers. All remaining tests use real lookup by default. The exact opt-in list and reasons are in tmp/builder/round7-review-injection-manifest.json. Re-run both evidence modes; separately prove native checks abort, rather than pass, in a /dev without UUID mappings.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Restore real-interface checks and make host-independent injection explicit, keeping the default real.",
+          "choice": "Review follow-up: restore both real Linux disk UUID and tmpfs tests with their original assertions and a /dev/disk/by-uuid JUnit assumption; retain the separate injected variants. Restore the real unsupported-ABI portable-witness test and retain its injected companion. Also restore the original real-host prune replay missing-record check with unchanged assertions and a native-comparable-evidence assumption; retain its injected companion separately. Remove module-wide autodetection resources/service registration and the injection hidden in WorkerBootFixture. Register controlled volume evidence explicitly on only the affected upgrade tests and the deferred-writer handoff method, restore the previous lookup after each test, and install it explicitly in the two raw crash drivers. All remaining tests use real lookup by default. The exact opt-in list and reasons are in tmp/builder/round7-review-injection-manifest.json. Re-run both evidence modes; separately prove native checks abort, rather than pass, in a /dev without UUID mappings.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Ordinary unscoped watcher/scan/replay admissions retain main policy retirement without source reads. Only original v13 upgrade admissions and durably quarantined unscoped admissions encountered while invalidating an upgrade checkpoint use bounded retry; they acquire no ingestion authority.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Keep ordinary main retirement and wait only for upgrade cases where admission evidence may still arrive, with a bound.",
+          "choice": "Keep SKIP_DONE/SKIPPED_POLICY/NONE for ordinary missing-boundary admissions, including legacy VDU refresh and unscoped retries/replay. Use existing RETRY_WITH_BACKOFF, bounded at seven days from first failure, for release030/ identities or release030-unscoped/ quarantine. The latter is stamped only inside the existing upgrade-preparation transaction when a recovery checkpoint describes unscoped modern work. It preserves the opaque original revision as a suffix, survives checkpoint completion/restart, and never matches the release030/% legacy authority selector. A fresh real scoped admission replaces the quarantine. Pending backoff contributes to queue depth and WAITING; after the bound, RETRY_EXHAUSTED is visible as a failure and leaves the active queue. Real unavailable/locked sources with valid scope retain retry-until-available. No schema/checkpoint-format change.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java#onlyUpgradeUnscopedDebtUsesTheBoundedRetryLadder"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: an intentional modern exact-file add outside roots works with injected UUID evidence both present and absent, never becomes a v13 admission and never ingests its neighbor. The stale-database test separately holds an unowned modern job through restart, then demonstrates that a fresh deliberate exact request resolves its durable debt.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Keep all earlier behavior while fixing unowned modern admissions and verify both UUID evidence states.",
+          "choice": "Use the actual RootAdded marker that makes a request a deliberate add. Retain the failed unmarked positive setup as a diagnostic rather than claiming it is a product regression: a marked request records an available parent volume, while an unmarked one deliberately records nothing. Parameterized names include their methods for unambiguous matched evidence. This preservation check passes before and after; the negative database-binding and missing-boundary checks fail at their intended assertions before.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-admission-quality.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LegacyIngestionBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preserve main retirement for ordinary v21 watcher/scan and historical replay rows with no boundary, along with existing scoped replay and exclusion checks. New recovery quarantine persists after checkpoint cleanup and another restart, never grants a boundary, reaches RETRY_EXHAUSTED at the existing seven-day deadline with zero DONE rows, and is revived by a deliberate fresh exact-path admission.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Keep ordinary main retirement and bounded upgrade-only uncertainty without granting ingestion authority.",
+          "choice": "Preserve main retirement for ordinary v21 watcher/scan and historical replay rows with no boundary, along with existing scoped replay and exclusion checks. New recovery quarantine persists after checkpoint cleanup and another restart, never grants a boundary, reaches RETRY_EXHAUSTED at the existing seven-day deadline with zero DONE rows, and is revived by a deliberate fresh exact-path admission. Exercise the real SQLite queue and persisted deadline; restore the four ordinary main preservation methods from HEAD unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LegacyIngestionBoundaryTest.java#replacementCheckpointQuarantinesOnlyUpgradeDebtAndStopsRetryingAfterSevenDays"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Register the volume extension explicitly on this class, restore real lookup after each test, and initialize the same selected lookup in its raw crash-worker JVM. Keep every crash cut, halt code, queue revision, atomic parent/chunk assertion, reload debt and cleanup oracle unchanged. The default full suite exposed four unreached cuts because child real UUID disagreed with parent synthetic UUID; the absent matrix is audited separately. A focused two-mode follow-up replaces only this superseded harness result; all other full-suite results remain valid on identical product bytes.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Make volume-dependent module checks deterministic with UUID evidence present and absent; preserve every earlier crash and queue check.",
+          "choice": "Use explicit per-test registration and the existing test extension initialization at this raw child entry point, as for the upgrade process-kill fixture. No product, crash boundary, assertion or model changes. Preserve failing full-run XML, prove all seven cases with each lookup result, and do not run a second heavy Gradle call while Engine suites are active.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceDocumentIdentityTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneWriterFenceTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "split"
+      ],
+      "whatMoved": "Retain every original real-host prune replay assertion, adding only explicit native-evidence assumptions. Keep the injected comparable-volume variant as an additional method. Document identity and prune fence classes use real lookup by default. Rename fixtures retain the physical destination/move precondition fixes and all existing UID/rekey/row/replay/fence assertions. No rename, prune or volume product policy changes.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Make host-volume-dependent module fixtures deterministic and keep all earlier behavior; missing job admission evidence must fail closed.",
+          "choice": "Retain every original real-host prune replay assertion, adding only explicit native-evidence assumptions. Keep the injected comparable-volume variant as an additional method. Document identity and prune fence classes use real lookup by default. Rename fixtures retain the physical destination/move precondition fixes and all existing UID/rekey/row/replay/fence assertions. No rename, prune or volume product policy changes.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UpgradeUnscopedDebtReadmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Ordinary enqueue, explicit retry and maintenance re-admission without new scope preserve non-authorizing upgrade quarantine with a fresh revision; they cannot retire unresolved upgrade debt. A fresh scoped admission clears the quarantine and works normally.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Restore ordinary main retirement and bound only upgrade missing-boundary debt, without losing that classification on a legitimate unscoped retry.",
+          "choice": "Preserve the distinct release030-unscoped/ classification in the common enqueue conflict update only while new scope is absent; always mint a new revision and never grant legacy exact-file authority. Reuse existing revision and retry bound; no schema change.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round7-readmission.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UpgradeUnscopedDebtReadmissionTest.java"
       ],
       "repaired": true
     }

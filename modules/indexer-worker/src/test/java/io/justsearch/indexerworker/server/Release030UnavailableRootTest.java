@@ -19,6 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** U11: the volume evidence must hold before boot, sync, watcher or queued work can delete. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030UnavailableRootTest {
   @Test
   @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)

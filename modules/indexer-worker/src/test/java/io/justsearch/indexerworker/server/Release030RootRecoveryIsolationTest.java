@@ -33,6 +33,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 /** C5: each registered root owns its absence evidence and recovery admissions. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RootRecoveryIsolationTest {
   @ParameterizedTest
   @CsvSource({"true,false", "false,false", "true,true", "false,true"})
@@ -53,8 +55,12 @@ final class Release030RootRecoveryIsolationTest {
         var volumes = new Properties();
         try (var in = Files.newInputStream(ledger)) { volumes.load(in); }
         String parentVolume = volumes.getProperty(key(parent.resolve("beta")));
-        assertNotNull(parentVolume, "fixture boot records the available volume");
-        volumes.setProperty(key(parent), parentVolume);
+        if (io.justsearch.indexerworker.services.NoVolumeIdentityExtension.volumeIdentityAvailable(parent)) {
+          assertNotNull(parentVolume, "fixture boot records the injected available volume");
+          volumes.setProperty(key(parent), parentVolume);
+        } else {
+          assertNull(parentVolume, "an unavailable UUID must not manufacture a parent volume");
+        }
         volumes.setProperty(key(child), "windows-volume:123abc");
         try (var out = Files.newOutputStream(ledger)) { volumes.store(out, "nested volume unavailable"); }
         Files.move(child, root.resolve("held-alpha"));

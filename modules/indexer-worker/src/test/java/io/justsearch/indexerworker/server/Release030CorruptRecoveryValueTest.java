@@ -16,6 +16,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** Invalid values retain uncertain debt rather than stopping boot or dropping a root. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030CorruptRecoveryValueTest {
   @ParameterizedTest
   @ValueSource(strings = {"root-state", "format", "escaped-value"})

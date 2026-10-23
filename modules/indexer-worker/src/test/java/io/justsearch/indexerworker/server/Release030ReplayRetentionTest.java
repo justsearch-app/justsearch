@@ -28,6 +28,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** C4: recorded authority, settled native effects and retention of unfinished recovery evidence. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030ReplayRetentionTest {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})

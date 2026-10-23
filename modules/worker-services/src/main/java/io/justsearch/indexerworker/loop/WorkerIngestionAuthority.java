@@ -42,15 +42,18 @@ final class WorkerIngestionAuthority {
 
   SourceAdmission admit(io.justsearch.indexerworker.queue.JobQueue.IndexJob job) throws IOException {
     if (job.ingestionRoot() == null) {
-      // Pre-boundary queue and switch-buffer records cannot distinguish explicit files from
-      // directory discoveries. Retire this admission before any source read; a fresh scan,
-      // witnessed event or explicit-file request can admit it again with its actual boundary.
+      // Ordinary historical/main admissions retain policy retirement. Only original upgrade
+      // debt, or unowned rows quarantined while invalidating an upgrade checkpoint, can still
+      // acquire scope from recovery. Keep their content, with the existing seven-day retry bound.
+      String revision = job.unitRevision();
+      boolean recovery = revision != null && (revision.startsWith("release030/")
+          || revision.startsWith("release030-unscoped/"));
       return SourceAdmission.terminal(
-          SourceAdmissionAction.SKIP_DONE,
+          recovery ? SourceAdmissionAction.RETRYABLE_FAILURE : SourceAdmissionAction.SKIP_DONE,
           outcome(
-              IngestionOutcomeClass.SKIPPED_POLICY,
+              recovery ? IngestionOutcomeClass.IO_FAILED : IngestionOutcomeClass.SKIPPED_POLICY,
               IngestionReasonCodes.MISSING_INGESTION_BOUNDARY,
-              IngestionRetryPolicy.NONE,
+              recovery ? IngestionRetryPolicy.RETRY_WITH_BACKOFF : IngestionRetryPolicy.NONE,
               "Missing ingestion policy boundary; fresh admission required"));
     }
     return admit(job.path(), job.ingestionRoot());

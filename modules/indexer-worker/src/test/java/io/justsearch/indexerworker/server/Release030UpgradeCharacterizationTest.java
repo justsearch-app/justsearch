@@ -18,6 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Issue #739: compatible in-place upgrade and durable recovery through the real Worker boot. */
 @Timeout(120)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030UpgradeCharacterizationTest {
   @Test
   void issue739CompatibleReleaseIndexStaysWritableAndSearchableAcrossRestart(@TempDir Path temporary)

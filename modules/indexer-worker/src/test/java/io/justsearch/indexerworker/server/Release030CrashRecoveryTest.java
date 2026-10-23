@@ -27,6 +27,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Real process kills: no close(), rollback callback or shutdown hook gets to tidy up the cut. */
 @Timeout(600)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030CrashRecoveryTest {
   @Test
   void killedQueueMigrationPreservesEveryReleasedSavedJobField(@TempDir Path temporary)
@@ -150,6 +152,7 @@ final class Release030CrashRecoveryTest {
 
   /** Subprocess driver, using existing hooks/proxies instead of production crash-test options. */
   public static void main(String[] args) throws Exception {
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.installVolumeLookupIfAbsent();
     Path root = Path.of(args[0]);
     String cut = args[1];
     if (cut.startsWith("migration-")) {

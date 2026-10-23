@@ -20,6 +20,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** C1's five claims, exercised against real boot, queue claims, disk evidence and reconciliation. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030ChallengerRecoveryTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})

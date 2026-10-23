@@ -30,6 +30,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** C2: exact-file authority does not depend on the drive inferred from an indexed sample. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030ExactFileRecoveryTest {
   @Test
   void isolatedQueuedUpdateIndexesAndSurvivesRestart(@TempDir Path temporary) throws Exception {

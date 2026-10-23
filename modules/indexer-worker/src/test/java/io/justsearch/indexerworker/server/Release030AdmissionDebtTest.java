@@ -12,6 +12,7 @@ import io.justsearch.indexerworker.queue.Release030RecoveryState;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.NoVolumeIdentityExtension;
 import io.justsearch.ipc.BatchRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** C3: admission identity, cutover-independent exhausted debt and corrupt checkpoint keys. */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(
+    NoVolumeIdentityExtension.class)
 final class Release030AdmissionDebtTest {
   @Test
   void newExplicitAdmissionCannotBorrowLegacyAuthority(@TempDir Path temporary) throws Exception {
@@ -102,20 +105,51 @@ final class Release030AdmissionDebtTest {
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @Test
-  void replacementModernDatabaseCannotBorrowV13AdmissionIdentity(@TempDir Path temporary) throws Exception {
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {true, false})
+  void deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority(boolean volumeAvailable,
+      @TempDir Path temporary) throws Exception {
+    Path root = Release030Fixture.unpack("small", temporary);
+    Path file = Files.writeString(root.resolve("modern-explicit.txt"), "currentexplicitcobalt");
+    ConfigStore previous = ConfigStore.globalOrNull();
+    var installed = configure(root);
+    var evidence = NoVolumeIdentityExtension.withVolumeIdentity(volumeAvailable);
+    try (evidence) {
+      var models = new ReleasedModelIdentities(root);
+      try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+        stopRecovery(server);
+        var response = server.appServices().ingestService().submitBatch(BatchRequest.newBuilder()
+            .addFilePaths(file.toString()).setRootAdded(true).build(), CallContext.none());
+        assertEquals(1, response.getAcceptedCount(), response.getErrorMessage());
+        assertEquals(1, count(root, "path='" + key(file) + "' AND ingestion_root=path"));
+        assertFalse(queue(server).isRelease030ExactFile(file));
+        activate(server);
+        await(() -> search(server, "currentexplicitcobalt").contains(key(file)),
+            "an intentional current explicit request retains its own exact authority", 20);
+        assertEquals(0, count(root, "path='" + key(root.resolve("neighbor.txt")) + "'"));
+      }
+    } finally { ConfigStore.restoreGlobal(installed, previous); }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {true, false})
+  void replacementModernDatabaseCannotBorrowV13AdmissionIdentity(boolean volumeAvailable, @TempDir Path temporary) throws Exception {
     Path root = Release030Fixture.unpack("small", temporary);
     Path db = root.resolve("data/jobs.db"), file = root.resolve("explicit.txt");
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
-    try {
+    var evidence = NoVolumeIdentityExtension.withVolumeIdentity(volumeAvailable);
+    try (evidence) {
       var models = new ReleasedModelIdentities(root);
       try (models) {
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
           stopRecovery(server);
           assertTrue(queue(server).isRelease030ExactFile(file));
           assertTrue(search(server, "apricot").contains(key(file)));
+          assertTrue(search(server, "unownedreplacementcobalt").isEmpty());
         }
+        io.justsearch.indexerworker.services.ExplicitIngestRecords.recordFileFolder(
+            root.resolve("data/index/default"), root);
         // A different current-schema database does not inherit the old database's cohort,
         // even if its caller did not supply a policy boundary. Retain the original DB intact.
         for (String suffix : List.of("", "-wal", "-shm")) {
@@ -132,29 +166,50 @@ final class Release030AdmissionDebtTest {
         }
         assertEquals(1, count(root, "state='PENDING' AND ingestion_root IS NULL AND unit_revision NOT LIKE 'release030/%'"),
             "a genuinely new modern admission precedes the stale-sidecar check");
+        Files.writeString(file, "unownedreplacementcobalt");
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
           stopRecovery(server);
           assertFalse(queue(server).isRelease030ExactFile(file),
               "C3-1: re-preparing a replacement database cannot manufacture v13 provenance");
           assertEquals(0, queue(server).unownedFailureCount(), "modern failures retain their cutover budget");
+          assertEquals(1, count(root, "path='" + key(file) + "' AND ingestion_root IS NULL"),
+              "X4: a stale checkpoint cannot create a boundary for a non-legacy admission");
           activate(server);
           await(() -> count(root, "path='" + key(file) + "' AND retry_after>0") == 1,
               "unowned modern work waits for authority without deletion", 20);
           assertTrue(search(server, "apricot").contains(key(file)));
+          assertTrue(search(server, "unownedreplacementcobalt").isEmpty());
           assertEquals(0, count(root, "state='DONE' AND path='" + key(file) + "'"));
           assertTrue(Files.exists(root.resolve("data/old-jobs.db")));
+        }
+        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+          stopRecovery(server);
+          activate(server);
+          assertFalse(queue(server).isRelease030ExactFile(file));
+          assertTrue(search(server, "apricot").contains(key(file)), "unowned work stays held after restart");
+          assertTrue(search(server, "unownedreplacementcobalt").isEmpty());
+          assertEquals(0, count(root, "state='DONE' AND path='" + key(file) + "'"));
+          var admitted = server.appServices().ingestService().submitBatch(BatchRequest.newBuilder()
+              .addFilePaths(file.toString()).setRootAdded(true).setForceReindex(true).build(), CallContext.none());
+          assertEquals(1, admitted.getAcceptedCount(), admitted.getErrorMessage());
+          await(() -> search(server, "unownedreplacementcobalt").contains(key(file)),
+              "a fresh intentional exact admission resolves the held modern debt", 20);
+          assertFalse(queue(server).isRelease030ExactFile(file));
+          assertEquals(0, count(root, "path='" + key(root.resolve("neighbor.txt")) + "'"));
         }
       }
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @Test
-  void uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(@TempDir Path temporary) throws Exception {
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {true, false})
+  void uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean volumeAvailable, @TempDir Path temporary) throws Exception {
     Path root = Release030Fixture.unpack("small", temporary);
     Path file = root.resolve("explicit.txt");
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
-    try {
+    var evidence = NoVolumeIdentityExtension.withVolumeIdentity(volumeAvailable);
+    try (evidence) {
       var models = new ReleasedModelIdentities(root);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         stopRecovery(server);
@@ -163,10 +218,13 @@ final class Release030AdmissionDebtTest {
         assertTrue(search(server, "apricot").contains(key(file)), "old explicit content exists before processing");
         Path ledger = root.resolve("data/index/default/root-volumes.properties");
         var volumes = properties(ledger);
-        volumes.setProperty("explicit-file-folder|" + key(root), volumes.getProperty(key(root.resolve("roots/alpha"))));
-        store(ledger, volumes);
+        if (volumeAvailable) {
+          volumes.setProperty("explicit-file-folder|" + key(root),
+              java.util.Objects.requireNonNull(volumes.getProperty(key(root.resolve("roots/alpha")))));
+          store(ledger, volumes);
+        }
         assertTrue(server.appServices().ingestService().rootCheck().vouchesForFile(root),
-            "without legacy protection this known parent could authorize absence");
+            "the normal explicit-folder rule alone would authorize absence; admission uncertainty must stop it");
         Files.move(file, root.resolve("held-explicit.txt"));
         var field = SqliteJobQueue.class.getDeclaredField("connection");
         field.setAccessible(true);
@@ -190,13 +248,14 @@ final class Release030AdmissionDebtTest {
           assertTrue(search(server, "apricot").contains(key(file)),
               "unknown current admission revision cannot authorize deleting old indexed content");
           assertEquals(0, count(root, "path='" + key(file) + "' AND state='DONE'"));
+          assertTrue(revisionReads.get() > 0, "the queue admission identity read actually failed");
           System.out.println("Admission revision failure read attempts=" + revisionReads.get());
         } finally { field.set(queue, original); }
       }
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String fixture, @TempDir Path temporary)
       throws Exception {
@@ -225,7 +284,7 @@ final class Release030AdmissionDebtTest {
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean returnsWhileFailed, @TempDir Path temporary)
       throws Exception {
