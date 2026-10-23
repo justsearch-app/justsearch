@@ -63,18 +63,18 @@ function sh(command, cwd) {
     env.GRADLE_USER_HOME ||= path.join(os.homedir(), '.gradle');
     const profile = path.join(cwd, 'build', 'test-evidence-profile');
     const home = path.join(profile, 'home');
-    const data = path.join(home, '.justsearch');
     const paths = {
       HOME: home, USERPROFILE: home,
       APPDATA: path.join(home, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(home, 'AppData', 'Local'),
       XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: path.join(home, '.local', 'share'),
       XDG_CACHE_HOME: path.join(home, '.cache'), XDG_STATE_HOME: path.join(home, '.local', 'state'),
-      JUSTSEARCH_HOME: data, JUSTSEARCH_DATA_DIR: data,
     };
     for (const [key, directory] of Object.entries(paths)) {
       fs.mkdirSync(directory, { recursive: true });
       env[key] = directory;
     }
+    delete env.JUSTSEARCH_HOME;
+    delete env.JUSTSEARCH_DATA_DIR;
     // JVM properties are not inherited by Gradle test workers. An init script also protects
     // --before checkouts, whose Test tasks may predate the shared isolation convention.
     const initScript = 'build/test-evidence-profile.init.gradle';
@@ -85,16 +85,16 @@ allprojects {
     doFirst {
       def profile = profileDirectory.get().asFile
       def home = new File(profile, "home")
-      def data = new File(home, ".justsearch")
       def paths = [HOME: home, USERPROFILE: home,
         APPDATA: new File(home, "AppData/Roaming"), LOCALAPPDATA: new File(home, "AppData/Local"),
         XDG_CONFIG_HOME: new File(home, ".config"), XDG_DATA_HOME: new File(home, ".local/share"),
-        XDG_CACHE_HOME: new File(home, ".cache"), XDG_STATE_HOME: new File(home, ".local/state"),
-        JUSTSEARCH_HOME: data, JUSTSEARCH_DATA_DIR: data]
+        XDG_CACHE_HOME: new File(home, ".cache"), XDG_STATE_HOME: new File(home, ".local/state")]
       paths.values().each { it.mkdirs() }
       systemProperty "user.home", home.absolutePath
-      systemProperty "justsearch.data.dir", data.absolutePath
-      systemProperty "justsearch.home", data.absolutePath
+      systemProperties.remove("justsearch.data.dir")
+      systemProperties.remove("justsearch.home")
+      environment.remove("JUSTSEARCH_HOME")
+      environment.remove("JUSTSEARCH_DATA_DIR")
       paths.each { key, directory -> environment key, directory.absolutePath }
     }
   }

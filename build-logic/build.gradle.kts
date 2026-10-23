@@ -87,7 +87,6 @@ tasks.withType<Test>().configureEach {
   doFirst {
     val profile = testProfile.get().asFile
     val home = profile.resolve("home")
-    val data = home.resolve(".justsearch")
     val paths = mapOf(
         "HOME" to home, "USERPROFILE" to home,
         "APPDATA" to home.resolve("AppData/Roaming"),
@@ -95,13 +94,15 @@ tasks.withType<Test>().configureEach {
         "XDG_CONFIG_HOME" to home.resolve(".config"),
         "XDG_DATA_HOME" to home.resolve(".local/share"),
         "XDG_CACHE_HOME" to home.resolve(".cache"),
-        "XDG_STATE_HOME" to home.resolve(".local/state"),
-        "JUSTSEARCH_HOME" to data, "JUSTSEARCH_DATA_DIR" to data)
+        "XDG_STATE_HOME" to home.resolve(".local/state"))
     paths.values.forEach { it.mkdirs() }
     (this as Test).apply {
       systemProperty("user.home", home.absolutePath)
-      systemProperty("justsearch.data.dir", data.absolutePath)
-      systemProperty("justsearch.home", data.absolutePath)
+      // Clear inherited overrides; YAML and test fixtures retain their normal precedence.
+      systemProperties.remove("justsearch.data.dir")
+      systemProperties.remove("justsearch.home")
+      environment.remove("JUSTSEARCH_HOME")
+      environment.remove("JUSTSEARCH_DATA_DIR")
       paths.forEach { (key, path) -> environment(key, path.absolutePath) }
     }
   }

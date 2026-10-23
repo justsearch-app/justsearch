@@ -1,6 +1,7 @@
 package io.justsearch.configuration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -17,7 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
 final class TestProfileIsolationTest {
   private static final List<String> PROFILE_VARIABLES = List.of(
       "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
-      "XDG_CACHE_HOME", "XDG_STATE_HOME", "JUSTSEARCH_HOME", "JUSTSEARCH_DATA_DIR");
+      "XDG_CACHE_HOME", "XDG_STATE_HOME");
+  private static final List<String> DATA_VARIABLES = List.of("JUSTSEARCH_HOME", "JUSTSEARCH_DATA_DIR");
 
   @TempDir Path temporary;
 
@@ -34,8 +36,11 @@ final class TestProfileIsolationTest {
     }
     assertEquals(home.toString(), System.getenv("HOME"));
     assertEquals(home.toString(), System.getenv("USERPROFILE"));
-    assertEquals(System.getProperty("justsearch.data.dir"), System.getenv("JUSTSEARCH_DATA_DIR"));
-    assertEquals(System.getProperty("justsearch.home"), System.getenv("JUSTSEARCH_HOME"));
+    assertNull(System.getProperty("justsearch.data.dir"));
+    assertNull(System.getProperty("justsearch.home"));
+    for (String key : DATA_VARIABLES) assertNull(System.getenv(key), key + " must be unset");
+    assertTrue(PlatformPaths.resolveDataDir().toAbsolutePath().normalize().startsWith(home),
+        "unconfigured data must resolve inside the isolated home");
   }
 
   @Test
@@ -55,6 +60,7 @@ final class TestProfileIsolationTest {
         System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString());
     command.add(source.toString());
     command.addAll(PROFILE_VARIABLES);
+    command.addAll(DATA_VARIABLES);
     Path output = temporary.resolve("child.properties");
     Process child = new ProcessBuilder(command).redirectOutput(output.toFile())
         .redirectError(ProcessBuilder.Redirect.INHERIT).start();
@@ -70,6 +76,7 @@ final class TestProfileIsolationTest {
             "child " + key + " must be inside the task build folder: " + value);
         assertEquals(System.getenv(key), value, "child inherits " + key);
       }
+      for (String key : DATA_VARIABLES) assertEquals("", properties.getProperty(key), "child " + key + " must be unset");
     } finally {
       if (child.isAlive()) { child.destroyForcibly(); child.waitFor(); }
     }
