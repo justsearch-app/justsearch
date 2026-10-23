@@ -746,7 +746,7 @@ export class StatusDeck extends JfElement {
     // Policy edges have stable announcements, independent of waiting counts or observation gaps.
     // Ordinary activity still announces automatic holds and withdraws stale claims as before.
     if (progress.activity.confirmed) {
-      const resumedKey = `resumed:${progress.phase}:${this.status?.operating?.indexing?.reasons?.join(',')}`;
+      const resumedKey = `resumed:${activityAnnouncement}`;
       if (progress.pause) {
         if (this.indexingAnnouncementKey !== progress.pause.state) this.indexingAnnouncement = activityAnnouncement;
         this.indexingAnnouncementKey = progress.pause.state;

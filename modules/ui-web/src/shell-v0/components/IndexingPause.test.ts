@@ -226,6 +226,35 @@ describe('WP3.7 shared pause surfaces', () => {
     } finally { observer.disconnect(); }
   });
 
+  it('R5-1 announces changed error counts after Resume without an intervening indexing sample', async () => {
+    const error = (failed: number, paused = false): void => {
+      const s = snapshot(paused ? 'PAUSED' : 'RUNNING', 0);
+      s.operating!.indexing!.reasons = paused ? ['user_paused'] : [];
+      s.worker!.core!.indexState = 'ERROR';
+      s.worker!.failure = { failedJobs: failed } as NonNullable<StatusSnapshot['worker']>['failure'];
+      __feedForTest({ status: s }); __feedContactForTest();
+    };
+    error(1);
+    const el = await mount('jf-status-deck');
+    const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    expect(announcer.textContent).toContain('1 file could not be indexed');
+    const changes: string[] = [];
+    const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
+    observer.observe(announcer, { subtree: true, childList: true, characterData: true });
+    try {
+      error(1, true); await settle(el);
+      error(1); await settle(el);
+      error(1); await settle(el);
+      expect(announcer.textContent).toBe('Indexing resumed.');
+      error(2); await settle(el);
+      expect(announcer.textContent).toContain('Indexing error');
+      expect(announcer.textContent).toContain('2 files could not be indexed');
+      error(2); await settle(el);
+      expect(changes.filter(s => s.includes('Indexing resumed'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('2 files could not be indexed'))).toHaveLength(1);
+    } finally { observer.disconnect(); }
+  });
+
   it('S37.8 Search v3 offers Resume alongside paused waiting-file context for Search and Ask', async () => {
     feed('PAUSED');
     __feedForTest({ inference: { mode: 'online', available: true, activeModelId: 'test-model' } as never });

@@ -355,6 +355,30 @@ these two product test files are durable. No acceptance record is authored by th
         "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.7 announces confirmed pause and resume once across details and unconfirmed blips"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A fresh ERROR with two failures after Resume from ERROR with one failure updates the existing live region, even without an intervening INDEXING observation. Resume itself and identical polls remain deduplicated.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 S37.7/N37.1 and the R5-1 announcement regression repair.",
+          "choice": "R5-1 Resume announces once; later changed activity remains announced.",
+          "quote": "Fix so \"Indexing resumed.\" is announced once on the resume edge, and any later change in the announced activity (count, phase, error text) is announced as before; pause/resume edges still are not repeated on identical polls (keep the S37.7 repair).",
+          "location": "task t-20261019-bd718f WP3.7 one regression from the announcement fix continuation",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-ui-error-announcements.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#R5-1 announces changed error counts after Resume without an intervening indexing sample"
+      ],
+      "repaired": true
     }
   ]
 }

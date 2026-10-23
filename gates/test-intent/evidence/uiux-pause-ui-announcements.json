@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T06:47:35.569Z",
-  "revision": "dfc1cb885304c12d1f3476636fb44700f7e3a1f4",
-  "tree": "9cfd216ce9520f41d21f4033bc4e44172320294e",
+  "createdAt": "2026-10-23T08:25:20.341Z",
+  "revision": "dcdae998335cbf49cfe447d14ae486a4b75e6160",
+  "tree": "6382504124639b6800fbd2aa6f0ef966c3104bd4",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fj0fl0xd/tmp/test-intent-vitest-3793158-1792738046041.json\"",
+      "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-612924-1792743911988.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3772
+      "durationMs": 3456
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.7 announces confirmed pause and resume once across details and unconfirmed blips",
       "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:06e889b642c48fd9c80098085571e4818bffa0f3211936daa4ba9e4225331ec8",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -48,11 +48,11 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fj0fl0xd/tmp/test-intent-vitest-3793158-1792738051111.json\"",
+        "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-612924-1792743916500.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4261,
-        "output": "JSON report written to /home/elias/.cache/am/fj0fl0xd/tmp/test-intent-vitest-3793158-1792738051111.json\n\n"
+        "durationMs": 3673,
+        "output": "JSON report written to /home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-612924-1792743916500.json\n\n"
       }
     ],
     "checks": [
@@ -63,5 +63,5 @@
       }
     ]
   },
-  "digest": "sha256:c7c0ceea6f8119affd3b2011ba5f98aae7aad3937cfc10b75997af321d889d27"
+  "digest": "sha256:79dbe67ebfcd338b1bbd93b048626e70b844c52e39c1284f66ad3dced42efb61"
 }
