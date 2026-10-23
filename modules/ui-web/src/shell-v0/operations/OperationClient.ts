@@ -139,6 +139,12 @@ export class OperationError extends Error {
   }
 }
 
+/** A resolved/expired approval is a neutral closure, not a failed execution. */
+export function isStaleAuthorization(error: unknown): boolean {
+  return error instanceof OperationError && (error.errorClass === 'AUTHORIZATION_NO_LONGER_PENDING'
+    || (error.errorClass === 'CAPSULE_MINT_FAILED' && (error.httpStatus === 404 || error.httpStatus === 410)));
+}
+
 interface WireResponseShape {
   success: boolean;
   message?: string;
@@ -319,7 +325,7 @@ export class OperationClient {
         undoSupported?: boolean;
         argsSummary?: string;
         purpose?: string;
-      }) => Promise<{ approved: boolean; allowAlways: boolean }>;
+      }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean }>;
     } = {},
   ): Promise<OperationInvocationSuccess> {
     // Preserve the exact JSON input sent before the asynchronous ceremony. A caller can
@@ -348,6 +354,9 @@ export class OperationClient {
             ...(typeof d.argsSummary === 'string' && d.argsSummary ? { argsSummary: d.argsSummary } : {}),
             ...(err.message ? { purpose: err.message } : {}),
           });
+          if (decision.superseded) {
+            throw new OperationError('Approval request is no longer pending', 'AUTHORIZATION_NO_LONGER_PENDING');
+          }
           approved = decision.approved;
           allowAlways = decision.allowAlways; // tempdoc 550 thesis IV: "allow always" → durable grant
         }
@@ -630,7 +639,7 @@ export class OperationClient {
         undoSupported?: boolean;
         argsSummary?: string;
         purpose?: string;
-      }) => Promise<{ approved: boolean; allowAlways: boolean }>;
+      }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean }>;
     } = {},
   ): Promise<OperationInvocationSuccess> {
     const { transport, idempotencyKey, preparationNonce } = opts;
@@ -657,6 +666,9 @@ export class OperationClient {
               : {}),
             ...(err.message ? { purpose: err.message } : {}),
           });
+          if (decision.superseded) {
+            throw new OperationError('Approval request is no longer pending', 'AUTHORIZATION_NO_LONGER_PENDING');
+          }
           approved = decision.approved;
           allowAlways = decision.allowAlways;
         }

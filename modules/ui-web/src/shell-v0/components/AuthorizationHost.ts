@@ -170,7 +170,9 @@ export class AuthorizationHost extends JfElement {
     setAuthorizationPresenter((prompt) => this.present(prompt));
     // Tempdoc 605 — register the run-scoped ceremony drain so a concluding run can fail-closed
     // its own still-open authorize ceremonies (Move 2), freeing the host for the next run.
-    setAuthorizationCanceller((runId) => this.cancelForRun(runId));
+    setAuthorizationCanceller((id, scope) => scope === 'pending'
+      ? this.cancelMatching(prompt => prompt.pendingId === id)
+      : this.cancelForRun(id));
     // Tempdoc 550 G9: this host also presents capability-consent requests so there is one
     // ceremony surface. The consent substrate keeps its federated grant model.
     if (!this.consentListener) {
@@ -241,8 +243,12 @@ export class AuthorizationHost extends JfElement {
    */
   cancelForRun(runId: string): number {
     if (!runId) return 0;
+    return this.cancelMatching(prompt => prompt.owningRunId === runId);
+  }
+
+  private cancelMatching(matches: (prompt: AuthorizationPrompt) => boolean): number {
     const owns = (item: CeremonyItem): boolean =>
-      item.kind === 'authorize' && item.prompt.owningRunId === runId;
+      item.kind === 'authorize' && matches(item.prompt);
     // The drain is a SUPERSEDE, not a human deny: resolve with `superseded` so the awaiting
     // dispatcher skips a backend reject POST to the now-concluded run (the legible notice is
     // surfaced once by the run-conclusion caller, not per ceremony).
@@ -261,11 +267,12 @@ export class AuthorizationHost extends JfElement {
     if (this.active && owns(this.active)) {
       supersede(this.active);
       this.active = null;
+      this.modal.close();
+      this.typed = '';
+      this.allowAlways = false;
       denied++;
     }
     if (denied > 0) {
-      this.typed = '';
-      this.allowAlways = false;
       this.requestUpdate();
       this.pumpQueue();
     }

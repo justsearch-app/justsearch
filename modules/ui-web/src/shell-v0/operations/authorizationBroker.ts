@@ -21,6 +21,8 @@
  * dependency.)
  */
 
+import { subscribeStatus } from '../utils/statusPoll.js';
+
 /** What the ceremony needs to render a consistent approve/deny prompt for a gated action. */
 export interface AuthorizationPrompt {
   /** Backend-issued id; the only thing the approval references. */
@@ -99,7 +101,7 @@ export type AuthorizationPresenter = (prompt: AuthorizationPrompt) => Promise<Au
  * untouched). Lets a concluding run satisfy the liveness invariant (550 Thesis II) so a stuck
  * predecessor ceremony can no longer block the next run's ceremony from surfacing.
  */
-export type AuthorizationCanceller = (runId: string) => number;
+export type AuthorizationCanceller = (id: string, scope?: 'run' | 'pending') => number;
 
 let presenter: AuthorizationPresenter | null = null;
 let canceller: AuthorizationCanceller | null = null;
@@ -130,17 +132,52 @@ export function cancelAuthorizationsForRun(runId: string): number {
   return canceller(runId);
 }
 
+/** Withdraw every copy of an Engine request that is no longer pending, including queued copies. */
+export function withdrawAuthorization(pendingId: string): number {
+  return canceller && pendingId ? canceller(pendingId, 'pending') : 0;
+}
+
 /**
  * Ask the human to decide a gated action. Delegates to the registered presenter; resolves
  * `false` (deny, fail-closed) when no presenter is mounted.
  */
 export async function requestAuthorization(
   prompt: AuthorizationPrompt,
+  isPending?: () => Promise<boolean>,
 ): Promise<AuthorizationDecision> {
   if (!presenter) {
     // Fail-closed: no host mounted. Flagged (tempdoc 807 item 4) so a caller can tell this apart
     // from a human deny and say so, instead of ending the ceremony in silence.
     return { approved: false, allowAlways: false, failedClosed: true };
   }
-  return presenter(prompt);
+  // An original caller already has its own prompt even if the broadcast bridge's first
+  // detail read failed. Keep that prompt reconciled through the same shared status cadence.
+  let finished = false;
+  let checking = false;
+  const stopStatus = isPending ? subscribeStatus(snapshot => {
+    if (!snapshot || checking) return;
+    checking = true;
+    void Promise.resolve().then(isPending).then(pending => {
+      if (!finished && !pending) withdrawAuthorization(prompt.pendingId);
+    }).catch(() => {
+      // A failed read does not prove the request is gone.
+    }).finally(() => { checking = false; });
+  }) : undefined;
+  let decision: AuthorizationDecision;
+  try {
+    decision = await presenter(prompt);
+  } finally {
+    finished = true;
+    stopStatus?.();
+  }
+  // Engine callers can recheck after either answer. Chat's run-owned gates use their own
+  // lifetime and do not supply this reader. An unavailable read never proves a request is gone.
+  if (isPending && !decision.superseded && !decision.failedClosed) {
+    try {
+      if (!await isPending()) return { approved: false, allowAlways: false, superseded: true };
+    } catch {
+      // The approval endpoint remains authoritative if the read fails transiently.
+    }
+  }
+  return decision;
 }
