@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T18:45:50.561Z",
+  "revision": "d36738d920c9899c26eb49625cbfd9472e424fab",
+  "tree": "4c1c4a6668bad85316d7a705f30f5577415588be",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:reranker:test --tests \"io.justsearch.reranker.CitationScorerNumericTest.preservesLiteralCompatiblePairs\" --tests \"io.justsearch.reranker.CitationScorerNumericTest.preservesNumberFreeCorpusAndThreshold\" --tests \"io.justsearch.reranker.NumericConsistencyTokenizationTest.preservesAgreedWholeValuesAndPunctuation\" --tests \"io.justsearch.reranker.CitationScorerNumericTest.preservesSpacedPercentRanges\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6326
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.CitationMatchOpsNumericTest.preservesReferencesOrdinalsAndNumberFreeCorpus\" --tests \"io.justsearch.indexerworker.services.CitationMatchOpsNumericTest.preservesCompatibleNumbersAndOriginalThreshold\" --tests \"io.justsearch.indexerworker.services.CitationMatchOpsNumericTest.preservesSpacedPercentRanges\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3217
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesLiteralCompatiblePairs",
+      "file": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c7d37478c91b460ee85867651c59f77ceec78ab9605ef9c1c022782fb38d3623",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesLiteralCompatiblePairs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold",
+      "file": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c7d37478c91b460ee85867651c59f77ceec78ab9605ef9c1c022782fb38d3623",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesNumberFreeCorpusAndThreshold()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesReferencesOrdinalsAndNumberFreeCorpus",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:704308cb6a8b21e97767d3d49ec295363446006c1cba0ad203ebe1904de84beb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesReferencesOrdinalsAndNumberFreeCorpus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:704308cb6a8b21e97767d3d49ec295363446006c1cba0ad203ebe1904de84beb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesCompatibleNumbersAndOriginalThreshold()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#preservesAgreedWholeValuesAndPunctuation",
+      "file": "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8dd00542cd34e71445402d2aebd576b88fe51dbeba4397a8facff2941524be47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesAgreedWholeValuesAndPunctuation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesSpacedPercentRanges",
+      "file": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c7d37478c91b460ee85867651c59f77ceec78ab9605ef9c1c022782fb38d3623",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesSpacedPercentRanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesSpacedPercentRanges",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:704308cb6a8b21e97767d3d49ec295363446006c1cba0ad203ebe1904de84beb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesSpacedPercentRanges()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9c94d85b1dc52643533218093325d586d10d759b9bef657733d59752680388dc"
+}

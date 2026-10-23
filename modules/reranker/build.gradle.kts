@@ -39,6 +39,7 @@ testing {
       dependencies {
         implementation(project())
         implementation(testFixtures(project(":modules:configuration")))
+        implementation(testFixtures(project(":modules:ort-common")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
         implementation(libs.mockito.core)
