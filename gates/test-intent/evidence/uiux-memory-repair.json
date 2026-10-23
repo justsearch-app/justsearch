@@ -1,0 +1,172 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T15:57:30.426Z",
+  "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
+  "tree": "500417b791e987dec276936465e278d6f086609c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-92626-1792771039180.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2244
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-92626-1792771041425.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2934
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f25472d02be4014b4e436af9dc441590758ed652c859d123faaaabb4388047a3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "names each Forget control with its memory (S53.3, S53.7)",
+          "status": "passed"
+        },
+        {
+          "name": "confirms the named memory and cancellation sends no delete (S53.3)",
+          "status": "passed"
+        },
+        {
+          "name": "guards repeated activation during confirmation and deletion (S53.3)",
+          "status": "passed"
+        },
+        {
+          "name": "announces confirmed removal and focuses the next useful control (S53.3, S53.7)",
+          "status": "passed"
+        },
+        {
+          "name": "focuses the teaching input after forgetting the last memory (S53.3)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles a lost delete response with a confirmed absence (S53.3 amendment)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles a lost delete response with a still-present memory (S53.3 amendment)",
+          "status": "passed"
+        },
+        {
+          "name": "leaves an unknown outcome when reconciliation fails and offers a fresh read (S53.3 amendment, S53.4)",
+          "status": "passed"
+        },
+        {
+          "name": "cannot infer absence from a locked reconciliation (S53.3 amendment, S53.4)",
+          "status": "passed"
+        },
+        {
+          "name": "cannot infer absence from a malformed reconciliation (S53.3 amendment, S53.4)",
+          "status": "passed"
+        },
+        {
+          "name": "keeps a refused deletion retryable by keyboard after refreshing the list (S53.3, S53.7)",
+          "status": "passed"
+        },
+        {
+          "name": "does not send a delete when confirmation belongs to a previous visit (S53.3)",
+          "status": "passed"
+        },
+        {
+          "name": "does not let a delayed deletion change a newer visit (S53.3 amendment, S53.4)",
+          "status": "passed"
+        },
+        {
+          "name": "keeps Forget guarded when an earlier visit finishes Remember (S53.3, N53.2)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:59c6cf71f8ba1cca5d24460505bb0bd3d8cb36d62813dc55c8a886617eb3278a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "opens the existing Memory surface from a keyboard palette command (S53.3, DM1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#fits narrow viewports with a side gap in every theme (S53.7)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27c39fdd7723163c06d7b551addc29fa5d1d542911158441a705974faf65914d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fits narrow viewports with a side gap in every theme (S53.7)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bcab79eeb",
+    "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-92626-1792771045603.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2009,
+        "output": "JSON report written to /home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-92626-1792771045603.json\n\n"
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-92626-1792771047612.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2635,
+        "output": "JSON report written to /home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-92626-1792771047612.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts",
+        "classification": "assertion",
+        "detail": "names each Forget control with its memory (S53.3, S53.7):  AssertionError: expected 'Forget' to be 'Forget: My preferred language is Germ…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-continuation/test-intent-before-00trb1/modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts:58:28\n    at process | confirms the named memory and cancellation sends no delete (S53.3):  AssertionError: expected \"vi.fn()\" to be called with arguments: [ Obj"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
+        "classification": "assertion",
+        "detail": "opens the existing Memory surface from a keyboard palette command (S53.3, DM1):  AssertionError: expected '' to contain 'Memory'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-continuation/test-intent-before-00trb1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:35:40\n    at processTicksAndRejections (node:internal/process/task"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#fits narrow viewports with a side gap in every theme (S53.7)",
+        "classification": "assertion",
+        "detail": "fits narrow viewports with a side gap in every theme (S53.7):  AssertionError: dialog must fit 360px with 16px each side: expected 362 to be less than or equal to 328\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-continuation/test-intent-before-00trb1/modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts:94:"
+      }
+    ]
+  },
+  "digest": "sha256:9a8e4b96000786c581b7284bb4dd17889b5f8a48cc642de42136408defc202e0"
+}

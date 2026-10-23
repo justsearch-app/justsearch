@@ -67,10 +67,12 @@ export class ConfirmDialog extends JfElement {
     /* 574 remediation A1 — native <dialog> (showModal): browser inert + focus-trap + Top Layer,
        so no .backdrop div + no hand-picked z-index (the §16 S4 z-literal is gone here). */
     dialog {
+      box-sizing: border-box;
       border: 1px solid var(--border-subtle);
       border-radius: 0.75rem;
-      max-width: 28rem;
-      width: 100%;
+      /* Keep the existing wide size (28rem content + borders), with a gap on narrow screens. */
+      max-width: calc(28rem + 2px);
+      width: calc(100% - 2rem);
       padding: 0;
       background: var(--surface-1);
       color: var(--text-primary);

@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T15:58:05.957Z",
+  "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
+  "tree": "e124923fef59b9b5e82a5c6547a45fa5d5cde352",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-99889-1792771082639.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3317
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#preserves the wide dialog width (S53.7 preservation)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27c39fdd7723163c06d7b551addc29fa5d1d542911158441a705974faf65914d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserves the wide dialog width (S53.7 preservation)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#keeps the page inert and returns from native browser focus with Tab and Shift+Tab (S53.7 preservation)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27c39fdd7723163c06d7b551addc29fa5d1d542911158441a705974faf65914d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps the page inert and returns from native browser focus with Tab and Shift+Tab (S53.7 preservation)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fb2b5a33c74f0d209133f4cc5a7c2683b8d3faab8ba02a64dc74c86634bb5210"
+}
