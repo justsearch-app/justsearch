@@ -182,3 +182,14 @@ these two product test files are durable. No acceptance record is authored by th
   "note": "Expectations follow the delegated S37/N37 scenarios; all 17 repaired checks pass and assertion-fail before, preservation passes. Acceptance covers test intent only; the unknown-reason HTTP decoder probe fails separately and does not receive product sign-off."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp37-verifier-er6hlprz",
+  "verdict": "accept",
+  "digest": "sha256:d8ee7175f8018bf1909bf03ed2a3ffa91fba434622f3b5ee224d312c95bf2d05",
+  "note": "Independent review and scratch run-evidence: 17 repaired checks pass on snapshot 71f753520 and assertion-fail on b62fc5921; preservation passes. Sources match delegated S37/N37 scope. RS37 removes the unknown-reason product requirement; selector-only defensive coverage supplies no wire-boundary claim. Test intent accepted separately from the live product verdict."
+}
+```
