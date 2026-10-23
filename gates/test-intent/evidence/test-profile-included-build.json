@@ -1,0 +1,233 @@
+{
+  "kind": "supplemental-included-build-isolation-evidence",
+  "base": "1ebd070b709951bdf7d4e6b6cf246656da86d81e",
+  "observedAtUtc": "2026-10-23T10:19:06Z",
+  "scope": "Verifier finding G1/G2 only. Previous G3-G7 evidence retained; no broad suites rerun.",
+  "sourceSha256": {
+    "build-logic/build.gradle.kts": "d717d708b00502e7f9192839d82c1cafacf3ffc017865c84d13aaa5e9f2e0cdd",
+    "build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt": "379954c4f04f479c1c7c6925f37ba69c36ce448ee83127ab435991a864263d2b"
+  },
+  "setup": {
+    "beforeCommands": [
+      [
+        "git",
+        "clone",
+        "--quiet",
+        "--shared",
+        "--no-checkout",
+        ".",
+        "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/before"
+      ],
+      [
+        "git",
+        "-C",
+        "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/before",
+        "checkout",
+        "--quiet",
+        "--detach",
+        "1ebd070b7"
+      ]
+    ],
+    "actualBeforeTree": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/before",
+    "preflight": "No .agents/preflight exists.",
+    "probeOrigin": "Verifier-supplied probe referenced by tmp/verifier-finding/included-build.init.gradle; copied unchanged to own scratch directory.",
+    "probeSource": "import org.junit.jupiter.api.Test;\nimport java.nio.file.*;\nimport java.util.*;\nimport java.util.concurrent.TimeUnit;\npublic class VerifierProfileProbe {\n static final String[] KEYS={\"HOME\",\"USERPROFILE\",\"APPDATA\",\"LOCALAPPDATA\",\"XDG_CONFIG_HOME\",\"XDG_DATA_HOME\",\"XDG_CACHE_HOME\",\"XDG_STATE_HOME\",\"JUSTSEARCH_HOME\",\"JUSTSEARCH_DATA_DIR\"};\n static void require(boolean ok,String message){if(!ok)throw new AssertionError(message);}\n @Test void workerAndChild() throws Exception {\n   Path profile=Path.of(System.getProperty(\"verifier.expected\"));\n   List<String> errors=new ArrayList<>();\n   String home=System.getProperty(\"user.home\");\n   System.out.println(\"USER_HOME=\"+home+\" EXPECTED=\"+profile);\n   if(!Path.of(home).startsWith(profile))errors.add(\"worker user.home=\"+home);\n   for(String k:KEYS){String v=System.getenv(k);System.out.println(k+\"=\"+v);if(v==null||!Path.of(v).startsWith(profile))errors.add(\"worker \"+k+\"=\"+v);}\n   for(String k:List.of(\"justsearch.data.dir\",\"justsearch.home\")){String v=System.getProperty(k);System.out.println(k+\"=\"+v);if(v==null||!Path.of(v).startsWith(profile))errors.add(k+\"=\"+v);}\n   Path out=Files.createTempFile(\"verifier-child-\", \".properties\");\n   Process p=new ProcessBuilder(Path.of(System.getProperty(\"java.home\"),\"bin\",\"java\").toString(),\"-cp\",System.getProperty(\"java.class.path\"),\"VerifierProfileProbe$Child\").redirectOutput(out.toFile()).redirectError(ProcessBuilder.Redirect.INHERIT).start();\n   try{require(p.waitFor(30,TimeUnit.SECONDS),\"child timed out\");require(p.exitValue()==0,\"child failed\");Properties props=new Properties();try(var in=Files.newInputStream(out)){props.load(in);}for(String k:KEYS){String v=props.getProperty(k);if(v==null||!Path.of(v).startsWith(profile)||!Objects.equals(v,System.getenv(k)))errors.add(\"child \"+k+\"=\"+v);}System.out.println(\"ACCEPTED_JAVA_CHILD_USER_HOME_GAP=\"+props.getProperty(\"java.user.home\"));}finally{p.destroyForcibly();p.waitFor();Files.deleteIfExists(out);}\n   require(errors.isEmpty(),String.join(\"; \",errors));\n }\n public static class Child {public static void main(String[] args)throws Exception{Properties p=new Properties();for(String k:KEYS)p.setProperty(k,Objects.toString(System.getenv(k),\"\"));p.setProperty(\"java.user.home\",System.getProperty(\"user.home\"));p.store(System.out,null);}}\n}\n",
+    "initScript": "gradle.projectsEvaluated {\n def p=gradle.rootProject\n if(p.name!='build-logic')return\n def jars=p.files(\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-api/5.14.4/478c1ec9780d6214c04db63caa520a18a7a0c697/junit-jupiter-api-5.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-engine/5.14.4/dd198558041b67d6a86f801908020ee21cdadf3e/junit-jupiter-engine-5.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-launcher/1.14.4/d68ebf573daf08bc82c452027686eaaa5a2be1c6/junit-platform-launcher-1.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-engine/1.14.4/efa8516a9ba0d1efa7f9f64d7a046f05c6b39cfd/junit-platform-engine-1.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-commons/1.14.4/8fc5afb31243ac7141e48e5aa571955340c83795/junit-platform-commons-1.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.opentest4j/opentest4j/1.3.0/152ea56b3a72f655d4fd677fc0ef2596c3dd5e6e/opentest4j-1.3.0.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.apiguardian/apiguardian-api/1.1.2/a231e0d844d2721b0fa1b238006d15c6ded6842a/apiguardian-api-1.1.2.jar\")\n def compile=p.tasks.register('verifierCompileProfile',org.gradle.api.tasks.compile.JavaCompile) {\n   source new File(System.getenv('VERIFIER_EVIDENCE'),'probe')\n   classpath=jars\n   destinationDirectory=p.layout.buildDirectory.dir('verifierProbeClasses')\n   javaCompiler=p.javaToolchains.compilerFor {languageVersion=JavaLanguageVersion.of(21)}\n }\n p.tasks.named('test',org.gradle.api.tasks.testing.Test) {\n   testClassesDirs=p.files(compile.flatMap {it.destinationDirectory})\n   classpath=testClassesDirs+jars\n   useJUnitPlatform()\n   systemProperty 'verifier.expected',new File(p.layout.buildDirectory.get().asFile,'test-profile/test').absolutePath\n   systemProperty 'user.home',System.getenv('HOME')\n   testLogging.showStandardStreams=true\n }\n}\n",
+    "guardedRunner": "#!/usr/bin/env bash\nset -eu\nlabel=$1; tree=$2; shift 2\ncd \"$tree\"\nunset DISPLAY WAYLAND_DISPLAY\nexport GRADLE_USER_HOME=/home/elias/.gradle\nexport HOME=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-$label\" USERPROFILE=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-$label\"\nexport APPDATA=\"$HOME/AppData/Roaming\" LOCALAPPDATA=\"$HOME/AppData/Local\"\nexport XDG_CONFIG_HOME=\"$HOME/.config\" XDG_DATA_HOME=\"$HOME/.local/share\" XDG_CACHE_HOME=\"$HOME/.cache\" XDG_STATE_HOME=\"$HOME/.local/state\"\nexport JUSTSEARCH_HOME=\"$HOME/.justsearch\" JUSTSEARCH_DATA_DIR=\"$HOME/.justsearch\"\nexport VERIFIER_EVIDENCE=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a\"\nmkdir -p \"$HOME/.justsearch\"\nexec \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh\" \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/$label.memory.log\" -- js-gradle-slot ./gradlew \"$@\" -PskipWebBuild=true --console=plain\n"
+  },
+  "before": {
+    "arguments": ":build-logic:test --tests VerifierProfileProbe --rerun --init-script /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/included-build.init.gradle",
+    "exit": 1,
+    "suite": {
+      "name": "VerifierProfileProbe",
+      "tests": "1",
+      "skipped": "0",
+      "failures": "1",
+      "errors": "0",
+      "timestamp": "2026-10-23T10:03:12.324Z",
+      "hostname": "elias-systemproductname",
+      "time": "0.077",
+      "cases": [
+        {
+          "name": "workerAndChild()",
+          "classname": "VerifierProfileProbe",
+          "time": "0.071",
+          "failures": [
+            {
+              "message": "java.lang.AssertionError: worker user.home=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before; worker HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before; worker USERPROFILE=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before; worker APPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/AppData/Roaming; worker LOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/AppData/Local; worker XDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.config; worker XDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.local/share; worker XDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.cache; worker XDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.local/state; worker JUSTSEARCH_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.justsearch; worker JUSTSEARCH_DATA_DIR=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.justsearch; justsearch.data.dir=null; justsearch.home=null; child HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before; child USERPROFILE=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before; child APPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/AppData/Roaming; child LOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/AppData/Local; child XDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.config; child XDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.local/share; child XDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.cache; child XDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.local/state; child JUSTSEARCH_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.justsearch; child JUSTSEARCH_DATA_DIR=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.justsearch",
+              "type": "java.lang.AssertionError"
+            }
+          ]
+        }
+      ],
+      "stdout": "USER_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before EXPECTED=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/before/build-logic/build/test-profile/test\nHOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before\nUSERPROFILE=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before\nAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/AppData/Roaming\nLOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/AppData/Local\nXDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.config\nXDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.local/share\nXDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.cache\nXDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.local/state\nJUSTSEARCH_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.justsearch\nJUSTSEARCH_DATA_DIR=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/client-home-before/.justsearch\njustsearch.data.dir=null\njustsearch.home=null\nACCEPTED_JAVA_CHILD_USER_HOME_GAP=/home/elias\n"
+    },
+    "logTail": [
+      "    justsearch.data.dir=null",
+      "    justsearch.home=null",
+      "    ACCEPTED_JAVA_CHILD_USER_HOME_GAP=/home/elias",
+      "",
+      "VerifierProfileProbe > workerAndChild() FAILED",
+      "    java.lang.AssertionError at VerifierProfileProbe.java:7",
+      "",
+      "1 test completed, 1 failed",
+      "",
+      "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/before/build/reports/problems/problems-report.html",
+      "",
+      "FAILURE: Build failed with an exception.",
+      "",
+      "* What went wrong:",
+      "Execution failed for task ':build-logic:test'.",
+      "> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/before/build-logic/build/reports/tests/test/index.html",
+      "",
+      "BUILD FAILED in 4s",
+      "7 actionable tasks: 5 executed, 2 from cache",
+      "Configuration cache entry stored."
+    ]
+  },
+  "after": {
+    "arguments": ":build-logic:test --tests VerifierProfileProbe --rerun :build-logic:check --init-script /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/included-profile-0sa6e58a/included-build.init.gradle",
+    "exit": 0,
+    "suite": {
+      "name": "VerifierProfileProbe",
+      "tests": "1",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-23T10:18:27.693Z",
+      "hostname": "elias-systemproductname",
+      "time": "0.095",
+      "cases": [
+        {
+          "name": "workerAndChild()",
+          "classname": "VerifierProfileProbe",
+          "time": "0.088",
+          "failures": []
+        }
+      ],
+      "stdout": "USER_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home EXPECTED=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test\nHOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home\nUSERPROFILE=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home\nAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Roaming\nLOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Local\nXDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.config\nXDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/share\nXDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.cache\nXDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/state\nJUSTSEARCH_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch\nJUSTSEARCH_DATA_DIR=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch\njustsearch.data.dir=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch\njustsearch.home=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch\nACCEPTED_JAVA_CHILD_USER_HOME_GAP=/home/elias\n"
+    },
+    "logTail": [
+      "    APPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Roaming",
+      "    LOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Local",
+      "    XDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.config",
+      "    XDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/share",
+      "    XDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.cache",
+      "    XDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/state",
+      "    JUSTSEARCH_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch",
+      "    JUSTSEARCH_DATA_DIR=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch",
+      "    justsearch.data.dir=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch",
+      "    justsearch.home=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.justsearch",
+      "    ACCEPTED_JAVA_CHILD_USER_HOME_GAP=/home/elias",
+      "",
+      "> Task :build-logic:validatePlugins",
+      "> Task :build-logic:check",
+      "",
+      "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+      "",
+      "BUILD SUCCESSFUL in 2s",
+      "8 actionable tasks: 3 executed, 1 from cache, 4 up-to-date",
+      "Configuration cache entry stored."
+    ]
+  },
+  "moduleRegression": {
+    "arguments": ":modules:configuration:test --tests io.justsearch.configuration.TestProfileIsolationTest --rerun",
+    "exit": 0,
+    "suite": {
+      "name": "io.justsearch.configuration.TestProfileIsolationTest",
+      "tests": "2",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-23T10:16:06.914Z",
+      "hostname": "elias-systemproductname",
+      "time": "0.312",
+      "cases": [
+        {
+          "name": "plainChildInheritsTaskLocalProfile()",
+          "classname": "io.justsearch.configuration.TestProfileIsolationTest",
+          "time": "0.3",
+          "failures": []
+        },
+        {
+          "name": "testJvmUsesTaskLocalProfile()",
+          "classname": "io.justsearch.configuration.TestProfileIsolationTest",
+          "time": "0.002",
+          "failures": []
+        }
+      ],
+      "stdout": ""
+    },
+    "logTail": [
+      "",
+      "> Task :modules:configuration:compileJava",
+      "/home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java:638: warning: [OperatorPrecedence] Use grouping parenthesis to make the operator precedence explicit",
+      "    return node != null && node.isBoolean() ? node.booleanValue() : null;",
+      "                        ^",
+      "    (see https://errorprone.info/bugpattern/OperatorPrecedence)",
+      "  Did you mean 'return (node != null && node.isBoolean()) ? node.booleanValue() : null;'?",
+      "Note: Some input files use or override a deprecated API.",
+      "Note: Recompile with -Xlint:deprecation for details.",
+      "1 warning",
+      "",
+      "> Task :modules:configuration:classes",
+      "> Task :modules:configuration:jar UP-TO-DATE",
+      "> Task :modules:configuration:compileTestFixturesJava",
+      "> Task :modules:configuration:testFixturesClasses",
+      "> Task :modules:configuration:testFixturesJar UP-TO-DATE",
+      "",
+      "> Task :modules:configuration:compileTestJava",
+      "Note: Some input files use or override a deprecated API.",
+      "Note: Recompile with -Xlint:deprecation for details.",
+      "",
+      "> Task :modules:configuration:testClasses",
+      "> Task :modules:configuration:test",
+      "> Task :modules:configuration:jacocoTestReport SKIPPED",
+      "",
+      "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+      "",
+      "BUILD SUCCESSFUL in 7s",
+      "13 actionable tasks: 5 executed, 8 up-to-date",
+      "Configuration cache entry stored."
+    ]
+  },
+  "discardedInvocation": {
+    "arguments": ":build-logic:check --tests VerifierProfileProbe --rerun",
+    "exit": 1,
+    "reason": "Runner error: --tests belongs to test, not check. Corrected invocation above. No tests ran in this invocation.",
+    "logTail": [
+      "> Configure project :modules:worker-services",
+      "The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties",
+      "\tat Build_gradle$4$1.execute(build.gradle.kts:191)",
+      "\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)",
+      "",
+      "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+      "",
+      "FAILURE: Build failed with an exception.",
+      "",
+      "* What went wrong:",
+      "Problem configuring task :check from command line.",
+      "> Unknown command-line option '--tests'.",
+      "",
+      "* Try:",
+      "> Run gradlew help --task :check to get task usage details.",
+      "> Run with --stacktrace option to get the stack trace.",
+      "> Run with --info or --debug option to get more log output.",
+      "> Get more help at https://help.gradle.org.",
+      "",
+      "BUILD FAILED in 9s",
+      "4 actionable tasks: 2 executed, 2 up-to-date",
+      "Configuration cache entry stored."
+    ]
+  },
+  "resources": [
+    "Existing /home/elias/.gradle caches and daemon pool",
+    "Shared js-gradle-slot scheduler in /tmp/js-linux-port",
+    "Own fake client homes and build folders; no running app, browser or real JustSearch profile used"
+  ],
+  "limitations": [
+    "Java child JVM user.home gap remains accepted and unchanged; G2 checks inherited environment only.",
+    "No Windows run in this Linux session. Host GPU devices were exposed; access was not traced.",
+    "No existing committed test was adjusted for this follow-up."
+  ]
+}

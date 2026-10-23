@@ -16,12 +16,17 @@ writes are its own JUnit temporary source/output files. G2 is limited to environ
 by the owner’s follow-up; explicit Java profile gaps are listed in test-profile-java-children.json.
 The generated repair evidence records passes on the candidate and assertion failures on the baseline.
 The separate historical-runner evidence records passes with the new runner and the old convention.
+The included build compiles this convention and cannot apply it to itself. Its matching execution-time
+block extends the same contract to its own Test tasks; the two sites name each other for synchronization.
+Supplemental verifier-probe evidence is in test-profile-included-build.json; its before tree is a shared
+clone of 1ebd070b7 and its client profile is fake in both runs. No committed tests were adjusted for this fix.
 
 ```json
 {
   "entries": [
     {
       "items": [
+        "build-logic/build.gradle.kts",
         "build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt",
         "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java"
       ],

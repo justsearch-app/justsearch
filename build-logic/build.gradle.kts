@@ -78,3 +78,31 @@ dependencies {
   // Jackson on buildscript classpath — used by modules/ui/build.gradle.kts dev-stack tasks
   implementation("com.fasterxml.jackson.core:jackson-databind:2.18.6")
 }
+
+// This build cannot apply the convention plugin while compiling it. Keep this isolation block
+// in sync with src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt.
+// Resolve paths at execution time to preserve build/configuration-cache reuse across checkouts.
+tasks.withType<Test>().configureEach {
+  val testProfile = project.layout.buildDirectory.dir("test-profile/$name")
+  doFirst {
+    val profile = testProfile.get().asFile
+    val home = profile.resolve("home")
+    val data = home.resolve(".justsearch")
+    val paths = mapOf(
+        "HOME" to home, "USERPROFILE" to home,
+        "APPDATA" to home.resolve("AppData/Roaming"),
+        "LOCALAPPDATA" to home.resolve("AppData/Local"),
+        "XDG_CONFIG_HOME" to home.resolve(".config"),
+        "XDG_DATA_HOME" to home.resolve(".local/share"),
+        "XDG_CACHE_HOME" to home.resolve(".cache"),
+        "XDG_STATE_HOME" to home.resolve(".local/state"),
+        "JUSTSEARCH_HOME" to data, "JUSTSEARCH_DATA_DIR" to data)
+    paths.values.forEach { it.mkdirs() }
+    (this as Test).apply {
+      systemProperty("user.home", home.absolutePath)
+      systemProperty("justsearch.data.dir", data.absolutePath)
+      systemProperty("justsearch.home", data.absolutePath)
+      paths.forEach { (key, path) -> environment(key, path.absolutePath) }
+    }
+  }
+}

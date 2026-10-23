@@ -110,6 +110,8 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         usesService(testGate)
         // Test profiles belong to the task, never to the developer running Gradle. Resolve at
         // execution time so absolute checkout paths do not become build/configuration-cache inputs.
+        // Keep profile isolation in sync with build-logic/build.gradle.kts: that build cannot
+        // apply this plugin while compiling it.
         val testProfile = project.layout.buildDirectory.dir("test-profile/$name")
         doFirst {
           val profile = testProfile.get().asFile
