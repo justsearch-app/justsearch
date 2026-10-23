@@ -60,6 +60,14 @@ export async function discoverLiveAgentRun(
   apiBase: string,
   conversationId?: string | null,
 ): Promise<string | null> {
+  return (await discoverLiveAgentRunRow(apiBase, conversationId))?.runId ?? null;
+}
+
+/** The same discovery, retaining the conversation identity needed before an observer attaches. */
+export async function discoverLiveAgentRunRow(
+  apiBase: string,
+  conversationId?: string | null,
+): Promise<LiveRunRow | null> {
   const runs = await fetchLiveRuns(apiBase, AGENT_SHAPE_ID);
   for (const run of runs) {
     // The server honours `?shapeId=`; this re-check is the guarantee, so a backend that ever stopped
@@ -67,7 +75,7 @@ export async function discoverLiveAgentRun(
     if (run.shapeId !== AGENT_SHAPE_ID) continue;
     if (!run.runId) continue;
     if (conversationId && run.conversationId && conversationId !== run.conversationId) continue;
-    return run.runId;
+    return run;
   }
   return null;
 }
