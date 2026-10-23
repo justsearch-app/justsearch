@@ -174,6 +174,7 @@ import {
 // channel every region's fix-it control leaves through.
 import {
   deriveSv3HistoryLocked,
+  sv3ExplainsRankingTrace,
   projectSv3Corpus,
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
@@ -1673,8 +1674,11 @@ export class SearchV3View extends JfElement {
       streaming: this.streaming,
     });
     if (items.length === 0 && branch.length === 0) return;
-    const shapeId = session.turns.find(turn => turn.id === detail.turnId)?.shapeId;
-    const retryNote = shapeId === 'core.extract' ? this.structuredNote(detail.turnId)
+    const turn = session.turns.find(turn => turn.id === detail.turnId);
+    const shapeId = turn?.shapeId;
+    const retryNote = sv3ExplainsRankingTrace(turn ?? null)
+      ? this.summaryInputs.has(detail.turnId) ? 'Explain with the original ranking trace.' : 'After reload, start Explain from the result again.'
+      : shapeId === 'core.extract' ? this.structuredNote(detail.turnId)
       : shapeId === 'core.summarize'
         ? this.summaryInputs.has(detail.turnId) ? 'Summarize with the original inputs.' : 'Opens Summarize; choose the original inputs before sending.'
         : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId));
@@ -1995,7 +1999,9 @@ export class SearchV3View extends JfElement {
       this.preparedHandoff = { shapeId: 'core.summarize', selection: inputs?.selection ?? null };
       if (inputs === undefined) {
         this.handoffBlocked = true;
-        this.handoffNotice = 'No readable summary input is saved. Choose the original files or passage before sending.';
+        this.handoffNotice = sv3ExplainsRankingTrace(turn)
+          ? 'Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.'
+          : 'No readable summary input is saved. Choose the original files or passage before sending.';
         this.writeDraft(text);
         this.requestUpdate();
       } else {
@@ -3209,10 +3215,15 @@ export class SearchV3View extends JfElement {
    * it opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
   private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string): Promise<void> {
-    const question = rawQuestion.trim();
+    let question = rawQuestion.trim();
     if (question === '') return;
     const handoff = this.preparedHandoff;
     const shapeId = schema !== undefined ? 'core.extract' : handoff?.shapeId ?? SV3_ASK_SHAPE_ID;
+    // Keep the actual trace visible in the durable user turn even if its instructions were edited.
+    if (shapeId === 'core.summarize' && handoff?.selection?.kind === 'search-trace') {
+      const trace = handoff.selection.summary;
+      if (typeof trace === 'string' && trace && !question.includes(trace)) question += `\n\nRanking trace:\n${trace}`;
+    }
     if (schema !== undefined && (scope?.paths.length ?? 0) > 5) {
       this.structuredError = 'Choose at most 5 files for one extraction.';
       this.requestUpdate();

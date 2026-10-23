@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T20:06:13.989Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "d821959ca6e0d983429aefe547a5eb5c893e9a2d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-717448-1792785965697.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3736
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain guidance names Explain and only its observed reload limitation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8e4b473338fe6eb404ac9f8b107d3eb1d28154548d49b66c150803cec5213fcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 Explain guidance names Explain and only its observed reload limitation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain Retry menu states its actual restoration limit",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 a reloaded Explain Retry menu states its actual restoration limit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "12bb2beb3",
+    "revision": "12bb2beb38ee54fb0eaa8b483feff4a41b06d8d3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-717448-1792785970514.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3275,
+        "output": "JSON report written to /home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-717448-1792785970514.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain guidance names Explain and only its observed reload limitation",
+        "classification": "assertion",
+        "detail": "HO5 Explain guidance names Explain and only its observed reload limitation:  AssertionError: expected 'Summarize. Retry/Edit requires the or…' to be 'Explain. After reload, start Explain …' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-7c7S4c/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts:119:68\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain Retry menu states its actual restoration limit",
+        "classification": "assertion",
+        "detail": "HO5 a reloaded Explain Retry menu states its actual restoration limit:  AssertionError: expected 'Retry from here · Opens Summarize; ch…' to contain 'After reload, start Explain from the …'\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-7c7S4c/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:457:24\n    at file:///home/elias/dev/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit",
+        "classification": "assertion",
+        "detail": "HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit:  AssertionError: expected '\\n              No readable summary i…' to contain 'Retry/Edit cannot restore the origina…'\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-7c7S4c/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:467:52\n    at file:///home/elias/dev/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit",
+        "classification": "assertion",
+        "detail": "HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit:  AssertionError: expected '\\n              No readable summary i…' to contain 'Retry/Edit cannot restore the origina…'\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-7c7S4c/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:467:52\n    at file:///home/elias/dev/jus"
+      }
+    ]
+  },
+  "digest": "sha256:a29e10ea19ae88f2b7cf810119e24faf703b13a7b24d932e0efd4ecc47308681"
+}

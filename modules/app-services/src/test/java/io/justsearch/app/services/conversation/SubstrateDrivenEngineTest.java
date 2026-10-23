@@ -54,6 +54,46 @@ final class SubstrateDrivenEngineTest {
   @org.junit.jupiter.api.io.TempDir java.nio.file.Path retrievalStoreDir;
 
   @Test
+  void explainTraceSourceAndPreparedTextSurviveStoreReopen() {
+    var docs = summaryDocuments(new IllegalStateException("trace must not fetch documents"), true);
+    var shape = io.justsearch.app.services.conversation.shapes.SummarizeShape.definition();
+    var engine = newEngineWithStore(shape,
+        List.of(io.justsearch.app.services.conversation.spi.SummarizationStyle.INSTANCE),
+        List.of(new io.justsearch.app.services.conversation.spi.DocAccess(docs),
+            new io.justsearch.app.services.conversation.spi.SelectionContextInjector(docs),
+            io.justsearch.app.services.conversation.spi.UserPromptInjector.INSTANCE),
+        List.of(new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs),
+            io.justsearch.app.services.conversation.spi.SummaryDoneEnricher.INSTANCE),
+        List.of(), new ScriptedAi(List.of("The sparse rank is two.")), new FileConversationStore(retrievalStoreDir));
+    String prompt = "Explain this result.\n\nRanking trace:\nsparse-retrieval #2 3.50";
+    var body = Map.<String, Object>of("conversationId", "trace-record", "prompt", prompt,
+        "selection", Map.of("kind", "search-trace", "scope", "hit", "summary", "sparse-retrieval #2 3.50", "docId", "orchard.md"));
+    var live = new ArrayList<SseEvent>();
+    engine.run(shape.id(), body, Audience.USER, live::add,
+        io.justsearch.app.services.TestEngineContexts.internal());
+    org.mockito.Mockito.verify(docs, org.mockito.Mockito.never()).fetch(
+        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    var source = live.stream().filter(e -> e.name().equals("rag.citations"))
+        .findFirst();
+    assertTrue(source.isPresent(), "Explain must list its hit document as a source live");
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("trace-record");
+    assertEquals(prompt, history.getFirst().get("content"), "the exact trace stays inspectable in the user turn");
+    assertEquals("The sparse rank is two.", history.getLast().get("content"));
+    var citations = (List<?>) history.getLast().get("citations");
+    assertNotNull(citations, "Explain sources must survive reopening the store");
+    var citation = (Map<?, ?>) citations.getFirst();
+    assertEquals("orchard.md", citation.get("parentDocId"));
+    assertEquals(-1, ((Number) citation.get("chunkIndex")).intValue(), "trace provenance has no document chunk");
+    assertEquals("", citation.get("excerpt"), "the trace must not be presented as a document quotation");
+    assertEquals(0, ((Number) citation.get("startChar")).intValue());
+    assertEquals(0, ((Number) citation.get("endChar")).intValue());
+    var shown = (Map<?, ?>) ((List<?>) source.get().payload().get("citations")).getFirst();
+    assertEquals("orchard.md", shown.get("parentDocId"));
+    assertEquals(-1, ((Number) shown.get("chunkIndex")).intValue());
+    assertEquals("", shown.get("excerpt"));
+  }
+
+  @Test
   void summarySourcesSurviveReloadForDocumentsAndSelections() {
     for (boolean selected : List.of(false, true)) {
       var directory = retrievalStoreDir.resolve(selected ? "selection" : "document");

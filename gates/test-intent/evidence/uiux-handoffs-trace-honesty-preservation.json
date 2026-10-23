@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T20:06:03.776Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "362494d30d27c0b0f9b1113406a7ded723bbab78",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-716393-1792785961849.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1927
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 document summaries and ordinary citations keep their existing presentation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8e4b473338fe6eb404ac9f8b107d3eb1d28154548d49b66c150803cec5213fcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 document summaries and ordinary citations keep their existing presentation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b5ecfbbeb99b080faf980b23d833342570eaee69bf5a832232de5af4857b184d"
+}

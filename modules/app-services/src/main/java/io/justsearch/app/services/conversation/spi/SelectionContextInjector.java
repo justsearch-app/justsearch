@@ -243,7 +243,16 @@ public final class SelectionContextInjector implements ContextInjector {
     InjectorResult rejection = summaryLimitRejection(ctx, source);
     if (rejection != null) return rejection;
     Map<String, Object> message = userMessage("", source);
-    return InjectorResult.messagesOnly(List.of(message));
+    if (!"hit".equals(st.scope()) || st.docId() == null || st.docId().isBlank()) {
+      return InjectorResult.messagesOnly(List.of(message));
+    }
+    // This source identifies the result being explained, not a passage read by the model.
+    // Announce it through the existing live/record path, without adding document text to the
+    // verification inputs or inventing a chunk, span or quotation for the ranking trace.
+    ContextCitation citation = new ContextCitation(
+        st.docId(), ContextCitation.CHUNK_INDEX_ABSENT, 1, 0, 0, 1.0f, "", 0, 0, "", 0,
+        DocumentService.ContextInclusion.ABSENT);
+    return InjectorResult.of(List.of(message), List.of(citationsEvent(citation, 0, 0)));
   }
 
   /**
@@ -650,7 +659,7 @@ public final class SelectionContextInjector implements ContextInjector {
   private static SseEvent citationsEvent(ContextCitation citation, int startChar, int endChar) {
     Map<String, Object> citationMap = new LinkedHashMap<>();
     citationMap.put("parentDocId", citation.parentDocId());
-    citationMap.put("chunkIndex", 0);
+    citationMap.put("chunkIndex", citation.chunkIndex());
     citationMap.put("startChar", startChar);
     citationMap.put("endChar", endChar);
     citationMap.put("score", 1.0f);

@@ -7,7 +7,7 @@ author-session: wp1.3b-uiux-handoffs-builder
 
 # Test-intent entries
 
-These tests are durable. The evidence launcher adds only --cache=false and --maxWorkers=2 to Vitest through a temporary npx wrapper; all assertions and evidence classification use the repository runner unchanged. HO/HN scenarios and design decisions are agent-adopted choices under the quoted design delegation, as the agreed source specifies.
+These tests are durable. The earlier receiver-repair evidence overlays the current Explain sender and its selection type onto 12bb2beb3 so that its fail-before still reaches the original receiver refusal (zero dispatches), rather than stopping on the newly appended trace text. The new provenance checks fail on unmodified f05b44c2a in the manual shared clone and on unmodified 12bb2beb3 in the evidence runner. The evidence launcher adds only --cache=false and --maxWorkers=2 to Vitest through a temporary npx wrapper; all assertions and evidence classification use the repository runner unchanged. HO/HN scenarios and design decisions are agent-adopted choices under the quoted design delegation, as the agreed source specifies.
 
 ```json
 {
@@ -24,7 +24,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO6 — agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
+          "choice": "HO6 \u2014 agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
           "label": "agent choice"
         },
         {
@@ -32,7 +32,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO9 — agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
+          "choice": "HO9 \u2014 agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
           "label": "agent choice"
         },
         {
@@ -40,7 +40,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN2 — agent-adopted scenario:\nHN2 While the old window is the main window it receives every hand-off as today, except the S15.6 repair and any shared Summarize change from D12.",
+          "choice": "HN2 \u2014 agent-adopted scenario:\nHN2 While the old window is the main window it receives every hand-off as today, except the S15.6 repair and any shared Summarize change from D12.",
           "label": "agent choice"
         },
         {
@@ -72,7 +72,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO1 — agent-adopted scenario:\nS15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
+          "choice": "HO1 \u2014 agent-adopted scenario:\nS15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
           "label": "agent choice"
         },
         {
@@ -80,7 +80,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO2 — agent-adopted scenario:\nS15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
+          "choice": "HO2 \u2014 agent-adopted scenario:\nS15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
           "label": "agent choice"
         },
         {
@@ -88,7 +88,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO3 — agent-adopted scenario:\nS15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for…\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
+          "choice": "HO3 \u2014 agent-adopted scenario:\nS15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for\u2026\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
           "label": "agent choice"
         },
         {
@@ -96,7 +96,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "choice": "HO4 \u2014 agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
           "label": "agent choice"
         },
         {
@@ -104,7 +104,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -112,7 +112,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO6 — agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
+          "choice": "HO6 \u2014 agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
           "label": "agent choice"
         },
         {
@@ -120,7 +120,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO7 — agent-adopted scenario:\nS15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
+          "choice": "HO7 \u2014 agent-adopted scenario:\nS15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
           "label": "agent choice"
         },
         {
@@ -128,7 +128,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO8 — agent-adopted scenario:\nS15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
+          "choice": "HO8 \u2014 agent-adopted scenario:\nS15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
           "label": "agent choice"
         },
         {
@@ -136,7 +136,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO9 — agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
+          "choice": "HO9 \u2014 agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
           "label": "agent choice"
         },
         {
@@ -144,7 +144,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO10 — agent-adopted scenario:\nS15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
+          "choice": "HO10 \u2014 agent-adopted scenario:\nS15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
           "label": "agent choice"
         },
         {
@@ -152,7 +152,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO11 — agent-adopted scenario:\nS15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=…&shape=…`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
+          "choice": "HO11 \u2014 agent-adopted scenario:\nS15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=\u2026&shape=\u2026`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
           "label": "agent choice"
         },
         {
@@ -160,7 +160,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO12 — agent-adopted scenario:\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
+          "choice": "HO12 \u2014 agent-adopted scenario:\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
           "label": "agent choice"
         },
         {
@@ -168,7 +168,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "choice": "HO13 \u2014 agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
           "label": "agent choice"
         },
         {
@@ -176,7 +176,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN1 — agent-adopted scenario:\nHN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
+          "choice": "HN1 \u2014 agent-adopted scenario:\nHN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
           "label": "agent choice"
         },
         {
@@ -184,7 +184,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN3 — agent-adopted scenario:\nHN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
+          "choice": "HN3 \u2014 agent-adopted scenario:\nHN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
           "label": "agent choice"
         },
         {
@@ -192,7 +192,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN4 — agent-adopted scenario:\nHN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
+          "choice": "HN4 \u2014 agent-adopted scenario:\nHN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
           "label": "agent choice"
         },
         {
@@ -246,7 +246,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO1 — agent-adopted scenario:\nS15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
+          "choice": "HO1 \u2014 agent-adopted scenario:\nS15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
           "label": "agent choice"
         },
         {
@@ -254,7 +254,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO2 — agent-adopted scenario:\nS15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
+          "choice": "HO2 \u2014 agent-adopted scenario:\nS15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
           "label": "agent choice"
         },
         {
@@ -262,7 +262,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO3 — agent-adopted scenario:\nS15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for…\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
+          "choice": "HO3 \u2014 agent-adopted scenario:\nS15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for\u2026\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
           "label": "agent choice"
         },
         {
@@ -270,7 +270,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "choice": "HO4 \u2014 agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
           "label": "agent choice"
         },
         {
@@ -278,7 +278,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -286,7 +286,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO6 — agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
+          "choice": "HO6 \u2014 agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
           "label": "agent choice"
         },
         {
@@ -294,7 +294,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO7 — agent-adopted scenario:\nS15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
+          "choice": "HO7 \u2014 agent-adopted scenario:\nS15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
           "label": "agent choice"
         },
         {
@@ -302,7 +302,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO8 — agent-adopted scenario:\nS15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
+          "choice": "HO8 \u2014 agent-adopted scenario:\nS15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
           "label": "agent choice"
         },
         {
@@ -310,7 +310,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO9 — agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
+          "choice": "HO9 \u2014 agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
           "label": "agent choice"
         },
         {
@@ -318,7 +318,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO10 — agent-adopted scenario:\nS15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
+          "choice": "HO10 \u2014 agent-adopted scenario:\nS15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
           "label": "agent choice"
         },
         {
@@ -326,7 +326,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO11 — agent-adopted scenario:\nS15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=…&shape=…`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
+          "choice": "HO11 \u2014 agent-adopted scenario:\nS15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=\u2026&shape=\u2026`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
           "label": "agent choice"
         },
         {
@@ -334,7 +334,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO12 — agent-adopted scenario:\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
+          "choice": "HO12 \u2014 agent-adopted scenario:\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
           "label": "agent choice"
         },
         {
@@ -342,7 +342,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "choice": "HO13 \u2014 agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
           "label": "agent choice"
         },
         {
@@ -350,7 +350,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN1 — agent-adopted scenario:\nHN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
+          "choice": "HN1 \u2014 agent-adopted scenario:\nHN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
           "label": "agent choice"
         },
         {
@@ -358,7 +358,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN3 — agent-adopted scenario:\nHN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
+          "choice": "HN3 \u2014 agent-adopted scenario:\nHN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
           "label": "agent choice"
         },
         {
@@ -366,7 +366,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN4 — agent-adopted scenario:\nHN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
+          "choice": "HN4 \u2014 agent-adopted scenario:\nHN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
           "label": "agent choice"
         },
         {
@@ -395,7 +395,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "choice": "HO4 \u2014 agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
           "label": "agent choice"
         },
         {
@@ -403,7 +403,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -411,7 +411,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "choice": "HO13 \u2014 agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
           "label": "agent choice"
         },
         {
@@ -419,7 +419,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "choice": "HN5 \u2014 agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
           "label": "agent choice"
         },
         {
@@ -450,7 +450,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "choice": "HO4 \u2014 agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
           "label": "agent choice"
         },
         {
@@ -458,7 +458,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -466,7 +466,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "choice": "HO13 \u2014 agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
           "label": "agent choice"
         },
         {
@@ -474,7 +474,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "choice": "HN5 \u2014 agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
           "label": "agent choice"
         },
         {
@@ -513,7 +513,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "choice": "HO4 \u2014 agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
           "label": "agent choice"
         },
         {
@@ -521,7 +521,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -529,7 +529,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "choice": "HO13 \u2014 agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
           "label": "agent choice"
         },
         {
@@ -537,7 +537,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "choice": "HN5 \u2014 agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
           "label": "agent choice"
         },
         {
@@ -566,7 +566,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "choice": "HO4 \u2014 agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
           "label": "agent choice"
         },
         {
@@ -574,7 +574,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -582,7 +582,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "choice": "HO13 \u2014 agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
           "label": "agent choice"
         },
         {
@@ -590,7 +590,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "choice": "HN5 \u2014 agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
           "label": "agent choice"
         },
         {
@@ -624,7 +624,7 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
-          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "choice": "HO5 \u2014 agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
           "label": "agent choice"
         },
         {
@@ -651,12 +651,194 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "delegationScope": "WP1.3b HO3/HO5 and HO4/HO13, including independent-verifier follow-up decisions.",
           "choice": "HO3/HO5: the exact whyThisResult.ts sender payload, including docIds:[], must dispatch its valid search-trace selection as Summarize and survive reload.\nHO4/HO13 orchestrator decision: when chosen files arrive with a forced shape that cannot read files, prepare a file-limited Ask over exactly those files and say visibly that the requested mode was replaced; never show a file limit on a send that ignores it.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: the Explain turn lists the result it explains as its source, opening it the same way other sources do; the ranking trace the model was given stays inspectable with the turn. Reuse existing summarize turn, sources disclosure and record fields. If the result has no document id, disclose a trace-only explanation.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-handoffs-followup.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Explain carries the hit identity and exact ranking trace in its prepared user text; a missing identity is visibly trace-only. A known document path wins over a chunk identity; a bare chunk identity has no document link.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: the Explain turn lists the result it explains as its source, opening it the same way other sources do; the ranking trace the model was given stays inspectable with the turn. Reuse existing summarize turn, sources disclosure and record fields. If the result has no document id, disclose a trace-only explanation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-trace-frontend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain carries the hit document as trace provenance",
+        "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain keeps the exact model trace in the prepared text",
+        "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain without a document identity visibly keeps a trace-only record",
+        "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain links the document path when the result identity is a chunk",
+        "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 an unmerged chunk without a document path stays visibly trace-only"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Edited Explain instructions retain the exact model trace in the submitted user turn and dispatch body.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: the Explain turn lists the result it explains as its source, opening it the same way other sources do; the ranking trace the model was given stays inspectable with the turn. Reuse existing summarize turn, sources disclosure and record fields. If the result has no document id, disclose a trace-only explanation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-trace-edits.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Explain emits its hit document as a live source without fetching document content or inventing a quotation or chunk; the same source and prepared trace text survive reopening the conversation store.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: the Explain turn lists the result it explains as its source, opening it the same way other sources do; the ranking trace the model was given stays inspectable with the turn. Reuse existing summarize turn, sources disclosure and record fields. If the result has no document id, disclose a trace-only explanation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-trace-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#explainTraceSourceAndPreparedTextSurviveStoreReopen"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Source previews on document-content summaries remain readable in all existing card states and themes. Explain subject cards have no excerpt preview.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: the Explain turn lists the result it explains as its source, opening it the same way other sources do; the ranking trace the model was given stays inspectable with the turn. Reuse existing summarize turn, sources disclosure and record fields. If the result has no document id, disclose a trace-only explanation.\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.\nAccessibility choice: document-content source preview text meets WCAG AA 4.5:1 on resting, hovered, selected and selected-hovered cards in both themes.\nFollow-up: Explain now names the subject without an excerpt preview; this contrast check preserves other turns' document previews.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-trace-contrast.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#HO5 source preview text clears AA in both themes and every card state"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Explain names the ranking trace as its basis in the existing answer frame, presents the linked result as the subject without an empty excerpt, and omits the cited/retrieved header when opening it. Other document summaries and citations keep their existing presentation. This presentation uses the saved prepared-text Ranking trace context label and existing citations; no new saved field or component.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: Explain names the ranking trace as its basis in the existing answer frame, presents the linked result as the subject without an empty excerpt, and omits the cited/retrieved header when opening it. Other document summaries and citations keep their existing presentation. This presentation uses the saved prepared-text Ranking trace context label and existing citations; no new saved field or component. The subject disclosure also omits the ordinary sentence-grounding legend and names only the actual panel in aria-controls; ordinary sources retain their legend.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-trace-honesty.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain frame names its ranking trace rather than document content",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain sources name the subject without an empty excerpt",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain subject pane makes no cited or retrieved claim",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain subject names a Windows result without exposing its full path as the name",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain subject disclosure omits sentence-grounding instructions"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Explain names the ranking trace as its basis in the existing answer frame, presents the linked result as the subject without an empty excerpt, and omits the cited/retrieved header when opening it. Other document summaries and citations keep their existing presentation. This presentation uses the saved prepared-text Ranking trace context label and existing citations; no new saved field or component.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: Explain names the ranking trace as its basis in the existing answer frame, presents the linked result as the subject without an empty excerpt, and omits the cited/retrieved header when opening it. Other document summaries and citations keep their existing presentation. This presentation uses the saved prepared-text Ranking trace context label and existing citations; no new saved field or component.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: name the action Explain in its scope, Edit, Retry-menu and refusal guidance. State only the observed restoration limit: live Retry/Edit reuse the original trace selection and docId; after reload they preserve the question but cannot restore that selection, so sending is refused and the user must start Explain from the result again. Real Summarize keeps its current line and behavior. This is a wording repair, not a Retry/Edit behavior or record change.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-trace-honesty-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 document summaries and ordinary citations keep their existing presentation"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "name the action Explain in its scope, Edit, Retry-menu and refusal guidance. State only the observed restoration limit: live Retry/Edit reuse the original trace selection and docId; after reload they preserve the question but cannot restore that selection, so sending is refused and the user must start Explain from the result again. Real Summarize keeps its current line and behavior. This is a wording repair, not a Retry/Edit behavior or record change.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO5, including the orchestrator continuation requiring the Explain hit source and inspectable trace live, after cold reload and after Engine restart.",
+          "choice": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).\nContinuation choice: name the action Explain in its scope, Edit, Retry-menu and refusal guidance. State only the observed restoration limit: live Retry/Edit reuse the original trace selection and docId; after reload they preserve the question but cannot restore that selection, so sending is refused and the user must start Explain from the result again. Real Summarize keeps its current line and behavior. This is a wording repair, not a Retry/Edit behavior or record change.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-explain-actions.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 Explain guidance names Explain and only its observed reload limitation",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain Retry menu states its actual restoration limit",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit"
       ],
       "repaired": true
     }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T12:05:28.550Z",
-  "revision": "12bb2beb38ee54fb0eaa8b483feff4a41b06d8d3",
-  "tree": "52fd801db52ce6ae60e2377203341eb19041ccef",
+  "createdAt": "2026-10-23T20:05:34.595Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "97934c0060f9e6255f46e72adafa395256b91908",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8vs8_wln/tmp/test-intent-vitest-2433328-1792757125734.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-712577-1792785931398.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2815
+      "durationMs": 3196
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO12 keyboard palette search after a hand-off returns focus to the composer",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:672656f702a1b17d9c009f47d59b3833563739f6fd14c8adaf10c3c742b96b35"
+  "digest": "sha256:82a3a2f52545ebf7b3b257daa44e9466edd0625dc73ad0de3908b29e803a5cc7"
 }

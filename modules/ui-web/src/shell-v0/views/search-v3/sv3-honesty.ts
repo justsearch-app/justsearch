@@ -11,7 +11,8 @@
  *
  * Nothing here authors a VERDICT of its own: the frame and its wording come from the shared
  * `components/chat/evidenceProjection.ts` authority (tempdoc 559 Authority IV / 577 Move 3), the same
- * one the shipped window reads. This module supplies only the window's inputs to it.
+ * one the shipped window reads. A ranking-trace explanation instead names its subject and input;
+ * it makes no claim about grounding in document content.
  */
 import type { AiState } from '../../state/aiStateStore.js';
 // The ONE answer-frame authority. The window derives no grounding verdict and words none: it hands
@@ -19,6 +20,7 @@ import type { AiState } from '../../state/aiStateStore.js';
 // does the same through its own `frameFor`).
 import {
   answerFrame,
+  filenameOf,
   answerFrameLabel,
   groundingCoverage,
   coverageHonesty,
@@ -390,6 +392,13 @@ export function sv3AnswerFrame(turn: Sv3Turn): AnswerFrame | null {
   );
 }
 
+/** The existing prepared-text context label is saved with the user turn, including after edits.
+ * It describes a ranking trace, not document content; no additional record field is needed.
+ */
+export function sv3ExplainsRankingTrace(turn: Sv3Turn | null): boolean {
+  return turn?.shapeId === 'core.summarize' && turn.question.includes('\n\nRanking trace:\n');
+}
+
 export function projectSv3AnswerFrame(
   turn: Sv3Turn,
   currentModelLabel: string | null,
@@ -403,6 +412,15 @@ export function projectSv3AnswerFrame(
     turn.durationMs,
     sv3TailModelLabel(turn.modelLabel, currentModelLabel, detailed),
   );
+  if (sv3ExplainsRankingTrace(turn)) {
+    const subject = turn.evidence?.sources[0];
+    return {
+      verdict: subject
+        ? `Explains the ranking of ${filenameOf(subject.parentDocId)} from its ranking trace`
+        : 'Explains the ranking trace',
+      elaboration: '', tail,
+    };
+  }
   const frame = sv3AnswerFrame(turn);
   if (frame === null) {
     // `evidence === null` — "never told", so there is no verdict to word; the tail still renders.

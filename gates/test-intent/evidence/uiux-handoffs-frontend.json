@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T12:05:23.877Z",
-  "revision": "12bb2beb38ee54fb0eaa8b483feff4a41b06d8d3",
-  "tree": "9a699c97c70f51e1d3ff98e415c371b0cfe84b6d",
+  "createdAt": "2026-10-23T20:05:28.765Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "48f42db7906f1b222e3110ee5e2dfa110123b97e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/utils/composeHandoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8vs8_wln/tmp/test-intent-vitest-2431949-1792757117605.json\"",
+      "command": "npx vitest run \"src/shell-v0/utils/composeHandoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-710714-1792785920818.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2709
+      "durationMs": 3450
     }
   ],
   "checks": [
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO1 HO2 a cold address query arrives intact and is consumed from the address",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.extract prepares the chosen files and waits",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 HO9 a selection is local to its prepared turn",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 two arrivals replace preparation without sending",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 an incoming query replaces typed Search without creating a conversation place",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a cold hand-off keeps the restored draft with its previous conversation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO11 an answer link ignores agent affordance and conversation and waits",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -209,7 +209,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 an empty file hand-off cannot widen to the whole index",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -224,7 +224,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary Retry menu names the original summary inputs",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -239,7 +239,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,7 +254,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -269,7 +269,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 an outgoing conversation keeps its unsent draft and files one click away",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -284,7 +284,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 abandoning a prepared selection cannot attach it to another mode send",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -299,7 +299,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -314,7 +314,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 leaving the window retires prepared context while a layout reparent keeps it",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -329,7 +329,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO10 unavailable chat still shows the prepared task and chosen files",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -344,7 +344,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO12 an incoming task puts keyboard focus in the composer",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -359,7 +359,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 malformed selection data is refused visibly without a crash",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -374,7 +374,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -389,7 +389,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a held real controller keeps its decision and reopens from the sidebar",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -404,7 +404,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a locked conversation is left intact by incoming preparation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -419,7 +419,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 a refused unreadable-document hand-off keeps the instruction and files",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -434,7 +434,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:46d2466e4bf1ae0fcca8dcc799ec252ba41124483a269ce5ae18108cee049a84",
+      "contentDigest": "sha256:a6367bac67d30ae4883cd5ecd631afa14eb821be8d82bbc5da9e68800cb7217b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -453,83 +453,83 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/utils/composeHandoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8vs8_wln/tmp/test-intent-vitest-2431949-1792757121359.json\"",
+        "command": "npx vitest run \"src/shell-v0/utils/composeHandoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-710714-1792785925708.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2372,
-        "output": "JSON report written to /home/elias/.cache/am/8vs8_wln/tmp/test-intent-vitest-2431949-1792757121359.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
+        "durationMs": 2865,
+        "output": "JSON report written to /home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-710714-1792785925708.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts#HO6 Browse core.ask carries the clicked document without an affordance",
         "classification": "assertion",
-        "detail": "HO6 Browse core.ask carries the clicked document without an affordance:  AssertionError: expected 'core.free-chat' to be 'core.rag-ask' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts:13:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui"
+        "detail": "HO6 Browse core.ask carries the clicked document without an affordance:  AssertionError: expected 'core.free-chat' to be 'core.rag-ask' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts:13:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts#HO6 Browse core.summarize carries the clicked document without an affordance",
         "classification": "assertion",
-        "detail": "HO6 Browse core.summarize carries the clicked document without an affordance:  AssertionError: expected undefined to deeply equal { kind: 'result-set', …(1) }\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts:16:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/"
+        "detail": "HO6 Browse core.summarize carries the clicked document without an affordance:  AssertionError: expected undefined to deeply equal { kind: 'result-set', …(1) }\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts:16:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts#HO9 a second compose without a selection replaces the first one",
         "classification": "assertion",
-        "detail": "HO9 a second compose without a selection replaces the first one:  AssertionError: expected { kind: 'search-trace', …(2) } to be null\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts:21:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/node_modules/"
+        "detail": "HO9 a second compose without a selection replaces the first one:  AssertionError: expected { kind: 'search-trace', …(2) } to be null\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/utils/composeHandoffs.test.ts:21:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/node_modules/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO1 HO2 a cold address query arrives intact and is consumed from the address",
         "classification": "assertion",
-        "detail": "HO1 HO2 a cold address query arrives intact and is consumed from the address:  AssertionError: expected '' to be '# & % \"日本語\" long long long long long …' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:90:66\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+        "detail": "HO1 HO2 a cold address query arrives intact and is consumed from the address:  AssertionError: expected '' to be '# & % \"日本語\" long long long long long …' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:90:66\n    at file:///home/elias/dev/justsearch/.claude/worktr"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
         "classification": "assertion",
-        "detail": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits:  AssertionError: expected '' to be 'Describe risks' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:100:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modul"
+        "detail": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits:  AssertionError: expected '' to be 'Describe risks' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:100:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modul"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
         "classification": "assertion",
-        "detail": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits:  AssertionError: expected '' to be 'Describe risks' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:100:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modul"
+        "detail": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits:  AssertionError: expected '' to be 'Describe risks' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:100:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modul"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.extract prepares the chosen files and waits",
         "classification": "assertion",
-        "detail": "HO3 HO4 HO5 core.extract prepares the chosen files and waits:  AssertionError: expected '' to be 'Describe risks' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:100:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modul"
+        "detail": "HO3 HO4 HO5 core.extract prepares the chosen files and waits:  AssertionError: expected '' to be 'Describe risks' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:100:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modul"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 HO9 a selection is local to its prepared turn",
         "classification": "assertion",
-        "detail": "HO3 HO5 HO9 a selection is local to its prepared turn:  AssertionError: expected { kind: 'text-range', …(3) } to be null\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:119:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-we"
+        "detail": "HO3 HO5 HO9 a selection is local to its prepared turn:  AssertionError: expected { kind: 'text-range', …(3) } to be null\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:119:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-we"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 two arrivals replace preparation without sending",
         "classification": "assertion",
-        "detail": "HO8 two arrivals replace preparation without sending:  AssertionError: expected '' to be 'later' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:157:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web"
+        "detail": "HO8 two arrivals replace preparation without sending:  AssertionError: expected '' to be 'later' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:170:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 an incoming query replaces typed Search without creating a conversation place",
         "classification": "assertion",
-        "detail": "HO8 an incoming query replaces typed Search without creating a conversation place:  AssertionError: expected 'previous search' to be 'replacement search' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:165:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
+        "detail": "HO8 an incoming query replaces typed Search without creating a conversation place:  AssertionError: expected 'previous search' to be 'replacement search' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:178:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a cold hand-off keeps the restored draft with its previous conversation",
         "classification": "assertion",
-        "detail": "HO8 a cold hand-off keeps the restored draft with its previous conversation:  AssertionError: expected 'draft before cold navigation' to be 'incoming cold task' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:177:85\n    at file:///home/elias/dev/justsearch/.clau"
+        "detail": "HO8 a cold hand-off keeps the restored draft with its previous conversation:  AssertionError: expected 'draft before cold navigation' to be 'incoming cold task' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:190:85\n    at file:///home/elias/dev/justsearch/.clau"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO11 an answer link ignores agent affordance and conversation and waits",
         "classification": "assertion",
-        "detail": "HO11 an answer link ignores agent affordance and conversation and waits:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:196:32\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web"
+        "detail": "HO11 an answer link ignores agent affordance and conversation and waits:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:209:32\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 an empty file hand-off cannot widen to the whole index",
         "classification": "assertion",
-        "detail": "HO13 an empty file hand-off cannot widen to the whole index:  AssertionError: expected '' to be 'question' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:203:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-"
+        "detail": "HO13 an empty file hand-off cannot widen to the whole index:  AssertionError: expected '' to be 'question' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:216:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary Retry menu names the original summary inputs",
         "classification": "assertion",
-        "detail": "HO7 a reloaded summary Retry menu names the original summary inputs:  AssertionError: expected 'Retry from here · Searches all your f…' to match /Summarize.*original (files|input|pas…/i\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:243:24\n    at file:///home/elias/dev/justs"
+        "detail": "HO7 a reloaded summary Retry menu names the original summary inputs:  AssertionError: expected 'Retry from here · Searches all your f…' to match /Summarize.*original (files|input|pas…/i\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:256:24\n    at file:///home/elias/dev/justs"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
@@ -544,7 +544,7 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 an outgoing conversation keeps its unsent draft and files one click away",
         "classification": "assertion",
-        "detail": "HO8 an outgoing conversation keeps its unsent draft and files one click away:  AssertionError: expected 'unsent draft' to be 'incoming task' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:264:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-han"
+        "detail": "HO8 an outgoing conversation keeps its unsent draft and files one click away:  AssertionError: expected 'unsent draft' to be 'incoming task' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:277:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-han"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 abandoning a prepared selection cannot attach it to another mode send",
@@ -554,42 +554,42 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
         "classification": "assertion",
-        "detail": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope:  AssertionError: expected '' to be 'incoming summary' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:288:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/mod"
+        "detail": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope:  AssertionError: expected '' to be 'incoming summary' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:301:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/mod"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 leaving the window retires prepared context while a layout reparent keeps it",
         "classification": "assertion",
-        "detail": "HO9 leaving the window retires prepared context while a layout reparent keeps it:  AssertionError: expected '' to be 'incoming summary' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:303:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/mod"
+        "detail": "HO9 leaving the window retires prepared context while a layout reparent keeps it:  AssertionError: expected '' to be 'incoming summary' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:316:85\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/mod"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO10 unavailable chat still shows the prepared task and chosen files",
         "classification": "assertion",
-        "detail": "HO10 unavailable chat still shows the prepared task and chosen files:  AssertionError: expected '' to be 'summarize the risks' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:317:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/"
+        "detail": "HO10 unavailable chat still shows the prepared task and chosen files:  AssertionError: expected '' to be 'summarize the risks' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:330:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO12 an incoming task puts keyboard focus in the composer",
         "classification": "assertion",
-        "detail": "HO12 an incoming task puts keyboard focus in the composer:  AssertionError: expected null to be <textarea rows=\"1\" …(2)></textarea> // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:326:39\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+        "detail": "HO12 an incoming task puts keyboard focus in the composer:  AssertionError: expected null to be <textarea rows=\"1\" …(2)></textarea> // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:339:39\n    at file:///home/elias/dev/justsearch/.claude/worktree"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 malformed selection data is refused visibly without a crash",
         "classification": "assertion",
-        "detail": "HO13 malformed selection data is refused visibly without a crash:  AssertionError: expected '\\n      \\n        \\n      \\n        W…' to contain 'Invalid selection'\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:332:37\n    at file:///home/elias/dev/justsearch/.claude/workt"
+        "detail": "HO13 malformed selection data is refused visibly without a crash:  AssertionError: expected '\\n      \\n        \\n      \\n        W…' to contain 'Invalid selection'\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:345:37\n    at file:///home/elias/dev/justsearch/.claude/workt"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
         "classification": "assertion",
-        "detail": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off:  AssertionError: expected <button type=\"button\" …(4)>…(1)</button> to be null\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:353:56\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/m"
+        "detail": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off:  AssertionError: expected <button type=\"button\" …(4)>…(1)</button> to be null\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:366:56\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/m"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a held real controller keeps its decision and reopens from the sidebar",
         "classification": "assertion",
-        "detail": "HO8 a held real controller keeps its decision and reopens from the sidebar:  AssertionError: expected '' to be 'prepared task' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:379:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/module"
+        "detail": "HO8 a held real controller keeps its decision and reopens from the sidebar:  AssertionError: expected '' to be 'prepared task' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:392:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/module"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a locked conversation is left intact by incoming preparation",
         "classification": "assertion",
-        "detail": "HO8 a locked conversation is left intact by incoming preparation:  AssertionError: expected '' to be 'keep this instruction' // Object.is equality\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:394:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoff"
+        "detail": "HO8 a locked conversation is left intact by incoming preparation:  AssertionError: expected '' to be 'keep this instruction' // Object.is equality\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:407:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoff"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 a refused unreadable-document hand-off keeps the instruction and files",
@@ -599,9 +599,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
         "classification": "assertion",
-        "detail": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/8vs8_wln/tmp/test-intent-before-sR6U4d/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:414:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/node_modules/@vite"
+        "detail": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/racowdwl/tmp/test-intent-before-pevP4U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:427:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/node_modules/@vite"
       }
     ]
   },
-  "digest": "sha256:b6084e664b8f565d4461b428060fb60dc24042751dd548aeb7afe6aa474bd176"
+  "digest": "sha256:e65ecdea49f0662e55a4cbf67456b664bd09d419ea8f7f1a22f59d9d30eb8e64"
 }

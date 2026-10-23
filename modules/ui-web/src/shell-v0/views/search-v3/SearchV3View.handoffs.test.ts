@@ -132,12 +132,25 @@ it('HO3 HO5 the real Explain sender with empty docIds sends the ranking trace', 
   ] }), source);
   source.querySelector<HTMLButtonElement>('[data-testid="hit-why-explain"]')!.click();
   await navigation; await drain(view);
-  const prompt = 'Explain why this result ("chosen-orchard.md") ranked where it did.';
+  const prompt = 'Explain why this result ("chosen-orchard.md") ranked where it did.\n\nNo document link is available for this result; the ranking trace is shown below.\n\nRanking trace:\nsparse-retrieval #1 12.40 · cross-encoder #1 0.98';
   expect(state).toEqual({ query: prompt, affordance: 'none', docIds: [], forceShapeId: 'core.summarize' });
   expect(dispatches()).toHaveLength(0);
   const body = await send(view);
   expect(body.shapeId).toBe('core.summarize'); expect(body.prompt).toBe(prompt);
   expect(body.selection).toEqual({ kind: 'search-trace', scope: 'hit', summary: 'sparse-retrieval #1 12.40 · cross-encoder #1 0.98' });
+});
+it('HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn', async () => {
+  const view = await mount();
+  setPendingSelection({ kind: 'search-trace', scope: 'hit', summary: 'sparse-retrieval #2 3.50' });
+  await navigate({ query: 'Explain this ranking', forceShapeId: 'core.summarize', docIds: [] });
+  await drain(view);
+  const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+  input.value = 'Explain in two sentences'; input.dispatchEvent(new Event('input')); await drain(view);
+  const body = await send(view);
+  expect(body.prompt).toBe('Explain in two sentences\n\nRanking trace:\nsparse-retrieval #2 3.50');
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;
+  await main.updateComplete;
+  expect(main.shadowRoot!.querySelector('[data-testid="sv3-turn-question"]')?.textContent).toBe(body.prompt);
 });
 it('HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask', async () => {
   const view = await mount();
@@ -207,10 +220,10 @@ it('HO13 an empty file hand-off cannot widen to the whole index', async () => {
 });
 const savedUserId = '11111111-2222-4333-8444-555555555550';
 const savedAnswerId = '11111111-2222-4333-8444-555555555551';
-function savedBackend(historyOverrides: Record<string, unknown> = {}): void {
+function savedBackend(historyOverrides: Record<string, unknown> = {}, question = 'saved summary'): void {
   const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
   const messages = [
-    { id: savedUserId, role: 'user', content: 'saved summary', shapeId: 'core.summarize' },
+    { id: savedUserId, role: 'user', content: question, shapeId: 'core.summarize' },
     { id: savedAnswerId, role: 'assistant', content: answer, shapeId: 'core.summarize' },
   ];
   fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
@@ -224,7 +237,7 @@ function savedBackend(historyOverrides: Record<string, unknown> = {}): void {
           kind: i === 0 ? 'USER_MESSAGE' : 'ASSISTANT_MESSAGE', originator: m.role,
           content: m.content, attributes: { shapeId: m.shapeId } })) : [] });
     if (href.endsWith('/api/chat/conversations') || href.includes('/api/chat/conversations?')) return reply({ sessions: [{ sessionId: 'saved',
-      createdAtMs: 1, lastActiveAtMs: 2, messageCount: 2, firstUserMessage: 'saved summary', shapeId: 'core.summarize' }] });
+      createdAtMs: 1, lastActiveAtMs: 2, messageCount: 2, firstUserMessage: question, shapeId: 'core.summarize' }] });
     return previous(url, init);
   });
   setLastViewedConversation('saved');
@@ -427,5 +440,32 @@ it('HO12 keyboard palette search after a hand-off returns focus to the composer'
   const current = await composer(view);
   expect(current.getAttribute('tier')).toBe('search');
   expect(current.shadowRoot!.activeElement).toBe(q(current, 'sv3-composer-input'));
+  expect(dispatches()).toHaveLength(0);
+});
+
+
+const savedExplainQuestion = 'Explain why this result ("chosen.md") ranked where it did.\n\nRanking trace:\nsparse #1 0.75';
+it('HO5 a reloaded Explain Retry menu states its actual restoration limit', async () => {
+  savedBackend({}, savedExplainQuestion);
+  const menu = vi.spyOn(contextMenus, 'openContextMenu').mockResolvedValue(null);
+  const view = await mount();
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
+  const turnId = (q(main, 'sv3-turn-question')!.getAttribute('data-item-id') ?? '').replace(/:q$/, '');
+  main.dispatchEvent(new CustomEvent('sv3-context-menu', {bubbles: true, composed: true, detail: {turnId, x: 1, y: 1}}));
+  await drain(view);
+  const retry = menu.mock.calls[0]?.[0].actions.find(item => item.id === 'retry');
+  expect(retry?.label).toContain('After reload, start Explain from the result again.');
+  expect(retry?.label).not.toContain('Summarize');
+});
+it.each(['retry', 'edit'])('HO5 a reloaded Explain %s keeps its trace and states the selection restoration limit', async action => {
+  savedBackend({}, savedExplainQuestion);const view = await mount();
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
+  const turnId = (q(main, 'sv3-turn-question')!.getAttribute('data-item-id') ?? '').replace(/:q$/, '');
+  const text = action === 'edit' ? savedExplainQuestion.replace('Explain why', 'Explain briefly why') : savedExplainQuestion;
+  main.dispatchEvent(new CustomEvent('sv3-branch-action', {bubbles: true, composed: true, detail: {action, turnId, ...(action === 'edit' ? {text} : {})}}));
+  await drain(view);const c = await composer(view);
+  expect(q(c, 'sv3-composer-notice')?.textContent).toContain('Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.');
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe(text);
+  q<HTMLButtonElement>(c, 'sv3-composer-send')!.click();await drain(view);
   expect(dispatches()).toHaveLength(0);
 });

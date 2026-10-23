@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T09:46:17.560Z",
-  "revision": "77587606ff8871c1bbc5e9f7bcbce47152470690",
-  "tree": "787afe097723ec0ec81bb8b75b674b08a008b7dd",
+  "createdAt": "2026-10-23T15:13:21.719Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "e8f8d310354fbbff56fc27fc0dca038562585930",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.promptlessContentKeepsDefaultTask\" --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.promptlessDocumentKeepsDefaultTaskAndCitation\" --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.unreadableAskSelectionIsRefused\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.documentInjectorRefusalsTerminateRealSummaryDispatch\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3940
+      "durationMs": 3576
     }
   ],
   "checks": [
@@ -74,7 +74,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#documentInjectorRefusalsTerminateRealSummaryDispatch",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b113090037bb28b41cc223c07c185a173aea44eed908a5ff3dcecc2bc3395315",
+      "contentDigest": "sha256:ace1077c419e3f3060fa0dc9f0307069c8af1029cabc16e9ab54c697b5a73517",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,5 +87,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:b0396ef11384c39aa170d97923bf7d4b33b3faf04647661747b8313ababc2094"
+  "digest": "sha256:a5ba3bf4d23500bc386c2ab3b8d6862917e8e8a43c50ca1c1d2289dc65293a46"
 }
