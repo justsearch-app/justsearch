@@ -304,3 +304,14 @@ CR37/CR37a/CR37b continuation: agent-adopted under the same delegation. The orig
   "note": "Independent review and scratch run-evidence: 17 repaired checks pass on snapshot 71f753520 and assertion-fail on b62fc5921; preservation passes. Sources match delegated S37/N37 scope. RS37 removes the unknown-reason product requirement; selector-only defensive coverage supplies no wire-boundary claim. Test intent accepted separately from the live product verdict."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp37-verifier-ga5ny11w",
+  "verdict": "accept",
+  "digest": "sha256:c36d301a4609c7a543ac29ff892cdf18ec1a48a9aec158581485e3ae61df37f5",
+  "note": "Independent intent review: expectations follow the delegated S37/N37 and CR37/CR37a/CR37b scenarios. Scratch run-evidence executes all 17 original repair checks and 19 continuation checks: candidate passes; b62fc5921 and 30f3617ea respectively assertion-fail. Preservation check passes. Initial dependency-copy executable-link failure retained; direct package entry rerun passes. This acceptance covers test intent; the real-system product verdict is reported separately."
+}
+```
