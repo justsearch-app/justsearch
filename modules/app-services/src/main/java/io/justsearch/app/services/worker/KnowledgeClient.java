@@ -1067,8 +1067,19 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public IndexingService.PrefixDeletionOutcome deleteDocsByPathPrefixWithOutcome(
+            Path pathPrefix, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocsByPathPrefixWithOutcome(pathPrefix, engineContext);
+    }
+
+    @Override
     public boolean deleteDocById(String docId, EngineContext engineContext) {
         return rootLifecycleOps.deleteDocById(docId, engineContext);
+    }
+
+    @Override
+    public IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocByIdWithOutcome(docId, engineContext);
     }
 
     /**

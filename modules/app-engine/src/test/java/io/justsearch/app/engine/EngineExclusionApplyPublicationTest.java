@@ -43,7 +43,7 @@ final class EngineExclusionApplyPublicationTest {
       doAnswer(call -> {
         deleting.countDown();
         return call.callRealMethod();
-      }).when(client).deleteDocById(eq(id),any());
+      }).when(client).deleteDocByIdWithOutcome(eq(id),any());
       var excludes = new ExcludesServiceImpl(() -> client);
       try (var view = engine.captureServingView()) {
         var runtime = (RunningRuntime)view.ingestRuntime();
