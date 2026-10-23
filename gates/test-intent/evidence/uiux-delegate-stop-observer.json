@@ -1,0 +1,132 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T12:34:30.966Z",
+  "revision": "b06ad571fe1ceacbe7ad970b081e999f9f99af99",
+  "tree": "8f8fa51c56f4783496597a1387d3fcce85c0366c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/bounded-grace/evidence-tmp/test-intent-vitest-2719336-1792758853780.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8047
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:55c0f0662131cb8eed03804cb1391233c0ae39fd067b41964447b7459085758d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS1 DS2 DS3 DS8 delayed cancellation appears once without reload or focus movement",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS4 keeps completed output and disposition when completion wins Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS4 DS5 an observer reconciles Stop saved after its completed record read",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DN1 clean DONE stops record reads after the five-second grace, also after navigation",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS3 DS4 this window own Halt still waits beyond the clean-DONE grace",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 DS7 remote cancellation with an early record read recovers once without generic failure",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 both windows reconcile one Stop and keep a different conversation untouched",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS7 a dropped observer retries a failed record fallback without inventing Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 DS7 cold attach keeps the named conversation and its already loaded record turn",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DN2 an old-window Halt updates the observing Search turn and preserves saved partial output",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held budget decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held context decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held approval decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 a dropped transport alone does not remove the held decision",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 preserves genuine complete without inventing Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 preserves genuine failure without inventing Stop",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b06ad571f",
+    "revision": "b06ad571fe1ceacbe7ad970b081e999f9f99af99",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/uiux-delegate-stop-unbounded.patch",
+        "contentDigest": "sha256:3a457914df370c90f3bf3b3aa5df52304567c222119c2fff087ff4c52d04d370"
+      }
+    ],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/bounded-grace/evidence-tmp/test-intent-vitest-2719336-1792758862862.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7905,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/bounded-grace/evidence-tmp/test-intent-vitest-2719336-1792758862862.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record DN1 clean DONE stops record reads after the five-second grace, also after navigation:  AssertionError: expected 103 to be 23 // Object.is equality\n    at /home/elias/.cache/am/bzozdzpt/tmp/evidence-before/test-intent-before-1Qjlmn/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:192:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at pro"
+      }
+    ]
+  },
+  "digest": "sha256:83976838ff39c078b7afcf6a147f35859f6e2de209eb3a89cd84f705e74d7b3c"
+}

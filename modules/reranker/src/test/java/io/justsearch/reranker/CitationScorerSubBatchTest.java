@@ -56,7 +56,7 @@ class CitationScorerSubBatchTest {
   void sweepIsSubBatched() throws Exception {
     RecordingScorer scorer = new RecordingScorer("the winning passage");
 
-    CitationScorer.scoreSentence(passages(100, 3), Long.MAX_VALUE, scorer);
+    CitationScorer.scoreSentence(passages(100, 3), Long.MAX_VALUE, _ -> true, scorer);
 
     assertTrue(
         scorer.subBatchSizes.size() > 1,
@@ -76,7 +76,7 @@ class CitationScorerSubBatchTest {
     RecordingScorer scorer = new RecordingScorer("the winning passage");
 
     CitationScorer.BestOf best =
-        CitationScorer.scoreSentence(passages(100, 97), Long.MAX_VALUE, scorer);
+        CitationScorer.scoreSentence(passages(100, 97), Long.MAX_VALUE, _ -> true, scorer);
 
     assertEquals(97, best.index(), "the offset must be added back to the sub-batch position");
     assertEquals(0.99, best.score(), 1e-6);
@@ -90,7 +90,7 @@ class CitationScorerSubBatchTest {
     long alreadyPast = System.nanoTime() - 1;
 
     CitationScorer.BestOf best =
-        CitationScorer.scoreSentence(passages(100, 97), alreadyPast, scorer);
+        CitationScorer.scoreSentence(passages(100, 97), alreadyPast, _ -> true, scorer);
 
     assertFalse(best.complete(), "a cut-short sweep must say so rather than report a best-of-prefix");
     assertEquals(
@@ -112,7 +112,7 @@ class CitationScorerSubBatchTest {
           return out;
         };
 
-    CitationScorer.BestOf best = CitationScorer.scoreSentence(chunks, Long.MAX_VALUE, allHigh);
+    CitationScorer.BestOf best = CitationScorer.scoreSentence(chunks, Long.MAX_VALUE, _ -> true, allHigh);
 
     assertEquals(-1, best.index(), "a blank passage is unverifiable, not a match");
     assertTrue(best.complete());
