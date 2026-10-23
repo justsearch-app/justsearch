@@ -7,7 +7,7 @@ author-session: 01a15fc2-b9f6-7a13-9835-bda855d20c35
 
 # Test-intent entries
 
-Round ten is the current rule. Historical entries 1–4, 6–8, 10 and 12–13 are retained and explicitly superseded where classification/fixture evidence changed; their independent acceptance records remain byte-for-byte unchanged. Entries 5, 9 and 11 retain their accepted obligations. Current rule proof is in entries 14–15; round-eleven analyzer coverage and companion recovery are in entries 16–17. No schema change or commit.
+Round ten is the current rule. Historical entries 1–4, 6–8, 10 and 12–13 are retained and explicitly superseded where classification/fixture evidence changed; their independent acceptance records remain byte-for-byte unchanged. Entries 5, 9 and 11 retain their accepted obligations. Current rule proof is in entries 14–15; retained round-eleven analyzer and companion checks are in entries 16–17. Round twelve replaces manual token consumption with disposable Lucene indexing (entries18–19). No schema change or commit.
 
 Removed expectations: `successResetsAmbiguousGrace` is replaced by `healthyBatchCannotRenewFreeGraceForPoison`; `poisonEventuallyUsesLadder` checks the first batch instead of waiting four batches; snapshot checks expect immediate canaries instead of no canary, and the untyped extraction case expects one probe at each of four pause steps instead of only the fourth. `EngineOwnedPathsTest` is retired with the removed classifier and replaced by real canonical-source/companion/analyzer checks. Mock shared outages now fail their service health probe as well as their normal operation. The direct policy tests explicitly supply failed health or a typed unavailable signal instead of relying on exception reason codes. No ladder, terminal-state, recovery, status or shutdown assertion is relaxed. The copied analyzer fixture now compares Path.getFileName exactly: a portability edit using a bare poison.txt suffix also selected healthy-after-poison.txt. The first baseline exposed that fixture mistake. Eleven unchanged-source baseline executions are retained under hashes; the corrected two-case analyzer class reruns before the single full candidate invocation. Original source, XML and log remain explicitly archived as the preliminary fixture result, never as a passing preservation check.
 
@@ -17,7 +17,7 @@ The corrected full round-ten run passed all other 107 targeted cases, including 
 
 Final round-ten evidence: exact91dc01358 has17 intended assertion failures and4 preservation passes across21 executions. The candidate has108 targeted passes with no skips, including the37-state matrix and every retained U17/U19 check. Main/test compile and all8 PMD checks pass for worker-core, adapters-lucene, worker-services and indexer-worker. Full module results, with the five-case fixture correction executed freshly and all other2131 class files unchanged, report 4773 tests, 55 skips and the single known argFileEncodingRoundTripsThroughTheJdkParser launcher-NOTE environment failure. Earlier failed full results remain in execution history. Independent acceptance is pending.
 
-Round eleven is a narrow repair of the accepted round-ten rule. The writer probe now maps a tiny document and exhausts every indexed text field through the actual IndexWriter analyzer, including token reset/end/close, before the unchanged Directory check. It adds no document and commits nothing. O10 and clarified K2 appear in the current table and entries16–17. On exact37a3008f8, A1 charges two healthy files once with minute-scale retries and all four field probes incorrectly succeed; these five assertions fail before and pass after. The companion preservation check passes before and after: uncounted during a real closed-writer outage, then one charge in the first recovered batch. See [before](../../../tmp/builder/round11/before.txt) and [after](../../../tmp/builder/round11/after.txt).
+Historical round-eleven implementation (manual token consumption is superseded by round twelve; its checks remain): a narrow repair of the accepted round-ten rule. The writer probe now maps a tiny document and exhausts every indexed text field through the actual IndexWriter analyzer, including token reset/end/close, before the unchanged Directory check. It adds no document and commits nothing. O10 and clarified K2 appear in the current table and entries16–17. On exact37a3008f8, A1 charges two healthy files once with minute-scale retries and all four field probes incorrectly succeed; these five assertions fail before and pass after. The companion preservation check passes before and after: uncounted during a real closed-writer outage, then one charge in the first recovered batch. See [before](../../../tmp/builder/round11/before.txt) and [after](../../../tmp/builder/round11/after.txt).
 
 Final round-eleven verification:114 targeted executions pass without skips, including all37 matrix states and the retained U17/U19 targets;52 supplied verifier product executions and their environment check pass without skips. Three full modules report4310 JUnit entries,48 platform/model skips and the one known argFileEncodingRoundTripsThroughTheJdkParser launcher-NOTE environment failure. All three modules compile main/test and all6 PMD reports have zero violations. The initial external-verifier compilation lacked the runtime-only KeywordTokenizer jar; its isolated compile classpath was corrected. Two external snapshot checks then stopped at absent fixture names, so only their path names were adapted to the existing immutable >1MiB corpus and rerun. Assertions are unchanged;50 other verifier passes are retained under unchanged compiled-class hashes, and module results under1830 class hashes. Both setup failures and the initial init-script failure remain archived, never relabelled. No production or committed test byte changed during these harness corrections. The acceptance tail remains byte-identical. [Verification detail](../../../tmp/builder/round11/report.md).
 
@@ -33,7 +33,7 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 | O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
-| O10 open writer with broken shared analysis/mapping | [real retired analyzer and field-by-field tokenization](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field, no write/commit](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java) |
+| O10 open writer with broken shared analysis/mapping or Lucene-rejected token contracts | [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
 | K2 failures on the source itself stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
@@ -916,6 +916,86 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java#companionIsDeferredDuringOutageAndChargedInFirstRecoveredBatch"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10: an open, input-independently broken shared analyzer emits a zero first-token position. Real Lucene rejects both healthy writes and must also reject the disposable canary. Rows remain uncounted with deadlines at most eight seconds; restoring only the analyzer completes the same queued files within ten seconds, without re-enqueue or deadline shortening.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Narrow replacement of the writer probe and its regression/isolation checks; keep all other health, retry, status and pacing behavior; no schema or acceptance-record change.",
+          "choice": "Replace the manual token loop rather than layering validation onto it. Build the canary with the existing FieldMapper for every catalog text field, and add it to an IndexWriter in a ByteBuffersDirectory whose IndexWriterConfig borrows the real writer analyzer. Flush the tiny RAM index so Lucene indexing/segment validation runs, then discard it with commitOnClose=false and close its directory. Keep the real writer-open/tragic and real Directory create/write/delete checks under the existing barrier/dispatch lock. The borrowed analyzer is never closed by this probe. No document operation or commit targets the real index. The real invalid-position regression is copied from the supplied verifier, adapting fixture helpers, class name and StandardTokenizer (already in the test compile API) for the same first-position fault; native Lucene must throw, never an injected exception. A healthy-probe preservation check witnesses unchanged real document count/sequence/commit state and a successful later real write. This is an orchestrator decision implemented under delegated autonomy, never owner-words. The first candidate exposed CommitFunnelArchTest ownership violations. Preserve that rule unchanged: ComponentsFactory creates/closes the disposable writer and WritePathOps owns its addDocument/flush; the coordinator still holds the original locks and invokes the factory. No new owner, allowlist, wrapper type or public API is introduced. Cancelled first-candidate execution is archived; the final candidate reruns compile, PMD and all three full modules, reusing the exact unchanged-test baseline.",
+          "label": "agent choice under orchestrator decision"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-indexing-validation.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10 preservation: successful canary leaves the real writer document count, operation sequence, pending-commit state and published-index existence unchanged. The same borrowed analyzer can index a real document afterward.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Narrow replacement of the writer probe and its regression/isolation checks; keep all other health, retry, status and pacing behavior; no schema or acceptance-record change.",
+          "choice": "Replace the manual token loop rather than layering validation onto it. Build the canary with the existing FieldMapper for every catalog text field, and add it to an IndexWriter in a ByteBuffersDirectory whose IndexWriterConfig borrows the real writer analyzer. Flush the tiny RAM index so Lucene indexing/segment validation runs, then discard it with commitOnClose=false and close its directory. Keep the real writer-open/tragic and real Directory create/write/delete checks under the existing barrier/dispatch lock. The borrowed analyzer is never closed by this probe. No document operation or commit targets the real index. The real invalid-position regression is copied from the supplied verifier, adapting fixture helpers, class name and StandardTokenizer (already in the test compile API) for the same first-position fault; native Lucene must throw, never an injected exception. A healthy-probe preservation check witnesses unchanged real document count/sequence/commit state and a successful later real write. This is an orchestrator decision implemented under delegated autonomy, never owner-words. The first candidate exposed CommitFunnelArchTest ownership violations. Preserve that rule unchanged: ComponentsFactory creates/closes the disposable writer and WritePathOps owns its addDocument/flush; the coordinator still holds the original locks and invokes the factory. No new owner, allowlist, wrapper type or public API is introduced. Cancelled first-candidate execution is archived; the final candidate reruns compile, PMD and all three full modules, reusing the exact unchanged-test baseline.",
+          "label": "agent choice under orchestrator decision"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-indexing-validation.json",
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java"
+      ],
+      "repaired": false
     }
   ]
 }
@@ -1128,6 +1208,8 @@ The large-input checks pin the actual recovery claim to the shared deadline D th
 
 Execution results, exact before baseline b4e2f6183, hashes and commands are recorded by the
 round-nine evidence producer. Final result: all96 targeted executions pass without skips, including the unchanged37-state matrix and all87 earlier targets. Exact-source baseline b4e2f6183 has seven intended assertions and one mixed-poison preservation pass: the five outage cases charge healthy rows; isolated/all-poison cases lack the required canary. The final four real snapshot faults and untyped O8 keep attempts0, report WAITING and claim both rows1–5ms after D; single/all poison have one passing canary and terminal FAILED/attempt1. The fixed large corpus and JVM roots are reused. Both modules main/test compile and four PMD reports complete with zero violations. Full-module evidence plus the isolated fixture correction has3494 reported JUnit entries, one known launcher-NOTE environment failure and46 skipped entries; all skip names are recorded rather than counted as passes. Public status on the real queue is tested by delegation, avoiding a copied owning-store spy whose constructor callbacks pointed at a closed original. The final producer checks all production and other test hashes before reusing88 pass results and re-executes the corrected8-case file before/after. The original full run with five fixture-status failures remains in the machine record. Linux only; physical ENOSPC is not induced (path-provenance full-storage reasons are checked), and broad Engine/UI/system suites are not rerun. Independent acceptance remains required.
+
+Round 12 O10 replaces the superseded manual token-consumption probe with native mapped-document indexing and flush in a disposable ByteBuffersDirectory, borrowing the real writer analyzer. The real index receives no canary document or commit; its existing writer/Directory checks remain. Product delta: +20/-14 (net +6), three existing classes, retaining the original writer lifecycle/mutation ownership rules. Exact 3ba3507d2 before: the real invalid-first-token-position regression fails the intended attempts/deadline/recovery assertions (both healthy rows attempts=1 and minute retries); the isolation check passes. After: both checks pass, healthy rows retain attempts=0, and analyzer repair alone completes the same rows in 1,189 ms. All 116 targets, including the 37-state matrix, pass with zero skips. The supplied/equivalent external verifier suite passes 55 product checks plus one environment check. Full touched-module suites report 4,313 entries, 48 existing skips and the one known JDK_JAVA_OPTIONS launcher-NOTE failure in PersistentExtractionSandboxTest.argFileEncodingRoundTripsThroughTheJdkParser; it is not counted as a pass. Main/test compile and all six PMD reports pass. [Detailed report, commands and limitations](../../../tmp/builder/round12/report.md), [before](../../../tmp/builder/round12/before.txt), [after](../../../tmp/builder/round12/after.txt), [execution evidence](../evidence/systemic-batch-deferral-indexing-validation.json). The first candidate's architecture-rule failure/cancellation is retained; final module results are fresh for the corrected ownership placement. Existing acceptance records below are unchanged; independent acceptance is pending.
 
 ## Acceptance records
 

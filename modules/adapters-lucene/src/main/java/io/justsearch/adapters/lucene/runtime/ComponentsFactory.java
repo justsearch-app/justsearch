@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.FieldInfo;
@@ -37,6 +38,7 @@ import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 import org.slf4j.Logger;
@@ -53,6 +55,15 @@ final class ComponentsFactory {
   private static final Logger log = LoggerFactory.getLogger(ComponentsFactory.class);
 
   private ComponentsFactory() {}
+
+  /** Owns the disposable RAM writer lifecycle while borrowing the session's analyzer. */
+  static void probeDocument(Analyzer analyzer, Document document) throws IOException {
+    try (var directory = new ByteBuffersDirectory();
+        var canary = new IndexWriter(directory,
+            new IndexWriterConfig(analyzer).setCommitOnClose(false))) {
+      WritePathOps.probeDocument(canary, document);
+    }
+  }
 
   /**
    * Builds the Lucene components for an index runtime.

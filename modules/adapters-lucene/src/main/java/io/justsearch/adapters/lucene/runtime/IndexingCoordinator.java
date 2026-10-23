@@ -18,7 +18,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.index.IndexOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,7 +90,7 @@ public final class IndexingCoordinator {
   // Tempdoc 402: write-op dispatch
   // ==========================================================================
 
-  /** Proves mapping, analysis, writer and Directory health without adding or committing a document. */
+  /** Proves mapped-document indexing in disposable RAM, plus the live writer and Directory health. */
   public void probeIngestion() {
     acquireReadLockTimed();
     try {
@@ -104,18 +103,8 @@ public final class IndexingCoordinator {
         for (var field : session.fieldMapper.fieldDefs().values()) {
           if ("text".equals(field.type)) fields.put(field.id, "JustSearch ingestion canary");
         }
-        for (var field : session.fieldMapper.toDocument(fields, null)) {
-          if (field.fieldType().indexOptions() == IndexOptions.NONE || !field.fieldType().tokenized()) {
-            continue;
-          }
-          try (var tokens = field.tokenStream(snapshot.writer().getAnalyzer(), null)) {
-            tokens.reset();
-            while (tokens.incrementToken()) {
-              // Consume the full stream, including failures deferred until tokenization.
-            }
-            tokens.end();
-          }
-        }
+        ComponentsFactory.probeDocument(snapshot.writer().getAnalyzer(),
+            session.fieldMapper.toDocument(fields, null));
         String name = null;
         try {
           try (var output = snapshot.directory().createTempOutput(

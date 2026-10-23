@@ -69,6 +69,12 @@ public final class WritePathOps {
     this.bridge = bridge;
   }
 
+  /** Indexes and flushes the mapped document in the factory-owned disposable writer. */
+  static void probeDocument(IndexWriter canary, Document document) throws IOException {
+    canary.addDocument(document);
+    canary.flush();
+  }
+
   /**
    * Core single-document write. Caller is responsible for guards and queue-depth accounting.
    *
