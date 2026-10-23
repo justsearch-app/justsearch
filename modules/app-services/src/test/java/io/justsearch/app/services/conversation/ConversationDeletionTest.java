@@ -210,6 +210,22 @@ class ConversationDeletionTest {
     }
   }
 
+  @Test
+  void incompleteRunOnlyDeletionRemainsPresentAfterJoinMetadataIsLost() throws Exception {
+    var store = new FileConversationStore(temp.resolve("conversations"));
+    var runs = new AgentRunStore(temp.resolve("runs"));
+    var client = mock(KnowledgeClient.class);
+    when(client.deleteHistoryTranscript(any(), any())).thenThrow(new AssertionError("engine stop"));
+    try (var history = new AgentHistoryIndexer(new TestEngineExecutors(), temp.resolve("history"), () -> client)) {
+      var deletion = deletion(store, runs, history);
+      seedRun(runs, "run", "conversation");
+      assertThrows(AssertionError.class, () -> deletion.delete("conversation"));
+      Files.delete(temp.resolve("runs/run/meta.json"));
+      assertTrue(deletion.exists("conversation"), "the durable intent must keep leftover run events discoverable");
+      assertTrue(Files.exists(temp.resolve("runs/run/events.ndjson")));
+    }
+  }
+
   private ConversationDeletion deletion(FileConversationStore store, AgentRunStore runs, AgentHistoryIndexer history) {
     return new ConversationDeletion(store, runs, history, new RunChannelRegistry(), DataKeyManager.disabled());
   }

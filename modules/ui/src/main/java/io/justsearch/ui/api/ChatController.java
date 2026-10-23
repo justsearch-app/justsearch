@@ -467,6 +467,7 @@ public final class ChatController {
    */
   public void handleListSessions(Context ctx) {
     String shapeId = ctx.queryParam("shapeId");
+    String childrenOf = ctx.queryParam("childrenOf");
     String parent = ctx.queryParam("parentSessionId");
     String point = ctx.queryParam("branchPointMessageId");
     boolean forkRead = parent != null || point != null;
@@ -476,8 +477,14 @@ public final class ChatController {
       return;
     }
     if (forkRead && StoreIdRequest.rejectUnsafe(ctx, parent)) return;
+    if (childrenOf != null && (forkRead || shapeId != null)) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "childrenOf cannot be combined with fork or shape filters"));
+      return;
+    }
+    if (childrenOf != null && StoreIdRequest.rejectUnsafe(ctx, childrenOf)) return;
     String limitParam = ctx.queryParam("limit");
-    int limit = forkRead ? Integer.MAX_VALUE
+    int limit = forkRead || childrenOf != null ? Integer.MAX_VALUE
         : Math.min(limitParam != null ? Integer.parseInt(limitParam) : 20, 100);
     List<ConversationStore.SessionSummary> sessions = conversationStore.listSessions(shapeId, limit);
     if (forkRead) {
@@ -509,12 +516,22 @@ public final class ChatController {
     List<Map<String, Object>> result = new ArrayList<>(storeRows);
     // Only store-backed conversations can fork. The unfiltered two-store join stays unchanged.
     if (!forkRead) result.addAll(runBackedRows(shapeId, limit, storeRows));
+    if (childrenOf != null) {
+      result.removeIf(row -> !childrenOf.equals(row.get("sessionId"))
+          && !childrenOf.equals(row.get("parentSessionId")));
+      var work = conversationStore.conversationWork();
+      for (var row : result) row.put("busy", work != null && work.isBusy((String) row.get("sessionId")));
+    }
     // One order for both records. The store side already sorts by last activity, so a STABLE sort on
     // the same key leaves it untouched and only decides where the synthesized rows land.
     result.sort((a, b) -> Long.compare(asMillis(b.get("lastActiveAtMs")), asMillis(a.get("lastActiveAtMs"))));
     var writes = conversationStore.conversationWork();
     Map<String, Object> response = new LinkedHashMap<>();
     response.put("sessions", result.size() <= limit ? result : result.subList(0, limit));
+    if (childrenOf != null) {
+      response.put("childrenOf", childrenOf);
+      response.put("locked", conversationStore.isLocked());
+    }
     if (forkRead) response.put("fork", Map.of("parentSessionId", parent, "branchPointMessageId", point));
     response.put("deletedIds", List.of());
     if (writes != null) {

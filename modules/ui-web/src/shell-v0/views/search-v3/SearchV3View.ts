@@ -219,7 +219,6 @@ import {
 } from '../../state/conversationListStore.js';
 // The product's ONE confirm dialog. Cascade-delete asks a second question — "and its branches?" —
 // and asking it in a second dialect would be a second dismiss rule for the same gesture.
-import { confirmAsync } from '../../components/ConfirmDialog.js';
 // Tempdoc 610 §K — the SHELL-mounted context inspector. The window pushes the projection and opens
 // the drawer; the drawer is the product's one "what did the assistant actually see" surface and is
 // not re-implemented here.
@@ -318,6 +317,8 @@ import {
   subscribeAppearanceMode,
   type AppearanceMode,
 } from '../../state/themeState.js';
+import { confirmConversationTree, conversationDeleteOutcome } from '../../components/chat/conversationDelete.js';
+import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
 import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
@@ -330,10 +331,6 @@ import {
   CONTEXT_INCLUDE_FAILED,
   CONTEXT_RESTORE_FAILED,
   CONTEXT_SUMMARY_FAILED,
-  DELETE_FAILED,
-  deleteCascadeConfirm,
-  deleteCascadeMessage,
-  deleteCascadeTitle,
   PANE_LABEL,
   SV3_COMMAND_EXPORT_MARKDOWN,
   SV3_COMMAND_SEARCH,
@@ -3960,62 +3957,16 @@ export class SearchV3View extends JfElement {
     void this.deleteThroughStore(id);
   }
 
-  /**
-   * Delete, CASCADE-AWARE (slice 517 FIX-U1, ported by 852 S3 — the one behavior the retired
-   * conversation-history dropdown had that this window's sidebar did not).
-   *
-   * Slices 515/516 made it impossible to orphan a branch: the store REFUSES to delete a conversation
-   * other conversations were forked from, with `409` + the children's ids. This window's delete
-   * called the plain store function, which reports that refusal as a bare `false` — so the row
-   * vanished from the list, the conversation stayed on disk, and the reader was told nothing. That
-   * is not a missing feature; it is a delete that silently does not delete.
-   *
-   * What the reader is now asked is the same question the shipped window asked, in this window's
-   * own words, and it NAMES the branches — the ids come back from the refusal, the labels from the
-   * list this window already holds. It promises ONE level, because that is what the cascade does:
-   * the store function recurses into each child WITHOUT the consent callback, so a child that has
-   * children of its own answers `409`, the cascade aborts, and nothing is deleted. The copy says so
-   * ({@link deleteCascadeMessage}) rather than promising a depth this act refuses to perform.
-   *
-   * Nothing leaves the list until the store says it left — including the conversation the reader
-   * pressed delete on, which is why removing it on screen happens HERE and not at the press.
-   */
+  /** Discover, confirm once, and remove only identities the Engine confirms are gone. */
   private async deleteThroughStore(id: string): Promise<void> {
-    const labels = new Map(this.sessions.sessions.map(s => [s.id, this.conversationLabel(s.id)]));
-    let cascaded: readonly string[] = [];
-    let declined = false;
-    const result = await deleteConversationWithCascade(id, async (childIds) => {
-      cascaded = childIds;
-      const consented = await confirmAsync({
-        title: deleteCascadeTitle,
-        message: deleteCascadeMessage(
-          this.conversationLabel(id),
-          childIds.map((childId) => this.conversationLabel(childId)),
-        ),
-        variant: 'danger',
-        confirmLabel: deleteCascadeConfirm(childIds.length),
-      });
-      declined = !consented;
-      return consented;
+    let tree: DeleteTreeEntry[] = [];
+    const result = await deleteConversationWithCascade(id, (children, preview) => {
+      tree = preview;
+      return confirmConversationTree(children, preview);
     });
-    this.forgetDeletedConversations(result.ok ? [id, ...cascaded] : result.deletedIds ?? []);
-    if (!result.ok) {
-      // A DECLINED cascade is NOT a failure — the reader was asked and said no — and it is the ONE
-      // silent case. A plain refusal and a consented cascade that then broke halfway are both real
-      // failures and both must say so; the store function's return cannot tell the three apart
-      // (`{ok:false, childIds}` covers two of them), which is why the reader's own answer is tracked
-      // here instead of inferred from it. Successfully deleted children have already left the window;
-      // the refresh reconciles the remaining server rows.
-      if (!declined) {
-        const progress = result.deletedIds?.length
-          ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. Deleted: ${result.deletedIds.map(gone => `“${labels.get(gone) ?? gone}”`).join(', ')}. ` : '';
-        const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${this.conversationLabel(result.failedId)}”. ` : '';
-        emitEphemeralToast({ message: progress + failed + (result.error ?? DELETE_FAILED), severity: 'warning' });
-      }
-      if (result.deletedIds?.length || !['STORE_LOCKED', 'CONVERSATION_BUSY'].includes(result.errorCode ?? '')) {
-        void loadConversations();
-      }
-      return;
+    this.forgetDeletedConversations(result.deletedIds ?? []);
+    if (!result.ok && !result.cancelled) {
+      emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
     }
   }
 
@@ -4028,13 +3979,6 @@ export class SearchV3View extends JfElement {
       // Server confirmation wins even over stale local run state: the content is already gone.
       this.sessions = { ...this.sessions, sessions: this.sessions.sessions.filter(s => s.id !== gone) };
     }
-  }
-
-  /** A conversation's name as the reader knows it, for a dialog that must name what it will delete. */
-  private conversationLabel(id: string): string {
-    const session = sessionById(this.sessions, id);
-    const row = this.conversations.find((c) => c.id === id) ?? null;
-    return session?.title ?? row?.title ?? row?.firstUserMessage ?? id;
   }
 
   /**

@@ -1376,80 +1376,130 @@ export async function deleteConversation(sessionId: string): Promise<boolean> {
   }
 }
 
-/**
- * Slice 517 FIX-U1 — delete with cascade support for branched conversations.
- *
- * If the backend rejects with HTTP 409 + BRANCHES_PREVENT_DELETION (the
- * slice 515 + 516 guarantee that orphaned branches can't be silently
- * created), this function:
- *  1. extracts the {@code childSessionIds} from the response body,
- *  2. invokes {@code onChildsFound(childIds)} so the caller can prompt the
- *     user "delete the children too?" (returns a {@code Promise<boolean>}),
- *  3. if the user confirms, deletes the children sequentially then retries
- *     the parent.
- *
- * Sequential (not Promise.all) — simpler error semantics, cascade depth is
- * typically 1 today, cost is bounded by N branches.
- *
- * The original {@link deleteConversation} signature is preserved for
- * backward compatibility; callers that don't need cascade UX keep using it.
- */
+/** One confirmed row, in preorder, with structural facts available even while content is locked. */
+export interface DeleteTreeEntry extends Conversation {
+  depth: number;
+  busy: boolean;
+}
+
 export interface DeleteCascadeResult {
   ok: boolean;
   childIds?: string[];
   error?: string;
   errorCode?: string;
   deletedIds?: string[];
+  remainingIds?: string[];
+  unconfirmedIds?: string[];
   failedId?: string;
+  cancelled?: boolean;
 }
 
+/** Client walk over complete direct-child reads; no recent-list cap and no recursive server delete. */
+async function readDeleteTree(root: string): Promise<{ tree: DeleteTreeEntry[]; locked: boolean }> {
+  const tree: DeleteTreeEntry[] = [];
+  const pending = [{ id: root, depth: 0 }];
+  const seen = new Set<string>();
+  let locked = false;
+  while (pending.length > 0) {
+    const next = pending.pop()!;
+    if (seen.has(next.id)) throw new Error('The conversation tree changed. Review it again before deleting.');
+    seen.add(next.id);
+    const query = new URLSearchParams({ childrenOf: next.id });
+    const response = await authorizedFetch(`${apiBase}/api/chat/conversations?${query}`);
+    if (!response.ok) {
+      let reason = 'Could not read the complete conversation tree. Nothing further was deleted.';
+      try { const body = await response.json(); if (typeof body.error === 'string') reason = body.error; } catch { /* No readable reason. */ }
+      throw new Error(reason);
+    }
+    const data = await response.json();
+    if (data.childrenOf !== next.id || !Array.isArray(data.sessions) || typeof data.locked !== 'boolean') {
+      throw new Error('The Engine could not confirm the complete conversation tree.');
+    }
+    locked ||= data.locked;
+    const rows = data.sessions as Record<string, unknown>[];
+    const row = rows.find(r => r.sessionId === next.id);
+    if (!row || typeof row.busy !== 'boolean') throw new Error('The conversation changed or could not be read. Review it again before deleting.');
+    tree.push({ ...toConversation(row, listRequests, {}), depth: next.depth, busy: row.busy });
+    const children = rows.filter(r => r.sessionId !== next.id);
+    for (const child of children.reverse()) {
+      if (typeof child.sessionId !== 'string' || child.parentSessionId !== next.id) {
+        throw new Error('The Engine could not confirm the conversation tree.');
+      }
+      pending.push({ id: child.sessionId, depth: next.depth + 1 });
+    }
+  }
+  return { tree, locked };
+}
+
+function rememberDeletedConversation(id: string): void {
+  forgetRecentSession(id);
+  listShown = ++listRequests;
+  state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
+    deletedIds: [...new Set([...state.deletedIds, id])], loading: false,
+    activeId: state.activeId === id ? null : state.activeId };
+  emit();
+}
+
+/** Refresh the roster, then ask the two-store existence boundary about EACH named identity. */
+async function reconcileDelete(tree: readonly DeleteTreeEntry[], confirmed: Set<string>, result: DeleteCascadeResult): Promise<DeleteCascadeResult> {
+  await loadConversations();
+  const deletedIds: string[] = [];
+  const remainingIds: string[] = [];
+  const unconfirmedIds: string[] = [];
+  for (const row of tree) {
+    if (confirmed.has(row.id)) { deletedIds.push(row.id); continue; }
+    const exists = await readConversationExists(row.id, listRequests);
+    if (exists === true) remainingIds.push(row.id);
+    else if (exists === false) { deletedIds.push(row.id); rememberDeletedConversation(row.id); }
+    else unconfirmedIds.push(row.id);
+  }
+  return { ...result, deletedIds, remainingIds, unconfirmedIds };
+}
+
+/** Without a callback, retain the single-delete boundary. With one, confirm the full tree ONCE. */
 export async function deleteConversationWithCascade(
   sessionId: string,
-  onChildsFound?: (childIds: string[]) => Promise<boolean>,
+  onTreeFound?: (childIds: string[], tree: DeleteTreeEntry[]) => Promise<boolean>,
 ): Promise<DeleteCascadeResult> {
-  try {
-    const res = await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(sessionId)}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      forgetRecentSession(sessionId);
-      listShown = ++listRequests;
-      state = {
-        ...state,
-        conversations: state.conversations.filter((c) => c.id !== sessionId),
-        deletedIds: [...new Set([...state.deletedIds, sessionId])],
-        loading: false,
-        activeId: state.activeId === sessionId ? null : state.activeId,
-      };
-      emit();
-      return { ok: true };
+  if (onTreeFound) {
+    let tree: DeleteTreeEntry[] = [];
+    const confirmed = new Set<string>();
+    try {
+      const preview = await readDeleteTree(sessionId);
+      tree = preview.tree;
+      const busy = tree.find(row => row.busy);
+      if (busy) return { ok: false, errorCode: 'CONVERSATION_BUSY', failedId: busy.id,
+        error: 'Stop the running answer or agent, including any pending decision, before deleting this tree.' };
+      if (!await onTreeFound(tree.slice(1).map(row => row.id), tree)) return { ok: false, cancelled: true };
+      const current = await readDeleteTree(sessionId);
+      if (current.locked) return { ok: false, errorCode: 'STORE_LOCKED', error: 'Unlock chat history before deleting this conversation.' };
+      if (current.tree.some(row => row.busy)) return { ok: false, errorCode: 'CONVERSATION_BUSY',
+        error: 'Stop the running answer or agent, including any pending decision, before deleting this tree.' };
+      const named = new Map(tree.map(row => [row.id, row.parentSessionId]));
+      if (current.tree.length !== tree.length || current.tree.some(row => !named.has(row.id) || named.get(row.id) !== row.parentSessionId)) {
+        return reconcileDelete(tree, confirmed, { ok: false, error: 'The conversation tree changed. Review it again before deleting.' });
+      }
+      // Every child precedes its parent, at any depth; stable sort preserves sibling order.
+      for (const row of [...tree].sort((a, b) => b.depth - a.depth)) {
+        const result = await deleteConversationWithCascade(row.id);
+        if (!result.ok) return reconcileDelete(tree, confirmed, { ...result, failedId: row.id });
+        confirmed.add(row.id);
+      }
+      return { ok: true, deletedIds: tree.map(row => row.id), remainingIds: [], unconfirmedIds: [] };
+    } catch (failure) {
+      const result = { ok: false, error: failure instanceof Error ? failure.message : 'Could not confirm deletion.' };
+      return tree.length > 0 ? reconcileDelete(tree, confirmed, result) : { ...result, unconfirmedIds: [sessionId] };
     }
+  }
+  try {
+    const res = await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+    if (res.ok) { rememberDeletedConversation(sessionId); return { ok: true }; }
     let body: { error?: unknown; errorCode?: string; childSessionIds?: unknown } = {};
     try { body = await res.json() as typeof body; } catch { /* A failed response may have no JSON. */ }
-    const error = typeof body.error === 'string' && body.error ? body.error : undefined;
-    if (res.status === 409 && (body.errorCode === 'BRANCHES_PREVENT_DELETION'
-      || (body.errorCode === undefined && Array.isArray(body.childSessionIds) && body.childSessionIds.length > 0))) {
-      const childIds = Array.isArray(body.childSessionIds)
-        ? body.childSessionIds.filter((id): id is string => typeof id === 'string') : [];
-      if (!onChildsFound || childIds.length === 0) return { ok: false, childIds };
-      const userConfirmed = await onChildsFound(childIds);
-      if (!userConfirmed) return { ok: false, childIds };
-      const deletedIds: string[] = [];
-      for (const childId of childIds) {
-        const childResult = await deleteConversationWithCascade(childId);
-        if (!childResult.ok) return {
-          ...childResult, childIds, deletedIds: [...deletedIds, ...(childResult.deletedIds ?? [])],
-          failedId: childResult.failedId ?? childId,
-        };
-        deletedIds.push(childId);
-      }
-      const parentResult = await deleteConversationWithCascade(sessionId);
-      return parentResult.ok ? parentResult : { ...parentResult, deletedIds, failedId: sessionId };
-    }
-    return error ? { ok: false, error, ...(body.errorCode ? { errorCode: body.errorCode } : {}) } : { ok: false };
-  } catch {
-    return { ok: false };
-  }
+    const childIds = Array.isArray(body.childSessionIds) ? body.childSessionIds.filter((id): id is string => typeof id === 'string') : undefined;
+    return { ok: false, ...(typeof body.error === 'string' ? { error: body.error } : {}),
+      ...(body.errorCode ? { errorCode: body.errorCode } : {}), ...(childIds ? { childIds } : {}) };
+  } catch { return { ok: false, error: 'The delete response was not received.' }; }
 }
 
 export function exportConversationMarkdown(

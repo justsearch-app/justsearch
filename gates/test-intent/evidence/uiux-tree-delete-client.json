@@ -1,0 +1,207 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T10:46:02.826Z",
+  "revision": "c949c4dabb94abb432c59578a2042a9b320f681f",
+  "tree": "ee2554c50e8a81fa5054c4ab93a7090a4ee0b959",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationTreeDelete.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3lhmkoq1/tmp/test-intent-vitest-1775596-1792752358874.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1152
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD2 confirms every depth before any DELETE and removes leaves first",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD2 confirms every depth before any DELETE and removes leaves first",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD2 TD9 cancellation sends no DELETE including a single conversation",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD2 TD9 cancellation sends no DELETE including a single conversation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD3 TD4 stops at disk failure and identifies deleted and remaining conversations",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD3 TD4 stops at disk failure and identifies deleted and remaining conversations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD6 refuses known active work in any descendant before deleting",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD6 refuses known active work in any descendant before deleting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD6 rechecks work admitted while the confirmation was open",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD6 rechecks work admitted while the confirmation was open",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD7 reconciles a lost DELETE response by exact existence rather than the recent list",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD7 reconciles a lost DELETE response by exact existence rather than the recent list",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD7 keeps unanswered outcomes unconfirmed and never resumes automatically",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD7 keeps unanswered outcomes unconfirmed and never resumes automatically",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD5 does not delete a newly discovered child outside the confirmed tree",
+      "file": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD5 does not delete a newly discovered child outside the confirmed tree",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c949c4dab",
+    "revision": "c949c4dabb94abb432c59578a2042a9b320f681f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/conversationTreeDelete.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3lhmkoq1/tmp/test-intent-vitest-1775596-1792752361638.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 989,
+        "output": "JSON report written to /home/elias/.cache/am/3lhmkoq1/tmp/test-intent-vitest-1775596-1792752361638.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD2 confirms every depth before any DELETE and removes leaves first",
+        "classification": "assertion",
+        "detail": "TD2 confirms every depth before any DELETE and removes leaves first:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/3lhmkoq1/tmp/test-intent-before-wZ7384/modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts:48:21\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD2 TD9 cancellation sends no DELETE including a single conversation",
+        "classification": "assertion",
+        "detail": "TD2 TD9 cancellation sends no DELETE including a single conversation:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/3lhmkoq1/tmp/test-intent-before-wZ7384/modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts:55:21\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD3 TD4 stops at disk failure and identifies deleted and remaining conversations",
+        "classification": "assertion",
+        "detail": "TD3 TD4 stops at disk failure and identifies deleted and remaining conversations:  AssertionError: expected [ 'root', 'child' ] to deeply equal [ 'leaf', 'child' ]\n    at /home/elias/.cache/am/3lhmkoq1/tmp/test-intent-before-wZ7384/modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts:61:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD6 refuses known active work in any descendant before deleting",
+        "classification": "assertion",
+        "detail": "TD6 refuses known active work in any descendant before deleting:  AssertionError: expected { ok: false, …(3) } to match object { ok: false, …(1) }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD6 rechecks work admitted while the confirmation was open",
+        "classification": "assertion",
+        "detail": "TD6 rechecks work admitted while the confirmation was open:  AssertionError: expected { ok: false, …(3) } to match object { ok: false, …(1) }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD7 reconciles a lost DELETE response by exact existence rather than the recent list",
+        "classification": "assertion",
+        "detail": "TD7 reconciles a lost DELETE response by exact existence rather than the recent list:  AssertionError: expected { ok: false } to match object { ok: false, …(3) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD7 keeps unanswered outcomes unconfirmed and never resumes automatically",
+        "classification": "assertion",
+        "detail": "TD7 keeps unanswered outcomes unconfirmed and never resumes automatically:  AssertionError: expected { ok: false, …(3) } to match object { ok: false, deletedIds: [], …(2) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts#TD5 does not delete a newly discovered child outside the confirmed tree",
+        "classification": "assertion",
+        "detail": "TD5 does not delete a newly discovered child outside the confirmed tree:  AssertionError: expected { ok: false, …(3) } to match object { ok: false, …(2) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<"
+      }
+    ]
+  },
+  "digest": "sha256:ec13f7c0379fafd9a6c875ffc35799bd764ddd90cf51eeccb456aa8c3bd03033"
+}

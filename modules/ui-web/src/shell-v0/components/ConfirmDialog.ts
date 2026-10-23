@@ -40,7 +40,7 @@ export class ConfirmDialog extends JfElement {
 
   declare open: boolean;
   declare title: string;
-  declare message: string;
+  declare message: string | TemplateResult;
   declare confirmLabel: string;
   declare cancelLabel: string;
   declare variant: Variant;
@@ -67,6 +67,7 @@ export class ConfirmDialog extends JfElement {
     /* 574 remediation A1 — native <dialog> (showModal): browser inert + focus-trap + Top Layer,
        so no .backdrop div + no hand-picked z-index (the §16 S4 z-literal is gone here). */
     dialog {
+      box-sizing: border-box;
       border: 1px solid var(--border-subtle);
       border-radius: 0.75rem;
       max-width: 28rem;
@@ -119,11 +120,15 @@ export class ConfirmDialog extends JfElement {
     }
     .message {
       overflow-wrap: anywhere;
+      max-height: 50vh;
+      overflow: auto;
       margin: 0 0 1rem 0;
       font-size: var(--font-size-sm);
       line-height: 1.5;
       color: var(--text-secondary);
     }
+    .message ol { padding-inline-start: 1.25rem; }
+    .message li { margin-block: 0.5rem; }
     .typed-row {
       margin-bottom: 0.875rem;
       display: flex;
@@ -267,7 +272,7 @@ export class ConfirmDialog extends JfElement {
               ${icon({ name: 'x', size: 14 })}
             </jf-button>
           </div>
-          <p class="message">${this.message}</p>
+          <div class="message" tabindex="0">${this.message}</div>
           ${this.typedConfirmWord
             ? html`
                 <div class="typed-row">
@@ -318,7 +323,7 @@ if (typeof customElements !== 'undefined' && !customElements.get('jf-confirm-dia
 
 export interface ConfirmAsyncOptions {
   title: string;
-  message: string;
+  message: string | TemplateResult;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: Variant;
