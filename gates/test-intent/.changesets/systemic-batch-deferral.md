@@ -1406,3 +1406,14 @@ The exact df6092ffe fail-before check is reused with an identical test-source ha
   "note": "The disposable canary uses a different Similarity than the real writer, so a shared invalid-norm outage charges healthy files and leaves minute-scale retries after recovery."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16952-e863-7393-926c-869cd7836971",
+  "verdict": "reject",
+  "digest": "sha256:2b831422613d16aec330378b55284a6fd70fea616e0fc60732b4938fcfd0a5cf",
+  "note": "The writer canary passes a shared document-values outage that charges a healthy file, and a vanished canonical source alias is incorrectly deferred as an outage."
+}
+```
