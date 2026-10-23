@@ -264,13 +264,20 @@ test('CLI: candidate and historical runners isolate profiles while retaining Gra
       const probe = JSON.parse(fs.readFileSync(path.join(scratch, `${label}-profile.json`), 'utf8'));
       const profile = path.join(probe.cwd, 'build', 'test-evidence-profile');
       for (const key of ['HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME',
-        'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'JUSTSEARCH_HOME', 'JUSTSEARCH_DATA_DIR']) {
+        'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME']) {
         assert.ok(probe.env[key].startsWith(profile + path.sep), `${label} ${key} must use its checkout profile`);
+      }
+      for (const key of ['JUSTSEARCH_HOME', 'JUSTSEARCH_DATA_DIR']) {
+        assert.equal(Object.hasOwn(probe.env, key), false, `${label} must remove inherited ${key}`);
+        assert.ok(probe.init.includes(`environment.remove("${key}")`));
       }
       assert.equal(probe.env.GRADLE_USER_HOME, path.join(scratch, 'gradle-cache'));
       assert.match(probe.init, /tasks.withType\(org.gradle.api.tasks.testing.Test\).configureEach/);
       assert.match(probe.init, /systemProperty "user.home", home.absolutePath/);
-      assert.match(probe.init, /systemProperty "justsearch.data.dir", data.absolutePath/);
+      for (const key of ['justsearch.data.dir', 'justsearch.home']) {
+        assert.ok(probe.init.includes(`systemProperties.remove("${key}")`));
+      }
+      assert.doesNotMatch(probe.init, /systemProperty\s+["']justsearch\.(?:data\.dir|home)["']/);
     }
   });
 });
