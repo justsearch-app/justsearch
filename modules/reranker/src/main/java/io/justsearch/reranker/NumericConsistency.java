@@ -13,8 +13,9 @@ import java.util.regex.Pattern;
  */
 public final class NumericConsistency {
   private static final String SEPARATORS = ", \\u00a0\\u202f";
+  // A space group ends after exactly three digits; longer runs start a separate value.
   private static final String GROUPED_NUMBER =
-      "[0-9]{1,3}(?:(?:,[0-9]{3})+|(?: [0-9]{3})+)(?:\\.[0-9]+)?";
+      "[0-9]{1,3}(?:(?:,[0-9]{3})+|(?: [0-9]{3}(?![0-9]))+)(?:\\.[0-9]+)?";
   // Read grouped values atomically: an ending cannot make a shorter group match instead.
   // Otherwise consume adjacent digit groups and decimal points whole, never decimal pieces.
   private static final Pattern NUMBER = Pattern.compile("(?>" + GROUPED_NUMBER + ")(?![0-9]|[.,][0-9])"

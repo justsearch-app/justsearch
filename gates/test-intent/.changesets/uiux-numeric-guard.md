@@ -2,8 +2,30 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx3c
+author-session: uiux-numeric-guard-nx3d
 ---
+
+# NX3d literal contract (recorded before implementation)
+
+Start 2026-10-23 04:13:23 UTC; estimate 45 min; return by 05:43:23 UTC
+(assignment hard stop 06:15 UTC). Before-state 8d0f96f33.
+The new checks exercise direct CE selection and real Worker CE/cosine supplied
+and indexed paths, with fixed model outputs isolating numeric eligibility.
+Four/five-digit whitespace tails are repair cases; two-digit tails, valid
+three-digit groups and attached malformed continuations are preservation cases.
+
+### Clarification NX3d (agent-adopted, orchestrator 2026-10-23, under the user's delegation "you dont need to wait for my opinion regarding the designs, i agree with you on them"; origin: verifier-8 V8-F1/V8-F2; replaces NX3c's "a further digit group" wording)
+
+NX3c's malformed-run rule covers only continuations attached without whitespace (a further "." or "," followed by digits, more decimal points). Whitespace that does not form a valid three-digit space group ends the number: what follows is a separate plain number, read on both sides, which is NX3's generous reading (the user's decision).
+
+| Case | Expected |
+|---|---|
+| Claim 1200000 vs passage "1 200 000 12" | verified (the passage holds 1200000 and 12) |
+| Claim "1 200 000 12" vs passage "12" | not verified (the claim holds 1200000, absent from the passage) |
+| Claim 1200000 vs passage "1 200 000 1234" | verified (1200000 and 1234) |
+| Claim 1200000123 vs passage "1 200 000 123" | verified (a valid space group continues the number) |
+| Claim 200 vs passage "1 200 000.5.1"; claim 1200000 vs "1 200 000.5.1"; claim 1200000 vs "1,200,000,12" | not verified (NX3c, attached continuation; must keep) |
+| Every NX3, NX3a, NX3b and other NX3c row | unchanged |
 
 # NX3c literal contract (recorded before implementation)
 
@@ -1977,6 +1999,120 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java#preservesNx3cLiteralControlsAndSkippedClaims",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java#preservesNx3cMarkdownKeysScoresAndCounts"
       ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3dTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3d: valid three-digit space groups continue a grouped value; other whitespace starts a separate plain number on both sides. Direct CE and raw Worker CE/cosine supplied/indexed paths preserve exact keys, scores, scored/matched counts and thresholds; attached malformed continuations still supply no values.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify whitespace boundaries in the user's NX3 plain-number guard, replacing only NX3c's further-digit-group wording: attached malformed continuations remain unreadable, valid space groups continue the value, and non-grouping whitespace separates plain numbers. Preserve earlier numeric, scoring, segmentation and historical-verdict rules.",
+          "choice": "### Clarification NX3d (agent-adopted, orchestrator 2026-10-23, under the user's delegation \"you dont need to wait for my opinion regarding the designs, i agree with you on them\"; origin: verifier-8 V8-F1/V8-F2; replaces NX3c's \"a further digit group\" wording)\n\nNX3c's malformed-run rule covers only continuations attached without whitespace (a further \".\" or \",\" followed by digits, more decimal points). Whitespace that does not form a valid three-digit space group ends the number: what follows is a separate plain number, read on both sides, which is NX3's generous reading (the user's decision).\n\n| Case | Expected |\n|---|---|\n| Claim 1200000 vs passage \"1 200 000 12\" | verified (the passage holds 1200000 and 12) |\n| Claim \"1 200 000 12\" vs passage \"12\" | not verified (the claim holds 1200000, absent from the passage) |\n| Claim 1200000 vs passage \"1 200 000 1234\" | verified (1200000 and 1234) |\n| Claim 1200000123 vs passage \"1 200 000 123\" | verified (a valid space group continues the number) |\n| Claim 200 vs passage \"1 200 000.5.1\"; claim 1200000 vs \"1 200 000.5.1\"; claim 1200000 vs \"1,200,000,12\" | not verified (NX3c, attached continuation; must keep) |\n| Every NX3, NX3a, NX3b and other NX3c row | unchanged |\n",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3d-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3dTest.java#readsNx3dWholeValuesAfterNonGroupingWhitespace",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3dTest.java#checksNx3dBothClaimValuesAfterNonGroupingWhitespace"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3dTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3d: valid three-digit space groups continue a grouped value; other whitespace starts a separate plain number on both sides. Direct CE and raw Worker CE/cosine supplied/indexed paths preserve exact keys, scores, scored/matched counts and thresholds; attached malformed continuations still supply no values.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify whitespace boundaries in the user's NX3 plain-number guard, replacing only NX3c's further-digit-group wording: attached malformed continuations remain unreadable, valid space groups continue the value, and non-grouping whitespace separates plain numbers. Preserve earlier numeric, scoring, segmentation and historical-verdict rules.",
+          "choice": "### Clarification NX3d (agent-adopted, orchestrator 2026-10-23, under the user's delegation \"you dont need to wait for my opinion regarding the designs, i agree with you on them\"; origin: verifier-8 V8-F1/V8-F2; replaces NX3c's \"a further digit group\" wording)\n\nNX3c's malformed-run rule covers only continuations attached without whitespace (a further \".\" or \",\" followed by digits, more decimal points). Whitespace that does not form a valid three-digit space group ends the number: what follows is a separate plain number, read on both sides, which is NX3's generous reading (the user's decision).\n\n| Case | Expected |\n|---|---|\n| Claim 1200000 vs passage \"1 200 000 12\" | verified (the passage holds 1200000 and 12) |\n| Claim \"1 200 000 12\" vs passage \"12\" | not verified (the claim holds 1200000, absent from the passage) |\n| Claim 1200000 vs passage \"1 200 000 1234\" | verified (1200000 and 1234) |\n| Claim 1200000123 vs passage \"1 200 000 123\" | verified (a valid space group continues the number) |\n| Claim 200 vs passage \"1 200 000.5.1\"; claim 1200000 vs \"1 200 000.5.1\"; claim 1200000 vs \"1,200,000,12\" | not verified (NX3c, attached continuation; must keep) |\n| Every NX3, NX3a, NX3b and other NX3c row | unchanged |\n",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3d-preserved.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3dTest.java#preservesNx3dTwoDigitBoundariesValidGroupsAndAttachedContinuations"
+      ]
     }
   ]
 }
@@ -2427,6 +2563,46 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   The private shared before clone and script-created before worktrees were
   removed after comparisons. No processes other than test-owned resources
   were stopped. Changes remain uncommitted.
+
+## NX3d builder observations (2026-10-23; no acceptance verdict)
+
+- NumericConsistency changes only the space-group pattern: each group must end
+  after exactly three digits. Four/five-digit tails after whitespace become a
+  separate whole value on both sides. Attached malformed continuations retain
+  NX3c behavior. No existing test, saved-state format or segmentation change.
+- Durable NumericCitationNx3dTest covers every NX3d row and NFKC-space neighbours:
+  40 repaired pairs and 38 preservation pairs. Each uses direct real CE selection,
+  Worker CE supplied/indexed paths and raw cosine supplied/indexed paths, checking
+  exact scores/keys/counts and unchanged low-score thresholds.
+- Unchanged 8d0f96f33: passage repair expects a match but gets none; claim repair
+  expects none but gets the 0.976 match. Raw cosine likewise assertion-fails in
+  both directions. The new preservation method passes before/after, as does the
+  separate 75-check preservation suite. Final numeric suite: 97 passed; affected
+  app-services: 48 passed; zero skips in these suites.
+- Five-module PMD and full build -x test passed. The build's UI integration suite
+  passed 42 checks and skipped one existing Windows-only machine-policy check.
+  Operation, execution, register-resolution and wire gates passed; the prescribed
+  npm ci for scripts/wire-contract ran before wire.
+- D10 fixed protocol unchanged: same six fixtures/model hashes, CPU, two warm-up
+  suites, five timed suite sums, 2000 ms deadline. Before median 162262155 ns;
+  after 156590417 ns (ratio 0.965046); all six fixtures scored in every run.
+  Java 25.0.4.1 / ORT 1.24.3 / 20 processors; unreserved load 10.0488 before,
+  10.4253 after. Fresh XML: uiux-numeric-guard-nx3d-controlled-performance-*.xml.
+- Both fresh run-evidence files (nx3d-repaired / nx3d-preserved) passed in default
+  link mode. Both repair methods assertion-fail on before-state 8d0f96f33 and
+  pass after. The new preservation method executes and passes without skips.
+- Gitleaks initially flagged only tokenizer hash labels in the two new performance
+  XML files. Replacing label sha256= with sha256 plus a space preserved hashes
+  and timings; the final scan found no leaks. Script-written JSON is untouched.
+- Historical evidence, previous intent entries and acceptance records are
+  unchanged. The new entries require an independent acceptance; the builder
+  has not written a record. No manifest, lockfile or frontend edit.
+- Shared resources: Gradle/npm caches and slot locks, read-only local CPU scorer
+  models, stock full-build GPU/NVML capability probes. No owner application or
+  dev stack was used. Production NG8 Ask coverage/timing and NG9 rag-qa Ask counts
+  remain unverified because the dev stack is unavailable. Private shared clone
+  and script-created before worktrees were removed after comparisons. No manual
+  process stops; test-owned lifecycle cleanup only. Changes remain uncommitted.
 
 ## Acceptance records
 
