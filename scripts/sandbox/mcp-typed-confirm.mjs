@@ -78,7 +78,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
-import http from 'node:http';
+import { createRequire } from 'node:module';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -97,18 +97,9 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 // fired still works: the stream's snapshot-on-subscribe frame replays
 // AdvisoryLog.recent(), so there is no race to win against the broadcast.
 //
-// Port discovery mirrors the shipped bridge's own algorithm (index.js
-// discoverPort): --port / JUSTSEARCH_API_PORT env var, then head.apiPort from
-// the runtime manifest the app writes
-// (%APPDATA%\io.justsearch.shell\runtime\manifest.json), then the default 8080
-// -- each candidate is only trusted if GET /api/health answers. The manifest is
-// the one filesystem discovery transport (tempdoc 501 section 6 closure rule).
+// Use the staged bridge's manifest validation and connection proof for this protected stream.
+// Explicit port overrides use only JUSTSEARCH_SESSION_TOKEN, just like the bridge.
 // ---------------------------------------------------------------------------
-
-const DEFAULT_API_PORT = 8080;
-const HEALTH_TIMEOUT_MS = 2500;
-const APPDATA = process.env.APPDATA || '';
-const MANIFEST_FILE = path.join(APPDATA, 'io.justsearch.shell', 'runtime', 'manifest.json');
 
 // The advisory record's classExtras.operationId is the WIRE operation id, not
 // the MCP tool name -- these differ. McpToolSurface.callTool dispatches
@@ -127,42 +118,20 @@ const MANIFEST_FILE = path.join(APPDATA, 'io.justsearch.shell', 'runtime', 'mani
 // recent unrelated one.
 export const INGEST_OPERATION_ID = 'core.ingest-files';
 
-function readManifestPort() {
-  try {
-    const port = JSON.parse(fs.readFileSync(MANIFEST_FILE, 'utf8'))?.head?.apiPort;
-    if (Number.isInteger(port) && port > 0 && port < 65536) return port;
-  } catch {
-    /* missing/unreadable/malformed manifest -- fall through */
+async function discoverApiEngine(explicitPort, discovery) {
+  const override = explicitPort ?? process.env.JUSTSEARCH_API_PORT;
+  if (override) {
+    const token = process.env.JUSTSEARCH_SESSION_TOKEN?.trim();
+    if (!token) throw new Error('An explicit port requires JUSTSEARCH_SESSION_TOKEN');
+    const port = Number(override);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid API port');
+    // The token goes only to the proven Engine of a runtime manifest naming the port.
+    const { selected } = await discovery.selectPinned(discovery.standardCandidates(), port);
+    if (!selected) throw new Error(`Port ${port} refused: no proven runtime manifest names it; set JUSTSEARCH_DATA_DIR to that Engine's data folder`);
+    return { port, token, engine: selected };
   }
-  return null;
-}
-
-function httpGetStatus(port, urlPath, timeoutMs) {
-  return new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port, path: urlPath, timeout: timeoutMs }, (res) => {
-      res.resume(); // drain
-      resolve(res.statusCode || 0);
-    });
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(0));
-  });
-}
-
-/** Returns a live, health-checked port, or null. Order: --port/env, runtime manifest, default 8080. */
-async function discoverApiPort(explicitPort) {
-  const candidates = [];
-  const explicit = Number.parseInt(explicitPort ?? '', 10);
-  if (Number.isInteger(explicit) && explicit > 0) candidates.push(explicit);
-  const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
-  if (Number.isInteger(envPort) && envPort > 0) candidates.push(envPort);
-  const manifestPort = readManifestPort();
-  if (manifestPort !== null) candidates.push(manifestPort);
-  candidates.push(DEFAULT_API_PORT);
-  const unique = [...new Set(candidates)];
-  for (const port of unique) {
-    if ((await httpGetStatus(port, '/api/health', HEALTH_TIMEOUT_MS)) === 200) return port;
-  }
-  return null;
+  const { selected } = await discovery.selectEngine(discovery.standardCandidates());
+  return selected ? { port: selected.port, token: selected.token, engine: selected } : null;
 }
 
 /**
@@ -202,7 +171,7 @@ export function findPendingId(node, wantOperationId) {
  * primary PASS/FAIL verdict, which is already decided by the tools/call
  * response itself.
  */
-function resolvePendingId(port, wantOperationId, timeoutSeconds) {
+function resolvePendingId(target, wantOperationId, timeoutSeconds, discovery) {
   return new Promise((resolve) => {
     let settled = false;
     let req;
@@ -216,13 +185,13 @@ function resolvePendingId(port, wantOperationId, timeoutSeconds) {
       }
       resolve(id);
     };
-    req = http.get(
+    req = discovery.engineRequest(
+      target,
       {
-        host: '127.0.0.1',
-        port,
         path: '/api/advisory/authorization-pending/stream',
         headers: { Accept: 'text/event-stream' },
-        timeout: timeoutSeconds * 1000,
+        credential: true,
+        timeoutMs: timeoutSeconds * 1000,
       },
       (res) => {
         let buf = '';
@@ -258,6 +227,7 @@ function resolvePendingId(port, wantOperationId, timeoutSeconds) {
     );
     req.on('timeout', () => finish(null));
     req.on('error', () => finish(null));
+    req.end();
     setTimeout(() => finish(null), timeoutSeconds * 1000 + 500);
   });
 }
@@ -451,12 +421,14 @@ async function main() {
       // Resolve the pendingId so the round doesn't have to hand-scrape SSE:
       // the gate response text itself never carries it (verified against
       // McpToolSurface.handleConfirmationRequired).
-      const resolvedPort = await discoverApiPort(args.port);
-      if (resolvedPort) {
+      const discovery = createRequire(import.meta.url)(path.join(path.dirname(path.resolve(args.bridge)), 'engine-discovery.cjs'));
+      const target = await discoverApiEngine(args.port, discovery);
+      if (target) {
+        const resolvedPort = target.port;
         log(
           `Resolving pendingId via GET http://127.0.0.1:${resolvedPort}/api/advisory/authorization-pending/stream ...`,
         );
-        const pendingId = await resolvePendingId(resolvedPort, INGEST_OPERATION_ID, Math.min(args.timeout, 15));
+        const pendingId = await resolvePendingId(target, INGEST_OPERATION_ID, Math.min(args.timeout, 15), discovery);
         if (pendingId) {
           process.stdout.write(`\nPENDING_ID=${pendingId}\n`);
           process.stdout.write(
@@ -473,7 +445,7 @@ async function main() {
         }
       } else {
         process.stdout.write(
-          '\nWARN: could not discover the API port to resolve pendingId (tried --port, JUSTSEARCH_API_PORT, the port file, and default 8080). ' +
+          '\nWARN: could not discover a validated Engine to resolve pendingId. ' +
             'Check the JustSearch app UI for the pending approval instead.\n',
         );
       }

@@ -28,7 +28,8 @@ import { fileURLToPath } from 'node:url';
 
 const SIGNAL_POLICY = JSON.parse(fs.readFileSync(new URL('./workflow-signal-policy.v1.json', import.meta.url), 'utf8'));
 const REQUIRED_CHECKS = SIGNAL_POLICY.workflows.find((w) => w.name === 'CI').requiredStatusChecks;
-const PART_CHECKS = ['Unit tests (app-ui-ui)', 'Unit tests (app-ui-services)', 'Windows-native tests (node)', 'Windows-native tests (contracts)'];
+const SHARD_POLICY = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
+const PART_CHECKS = [...SHARD_POLICY.lanes.map(lane => lane.jobName), 'Windows-native tests (node)', 'Windows-native tests (contracts)'];
 
 const KIND = 'justsearch-ci-walltime-attribution.v1';
 
@@ -173,7 +174,7 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
 
   const requiredNames = [...requiredChecks];
   // Preserve reporting for runs from before the split.
-  if (jobs.some((j) => PART_CHECKS.includes(j.name))) requiredNames.push(...PART_CHECKS);
+  requiredNames.push(...PART_CHECKS.filter(name => jobs.some(job => job.name === name)));
   const requiredJobs = jobs.filter((j) => requiredNames.includes(j.name));
   const missing = requiredNames.filter((name) => !requiredJobs.some((j) => j.name === name && j.completed_at));
   const starts = requiredJobs.map((j) => Date.parse(j.started_at)).filter(Number.isFinite);
@@ -186,7 +187,11 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
   };
   const warnings = missing.map((name) => `required job missing or incomplete: ${name}`);
   for (const job of jobReports) {
-    if (UNIT_LANE_JOB.test(job.name) && job.name !== 'Unit tests (app-ui)' && !job.components) {
+    const raw = jobs.find((j) => (j.name || '<job>') === job.name);
+    const skipped = job.conclusion === 'skipped' || (Array.isArray(raw?.steps) && raw.steps.length > 0 && raw.steps.every((step) =>
+      step.conclusion === 'skipped' || /^(Set up job|Complete job)$/.test(step.name)));
+    if (!skipped && UNIT_LANE_JOB.test(job.name) && !SHARD_POLICY.aggregates.some(aggregate => aggregate.requiredCheck === job.name &&
+        aggregate.parts.some(part => jobs.some(candidate => candidate.name === SHARD_POLICY.lanes.find(lane => lane.jobId === part)?.jobName))) && job.name !== 'Unit tests (app-ui)' && !job.components) {
       warnings.push(`unit attribution missing for ${job.name}`);
     }
   }

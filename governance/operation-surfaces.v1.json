@@ -299,6 +299,15 @@
       "note": "Tempdoc 561 P-C: the shell mounts the action-ledger client/view; a consumer, not an independent model."
     },
     {
+      "id": "fe-pending-authorization-bridge",
+      "kind": "consumer",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.ts",
+      "guard": "exempt:consumer reads ActionLedgerClient activity only to re-check pending authorization prompts; no projection law to mutate-guard",
+      "consumesProjection": "fe-action-ledger-client",
+      "note": "Authorization prompts answered elsewhere: the bridge listens to the action-ledger stream as a wake-up signal and re-reads pending authorizations from the operation client; it keeps no lifecycle model of its own."
+    },
+    {
       "id": "fe-ai-activity-digest",
       "kind": "consumer",
       "lang": "ts",
@@ -441,6 +450,15 @@
       "guard": "test:FileConversationStoreTest",
       "consumesProjection": "self",
       "note": "Tempdoc 561 §18 C-1 (positive durable-store gate): the ONE durable answer-plane record (the InteractionThread sibling's answerPlaneAuthority) — chat + ephemeral-RAG turns with citations/calibration persisted, which InteractionThreadController projects into the unified thread. Declared (kind:store) so the answer-plane authority is classified, not forked."
+    },
+    {
+      "id": "conversation-deletion",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationDeletion.java",
+      "guard": "test:ConversationDeletionTest",
+      "consumesProjection": "agent-run-store-canonical",
+      "note": "Conversation delete: removes a conversation's runs through AgentRunStore's own API (listRunIdsByConversation/deleteRuns) and refuses while the store is locked; it reads and deletes the canonical record, never models run lifecycle state itself."
     },
     {
       "id": "agent-read-query-service",

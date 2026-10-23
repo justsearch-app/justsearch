@@ -11,6 +11,22 @@ This doc answers: "Where is the source of truth for JustSearch API schemas and s
 
 ## HTTP (Local API)
 
+### Production authentication
+
+Every production request requires `X-JustSearch-Session`, including reads and streams, except
+OPTIONS and GET/HEAD on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json`. Public responses never carry
+the credential. The only published credential source is the owner-only canonical
+`runtime/manifest.json` (`head.sessionToken`, POSIX 0600; Windows owner and SYSTEM only).
+`GET /api/mcp/token` is removed: 401 without a token, 404 with a valid token. No stdout token
+line is emitted. Browser SSE uses authenticated fetch headers, with no credential in URLs.
+Development mode remains token-free. See [ADR-0046](../decisions/0046-local-api-trust-boundary.md).
+
+The route and OpenAPI captures are generated together with
+`JUSTSEARCH_SESSION_TOKEN` set from that owner-only manifest:
+`node scripts/codegen/gen-api-client.mjs --from-live=http://127.0.0.1:<port>`.
+The prose in this contract map is maintained by hand; the repository has no generator for it.
+
 ### Status publication metadata (additive)
 
 Every head API response carries `X-JustSearch-Status-Epoch` (opaque process identity) and
@@ -81,7 +97,7 @@ uses the component's current configuration and bounded attempt budget.
 The HTTP route returns 202 when accepted, 429 when an attempt is already running,
 409 when recovery is not applicable, 404 for an unknown component, and 503 when
 the owner is unavailable or the budget is exhausted. The normal error envelope
-distinguishes these outcomes. The mutation token and local API trust checks apply.
+distinguishes these outcomes. The session token and local API trust checks apply.
 
 The former `POST /api/worker/restart` route is retained for one release solely to
 return 410 with permanent `ENDPOINT_RETIRED` and the replacement route in its
@@ -305,9 +321,14 @@ fires. The pattern is named-question, not generic-dashboard (419 C3 explicit non
   the existing `gpu.recentUtilizationPercent` sparkline renders next to it.
 
 **Corpus counts — two distinct numbers (post tempdoc 811 C-4, 2026-08-06):**
-- `worker.core.indexedDocuments: long` — every non-chunk document in the index (total docs minus
+- `worker.core.indexState: string` — `INDEXING` for ready or processing jobs, `WAITING` for
+  retry-only backlog, `IDLE` when empty, `ERROR` for terminal failures with no unfinished work,
+  `FAILED` for fatal loop failure. Waiting uses the existing `worker.failure.nextRetryAtMs` and
+  total `worker.core.pendingJobs`; see [retry waiting and counts](contracts/health-readiness-contract.v1.md#retry-waiting-and-indexed-counts).
+- `worker.core.indexedDocuments: long` — every non-chunk parent document in the serving index (total docs minus
   chunk docs). Describes the INDEX. Consumed by Health (`core.files`), jseval readiness, and
-  sandbox evidence; its meaning is unchanged and must stay unchanged.
+  sandbox evidence. Building-generation progress is reported separately through
+  `worker.migration.buildingIndexedDocuments`, and completed queue rows never substitute for this count.
 - `worker.core.searchableDocuments: long` — the population a DEFAULT-scope search can actually
   return: `indexedDocuments` minus the collections the default scope excludes (today exactly
   `agent-history`). Derived in `IndexStatusOps#countDefaultScopeDocs` from
@@ -491,6 +512,37 @@ Endpoints:
   - **Query params (all optional and additive — a request with none behaves exactly as before).** `?correlationId=<id>` (561 P-B1) keeps rows carrying that loop/session join key; `?originator=<user|agent|system>` keeps that attribution; `?kind=<kind>` (repeatable, 812 D3) keeps only the named kinds; `?limit=<n>` (812 D3) returns the **newest** `n` rows after filtering — default 500, capped at 2000, with an unparseable or non-positive value falling back to the default. Sources: `ActionLedgerController.handleGet` + `ActionEventJournal`.
 - `GET /api/action-ledger/stream` (SSE) — Live read-view of the same projection (G3/G4/G5). Stream-only (no journal fold); rows dedup by `id`. "Snapshot" and "stream" are two reads of one projection, never two code paths. **Tempdoc 662: also reachable multiplexed via `/api/shell-events/stream` below** — the FE shell subscribes there by default; this dedicated endpoint stays live for direct/tooling consumers.
 - `POST /api/action-ledger/events` — Process-spanning ingest (thesis I): the FE folds local effects into the ONE log. Idempotent by event `id` (re-ingest on reload does not duplicate). Body: an effect event (`id`, `effectKind`, `subject`, `occurredAt`). New effects use `fe-effect:<UUIDv4>` (canonical lowercase), minted once and persisted in the existing frontend journal. The local numeric ID still owns undo and causation. Older persisted entries keep their prior `fe-effect:<positive integer>` wire identity (at most 16 digits) to avoid duplication on upgrade; this compatibility does not repair historical collisions between old clients. Other namespaces return 400 before entering the ledger, so client effects cannot claim a server operation/grant/gate identity.
+- `GET /api/indexing-jobs/stream` (SSE; queue-scale contract change, decision 4) — Snapshot `items` is a **window**, containing all PROCESSING rows and the 200 most recent FAILED/RETRY_EXHAUSTED rows. PENDING and DONE rows are absent from snapshots. Clients must use status for queue totals; snapshot length is never a queue count. Live Insert/Update deltas carry committed changes to the window and every terminal outcome, including outcomes outside the window, for activity and scan rollups. Newly inserted PENDING rows may be omitted from the head feed because they cannot already be in the window; state-presence barriers and updates that remove a visible row are preserved. Clients maintain the same bounded view while forwarding terminal events. A resync may replace the window with another snapshot within the same stream; snapshots do not replay terminal activity. Both standalone and multiplexed subscriptions use this contract. Waiting files appear as one aggregate queued entry using `worker.migration.pendingJobsCount` from status; retried files join that entry until claimed. Rail and Resource queue totals come from status, including processing and failure rows outside the displayed window. Head overflow recovery uses a typed continuity-loss cause and immediate, rate-limited resubscription; SSE observers serialize and send off the worker-to-head drain thread. Retired-subscription callbacks cannot change the head or publish live events. Worker subscription-local sequence numbers are rebased at the head on reconnect; its snapshot cursor never moves backward, and older frames within the active subscription are ignored.
+  Re-enqueue of an existing path emits `kind: update` with state PENDING; a new path, when emitted, uses `kind: insert`. Both variants use the same keyed-row semantics.
+
+Terminal activity is accepted through an independent live worker subscription before the row
+view's recoverable handoff. Its empty initial frame acknowledges registration, and snapshots or
+resyncs never replay outcomes. View overflows therefore cannot drop terminal events from activity;
+SSE observer delivery remains asynchronous. Current ingestion outcome rollups read the persisted
+worker ledger directly; historical scan-rollup records retain their decoding/rendering contract.
+
+The queue bookkeeping uses jobs.db **V24**. V23 remains main's monotonic
+`switch_buffer_admissions` counter and restart fence; V24 adds transactional `job_counts`
+and the claim/readiness indexes. The existing transactional ladder upgrades every supported
+older schema, including v13 and main's V23, without changing saved job fields. Reopening
+reconciles counts and preserves the admission high-water. Older binaries refuse V24.
+The unreleased queue branch also used V23: V24 idempotently ensures main's admission-counter
+objects before adding bookkeeping, so those development databases can upgrade without
+discarding jobs or resetting an existing admission counter. Historical V23 execution receipts
+describe that unreleased branch; new migration evidence is explicitly named V24.
+V25 follows V24 without a table-layout change: switch-buffer DELETE payloads carry their
+origin and watcher-reconciliation receipts are kept as switch-buffer rows, so older binaries,
+which would read a versioned DELETE as a raw path, refuse V25. Neither adds a `jobs` row, so
+`job_counts` and the claim indexes are unaffected.
+
+The indexing-jobs worker/head bridge carries an optional `state_presence` message on existing
+`IndexingJobsFrame` frames: every snapshot contains the set of states present anywhere in jobs.db;
+the last delta of a commit contains it only when that set changed. An explicitly empty message
+means no states remain; an absent message means no new presence publication. These frames are
+ordering barriers in the path-coalescing handoff. The head invalidates status from this set,
+independently of its row window. This metadata does not add fields to the browser SSE envelopes.
+
+
 - `GET /api/shell-events/stream` (SSE, tempdoc 662) — **The managed connection budget's multiplexer.** Aggregates 7 of the shell's previously-independent always-on streams onto ONE physical connection: `/api/intent/stream`, `/api/advisory/operation-completed/stream`, `/api/advisory/health-recoverable/stream`, `/api/advisory/authorization-pending/stream` (tempdoc 655's long-term design pass — a `REQUIRES_ACK`-classed advisory for a pending MCP/UI approval, complementing the direct ceremony dialog below with a discoverable inbox/toast signal for when the user wasn't looking), `/api/action-ledger/stream`, `/api/indexing-jobs/stream`, and (tempdoc 655) the pending-authorization announcement channel (`system:pending-authorizations` — routing info only: `pendingId`/`operationId`/`sourceTier`/`riskTier`/`gateBehavior`; no args-derived content, see `GET /api/authorizations/pending/{id}` above) — collapsing the browser's HTTP/1.1 ~6-per-host connection-pool consumption that previously starved the cheap `/api/status`/`/api/inference/status` polls under load (tempdoc 649). Every forwarded frame still carries its origin `streamId` (the universal `SseEnvelope` discriminator, unchanged); the FE `MultiplexedStream` demuxes by `streamId` to each consumer's existing reducer. Resume is a **bundle** of the opaque per-channel `?since=<token>` checkpoints (stream, sequence and channel incarnation, encoded by `ResumeTokenCodec`), comma-joined — no new resume protocol. The individual endpoints above stay live for non-shell consumers (tooling, direct API use); see `MultiplexedSseWriter.java` / `ShellEventsStreamController.java` (backend) and `streaming/MultiplexedStream.ts` (FE). Governed by `governance/live-channels.v1.json` + `check-live-channels.mjs` (the connection-budget register/gate).
 - `GET /api/operations/{id}/preview` — Preview face (Slice F2). Returns evaluated `availability` (capability-derived, structural) + `risk` + the predicted gate behavior, computed from the SAME `IntentGateEvaluator` instance the enforcement chokepoint uses — including the live Global Hard Stop (S2/F1). Args-bound consent-capsule verification is correctly deferred to dispatch (the preview has no args/token), so the preview is the structural-prediction read of the one verdict. Unknown operation id → 404.
 - `POST /api/authorizations/approve` — Authorize face (Slice A1). On a user approval of a backend-gated action, mints a single-use, args-bound consent capsule (the max-attenuated Grant). Body: `{pendingId: string, allowAlways?: boolean, execute?: boolean}`. When `allowAlways` is true (thesis IV), also records a durable allow-always grant in `DurableGrantStore` keyed `(operationId, sourceTier)`, so future invocations of that op from that tier auto-approve without re-prompting. Both grant lifecycles are recorded as `grant` ActionEvents (ISSUED/CONSUMED/REVOKED, GRANTED_ALWAYS/REVOKED) in the one log → one audit, one revocation path. Tempdoc 655: `execute: true` additionally dispatches the pending's operation server-side, immediately, using its own stored args — for an approval whose origin (e.g. an MCP tool call) never gave the browser the full args to replay itself.
@@ -699,12 +751,14 @@ Dynamic dispatch endpoint (reads `shapeId` from body):
 Conversation management (slice 513 + 515):
 
 - `GET /api/chat/conversations?shapeId=<id>&limit=<N>` — List recent sessions (most-recent first, capped at 100). Each row: `sessionId`, `shapeId`, `createdAtMs`, `lastActiveAtMs`, `messageCount`, `firstUserMessage`, optional `parentSessionId` + `branchPointMessageId` (slice 513 branch metadata), optional `title` + `titleSource` (`"user"` | `"auto"`, tempdoc 838). `title` is a sealed content field: it is omitted while the conversation store is encrypted and locked, exactly like `firstUserMessage`; `titleSource` is structural and stays present.
+  - **Complete fork read (WP1.4a).** Supplying both `parentSessionId=<id>` and `branchPointMessageId=<id>` returns the base conversation and all direct branches at that exact point, including empty branches. This filtered read ignores `limit` and the 100-row cap; other turns, deeper descendants and run-only conversations are excluded. `shapeId` still filters the store rows. The response echoes `fork: {parentSessionId, branchPointMessageId}` so readers can distinguish a complete answer from an older Engine that ignores the filter. A partial pair, unsafe parent id or blank point returns **400**. Rows keep the same content-hiding behavior while locked. Without the pair, the recent list and two-store join below are unchanged.
   - **Two records, one list (tempdoc 859 slice C).** The endpoint joins `ConversationStore` with the agent-run record, because a delegate run persists a whole conversation and no store row (the shape-driven dispatch appends no messages) — so before the join an agent conversation had a complete record, served in full by `GET /api/thread/{id}`, and no listing anywhere. `limit` applies **per store** and the merged list is re-sorted by `lastActiveAtMs` and re-limited, so the response never exceeds `limit`. `shapeId` filters both sides: a query naming any shape other than `core.agent-run` excludes run-backed rows entirely. A conversation present in both records is listed once, as its store row — membership is resolved by a direct store lookup per run-backed candidate, not against the limited window, so a mixed conversation whose last chat turn has aged out of that window is still listed as its (renameable) store row.
   - A **run-backed** row carries `storeBacked: false` (a conditional key — absent means store-backed, like `title`/`parentSessionId`) and **omits `messageCount`** (absent = not told: deriving one means projecting the conversation's whole event stream per row, per request). Its `sessionId` is a real conversation id; what it lacks is the store session that `rename` / `branch` / `context-floor` / `compact` / `exclude` write to.
 - `GET /api/chat/conversations/{sessionId}/history` — Load message history. Response: `messages[{role, content, id, hash}]`; for branched sessions also includes `parentSessionId`, `branchPointMessageId`, and (slice 515 FIX-8) `parentFirstUserMessage` preview. `loadHistory` walks parent chain lazily.
   - It does **not** perform the two-store join the list above does (tempdoc 859 slice C): the unified transcript's one authority is `GET /api/thread/{id}`, which already merges the answer and action planes. A run-backed conversation therefore answers here with an empty message list, which is the true thing about it.
 - `DELETE /api/chat/conversations/{sessionId}` — Delete a session. **409 Conflict** with `childSessionIds[]` body if the session has child branches (slice 515 FIX-3); the client must delete branches first or implement cascade deletion.
   - It also deletes the conversation's **agent runs** (tempdoc 859 slice C), which is what makes a run-backed row removable rather than a sidebar that only grows; the response carries `agentRunsDeleted`. Every run joined on that `conversationId` goes, whatever its shape — deleting a conversation destroys the conversation, and leaving other-shape runs alive would keep `GET /api/thread/{id}` serving content for a conversation the reader deleted. The store deletion runs first, so a 409 aborts before any run is destroyed, and the run deletion fails closed while the run store is sealed + locked.
+- `POST /api/chat/conversations/{sessionId}/stop` — The reader's Stop on a running turn. Body: `{turnId}`, the id the turn was dispatched with (`POST /api/chat/dispatch` carries it as `turnId`; Search v3's Ask sends one). The Engine cancels that turn's work with the reason `user_stop` and saves the turn as stopped: its question, its `standaloneQuestion` if the question was rewritten, and an assistant message holding whatever had streamed (empty for an early Stop), the thinking (`reasoning`) and sources (`citations`) the stream had shown, with `disposition: "CANCELLED"`, which the transcript reads as "stopped by you". The turn's stream then ends with one terminal, an `error` with `errorCode: "CANCELLED"`. A Stop that overtakes its dispatch (it arrives before the turn has started, for example while the chat model loads) is kept until the turn starts, however long that takes, and stops it the moment it starts, which is then saved as stopped with nothing rewritten or answered; at most 256 such Stops are kept (the oldest goes first), each used once. Response: `{stopped, pending}` — `stopped: true` when the running turn was stopped now; `pending: true` when it has not started yet and is stopped when it starts; both `false` when nothing changed: the turn's answer was already saved (its stream ends with `done`, and its late Stop is not kept, so it never stops a later dispatch naming the same turn), or it had already ended for another reason. A dispatch's `turnId` should name that dispatch alone (Search v3 sends a fresh random id each time). A closed connection is not a Stop: a dispatch whose client goes away keeps running and saves its answer. **400** without a `turnId`.
 - `POST /api/chat/conversations/{sessionId}/branch?fromMsgId=<id>` — Create a branch from an existing session at the given message id. Response: `{sessionId, parentSessionId, branchPointMessageId}`. **400** if `fromMsgId` doesn't exist in the parent's resolved history (slice 515 FIX-2). The branch carries no messages of its own; loadHistory resolves the parent prefix on every call.
 - `POST /api/chat/conversations/{sessionId}/title` — Name a conversation durably (tempdoc 838). Body: `{title, source?}` where `source` is `"user"` (default) or `"auto"`. Response: `{ok, title, titleSource}` — `title` is what was STORED, trimmed and capped at 200 characters. **400** on a blank title (clearing is `DELETE`) or an unrecognised `source`; **404** when the session has no `meta.json` (a rename must not mint a zero-message conversation); **423** when the conversation store's data key is locked, via the global `KeyLockedException` mapping.
   - With the request header `If-None-Match: *` the name is stored only while the conversation has none; otherwise **412** with `{error, errorCode: "INVALID_STATE", title, titleSource}` carrying the name it keeps. The web UI sends a browser's retained legacy name this way, so a late adoption can never replace a name a person gave the conversation meanwhile, from any window.
@@ -896,7 +950,7 @@ and `modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java`.
 - Response is `OperationInvocationResponse`: `success`, `message`, optional error fields and `structuredData` containing `operationKey`, `operationRecordId` and state metadata. HTTP 200 alone does not imply operation success. Acceptance does not mean indexing completed and supplies no accepted-file count or `scanId`.
 - Poll `GET /api/operation-history/{operationKey}` for durable state, phase, committed units and terminal outcome. A read does not cancel the operation when its client disconnects.
 - Reuse a canonical UUIDv7 `idempotencyKey` with the same public arguments after an interrupted response. Known keys answer from their recorded invocation/outcome without fresh preparation; changed arguments receive HTTP 409 `OPERATION_KEY_REUSED`.
-- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/mutation-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
+- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/session-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
 
 `DELETE /api/indexing/collections`:
 
@@ -989,6 +1043,13 @@ operation-invocation error body it replaced: `{"success": false, "message": "...
 - Query parameter: `counts=true` -- includes a per-root bounded file count (capped scan, `-1` if the count itself failed).
 - Response: `{"roots": [{collection, path, fileCount, lastIndexed?}]}` -- `collection` defaults to `"default"` when the root was added without one; `lastIndexed` is omitted (not empty-string) when the root has never completed a scan.
 
+`POST /api/indexing-roots/preview` previews a proposed Library folder without changing registrations.
+
+- Request body: `{"path": string}`; the path is normalized to an absolute path.
+- Response: `{exists, isDir, fileCount, capped, alreadyWatched, overlap?}`. Existing fields retain their meanings. `alreadyWatched` describes exact path membership only.
+- Optional additive `overlap: {path: string, relationship: "inside" | "containing"}` names one normalized watched folder that overlaps the proposed folder; the relationship describes the proposed folder relative to that watched folder. It is omitted for exact re-add (even with legacy nesting) and when no overlap is found. Path-segment ancestry is used, so a sibling sharing a text prefix is not an overlap.
+- Library explains an overlap and makes Add unavailable before submission. Older clients may ignore this additional field; older Engines may omit it. The Engine still refuses new nested additions at submission, including races after preview; exact re-add remains idempotent.
+
 `POST /api/indexing/roots` adds a folder to the Library.
 
 - Request body: `{"path": string, "collection"?: string}` -- `path` is required and must resolve (after `Path.of(path).toAbsolutePath().normalize()`) to an **existing directory**; `collection` is optional and defaults to `"default"` when omitted.
@@ -1075,7 +1136,7 @@ JustSearch's loopback HTTP server exposes a minimal OpenAI-compatible surface th
 - Method, body, and most request headers are forwarded. Hop-by-hop headers (`Host`, `Connection`, `Transfer-Encoding`, etc.) are dropped per RFC 7230.
 - Status code, response headers, and body are streamed back unchanged.
 - When `llama-server` is offline (port unset, connect refused, or no chat package installed), the proxy responds `503 SERVICE_UNAVAILABLE` using the project's standard error envelope.
-- Token enforcement: `POST /v1/chat/completions` is subject to the same session-token requirement as the rest of the non-GET API surface in prod mode. Third-party agents read the token from JustSearch's stdout `JUSTSEARCH_SESSION_TOKEN=...` line on launch (or via the Tauri bridge for in-app agents).
+- Token enforcement: `POST /v1/chat/completions` requires the production session token, as do all non-public routes. Third-party agents read `head.sessionToken` from the owner-only canonical runtime manifest (the Tauri bridge supplies it to in-app agents).
 
 **Out of scope:**
 - `/v1/embeddings` — JustSearch's embedding encoder is in-process in the Worker; no HTTP server hosts it.

@@ -1,0 +1,144 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T12:01:40.990Z",
+  "revision": "9be9fdbf79422a30ace715ef53388c874fde0a84",
+  "tree": "ddec482270eef438c2d6717f304aa650366ba7f6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/api/engineOrigin.test.ts\" \"src/shell-v0/api/engineOrigin.live.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent-vitest-2047286-1792584096988.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1094
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/api/engineOrigin.test.ts",
+      "file": "modules/ui-web/src/shell-v0/api/engineOrigin.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:67760a080b63d0f7f7ccae4b9b4e4d7dddbfe0c867f97eed6397e28a815271f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Engine credential origin never gives port A the new token when its rejection races a binding move to B",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin does not attach a token to override or other-host URL http://localhost:43111/api/search",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin does not attach a token to override or other-host URL http://127.0.0.1:43112/api/search",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin does not attach a token to override or other-host URL https://127.0.0.1:43111/api/search",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin strips a session header carried by a foreign Request input",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin prevents redirects for token-bearing string and Request inputs",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin drops an in-flight resolution invalidated by a restart",
+          "status": "passed"
+        },
+        {
+          "name": "Engine credential origin applies the binding and redirect rule to the general HTTP client and both stream paths",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/api/engineOrigin.live.test.ts",
+      "file": "modules/ui-web/src/shell-v0/api/engineOrigin.live.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:84e3fc2748f153a345660371de24acd3cd2fd42cf443f975df1e12d72a9463f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Engine origin on real HTTP connections does not send a successor credential back to the impostor returning TOKEN_REQUIRED",
+          "status": "passed"
+        },
+        {
+          "name": "Engine origin on real HTTP connections does not follow a redirect carrying the session header or request body",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/api/engineOrigin.test.ts#drops an in-flight resolution invalidated by a restart",
+      "file": "modules/ui-web/src/shell-v0/api/engineOrigin.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:67760a080b63d0f7f7ccae4b9b4e4d7dddbfe0c867f97eed6397e28a815271f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Engine credential origin drops an in-flight resolution invalidated by a restart",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "947be754dc59485c01e34c53fe62f78a8bdc7d55",
+    "revision": "947be754dc59485c01e34c53fe62f78a8bdc7d55",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/shell-proof-before-ui-compat.patch",
+        "contentDigest": "sha256:cf5aa4d0287fc113a44f432d43f47d8bcb80113672d5f9c20d21daaab6609547"
+      }
+    ],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/api/engineOrigin.test.ts\" \"src/shell-v0/api/engineOrigin.live.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent-vitest-2047286-1792584099553.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 866,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent-vitest-2047286-1792584099553.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/api/engineOrigin.test.ts",
+        "classification": "assertion",
+        "detail": "Engine credential origin never gives port A the new token when its rejection races a binding move to B:  AssertionError: expected 200 to be 401 // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent/test-intent-before-YX1JWz/modules/ui-web/src/shell-v0/api/engineOrigin.test.ts:32:112\n    at processTicksAndRejections (node:internal/process/task_queu | Engine credential origin does not attach a token to override or other-host URL http://localh"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/api/engineOrigin.live.test.ts",
+        "classification": "assertion",
+        "detail": "Engine origin on real HTTP connections does not send a successor credential back to the impostor returning TOKEN_REQUIRED:  AssertionError: expected [ 'dead-incarnation', …(1) ] to deeply equal [ 'dead-incarnation' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent/test-intent-before-YX1JWz/modules/ui-web/src/shell-v0/api/engineOrigin.live.test.ts:38:22\n    at processTicksAndRejecti | Engine origin on real HTTP connections does not follow a redirect carryin"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/api/engineOrigin.test.ts#drops an in-flight resolution invalidated by a restart",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:8b10c8cd21ede61c10f4499036be8e1d6d8723b2aaba2dff2c62d2c6fabfaa3f"
+}

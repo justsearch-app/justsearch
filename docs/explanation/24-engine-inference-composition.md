@@ -100,7 +100,7 @@ Cursor and pinned-reader accounting remain assigned to D2.
 
 The D1 `EngineComponentRegistry` is the shipped process-level lifecycle and readiness authority.
 `EngineRoot` registers `index` and `encoders` component handles, and the inference root publishes
-component observations through the index owner. (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:443-467`,
+component observations through the index owner. (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:953-958`,
 `modules/core/src/main/java/io/justsearch/core/component/EngineComponentRegistry.java:7-29`)
 
 `ModelRegistry` remains a v2 package registry for installed model definitions and variants. Composition

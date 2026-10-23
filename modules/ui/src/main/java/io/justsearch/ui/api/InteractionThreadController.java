@@ -69,7 +69,7 @@ public final class InteractionThreadController {
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
     this.backgroundRunService =
-        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission);
+        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission, conversationStore);
   }
 
   /** Stops the owned background-run scheduler and cancels pending work. */
@@ -80,6 +80,7 @@ public final class InteractionThreadController {
   /** Handles {@code GET /api/thread/{id}}. */
   public void handleGet(Context ctx) {
     String conversationId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, conversationId)) return;
     try {
       List<InteractionEvent> events = new ArrayList<>();
       // Tempdoc 863 §4.A.5 (F2) — the runs whose ANSWER this plane actually holds. This is the one
@@ -206,6 +207,7 @@ public final class InteractionThreadController {
       // segment, §26.A). Absent ⇒ a stand-alone background run, visible only in the cross-conversation
       // inbox (/api/presence). The 7-arg AgentRequest sets conversationId; the others default it null.
       Object convObj = body.get("conversationId");
+      if (StoreIdRequest.rejectBody(ctx, body)) return;
       String conversationId = convObj instanceof String c && !c.isBlank() ? c : null;
       io.justsearch.agent.api.AgentRequest request =
           new io.justsearch.agent.api.AgentRequest(
@@ -234,6 +236,12 @@ public final class InteractionThreadController {
       response.put("state", record.state().name());
       if (record.receipt() != null) response.put("outcomeCode", record.receipt().code());
       ctx.json(response);
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status("CONVERSATION_NOT_FOUND".equals(refused.code()) ? 404 : 409)
+          .json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException locked) {
+      ctx.status(423).json(Map.of("ok", false, "errorCode", "STORE_LOCKED",
+          "error", "Unlock chat history before starting a background run."));
     } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
       var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
       int status = switch (response.errorClass()) {
@@ -260,6 +268,7 @@ public final class InteractionThreadController {
   @SuppressWarnings("unchecked")
   public void handlePostEvent(Context ctx) {
     String conversationId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, conversationId)) return;
     if (conversationId == null || conversationId.isBlank()) {
       ctx.status(400).json(Map.of("error", "conversationId is required"));
       return;
@@ -310,6 +319,8 @@ public final class InteractionThreadController {
         return;
       }
       ctx.status(201).json(Map.of("id", eventId));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status(409).json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
     } catch (Exception e) {
       log.error("Failed to append thread event for {}", conversationId, e);
       ctx.status(500).json(Map.of("error", "Failed to append thread event"));
@@ -356,6 +367,9 @@ public final class InteractionThreadController {
     if (kind == InteractionEventKind.ERROR && msg.get("errorCode") instanceof String code) {
       attributes.put("errorCode", code);
     }
+    if (kind == InteractionEventKind.ERROR && msg.get("retrievalScoped") instanceof Boolean scoped) {
+      attributes.put("retrievalScoped", scoped);
+    }
     if (citations instanceof List<?> c && !c.isEmpty()) {
       attributes.put("citations", citations);
     }
@@ -401,6 +415,12 @@ public final class InteractionThreadController {
     Object shapeId = msg.get("shapeId");
     if (shapeId instanceof String s && !s.isBlank()) {
       attributes.put("shapeId", shapeId);
+    }
+    // The follow-up's rewritten question (the "Interpreted as" note), on the turn's outcome row —
+    // an answer or an error alike — so a reloaded turn shows the note the live turn showed.
+    Object standaloneQuestion = msg.get("standaloneQuestion");
+    if (standaloneQuestion instanceof String q && !q.isBlank()) {
+      attributes.put("standaloneQuestion", q);
     }
     return new InteractionEvent(
         eventId,

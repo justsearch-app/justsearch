@@ -374,7 +374,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         reader == null
             ? null
             : new OperatingGpuProjection(
-                reader, OperatingGpuProjection::engineAndDescendants, java.time.Clock.systemUTC());
+                reader, OperatingGpuProjection::engineAndDescendants,
+                () -> Instant.ofEpochMilli(clockMs.getAsLong()));
     gpuMemory = projection == null ? null : new GpuMemoryReaderHold(reader, projection);
     if (previous != null && previous.reader() != reader) previous.reader().close();
     if (projection != null) {
@@ -501,6 +502,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.knowledgeServerLifecycleSupplier = supplier;
     // Spec E step E1: the operating indexing block reads the same Engine's bulk-work gate.
     operatingStateAssembler.setBulkWork(() -> value("bulk-gate", null));
+    operatingStateAssembler.setIndexingHold(() -> value("indexing-hold", null));
   }
 
   /**
@@ -670,6 +672,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       var server = supplier == null ? null : supplier.get();
       return server == null ? null : server.bulkWork().snapshot();
     }, period));
+    pending.add(refresh("indexing-hold", () -> {
+      var supplier = knowledgeServerLifecycleSupplier;
+      var server = supplier == null ? null : supplier.get();
+      var scheduling = server == null ? null : server.gpuScheduling();
+      return scheduling == null ? null : scheduling.indexingHold().snapshot();
+    }, period));
     pending.add(refresh("vdu", () -> vduCapabilitySnapshotSupplier == null ? null : vduCapabilitySnapshotSupplier.get(), period));
     pending.add(refresh("vdu-processing", () -> vduProcessingSupplier != null && Boolean.TRUE.equals(vduProcessingSupplier.get()), period));
     pending.add(refresh("vision", this::visionCapable, period));
@@ -786,33 +794,37 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Performs one Worker observation and caches it. Never throws — a failed observation is itself a
    * recorded sample, which is what keeps {@code workerRpcStale} honest when the Worker is gone.
    */
-  private WorkerViewSample observeWorker() {
+  private java.util.Optional<WorkerViewSample> observeWorker() {
     // Stamped BEFORE the call, not after it, so the age reported to consumers is never younger
     // than the observation actually is (the 821 §3-C1 convention, preserved).
     long sampledAtMs = clockMs.getAsLong();
     KnowledgeServerBootstrap server = knowledgeServer;
     if (server == null || !server.hasClient()) {
-      return new WorkerViewSample(
-          WorkerOperationalView.fallback(cachedWorkerHealth()), true, null, sampledAtMs);
+      return java.util.Optional.of(new WorkerViewSample(
+          WorkerOperationalView.fallback(cachedWorkerHealth()), true, null, sampledAtMs));
     }
-    try (var lease = server.captureClient()) {
-      WorkerOperationalView view = lease.withClient(client -> client.getWorkerOperationalView(
-          io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
-              io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
-      lastWorkerObservationAtMs = sampledAtMs;
-      return new WorkerViewSample(view, false, null, sampledAtMs);
+    try {
+      var captured = server.tryCaptureClient();
+      if (captured.isEmpty()) return java.util.Optional.empty();
+      try (var lease = captured.orElseThrow()) {
+        WorkerOperationalView view = lease.withClient(client -> client.getWorkerOperationalView(
+            io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
+                io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
+        lastWorkerObservationAtMs = sampledAtMs;
+        return java.util.Optional.of(new WorkerViewSample(view, false, null, sampledAtMs));
+      }
     } catch (Exception e) {
       log.debug(
           "Failed to fetch Knowledge Server status: {} - {}",
           e.getClass().getSimpleName(),
           e.getMessage(),
           e);
-      return new WorkerViewSample(
+      return java.util.Optional.of(new WorkerViewSample(
           WorkerOperationalView.fallback("UNAVAILABLE"),
           true,
           e.getClass().getSimpleName() + ": " + e.getMessage(),
-          sampledAtMs);
+          sampledAtMs));
     }
   }
 
@@ -901,7 +913,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     OperatingStateView operating = value("operating", (OperatingStateView) null);
     operating = StatusSnapshotCache.ageOperating(operating, clockMs.getAsLong(),
         stale("operating") || stale("inference") || stale("registry"),
-        stale("operating") || workerRpcStale || stale("bulk-gate") || stale("power"),
+        stale("operating") || workerRpcStale || stale("bulk-gate") || stale("indexing-hold") || stale("power"),
         stale("operating") || stale("gpu-memory") || stale("device-plan"), observation("gpu-memory").staleAfterMs());
     operating = StatusSnapshotCache.projectOperating(operating, lifecycleSnapshot, inference);
     if (operating != null) {
@@ -937,7 +949,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   private WorkerViewSample sampleWorkerIndependently(long period) {
     var before = lastComponentSnapshot.get();
-    var sampled = observeWorker();
+    var observed = observeWorker();
+    // Keep the previous sample's actual timestamp. No contact verdict was observed while the
+    // physical owner was intentionally retiring, so there is nothing new to publish as a fault.
+    if (observed.isEmpty()) return lastWorkerSample == null ? fallbackWorker() : lastWorkerSample;
+    var sampled = observed.orElseThrow();
     lastWorkerSample = sampled;
     // Contact is published independently of the registry's apply/publication lock.
     this.<Boolean>observation("index-publication").refresh("index-publication", () -> {
@@ -1016,7 +1032,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // The producer reports per-document failures as ERROR (or INDEXING while other units run).
     // Keep that corpus diagnostic without declaring the live Worker control plane offline.
     // Fatal loop failure has precedence and is reported as FAILED, which remains refused.
-    return ("ERROR".equals(core.indexState()) || "INDEXING".equals(core.indexState()))
+    return ("ERROR".equals(core.indexState()) || "INDEXING".equals(core.indexState())
+        || "WAITING".equals(core.indexState()))
         && view.failure() != null && view.failure().failedJobs() > 0;
   }
 
@@ -1607,12 +1624,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   static boolean hasActiveIndexWork(WorkerOperationalView workerView) {
-    if (workerView == null) {
+    if (workerView == null || workerView.core() == null) {
       return false;
     }
-    return workerView.migration().processingJobsCount() > 0
-        || workerView.migration().pendingJobsCount() > 0
-        || workerView.migration().pendingReadyJobsCount() > 0;
+    // The Worker has already classified queue eligibility and fatal-loop precedence.
+    return "INDEXING".equals(workerView.core().indexState());
   }
 
   /**
@@ -1638,7 +1654,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // lands (see InferenceRuntimeView's dropped `queue` field). The activity gate degrades
     // by one signal in the interim; the remaining (worker processing-jobs, GPL training, and
     // onlineAi.isAvailable) terms still cover the dominant false-positive cases.
-    if (workerView != null) {
+    if (hasActiveIndexWork(workerView)) {
       gate += Math.max(0L, workerView.migration().processingJobsCount());
     }
     if (gplCoordinatorSupplier != null) {

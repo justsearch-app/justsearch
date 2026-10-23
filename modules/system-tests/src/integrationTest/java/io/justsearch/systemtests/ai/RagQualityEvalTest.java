@@ -586,13 +586,13 @@ class RagQualityEvalTest {
     if (answer == null || answer.isBlank()) {
       return 0.0;
     }
-    List<String> sentences = splitSentences(answer);
-    if (sentences.isEmpty()) {
+    var claims = AnswerSegmentation.splitClaims(answer);
+    if (claims.isEmpty()) {
       return 0.0;
     }
     CitationScorer.ScoringResult scoringResult =
-        citationScorer.scoreAll(
-            sentences,
+        citationScorer.scoreClaims(
+            claims,
             chunkTexts,
             chunkDocIds,
             FAITHFULNESS_THRESHOLD,
@@ -601,16 +601,6 @@ class RagQualityEvalTest {
       return 0.0;
     }
     return (double) scoringResult.sentencesMatched() / scoringResult.sentencesTotal();
-  }
-
-  /**
-   * The PRODUCTION splitter, not a copy of it (tempdoc 847 S5). The faithfulness ratio below is
-   * "how many of the answer's sentences a source supports", so it has to cut the answer into the
-   * same sentences production scores — a local copy measured a segmentation the product stopped
-   * using the moment either side changed.
-   */
-  static List<String> splitSentences(String text) {
-    return AnswerSegmentation.splitSentences(text);
   }
 
   /** Extracts [N] citation markers from LLM output. Returns list of marker numbers. */

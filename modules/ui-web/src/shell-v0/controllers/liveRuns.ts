@@ -15,11 +15,6 @@ import {
   liveRunsResponseSchema,
   type LiveRunsResponse,
 } from '../../api/generated/schema-types/live-runs-response.js';
-import {
-  SESSION_TOKEN_HEADER,
-  getSessionToken,
-  resolveSessionTokenFromTauri,
-} from '../../api/http.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 
 /** The shape id every steerable agent run carries (`RunChannelObservation.AGENT_SHAPE_ID`). */
@@ -27,27 +22,6 @@ export const AGENT_SHAPE_ID = 'core.agent-run';
 
 /** One row of the enumeration. */
 export type LiveRunRow = NonNullable<LiveRunsResponse['runs']>[number];
-
-/**
- * The one GET in this frontend that must carry the session token.
- *
- * `authorizedFetch` exempts GET/HEAD because `ApiSecurityFilters` exempts them — but this route is
- * the documented exception (`ApiSecurityFilters.requiresSessionToken`): it dispenses the very runIds
- * that address a run's stream, so it is guarded like a mutation. Without the header the answer is
- * 401, not an empty list. The header is set explicitly here, which `authorizedFetch` passes through
- * untouched on a GET.
- */
-async function sessionTokenHeader(): Promise<Record<string, string>> {
-  let token = getSessionToken();
-  if (!token) {
-    try {
-      token = await resolveSessionTokenFromTauri();
-    } catch {
-      token = null; // non-Tauri contexts (dev/browser) resolve to no token, which dev mode allows
-    }
-  }
-  return token ? { [SESSION_TOKEN_HEADER]: token } : {};
-}
 
 /**
  * Every run executing right now, newest-first (the registry sorts by `startedAtEpochMs` descending;
@@ -63,9 +37,7 @@ export async function fetchLiveRuns(
     // with no conversation of its own is adoptable by anyone, which a server-side equality filter
     // would exclude. Narrowing by shape has no such asymmetry.
     const query = shapeId ? `?shapeId=${encodeURIComponent(shapeId)}` : '';
-    const res = await authorizedFetch(`${apiBase}/api/chat/runs/live${query}`, {
-      headers: await sessionTokenHeader(),
-    });
+    const res = await authorizedFetch(`${apiBase}/api/chat/runs/live${query}`);
     if (!res.ok) return [];
     const parsed = liveRunsResponseSchema.safeParse(await res.json());
     if (!parsed.success) return [];
@@ -88,6 +60,14 @@ export async function discoverLiveAgentRun(
   apiBase: string,
   conversationId?: string | null,
 ): Promise<string | null> {
+  return (await discoverLiveAgentRunRow(apiBase, conversationId))?.runId ?? null;
+}
+
+/** The same discovery, retaining the conversation identity needed before an observer attaches. */
+export async function discoverLiveAgentRunRow(
+  apiBase: string,
+  conversationId?: string | null,
+): Promise<LiveRunRow | null> {
   const runs = await fetchLiveRuns(apiBase, AGENT_SHAPE_ID);
   for (const run of runs) {
     // The server honours `?shapeId=`; this re-check is the guarantee, so a backend that ever stopped
@@ -95,7 +75,7 @@ export async function discoverLiveAgentRun(
     if (run.shapeId !== AGENT_SHAPE_ID) continue;
     if (!run.runId) continue;
     if (conversationId && run.conversationId && conversationId !== run.conversationId) continue;
-    return run.runId;
+    return run;
   }
   return null;
 }

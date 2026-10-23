@@ -1,0 +1,6 @@
+{"event": "task-start", "task": ":modules:app-services:test", "time": 1792557699656}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.HeadAssemblyTest", "name": "recoveredWorkerPreparationDefersIndexingJobsUntilActivation()", "time": 1792557832906}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.HeadAssemblyTest", "name": "recoveredWorkerPreparationDefersIndexingJobsUntilActivation()", "time": 1792557832927, "durationMs": 22, "result": "SUCCESS"}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpl.LambdaMartRerankerTest", "name": "rerank_threadSafe_noConcurrentExceptions()", "time": 1792558019202}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpl.LambdaMartRerankerTest", "name": "rerank_threadSafe_noConcurrentExceptions()", "time": 1792558023255, "durationMs": 4053, "result": "SKIPPED"}
+{"event": "task-end", "task": ":modules:app-services:test", "time": 1792558023255, "durationMs": 323596, "tests": 1445, "failed": 0, "skipped": 10}

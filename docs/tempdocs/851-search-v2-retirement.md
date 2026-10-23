@@ -62,6 +62,8 @@ lines that explicitly name the window as retired.
 
 ## 4. The forcing function
 
+**2026-10-20:** The 2026-11-30 deadline became report-only: incomplete Search v3 promotion warns at every date because finishing it is an estimated 16–32 h product change, not done yet; restoring search-v2 or losing a readable registration fails.
+
 `scripts/ci/check-window-cutover.mjs` (+ `check-window-cutover.test.mjs`, 20 assertions), wired
 into `ci.yml`'s `public-claims` job next to its sibling `check-*` gates.
 

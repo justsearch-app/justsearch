@@ -63,6 +63,7 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.IndexingJobChangeFeed;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.WatcherRootReconciliation;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
@@ -173,7 +174,8 @@ public final class WorkerIngestService {
   private final Map<String, VduProcessingClaim> vduProcessingClaims = new HashMap<>();
 
   private record VduProcessingClaim(
-      java.util.UUID owner, int previousRetryCount, int claimedRetryCount) {}
+      java.util.UUID owner, String attemptId, Map<String, Object> expectedRevision,
+      int previousRetryCount, int claimedRetryCount) {}
 
   /**
    * Creates a new WorkerIngestService backed by the specified lifecycle managers.
@@ -511,6 +513,94 @@ public final class WorkerIngestService {
     return new ReplayedPrune(result, queued);
   }
 
+  /**
+   * Exact watcher/legacy replay shares the publisher's fence and root proof. Queue work is left
+   * intact: a newer UPSERT can arrive after the final filesystem probe. A recreated source is
+   * admitted even when an earlier replay crashed after deleting Lucene but before committing.
+   * Anything but {@link BufferedDeleteReplay#SETTLED} keeps the exact receipt durable for retry,
+   * unless the caller's surviving generation owns the file's root reconciliation.
+   */
+  public BufferedDeleteReplay replayBufferedFileDelete(
+      io.justsearch.adapters.lucene.runtime.RunningRuntime target,
+      io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
+    return withFileMutationFence(() -> {
+      Path file = Path.of(deletion.path());
+      Path root = bufferedDeleteRoot(deletion);
+      var binding = rootWatcherRegistry.subscription(root);
+      if (io.justsearch.configuration.PlatformPaths.isLinux()
+          && deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER
+          && !rootWatcherRegistry.ownsPath(root, file)) return BufferedDeleteReplay.UNCERTAIN;
+      String collection = binding == null ? deletion.collection() : binding.collection();
+      if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY
+          && collection == null) {
+        try {
+          collection = target.documentFieldOps().getDocumentFieldOrThrow(deletion.path(), SchemaFields.COLLECTION);
+        } catch (IOException unreadable) { return BufferedDeleteReplay.FAILED; }
+      }
+      if (deletion.rootIdentity() != null) {
+        try {
+          if (!RootIdentity.capture(root).matchesReceipt(deletion.rootIdentity())) {
+            return BufferedDeleteReplay.UNCERTAIN;
+          }
+        } catch (IOException unavailable) {
+          return BufferedDeleteReplay.UNCERTAIN;
+        }
+      }
+      var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, rootWitness);
+      if (verdict == io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT) {
+        if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY) {
+          log.warn("Legacy buffered DELETE skipped because its source exists: {}", file);
+        }
+        if (!rootWitness.admits(root)) return BufferedDeleteReplay.UNCERTAIN;
+        if (!io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
+          var entry = JobQueue.EnqueueEntry.stat(file);
+          // Originless rows did not retain an admitting root. Preserve any existing job's root
+          // rather than replacing it with an inferred parent; a live binding is authoritative.
+          if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
+          if (!jobQueue.enqueueReappearedFile(entry, collection)) {
+            return BufferedDeleteReplay.FAILED;
+          }
+        }
+        return BufferedDeleteReplay.SETTLED;
+      }
+      if (verdict != io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
+        return BufferedDeleteReplay.UNCERTAIN;
+      }
+      target.indexingCoordinator().deleteByIdAndChunks(deletion.path());
+      target.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
+      target.commitOps().maybeRefreshBlocking();
+      // The filesystem is not locked by the writer fence. Check again after the durable effect;
+      // on a crash the retained receipt performs this same admission on the next boot.
+      if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
+          == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
+        if (!rootWitness.admits(root)) return BufferedDeleteReplay.FAILED;
+        var entry = JobQueue.EnqueueEntry.stat(file);
+        if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
+        return jobQueue.enqueueReappearedFile(entry, collection)
+            ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
+      }
+      return confirmedAbsent(deletion.path(), root)
+          ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
+    });
+  }
+
+  /**
+   * The root {@link #replayBufferedFileDelete} judges a buffered file delete under: the receipt's
+   * root, else the watched root that holds the path; an explicit file's own folder when the root
+   * names the file itself.
+   */
+  public Path bufferedDeleteRoot(io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
+    Path file = Path.of(deletion.path());
+    Path root = deletion.root() == null ? pruneRootFor(deletion.path()) : Path.of(deletion.root());
+    return root.equals(file.toAbsolutePath().normalize()) ? file.toAbsolutePath().getParent() : root;
+  }
+
+  /**
+   * A buffered file delete's replay outcome. {@code UNCERTAIN} means nothing was changed because
+   * the root or the source could not be proved; {@code FAILED} means a write or proof failed.
+   */
+  public enum BufferedDeleteReplay { SETTLED, UNCERTAIN, FAILED }
+
   /** A replayed prune's result, and the number of files it removed that were queued again. */
   public record ReplayedPrune(
       io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result, int requeued) {}
@@ -551,6 +641,8 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
+      if (io.justsearch.configuration.PlatformPaths.isLinux()
+          && !rootWatcherRegistry.ownsPath(witness.root(), path)) return;
       if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
           path, witness.root())) return;
       acceptWatcherUpsertUnderLease(collection, path, witness.root());
@@ -592,6 +684,8 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(witness, "witness");
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
+      if (io.justsearch.configuration.PlatformPaths.isLinux()
+          && !rootWatcherRegistry.ownsPath(witness.root(), Path.of(normalizedPath))) return;
       acceptWatcherDeleteUnderLease(
           normalizedPath, directEffect, false, true, witness.root(), witness.rootIdentity());
     }
@@ -600,13 +694,6 @@ public final class WorkerIngestService {
   private boolean acceptWatcherDeleteUnderLease(
       String normalizedPath, Runnable directEffect, boolean requireConfirmedAbsence,
       boolean skipUnlessConfirmedAbsent, Path requiredRoot, RootIdentity expectedRootIdentity) {
-    if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
-      if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
-        switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
-        return true;
-      }
-      throw IngestSwitchBufferOps.switchingUnavailable();
-    }
     return withFileMutationFence(() -> {
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
@@ -631,13 +718,156 @@ public final class WorkerIngestService {
               "Candidate reconciliation could not confirm file absence");
         }
       }
-      journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
+      Path root = requiredRoot == null ? Path.of(normalizedPath).getParent() : requiredRoot;
+      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
+        journalWatcherDelete(normalizedPath, root, expectedRootIdentity);
+        return true;
+      }
+      if (ingestLifecycle == null || !ingestLifecycle.isAcceptingWrites()) {
+        if (switchBufferOps.buildingGenerationForFileAdmission() != null) {
+          journalWatcherDelete(normalizedPath, root, expectedRootIdentity);
+          return true;
+        }
+        deferWatcherRootReconciliation(root, expectedRootIdentity);
+        return true;
+      }
+      journalAndProjectWatcherDeleteToServing(normalizedPath, root, expectedRootIdentity);
       directEffect.run();
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
       }
       return true;
     });
+  }
+
+  private static final String WATCHER_RECONCILE = WatcherRootReconciliation.OPERATION;
+
+  private void deferWatcherRootReconciliation(Path root, RootIdentity expectedRootIdentity) {
+    try {
+      var subscription = rootWatcherRegistry.subscription(root);
+      RootIdentity identity = expectedRootIdentity != null ? expectedRootIdentity
+          : subscription != null ? subscription.rootIdentity() : RootIdentity.capture(root);
+      identity.requireCurrent(root);
+      var debt = new WatcherRootReconciliation(root.toAbsolutePath().normalize().toString(),
+          identity.toString(), subscription == null ? null : subscription.collection());
+      if (!(jobQueue instanceof SwitchBufferCapableQueue journal)
+          || !journal.putSwitchBuffer(debt.key(), WATCHER_RECONCILE, debt.encode())) {
+        throw IngestSwitchBufferOps.switchBufferUnavailable();
+      }
+    } catch (IOException unavailable) {
+      throw WorkerServiceException.unavailable("Watcher reconciliation root identity is unavailable");
+    }
+  }
+
+  /**
+   * The retiring watcher has stopped before this runs. Its registry still owns root removals,
+   * collection attribution and identity proof, so replay does not re-register a removed root.
+   * The exact obligation is retained on any failure, including a crash before cleanup.
+   */
+  public void reconcileReloadedWatcherRootsFrom(WorkerIngestService retiring) {
+    RootWatcherRegistry ownRegistry = rootWatcherRegistry;
+    // A failed earlier attempt may already have handed the roots on; borrow their current owner.
+    setRootWatcherRegistry(retiring.rootWatcherRegistry.current());
+    try {
+      reconcilePendingWatcherRoots();
+    } finally {
+      setRootWatcherRegistry(ownRegistry);
+    }
+  }
+
+  private boolean canApplyWatcherReceipts() {
+    return ingestLifecycle != null && ingestLifecycle.isAcceptingWrites()
+        && !switchBufferOps.isSwitching()
+        && (!io.justsearch.configuration.PlatformPaths.isLinux()
+            || (searchLifecycle == ingestLifecycle && switchBufferOps.migratingGeneration() == null));
+  }
+
+  public void reconcilePendingWatcherRoots() {
+    try (var ignoredMutation = mutationLease()) {
+      reconcilePendingWatcherRootsUnderLease();
+    }
+  }
+
+  private void reconcilePendingWatcherRootsUnderLease() {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal) || !canApplyWatcherReceipts()) {
+      return;
+    }
+    for (var receipt : journal.listSwitchBufferOpsStrict()) {
+      if (!WATCHER_RECONCILE.equals(receipt.op())) continue;
+      var debt = WatcherRootReconciliation.decode(receipt.payload());
+      Path root = Path.of(debt.root());
+      if (!receipt.key().equals(debt.key())
+          || (receipt.generation() != null && !receipt.generation().isBlank())) {
+        throw new IllegalArgumentException("Invalid watcher reconciliation receipt");
+      }
+      var subscription = rootWatcherRegistry.subscription(root);
+      if (subscription == null) continue; // Startup waits for the declared root's registration.
+      // An unavailable or replaced root keeps its receipt for its return; it never fails the
+      // caller (a reload, a start or another root's watch), and nothing is applied to it.
+      try (var ignoredEvent = rootWatcherRegistry.enterEvent(subscription)) {
+        if (ignoredEvent == null) continue;
+        if (!subscription.rootIdentity().matchesReceipt(debt.rootIdentity())) {
+          log.warn("Watcher reconciliation for {} waits: its root is another folder now", root);
+          continue;
+        }
+        SyncDirectoryResponse result = io.justsearch.configuration.PlatformPaths.isLinux()
+            ? syncOps.execute(root.toString(), false, null, () -> false, subscription.collection(),
+                file -> rootWatcherRegistry.ownsPath(root, file))
+            : syncDirectory(SyncDirectoryRequest.newBuilder()
+                .setRootPath(root.toString()).setForce(false).build(), CallContext.none());
+        if (!result.getError().isBlank() || result.getSkipped()
+            || result.getDeleteDetectionUnverified()) {
+          subscription.rootIdentity().requireCurrent(root);
+          throw WorkerServiceException.unavailable("Watcher reconciliation is incomplete");
+        }
+        subscription.rootIdentity().requireCurrent(root);
+        ingestLifecycle.commitOps().commitAndTrack(CommitReason.WATCHER_DELETE);
+        ingestLifecycle.commitOps().maybeRefreshBlocking();
+        subscription.rootIdentity().requireCurrent(root);
+        if (journal.removeReplayedSwitchBufferOps(List.of(receipt)) != 1) {
+          throw WorkerServiceException.unavailable("Watcher reconciliation receipt changed");
+        }
+      } catch (IOException unavailable) {
+        log.warn("Watcher reconciliation for {} waits for its root: {}", root,
+            unavailable.getMessage());
+      }
+    }
+  }
+
+  private void replayReturnedWatcherDelete(Path returnedRoot, SwitchBufferCapableQueue journal,
+      SwitchBufferCapableQueue.SwitchBufferOp receipt,
+      io.justsearch.adapters.lucene.runtime.RunningRuntime active) {
+    var deletion = io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(receipt.payload());
+    if (deletion.origin() != io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER) return;
+    Path root = Path.of(deletion.root());
+    if (!root.equals(returnedRoot)) return;
+    var subscription = rootWatcherRegistry.subscription(root);
+    if (subscription == null) return;
+    if (!("path:" + deletion.path()).equals(receipt.key())) {
+      throw new IllegalArgumentException("Invalid watcher delete receipt key");
+    }
+    try (var event = rootWatcherRegistry.enterEvent(subscription)) {
+      if (event == null || replayBufferedFileDelete(active, deletion) != BufferedDeleteReplay.SETTLED) return;
+      int removed = receipt.generation() == null || receipt.generation().isBlank()
+          ? journal.removeReplayedSwitchBufferOps(List.of(receipt))
+          : journal.removeReplayedSwitchBufferOpsForGeneration(receipt.generation(), List.of(receipt));
+      if (removed != 1) throw WorkerServiceException.unavailable("Watcher delete receipt changed");
+    } catch (IOException unavailable) {
+      log.debug("Watcher delete waits for its root: {}", root);
+    }
+  }
+
+  /**
+   * A closing reload's successor takes over every root this service watched or held for its
+   * volume, so the reload leaves the watch list as it was; removed roots stay removed.
+   */
+  public void handWatchedRootsTo(WorkerIngestService successor) {
+    try (var ignoredMutation = successor.mutationLease()) {
+      rootWatcherRegistry.handOverTo(successor.rootWatcherRegistry, (registry, root, collection) ->
+          successor.rootOnAnotherVolume(root.toString()) != null
+              ? registry.watchWhenVolumeReturns(root, collection)
+              : registry.watch(root.toString(), collection));
+    }
   }
 
   /**
@@ -750,6 +980,7 @@ public final class WorkerIngestService {
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
     }
+    bootExclusionRoots = List.copyOf(roots);
     try {
       if (rootVolumes.beginUpgradeSeeding(roots)) {
         log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
@@ -894,9 +1125,75 @@ public final class WorkerIngestService {
     }
   }
 
+  /** Linux return detection is independent of the Head's one-root-per-minute scan queue. */
+  public Set<Path> watcherRecoveryRoots() {
+    return rootWatcherRegistry.recoveryRoots();
+  }
+
+  /** Called through the current writer's admission gate, so a transition keeps this work pending. */
+  public void recoverWatcherRoot(Path root) throws IOException {
+    try (var ignoredMutation = mutationLease()) {
+      if (!canApplyWatcherReceipts() || !rootWitness.provenOnRecordedVolume(root)) return;
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      if (!registry.recoveryRoots().contains(root)) return;
+      resumeWatchAwaitingVolume(root);
+      // A dead published watcher is recovered directly; a held watch follows the same proof.
+      if (!registry.awaitsVolume(root)) registry.resumeAwaitingVolume(root);
+      var subscription = registry.subscription(root);
+      if (subscription == null || !registry.isCurrentAndActive(subscription)) return;
+      try (var event = registry.enterEvent(subscription)) {
+        if (event == null) return;
+        // Re-enumerate all present files, as startup does. The loop still skips unchanged stamps.
+        var result = syncOps.execute(root.toString(), true, null, () -> false,
+            subscription.collection(), file -> registry.ownsPath(root, file));
+        if (!result.getError().isBlank() || result.getSkipped()
+            || result.getDeleteDetectionUnverified()) return;
+      }
+      if (jobQueue instanceof SwitchBufferCapableQueue journal) {
+        String activeGeneration = activeGenerationSupplier().get();
+        for (var receipt : journal.listSwitchBufferOpsStrict()) {
+          if ("DELETE".equals(receipt.op())
+              && (receipt.generation() == null || receipt.generation().isBlank()
+                  || receipt.generation().equals(activeGeneration))) {
+            replayReturnedWatcherDelete(root, journal, receipt, ingestLifecycle);
+          }
+        }
+      }
+      reconcilePendingWatcherRoots();
+      if (registry.isCurrentAndActive(subscription)) registry.recoveryCompleted(subscription);
+    }
+  }
+
   private static void requireWatcherRootCurrent(
       RootWatcherRegistry.Subscription witness) {
     requireCandidateRootIdentity(witness.root(), witness.rootIdentity());
+  }
+
+  private void journalWatcherDelete(String path, Path root, RootIdentity expectedRootIdentity) {
+    try {
+      RootWatcherRegistry.Subscription subscription = rootWatcherRegistry.subscription(root);
+      RootIdentity identity = expectedRootIdentity != null ? expectedRootIdentity
+          : subscription != null ? subscription.rootIdentity() : RootIdentity.capture(root);
+      identity.requireCurrent(root);
+      switchBufferOps.journalWatcherDelete(path, root, identity.toString(),
+          subscription == null ? null : subscription.collection());
+    } catch (IOException unavailable) {
+      throw WorkerServiceException.unavailable("Watcher delete root identity is unavailable");
+    }
+  }
+
+  private void journalAndProjectWatcherDeleteToServing(String path, Path root,
+      RootIdentity expectedRootIdentity) {
+    if (switchBufferOps.buildingGenerationForFileAdmission() == null) return;
+    if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
+        || !active.isAcceptingWrites()) {
+      throw WorkerServiceException.unavailable("Serving projection is unavailable during migration");
+    }
+    journalWatcherDelete(path, root, expectedRootIdentity);
+    if (active != ingestLifecycle) {
+      active.indexingCoordinator().deleteByIdAndChunks(path);
+      active.commitOps().commitAndTrack(CommitReason.WATCHER_DELETE);
+    }
   }
 
   private void journalAndProjectDeleteToServing(String normalizedId, CommitReason reason) {
@@ -1215,6 +1512,43 @@ public final class WorkerIngestService {
     }
   }
 
+  private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
+  private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
+
+  /**
+   * The composing owner binds its current file policy and Head-owned watched membership before
+   * publication. Construction alone must not bind: temporary replay services share the runtime
+   * but never own its processing policy.
+   */
+  public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
+    exclusionRoots = java.util.Objects.requireNonNull(roots, "roots");
+    if (ingestLifecycle != null) {
+      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
+    }
+  }
+
+  /** Current user policy, including saved roots not yet registered with a native watcher. */
+  public boolean isUserExcluded(Path file, Path root) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    if (patterns.isExcludedPath(root, file) || rootWatcherRegistry.isUserExcluded(file)) return true;
+    for (Path watched : exclusionRoots.get()) {
+      if (patterns.isExcludedPath(watched, file)) return true;
+    }
+    return false;
+  }
+
+  private boolean sourceProcessingAllowed(String source) {
+    if (source == null || source.isBlank()) return true;
+    try {
+      Path file = Path.of(source);
+      // Projection and non-file document IDs have no filesystem exclusion scope.
+      return !file.isAbsolute() || !isUserExcluded(file, file);
+    } catch (InvalidPathException nonFile) {
+      return true;
+    }
+  }
+
   public BatchResponse submitBatch(BatchRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       List<String> filePaths = request.getFilePathsList();
@@ -1251,10 +1585,10 @@ public final class WorkerIngestService {
 
         for (String pathStr : filePaths) {
           Path sanitized = sanitizePath(pathStr);
-          if (sanitized != null) {
-            validPaths.add(sanitized);
-          } else {
+          if (sanitized == null) {
             rejected++;
+          } else if (!isUserExcluded(sanitized, sanitized)) {
+            validPaths.add(sanitized);
           }
         }
 
@@ -1263,7 +1597,8 @@ public final class WorkerIngestService {
         }
 
         if (validPaths.isEmpty()) {
-          return batchErrorResponse("All paths were invalid or unsafe");
+          return rejected == filePaths.size()
+              ? batchErrorResponse("All paths were invalid or unsafe") : batchSuccessResponse(0);
         }
         if (request.getRootAdded()) {
           // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
@@ -1627,18 +1962,44 @@ public final class WorkerIngestService {
         requireServingVduTarget();
         var procedureOwner = ctx.engineContext().workId();
         VduProcessingClaim claim = vduProcessingClaims.get(docId);
-        if (procedureOwner.isPresent()
-            && (claim == null || !procedureOwner.get().equals(claim.owner()))) {
+        if (procedureOwner.isEmpty() || claim == null
+            || !procedureOwner.get().equals(claim.owner())
+            || !request.getAttemptId().equals(claim.attemptId())) {
+          if (request.getAttemptId().isBlank()) {
+            try {
+              withFileMutationFence(() -> {
+                try { refreshLegacyVduSource(docId); return true; }
+                catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+              });
+            } catch (java.io.UncheckedIOException failure) {
+              return updateVduErrorResponse(failure.getCause().getMessage());
+            }
+          }
           return updateVduErrorResponse("VDU procedure no longer owns this document: " + docId);
         }
         try {
           // The chunk replacement holds the file-mutation fence, so a prune of this file never
           // sees part of it and no replacement chunk lands after the file was removed.
-          boolean applied;
+          String refusal;
           try {
-            applied = withFileMutationFence(() -> {
+            refusal = withFileMutationFence(() -> {
               try {
-                return VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled());
+                ingestLifecycle.commitOps().maybeRefreshBlocking();
+                if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                  // Already under the mutation lease, monitor and file fence: reset this exact
+                  // claim directly instead of re-entering the public release admission path.
+                  if (resetVduStatusToPending(docId, claim.owner(), Set.of(claim.attemptId()))) {
+                    ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+                    ingestLifecycle.commitOps().maybeRefreshBlocking();
+                  }
+                  requireServingVduTarget();
+                  return "Source is excluded by the current policy";
+                }
+                if (!vduClaimMatches(docId, claim)
+                    || !VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled(), claim.expectedRevision())) {
+                  return "VDU source revision changed: " + docId;
+                }
+                return null;
               } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
               }
@@ -1646,8 +2007,9 @@ public final class WorkerIngestService {
           } catch (java.io.UncheckedIOException e) {
             throw e.getCause();
           }
-          if (!applied) {
-            return updateVduErrorResponse("Document not found: " + docId);
+          if (refusal != null) {
+            vduProcessingClaims.remove(docId, claim);
+            return updateVduErrorResponse(refusal);
           }
           vduProcessingClaims.remove(docId);
           ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
@@ -1787,6 +2149,7 @@ public final class WorkerIngestService {
       String normalizedId = normalizeDocIdForMutation(docId);
 
       if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
+        if (request.getRequireSettled()) throw IngestSwitchBufferOps.switchingUnavailable();
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
           return switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedId);
         }
@@ -1796,8 +2159,15 @@ public final class WorkerIngestService {
       return withFileMutationFence(() -> {
         journalAndProjectDeleteToServing(normalizedId, CommitReason.GRPC_DELETE_BY_ID);
         ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(normalizedId);
-        jobQueue.deleteByExactPath(normalizedId);
+        if (jobQueue.deleteByExactPath(normalizedId) < 0) {
+          throw new IllegalStateException("Could not remove pending ingestion for deleted document");
+        }
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_ID);
+        if (request.getRequireSettled()) {
+          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          if (searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime serving
+              && serving != ingestLifecycle) serving.commitOps().maybeRefreshBlocking();
+        }
         log.info("deleteById complete for doc_id: {}", normalizedId);
         return deleteByIdResponse(true, "");
       });
@@ -1975,7 +2345,13 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
+      Path root = parsedRoot(rootPath);
+      var binding = rootWatcherRegistry.subscription(root);
+      java.util.function.Predicate<Path> ownsPath = io.justsearch.configuration.PlatformPaths.isLinux()
+              && root != null && rootWatcherRegistry.hasNestedRoots(root)
+          ? file -> rootWatcherRegistry.ownsPath(root, file) : null;
+      return syncOps.execute(rootPath, force, provenance, ctx::cancelled,
+          binding == null ? null : binding.collection(), ownsPath);
     }
   }
 
@@ -2285,8 +2661,7 @@ public final class WorkerIngestService {
    * exactly this root. Reads the registry field at call time; it is replaceable by a setter.
    */
   private RootIdentity registeredRootIdentity(Path root) {
-    RootWatcherRegistry.Subscription subscription = rootWatcherRegistry.subscription(root);
-    return subscription == null ? null : subscription.rootIdentity();
+    return rootWatcherRegistry.registeredIdentity(root);
   }
 
   /**
@@ -2429,14 +2804,42 @@ public final class WorkerIngestService {
         requireServingVduTarget();
 
         try {
-          int currentCount = readVduRetryCount(docId);
-          return applyMarkVduProcessing(
-              docId, currentCount, maxRetries, ctx.engineContext().workId().orElse(null));
+          if (ctx.engineContext().workId().isEmpty() || request.getAttemptId().isBlank()) {
+            return markVduErrorResponse("VDU requires a procedure owner and unique attempt_id");
+          }
+          return withFileMutationFence(() -> {
+            try {
+              ingestLifecycle.commitOps().maybeRefreshBlocking();
+              if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                return markVduErrorResponse("Source is excluded by the current policy");
+              }
+              var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+              if (input == null) return markVduErrorResponse("Document not found: " + docId);
+              if (input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) {
+                refreshLegacyVduSource(docId);
+                return markVduErrorResponse("VDU source revision needs a targeted refresh: " + docId);
+              }
+              var previousClaim = vduProcessingClaims.get(docId);
+              if (previousClaim != null) {
+                if (vduClaimMatches(docId, previousClaim)) {
+                  return markVduErrorResponse("VDU document already has a claim: " + docId);
+                }
+                vduProcessingClaims.remove(docId, previousClaim);
+              }
+              return applyMarkVduProcessing(docId, readVduRetryCount(docId), maxRetries,
+                  ctx.engineContext().workId().orElseThrow(), request.getAttemptId(), input.fields());
+            } catch (RuntimeException failure) {
+              throw failure;
+            } catch (Exception failure) {
+              throw new java.io.UncheckedIOException(new IOException(failure.getMessage(), failure));
+            }
+          });
         } catch (WorkerServiceException failure) {
           throw failure;
         } catch (Exception e) {
           log.error("markVduProcessing failed for doc: {}", docId, e);
-          return markVduErrorResponse(e.getMessage());
+          return markVduErrorResponse(e instanceof java.io.UncheckedIOException io
+              ? io.getCause().getMessage() : e.getMessage());
         }
       }
     }
@@ -2452,8 +2855,8 @@ public final class WorkerIngestService {
   }
 
   private MarkVduProcessingResponse applyMarkVduProcessing(
-      String docId, int currentCount, int maxRetries, java.util.UUID procedureOwner)
-      throws Exception {
+      String docId, int currentCount, int maxRetries, java.util.UUID procedureOwner,
+      String attemptId, Map<String, String> fields) throws Exception {
     MarkVduRetryDecision decision = decideMarkVduRetry(currentCount, maxRetries);
 
     // Check if max retries exceeded.
@@ -2481,12 +2884,9 @@ public final class WorkerIngestService {
 
     boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
     if (updated) {
-      if (procedureOwner == null) {
-        vduProcessingClaims.remove(docId);
-      } else {
-        vduProcessingClaims.put(docId,
-            new VduProcessingClaim(procedureOwner, currentCount, decision.retryCount()));
-      }
+      Map<String, Object> expected = vduRevision(fields);
+      vduProcessingClaims.put(docId,
+          new VduProcessingClaim(procedureOwner, attemptId, expected, currentCount, decision.retryCount()));
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       requireServingVduTarget();
@@ -2507,33 +2907,75 @@ public final class WorkerIngestService {
    * is absent or no longer PROCESSING; nothing is changed then.
    */
   public boolean releaseVduProcessing(String docId, CallContext ctx) {
+    return releaseVduProcessing(docId, "", ctx);
+  }
+
+  public boolean releaseVduProcessing(String docId, String attemptId, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       if (docId == null || docId.isBlank()) {
         throw new WorkerServiceException(WorkerServiceException.Status.INVALID_ARGUMENT, "doc_id is required");
       }
       requireEnrichmentReader(ctx);
       requireServingVduTarget();
-      // Serialized with marks, results and recovery, which own the process-local claims.
       synchronized (vduMutationMonitor) {
+        var claim = vduProcessingClaims.get(docId);
+        if (claim == null || !claim.attemptId().equals(attemptId)
+            || ctx.engineContext().workId().filter(claim.owner()::equals).isEmpty()) return false;
         try {
-          String status = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.VDU_STATUS);
-          if (!SchemaFields.VDU_STATUS_PROCESSING.equals(status)) return false;
-          Map<String, Object> updates = new HashMap<>();
-          updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
-          updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(Math.max(0, readVduRetryCount(docId) - 1)));
-          if (!ingestLifecycle.indexingCoordinator().updateDocument(docId, updates)) return false;
-          // The released attempt was never made: its claim may not authorize a later result.
-          vduProcessingClaims.remove(docId);
-          ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
-          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          boolean reset = withFileMutationFence(() -> {
+            try { return resetVduStatusToPending(docId, claim.owner(), Set.of(attemptId)); }
+            catch (Exception failure) { throw new IllegalStateException(failure); }
+          });
+          if (reset) {
+            ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+            ingestLifecycle.commitOps().maybeRefreshBlocking();
+          }
           requireServingVduTarget();
-          return true;
+          return reset;
         } catch (WorkerServiceException failure) {
           throw failure;
-        } catch (Exception e) {
-          throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL, "VDU release failed", e);
+        } catch (Exception failure) {
+          throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL, "VDU release failed", failure);
         }
       }
+    }
+  }
+
+  private static Map<String, Object> vduRevision(Map<String, String> fields) {
+    Map<String, Object> expected = new HashMap<>();
+    for (String field : List.of(SchemaFields.DOC_UID, SchemaFields.SOURCE_SHA256,
+        SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256)) expected.put(field, fields.get(field));
+    return expected;
+  }
+
+  private boolean vduClaimMatches(String docId, VduProcessingClaim claim) throws IOException {
+    var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+    return input != null && claim.expectedRevision().equals(vduRevision(input.fields()))
+        && SchemaFields.VDU_STATUS_PROCESSING.equals(input.fields().get(SchemaFields.VDU_STATUS))
+        && Integer.toString(claim.claimedRetryCount()).equals(input.fields().get(SchemaFields.VDU_RETRY_COUNT));
+  }
+
+  /** Refresh just an unverifiable legacy source, with the queue's existing durable source witness. */
+  public void refreshLegacyVduSource(String docId) throws IOException {
+    ingestLifecycle.commitOps().maybeRefreshBlocking();
+    if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) return;
+    var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+    if (input == null || !input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) return;
+    var expected = vduRevision(input.fields());
+    ingestLifecycle.indexingCoordinator().updateDocumentIf(docId, expected,
+        Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING));
+    ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+    if (jobQueue == null) return;
+    try {
+      Path path = Path.of(docId);
+      var stat = JobQueue.EnqueueEntry.stat(path);
+      var entry = new JobQueue.EnqueueEntry(path, stat.sizeBytes(), stat.provenance(),
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
+      if (jobQueue.enqueueEntriesWithExactCollection(List.of(entry), input.fields().get(SchemaFields.COLLECTION)) != 1) {
+        throw new IOException("Legacy VDU source refresh was not admitted: " + docId);
+      }
+    } catch (java.nio.file.FileSystemException unavailable) {
+      log.info("Legacy VDU source refresh deferred for {}: {}", docId, unavailable.getMessage());
     }
   }
 
@@ -2542,15 +2984,15 @@ public final class WorkerIngestService {
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
   }
 
-  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner)
-      throws Exception {
+  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner, Set<String> attemptIds)
+      throws IOException {
     synchronized (vduMutationMonitor) {
       VduProcessingClaim claim = vduProcessingClaims.get(docId);
       if (procedureOwner != null
-          && (claim == null || !procedureOwner.equals(claim.owner()))) {
+          && (claim == null || !procedureOwner.equals(claim.owner()) || !attemptIds.contains(claim.attemptId()))) {
         return false;
       }
-      Map<String, Object> expected = new HashMap<>();
+      Map<String, Object> expected = procedureOwner == null ? new HashMap<>() : new HashMap<>(claim.expectedRevision());
       expected.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
       Map<String, Object> updates = new HashMap<>();
       updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
@@ -2601,9 +3043,12 @@ public final class WorkerIngestService {
   }
 
   private VduRecoveryResult recoverProcessingDocs(
-      List<String> processingDocIds, java.util.UUID procedureOwner) {
+      List<String> processingDocIds, java.util.UUID procedureOwner, Set<String> attemptIds) {
+    // The conditional RMW already compares source/UID/status/retry under the coordinator lock.
+    // Keep the same monitor order as claims/results; taking the file fence before this monitor
+    // would invert their monitor -> fence order during concurrent cancellation.
     return recoverProcessingDocsWithResetOp(
-        processingDocIds, docId -> resetVduStatusToPending(docId, procedureOwner));
+        processingDocIds, docId -> resetVduStatusToPending(docId, procedureOwner, attemptIds));
   }
 
   private static java.util.UUID recoveryProcedureOwner(
@@ -2642,7 +3087,7 @@ public final class WorkerIngestService {
 
       log.info("recoverVduProcessing: found {} stuck documents", processingDocIds.size());
 
-      VduRecoveryResult result = recoverProcessingDocs(processingDocIds, procedureOwner);
+      VduRecoveryResult result = recoverProcessingDocs(processingDocIds, procedureOwner, new java.util.HashSet<>(request.getAttemptIdsList()));
       int recovered = result.recovered();
 
       if (recovered > 0) {
@@ -2699,6 +3144,11 @@ public final class WorkerIngestService {
         String rawOldPath = mapping.getOldPath();
         String rawNewPath = mapping.getNewPath();
         if (rawOldPath.isBlank() || rawNewPath.isBlank()) {
+          failedPaths.add(rawOldPath);
+          continue;
+        }
+        Path destination = Path.of(rawNewPath);
+        if (isUserExcluded(destination, destination)) {
           failedPaths.add(rawOldPath);
           continue;
         }
@@ -3235,10 +3685,20 @@ public final class WorkerIngestService {
           }
         }
         Path held = rootOnAnotherVolume(rootPath);
+        Path parsed = parsedRoot(rootPath);
+        if (held == null && io.justsearch.configuration.PlatformPaths.isLinux()
+            && parsed != null && !Files.isDirectory(parsed)) held = parsed;
         RootWatcherRegistry.WatchResult result =
             held != null
                 ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
                 : rootWatcherRegistry.watch(rootPath, request.getCollection());
+        if (result.watching()) {
+          // A watch that reaches a service which cannot apply receipts (a deferred view whose
+          // writer upgrade already ran its reconcile before this subscription existed) queues
+          // them for whichever writer is current when the watcher's reconcile thread runs them.
+          if (canApplyWatcherReceipts()) reconcilePendingWatcherRoots();
+          else rootWatcherRegistry.applyPendingReceiptsLater();
+        }
         return io.justsearch.ipc.WatchRootResponse.newBuilder()
             .setWatching(result.watching())
             .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
@@ -3258,11 +3718,30 @@ public final class WorkerIngestService {
       try {
         boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
         forgetRemovedRoot(request.getRootPath());
+        if (jobQueue instanceof SwitchBufferCapableQueue journal) {
+          String key = "watcher-reconcile:" + Path.of(request.getRootPath()).toAbsolutePath().normalize();
+          var obsolete = journal.listSwitchBufferOpsStrict().stream()
+              .filter(receipt -> (key.equals(receipt.key()) && WATCHER_RECONCILE.equals(receipt.op()))
+                  || (io.justsearch.configuration.PlatformPaths.isLinux()
+                      && "DELETE".equals(receipt.op())
+                      && watcherDeleteForRemovedRoot(receipt, request.getRootPath())))
+              .toList();
+          if (journal.removeReplayedSwitchBufferOps(obsolete) != obsolete.size()) {
+            throw WorkerServiceException.unavailable("Removed-root reconciliation cleanup changed");
+          }
+        }
         return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
       } finally {
         markReplayUncertainForWatchChangeDuringMigration();
       }
     }
+  }
+
+  private static boolean watcherDeleteForRemovedRoot(
+      SwitchBufferCapableQueue.SwitchBufferOp receipt, String rootPath) {
+    var deletion = io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(receipt.payload());
+    return deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER
+        && Path.of(rootPath).toAbsolutePath().normalize().equals(Path.of(deletion.root()).normalize());
   }
 
   /**
@@ -3276,7 +3755,10 @@ public final class WorkerIngestService {
       return;
     }
     try {
-      rootWitness.forgetUnder(rootPath);
+      Path root = Path.of(rootPath).toAbsolutePath().normalize();
+      rootWitness.forgetUnder(rootPath, io.justsearch.configuration.PlatformPaths.isLinux()
+              && rootWatcherRegistry.hasNestedRoots(root)
+          ? file -> rootWatcherRegistry.ownsPath(root, file) : ignored -> true);
     } catch (IOException | RuntimeException notForgotten) {
       log.warn("unwatchRoot: could not drop the recorded volume under {}: {}", rootPath,
           notForgotten.getMessage());
@@ -3328,6 +3810,52 @@ public final class WorkerIngestService {
   }
 
   // ==================== Slice 445 — Job-queue TABULAR Resource ====================
+
+  /**
+   * Accept live terminal outcomes before any recoverable view handoff. No history, row snapshot,
+   * pending-snapshot queue or SSE observer is involved. The empty initial frame acknowledges
+   * registration; committed deltas remain serialized with it and cancellation fences delivery.
+   */
+  public void subscribeIndexingJobOutcomes(
+      java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> sink, CallContext ctx) {
+    IndexingJobChangeFeed feed = jobQueue.indexingJobChangeFeed().orElseThrow(() ->
+        WorkerServiceException.unimplemented("Job queue does not support change-feed"));
+    Object emitLock = new Object();
+    var closed = new java.util.concurrent.atomic.AtomicBoolean();
+    var subscription = new java.util.concurrent.atomic.AtomicReference<IndexingJobChangeFeed.Subscription>();
+    var sequence = new java.util.concurrent.atomic.AtomicLong();
+    Runnable close = () -> {
+      closed.set(true);
+      var current = subscription.getAndSet(null);
+      if (current != null) current.close();
+    };
+    ctx.onCancel(close);
+    // Nothing can invoke this new consumer before registration, so acquiring the queue owner
+    // lock here cannot invert locks with a pre-existing delivery to this subscription.
+    synchronized (emitLock) {
+      if (closed.get() || ctx.cancelled()) return;
+      var registered = feed.subscribe(delta -> {
+        IndexingJobChangeFeed.JobRow row = switch (delta) {
+          case IndexingJobChangeFeed.Delta.Insert insert -> insert.row();
+          case IndexingJobChangeFeed.Delta.Update update -> update.row();
+          default -> null; // Resync is view state, never a replay of terminal activity.
+        };
+        if (row == null || !(row.state().equals("DONE") || row.state().equals("FAILED")
+            || row.state().equals("RETRY_EXHAUSTED"))) return;
+        synchronized (emitLock) {
+          if (closed.get() || ctx.cancelled()) return;
+          sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(sequence.incrementAndGet())
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(toJobView(row))).build());
+        }
+      });
+      subscription.set(registered);
+      if (closed.get() || ctx.cancelled()) { close.run(); return; }
+      try {
+        sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(sequence.incrementAndGet())
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+      } catch (RuntimeException | Error failure) { close.run(); throw failure; }
+    }
+  }
 
   /**
    * Streams the indexing-jobs collection: one snapshot frame followed by
@@ -3385,7 +3913,25 @@ public final class WorkerIngestService {
           if (ctx.cancelled() || closeRequested.get()) return;
           io.justsearch.ipc.IndexingJobsDelta.Builder deltaBuilder =
               io.justsearch.ipc.IndexingJobsDelta.newBuilder();
+          if (delta instanceof IndexingJobChangeFeed.Delta.Resync resync) {
+            var replacement = io.justsearch.ipc.IndexingJobsSnapshot.newBuilder();
+            for (var row : resync.items()) replacement.addItems(toJobView(row));
+            synchronized (emitLock) {
+              try {
+                sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+                    .setSnapshot(replacement.build()).setSeq(frameSeq.incrementAndGet())
+                    .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                        .addAllStates(resync.presentStates() == null ? Set.of() : resync.presentStates()))
+                    .build());
+              } catch (RuntimeException e) {
+                log.warn("subscribeIndexingJobs: resync delivery failed; closing subscription", e);
+                closeSubscription.run();
+              }
+            }
+            return;
+          }
           switch (delta) {
+            case IndexingJobChangeFeed.Delta.Resync ignored -> throw new IllegalStateException("Resync already handled");
             case IndexingJobChangeFeed.Delta.Insert ins ->
                 deltaBuilder.setInsert(toJobView(ins.row()));
             case IndexingJobChangeFeed.Delta.Update upd ->
@@ -3395,11 +3941,13 @@ public final class WorkerIngestService {
           }
           synchronized (emitLock) {
             try {
-              sink.accept(
-                  io.justsearch.ipc.IndexingJobsFrame.newBuilder()
-                      .setDelta(deltaBuilder.build())
-                      .setSeq(frameSeq.incrementAndGet())
-                      .build());
+              var frame = io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+                  .setDelta(deltaBuilder.build()).setSeq(frameSeq.incrementAndGet());
+              if (delta.presentStates() != null) {
+                frame.setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                    .addAllStates(delta.presentStates()));
+              }
+              sink.accept(frame.build());
             } catch (RuntimeException e) {
               log.warn("subscribeIndexingJobs: delta delivery failed; closing subscription", e);
               closeSubscription.run();
@@ -3451,6 +3999,8 @@ public final class WorkerIngestService {
         sink.accept(
             io.justsearch.ipc.IndexingJobsFrame.newBuilder()
                 .setSnapshot(snapBuilder.build())
+                .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                    .addAllStates(snap.presentStates() == null ? Set.of() : snap.presentStates()))
                 .setSeq(frameSeq.incrementAndGet())
                 .build());
         // Reentrant sink writes also join this queue, behind already buffered deltas.

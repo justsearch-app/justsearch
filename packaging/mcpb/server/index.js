@@ -18,12 +18,11 @@
  * instance (GET /api/runtime/live) and /api/health answers 200; there is no default-port
  * guess, so an unrelated service is never picked up. Every request to the Engine goes through
  * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS
- * says its server end is the manifest pid's; when that fails, the bridge selects again (fetching
- * that Engine's own token) and retries once. A JUSTSEARCH_API_PORT pin that a manifest names is
- * that manifest Engine, with the same proof (a manifest naming it that is not proven refuses the
- * pin); a pin no manifest names answers over token-bound connections, each sending only the
- * session token it fetched itself, so whatever takes the port never gets a token from another
- * connection (it does get request content: that is what the pin trusts).
+ * says its server end is the manifest pid's; when that fails, the bridge selects again (taking
+ * that Engine's token from its validated manifest) and retries once. A JUSTSEARCH_API_PORT pin
+ * needs JUSTSEARCH_SESSION_TOKEN, and that token goes only to the Engine of a manifest naming the
+ * pinned port, with the same proof; a pin whose manifest is not proven, or that no manifest
+ * names, is refused, so whatever answers the port never gets the token.
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -33,7 +32,6 @@
 
 const { describeTried, engineRequest, selectEngine, selectPinned, standardCandidates } = require('./engine-discovery.cjs');
 
-const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
 // Session setup (initialize, notifications/initialized) is cheap; requests wait for it, so it is bounded.
 const INITIALIZE_TIMEOUT_MS = 10000;
@@ -68,84 +66,35 @@ function actionableUnreachableMessage(tried) {
   ].join('\n');
 }
 
-/** GET /api/health of a pin no manifest names: { ok: true } or { ok: false, detail }. */
-function healthy(port) {
-  return new Promise((resolve) => {
-    const req = engineRequest({ port, engine: null }, { path: '/api/health', timeoutMs: HEALTH_TIMEOUT_MS }, (res) => {
-      res.resume(); // drain
-      resolve(res.statusCode === 200 ? { ok: true } : { ok: false, detail: `GET /api/health answered ${res.statusCode}` });
-    });
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', (e) => resolve({ ok: false, detail: e.message }));
-  });
-}
-
 /**
- * Fetch the desktop session token (GET /api/mcp/token) of a manifest Engine. In prod mode the API
- * requires it on non-GET requests (X-JustSearch-Session); GETs are always
- * allowed, which is exactly what lets a local MCP client bootstrap. Returns
- * '' for dev mode's empty token (no enforcement: no header is sent), null when the Engine offers
- * none (then nothing that needs one is sent), and null for a pin no manifest names, whose
- * connections each fetch their own.
- */
-function fetchSessionToken(found) {
-  if (!found.engine) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const req = engineRequest(
-      found,
-      { path: '/api/mcp/token', timeoutMs: HEALTH_TIMEOUT_MS },
-      (res) => {
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => (raw += chunk));
-        res.on('end', () => {
-          try {
-            const token = JSON.parse(raw).token;
-            resolve(typeof token === 'string' ? token : null); // '' is dev mode's token: none enforced
-          } catch {
-            resolve(null);
-          }
-        });
-      }
-    );
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(null));
-  });
-}
-
-/**
- * Returns { port, engine } or null; appends one line per location tried to triedOut.
- * Order: JUSTSEARCH_API_PORT pin (the manifest Engine naming that port, or engine null when no
- * manifest names it), then validated runtime manifests (engine-discovery.cjs; engine is the
- * selected candidate).
+ * Returns { port, engine, token } or null; appends one line per location tried to triedOut.
+ * Order: JUSTSEARCH_API_PORT pin (the proven Engine of the manifest naming that port, with
+ * JUSTSEARCH_SESSION_TOKEN, which the pin requires), then validated runtime manifests
+ * (engine-discovery.cjs; engine is the selected candidate, token the one in its manifest).
  */
 async function discoverEngine(triedOut) {
   const tried = triedOut || [];
   const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
   if (Number.isInteger(envPort) && envPort > 0) {
+    const token = process.env.JUSTSEARCH_SESSION_TOKEN?.trim();
+    if (!token) throw new Error('JUSTSEARCH_API_PORT requires JUSTSEARCH_SESSION_TOKEN from the Engine owner-only runtime/manifest.json.');
     const pin = `JUSTSEARCH_API_PORT=${envPort}`;
     const { selected, tried: named } = await selectPinned(standardCandidates(), envPort);
     if (selected) {
       log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${envPort}, pinned by ${pin})`);
-      state.pinnedByManifest = true;
-      return { port: envPort, engine: selected };
+      return { port: envPort, engine: selected, token };
     }
     if (named.length > 0) {
       tried.push(...describeTried(named).map((line) => `${pin}: refused, the manifest naming this port is not proven (${line})`));
-    } else if (state.pinnedByManifest) {
-      // Accepted through a manifest: without one it is refused, never used with per-connection tokens.
-      tried.push(`${pin}: refused, a runtime manifest named this port when it was accepted and none does now`);
     } else {
-      const live = await healthy(envPort);
-      if (live.ok) return { port: envPort, engine: null };
-      tried.push(`${pin} (not responding: ${live.detail})`);
+      tried.push(`${pin}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`);
     }
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
   tried.push(...describeTried(folders.filter((f) => !f.ok)));
   if (selected) {
     log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${selected.port})`);
-    return { port: selected.port, engine: selected };
+    return { port: selected.port, engine: selected, token: selected.token };
   }
   return null;
 }
@@ -156,15 +105,14 @@ async function discoverEngine(triedOut) {
 
 const state = {
   epoch: null, // the current Engine epoch (newEpoch): everything the bridge holds for one Engine
-  pinnedByManifest: false, // the JUSTSEARCH_API_PORT pin was accepted through a manifest
   initializeParams: null, // cached client initialize params (for re-init)
   reinitCounter: 0,
 };
 
 /**
  * One Engine epoch: everything the bridge holds for the Engine it talks to. target is
- * { port, engine, token } (engine the validated manifest candidate behind port, null for a
- * JUSTSEARCH_API_PORT pin no manifest names; token its desktop session token, if enforced). Then
+ * { port, engine, token } (engine the validated manifest candidate behind port; token its
+ * session token, from that manifest or JUSTSEARCH_SESSION_TOKEN for a pin, '' in dev mode). Then
  * what was negotiated with it over /mcp: identity (the Engine of the connection that answered its
  * initialize; engineRequest writes nothing on a connection to any other), sessionId (null when the
  * server assigns none), protocolVersion, the server->client stream, and the requests in flight.
@@ -308,8 +256,9 @@ function postToServer(epoch, message, onMessage = emit, timeoutMs = REQUEST_TIME
         if (!epoch.identity) epoch.identity = req.connectionIdentity;
         if (typeof assigned === 'string' && assigned.length > 0) epoch.sessionId = assigned;
 
-        if (status === 404 || status === 400) {
-          // Streamable HTTP: 404 = session expired/unknown -> re-initialize.
+        if (status === 404 || status === 400 || status === 401) {
+          // Streamable HTTP: 404 = session expired/unknown -> re-initialize; 401 = the token was
+          // refused (the Engine restarted): re-discover and re-read its manifest token.
           res.resume();
           const err = new Error(`HTTP ${status} from /mcp (stale session?)`);
           err.retryable = true; // the server answered that it did not take the request
@@ -362,7 +311,7 @@ function postToServer(epoch, message, onMessage = emit, timeoutMs = REQUEST_TIME
     });
     req.on('timeout', () => req.destroy(new Error('request timeout')));
     req.on('error', (e) => {
-      if (e.code === 'NO_TOKEN') return reject(e); // refused before writing: the Engine offers no token
+      if (e.code === 'NO_TOKEN') return reject(e); // refused before writing: there is no token to send
       const err = new Error(`connection failed: ${e.message}`);
       err.transport = true;
       // Only a request that never had a connection (ECONNREFUSED: app restarted or port moved;
@@ -414,9 +363,9 @@ async function recoverConnection(clientInitialize = null) {
     err.tried = tried;
     throw err;
   }
-  // The token rotates per app start; it is fetched from (and only ever sent to) the Engine found,
-  // in a new epoch that carries nothing of the old one.
-  const epoch = switchEpoch({ port: found.port, engine: found.engine, token: await fetchSessionToken(found) });
+  // The token rotates per app start; it is re-read from the manifest of (and only ever sent to)
+  // the Engine found, in a new epoch that carries nothing of the old one.
+  const epoch = switchEpoch({ port: found.port, engine: found.engine, token: found.token });
   if (clientInitialize) {
     if (await initializeEpoch(epoch, clientInitialize, emit)) settleEpoch(epoch, 'ready');
     return;
@@ -552,9 +501,8 @@ async function main() {
     process.stderr.write(`${actionableUnreachableMessage(tried)}\n`);
     process.exit(1);
   }
-  const { target } = switchEpoch({ port: found.port, engine: found.engine, token: await fetchSessionToken(found) });
-  const tokenNote = target.token ? ' (session token attached)' : found.engine ? '' : ' (pinned port: each connection fetches its own token)';
-  log(`bridging stdio <-> http://127.0.0.1:${found.port}/mcp${tokenNote}`);
+  const { target } = switchEpoch({ port: found.port, engine: found.engine, token: found.token });
+  log(`bridging stdio <-> http://127.0.0.1:${found.port}/mcp${target.token ? ' (session token attached)' : ''}`);
   markReady();
 }
 

@@ -34,6 +34,7 @@ import { authorizedFetch } from '../api/authorizedFetch.js';
 // host_.platform.capabilities so the legacy isTauriRuntime import was
 // dropped as part of the surface migration.
 import { icon } from '../components/Icon.js';
+import type { JfButton } from '../components/Button.js';
 // §2.A: rail-customization labels resolve through the one surface-label
 // authority — never the raw `core.*-surface` id.
 import { present } from '../display/present.js';
@@ -42,6 +43,8 @@ import { present } from '../display/present.js';
 import { projectFact } from '../display/facts.js';
 import { formatCount } from '../display/format.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { selectIndexingProgress } from '../state/indexingProgress.js';
+import '../components/IndexingControls.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalog.js';
 import { applyAppearance, getSurfaceMode, setSurfaceMode } from '../state/themeState.js';
 // Tempdoc 874 — the Search v3 chat-column width preset (FE-only, user-state document).
@@ -154,7 +157,6 @@ interface UISettings {
   highContrast?: boolean;
   defaultAction?: 'open' | 'reveal' | 'preview';
   vimMode?: boolean;
-  pauseIndexingDuringAi?: boolean;
 }
 
 /**
@@ -173,6 +175,19 @@ interface AllSettings {
   settingsMode?: string;
 }
 
+interface SearchShortcutStatus { enabled: boolean; active: boolean; reason: string | null; revision?: number }
+
+function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
+  if (value === null || typeof value !== 'object'
+    || !('enabled' in value) || typeof value.enabled !== 'boolean'
+    || !('active' in value) || typeof value.active !== 'boolean'
+    || !('reason' in value) || (value.reason !== null && typeof value.reason !== 'string')
+    || ('revision' in value && (typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 0))) {
+    throw new Error('Shortcut status is unavailable.');
+  }
+  return value as SearchShortcutStatus;
+}
+
 export class SettingsSurface extends JfElement {
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -187,6 +202,9 @@ export class SettingsSurface extends JfElement {
     saving: { state: true },
     autostart: { state: true },
     autostartLoaded: { state: true },
+    searchShortcut: { state: true },
+    searchShortcutBusy: { state: true },
+    searchShortcutError: { state: true },
     updateStatus: { state: true },
     updateBusy: { state: true },
     // Tempdoc 778 — the default-on local feedback-capture flag + its privacy note.
@@ -247,6 +265,11 @@ export class SettingsSurface extends JfElement {
   declare saving: boolean;
   declare autostart: boolean | null;
   declare autostartLoaded: boolean;
+  declare searchShortcut: SearchShortcutStatus | null;
+  declare searchShortcutBusy: boolean;
+  declare searchShortcutError: string | null;
+  private searchShortcutRevision = -1;
+  private searchShortcutUnsub: (() => void) | null = null;
   declare updateStatus: AppUpdateStatus | null;
   declare updateBusy: boolean;
   // Tempdoc 778 — null until loaded from GET /api/feedback/capture; default-on locally.
@@ -307,6 +330,10 @@ export class SettingsSurface extends JfElement {
   private themeUnsub: (() => void) | null = null;
   // 569 §14 — save-settings Effect listener (the appearance statechart persists through it).
   private saveSettingsListener: ((e: Event) => void) | null = null;
+  private appearanceRevision = 0;
+  private appearanceFieldRevisions = new Map<string, number>();
+  private pendingAppearanceSaves = 0;
+  private appearanceNeedsReconciliation = false;
   // 569 §14 — the appearance behaviour, run as a declared statechart through the gated dispatcher.
   private appearanceMachine: InteractionMachine | null = null;
   // 569 §15 — the BRANCHING delete-confirm ceremony (CONFIRM_CEREMONY), run as a declared statechart.
@@ -343,6 +370,9 @@ export class SettingsSurface extends JfElement {
     this.saving = false;
     this.autostart = null;
     this.autostartLoaded = false;
+    this.searchShortcut = null;
+    this.searchShortcutBusy = false;
+    this.searchShortcutError = null;
     this.updateStatus = null;
     this.updateBusy = false;
     this.feedbackCaptureEnabled = null;
@@ -419,6 +449,12 @@ export class SettingsSurface extends JfElement {
       display: flex;
       flex-direction: column;
       gap: 1rem;
+    }
+    @media (max-width: 600px) {
+      .settings-shell { flex-direction: column; }
+      jf-settings-nav { width: 100%; flex: 0 0 10rem; height: 10rem; border-bottom: 1px solid var(--border-subtle); }
+      .settings-content-pane { min-width: 0; }
+      .settings-content-inner { padding: 1rem; }
     }
     .empty-member {
       padding: 1.5rem;
@@ -859,6 +895,7 @@ export class SettingsSurface extends JfElement {
     void this.loadFeedbackCapture();
     if (this.host_.platform.capabilities.has('native-notifications')) {
       void this.loadAutostart();
+      this.searchShortcutUnsub = this.watchSearchShortcut();
       this.appUpdateUnsub = subscribeAppUpdate((status) => {
         this.updateStatus = status;
       });
@@ -918,7 +955,7 @@ export class SettingsSurface extends JfElement {
       const settings = (e as CustomEvent<{ settings?: Record<string, unknown> }>).detail?.settings;
       if (!settings || this.readOnly) return;
       // This surface owns the persist lifecycle the statechart's save-settings edge triggers:
-      // optimistic apply already happened (set-appearance effect); persistence is best-effort.
+      // Optimistic appearance is reconciled from the settings owner if persistence is refused.
       let patch: SettingsPatch;
       try {
         patch = captureSettingsPatch(settings);
@@ -926,15 +963,24 @@ export class SettingsSurface extends JfElement {
         this.error = err instanceof Error ? err.message : String(err);
         return;
       }
+      this.pendingAppearanceSaves++;
       this.saving = true;
       const send = (path: string, init?: RequestInit) => this.doFetch(path, init);
       const writesMode = patch.ui != null && 'mode' in patch.ui;
       void (writesMode ? enqueueUiModeSettings(send, patch) : saveAbsoluteSettings(send, patch))
         .catch((err: unknown) => {
           this.error = err instanceof Error ? err.message : String(err);
+          this.appearanceNeedsReconciliation = true;
         })
-        .finally(() => {
-          this.saving = false;
+        .finally(async () => {
+          this.pendingAppearanceSaves--;
+          if (this.pendingAppearanceSaves === 0) {
+            if (this.appearanceNeedsReconciliation) {
+              this.appearanceNeedsReconciliation = false;
+              await this.loadSettings();
+            }
+            this.saving = this.pendingAppearanceSaves > 0;
+          }
         });
     };
     document.addEventListener('jf-save-settings', this.saveSettingsListener);
@@ -954,13 +1000,7 @@ export class SettingsSurface extends JfElement {
     // destructive flow. The surface renders the confirm state from `deleteState` and runs the
     // bespoke Tauri delete (the §7 effect body) on entering `done`; the chart's declared effect is
     // the closed `toast`, dispatched + journaled through the same gated 550 seam.
-    this.deleteMachine = createMachine(
-      activeInteractionFor(CONFIRM_CEREMONY.id) ?? CONFIRM_CEREMONY,
-    );
-    this.deleteUnsub = this.deleteMachine.subscribe((state) => {
-      this.deleteState = state;
-      if (state === 'done') void this.runDelete();
-    });
+    this.initializeDeleteCeremony();
 
     // Tempdoc 560 §28 (4d) — load the operator's durable allow-always grants for the panel.
     void this.loadDurableGrants();
@@ -978,6 +1018,7 @@ export class SettingsSurface extends JfElement {
     this.error = null;
     this.deleteState = 'idle';
     this.confirmText = '';
+    this.searchShortcutError = null;
   }
 
   override disconnectedCallback(): void {
@@ -997,6 +1038,8 @@ export class SettingsSurface extends JfElement {
     this.workspaceProfilesUnsub?.();
     this.appUpdateUnsub?.();
     this.appUpdateUnsub = null;
+    this.searchShortcutUnsub?.();
+    this.searchShortcutUnsub = null;
     this.consentUnsub?.();
     if (this.saveSettingsListener) {
       document.removeEventListener('jf-save-settings', this.saveSettingsListener);
@@ -1049,6 +1092,7 @@ export class SettingsSurface extends JfElement {
 
   private async loadSettings(): Promise<void> {
     const modeRevision = getUiModeRevision();
+    const appearanceRevision = this.appearanceRevision;
     try {
       const res = await this.doFetch('/api/settings/v2');
       if (!res.ok) return;
@@ -1056,12 +1100,14 @@ export class SettingsSurface extends JfElement {
       // Boot restoration normally seeds uiModeState first. Retain the fallback for isolated mounts,
       // but never let this slower surface-local GET overwrite a choice made while it was in flight.
       if (getUiModeRevision() === modeRevision) setUiMode(data.ui?.mode);
-      this.ui = { ...(data.ui ?? {}), mode: getUiMode() };
+      // A late observation restores untouched preferences while preserving newer field intents.
+      const newerFields = Object.fromEntries(Object.entries(this.ui).filter(
+        ([key]) => (this.appearanceFieldRevisions.get(key) ?? 0) > appearanceRevision,
+      ));
+      this.ui = { ...(data.ui ?? {}), ...newerFields, mode: getUiMode() };
+      this.applyAppearance();
       this.llm = data.llm ?? {};
       this.readOnly = data.settingsMode === 'in_memory';
-      // §2.C: replay the persisted appearance on load (one writer) so the theme
-      // survives reload and the high-contrast class is applied.
-      this.applyAppearance();
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     }
@@ -1089,6 +1135,61 @@ export class SettingsSurface extends JfElement {
       // Plugin not available — leave null
     } finally {
       this.autostartLoaded = true;
+    }
+  }
+
+  private acceptSearchShortcutStatus(value: unknown): void {
+    const status = parseSearchShortcutStatus(value);
+    const revision = status.revision ?? 0;
+    if (revision < this.searchShortcutRevision) return;
+    this.searchShortcutRevision = revision;
+    this.searchShortcut = status;
+  }
+
+  private watchSearchShortcut(): () => void {
+    let stopped = false;
+    let unlisten: (() => void) | null = null;
+    const start = async (): Promise<void> => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        const stop = await listen('justsearch://search-shortcut-status', (event) => {
+          if (stopped) return;
+          try { this.acceptSearchShortcutStatus(event.payload); }
+          catch (error) { this.searchShortcutError = String(error); }
+        });
+        if (stopped) { stop(); return; }
+        unlisten = stop;
+      } catch {
+        // A snapshot can still show the current state if event subscription is unavailable.
+      }
+      if (!stopped) await this.loadSearchShortcut();
+    };
+    void start();
+    return () => { stopped = true; unlisten?.(); unlisten = null; };
+  }
+
+  private async loadSearchShortcut(): Promise<void> {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      this.acceptSearchShortcutStatus(await invoke('search_shortcut_status'));
+    } catch (error) {
+      this.searchShortcutError = String(error);
+    }
+  }
+
+  private async toggleSearchShortcut(): Promise<void> {
+    if (!this.searchShortcut || this.searchShortcutBusy) return;
+    this.searchShortcutBusy = true;
+    this.searchShortcutError = null;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      this.acceptSearchShortcutStatus(await invoke('set_search_shortcut_enabled', { enabled: !this.searchShortcut.enabled }));
+    } catch (error) {
+      this.searchShortcutError = String(error);
+      // A failed save leaves registration untouched. Read back rather than guessing at state.
+      await this.loadSearchShortcut();
+    } finally {
+      this.searchShortcutBusy = false;
     }
   }
 
@@ -1135,6 +1236,8 @@ export class SettingsSurface extends JfElement {
    */
   private patch(updates: Partial<UISettings>): void {
     if (this.readOnly) return;
+    this.appearanceRevision++;
+    for (const key of Object.keys(updates)) this.appearanceFieldRevisions.set(key, this.appearanceRevision);
     this.ui = { ...this.ui, ...updates };
     const m = this.appearanceMachine;
     if (!m) return;
@@ -1197,9 +1300,36 @@ export class SettingsSurface extends JfElement {
    * user-authored statechart that gates it. The imperative `showConfirmDialog` is replaced by the
    * declared `confirming` state the surface renders inline (the typed-confirm panel).
    */
+  private initializeDeleteCeremony(): void {
+    this.deleteUnsub?.();
+    this.deleteMachine = createMachine(
+      activeInteractionFor(CONFIRM_CEREMONY.id) ?? CONFIRM_CEREMONY,
+    );
+    this.deleteUnsub = this.deleteMachine.subscribe((state) => {
+      this.deleteState = state;
+      if (state === 'done') void this.runDelete();
+      if (state === 'confirming') {
+        void this.updateComplete.then(() => {
+          this.shadowRoot?.querySelector<HTMLInputElement>('input[aria-label="Type DELETE to confirm"]')?.focus();
+        });
+      }
+    });
+  }
+
+  private cancelDelete(): void {
+    this.confirmText = '';
+    this.deleteMachine?.send('CANCEL');
+    void this.updateComplete.then(async () => {
+      const button = this.shadowRoot?.querySelector<JfButton>('jf-button[label="Delete all local data"]');
+      await button?.updateComplete;
+      button?.focus();
+    });
+  }
+
   private async runDelete(): Promise<void> {
     if (!this.host_.platform.capabilities.has('native-notifications') || this.deleting) return;
     this.deleting = true;
+    this.error = null;
     try {
       const mod = await import('@tauri-apps/api/core');
       const token = await mod.invoke<string>('prepare_delete_data');
@@ -1207,6 +1337,8 @@ export class SettingsSurface extends JfElement {
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
       this.deleting = false;
+      this.confirmText = '';
+      this.initializeDeleteCeremony();
     }
   }
 
@@ -1301,7 +1433,7 @@ export class SettingsSurface extends JfElement {
           .data=${this.ui as Record<string, unknown>}
           .enabled=${!this.readOnly}
           @surface-change=${(e: CustomEvent<SurfaceChangeEventDetail>) =>
-            void this.patch(e.detail.data as Partial<UISettings>)}
+            void this.patch({ [e.detail.path]: e.detail.value } as Partial<UISettings>)}
         ></jf-declared-surface>
       </div>
       <div class="section">${this.renderRelatedSettingsRow('appearance', 'accessibility')}</div>
@@ -1586,6 +1718,16 @@ export class SettingsSurface extends JfElement {
    * surfaces and operations.
    * AGENT is reserved for the agent runtime, not user-selectable.
    */
+  /** Recovery navigation selects existing controls; it never changes tier or invokes Reset. */
+  async focusSettingsRecovery(): Promise<void> {
+    const user = this.viewerAudience === 'USER';
+    if (user) this.activateSearchHit('developer', 'view-tier');
+    await this.updateComplete;
+    const target = this.shadowRoot?.getElementById(user ? 'settings-view-tier' : 'settings-reset');
+    target?.scrollIntoView({ block: 'nearest' });
+    target?.focus();
+  }
+
   private renderViewerAudience(): TemplateResult {
     const audience: Audience = this.viewerAudience;
     const options: OptionButtonGroupOption[] = [
@@ -1594,7 +1736,7 @@ export class SettingsSurface extends JfElement {
       { value: 'DEVELOPER', label: 'Developer', description: 'Show everything', icon: 'database' },
     ];
     return html`
-      <div class="section">
+      <div class="section" id="settings-view-tier" tabindex="-1" role="group" aria-label="View tier settings">
         <h3>${icon({ name: 'shield', size: 12 })} View tier</h3>
         ${this.renderSettingRow(
           'View tier preference',
@@ -1686,13 +1828,13 @@ export class SettingsSurface extends JfElement {
   }
 
   private renderDesktop(): TemplateResult | typeof nothing {
-    if (!this.host_.platform.capabilities.has('native-notifications') || !this.autostartLoaded || this.autostart === null) {
+    if (!this.host_.platform.capabilities.has('native-notifications')) {
       return nothing;
     }
     return html`
       <div class="section">
         <h3>${icon({ name: 'power', size: 12 })} Desktop</h3>
-        ${this.renderSettingRow(
+        ${this.autostartLoaded && this.autostart !== null ? this.renderSettingRow(
           'Launch on startup',
           'Start minimized in the system tray',
           html`
@@ -1702,7 +1844,31 @@ export class SettingsSurface extends JfElement {
               @change=${() => void this.toggleAutostart()}
             ></jf-switch>
           `,
-        )}
+        ) : nothing}
+        <div data-testid="settings-search-shortcut">
+          ${this.renderSettingRow(
+            'Global search shortcut',
+            'Alt + Shift + Space',
+            html`<jf-switch
+              .checked=${this.searchShortcut?.enabled ?? false}
+              .disabled=${this.searchShortcutBusy || this.searchShortcut === null}
+              label="Global search shortcut"
+              .description=${[this.searchShortcutError, this.searchShortcut?.reason
+                ? `Shortcut not active. ${this.searchShortcut.reason} Alternatively, run JustSearch with --focus-search.`
+                : 'Alt + Shift + Space. Alternatively, run JustSearch with --focus-search.'].filter(Boolean).join(' ')}
+              @change=${() => void this.toggleSearchShortcut()}
+            ></jf-switch>`,
+          )}
+          <p role="status" aria-live="polite" aria-atomic="true">
+            ${this.searchShortcut === null
+              ? this.searchShortcutError ?? 'Loading shortcut status…'
+              : !this.searchShortcut.enabled ? 'Turned off'
+                : this.searchShortcut.active ? 'Active'
+                  : `Shortcut not active. ${this.searchShortcut.reason ?? 'Registration was refused.'}`}
+            ${this.searchShortcut && this.searchShortcutError ? this.searchShortcutError : nothing}
+          </p>
+          <p>Alternatively, run JustSearch with <code>--focus-search</code>.</p>
+        </div>
       </div>
     `;
   }
@@ -2456,8 +2622,8 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'database', size: 12 })} Data</h3>
         <p class="help" style="margin-top: 0">
-          If you want to uninstall JustSearch or start fresh, you can delete all local data from
-          inside the app.
+          Start fresh by deleting local data. Downloaded AI models and the AI runtime are kept.
+          This does not remove JustSearch itself.
         </p>
         <div style="margin-top: 0.75rem">
           ${this.deleteState === 'confirming'
@@ -2467,14 +2633,15 @@ export class SettingsSurface extends JfElement {
                 label="Delete all local data"
                 ?disabled=${!tauri || this.deleting}
                 title=${tauri
-                  ? 'Closes the app and wipes local data on next start'
+                  ? 'Restarts automatically and deletes local data before starting again'
                   : 'Available only in the desktop app (Tauri).'}
                 .onActivate=${() => this.deleteMachine?.send('REQUEST')}
               >
                 ${icon({ name: 'trash-2', size: 14 })}
-                ${this.deleting ? 'Closing…' : 'Delete all local data'}
+                ${this.deleting ? 'Restarting…' : 'Delete all local data'}
               </jf-button>`}
         </div>
+        ${!tauri ? html`<p class="help">Available only in the desktop app. A browser cannot delete the app's local data.</p>` : nothing}
       </div>
     `;
   }
@@ -2538,52 +2705,49 @@ export class SettingsSurface extends JfElement {
   private renderDeleteConfirm(): TemplateResult {
     const typed = this.confirmText.trim().toUpperCase() === 'DELETE';
     return html`
-      <div role="group" aria-label="Confirm delete all local data">
-        <p class="help" style="margin-top: 0">
-          This closes JustSearch and deletes your local index, settings, and logs on next launch
-          (your AI models in AI Home are preserved). Type <strong>DELETE</strong> to confirm.
+      <div role="group" aria-label="Confirm delete all local data"
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.cancelDelete(); }
+        }}>
+        <p id="delete-data-description" class="help" style="margin-top: 0">
+          JustSearch will restart automatically and delete conversations, memories, agent history,
+          the index, watched folders, settings, logs, and saved window data (including recent
+          searches, composer drafts, and conversation titles) before starting again.
+          Your original files and folders are untouched. Downloaded AI models and the AI runtime are kept.
+          These deleted items <strong>cannot be recovered</strong>, whether or not encryption is enabled.
+          Type <strong>DELETE</strong> to confirm.
         </p>
-        <div
-          style="margin-top:0.5rem; padding:0.6rem; background:var(--accent-warning-16); border-radius:0.25rem"
-        >
-          <!-- Tempdoc 629 (#protect-on-delete): the AUTHORED stores, if encrypted, are NOT rebuildable,
-               so the uniform wipe is permanent. Point to the encrypted export (in Security & Privacy)
-               first so the user can restore them later. -->
-          If you've encrypted your chat history, memories, or agent history, they
-          <strong>can't be rebuilt</strong> — export an encrypted backup first so you can restore them
-          later.
-          <div style="margin-top:0.5rem">
-            <jf-button
-              variant="secondary"
-              .onActivate=${() => this.host_.navigation.navigate('core.security-surface')}
-              >Open Security &amp; Privacy to export</jf-button
-            >
-          </div>
-        </div>
+        <p class="help">
+          Copy any conversations you want to keep before resetting. There is no automatic
+          conversation backup for an unencrypted store. If encryption is enabled, you can also
+          export an encrypted backup in Security &amp; Privacy first. Earlier backups and exports
+          are not deleted.
+          <jf-button variant="secondary"
+            .onActivate=${() => this.host_.navigation.navigate('core.security-surface')}
+          >Open Security &amp; Privacy</jf-button>
+        </p>
         <input
           type="text"
           aria-label="Type DELETE to confirm"
+          aria-describedby="delete-data-description"
           placeholder="DELETE"
-          style="padding:0.4rem 0.6rem; border-radius:0.375rem; border:1px solid var(--border-subtle); background:var(--surface-1); color:var(--text-primary); font:inherit; min-inline-size:12rem"
+          style="padding:0.4rem 0.6rem; border-radius:0.375rem; border:1px solid var(--border-subtle); background:var(--surface-1); color:var(--text-primary); font:inherit; box-sizing:border-box; min-inline-size:0; inline-size:min(18rem, 100%)"
           .value=${this.confirmText}
           @input=${(e: Event) => (this.confirmText = (e.target as HTMLInputElement).value)}
         />
-        <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem">
           <jf-button
             variant="danger"
-            label="Delete & Close"
+            label="Delete & Restart"
             ?disabled=${!typed}
             .onActivate=${() => this.deleteMachine?.send('CONFIRM', { typed })}
           >
-            ${icon({ name: 'trash-2', size: 14 })} Delete &amp; Close
+            ${icon({ name: 'trash-2', size: 14 })} Delete &amp; Restart
           </jf-button>
           <jf-button
             variant="ghost"
             label="Cancel"
-            .onActivate=${() => {
-              this.confirmText = '';
-              this.deleteMachine?.send('CANCEL');
-            }}
+            .onActivate=${() => this.cancelDelete()}
           >
             Cancel
           </jf-button>
@@ -2625,7 +2789,7 @@ export class SettingsSurface extends JfElement {
               ? html`<span style="font-size: var(--font-size-xs); color: var(--text-tint)">Saving…</span>`
               : nothing}
             ${!this.readOnly
-              ? html`<span
+              ? html`<span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
                   @op-success=${() => this.handleResetSuccess()}
                   @op-error=${(e: CustomEvent<OpErrorEventDetail>) =>
                     this.handleResetError(e)}
@@ -2701,6 +2865,7 @@ export class SettingsSurface extends JfElement {
    *  the redesign re-parents sections, it does not rewrite them). */
   private sectionRenderers(): Record<string, () => TemplateResult | typeof nothing> {
     return {
+      indexing: () => this.renderIndexing(),
       interface: () => this.renderInterfaceRegion(),
       theme: () => this.renderThemes(),
       accessibility: () => this.renderAccessibility(),
@@ -2722,6 +2887,18 @@ export class SettingsSurface extends JfElement {
       'workspace-profiles': () => this.renderWorkspaceProfilesDeveloper(),
       data: () => this.renderData(),
     };
+  }
+
+  private renderIndexing(): TemplateResult {
+    const s = this.aiSnapshot;
+    const progress = selectIndexingProgress(s?.status, s?.indexingStatusLive ?? false,
+      s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []);
+    return html`<section class="section" data-testid="settings-indexing">
+      <h3>Indexing</h3>
+      <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
+      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>` : nothing}
+      <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
+    </section>`;
   }
 
   /** Tempdoc 855 §4 — Feedback capture moves from nested-inside-Security-pointer to its own

@@ -73,6 +73,8 @@ async function showFiles(): Promise<void> {
 /** Set the projection directly — the render-level equivalent of a poll landing. */
 async function setProgress(p: Partial<IndexingProgress>): Promise<void> {
   (host as TaskList).progress = {
+    activity: { summary: 'Indexing status unconfirmed', detail: null,
+      confirmed: (p.phase ?? 'unknown') !== 'unknown' && p.live !== false, enrichmentDeferred: false },
     phase: 'unknown',
     jobsPending: 0,
     jobsRunning: 0,
@@ -86,6 +88,7 @@ async function setProgress(p: Partial<IndexingProgress>): Promise<void> {
     vduPending: 0,
     etaSeconds: null,
     indexingPercent: null,
+    rebuildPercent: null,
     pendingBytes: null,
     live: true,
     stages: { embedding: true, splade: true, ner: true },
@@ -314,10 +317,10 @@ describe('<jf-task-list> — aggregate card (813 §5)', () => {
     expect(q('[data-testid="tasks-disclosure"]')).toBeNull();
   });
 
-  it('says nothing at all on the `unknown` arm — no phase, no bar, no counts', async () => {
+  it('S33.4 unknown indexing is unconfirmed without a phase, bar or counts', async () => {
     upsertMirroredTask({ id: 'idxjob:r1', label: 'agent op', status: 'running' });
     await setProgress({ phase: 'unknown' });
-    expect(text('[data-testid="task-title"]')).toBe('Tasks');
+    expect(text('[data-testid="task-title"]')).toBe('Indexing status unconfirmed');
     expect(q('[data-testid="task-aggregate"]')).toBeNull();
   });
 
@@ -664,3 +667,42 @@ describe('<jf-task-list> — enrichment estimate (813 §20)', () => {
   });
 });
 
+
+it('keeps retry waiting visible without showing progress or a ready claim', async () => {
+  const detail = '8 files waiting. Next retry: 10/21/2026, 10:00:00 PM.';
+  await setProgress({ phase: 'waiting', jobsPending: 8, live: true,
+    activity: { summary: 'Waiting to retry', detail, confirmed: true, enrichmentDeferred: false } });
+  expect(host.hasAttribute('data-empty')).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Waiting to retry');
+  expect(host.shadowRoot?.textContent).toContain(detail);
+  expect(q('[role="progressbar"]')).toBeNull();
+  expect(host.shadowRoot?.textContent).not.toContain('Everything is indexed');
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: READY_SNAPSHOT });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(true);
+  __feedForTest({ status: snapshot({ core: { indexState: 'WAITING', pendingJobs: 8 },
+    failure: { nextRetryAtMs: Date.now() + 60_000 } }) });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Waiting to retry');
+  expect(q('[role="progressbar"]')).toBeNull();
+});
+
+it('terminal failures withdraw the completion window and remain visible as errors', async () => {
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: READY_SNAPSHOT });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(true);
+  __feedForTest({ status: snapshot({ core: { indexState: 'ERROR', pendingJobs: 0, indexHealthy: false },
+    failure: { failedJobs: 2 }, migration: { pendingJobsCount: 0, processingJobsCount: 0 } }) });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(host.hasAttribute('data-empty')).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Indexing error');
+  expect(host.shadowRoot?.textContent).toContain('2 files could not be indexed.');
+  expect(host.shadowRoot?.textContent).not.toContain('Everything is indexed');
+  expect(q('[role="progressbar"]')).toBeNull();
+});

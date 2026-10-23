@@ -45,6 +45,8 @@ class PolicyControllerTest {
     PolicyController controller = new PolicyController(snapshotSupplier, null);
     app = Javalin.create(cfg -> { cfg.showJavalinBanner = false; cfg.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()); });
     app.get("/api/policy/validate", controller::handleValidatePolicy);
+    app.get("/api/policy/effective", controller::handleGetEffectivePolicy);
+    app.post("/api/policy/user/allowlist/pack-manifest/add", controller::handleAddPackManifestShaToUserAllowlist);
     app.start("127.0.0.1", 0);
     port = app.port();
   }
@@ -59,10 +61,47 @@ class PolicyControllerTest {
     return MAPPER.readTree(resp.body());
   }
 
+  @org.junit.jupiter.api.io.TempDir Path policyRoot;
+
+  @Test
+  void effectiveEndpointAndAllowlistAppendKeepAppUpdatesDisabled() throws Exception {
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    String previousGpu = System.getProperty("policy.gpu_acceleration_enabled");
+    String previousExternal = System.getProperty("justsearch.policy.disallowExternalInferenceServers");
+    try {
+      io.justsearch.configuration.resolved.ConfigStore.setGlobal(
+          new io.justsearch.configuration.resolved.ConfigStore(
+              io.justsearch.configuration.resolved.TestResolvedConfigHelper.fromEntries(
+                  java.util.Map.of("justsearch.home", policyRoot.toString()))));
+      Path user = policyRoot.resolve("policy.v1.json");
+      java.nio.file.Files.writeString(user, "{\"schemaVersion\":1,\"appUpdatesEnabled\":false}");
+      var service = new io.justsearch.app.services.policy.EnterprisePolicyServiceImpl();
+      startServer(service::snapshot);
+      JsonNode before = fetch("/api/policy/effective");
+      assertTrue(before.has("appUpdatesEnabled"), "effective policy must expose the app-update permission");
+      assertFalse(before.path("appUpdatesEnabled").asBoolean(true));
+      HttpRequest append = HttpRequest.newBuilder()
+          .uri(URI.create("http://127.0.0.1:" + port + "/api/policy/user/allowlist/pack-manifest/add"))
+          .header("Content-Type", "application/json")
+          .POST(HttpRequest.BodyPublishers.ofString("{\"manifestSha256\":\"" + "a".repeat(64) + "\"}"))
+          .build();
+      assertEquals(200, client.send(append, HttpResponse.BodyHandlers.ofString()).statusCode());
+      assertFalse(MAPPER.readTree(java.nio.file.Files.readString(user)).path("appUpdatesEnabled").asBoolean(true));
+      assertFalse(fetch("/api/policy/effective").path("appUpdatesEnabled").asBoolean(true));
+    } finally {
+      io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous);
+      if (previousGpu == null) System.clearProperty("policy.gpu_acceleration_enabled");
+      else System.setProperty("policy.gpu_acceleration_enabled", previousGpu);
+      if (previousExternal == null) System.clearProperty("justsearch.policy.disallowExternalInferenceServers");
+      else System.setProperty("justsearch.policy.disallowExternalInferenceServers", previousExternal);
+    }
+  }
+
   @Test
   void validateReturnsValidWhenNoPoliciesPresent() throws Exception {
     // No policy files: machine not present, user not present
     EffectivePolicy policy = new EffectivePolicy(
+        true,
         true, true, true, false,
         List.of(), List.of(), "none", false,
         new EffectivePolicy.PolicySource(Path.of("/nonexistent/machine"), false, false, null, null),
@@ -83,6 +122,7 @@ class PolicyControllerTest {
   void validateReturnsValidWhenMachinePolicyLoadedSuccessfully() throws Exception {
     // Machine policy present and loaded successfully
     EffectivePolicy policy = new EffectivePolicy(
+        true,
         true, false, true, false,
         List.of(), List.of("abc123"), "machine", true,
         new EffectivePolicy.PolicySource(Path.of("C:/ProgramData/JustSearch/policy.v1.json"), true, true, null, null),
@@ -103,6 +143,7 @@ class PolicyControllerTest {
   void validateReturnsInvalidWhenMachinePolicyFailedToLoad() throws Exception {
     // Machine policy present but failed to load (fail-closed behavior)
     EffectivePolicy policy = new EffectivePolicy(
+        true,
         false, false, false, true,
         List.of(), List.of(), "machine", false,
         new EffectivePolicy.PolicySource(Path.of("C:/ProgramData/JustSearch/policy.v1.json"), true, false, "Invalid JSON syntax", null),
@@ -124,6 +165,7 @@ class PolicyControllerTest {
   void validateReturnsInvalidWhenUserPolicyHasError() throws Exception {
     // User policy present but failed to load
     EffectivePolicy policy = new EffectivePolicy(
+        true,
         true, true, true, false,
         List.of(), List.of(), "app", true,
         new EffectivePolicy.PolicySource(Path.of("/machine"), false, false, null, null),
@@ -144,6 +186,7 @@ class PolicyControllerTest {
   void validateReturnsValidWhenBothPoliciesLoadedSuccessfully() throws Exception {
     // Both machine and user policies present and loaded successfully
     EffectivePolicy policy = new EffectivePolicy(
+        true,
         true, false, true, false,
         List.of(), List.of("abc123"), "machine", true,
         new EffectivePolicy.PolicySource(Path.of("C:/ProgramData/JustSearch/policy.v1.json"), true, true, null, null),

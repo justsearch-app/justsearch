@@ -107,7 +107,7 @@ final class IngestResponses {
   }
 
   static DeleteByPathResponse bufferedDeleteByPathResponse() {
-    return deleteByPathResponse(0, "");
+    return deleteByPathResponse(0, "").toBuilder().setBuffered(true).build();
   }
 
   /** Tempdoc 811 (C-2a) — collection-keyed removal route response. */
@@ -124,7 +124,7 @@ final class IngestResponses {
   }
 
   static DeleteByIdResponse bufferedDeleteByIdResponse() {
-    return deleteByIdResponse(true, "");
+    return deleteByIdResponse(true, "").toBuilder().setBuffered(true).build();
   }
 
   static PruneResponse pruneErrorResponse(String error) {

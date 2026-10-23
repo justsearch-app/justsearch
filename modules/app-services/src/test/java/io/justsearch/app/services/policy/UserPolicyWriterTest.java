@@ -26,6 +26,7 @@ class UserPolicyWriterTest {
         true,
         true,
         true,
+        true,
         false,
         List.of(),
         List.of(),
@@ -93,6 +94,7 @@ class UserPolicyWriterTest {
             true,
             true,
             true,
+            true,
             false,
             List.of(),
             List.of(),
@@ -139,6 +141,7 @@ class UserPolicyWriterTest {
         new EffectivePolicy.PolicySource(user, false, false, null, null);
     EffectivePolicy eff =
         new EffectivePolicy(
+            true,
             true,
             true,
             true,
@@ -257,6 +260,7 @@ class UserPolicyWriterTest {
             true,
             true,
             true,
+            true,
             false,
             List.of(),
             List.of(appSha),
@@ -292,6 +296,7 @@ class UserPolicyWriterTest {
         new EffectivePolicy.PolicySource(user, true, true, null, null);
     EffectivePolicy eff =
         new EffectivePolicy(
+            true,
             true,
             true,
             true,

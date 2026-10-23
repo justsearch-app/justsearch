@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T13:34:50.589Z",
+  "revision": "75bab60ce95c96530f73caa180795e804343595d",
+  "tree": "3ab588efdfbeae1291dfd96c46542c596bc17a64",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26100",
+    "node": "v22.23.3",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": true
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_folder_window_control\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16562
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_plain_reveal_window_control\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5721
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_window_control",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::windows_folder_window_control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_plain_reveal_window_control",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::windows_plain_reveal_window_control",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1917817808d06e02cf8b5929b9cb6f747d82e219bf55194d6aa5985d7aca15b9"
+}

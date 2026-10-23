@@ -1,0 +1,88 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T12:05:16.914Z",
+  "revision": "ad2b22ae5feb8e7835b0e098b552cbf6f41a7bc7",
+  "tree": "345c7be787abc71c5b90271bba673747ee8b8d30",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::unavailable_crash_folder_reports_the_real_obstacle\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10424
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1775
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2000
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::unavailable_crash_folder_reports_the_real_obstacle",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:ae8fa541c2f13bc0388dd7be0379e7ce7214b49a53debbbd7832aad71eae2dd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::unavailable_crash_folder_reports_the_real_obstacle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:ae8fa541c2f13bc0388dd7be0379e7ce7214b49a53debbbd7832aad71eae2dd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:ae8fa541c2f13bc0388dd7be0379e7ce7214b49a53debbbd7832aad71eae2dd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9d83b79aa321b6aba1e9a515f6342fdd2450ecf4734fa7ea770ca3a75ae3a7e4"
+}

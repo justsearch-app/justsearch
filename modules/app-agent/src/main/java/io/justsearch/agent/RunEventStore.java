@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.agent.api.encryption.StoreCipher;
@@ -88,6 +89,7 @@ public final class RunEventStore {
    */
   public Map<String, Object> appendEvent(
       String sessionId, String shapeId, String eventType, Map<String, Object> payload) {
+    StoreIds.requireValid(sessionId);
     Map<String, Object> record = writeEventRecord(sessionId, shapeId, eventType, payload);
     if (record != null) {
       for (BiConsumer<String, Map<String, Object>> listener : eventListeners) {
@@ -106,8 +108,8 @@ public final class RunEventStore {
     if (!isEnabled()) {
       return null;
     }
+    requireRun(sessionId);
     try {
-      Files.createDirectories(runDir(sessionId));
       var record = new LinkedHashMap<String, Object>();
       record.put("schemaVersion", CURRENT_SCHEMA_VERSION);
       record.put("timestamp", Instant.now().toString());
@@ -138,11 +140,12 @@ public final class RunEventStore {
    * throws and the write fails soft without overwriting (mirrors {@link #writeEventRecord}).
    */
   public synchronized void appendRawEvents(String sessionId, List<?> records) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled() || records == null || records.isEmpty()) {
       return;
     }
+    requireRun(sessionId);
     try {
-      Files.createDirectories(runDir(sessionId));
       StringBuilder sb = new StringBuilder();
       for (Object record : records) {
         if (!(record instanceof Map<?, ?> rec)) {
@@ -189,6 +192,7 @@ public final class RunEventStore {
    * limitation" — it is an unfixed instance of a named defect class.
    */
   public synchronized List<Map<String, Object>> readEvents(String sessionId) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return List.of();
     }
@@ -227,13 +231,14 @@ public final class RunEventStore {
   }
 
   /**
-   * Tempdoc 565 §15.C — write the generic run-index {@code meta.json} (sessionId / conversationId /
+   * Creates the generic run-index {@code meta.json} (sessionId / conversationId /
    * shapeId / startedAt / state / background …). The unified thread finds a run by scanning these for
    * a matching {@code conversationId}, so a workflow run that writes one is projected alongside agent
    * runs. The AGENT run layers richer fields (profiles / handoff / resume) on the same file via
    * {@code AgentRunStore}; this is the shape-agnostic base both share.
    */
   public synchronized void writeRunMeta(String sessionId, Map<String, Object> meta) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -246,8 +251,25 @@ public final class RunEventStore {
     }
   }
 
+  /** Updates an existing run; terminal callbacks must never recreate a deleted run. */
+  public synchronized void updateRunMeta(String sessionId, Map<String, Object> meta) {
+    StoreIds.requireValid(sessionId);
+    if (!isEnabled()) return;
+    requireRun(sessionId);
+    writeRunMeta(sessionId, meta);
+  }
+
+  private void requireRun(String sessionId) {
+    if (Files.notExists(metaPath(sessionId))) {
+      throw new IllegalArgumentException("No such run: " + sessionId);
+    }
+    if (!Files.isRegularFile(metaPath(sessionId))) {
+      throw new CorruptDurableStoreException("run-events", "Run metadata is unreadable: " + sessionId);
+    }
+  }
+
   public Path runDir(String sessionId) {
-    return rootDir.resolve(sessionId);
+    return StoreIds.resolve(rootDir, sessionId);
   }
 
   public Path eventsPath(String sessionId) {

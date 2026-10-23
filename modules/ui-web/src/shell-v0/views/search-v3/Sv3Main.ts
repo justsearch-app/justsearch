@@ -16,6 +16,7 @@
  * Side-effect registers <jf-sv3-main>.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { coverageHonesty, coverageNote, groundingCoverage } from '../../components/chat/evidenceProjection.js';
 import { JfElement } from '../../primitives/JfElement.js';
 // The product's ONE reading-position authority (tempdoc 565 §21), and this surface is its SECOND
 // adopter — 565 §21 deferred "the general multi-surface authority … to the 2nd adopter", so the
@@ -109,6 +110,8 @@ import {
   TURN_EMPTY_ANSWER,
   TURN_FAILED,
   TURN_HALTED,
+  TURN_STOP_FAILED,
+  TURN_STOPPING,
   VERSION_AT_FIRST,
   VERSION_AT_LAST,
   VERSION_NEXT,
@@ -190,6 +193,15 @@ export interface Sv3CitationOpen {
    * is how a claim match arriving AFTER the pane opened is re-resolved onto the open pane (§4).
    */
   readonly sourceIndex: number;
+}
+
+/**
+ * The reader's Stop on a streaming answer, until the Engine ends the turn: asked (`stopping`), or
+ * refused or unanswered (`failed`), so the answer goes on and Stop can be pressed again.
+ */
+export interface Sv3StopState {
+  readonly turnId: string;
+  readonly state: 'stopping' | 'failed';
 }
 
 export type Sv3RunDecision =
@@ -474,6 +486,8 @@ export class Sv3Main extends JfElement {
          the question, so it sits with it, one step below the bubble's own text. */
       .ask-scope {
         margin: 0;
+        overflow-wrap: anywhere;
+        max-inline-size: 100%;
         color: var(--secondary-label);
         font-size: var(--font-size-sv3-xs);
       }
@@ -576,6 +590,7 @@ export class Sv3Main extends JfElement {
          markdown renderer, so the block-level rhythm is the renderer's and this box no longer
          preserves source whitespace (a 'pre-wrap' around block children would re-introduce the
          template's own newlines as vertical space). */
+      .structured-json { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; font-family: var(--font-mono, monospace); }
       .answer {
         position: relative;
         min-width: 0;
@@ -785,6 +800,14 @@ export class Sv3Main extends JfElement {
       .sv3-citations {
         display: block;
         margin: var(--space-2) 0 0;
+        overflow-wrap: anywhere;
+      }
+      .coverage-note {
+        margin: var(--space-2) 0 0;
+        color: var(--secondary-label);
+        font-size: var(--font-size-sv3-sm);
+        line-height: 1.5;
+        overflow-wrap: anywhere;
       }
       .answer-empty {
         color: var(--secondary-label);
@@ -1279,6 +1302,11 @@ export class Sv3Main extends JfElement {
         margin: 0;
         font-size: var(--font-size-sv3-sm);
       }
+      .no-evidence { margin-block: 0.75rem; line-height: 1.5; }
+      .model-answer-action { margin-block: 0.5rem; overflow-wrap: anywhere; }
+      .model-answer-button { min-height: 2rem; max-width: 100%; white-space: normal; text-align: start; }
+      .model-answer-button:disabled { cursor: default; opacity: 0.65; }
+
       .record-notice-detail {
         margin: var(--space-1) 0 0;
         color: var(--secondary-label);
@@ -1292,6 +1320,7 @@ export class Sv3Main extends JfElement {
     view: { attribute: false },
     turns: { attribute: false },
     turnScopes: { attribute: false },
+    structuredNotes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
     unconfirmedSteerNotes: { attribute: false },
@@ -1312,8 +1341,12 @@ export class Sv3Main extends JfElement {
     expandedSources: { state: true },
     turnContexts: { attribute: false },
     turnLineage: { attribute: false },
+    continuationVersions: { attribute: false },
     floorSummary: { attribute: false },
     streaming: { type: Boolean },
+    stopping: { attribute: false },
+    modelAnswerUnavailableReason: { attribute: false },
+    modelAnswerBusy: { type: Boolean, attribute: 'model-answer-busy' },
     showFloorSummary: { state: true },
     editingFloorSummary: { state: true },
     floorSummaryDraft: { state: true },
@@ -1327,10 +1360,13 @@ export class Sv3Main extends JfElement {
   declare view: Sv3ResultsView;
   /** The ACTIVE session's turns, oldest first. Handed down; the region holds no session list. */
   declare turns: readonly Sv3Turn[];
+  declare modelAnswerUnavailableReason: string;
+  declare modelAnswerBusy: boolean;
   /**
    * WP1.1 S1.7 — which turns this window limited to chosen files. Window-local: a reloaded turn is
    * not in it, and its Edit then says it searches all files, which is what it will do.
    */
+  declare structuredNotes: ReadonlyMap<string, string>;
   declare turnScopes: ReadonlyMap<string, Sv3AskScope>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
@@ -1417,6 +1453,8 @@ export class Sv3Main extends JfElement {
    * the arithmetic and performs none of it.
    */
   declare turnLineage: readonly Sv3TurnLineage[];
+  /** The versions after the last answer, before a continuation has its own question. */
+  declare continuationVersions: Sv3VersionSet | null;
   /** The compaction summary standing at the floor, or null for a plain rewind / no floor. */
   declare floorSummary: string | null;
   /**
@@ -1425,6 +1463,11 @@ export class Sv3Main extends JfElement {
    * flight, and a turn that is not itself streaming cannot see that.
    */
   declare streaming: boolean;
+  /**
+   * The reader's Stop on the streaming answer. Only the Engine's terminal says the turn stopped, so
+   * until then the turn says "Stopping…", or that the Stop did not reach the Engine.
+   */
+  declare stopping: Sv3StopState | null;
   /** The divider's disclosure — the summary is a paragraph of the model's words, not a label. */
   declare showFloorSummary: boolean;
   declare editingFloorSummary: boolean;
@@ -1567,7 +1610,7 @@ export class Sv3Main extends JfElement {
   private get transcriptArmRendered(): boolean {
     if (this.resultsArmRendered) return false;
     if (this.locksTranscript) return false;
-    return (this.turns ?? []).length > 0 || this.recordNotice;
+    return (this.turns ?? []).length > 0 || this.recordNotice || this.continuationVersions !== null;
   }
 
   constructor() {
@@ -1575,6 +1618,9 @@ export class Sv3Main extends JfElement {
     this.state = COMPOSER_STATE_DEFAULT;
     this.view = SV3_RESULTS_IDLE;
     this.turns = [];
+    this.modelAnswerUnavailableReason = '';
+    this.modelAnswerBusy = false;
+    this.structuredNotes = new Map();
     this.turnScopes = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
@@ -1590,8 +1636,10 @@ export class Sv3Main extends JfElement {
     this.expandedSources = new Set();
     this.turnContexts = [];
     this.turnLineage = [];
+    this.continuationVersions = null;
     this.floorSummary = null;
     this.streaming = false;
+    this.stopping = null;
     this.showFloorSummary = false;
     this.editingFloorSummary = false;
     this.floorSummaryDraft = '';
@@ -1707,6 +1755,15 @@ export class Sv3Main extends JfElement {
     if (el === null) return;
     this.followEnd = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_END_SLACK_PX;
   };
+
+  protected override willUpdate(): void {
+    const focused = deepActiveElement();
+    if (focused?.getRootNode() === this.shadowRoot && focused?.matches('[data-model-answer]')
+      && (focused.getAttribute('data-model-answer') !== this.turns.at(-1)?.id || !this.modelActionTurn(this.turns.at(-1))
+      || this.streaming || this.modelAnswerBusy || this.modelAnswerUnavailableReason !== '' || this.locksTranscript)) {
+      this.dispatchEvent(new CustomEvent('sv3-model-focus', { bubbles: true, composed: true }));
+    }
+  }
 
   protected override updated(changed: Map<string, unknown>): void {
     this.settleFloorSummaryEditor(changed);
@@ -1831,6 +1888,7 @@ export class Sv3Main extends JfElement {
               </div>`
             : nothing}
           ${turns.map((turn) => this.turn(turn))}
+          ${this.versionPager(null)}
         </div>
       </div>
       <!-- OUTSIDE the scroller: the card is viewport-positioned from the mark's own rect, so a
@@ -1944,7 +2002,9 @@ export class Sv3Main extends JfElement {
         ?data-excluded=${context?.hasExcluded === true}
       >
         ${this.question(turn)}
-        ${turn.kind === 'agent'
+        ${turn.status === 'no-evidence'
+          ? html`${this.rewriteNote(turn)}<p class="no-evidence" role="status" data-testid="sv3-no-evidence">Nothing in your files matched this question.</p>`
+          : turn.kind === 'agent'
           ? html`${/* Tempdoc 859 §A §1.9 — the reasoning STACK is gone from the agent arm. An agent
                       turn's thinking is inside the feed now, one thought above the step it produced,
                       which is what a run timeline is; stacking every block above the feed was A1's
@@ -1953,7 +2013,7 @@ export class Sv3Main extends JfElement {
           : html`
               ${this.rewriteNote(turn)}${this.reasoningBlocks(turn, streaming)}
               <div class="answer" data-testid="sv3-turn-answer" data-item-id=${`${turn.id}:a`}>
-                ${empty && !streaming
+                ${empty && turn.kind === 'model' && turn.status !== 'complete' ? nothing : empty && !streaming
                   ? html`<span class="answer-empty" data-testid="sv3-turn-answer-empty"
                       >${TURN_EMPTY_ANSWER}</span
                     >`
@@ -1962,7 +2022,9 @@ export class Sv3Main extends JfElement {
                     // it cannot disagree about what this answer stood on. Without them the block
                     // rendered at the renderer's default `'grounded'` and let an unverified `[n]` the
                     // model wrote pose as a reference on a sourced answer.
-                    html`<jf-markdown-block
+                    turn.shapeId === 'core.extract'
+                      ? html`<pre class="structured-json" data-testid="sv3-turn-json">${turn.answer}</pre>`
+                      : html`<jf-markdown-block
                       class="sv3-markdown"
                       prose
                       data-testid="sv3-turn-markdown"
@@ -1976,9 +2038,40 @@ export class Sv3Main extends JfElement {
                     ></jf-markdown-block>`}
               </div>
             `}
-        ${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.citations(turn)}
+        ${this.coverageNote(turn)}${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.modelAnswerAction(turn)}${this.citations(turn)}
       </div>
     `;
+  }
+
+  private modelActionTurn(turn: Sv3Turn | undefined): boolean {
+    return turn !== undefined && turn.shapeId !== 'core.extract' && (turn.status === 'no-evidence'
+      || (turn.kind === 'model' && ['failed', 'halted', 'refused'].includes(turn.status)));
+  }
+
+  private modelAnswerAction(turn: Sv3Turn): TemplateResult | typeof nothing {
+    if (turn !== this.turns.at(-1) || !this.modelActionTurn(turn) || this.streaming || this.modelAnswerBusy) return nothing;
+    const reason = this.modelAnswerUnavailableReason;
+    return html`<div class="model-answer-action">
+      <button type="button" class="tail-sources model-answer-button" data-model-answer=${turn.id}
+        data-testid=${turn.status === 'no-evidence' ? 'sv3-answer-without-files' : 'sv3-model-answer-retry'}
+        ?disabled=${reason !== ''}
+        aria-describedby=${reason === '' ? nothing : `${turn.id}:model-unavailable`}
+        @click=${() => this.dispatchEvent(new CustomEvent('sv3-model-answer', {
+          detail: { turnId: turn.id }, bubbles: true, composed: true,
+        }))}
+      >${turn.status === 'no-evidence' ? 'Answer without your files' : 'Try model answer again'}</button>
+      ${reason === '' ? nothing : html`<p id=${`${turn.id}:model-unavailable`}>${reason}</p>`}
+    </div>`;
+  }
+
+  /** The shared Ask coverage note; ordinary turn text, outside streaming announcements. */
+  private coverageNote(turn: Sv3Turn): TemplateResult | typeof nothing {
+    if (turn.kind !== 'ask' || turn.status !== 'complete' || turn.evidence === null) return nothing;
+    const evidence = turn.evidence;
+    const note = coverageNote(groundingCoverage(
+      evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal,
+    ));
+    return note === null ? nothing : html`<p class="coverage-note" data-testid="sv3-turn-coverage">${note}</p>`;
   }
 
   /**
@@ -2029,6 +2122,7 @@ export class Sv3Main extends JfElement {
            id space by construction (feed ids are the controller's entry/call ids). -->
       <div class="ask-bubble" data-testid="sv3-turn-question" data-item-id=${`${turn.id}:q`}>${turn.question}</div>
       ${this.scopeLine(turn)}
+      ${turn.shapeId === 'core.extract' ? html`<p class="ask-scope">${this.structuredNotes.get(turn.id) ?? 'Structured Retry/Edit opens the instruction with the current composer schema and stated inputs; review and send.'}</p>` : nothing}
       ${canEdit && !this.streaming
         ? html`<jf-control
             class="ask-edit"
@@ -2089,7 +2183,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+        ${turn.kind === 'model' ? 'This answer does not search your files.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
       </p>
       <div class="ask-edit-acts">
         <jf-control
@@ -2125,8 +2219,9 @@ export class Sv3Main extends JfElement {
    * Selecting a version CLAIMS that conversation; it is navigation, not a write, so the window's
    * ordinary open path handles it and nothing here is optimistic.
    */
-  private versionPager(turn: Sv3Turn): TemplateResult | typeof nothing {
-    const versions = sv3LineageFor(this.turnLineage, turn.id)?.versions ?? null;
+  private versionPager(turn: Sv3Turn | null): TemplateResult | typeof nothing {
+    const versions = turn === null ? this.continuationVersions
+      : sv3LineageFor(this.turnLineage, turn.id)?.versions ?? null;
     if (versions === null) return nothing;
     const go = (next: number): void => {
       const target = versions.sessions[next];
@@ -2565,7 +2660,7 @@ export class Sv3Main extends JfElement {
    * failed one is a fragment the reader did not ask to keep.
    */
   private tailCopy(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.kind !== 'ask' || turn.status !== 'complete' || turn.answer === '') return nothing;
+    if (turn.kind === 'agent' || turn.status !== 'complete' || turn.answer === '') return nothing;
     const copied = this.copiedTurnId === turn.id;
     return html`<button
         type="button"
@@ -2638,7 +2733,7 @@ export class Sv3Main extends JfElement {
     // them. A fact must be gated on itself, not on a classification that merely correlates with it
     // (the same shape 839 F2 fixed); `kind` still governs the activity feed, which is what it is
     // about.
-    if (turn.status === 'streaming' || turn.evidence === null) return false;
+    if (turn.status === 'streaming' || turn.status === 'no-evidence' || turn.kind === 'model' || turn.evidence === null) return false;
     return turn.evidence.sources.length > 0 || turn.evidence.matches.length > 0;
   }
 
@@ -2675,6 +2770,7 @@ export class Sv3Main extends JfElement {
       .retrievalMode=${turn.evidence.retrievalMode}
       .groundingIncomplete=${turn.evidence.groundingIncomplete ?? false}
       .sourceCoverage=${[...(turn.evidence.sourceCoverage ?? [])]}
+      .groupByCoverage=${turn.kind === 'ask'}
       @citation-select=${this.onCitationSelect}
     ></jf-citations-panel>`;
   }
@@ -3027,10 +3123,18 @@ export class Sv3Main extends JfElement {
   /**
    * What became of the turn, in words — the tail row's facts slot when the turn has no answer frame
    * of its own. A streaming turn says nothing: the text arriving IS the state, and a "generating…"
-   * label beside moving text would be a second, redundant claim.
+   * label beside moving text would be a second, redundant claim. The one exception is the reader's
+   * Stop, which the Engine has not yet confirmed: the text may still move, and the turn is not
+   * called stopped until the Engine says it is.
    */
   private turnNote(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.status === 'streaming') return nothing;
+    if (turn.status === 'streaming') {
+      const stop = this.stopping?.turnId === turn.id ? this.stopping.state : null;
+      if (stop === null) return nothing;
+      return html`<span class="tail-note" role="status" data-testid="sv3-turn-stopping"
+        >${stop === 'stopping' ? TURN_STOPPING : TURN_STOP_FAILED}</span
+      >`;
+    }
     const broken = turn.status === 'failed' || turn.status === 'refused';
     const fallback = retrievalFallbackPhrase(
       turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',
@@ -3045,7 +3149,7 @@ export class Sv3Main extends JfElement {
         >${[sv3RunReceiptLabel(turn.toolCalls, turn.status, turn.disposition), fallback].filter(Boolean).join(' · ')}</span
       >`;
     }
-    const sources = sv3TurnSourceCount(turn);
+    const sources = turn.status === 'no-evidence' ? null : sv3TurnSourceCount(turn);
     const detail =
       turn.status === 'halted'
         ? TURN_HALTED

@@ -1,0 +1,759 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T07:33:40.813Z",
+  "revision": "cd6c13a87add31055eed4be4906923dad07f3ac9",
+  "tree": "ee9a8802eef8e23bfab8fc8387f68ef236e66480",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.RunEventStoreTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4865
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.ConversationInvalidFoldersTest\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreTest\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest\" --tests \"io.justsearch.app.services.conversation.spi.CitationInclusionPersistenceTest\" --tests \"io.justsearch.app.services.feedback.AgentDispositionWiringTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5082
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.AgentHistoryExecutorRecoveryTest\" --tests \"io.justsearch.ui.api.ChatControllerDelegateHistoryTest\" --tests \"io.justsearch.ui.api.InteractionThreadControllerTest\" --tests \"io.justsearch.ui.api.SavedStoreIdsHttpTest\" --tests \"io.justsearch.ui.api.StoreEnumerationInvalidIdsHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8495
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/RunEventStoreTest.java",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/RunEventStoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b88cba66567d2f9cdcc1104489831373f4be77506f2a8f6690b56b2267ddeb87",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "appendRawEventsEmptyOrNullIsNoop()",
+          "status": "passed"
+        },
+        {
+          "name": "backupRoundTripThroughJsonIsFaithful()",
+          "status": "passed"
+        },
+        {
+          "name": "appendRawEventsDoesNotFireListeners()",
+          "status": "passed"
+        },
+        {
+          "name": "appendRawEventsPreservesTimestampsAndTypes()",
+          "status": "passed"
+        },
+        {
+          "name": "appendFailureIsObservableInsteadOfLookingLikeASuccessfulEmptyWrite()",
+          "status": "passed"
+        },
+        {
+          "name": "writesVersionedEventsAndRefusesFutureRecordsWithoutChangingBytes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInvalidFoldersTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInvalidFoldersTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e522da7e1542df09a88f807ff9e0a7f1479a5e38d325fec177233e383b1e0258",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "omitsInvalidLegacyFoldersWithoutReadingOrChangingTheirFilesAndWarnsOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "refusesAdditionalWindowsDevicesAtConversationStore()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e47ea28f47d08ee384cf8c6394d1757684de61ad2a759ee1161e75f6e307ca83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesCreatedAndLegacyIdsWithoutRewritingSavedData()",
+          "status": "passed"
+        },
+        {
+          "name": "recursiveDeleteCannotRemoveSentinelsBesideAndAboveRoot()",
+          "status": "passed"
+        },
+        {
+          "name": "refusesWindowsAliasesBeforeConversationAccess()",
+          "status": "passed"
+        },
+        {
+          "name": "validatesBranchDestinationBeforeReadingParent()",
+          "status": "passed"
+        },
+        {
+          "name": "refusesUnsafeIdsBeforeAnyOperationAndPreservesSentinels()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e99fc2567d510b83334208ff31cb780cf9ce4e3c9e8eb20f89eb75ad3f55622",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loadHistory synthesizes id + hash for legacy messages without them",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: naming an unknown session creates NOTHING — no ghost row in the list",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: an over-long title is capped at 200 characters, trimmed first",
+          "status": "passed"
+        },
+        {
+          "name": "appendMessage synthesizes id + hash on every write",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-3: deleteSession of a leaf session succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "listSessions exposes parent pointers for branched sessions",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 516 FIX-T4: deleteSession bypasses the branches check for THROWAWAY_SESSION_PREFIX",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: with no floor, loadEffectiveContext equals loadHistory",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: the title is SEALED — hidden while locked, back after unlock",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: empty-prefix branch inherits NOTHING from parent",
+          "status": "passed"
+        },
+        {
+          "name": "branchFrom creates a child session whose loadHistory prepends parent prefix",
+          "status": "passed"
+        },
+        {
+          "name": "new metadata writes declare schema v1",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER — meta content is sealed; the list survives a locked store (not deleted-looking)",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER regression (tempdoc 727) — loadHistory on a LOCKED store degrades per-message (keeps the position, hides the content) instead of throwing / 500ing the whole session",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-7: getSessionMeta returns SessionSummary for known session",
+          "status": "passed"
+        },
+        {
+          "name": "malformed message content is not reinterpreted as empty history",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: an unrecognised provenance is stored as the reader's, never verbatim",
+          "status": "passed"
+        },
+        {
+          "name": "A late name (automatic, or a browser's legacy copy) is stored only while there is none",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: a title round-trips, with its provenance, and DELETE clears both",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-3: deleteSession blocks when child branches exist",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-9: branch's prefix is bounded by branch-point — parent appends after branch are NOT inherited",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-9: branchFrom works with synthesized idx-N id from legacy data",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: a v1 meta written before the field reads as no title, no upcaster",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: context floor trims loadEffectiveContext but not loadHistory",
+          "status": "passed"
+        },
+        {
+          "name": "future metadata is refused without overwrite",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER regression (tempdoc 727) — an UNLOCKED live cipher decrypts sealed messages back to plaintext, proving a disabled() cipher (the pre-fix ResourceApiModule bug) could never do this",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 838: an appended message does not strip or re-seal the stored title",
+          "status": "passed"
+        },
+        {
+          "name": "excludingTheFloorMessageKeepsTheFloor(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-2: branchFrom rejects non-existent parent session",
+          "status": "passed"
+        },
+        {
+          "name": "863 A-10.1/F5: shapeId is first-wins, and a BLANK inherited value is not a declaration",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: loadEffectiveContext fails safe to full history for an unknown floor id",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-2: branchFrom rejects non-existent branch point",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 §J.3: excludeSource round-trips independently of excludeMessage",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 §E.3: per-message exclusion applies BEFORE the floor trim",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 §E.3: excludeMessage drops a turn from effective context, not the transcript",
+          "status": "passed"
+        },
+        {
+          "name": "malformed metadata is not skipped from session listings",
+          "status": "passed"
+        },
+        {
+          "name": "A sealed name counts as a name: a late write does not replace it",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: branchFrom accepts the empty-prefix sentinel without an existence check",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610: compactContext prepends the summary to effective context, clears on rewind",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 515 FIX-7: getSessionMeta returns empty for unknown session",
+          "status": "passed"
+        },
+        {
+          "name": "parent cycle is detected and truncates the prefix walk",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd34ae710987659993188495005562b990ea81e8858de699416a739ab754f2d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "summaryWithoutSystemPromptLeadsTheList()",
+          "status": "passed"
+        },
+        {
+          "name": "610 §J.3: the engine seeds the persisted source-exclusion onto ctx for an EPHEMERAL recordsToThread shape — keyed by conversationId (the threadId), not just sessionId. Regression: the original sessionId-only guard never fired for the documents RAG path.",
+          "status": "passed"
+        },
+        {
+          "name": "Controller returning STOP_ERROR emits an error event and terminates",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 834 §4.3: an ITERATING shape opens the marker; a ONE_SHOT ask never does",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §2.1: the turn's reasoning round-trips onto the persisted record",
+          "status": "passed"
+        },
+        {
+          "name": "561 P-A/P-B: an EPHEMERAL recordsToThread shape records the CLEAN user turn + assistant turn (with citations + producer calibration) under conversationId, WITHOUT loading history",
+          "status": "passed"
+        },
+        {
+          "name": "Slice 496 §3.C pre-flight: SUBSTRATE_DRIVEN + WITHIN_TURN_ITERATION + CONTINUE drives 2 LLM calls with correction delta injected between iterations",
+          "status": "passed"
+        },
+        {
+          "name": "E2: ContextInjector events are forwarded to sink before the LLM call",
+          "status": "passed"
+        },
+        {
+          "name": "ordinaryDocumentFailuresRetainSummaryFallbacks()",
+          "status": "passed"
+        },
+        {
+          "name": "rewrittenFollowUpPersistsTheStandaloneQuestion()",
+          "status": "passed"
+        },
+        {
+          "name": "ContextInjector.inject() is invoked exactly once even across multiple iterations (iteration-0-only invariant)",
+          "status": "passed"
+        },
+        {
+          "name": "rewriteThenRetrievalFailureKeepsTheNote()",
+          "status": "passed"
+        },
+        {
+          "name": "realRagProducerRefusalsTerminateDispatchBeforeLlm()",
+          "status": "passed"
+        },
+        {
+          "name": "documentInjectorRefusalsTerminateRealSummaryDispatch()",
+          "status": "passed"
+        },
+        {
+          "name": "failedAnswerGenerationRecordsTheRetrievalExplanationAndError()",
+          "status": "passed"
+        },
+        {
+          "name": "forwardedSummaryFoldsIntoTheLeadingSystemMessage()",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §1.7: a schema-constrained call with no explicit enableThinking resolves to DETERMINISTIC — it does not think, so nothing is persisted",
+          "status": "passed"
+        },
+        {
+          "name": "Substrate-driven path assembles prompt, injects, calls LLM, emits done",
+          "status": "passed"
+        },
+        {
+          "name": "E1: StreamConsumer donePayloadEntries merge into the done event payload",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 834 §4.3: the marker is genuinely SET while generation is in flight",
+          "status": "passed"
+        },
+        {
+          "name": "LLM error is surfaced via emitError with LLM_ERROR code",
+          "status": "passed"
+        },
+        {
+          "name": "terminalRetrievalErrorIsRecordedWithItsQuestionAndExplanation()",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §2.2b: turn N+1's LLM input carries assistant entries of EXACTLY {role, content}",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §1.7: the CALLER's explicit request to think wins over the schema's default, and that turn's reasoning IS persisted — behaviour, not a leak",
+          "status": "passed"
+        },
+        {
+          "name": "Engine enforces hard cap of 20 iterations; runaway controller terminates with iterationsUsed=20 done",
+          "status": "passed"
+        },
+        {
+          "name": "done payload carries the full token triple, completionTokens included",
+          "status": "passed"
+        },
+        {
+          "name": "StreamConsumer messageDeltas are appended before the next iteration",
+          "status": "passed"
+        },
+        {
+          "name": "unrevisedTurnCarriesNoStandaloneQuestion()",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 F2: think → answer → think persists TWO blocks, one per thinking region",
+          "status": "passed"
+        },
+        {
+          "name": "Multiple PromptContributors compose by priority ascending",
+          "status": "passed"
+        },
+        {
+          "name": "retrievalExplanationIsRecordedWithTheCompletedAnswer()",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §2.2: an ITERATING shape's turn N carries iteration N's reasoning only",
+          "status": "passed"
+        },
+        {
+          "name": "contextWithoutSystemMessagesIsUnchanged()",
+          "status": "passed"
+        },
+        {
+          "name": "E2: ContextInjector terminalError aborts before the LLM call",
+          "status": "passed"
+        },
+        {
+          "name": "rewriteThenGenerationFailureKeepsTheNote()",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 569 Phase 5: an unparseable schema degrades to validate-retry only (no response_format, sampling untouched) rather than failing the request",
+          "status": "passed"
+        },
+        {
+          "name": "forwardedContextCountsAsConversationInTheBreakdown()",
+          "status": "passed"
+        },
+        {
+          "name": "rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote()",
+          "status": "passed"
+        },
+        {
+          "name": "Wedge regression (836 §9.9): a producer that never calls back ends the turn with an LLM_TIMEOUT error instead of parking the request thread forever",
+          "status": "passed"
+        },
+        {
+          "name": "E1: Substrate-default keys override consumer entries with the same key",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §2.2: reasoning is persisted-only — the done payload does NOT carry it",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 848 §2.1: a turn that did not think carries NO reasoning key (not an empty list)",
+          "status": "passed"
+        },
+        {
+          "name": "exit: injector terminated",
+          "status": "passed"
+        },
+        {
+          "name": "exit: AI unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "exit: LlmStreamException",
+          "status": "passed"
+        },
+        {
+          "name": "exit: consumer onDone threw",
+          "status": "passed"
+        },
+        {
+          "name": "exit: controller next threw",
+          "status": "passed"
+        },
+        {
+          "name": "exit: STOP_SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "exit: STOP_ERROR",
+          "status": "passed"
+        },
+        {
+          "name": "exit: iteration hard cap",
+          "status": "passed"
+        },
+        {
+          "name": "Regression (slice 491 defect 1): finalResponse must be the chunk-accumulator, not the LLM finish_reason — onComplete receives \"stop\"/\"length\", not the response body",
+          "status": "passed"
+        },
+        {
+          "name": "LLM unavailable surfaces an AI_OFFLINE error event",
+          "status": "passed"
+        },
+        {
+          "name": "ContextInjectors compose in declaration order",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 569 Phase 5: a request-body schema is promoted to a server-side response_format constraint so iteration-1 is schema-valid by construction",
+          "status": "passed"
+        },
+        {
+          "name": "The running shape's id reaches SPIs via ConversationContext.shapeId()",
+          "status": "passed"
+        },
+        {
+          "name": "compactionSummaryFoldsIntoTheLeadingSystemMessage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/CitationInclusionPersistenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/CitationInclusionPersistenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9efa13dc4add743f6b7576b0ea8c44a79a8c5276bb403ce108f806d1104965ba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "849 D-11: a pre-849 (ABSENT) citation persists with NO inclusion key at all",
+          "status": "passed"
+        },
+        {
+          "name": "849 D-11: a partial citation keeps its included-character count across the store",
+          "status": "passed"
+        },
+        {
+          "name": "849 D-11: a dropped citation is persisted and re-read with its state intact",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/AgentDispositionWiringTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/AgentDispositionWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3ec4356b90f2cdb47a67572b78f3a23f7499d0a2675f94a8ee85dc0aa44245e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "productionRunEventEnvelopeCapturesFeaturesAndCitedShownAsynchronously(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "doneEventUsesKeyedIdentityWithoutReadingHistoricalSnapshots(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "agentRun_capturesSnapshot_andDispositionsJoinIt_bySessionId(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "asynchronousAgentCaptureSurvivesFailedHistoricalLookup(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "register_omitsDispositionWithoutUidBearingSnapshot(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "irrelevantDurableEventsNeverConsumeObservationCapacity(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/AgentHistoryExecutorRecoveryTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/AgentHistoryExecutorRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bdbc9da573549ab4ff1edc75e1dba009864ff31b5f3dc5336c9ed2c45ac1d24d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedTerminalEventIsReconciledFromTheDurableStoreWithoutRestart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerDelegateHistoryTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerDelegateHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c1ecfd09db24c5f76ccc280711051671dcf20f3d1069b801e2efddea49fd057",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "863 A-10.1: a branch keeps the shape it inherited; its own appends do not relabel it",
+          "status": "passed"
+        },
+        {
+          "name": "863 F1: every turn's record declares the shape that dispatched it",
+          "status": "passed"
+        },
+        {
+          "name": "863 A-10.1: a delegate turn in a MIXED conversation does not relabel it — first shape wins",
+          "status": "passed"
+        },
+        {
+          "name": "863: a NEW delegate conversation answers /history with the user turn AND the answer, carrying the answer's evidence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7df5c8740bc34d053312f9dd3d978a86408685d57ee472eb0484aa19483d4730",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S4b: a null id from the write path (persistence failure) surfaces as 500",
+          "status": "passed"
+        },
+        {
+          "name": "561 P-A: a chat turn's persisted citations + calibration are surfaced on the thread event (evidence on the record)",
+          "status": "passed"
+        },
+        {
+          "name": "interleaves chat turns (ConversationStore) and agent activity (AgentService) by timestamp",
+          "status": "passed"
+        },
+        {
+          "name": "S4b: a SEARCH body missing required fields is rejected with 400",
+          "status": "passed"
+        },
+        {
+          "name": "871 §3b: a run whose answer row projects no carrier drops the block, never misplaces it",
+          "status": "passed"
+        },
+        {
+          "name": "629 LAYER regression (tempdoc 727) — GET /api/thread/{id} over a REAL locked FileConversationStore returns 200 with the action-plane events intact, NOT a 500 for the whole thread (pre-fix: loadHistory's KeyLockedException hit handleGet's catch-all Exception handler and 500'd everything, including the unencrypted agent activity)",
+          "status": "passed"
+        },
+        {
+          "name": "surfacesTheStandaloneQuestionFromTheRecord()",
+          "status": "passed"
+        },
+        {
+          "name": "863: a STAMPED delegate turn renders ONCE through the merge — one user item, one answer",
+          "status": "passed"
+        },
+        {
+          "name": "863 A-3: the store plane carries the SAME evidence attributes the run plane's done carried",
+          "status": "passed"
+        },
+        {
+          "name": "recordedTerminalRetrievalErrorReachesTheThreadAsAnErrorWithMetadata()",
+          "status": "passed"
+        },
+        {
+          "name": "S4b: an unsupported event kind is rejected with 400",
+          "status": "passed"
+        },
+        {
+          "name": "recordedRetrievalExplanationReachesTheThreadResponse()",
+          "status": "passed"
+        },
+        {
+          "name": "S4b: POST /api/thread/{id}/events persists a SEARCH event and returns its id (201)",
+          "status": "passed"
+        },
+        {
+          "name": "848 §2.3: a chat turn's persisted reasoning is lifted onto the thread event",
+          "status": "passed"
+        },
+        {
+          "name": "empty conversation yields an empty events array",
+          "status": "passed"
+        },
+        {
+          "name": "871 §3b: a suppressed answer's TRAILING thinking lands on the answer, not on the tool before it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe9bdcd875849f86e3643dc0cf782c3b1cd8e65cf0b19b02ae3bebc1f6340190",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "conversationListIgnoresSavedRunsWithInvalidConversationIdsOverHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "branchWithInvalidSavedParentOpensLikeMissingParentOverHttp(history)",
+          "status": "passed"
+        },
+        {
+          "name": "branchWithInvalidSavedParentOpensLikeMissingParentOverHttp(thread)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyFormatBackupRestoresValidConversationsAndReportsInvalidEntriesOverHttp()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3e0ab9c509ecec0c41dd313b4ba1ec2d5c8100de63662e70a2d0fc611f330c8d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "runListsPresenceThreadAndDeleteWorkBesideInvalidRunFolders()",
+          "status": "passed"
+        },
+        {
+          "name": "validConversationCanBranchReadAndDeleteBesideInvalidFolders()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b272a8952f41b1612b42ea6f464e470978370fe9ede94dd6550857f211441981"
+}

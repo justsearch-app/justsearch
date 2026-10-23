@@ -112,16 +112,6 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
       }
-      targets {
-        all {
-          testTask.configure {
-            jvmArgs(
-              // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
-              "-Dnet.bytebuddy.experimental=true"
-            )
-          }
-        }
-      }
     }
     register<JvmTestSuite>("integrationTest") {
       useJUnitJupiter()
@@ -147,6 +137,19 @@ testing {
 sourceSets.named("integrationTest").configure {
   compileClasspath += sourceSets["test"].output
   runtimeClasspath += sourceSets["test"].output
+}
+
+// Keep the complete local suite and its hosted class shards on the same unit configuration.
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  // The launcher regression test reads these files outside the Java source sets.
+  inputs.files(
+    rootProject.file("packaging/headless/justsearch-headless.cmd"),
+    rootProject.file("packaging/headless/justsearch-headless.ps1"),
+  ).withPathSensitivity(PathSensitivity.RELATIVE)
+  jvmArgs(
+    // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
+    "-Dnet.bytebuddy.experimental=true"
+  )
 }
 
 tasks.withType<Test>().configureEach {
@@ -1077,7 +1080,14 @@ val aotCacheDir = layout.buildDirectory.dir("aot-cache")
 // UseCompactObjectHeaders setting (enabled)", checked 2026-10-01) and started with no cache at all.
 // Both spawn sites (lib.rs, dev-runner.cjs) pass these, so training and assembly pass them too;
 // scripts/dev/test-dev-runner-head-java-opts.mjs pins the three together.
-val aotTrainingJvmFlags = listOf("-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders")
+// Detect the launch host's libc. Never export JVM option variables: Engine children inherit them.
+val engineNativeHeapJvmArgs = if (OperatingSystem.current().isLinux && providers.exec {
+  commandLine("sh", "-c", "getconf GNU_LIBC_VERSION 2>/dev/null || true")
+}.standardOutput.asText.get().trim().startsWith("glibc ")) {
+  listOf("-XX:TrimNativeHeapInterval=30000")
+} else emptyList()
+
+val aotTrainingJvmFlags = listOf("-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders") + engineNativeHeapJvmArgs
 
 val generateHeadAotCache by tasks.registering {
   group = "distribution"
@@ -1829,6 +1839,7 @@ tasks.register("smokeSidecarBundle") {
 
     val command = listOf(
         javaBin.absolutePath,
+        *engineNativeHeapJvmArgs.toTypedArray(),
         "-Djustsearch.prod=true",
         "-Djustsearch.data.dir=${dataDir.absolutePath}",
         "-Djustsearch.ui.settings.mode=IN_MEMORY",
@@ -2024,6 +2035,15 @@ application {
 // Pattern copied from modules/app-launcher/build.gradle.kts:114-129.
 tasks.withType<CreateStartScripts>().configureEach {
   doLast {
+    // Scripts can be generated on a different OS from the machine that runs them.
+    // Keep the batch script unchanged and test Linux/glibc at Unix launch time.
+    val trim = """
+      if [ "${'$'}(uname -s)" = Linux ] && getconf GNU_LIBC_VERSION >/dev/null 2>&1; then
+          set -- '-XX:TrimNativeHeapInterval=30000' "${'$'}@"
+      fi
+    """.trimIndent()
+    unixScript.writeText(unixScript.readText().replace(
+      "exec \"${'$'}JAVACMD\" \"${'$'}@\"", "$trim\nexec \"${'$'}JAVACMD\" \"${'$'}@\""))
     val os = OperatingSystem.current()
     if (os.isWindows) {
       val windowsText = windowsScript.readText()
@@ -2034,6 +2054,12 @@ tasks.withType<CreateStartScripts>().configureEach {
       windowsScript.writeText(collapsed)
     }
   }
+}
+
+tasks.withType<JavaExec>().matching {
+  it.name in listOf("run", "runHeadless", "runHeadlessEval", "runHeadlessWithProfiling")
+}.configureEach {
+  jvmArgs(engineNativeHeapJvmArgs)
 }
 
 /**

@@ -195,6 +195,23 @@ final class IndexingJobsSnapshotOrderTest {
     assertTrue(frames.getFirst().hasSnapshot());
   }
 
+  @Test
+  void resyncIsASnapshotAndRetainsCausalOrderWithoutReplayingTerminalDeltas() throws Exception {
+    Fixture fixture = new Fixture(0);
+    List<IndexingJobsFrame> frames = new ArrayList<>();
+    fixture.subscribe(frames::add);
+    fixture.subscriber.get().accept(new IndexingJobChangeFeed.Delta.Update(row("DONE")));
+    fixture.subscriber.get().accept(new IndexingJobChangeFeed.Delta.Resync(List.of(row("FAILED"))));
+    fixture.emit("PROCESSING");
+    assertEquals(List.of(1L, 2L, 3L, 4L), frames.stream().map(IndexingJobsFrame::getSeq).toList());
+    assertTrue(frames.get(2).hasSnapshot());
+    assertEquals("FAILED", frames.get(2).getSnapshot().getItems(0).getState());
+    assertEquals(1, frames.stream().filter(f -> f.hasDelta()
+        && f.getDelta().getUpdate().getState().equals("DONE")).count(),
+        "resync uses the non-replaying snapshot path");
+    assertEquals("PROCESSING", frames.getLast().getDelta().getUpdate().getState());
+  }
+
   private static CallContext context(TestCancel signal) {
     var base = CallContext.none();
     return new CallContext(null, null, signal, base.engineContext(), base.provenance(), base.childLifetime());
@@ -214,6 +231,21 @@ final class IndexingJobsSnapshotOrderTest {
       cancelled = true;
       callback.run();
     }
+  }
+
+  @Test void presenceMetadataUsesExistingFramesAndDistinguishesEmptyFromUnchanged() throws Exception {
+    Fixture fixture = new Fixture(0);
+    var frames = new ArrayList<IndexingJobsFrame>();
+    fixture.subscribe(frames::add);
+    assertTrue(frames.getFirst().hasStatePresence());
+    fixture.subscriber.get().accept(new IndexingJobChangeFeed.Delta.Update(row("PENDING"), java.util.Set.of("PENDING", "DONE")));
+    assertEquals(java.util.Set.of("PENDING", "DONE"), java.util.Set.copyOf(frames.getLast().getStatePresence().getStatesList()));
+    fixture.emit("PENDING");
+    assertFalse(frames.getLast().hasStatePresence(), "heartbeat/count-only frames omit metadata");
+    fixture.subscriber.get().accept(new IndexingJobChangeFeed.Delta.Resync(List.of(), java.util.Set.of()));
+    assertTrue(frames.getLast().hasSnapshot());
+    assertTrue(frames.getLast().hasStatePresence());
+    assertTrue(frames.getLast().getStatePresence().getStatesList().isEmpty());
   }
 
   private static final class Fixture {

@@ -34,6 +34,7 @@ import { ENRICHMENT_BLOCKED_CAVEAT, ENRICHMENT_CATCHING_UP_CAVEAT } from './enri
 export type FolderState =
   | 'scanning' // walk in progress — files not yet fully enqueued
   | 'indexing' // in-flight jobs > 0
+  | 'waiting' // the shared index observation confirms retry-only waiting
   | 'enriching' // 809 finding 1 / 813 §4 — drained + keyword-searchable, enrichment still catching up
   | 'keyword-only' // round-15 F1b — drained + keyword-searchable, semantic enrichment CANNOT run
   | 'ready' // scanned, drained, no failures — fully searchable (or coverage unknowable)
@@ -63,6 +64,11 @@ export interface FolderStatus {
 }
 
 export interface FolderStatusContext {
+  /** Policy pause confirmed by the shared progress selector; folder facts stay independent. */
+  readonly indexingPaused?: boolean;
+  readonly indexingPauseReason?: string;
+  /** All pending jobs wait for retry, as reported by the shared index-wide projection. */
+  readonly retryWaiting?: boolean;
   /** Pre-formatted relative time of the last walk (host util), or '' if never. */
   readonly relativeTime: string;
   /**
@@ -142,8 +148,8 @@ function count(value: number | null | undefined): number {
  * costume. The displayed percent is correspondingly capped at 99 while work remains.
  */
 interface RootCoverage {
-  /** 0-100, capped at 99 while any document is unsettled. */
-  readonly percent: number;
+  /** Settled coverage, capped at 99 while unsettled; null before any stage settles. */
+  readonly percent: number | null;
   readonly complete: boolean;
 }
 
@@ -188,7 +194,7 @@ function rootCoverage(
   if (total <= 0) return null;
   const complete = settled >= total;
   return {
-    percent: complete ? 100 : Math.min(99, Math.round((settled / total) * 100)),
+    percent: complete ? 100 : settled <= 0 ? null : Math.min(99, Math.round((settled / total) * 100)),
     complete,
   };
 }
@@ -303,9 +309,10 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     // truthful ("Indexing · N remaining" — that IS what the queue is doing) and the carried count is
     // flagged as last-known so the chip can say so rather than assert it as a present fact.
     return {
-      state: 'indexing',
-      glyph: 'pending',
-      metaText: `${collection} · Indexing · ${inFlight.toLocaleString()} remaining`,
+      state: ctx.indexingPaused && deleteDetectionUnverified ? 'unverified'
+        : ctx.indexingPaused || ctx.retryWaiting ? 'waiting' : 'indexing',
+      glyph: ctx.indexingPaused && deleteDetectionUnverified ? 'unverified' : 'pending',
+      metaText: `${collection} · ${ctx.indexingPaused ? ctx.indexingPauseReason === 'settings_recovery' ? 'Waiting for Settings reset' : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Indexing'} · ${inFlight.toLocaleString()} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — reindex to be sure" : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -369,7 +376,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       return {
         state: 'enriching',
         glyph: 'pending',
-        metaText: `${collection} · ${fileCountText} · ${ENRICHMENT_CATCHING_UP_CAVEAT} · ${coverage.percent}%${verifiedSuffix}`,
+        metaText: `${collection} · ${fileCountText} · ${ENRICHMENT_CATCHING_UP_CAVEAT}${coverage.percent === null ? '' : ` · ${coverage.percent}%`}${verifiedSuffix}`,
         inFlight,
         failed,
       };

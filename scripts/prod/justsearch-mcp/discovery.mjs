@@ -10,7 +10,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import {devDataDirCandidates, isPidAlive, resolveDataDir as resolveUserDataDir} from '../../lib/platform-paths.mjs';
-import {describeTried, engineRequest, selectEngine, selectPinned, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
+import {describeTried, selectEngine, selectPinned, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
 
 /**
  * Resolve the JustSearch data directory.
@@ -47,76 +47,6 @@ export function resolveDataDir() {
 // shared library.
 
 /**
- * Validate that a JustSearch instance is responding on a pinned port no manifest names.
- * Issues GET /api/status (over a token-bound connection, engine-discovery.cjs) and confirms the
- * response contains status: "ok". Result: { ok: true } or { ok: false, detail }.
- */
-export function validatePort(port, timeoutMs = 2000) {
-  return new Promise((resolve) => {
-    const req = engineRequest(
-      { port, engine: null },
-      { path: '/api/status', timeoutMs, headers: { Accept: 'application/json' } },
-      (res) => {
-        if (res.statusCode !== 200) {
-          res.resume();
-          return resolve({ ok: false, detail: `GET /api/status answered ${res.statusCode}` });
-        }
-        const chunks = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('error', (e) => resolve({ ok: false, detail: e.message }));
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            resolve(json.status === 'ok' ? { ok: true } : { ok: false, detail: 'GET /api/status is not a JustSearch status' });
-          } catch {
-            resolve({ ok: false, detail: 'GET /api/status is not JSON' });
-          }
-        });
-      },
-    );
-    req.on('timeout', () => {
-      req.destroy(new Error('timeout'));
-    });
-    req.on('error', (e) => resolve({ ok: false, detail: e.message }));
-  });
-}
-
-/**
- * Fetch the session token from GET /api/mcp/token of target ({ port, engine }, engine-discovery.cjs
- * engineRequest: a manifest Engine's connection is proven first).
- * Returns the token string, empty string (dev mode), or null (endpoint not available or not proven).
- */
-export function fetchToken(target, timeoutMs = 3000) {
-  return new Promise((resolve) => {
-    const req = engineRequest(
-      target,
-      { path: '/api/mcp/token', timeoutMs, headers: { Accept: 'application/json' } },
-      (res) => {
-        if (res.statusCode !== 200) {
-          res.resume();
-          return resolve(null);
-        }
-        const chunks = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('error', () => resolve(null));
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            resolve(typeof json.token === 'string' ? json.token : null);
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-    );
-    req.on('timeout', () => {
-      req.destroy(new Error('timeout'));
-    });
-    req.on('error', () => resolve(null));
-  });
-}
-
-/**
  * The data folders whose runtime manifests discovery validates, in order:
  * JUSTSEARCH_HOME (legacy), JUSTSEARCH_DATA_DIR, the desktop app's folder, the dev `.dev-data`
  * folders above cwd, then the user data folder of headless/CLI starts.
@@ -131,39 +61,34 @@ export function engineCandidates({env = process.env, cwd = process.cwd()} = {}) 
   return out;
 }
 
+/** The session token for a pinned port: JUSTSEARCH_SESSION_TOKEN, which a pin requires. */
+function explicitSessionToken() {
+  const token = process.env.JUSTSEARCH_SESSION_TOKEN?.trim();
+  if (!token) throw new Error('An explicit port requires JUSTSEARCH_SESSION_TOKEN. Read it from the Engine owner-only runtime/manifest.json.');
+  return token;
+}
+
 /**
- * A port the operator pinned (label: '--port <n>' or 'JUSTSEARCH_API_PORT=<n>'). When a manifest
- * names it, the pin is that manifest Engine, with the same proof as discovery; a manifest that
- * names it but is not proven is a refusal (recorded in attempts), never a fallback. When none
- * does, the pin answers over token-bound connections: token is undefined, because each
- * connection carries the token it fetched itself (engine-discovery.cjs). requireManifest: the pin
- * was accepted through a manifest, so with none naming it now it is refused as well (server.mjs
- * re-selects this way after the Engine restarts on the pinned port).
+ * A port the operator pinned (label: '--port <n>' or 'JUSTSEARCH_API_PORT=<n>'). The pin's token
+ * is JUSTSEARCH_SESSION_TOKEN (required: throws without it), and it goes only to a proven Engine:
+ * when a manifest names the port, the pin is that manifest Engine, with the same proof as
+ * discovery. A manifest that names it but is not proven, or no manifest naming it, is a refusal
+ * (recorded in attempts, result null), never a fallback to whatever answers the port.
  */
-export async function pinnedEngine(port, label, attempts, log, { requireManifest = false } = {}) {
+export async function pinnedEngine(port, label, attempts) {
+  const token = explicitSessionToken();
   const { selected, tried } = await selectPinned(engineCandidates(), port);
   if (selected) {
-    const token = await fetchToken({ port, engine: selected });
     process.stderr.write(
       `[justsearch-mcp] Using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${port}, pinned by ${label})\n`,
     );
-    log(`token=${token ? 'obtained' : token === '' ? 'empty (dev mode)' : 'unavailable'}`);
     return { port, baseUrl: `http://127.0.0.1:${port}`, token, instanceId: selected.instanceId, dataDir: selected.dataDir, source: selected.source, engine: selected, pin: label };
   }
   if (tried.length > 0) {
     attempts.push(...describeTried(tried).map((line) => `${label}: refused, the manifest naming this port is not proven (${line})`));
-    return null;
+  } else {
+    attempts.push(`${label}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`);
   }
-  if (requireManifest) {
-    attempts.push(`${label}: refused, a runtime manifest named this port when it was accepted and none does now`);
-    return null;
-  }
-  const live = await validatePort(port);
-  if (live.ok) {
-    log(`Connected on ${label}: no manifest names this port; each connection fetches its own token`);
-    return { port, baseUrl: `http://127.0.0.1:${port}`, token: undefined, pin: label };
-  }
-  attempts.push(`${label} (not responding: ${live.detail})`);
   return null;
 }
 
@@ -177,14 +102,14 @@ export async function pinnedEngine(port, label, attempts, log, { requireManifest
  *    over a connection the OS reports as that pid's (engine-discovery.cjs engineRequest), answers
  *    GET /api/runtime/live with the manifest's pid and instanceId and /api/health with 200.
  *
- * A pin (1, 2) is used through pinnedEngine(). There is no port probe: a port with no validated
- * manifest behind it is never used unless the operator named it. A manifest Engine's session
- * token is fetched once, via GET /api/mcp/token over its proven connections.
+ * A pin (1, 2) is used through pinnedEngine(): only as the proven Engine of a manifest naming it,
+ * with JUSTSEARCH_SESSION_TOKEN. There is no port probe: a port with no validated manifest behind
+ * it is never used. A manifest Engine's session token is the one in that validated manifest.
  *
  * @param {{ port?: number, verbose?: boolean }} opts
- * @returns {Promise<{ port: number, baseUrl: string, token: string | null | undefined, instanceId?: string, dataDir?: string, source?: string, engine?: object, pin?: string }>}
- *   engine: the validated manifest candidate (absent for a pin no manifest names); every
- *   request goes through engine-discovery.cjs engineRequest({ port, engine, token }).
+ * @returns {Promise<{ port: number, baseUrl: string, token: string, instanceId: string, dataDir: string, source: string, engine: object, pin?: string }>}
+ *   engine: the validated manifest candidate; every request goes through engine-discovery.cjs
+ *   engineRequest({ port, engine, token }).
  */
 export async function discover({ port: explicitPort, verbose } = {}) {
   const log = verbose ? (msg) => process.stderr.write(`[justsearch-mcp] ${msg}\n`) : () => {};
@@ -193,7 +118,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   // 1. Explicit port (operator override).
   if (explicitPort != null) {
     log(`Trying explicit port ${explicitPort}...`);
-    const found = await pinnedEngine(explicitPort, `--port ${explicitPort}`, attempts, log);
+    const found = await pinnedEngine(explicitPort, `--port ${explicitPort}`, attempts);
     if (found) return found;
   }
 
@@ -201,7 +126,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   const envPort = parseInt(process.env.JUSTSEARCH_API_PORT, 10);
   if (Number.isFinite(envPort) && envPort > 0) {
     log(`Trying JUSTSEARCH_API_PORT=${envPort}...`);
-    const found = await pinnedEngine(envPort, `JUSTSEARCH_API_PORT=${envPort}`, attempts, log);
+    const found = await pinnedEngine(envPort, `JUSTSEARCH_API_PORT=${envPort}`, attempts);
     if (found) return found;
   }
 
@@ -210,7 +135,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
   attempts.push(...describeTried(tried.filter((t) => !t.ok)));
   if (selected) {
     const { port } = selected;
-    const token = await fetchToken({ port, engine: selected });
+    const token = selected.token;
     process.stderr.write(
       `[justsearch-mcp] Using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${port})\n`,
     );
@@ -233,7 +158,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
       '\n\nMake sure JustSearch is running, or specify the port:\n' +
       '  node justsearch-mcp.mjs --port <port>\n' +
       '  JUSTSEARCH_API_PORT=<port> node justsearch-mcp.mjs\n' +
-      'A pinned port that no runtime manifest names is trusted with request content from whatever answers it, but never with a session token fetched on another connection.',
+      'A pinned port needs JUSTSEARCH_SESSION_TOKEN and is used only when a runtime manifest names it and its Engine is proven.',
   );
 }
 

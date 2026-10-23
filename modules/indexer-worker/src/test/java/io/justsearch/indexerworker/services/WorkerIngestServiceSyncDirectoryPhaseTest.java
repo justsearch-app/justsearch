@@ -114,7 +114,8 @@ final class WorkerIngestServiceSyncDirectoryPhaseTest extends io.justsearch.adap
             CallContext.none());
 
     assertFalse(response.getSkipped(), "Expected error path, not skipped");
-    assertEquals("Root path does not exist or is not a directory", response.getError());
+    assertEquals((io.justsearch.configuration.PlatformPaths.isLinux() ? "ROOT_NOT_DIRECTORY: " : "")
+        + "Root path does not exist or is not a directory", response.getError());
     assertEquals(0, response.getFilesAdded());
     assertEquals(0, response.getFilesDeleted());
   }

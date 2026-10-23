@@ -5,6 +5,7 @@ import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.StreamConsumer;
 import io.justsearch.agent.api.conversation.StreamConsumerResult;
 import io.justsearch.agent.api.encryption.KeyLockedException;
+import io.justsearch.agent.api.memory.MemoriesUnavailableException;
 import io.justsearch.agent.api.memory.MemoryRecord;
 import io.justsearch.agent.api.memory.MemoryStore;
 import java.time.Instant;
@@ -48,6 +49,8 @@ public final class MemoryExtractionConsumer implements StreamConsumer {
    */
   private final AtomicBoolean lockedEpisodeReported = new AtomicBoolean(false);
 
+  private MemoriesUnavailableException unavailableEpisodeReported;
+
   public MemoryExtractionConsumer(MemoryStore memoryStore) {
     this.memoryStore = Objects.requireNonNull(memoryStore, "memoryStore");
   }
@@ -88,7 +91,7 @@ public final class MemoryExtractionConsumer implements StreamConsumer {
    * ephemeral ones that persist nothing else.
    */
   @Override
-  public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
+  public synchronized StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
     try {
       String userMessage = lastUserMessage(ctx.messages());
       Extracted fact = extract(userMessage);
@@ -117,6 +120,13 @@ public final class MemoryExtractionConsumer implements StreamConsumer {
               ctx.sessionId(),
               "chat",
               Instant.now()));
+    } catch (MemoriesUnavailableException unavailable) {
+      // Completion is serialized so a delayed failure from before recovery cannot replace the
+      // marker for a newer episode and make a later turn report that newer episode twice.
+      if (unavailableEpisodeReported != unavailable) {
+        unavailableEpisodeReported = unavailable;
+        LOG.warn("Passive memory extraction skipped: memories are unavailable; the learned fact was not recorded. Retry after the stored memories can be read.");
+      }
     } catch (KeyLockedException locked) {
       // The store locked between the pre-check and the write, or reports `isLocked()` conservatively.
       // Caught DISTINCTLY: this is a known refusal with a named cause, not an unexplained failure.

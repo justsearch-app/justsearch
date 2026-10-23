@@ -38,39 +38,32 @@ MCP server on?" is exactly "which port is the API on?":
   (after `--port` / `JUSTSEARCH_API_PORT` / `JUSTSEARCH_DATA_DIR`), accept it only when the pid is
   alive, `GET /api/runtime/live` on that port reports the same pid and instance, and
   `GET /api/health` answers 200 (an Engine that passes those checks but is still starting,
-  health 503, is re-checked for up to 30 s before it is passed over; no token is fetched before
+  health 503, is re-checked for up to 30 s before it is passed over; no credential is used before
   200), and otherwise fail with a list of every folder they tried. Every request either client
-  sends to a manifest Engine (probes, token, `/mcp`, every tool's requests) goes through one
+  sends to a manifest Engine (public probes, `/mcp`, every tool's requests) goes through one
   function whose keep-alive connections are proven before anything is written on them: the
   manifest still names the same pid and instance, and the operating system reports that pid as
   the owner of the server end of that very connection (Linux `/proc/net/tcp`, Windows
   `netstat -ano`). A reused connection needs no new proof, since a process that binds the port
   later cannot take over an established connection; the OS is asked once per connection. When a
-  proof fails, nothing is sent: the bridge re-discovers, the stdio server reports
-  `ENGINE_GONE` and must be restarted. A port pinned with `--port` or `JUSTSEARCH_API_PORT` that a
-  manifest names is that manifest's Engine, with the same proof; when that proof fails, the pin is
-  refused (and named in the error), never used without it. A manifest whose pid is gone but that
-  still names the pinned port is a refusal too (the error names that manifest file), and so is a
-  pin accepted through a manifest that is later deleted or corrupted: such a pin is never
-  downgraded to the no-manifest case below. When the pinned Engine restarts on the same port
-  with a new manifest, the stdio server's next call re-reads the manifests, proves the new
-  Engine and fetches its token before sending anything; a call in flight during the restart
-  fails. Whether a token is available is that Engine's answer: a mutating call to an Engine that
-  had no token endpoint first checks that the same Engine still serves the port, so the first
-  call after a restart is decided by the Engine there now (`NO_TOKEN` only if it has none). A pinned port that no runtime manifest
-  names is trusted with request content from whatever answers it, but never with a session token
-  fetched on another connection: each new connection fetches `GET /api/mcp/token` on itself
-  before anything else is written on it, and a request carries only that connection's token (so
-  after an Engine restart on the same port, the next call uses the new token; a call that needs a
-  token is refused, `NO_TOKEN`, with nothing sent, when the Engine there offers none). That fetch is
-  bounded (2 s); a port that accepts it and never answers is refused with an error saying so.
+  proof fails, nothing is sent: both clients re-discover the Engine and re-read its manifest
+  credential, and the production server retries only failures known to precede execution
+  (refused before writing, connection refused, token refused); if no proven Engine is available
+  it reports `ENGINE_GONE`. A port pinned with `--port` or `JUSTSEARCH_API_PORT` takes its token
+  only from `JUSTSEARCH_SESSION_TOKEN` (see Session credential), and that token goes only to the
+  Engine of a manifest that names the pinned port, with the same proof; when that proof fails, the
+  pin is refused (and named in the error), never used without it. A manifest whose pid is gone but
+  that still names the pinned port is a refusal too (the error names that manifest file), and so is
+  a pinned port that no manifest names: nothing proves what answers it. When the pinned Engine
+  restarts on the same port with a new manifest, the stdio server's next call re-reads the
+  manifests and proves the new Engine before sending anything, never falling back to another
+  Engine; a call in flight during the restart fails.
   Neither client sends a request again once it may have reached the Engine: the bridge redoes
   session setup (`initialize`, notifications) on a newly proven Engine, and sends another
-  request again only if it never had a connection or the Engine answered 400/404 for its
-  session; otherwise the call fails with an error saying its outcome is unknown. The bridge
+  request again only if it never had a connection or the Engine answered 400/401/404 for it;
+  otherwise the call fails with an error saying its outcome is unknown. The bridge
   sends an `Mcp-Session-Id` only on connections to the Engine that opened it (its manifest
-  identity, or for a pin no manifest names the pid and instance each new connection reads from
-  `GET /api/runtime/live` on itself), whether or not that Engine assigned a session id; a
+  identity), whether or not that Engine assigned a session id; a
   connection to any other Engine gets nothing negotiated with the first, and the
   bridge initializes a new session there first, sent exactly as a first `initialize` is: nothing
   negotiated with the earlier Engine (session, `MCP-Protocol-Version`, server stream) is carried
@@ -78,8 +71,8 @@ MCP server on?" is exactly "which port is the API on?":
   that per Engine epoch: a new Engine, or a client `initialize`, starts a new one, ends requests
   still in flight in the old one, and an answer or event of an ended epoch changes nothing. Nothing
   but an epoch's own `initialize` is sent in it until that has been answered (bounded at 10 s) and
-  the Engine that answered is known: other calls wait for it, or for the epoch that replaces it;
-  a later connection reaching another Engine starts a new epoch, initialized first. Idle pooled connections are closed after 25 s,
+  the Engine that answered is known: other calls wait for it, or for the epoch that replaces it.
+  Idle pooled connections are closed after 25 s,
   before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
   also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found), waiting up to 30 s for the answer;
@@ -94,9 +87,11 @@ MCP server on?" is exactly "which port is the API on?":
   installed desktop app's folder *before* a dev checkout's `.dev-data` folders, so when both are
   running it connects to the installed app (it prints which folder it used on stderr). To use the
   dev Engine instead, set `JUSTSEARCH_DATA_DIR` to that checkout's data folder (for example
-  `<checkout>/modules/ui-web/.dev-data`) or pass its port with `--port` / `JUSTSEARCH_API_PORT`.
-  The MCPB bridge never looks in a checkout; point it at a dev Engine with `JUSTSEARCH_DATA_DIR` or
-  `JUSTSEARCH_API_PORT`. The backend also prints
+  `<checkout>/modules/ui-web/.dev-data`) or pass its port with `--port` / `JUSTSEARCH_API_PORT`
+  (with `JUSTSEARCH_SESSION_TOKEN`; the pin is used because that checkout's manifest names it).
+  The MCPB bridge never looks in a checkout; point it at a dev Engine with `JUSTSEARCH_DATA_DIR`
+  (a `JUSTSEARCH_API_PORT` pin alone is refused there, since no manifest it reads names the
+  port). The backend also prints
   `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\engine.log`) and serves
   `GET /api/health` once up. (Gradle dev tasks like `runHeadless`/`devAll` default to `33221`,
   which is why older docs and scripts mention that number — the installed app does not use it.)
@@ -195,6 +190,31 @@ Remedies:
 - Or skip the project-scope approval flow entirely: pass the server programmatically via SDK
   options (Agent SDK), or via `--mcp-config <file> --strict-mcp-config` on the CLI.
 
+## Session credential
+
+The per-boot credential is published only in the Engine owner's canonical
+`runtime/manifest.json` (`head.sessionToken`). The file is POSIX 0600, or restricted to its
+owner and SYSTEM on Windows. Neither HTTP responses nor stdout provide the credential.
+Bridges take it from the manifest they validated after the live identity and socket-owner proof.
+Discovery probes are unauthenticated public reads. Reconnection re-reads the manifest, including
+when a restarted Engine changes port.
+
+An explicit `--port` or `JUSTSEARCH_API_PORT` override requires `JUSTSEARCH_SESSION_TOKEN`;
+without that variable discovery fails with a message naming it. The override selects which
+Engine to use, not whether to prove it: the token is sent only to the Engine of a runtime
+manifest that names the pinned port, after the same live identity and socket-owner proof. A
+pinned port that no manifest names, or whose manifest Engine is not proven, is refused.
+
+Production authenticates every request, including reads and streams, except `OPTIONS` and
+`GET`/`HEAD` on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json`. Public responses redact
+the credential. The removed `/api/mcp/token` route returns 401 without a valid token and 404
+with one. Development mode remains token-free.
+
+Update MCPB to 0.3.1 for this Engine. Older bundles fail with 401 because they bootstrap over
+HTTP. The updated bridge also reads the previous release's manifest and remains compatible
+with that Engine.
+
 ## Transport
 
 Streamable HTTP on the existing Javalin server (loopback-only,
@@ -204,7 +224,7 @@ same JVM as the Head process. No Node.js required.
 **Transport security.** The spec's Streamable-HTTP security clause ("Servers **MUST** validate the
 `Origin` header on all incoming connections to prevent DNS rebinding attacks... If the `Origin`
 header is present and invalid, servers **MUST** respond with HTTP 403 Forbidden") is enforced on
-every method served at `/mcp` — **and on `GET /api/mcp/token`**, the session-token bootstrap — by
+every method served at `/mcp` by
 `ApiSecurityFilters.setupMcpOriginValidation`. The rules:
 
 | `Origin` on the request | Outcome |
@@ -213,7 +233,7 @@ every method served at `/mcp` — **and on `GET /api/mcp/token`**, the session-t
 | loopback (`http(s)://127.0.0.1`, `localhost`, `[::1]`, any port) | served |
 | desktop shell (`tauri://localhost`, `http(s)://tauri.localhost`) | served |
 | `null` (sandboxed/`file://` context) | **403** — no host to verify, and no MCP client produces it |
-| anything else | **403**, JSON-RPC error body with no `id` (plain `{error, errorCode}` on the token route, which is not a JSON-RPC endpoint) |
+| anything else | **403**, JSON-RPC error body with no `id` |
 
 The value is parsed as a URI and its **host component** compared for equality, so a lookalike such
 as `http://127.0.0.1.evil.com` is rejected. This composes with — and does not replace — the

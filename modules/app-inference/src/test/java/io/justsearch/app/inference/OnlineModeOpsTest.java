@@ -152,7 +152,7 @@ class OnlineModeOpsTest {
             HttpClient.newHttpClient(),
             MAPPER,
             mode::get,
-            () -> port,
+            () -> new LlamaServerEndpoint(port, null),
             lastKnownModelId::get,
             () -> "default-model.gguf");
   }
@@ -1441,15 +1441,17 @@ class OnlineModeOpsTest {
   @Test
   void visionCompletion_timesOutWhenLockHeld() throws Exception {
     CountDownLatch chatArrived = new CountDownLatch(1);
+    CountDownLatch releaseChat = new CountDownLatch(1);
     server.removeContext("/v1/chat/completions");
     server.createContext(
         "/v1/chat/completions",
         exchange -> {
           chatArrived.countDown();
           try {
-            Thread.sleep(5000);
-          } catch (InterruptedException ignored) {
-            // test cleanup
+            assertTrue(releaseChat.await(5, TimeUnit.SECONDS), "chat release timed out");
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("chat interrupted", interrupted);
           }
           byte[] body =
               "{\"choices\":[{\"message\":{\"content\":\"slow\"}}]}"
@@ -1462,21 +1464,21 @@ class OnlineModeOpsTest {
 
     ops.visionLockDeadline = Duration.ofMillis(200);
 
-    // Start a chat that will hold the lock while the server sleeps
+    // The real HTTP request holds the lock until the test releases its response.
     CompletableFuture<String> chatFuture =
         ops.chatCompletion(List.of(Map.of("role", "user", "content", "block")), 100);
 
     // Wait until the server receives the request (lock is now held)
-    assertTrue(chatArrived.await(5, TimeUnit.SECONDS));
-
-    // Vision should timeout after 200ms trying to acquire the lock
-    CompletableFuture<String> visionFuture =
-        ops.visionCompletion("describe", new byte[] {1, 2, 3}, 100);
-
-    ExecutionException ex =
-        assertThrows(
-            ExecutionException.class, () -> visionFuture.get(3, TimeUnit.SECONDS));
-    assertTrue(ex.getCause().getMessage().contains("timed out"));
+    try {
+      assertTrue(chatArrived.await(5, TimeUnit.SECONDS));
+      CompletableFuture<String> visionFuture =
+          ops.visionCompletion("describe", new byte[] {1, 2, 3}, 100);
+      ExecutionException ex =
+          assertThrows(ExecutionException.class, () -> visionFuture.get(3, TimeUnit.SECONDS));
+      assertTrue(ex.getCause().getMessage().contains("timed out"));
+    } finally {
+      releaseChat.countDown();
+    }
 
     // Let the chat complete to avoid resource leaks
     chatFuture.get(10, TimeUnit.SECONDS);

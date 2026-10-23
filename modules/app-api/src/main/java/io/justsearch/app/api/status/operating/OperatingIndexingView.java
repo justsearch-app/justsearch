@@ -9,7 +9,14 @@ import java.util.Objects;
 /**
  * The {@code operating.indexing} block. {@code reasons} is ordered by {@link IndexingReason}
  * precedence; its first entry is the primary reason. It is listed even when {@code state} is IDLE,
- * so the UI can say "will pause" without a misleading "paused".
+ * so readers can describe the hold even when the file queue is empty. Automatic PAUSED reasons
+ * describe enrichment/GPU bulk holds, not a stop of text indexing. Energy saver defers idle
+ * CPU/GPU enrichment; sparse work interleaved between files may continue. Game/external GPU
+ * holds defer GPU-bound idle cycles and all interleaved sparse work, including CPU sparse work;
+ * CPU-only idle cycles may continue. USER_PAUSED and SETTINGS_RECOVERY instead hold every
+ * processing lane: PAUSING means admitted work has not yet acknowledged its final publication,
+ * PAUSED means all covered lanes are quiet. Their deadline uses epoch milliseconds; waiting work
+ * remains queued. Discovery, deletion and cutover are permitted in both states.
  */
 public record OperatingIndexingView(
     IndexingState state,
@@ -19,7 +26,9 @@ public record OperatingIndexingView(
     List<BulkWorkKind> affects,
     long pendingJobs,
     @Nullable String agingReleaseAt,
-    String sampledAt)
+    String sampledAt,
+    @Nullable Long untilEpochMs,
+    boolean waitingForResume)
     implements PreciseWire {
 
   public OperatingIndexingView {
@@ -34,8 +43,15 @@ public record OperatingIndexingView(
         throw new IllegalArgumentException("reasons must be distinct and in precedence order");
       }
     }
-    if ((state == IndexingState.PAUSED || state == IndexingState.SLOWED) && reasons.isEmpty()) {
+    if ((state == IndexingState.PAUSED || state == IndexingState.PAUSING
+        || state == IndexingState.SLOWED) && reasons.isEmpty()) {
       throw new IllegalArgumentException(state + " names at least one reason");
     }
+  }
+
+  public OperatingIndexingView(IndexingState state, List<IndexingReason> reasons, String reasonCode,
+      String since, List<BulkWorkKind> affects, long pendingJobs, String agingReleaseAt,
+      String sampledAt) {
+    this(state, reasons, reasonCode, since, affects, pendingJobs, agingReleaseAt, sampledAt, null, false);
   }
 }

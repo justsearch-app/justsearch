@@ -1,0 +1,70 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T08:59:29.381Z",
+  "revision": "c5204f626f3137b80e610d1dba6eee3561131d2c",
+  "tree": "0356fda5bbff0771e9ba8981c99e867f4937d313",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.PresenceRunOperationKeyTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5153
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PresenceRunOperationKeyTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PresenceRunOperationKeyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:89d7afee9d4a554613e2b061a87b0a4681622730b377114c232275cd340b7004",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acceptanceStorageFailureCannotLookLikeScheduledSuccess()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] null",
+          "status": "passed"
+        },
+        {
+          "name": "[2] number",
+          "status": "passed"
+        },
+        {
+          "name": "[3] invalid",
+          "status": "passed"
+        },
+        {
+          "name": "[4] empty",
+          "status": "passed"
+        },
+        {
+          "name": "publicKeySurvivesSchedulingAndTerminalRetryWithoutAnotherRun()",
+          "status": "passed"
+        },
+        {
+          "name": "missingKeyIsGeneratedAndCallerCannotChooseAuthority()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8696e0b8b3d72e9d6b6719e8ff4a339aa96f765992910cbc69ccf28bfc8de903"
+}

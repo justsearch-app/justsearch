@@ -8,8 +8,9 @@
  * Usage:
  *   node justsearch-mcp.mjs [--port <port>] [--verbose]
  *
- * A pinned port (--port, JUSTSEARCH_API_PORT) that a runtime manifest names is that manifest's
- * Engine, proven as in discovery. A pinned port that no runtime manifest names is trusted with request content from whatever answers it, but never with a session token fetched on another connection.
+ * A pinned port (--port, JUSTSEARCH_API_PORT) needs JUSTSEARCH_SESSION_TOKEN and is used only as
+ * the Engine of a runtime manifest that names it, proven as in discovery; a pinned port that no
+ * runtime manifest names is refused, so the token never goes to whatever answers it.
  *
  * See docs/tempdocs/187-production-mcp-server.md for architecture and design.
  */

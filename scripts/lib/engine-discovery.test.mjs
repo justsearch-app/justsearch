@@ -185,7 +185,7 @@ function manifestFor(engine, overrides = {}) {
     instanceId: engine.instanceId,
     pid: engine.pid,
     lifecycle: 'LIFECYCLE_STATE_READY',
-    head: { apiPort: engine.port, apiBaseUrl: `http://127.0.0.1:${engine.port}` },
+    head: { apiPort: engine.port, apiBaseUrl: `http://127.0.0.1:${engine.port}`, sessionToken: engine.token },
     ...overrides,
   };
 }
@@ -200,13 +200,12 @@ let instanceCounter = 0;
  * packaged app's session filter does); mcpSessions, initialize assigns an Mcp-Session-Id and a
  * call (POST /mcp with an id) with another one is answered 404 (as after an Engine restart); stream, GET /mcp is a
  * long-lived event stream; keepAliveMs, idle connections are closed after that long.
- * tokenPerConnection: each connection is answered its own token (`${token}-${conn}`), and
- * requireToken checks that one; closeAfterPost: every POST answer closes its connection;
+ * closeAfterPost: every POST answer closes its connection;
  * rejectNext(status): the next POST /mcp with an id is answered status; expireIdleMs: a request
  * that arrives on a connection idle at least that long is dropped unanswered with its connection
  * (the server's idle expiry crossing it on the wire), and no Keep-Alive hint is sent.
  */
-async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs, tokenPerConnection = false, closeAfterPost = false, expireIdleMs, protocolVersion = '2025-06-18', strictProtocol = false, noToken = false } = {}) {
+async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs, closeAfterPost = false, expireIdleMs, protocolVersion = '2025-06-18', strictProtocol = false } = {}) {
   const id = instanceId || `instance-${process.pid}-${++instanceCounter}`;
   const requests = [];
   // hold(url, { rpc }): the next request to url (with rpc: a POST /mcp of that JSON-RPC method) is
@@ -248,7 +247,6 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       const entry = { method: req.method, url: req.url, headers: req.headers, body, health: healthStatus, conn: req.socket.conn };
       requests.push(entry);
       res.once('close', () => (entry.closed = true));
-      const ownToken = tokenPerConnection ? `${token}-${req.socket.conn}` : token;
       const json = (status, obj, headers = {}) => {
         const close = closing || (closeAfterPost && req.method === 'POST');
         res.writeHead(status, { 'content-type': 'application/json', ...headers, ...(close ? { connection: 'close' } : {}) });
@@ -278,8 +276,8 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       if (req.url === '/api/status') return json(200, { status: 'ok' });
       if (kind === 'foreign') return json(404, { error: 'not found' });
       if (req.url === '/api/runtime/live') return json(200, { alive: true, pid, instanceId: id });
-      if (req.url === '/api/mcp/token') return noToken ? json(404, {}) : json(200, { token: ownToken });
-      if (requireToken && req.method !== 'GET' && req.headers['x-justsearch-session'] !== ownToken) return json(401, { error: 'session token required' });
+      if (req.url === '/api/mcp/token') return json(req.headers['x-justsearch-session'] === token ? 404 : 401, {});
+      if (requireToken && req.method !== 'GET' && req.headers['x-justsearch-session'] !== token) return json(401, { error: 'session token required', errorCode: 'UI_TOKEN_REQUIRED' });
       // strictProtocol: an MCP request naming another protocol version than the one this Engine
       // answers is refused, as a server that does not support that version refuses it.
       const named = req.headers['mcp-protocol-version'];
@@ -626,7 +624,7 @@ async function bridgeInteractive(m, entry, between) {
       `${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`,
   );
   await reply(1);
-  await between();
+  await between({ send: message => child.stdin.write(`${JSON.stringify(message)}\n`), reply });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'justsearch_ingest', arguments: { paths: ['/x'] } } })}\n`);
   await reply(2);
   child.stdin.end();
@@ -800,25 +798,30 @@ test('D4: a foreign service answering health on the desktop manifest port is rej
 // D5: explicit settings win; dev + installed is deterministic and named
 // ---------------------------------------------------------------------------
 
+/**
+ * The desktop Engine, and a second one whose manifest is in a folder only production MCP reads
+ * after the desktop app's (its user data folder): a pin to the second wins only by being a pin.
+ */
 async function desktopAndPinned(t, root) {
   const m = machine(root);
   const desktopEngine = await startService(t);
   writeManifest(m.desktop, manifestFor(desktopEngine));
   const pinned = await startService(t);
-  const pinnedDir = path.join(root, 'pinned-data');
+  const pinnedDir = m.userData;
   writeManifest(pinnedDir, manifestFor(pinned));
-  return { m, pinned, pinnedDir };
+  return { m, desktopEngine, pinned, pinnedDir };
 }
 
-test('D5: --port, JUSTSEARCH_API_PORT and JUSTSEARCH_DATA_DIR win over the desktop Engine (production MCP), JUSTSEARCH_API_PORT (bundle)', async (t) => {
+test('D5: --port, JUSTSEARCH_API_PORT and JUSTSEARCH_DATA_DIR win over the desktop Engine (production MCP); JUSTSEARCH_API_PORT wins over JUSTSEARCH_DATA_DIR (bundle); a pin is a manifest-named Engine', async (t) => {
   const root = tempRoot(t);
-  const { m, pinned, pinnedDir } = await desktopAndPinned(t, root);
-  assert.equal((await prodDiscover(m, { port: pinned.port })).result?.port, pinned.port, '--port');
-  const byEnvPort = await prodDiscover(m, { envExtra: { JUSTSEARCH_API_PORT: String(pinned.port) } });
+  const { m, desktopEngine, pinned, pinnedDir } = await desktopAndPinned(t, root);
+  assert.equal((await prodDiscover(m, { port: pinned.port, envExtra: { JUSTSEARCH_SESSION_TOKEN: pinned.token } })).result?.port, pinned.port, '--port');
+  const byEnvPort = await prodDiscover(m, { envExtra: { JUSTSEARCH_API_PORT: String(pinned.port), JUSTSEARCH_SESSION_TOKEN: pinned.token } });
   assert.equal(byEnvPort.result?.port, pinned.port, 'JUSTSEARCH_API_PORT');
   const byDataDir = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: pinnedDir } });
   assert.equal(byDataDir.result?.port, pinned.port, 'JUSTSEARCH_DATA_DIR');
-  assertConnectedTo(await bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(pinned.port) }), pinned);
+  // The bundle reads only JUSTSEARCH_DATA_DIR and the desktop folder: the pin picks the later one.
+  assertConnectedTo(await bridgeSession(m, bundle(root), { JUSTSEARCH_DATA_DIR: pinnedDir, JUSTSEARCH_API_PORT: String(desktopEngine.port), JUSTSEARCH_SESSION_TOKEN: desktopEngine.token }), desktopEngine);
 });
 
 test('D5: JUSTSEARCH_DATA_DIR wins over the desktop Engine in the bundle too', async (t) => {
@@ -920,7 +923,8 @@ test('D4: a proven Engine still starting (/api/health 503) is waited for and adm
     }
     assert.ok(engine.requests.some((r) => r.url === '/api/health' && r.health === 503), `${client}: it was seen starting`);
     const credentialed = engine.requests.filter((r) => r.url === '/api/mcp/token' || r.url === '/mcp');
-    assert.ok(credentialed.length > 0, client);
+    if (client === 'bundle') assert.ok(credentialed.length > 0, client);
+    assert.ok(!engine.requests.some(r => r.url === '/api/mcp/token'), 'no HTTP credential bootstrap');
     assert.ok(credentialed.every((r) => r.health === 200), `${client}: nothing past the probes before health 200`);
   }
 });
@@ -1164,12 +1168,13 @@ test('D9: the port is taken while /api/health is pending — neither client send
     const seen = await impostor.settled();
     reached[client] = { requests: seen.requests, answersFromIt: /impostor/.test(JSON.stringify(res.result ?? res.messages)) };
     // The observed refusal, never a timeout or a crash: it tried the port, wrote nothing, and ...
-    assert.ok(seen.connections > 0, `${client}: it tried the replacement's port\n${res.stderr}`);
+    if (client === 'bundle') assert.ok(seen.connections > 0, `${client}: it tried the replacement's port\n${res.stderr}`);
+    else assert.equal(seen.connections, 0, 'manifest discovery sends no request after its public probes');
     if (client === 'production MCP') {
       // ... discovery returns the proven Engine with no token.
       assert.equal(res.code, 0, res.stderr);
       assert.equal(res.result.instanceId, engine.instanceId, res.stderr);
-      assert.equal(res.result.token, null, 'the token bootstrap to the replacement is refused');
+      assert.equal(res.result.token, engine.token, 'the credential comes from the original proven manifest');
     } else {
       // ... the bridge exits naming the refusal.
       assert.equal(res.code, 1, res.stderr);
@@ -1204,8 +1209,8 @@ async function bridgeReconnectSwap(t, holdUrl, answer) {
   assert.match(call.error.message, /owner-mismatch/, session.stderr);
 }
 
-test('D9: bridge reconnect — the restarted Engine\'s port is taken while its token response is pending', async (t) => {
-  await bridgeReconnectSwap(t, '/api/mcp/token', { token: 'token-second' });
+test('D9: bridge reconnect — the restarted Engine\'s port is taken while its public health response is pending', async (t) => {
+  await bridgeReconnectSwap(t, '/api/health', { ok: true });
 });
 
 test('D9: bridge reconnect — the restarted Engine\'s port is taken while the re-initialize response is pending', async (t) => {
@@ -1216,65 +1221,43 @@ test('D9: bridge reconnect — the restarted Engine\'s port is taken while the r
   }));
 });
 
-test('D9: no code path reaches the Engine except engineRequest (one http.request, behind the proving or token-binding agent)', () => {
+test('D9: no code path reaches the Engine except engineRequest (one http.request, behind the proving agent)', () => {
   const clients = ['packaging/mcpb/server/index.js', 'scripts/prod/justsearch-mcp/server.mjs', 'scripts/prod/justsearch-mcp/discovery.mjs'];
   const direct = /\brequire\(\s*['"](node:)?(http|https|net)['"]\s*\)|\bfrom\s+['"](node:)?(http|https|net)['"]|\bfetch\s*\(|\bhttp\.(request|get)\s*\(|\bnet\.(connect|createConnection)\s*\(/;
   for (const rel of clients) {
     const src = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
     assert.doesNotMatch(src, direct, `${rel} must send through engine-discovery.cjs engineRequest`);
-    assert.match(src, /engineRequest\(/, rel);
   }
+  for (const rel of clients.slice(0, 2)) assert.match(fs.readFileSync(path.join(repoRoot, rel), 'utf8'), /engineRequest\(/, rel);
   const shared = fs.readFileSync(ENGINE_DISCOVERY, 'utf8');
-  assert.equal(shared.match(/\bhttp\.(request|get)\s*\(/g)?.length, 1, 'one http.request, in send');
-  assert.match(shared, /function send\([\s\S]*?\{\s*return http\.request\(/, 'the one http.request is send()');
-  // send() is called twice: by engineRequest through the target's agent (proven or token-bound
-  // connections), and by bootstrapGet for the token and identity requests a token-bound
-  // connection makes on itself (tokenBoundConnection) before it is handed out.
-  assert.equal(shared.match(/(?<!function )\bsend\((?!\))/g)?.length, 2, 'send() called twice');
-  assert.match(shared, /function engineRequest[\s\S]*?send\(agentFor\(target\)/, 'engineRequest always uses the target agent');
-  assert.match(shared, /function bootstrapGet\(socket[\s\S]*?send\(\s*undefined,[\s\S]*?createConnection: \(\) => socket/, 'the bootstrap requests go only on the connection being opened');
-  assert.match(shared, /function tokenBoundConnection[\s\S]*?bootstrapGet\(socket, options\.port, '\/api\/mcp\/token'/, 'the token-bound connection fetches its own token');
-  assert.equal(shared.match(/\bnet\.connect\s*\(/g)?.length, 1, 'one net.connect, in connect');
-  assert.equal(shared.match(/\bconnect\(options\)/g)?.length, 3, 'connect() defined once, called by provenConnection and tokenBoundConnection');
+  assert.equal(shared.match(/\bhttp\.(request|get)\s*\(/g)?.length, 1, 'one http.request, in engineRequest');
+  assert.match(shared, /function engineRequest[\s\S]*?http\.request\([\s\S]*?agent: agentFor\(engine\)/, 'it always uses the proving agent');
+  assert.equal(shared.match(/\bnet\.connect\s*\(/g)?.length, 1, 'one net.connect, in provenConnection');
   assert.doesNotMatch(shared, /\bfetch\s*\(/);
 });
 
 // ---------------------------------------------------------------------------
-// Pinned ports (--port, JUSTSEARCH_API_PORT): a credential goes only on a connection proven
-// before anything was written on it (manifest proof, or the token fetched on that connection)
+// Pinned ports (--port, JUSTSEARCH_API_PORT): a pin needs JUSTSEARCH_SESSION_TOKEN, and that
+// token goes only on a connection to the proven Engine of a runtime manifest naming the port
 // ---------------------------------------------------------------------------
 
+/** A pin and the token its operator gives it (JUSTSEARCH_SESSION_TOKEN; the fixture default). */
 const PINS = {
-  '--port': (port) => ({ args: ['--port', String(port)], label: `--port ${port}` }),
-  JUSTSEARCH_API_PORT: (port) => ({ envExtra: { JUSTSEARCH_API_PORT: String(port) }, label: `JUSTSEARCH_API_PORT=${port}` }),
+  '--port': (port, token = 'token-abc') => ({ args: ['--port', String(port)], envExtra: { JUSTSEARCH_SESSION_TOKEN: token }, label: `--port ${port}` }),
+  JUSTSEARCH_API_PORT: (port, token = 'token-abc') => ({ envExtra: { JUSTSEARCH_API_PORT: String(port), JUSTSEARCH_SESSION_TOKEN: token }, label: `JUSTSEARCH_API_PORT=${port}` }),
 };
 
 /** prodDiscover options for a pin. */
-function pinDiscover(kind, port) {
-  return kind === '--port' ? { port } : { envExtra: { JUSTSEARCH_API_PORT: String(port) } };
+function pinDiscover(kind, port, token = 'token-abc') {
+  const { envExtra } = PINS[kind](port, token);
+  return kind === '--port' ? { port, envExtra: { JUSTSEARCH_SESSION_TOKEN: token } } : { envExtra };
 }
 
-/**
- * Every request that carried a session token carried issued, and that token was answered to an
- * earlier GET /api/mcp/token on the same connection (requests in arrival order; a service's
- * records carry headers, an impostor's carry session).
- */
-function assertOwnTokens(requests, issued, label) {
-  for (const [i, r] of requests.entries()) {
-    const session = r.headers ? r.headers['x-justsearch-session'] : r.session;
-    if (!session) continue;
-    assert.equal(session, issued, `${label}: ${r.method} ${r.url} carried ${session}`);
-    assert.ok(
-      requests.slice(0, i).some((x) => x.conn === r.conn && x.url === '/api/mcp/token'),
-      `${label}: ${r.method} ${r.url} on connection ${r.conn} carried a token not fetched on that connection`,
-    );
-  }
-}
+/** The bundle's environment for a pin. */
+const bundlePin = (port, token = 'token-abc') => PINS.JUSTSEARCH_API_PORT(port, token).envExtra;
 
-/** The requests that reached a replacement carrying the Engine's token. */
-function engineTokenAt(seen, engine) {
-  return seen.requests.filter((r) => r.session === engine.token);
-}
+/** Name service in the desktop app's runtime manifest (replacing what was there). */
+const nameInManifest = (m, service) => writeManifest(m.desktop, manifestFor(service));
 
 /** Resolves once cond() holds (polled), or throws after timeoutMs. */
 async function until(cond, timeoutMs, what) {
@@ -1323,7 +1306,7 @@ for (const kind of Object.keys(PINS)) {
     const impostor = await startImpostor(t, { pid: livePid, instanceId: 'copied-instance' });
     writeManifest(m.desktop, { schemaVersion: 2, pid: livePid, instanceId: 'copied-instance', lifecycle: 'LIFECYCLE_STATE_READY', head: { apiPort: impostor.port } });
     const res = await prodDiscover(m, pinDiscover(kind, impostor.port));
-    const bridge = kind === 'JUSTSEARCH_API_PORT' ? await bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(impostor.port) }) : null;
+    const bridge = kind === 'JUSTSEARCH_API_PORT' ? await bridgeSession(m, bundle(root), bundlePin(impostor.port)) : null;
     const seen = await impostor.settled();
     assert.deepEqual(seen.requests, [], `nothing at all is written to the unproven server\n${res.stderr}\n${bridge?.stderr ?? ''}`);
     assert.ok(seen.connections > 0, 'the proof was tried there');
@@ -1379,154 +1362,43 @@ for (const kind of Object.keys(PINS)) {
   });
 }
 
-test('P3: a pin no manifest names — reused connections carry the token fetched on them; once a replacement answers the port it gets request content and only its own token', async (t) => {
-  const root = tempRoot(t);
-  const m = machine(root);
-  const engine = await startService(t);
-  const prod = await startProdMcp(t, m, PINS['--port'](engine.port));
-  const ingest = { paths: [path.join(root, 'doc.txt')] };
-  for (let i = 0; i < 2; i++) assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${engine.instanceId}`), prod.stderr);
-  engine.lastAnswers();
-  assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${engine.instanceId}`), prod.stderr);
-  await engine.close();
-  const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
-  const result = await prod.call('justsearch_ingest', ingest);
-  const seen = await impostor.settled();
-  assert.deepEqual(engineTokenAt(seen, engine), [], `the Engine's token never reaches the replacement\n${prod.stderr}`);
-  assertOwnTokens(seen.requests, 'impostor-token', 'replacement');
-  assert.ok(seen.requests.some((r) => r.url === '/api/knowledge/ingest' && r.session === 'impostor-token'), `the pin is used as given: the call reached it\n${prod.stderr}`);
-  assert.match(result, /impostor/, result);
-  assert.equal(engine.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 3);
-  assert.equal(engine.stats.connections, 1, 'startup and all three calls shared one connection (its token fetched once, on it)');
-  assertOwnTokens(engine.requests, engine.token, 'Engine');
-});
-
-test('P3: concurrent calls while a token fetch is held open — a connection opened to a replacement meanwhile carries only its own token; the held one is refused; the busy one is answered by the Engine', async (t) => {
-  const root = tempRoot(t);
-  const m = machine(root);
-  const engine = await startService(t);
-  const pin = PINS['--port'](engine.port);
-  const prod = await startProdMcp(t, m, pin);
-  const ingest = { paths: [path.join(root, 'doc.txt')] };
-  const busy = engine.hold('/api/knowledge/ingest');
-  const a = prod.call('justsearch_ingest', ingest); // on the startup connection, held
-  await within(busy.arrived, 10000, 'call A arriving');
-  engine.lastAnswers();
-  const tokenFetch = engine.hold('/api/mcp/token');
-  const b = prod.call('justsearch_ingest', ingest); // a new connection, whose token answer is held
-  const bDone = b.then(() => 'done');
-  await Promise.race([tokenFetch.arrived, bDone, pause(3000)]);
-  await engine.stopListening(); // A's and B's connections stay
-  const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
-  const c = await prod.call('justsearch_ingest', ingest); // a third connection, to the replacement
-  tokenFetch.release({ token: engine.token }); // its connection closes with this answer
-  busy.release({ success: true, operationKey: `op-${engine.instanceId}`, message: `ingest by ${engine.instanceId}` });
-  const [resultA, resultB] = await Promise.all([a, b]);
-  const seen = await impostor.settled();
-  assert.deepEqual(engineTokenAt(seen, engine), [], `the Engine's token never reaches the replacement\n${prod.stderr}`);
-  assertOwnTokens(seen.requests, 'impostor-token', 'replacement');
-  assert.match(c, /impostor/, 'call C reached the replacement, as a pin allows');
-  assert.match(resultA, new RegExp(`ingest by ${engine.instanceId}`), resultA);
-  assert.match(resultB, /ENGINE_GONE/, `call B: its connection closed before it could be used\n${resultB}`);
-  assert.ok(resultB.includes(`pinned by ${pin.label}`), resultB);
-  assertOwnTokens(engine.requests, engine.token, 'Engine');
-});
-
-test('P3: the port is replaced while the startup token response is held (it closes its connection) — both clients refuse the pin; the replacement never gets the Engine\'s token', async (t) => {
-  for (const client of ['production MCP', 'bundle']) {
-    const root = tempRoot(t);
-    const m = machine(root);
-    const engine = await startService(t, { holdUrl: '/api/mcp/token' });
-    const run = client === 'production MCP'
-      ? bridgeSession(m, PROD_MCP_ENTRY, {}, { args: ['--port', String(engine.port)] })
-      : bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(engine.port) });
-    const impostor = await takeOverWhileHeld(t, engine, { token: engine.token });
-    const res = await run;
-    const seen = await impostor.settled();
-    assert.deepEqual(engineTokenAt(seen, engine), [], `${client}: the Engine's token never reaches the replacement\n${res.stderr}`);
-    assertOwnTokens(seen.requests, 'impostor-token', `${client}: replacement`);
-    assert.notEqual(res.code, 0, `${client}: no connection to the pin fetched its own token, so it is refused\n${res.stderr}`);
-    const label = client === 'production MCP' ? `--port ${engine.port}` : `JUSTSEARCH_API_PORT=${engine.port}`;
-    assert.ok(res.stderr.includes(label), `${client}: the refusal names the pin\n${res.stderr}`);
-  }
-});
-
-test('P3: right after its token response the Engine stops (Connection: close) and a replacement binds — both clients refuse the pin; the replacement never gets the Engine\'s token', async (t) => {
-  for (const client of ['production MCP', 'bundle']) {
+for (const kind of ['--port', 'JUSTSEARCH_API_PORT', 'bundle']) {
+  test(`P3 (${kind}): a pin no runtime manifest names is refused — even a real Engine there is sent nothing, JUSTSEARCH_SESSION_TOKEN included, and the error says to point JUSTSEARCH_DATA_DIR at its data folder`, async (t) => {
     const root = tempRoot(t);
     const m = machine(root);
     const engine = await startService(t);
-    engine.lastAnswers();
-    let bound;
-    const ready = new Promise((resolve) => (bound = resolve)); // the client's messages follow the replacement
-    const run = client === 'production MCP'
-      ? bridgeSession(m, PROD_MCP_ENTRY, {}, { args: ['--port', String(engine.port)], ready })
-      : bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(engine.port) }, { ready });
-    await until(() => engine.requests.some((r) => r.url === '/api/mcp/token'), 10000, 'the token request');
-    await engine.close();
-    const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
-    bound();
-    const res = await run;
-    const seen = await impostor.settled();
-    assert.deepEqual(engineTokenAt(seen, engine), [], `${client}: the Engine's token never reaches the replacement\n${res.stderr}`);
-    assertOwnTokens(seen.requests, 'impostor-token', `${client}: replacement`);
-    assert.notEqual(res.code, 0, `${client}: the token's connection closed with it, so the pin is refused\n${res.stderr}`);
-  }
-});
+    const res = kind === 'bundle'
+      ? await bridgeSession(m, bundle(root), bundlePin(engine.port))
+      : await prodDiscover(m, pinDiscover(kind, engine.port));
+    const label = kind === '--port' ? `--port ${engine.port}` : `JUSTSEARCH_API_PORT=${engine.port}`;
+    assert.notEqual(res.code, 0, `refused\n${res.stderr}`);
+    assert.ok(res.stderr.includes(`${label}: refused, no runtime manifest names this port`), res.stderr);
+    assert.match(res.stderr, /set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found/);
+    assert.deepEqual(engine.requests, [], 'nothing reaches the unnamed pin');
+    assert.equal(engine.stats.connections, 0, 'not even a connection');
+  });
+}
 
-test('P3: the Engine evicts the idle connection, or resets it, and a replacement binds — the next call carries only the replacement\'s own token', async (t) => {
-  for (const how of ['idle eviction', 'reset']) {
-    const root = tempRoot(t);
-    const m = machine(root);
-    const engine = await startService(t, how === 'idle eviction' ? { keepAliveMs: 300 } : {});
-    const prod = await startProdMcp(t, m, PINS['--port'](engine.port));
-    const ingest = { paths: [path.join(root, 'doc.txt')] };
-    assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${engine.instanceId}`), prod.stderr);
-    if (how === 'reset') await engine.reset();
-    await until(() => engine.stats.open === 0, 10000, `${how}: the Engine's side of the connection closing`);
-    await pause(300); // the idle client handles the close (see the D9 ingest case for why it matters)
-    await engine.close();
-    const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
-    const result = await prod.call('justsearch_ingest', ingest);
-    const seen = await impostor.settled();
-    assert.deepEqual(engineTokenAt(seen, engine), [], `${how}: the Engine's token never reaches the replacement\n${prod.stderr}`);
-    assertOwnTokens(seen.requests, 'impostor-token', `${how}: replacement`);
-    assert.match(result, /impostor/, `${how}: the call reached the replacement, as a pin allows\n${result}`);
-  }
-});
-
-test('P3: the port is replaced between the status check and the token fetch — the replacement is asked for its own token and gets no other', async (t) => {
+test('P7: the Engine restarts on a manifest-named pinned port — the call in flight fails explicitly and is not sent again; the next call is proven on the restarted Engine (its new manifest) and succeeds, with the pin\'s token', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
-  const engine = await startService(t, { holdUrl: '/api/status' });
-  const run = bridgeSession(m, PROD_MCP_ENTRY, {}, { args: ['--port', String(engine.port)] });
-  const impostor = await takeOverWhileHeld(t, engine, { status: 'ok' });
-  const res = await run;
-  const seen = await impostor.settled();
-  assert.deepEqual(engineTokenAt(seen, engine), [], `the Engine's token never reaches the replacement\n${res.stderr}`);
-  assertOwnTokens(seen.requests, 'impostor-token', 'replacement');
-  assert.match(JSON.stringify(res.messages.find((x) => x.id === 2)), /impostor/, `the pin is used as given\n${res.stderr}`);
-});
-
-test('P7: the Engine restarts on the pinned port with a new token — the call in flight fails explicitly and is not sent again; the next call fetches the new token on a new connection and succeeds', async (t) => {
-  const root = tempRoot(t);
-  const m = machine(root);
-  const first = await startService(t, { token: 'token-first', requireToken: true });
-  const prod = await startProdMcp(t, m, PINS['--port'](first.port));
+  const first = await startService(t, { token: 'token-pin', requireToken: true });
+  nameInManifest(m, first);
+  const prod = await startProdMcp(t, m, PINS['--port'](first.port, 'token-pin'));
   const ingest = { paths: [path.join(root, 'doc.txt')] };
   assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${first.instanceId}`), prod.stderr);
   const lost = first.hold('/api/knowledge/ingest');
   const inFlight = prod.call('justsearch_ingest', ingest);
   await within(lost.arrived, 10000, 'the in-flight ingest arriving');
   await first.reset(); // the Engine goes; the in-flight ingest's answer is lost
-  const second = await startService(t, { port: first.port, token: 'token-second', requireToken: true });
+  const second = await startService(t, { port: first.port, token: 'token-pin', requireToken: true });
+  nameInManifest(m, second);
   const lostResult = await inFlight;
   const next = await prod.call('justsearch_ingest', ingest);
-  assert.deepEqual(second.requests.filter((r) => r.headers['x-justsearch-session'] === 'token-first'), [], `the old token never reaches the restarted Engine\n${prod.stderr}`);
   assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
   assert.equal(second.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 1, 'the lost ingest is not sent again');
   assert.match(lostResult, /NOT_CONNECTED|ENGINE_GONE/, `the call in flight fails explicitly: ${lostResult}`);
-  assertOwnTokens(second.requests, 'token-second', 'restarted Engine');
+  assert.ok(second.requests.every((r) => [undefined, 'token-pin'].includes(r.headers['x-justsearch-session'])), 'only the pin\'s token');
 });
 
 test('P5: bridge pinned to a port a manifest names — after the Engine goes and a replacement copying its identity binds, nothing reaches the replacement and the call fails naming the refusal', async (t) => {
@@ -1535,7 +1407,7 @@ test('P5: bridge pinned to a port a manifest names — after the Engine goes and
   const engine = await startService(t);
   writeManifest(m.desktop, manifestFor(engine));
   let impostor = null;
-  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, ...bundlePin(engine.port) } }, bundle(root), async () => {
     await handshakeDone(engine);
     await engine.close();
     await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
@@ -1550,57 +1422,32 @@ test('P5: bridge pinned to a port a manifest names — after the Engine goes and
   assert.match(session.stderr, new RegExp(`pinned by JUSTSEARCH_API_PORT=${engine.port}`));
 });
 
-test('P5: bridge pinned to a port no manifest names — the long-lived GET stream keeps one connection; initialize, initialized and each call carry only their own connection\'s token; a replacement gets only its own', async (t) => {
+test('P5/P7: bridge pinned to a manifest-named port — the Engine restarts there with a new identity and session (its new manifest names the port): the new identity leads to re-initialize, initialized and the call, sent once, with the pin\'s token', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
-  const engine = await startService(t, { stream: true });
-  let impostor = null;
-  let streamOpen = null;
-  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
-    await handshakeDone(engine, { stream: true });
-    await engine.closeIdle(); // the GET stream's connection stays open
-    await until(() => engine.stats.open === 1, 10000, 'the idle connections closing');
-    await pause(300); // the idle bridge handles the close
-    streamOpen = engine.stats.open;
-    impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
-  });
-  const seen = await impostor.settled();
-  assert.deepEqual(engineTokenAt(seen, engine), [], `the Engine's token never reaches the replacement\n${session.stderr}`);
-  assertOwnTokens(seen.requests, 'impostor-token', 'replacement');
-  assert.ok(seen.requests.some((r) => r.url === '/mcp' && r.method === 'POST' && r.session === 'impostor-token'), `the call reached the pin, as a pin allows\n${session.stderr}`);
-  assertOwnTokens(engine.requests, engine.token, 'Engine');
-  for (const step of ['initialize', 'notifications/initialized']) {
-    const sent = engine.requests.find((r) => r.url === '/mcp' && r.method === 'POST' && JSON.parse(r.body).method === step);
-    assert.equal(sent?.headers['x-justsearch-session'], engine.token, `${step} carries the token of its own connection`);
-  }
-  assert.equal(streamOpen, 1, 'the GET stream was still open on its own connection when the call was made');
-});
-
-test('P5/P7: bridge pinned to a port no manifest names — the Engine restarts there with a new token and session: the new identity leads to re-initialize, initialized and the call, sent once, each on a connection that fetched the new token', async (t) => {
-  const root = tempRoot(t);
-  const m = machine(root);
-  const first = await startService(t, { token: 'token-first', requireToken: true, mcpSessions: true });
+  const first = await startService(t, { token: 'token-pin', requireToken: true, mcpSessions: true });
+  nameInManifest(m, first);
   let second = null;
-  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, ...bundlePin(first.port, 'token-pin') } }, bundle(root), async () => {
     await handshakeDone(first);
     await first.close();
     await pause(300); // the idle bridge handles the close
-    second = await startService(t, { port: first.port, token: 'token-second', requireToken: true, mcpSessions: true });
+    second = await startService(t, { port: first.port, token: 'token-pin', requireToken: true, mcpSessions: true });
+    nameInManifest(m, second);
   });
-  assert.deepEqual(second.requests.filter((r) => r.headers['x-justsearch-session'] === 'token-first'), [], `the old token never reaches the restarted Engine\n${session.stderr}`);
   const call = session.messages.find((x) => x.id === 2);
   assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
-  assert.equal(call.result.session, 'token-second');
-  assertOwnTokens(second.requests, 'token-second', 'restarted Engine');
+  assert.equal(call.result.session, 'token-pin');
   const posts = second.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
   assert.deepEqual(posts, ['initialize', 'notifications/initialized', 'tools/call'], 'the old session is never used there: re-initialized, then the call, once');
+  assert.ok(second.requests.every((r) => r.headers['mcp-session-id'] !== `session-${first.instanceId}`), 'the old session stays with the Engine that opened it');
   assert.match(session.stderr, /reconnected to/);
 });
 
 // ---------------------------------------------------------------------------
-// Round 2: the token fetch is bounded; a manifest-accepted or stale-manifest pin is refused;
-// nothing that may have been sent is sent again; an MCP session stays with its endpoint; a
-// manifest-pinned Engine that restarts on its port is selected again
+// Round 2: a manifest-accepted or stale-manifest pin is refused; nothing that may have been
+// sent is sent again; an MCP session stays with its endpoint; a manifest-pinned Engine that
+// restarts on its port is selected again
 // ---------------------------------------------------------------------------
 
 const INIT_LINE = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } } })}\n`;
@@ -1608,13 +1455,15 @@ const callLine = (id) => `${JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/
 const INITIALIZED_LINE = `${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`;
 
 /**
- * Start a client pinned to port (production MCP: --port; bundle: JUSTSEARCH_API_PORT) and write
- * firstLine (initialize), leaving stdin open. exited resolves to the exit code; messages and stderr fill in.
+ * Start a client pinned to port (production MCP: --port; bundle: JUSTSEARCH_API_PORT; either with
+ * the fixture's JUSTSEARCH_SESSION_TOKEN) and write firstLine (initialize), leaving stdin open.
+ * A manifest must name the port for the pin to be used. exited resolves to the exit code;
+ * messages and stderr fill in.
  */
 function startPinnedClient(client, m, root, port, envExtra = {}, firstLine = INIT_LINE) {
   const [entry, args, env] = client === 'production MCP'
-    ? [PROD_MCP_ENTRY, ['--port', String(port)], {}]
-    : [bundle(root), [], { JUSTSEARCH_API_PORT: String(port) }];
+    ? [PROD_MCP_ENTRY, ['--port', String(port)], { JUSTSEARCH_SESSION_TOKEN: 'token-abc' }]
+    : [bundle(root), [], bundlePin(port)];
   const child = spawnNode([entry, ...args], { env: { ...m.env, ...env, ...envExtra }, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] }, 'stdin');
   const out = { child, messages: [], stderr: '' };
   let buf = '';
@@ -1633,22 +1482,6 @@ function startPinnedClient(client, m, root, port, envExtra = {}, firstLine = INI
   child.stdin.write(firstLine);
   return out;
 }
-
-test('P3 (bound): the pin accepts the token request and never answers it — both clients refuse within the probe bound, naming it, with stdin still open', async (t) => {
-  for (const client of ['production MCP', 'bundle']) {
-    const root = tempRoot(t);
-    const m = machine(root);
-    const engine = await startService(t, { holdUrl: '/api/mcp/token' }); // never released
-    const t0 = Date.now();
-    const run = startPinnedClient(client, m, root, engine.port);
-    const code = await within(run.exited, 7000, `${client}: a refusal while the token answer never comes\n${run.stderr}`);
-    const elapsed = Date.now() - t0;
-    assert.notEqual(code, 0, `${client}: refused\n${run.stderr}`);
-    assert.match(run.stderr, /did not answer GET \/api\/mcp\/token within 2000 ms/, `${client}: the error says why`);
-    assert.ok(elapsed < 6000, `${client}: no slower than the bound (${elapsed} ms)`);
-    assert.ok(engine.requests.every((r) => r.url === '/api/mcp/token'), `${client}: nothing but the token request was written`);
-  }
-});
 
 test('P3 (bound): closing stdin stops either client while discovery still waits (an Engine starting at /api/health 503)', async (t) => {
   for (const client of ['production MCP', 'bundle']) {
@@ -1671,7 +1504,7 @@ test('P1b/P5 (bundle): the manifest accepted for the pin is deleted, or corrupte
     const engine = await startService(t);
     writeManifest(m.desktop, manifestFor(engine));
     let impostor = null;
-    const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
+    const session = await bridgeInteractive({ ...m, env: { ...m.env, ...bundlePin(engine.port) } }, bundle(root), async () => {
       await handshakeDone(engine);
       const manifest = path.join(m.desktop, 'runtime', 'manifest.json');
       if (change === 'deleted') fs.rmSync(manifest);
@@ -1685,7 +1518,7 @@ test('P1b/P5 (bundle): the manifest accepted for the pin is deleted, or corrupte
     const call = session.messages.find((x) => x.id === 2);
     assert.ok(call?.error, `${change}: the call fails: ${JSON.stringify(call)}\n${session.stderr}`);
     assert.ok(
-      session.stderr.includes(`JUSTSEARCH_API_PORT=${engine.port}: refused, a runtime manifest named this port when it was accepted and none does now`),
+      session.stderr.includes(`JUSTSEARCH_API_PORT=${engine.port}: refused, no runtime manifest names this port`),
       `${change}: the refusal says why\n${session.stderr}`,
     );
   }
@@ -1714,8 +1547,8 @@ test('P1b (stale): a manifest whose pid is gone names the pinned port and someth
     const impostor = await startImpostor(t, { pid: 2147483647, instanceId: 'gone-instance' });
     writeManifest(m.desktop, { schemaVersion: 2, pid: await deadPid(), instanceId: 'gone-instance', lifecycle: 'LIFECYCLE_STATE_READY', head: { apiPort: impostor.port } });
     const res = client === 'production MCP'
-      ? await prodDiscover(m, { port: impostor.port })
-      : await bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(impostor.port) });
+      ? await prodDiscover(m, pinDiscover('--port', impostor.port))
+      : await bridgeSession(m, bundle(root), bundlePin(impostor.port));
     const seen = await impostor.settled();
     assert.deepEqual(seen.requests, [], `${client}: nothing is written to what answers the port\n${res.stderr}`);
     assert.notEqual(res.code, 0, `${client}: refused\n${res.stderr}`);
@@ -1724,16 +1557,18 @@ test('P1b (stale): a manifest whose pid is gone names the pinned port and someth
   }
 });
 
-test('P5 (bundle): a pin no manifest names is restarted with a new token — the old Mcp-Session-Id is never sent to the new endpoint', async (t) => {
+test('P5 (bundle): a manifest-named pin is restarted (a new manifest names the port) — the old Mcp-Session-Id is never sent to the new endpoint', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
-  const first = await startService(t, { token: 'token-first', mcpSessions: true, stream: true });
+  const first = await startService(t, { mcpSessions: true, stream: true });
+  nameInManifest(m, first);
   let second = null;
-  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, ...bundlePin(first.port) } }, bundle(root), async () => {
     await handshakeDone(first, { stream: true });
     await first.close();
     await pause(300); // the idle bridge handles the close
-    second = await startService(t, { port: first.port, token: 'token-second', mcpSessions: true, stream: true });
+    second = await startService(t, { port: first.port, mcpSessions: true, stream: true });
+    nameInManifest(m, second);
   });
   const oldSession = `session-${first.instanceId}`;
   const carried = second.requests.filter((r) => r.headers['mcp-session-id'] === oldSession).map((r) => `${r.method} ${r.url}`);
@@ -1763,12 +1598,14 @@ test('P5 (bundle): the Engine on a pin is replaced by one that speaks another MC
   const root = tempRoot(t);
   const m = machine(root);
   const first = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26', strictProtocol: true });
+  nameInManifest(m, first);
   let second = null;
-  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, ...bundlePin(first.port) } }, bundle(root), async () => {
     await handshakeDone(first, { stream: true });
     await first.close();
     await pause(300); // the idle bridge handles the close
     second = await startService(t, { port: first.port, mcpSessions: true, stream: true, protocolVersion: '2025-06-18', strictProtocol: true });
+    nameInManifest(m, second);
   });
   const call = session.messages.find((x) => x.id === 2);
   assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
@@ -1787,6 +1624,7 @@ test('P5 (bundle): the client initializes again — that initialize carries no s
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26' });
+  nameInManifest(m, engine);
   const run = startPinnedClient('bundle', m, root, engine.port);
   const replied = async (id) => {
     const deadline = Date.now() + 10000;
@@ -1813,6 +1651,7 @@ test('P5 (bundle): the client initializes again while a call is in flight and th
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t, { mcpSessions: true, stream: true });
+  nameInManifest(m, engine);
   const run = startPinnedClient('bundle', m, root, engine.port);
   await untilMessage(run, (x) => x.id === 1, 'initialize');
   run.child.stdin.write(INITIALIZED_LINE);
@@ -1843,6 +1682,7 @@ test('P5 (bundle): a client initialize superseded by the next one while unanswer
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t, { mcpSessions: true, stream: true });
+  nameInManifest(m, engine);
   const run = startPinnedClient('bundle', m, root, engine.port);
   await untilMessage(run, (x) => x.id === 1, 'initialize');
   run.child.stdin.write(INITIALIZED_LINE);
@@ -1865,6 +1705,7 @@ test('P5 (bundle): a client initialize the Engine turns away (404) is sent again
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26' });
+  nameInManifest(m, engine);
   const run = startPinnedClient('bundle', m, root, engine.port);
   const replied = async (id) => {
     const deadline = Date.now() + 10000;
@@ -1890,53 +1731,20 @@ test('P5 (bundle): a client initialize the Engine turns away (404) is sent again
   for (const r of inits) assert.deepEqual(initShape(r), initShape(inits[0]), 'each is sent as a first one');
 });
 
-// Round 5: the token answer and the bridge's negotiated state follow the Engine, not a side effect.
-for (const [from, to] of [['without', 'with'], ['with', 'without']]) {
-  test(`P7 (--port): production MCP pinned to a manifest Engine ${from} the token endpoint — it restarts on the port ${to} one, and the first call after it, a mutating one, is decided by the Engine there now`, async (t) => {
-    const root = tempRoot(t);
-    const m = machine(root);
-    const tokenless = { noToken: true };
-    const tokened = (token) => ({ token, requireToken: true });
-    const first = await startService(t, from === 'without' ? tokenless : tokened('token-first'));
-    writeManifest(m.desktop, manifestFor(first));
-    const prod = await startProdMcp(t, m, PINS['--port'](first.port));
-    const ingest = { paths: [path.join(root, 'doc.txt')] };
-    first.lastAnswers(); // no idle connection is left to the first Engine
-    const before = await prod.call('justsearch_ingest', ingest);
-    if (from === 'without') {
-      assert.match(before, /NO_TOKEN/, `the first Engine has no token endpoint\n${prod.stderr}`);
-      assert.equal(first.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 0, 'nothing is sent without a token');
-    } else {
-      assert.match(before, new RegExp(`ingest by ${first.instanceId}`), prod.stderr);
-    }
-    await first.close();
-    const second = await startService(t, { port: first.port, ...(to === 'with' ? tokened('token-second') : tokenless) });
-    writeManifest(m.desktop, manifestFor(second));
-    const next = await prod.call('justsearch_ingest', ingest); // the first call after the restart
-    const ingests = second.requests.filter((r) => r.url === '/api/knowledge/ingest');
-    if (to === 'with') {
-      assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
-      assert.deepEqual(ingests.map((r) => r.headers['x-justsearch-session']), ['token-second'], 'sent once, with the new Engine\'s token');
-    } else {
-      assert.match(next, /NO_TOKEN/, `${next}\n${prod.stderr}`);
-      assert.deepEqual(ingests, [], 'nothing is sent to an Engine without a token endpoint');
-      assert.ok(second.requests.some((r) => r.url === '/api/mcp/token'), 'the Engine there now was asked');
-    }
-    assert.ok(second.requests.every((r) => r.headers['x-justsearch-session'] !== 'token-first'), 'the old token never reaches it');
-  });
-}
-
+// Round 5: the bridge's negotiated state follows the Engine, not a side effect.
 test('P5 (bundle): an Engine that assigns no Mcp-Session-Id is replaced on the pin — nothing negotiated with it reaches the replacement: the first request there is an initialize sent as a first one, and the version is negotiated again', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
   const first = await startService(t, { protocolVersion: '2025-03-26', strictProtocol: true });
+  nameInManifest(m, first);
   let second = null;
-  const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+  const session = await bridgeInteractive({ ...m, env: { ...m.env, ...bundlePin(first.port) } }, bundle(root), async () => {
     await handshakeDone(first);
     await first.close();
     await pause(300); // the idle bridge handles the close
     // It would answer a request naming the old version, so only the order shows a reset.
     second = await startService(t, { port: first.port, protocolVersion: '2025-06-18' });
+    nameInManifest(m, second);
   });
   const call = session.messages.find((x) => x.id === 2);
   assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
@@ -1947,7 +1755,7 @@ test('P5 (bundle): an Engine that assigns no Mcp-Session-Id is replaced on the p
   assert.ok(second.requests.every((r) => r.headers['mcp-protocol-version'] !== '2025-03-26'), 'the old version never reaches it');
 });
 
-// Round 6: one epoch per Engine in the bridge; a call that needs a token fails closed.
+// Round 6: one epoch per Engine in the bridge.
 
 /** Resolve once run (startPinnedClient) has a stdout message matching pred. */
 async function untilMessage(run, pred, what) {
@@ -1962,6 +1770,7 @@ test('P5 (bundle): an initialize answer from the old Engine that arrives after t
   const root = tempRoot(t);
   const m = machine(root);
   const a = await startService(t, { mcpSessions: true, stream: true, protocolVersion: '2025-03-26' });
+  nameInManifest(m, a);
   const run = startPinnedClient('bundle', m, root, a.port);
   const initLine = (id) => INIT_LINE.replace('"id":1', `"id":${id}`);
   await untilMessage(run, (x) => x.id === 1, 'first initialize');
@@ -1972,6 +1781,7 @@ test('P5 (bundle): an initialize answer from the old Engine that arrives after t
   await held.arrived;
   await a.dropAllBut(held.socket);
   const b = await startService(t, { port: a.port, mcpSessions: true, stream: true, protocolVersion: '2025-06-18' });
+  nameInManifest(m, b);
   run.child.stdin.write(initLine(6));
   await untilMessage(run, (x) => x.id === 6, 'initialize with the replacement');
   const gets = () => b.requests.filter((r) => r.url === '/mcp' && r.method === 'GET');
@@ -2003,6 +1813,7 @@ async function recoveryHeldWhileReplaced(t) {
   const root = tempRoot(t);
   const m = machine(root);
   const a = await startService(t, { mcpSessions: true });
+  nameInManifest(m, a);
   const run = startPinnedClient('bundle', m, root, a.port);
   await untilMessage(run, (x) => x.id === 1, 'initialize');
   run.child.stdin.write(INITIALIZED_LINE);
@@ -2010,11 +1821,13 @@ async function recoveryHeldWhileReplaced(t) {
   await a.close();
   await pause(300); // the idle bridge handles the close
   const b = await startService(t, { port: a.port, mcpSessions: true });
+  nameInManifest(m, b);
   const held = b.hold('/mcp', { rpc: 'initialize' });
   run.child.stdin.write(callLine(2)); // refused on B's connection before writing: the bridge recovers
   await within(held.arrived, 10000, 'the recovery initialize at B');
   await b.dropAllBut(held.socket);
   const c = await startService(t, { port: a.port, mcpSessions: true });
+  nameInManifest(m, c);
   run.child.stdin.write(callLine(3));
   const posts = (service) => service.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
   const assertC = () => {
@@ -2053,6 +1866,7 @@ test('P5 (bundle): an initialize answered with an error leaves no session — th
   const root = tempRoot(t);
   const m = machine(root);
   const a = await startService(t, { mcpSessions: true, holdUrl: '/mcp' });
+  nameInManifest(m, a);
   const run = startPinnedClient('bundle', m, root, a.port);
   await within(a.arrived, 10000, 'the client initialize');
   a.release({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'not now' } });
@@ -2071,6 +1885,7 @@ test('P5 (bundle): a call before any initialize is refused and not sent', async 
   const root = tempRoot(t);
   const m = machine(root);
   const a = await startService(t, { mcpSessions: true });
+  nameInManifest(m, a);
   const run = startPinnedClient('bundle', m, root, a.port, {}, callLine(1));
   await untilMessage(run, (x) => x.id === 1, 'the call answer');
   assert.match(run.messages.find((x) => x.id === 1).error?.message ?? '', /has not sent initialize/, run.stderr);
@@ -2079,70 +1894,42 @@ test('P5 (bundle): a call before any initialize is refused and not sent', async 
   await within(run.exited, 7000, 'the bridge exits once stdin closes');
 });
 
-for (const client of ['production MCP', 'bundle']) {
-  test(`P3/P7 (${client}): a pin no manifest names — the Engine is replaced by one without a token endpoint; a call that needs a token is refused and nothing reaches it`, async (t) => {
-    const root = tempRoot(t);
-    const m = machine(root);
-    const first = await startService(t, { token: 'token-first', mcpSessions: true });
-    let second = null;
-    let answer;
-    if (client === 'production MCP') {
-      const prod = await startProdMcp(t, m, PINS['--port'](first.port));
-      await first.close();
-      await pause(300); // the idle client handles the close
-      second = await startService(t, { port: first.port, noToken: true, mcpSessions: true });
-      answer = await prod.call('justsearch_ingest', { paths: [path.join(root, 'doc.txt')] }); // the first call
-      assert.match(answer, /NO_TOKEN/, `${answer}\n${prod.stderr}`);
-    } else {
-      const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
-        await handshakeDone(first);
-        await first.close();
-        await pause(300); // the idle bridge handles the close
-        second = await startService(t, { port: first.port, noToken: true, mcpSessions: true });
-      });
-      answer = session.messages.find((x) => x.id === 2);
-      assert.match(answer?.error?.message ?? '', /offers no session token/, `${JSON.stringify(answer)}\n${session.stderr}`);
-    }
-    const written = second.requests.filter((r) => !['/api/mcp/token', '/api/runtime/live', '/api/health', '/api/status'].includes(r.url)).map((r) => `${r.method} ${r.url}`);
-    assert.deepEqual(written, [], 'nothing that needs a token reaches the Engine without one');
-    assert.ok(second.requests.every((r) => r.headers['x-justsearch-session'] === undefined), 'nor any token');
-  });
-}
-
 for (const kind of Object.keys(PINS)) {
-  test(`P7 (${kind}): production MCP pinned to a manifest Engine — the Engine restarts on the port with a new manifest and token; the next call is proven there and succeeds, sent once, with only the new token`, async (t) => {
+  test(`P7 (${kind}): production MCP pinned to a manifest Engine — the Engine restarts on the port with a new manifest and identity; the next call is proven there and succeeds, sent once, with the pin's token`, async (t) => {
     const root = tempRoot(t);
     const m = machine(root);
-    const first = await startService(t, { token: 'token-first', requireToken: true });
-    writeManifest(m.desktop, manifestFor(first));
-    const prod = await startProdMcp(t, m, PINS[kind](first.port));
+    const first = await startService(t, { token: 'token-pin', requireToken: true });
+    nameInManifest(m, first);
+    const prod = await startProdMcp(t, m, PINS[kind](first.port, 'token-pin'));
     const ingest = { paths: [path.join(root, 'doc.txt')] };
     first.lastAnswers(); // no idle connection is left to the first Engine
     assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${first.instanceId}`), prod.stderr);
     await first.close();
-    const second = await startService(t, { port: first.port, token: 'token-second', requireToken: true });
-    writeManifest(m.desktop, manifestFor(second));
+    const second = await startService(t, { port: first.port, token: 'token-pin', requireToken: true });
+    nameInManifest(m, second);
     const next = await prod.call('justsearch_ingest', ingest);
     assert.match(next, new RegExp(`ingest by ${second.instanceId}`), `${next}\n${prod.stderr}`);
     const tokens = second.requests.map((r) => r.headers['x-justsearch-session']).filter(Boolean);
-    assert.ok(tokens.length > 0 && tokens.every((x) => x === 'token-second'), `only the new token reaches the restarted Engine: ${tokens}`);
+    assert.ok(tokens.length > 0 && tokens.every((x) => x === 'token-pin'), `only the pin's token reaches the restarted Engine: ${tokens}`);
     assert.equal(second.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 1, 'the call is sent once');
   });
 }
 
 for (const tokens of ['empty', 'repeated']) {
-  test(`P5 (bundle, ${tokens} token): a pin no manifest names — the Engine stops and another one binds the port with the ${tokens === 'empty' ? 'same empty (dev mode)' : 'same'} token; the old Mcp-Session-Id never reaches it, and the bridge re-initializes there before the call`, async (t) => {
+  test(`P5 (bundle, ${tokens} token): the desktop Engine stops and another one binds the port with the ${tokens === 'empty' ? 'same empty (dev mode)' : 'same'} manifest token; the old Mcp-Session-Id never reaches it, and the bridge re-initializes there before the call`, async (t) => {
     const root = tempRoot(t);
     const m = machine(root);
     const token = tokens === 'empty' ? '' : 'token-same';
     const first = await startService(t, { token, mcpSessions: true, stream: true });
+    nameInManifest(m, first);
     let second = null;
-    const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+    const session = await bridgeInteractive(m, bundle(root), async () => {
       await handshakeDone(first, { stream: true });
       await first.close();
       await until(() => first.stats.open === 0, 10000, 'the first Engine\'s connections closing');
       await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
       second = await startService(t, { port: first.port, token, mcpSessions: true, stream: true });
+      nameInManifest(m, second);
     });
     const oldSession = `session-${first.instanceId}`;
     const carried = second.requests.filter((r) => r.headers['mcp-session-id'] === oldSession).map((r) => `${r.method} ${r.url}`);
@@ -2155,11 +1942,12 @@ for (const tokens of ['empty', 'repeated']) {
 }
 
 for (const status of [400, 404]) {
-  test(`P5 (bundle): an Engine that answers each connection its own token and closes after each POST rejects a call with ${status} — the bridge re-initializes and the call succeeds in the new session on the same Engine`, async (t) => {
+  test(`P5 (bundle): an Engine that closes the connection after each POST rejects a call with ${status} — the bridge re-initializes and the call succeeds in the new session on the same Engine, each request with the manifest's token`, async (t) => {
     const root = tempRoot(t);
     const m = machine(root);
-    const engine = await startService(t, { token: 'token-conn', tokenPerConnection: true, requireToken: true, mcpSessions: true, closeAfterPost: true });
-    const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
+    const engine = await startService(t, { token: 'token-conn', requireToken: true, mcpSessions: true, closeAfterPost: true });
+    nameInManifest(m, engine);
+    const session = await bridgeInteractive(m, bundle(root), async () => {
       await handshakeDone(engine);
       engine.rejectNext(status);
     });
@@ -2167,8 +1955,8 @@ for (const status of [400, 404]) {
     assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${engine.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
     const posts = engine.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
     assert.deepEqual(posts, ['initialize', 'notifications/initialized', 'tools/call', 'initialize', 'notifications/initialized', 'tools/call'], `rejected (${status}), re-initialized, sent again once`);
-    for (const r of engine.requests.filter((x) => x.headers['x-justsearch-session'])) {
-      assert.equal(r.headers['x-justsearch-session'], `token-conn-${r.conn}`, `${r.method} ${r.url} carries its own connection's token`);
+    for (const r of engine.requests.filter((x) => x.method === 'POST')) {
+      assert.equal(r.headers['x-justsearch-session'], 'token-conn', `${r.method} ${r.url} carries the manifest's token`);
     }
   });
 }
@@ -2183,9 +1971,12 @@ test('P3/P7: a connection idle past the agent\'s retirement is not reused — th
   const idleMs = 400;
   const root = tempRoot(t);
   const m = machine(root);
-  m.env.JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS = String(retireMs);
+  const mb = machine(tempRoot(t)); // each client's pin is named by a manifest of its own machine
+  m.env.JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS = mb.env.JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS = String(retireMs);
   const prodEngine = await startService(t, { expireIdleMs });
   const bridgeEngine = await startService(t, { expireIdleMs });
+  nameInManifest(m, prodEngine);
+  nameInManifest(mb, bridgeEngine);
   const ingest = { paths: [path.join(root, 'doc.txt')] };
   const prodRun = (async () => {
     const prod = await startProdMcp(t, m, PINS['--port'](prodEngine.port));
@@ -2193,7 +1984,7 @@ test('P3/P7: a connection idle past the agent\'s retirement is not reused — th
     await pause(idleMs);
     return { result: await prod.call('justsearch_ingest', ingest), stderr: prod.stderr };
   })();
-  const bridgeRun = bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(bridgeEngine.port) } }, bundle(root), async () => {
+  const bridgeRun = bridgeInteractive({ ...mb, env: { ...mb.env, ...bundlePin(bridgeEngine.port) } }, bundle(root), async () => {
     await handshakeDone(bridgeEngine);
     await pause(idleMs);
   });
@@ -2298,4 +2089,73 @@ test('D1: Windows reports the Roaming known folder even to a process started wit
   const asks = (e) => standardCandidates({ env: e, userHome: 'C:\\Users\\x' }).some((c) => typeof c.resolveDataDir === 'function');
   assert.ok(asks({}), 'without APPDATA the OS is asked');
   assert.ok(!asks({ APPDATA: 'C:\\Users\\x\\AppData\\Roaming' }), 'with APPDATA it is not');
+});
+
+test('T11/T14: discovery takes the credential from the validated manifest, without a token HTTP request', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { token: 'legacy-endpoint-decoy' });
+  const manifest = manifestFor(engine);
+  manifest.head.sessionToken = 'credential-from-owner-file';
+  writeManifest(m.desktop, manifest);
+  const result = await prodDiscover(m);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.result.token, 'credential-from-owner-file');
+  assert.ok(!engine.requests.some((request) => request.url === '/api/mcp/token'));
+});
+
+test('T13: explicit ports require JUSTSEARCH_SESSION_TOKEN instead of bootstrapping over HTTP', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  const result = await prodDiscover(m, { port: engine.port });
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /JUSTSEARCH_SESSION_TOKEN/);
+  assert.ok(!engine.requests.some((request) => request.url === '/api/mcp/token'));
+});
+
+
+test('T11: production MCP next call discovers a restarted Engine on a changed port', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { token: 'before-restart' });
+  writeManifest(m.desktop, manifestFor(first));
+  const prod = await startProdMcp(t, m);
+  const ingest = { paths: [path.join(root, 'doc.txt')] };
+  first.lastAnswers();
+  assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${first.instanceId}`));
+  await first.close();
+  const second = await startService(t, { token: 'after-restart' });
+  writeManifest(m.desktop, manifestFor(second));
+  assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${second.instanceId}`));
+  assert.ok(second.requests.some(r => r.headers['x-justsearch-session'] === second.token));
+  assert.ok(!second.requests.some(r => r.headers['x-justsearch-session'] === first.token));
+});
+
+
+test('T12: a concurrent call during reconnect retains the last proven target', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t);
+  writeManifest(m.desktop, manifestFor(first));
+  let seen;
+  const session = await bridgeInteractive(m, bundle(root), async ({ send, reply }) => {
+    // The initialize reply can precede the notification/GET socket proofs (netstat on Windows).
+    // Finish that handshake before restarting, so this test races only the two tool calls.
+    await handshakeDone(first, { stream: true });
+    await first.close();
+    const impostor = await startImpostor(t, { port: first.port, pid: first.pid, instanceId: first.instanceId });
+    const second = await startService(t, { holdUrl: '/api/health' });
+    writeManifest(m.desktop, manifestFor(second));
+    const call = id => ({ jsonrpc: '2.0', id, method: 'tools/call',
+      params: { name: 'justsearch_ingest', arguments: { paths: ['/must-remain-on-proven-engine'] } } });
+    send(call(3));
+    await within(second.arrived, 10000, 'reconnect waiting for the new Engine health proof');
+    send(call(4));
+    await reply(4);
+    seen = await impostor.settled();
+    second.release({ ok: true });
+  });
+  assert.ok(session.messages.some(message => message.id === 4), session.stderr);
+  assert.deepEqual(seen.requests, [], 'a concurrent request sends neither credentials nor tool arguments to the unproven old port');
 });

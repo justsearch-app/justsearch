@@ -1,0 +1,487 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T01:32:00.655Z",
+  "revision": "11c359f4918b7aa1ca02aee3e517bdcf2cb67171",
+  "tree": "756fc7449e4f4a4f6184bd14a911336fdaf991d4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-vitest-3190901-1792459906510.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7160
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Include all unconfirmed when its reload failed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Include all unconfirmed when its reload failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Restore unconfirmed when its reload failed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Restore unconfirmed when its reload failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#queues the next write until the previous refresh has settled",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) queues the next write until the previous refresh has settled",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R1' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R1' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R4' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R4' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R5' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R5' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R10' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R10' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'include' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'include' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'compact' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'compact' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'summary' and confirms saved context before the next Ask after refresh failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'summary' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved floor unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved floor unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved compact unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved compact unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved summary unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved summary unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved restore unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved restore unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved exclude unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved exclude unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved include unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved include-all unconfirmed when refresh fails and blocks Ask without losing its draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include-all unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#confirms a lost write response by reading history before sending Ask",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) confirms a lost write response by reading history before sending Ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#retries unconfirmed context on backoff and reconnect and cancels retries on disconnect",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) retries unconfirmed context on backoff and reconnect and cancels retries on disconnect",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#waits for queued context writes before Ask and sends the question once",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) waits for queued context writes before Ask and sends the question once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#Include all uses the exclusions saved by an earlier queued action after its failed refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) Include all uses the exclusions saved by an earlier queued action after its failed refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#automatically confirms saved context when a backoff retry succeeds",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) automatically confirms saved context when a backoff retry succeeds",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1f1f9bfad",
+    "revision": "1f1f9bfad1c0af712b6c852f06618f0b25346a79",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-vitest-3190901-1792459914694.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5744,
+        "output": "JSON report written to /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-vitest-3190901-1792459914694.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Include all unconfirmed when its reload failed",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Include all unconfirmed when its reload failed:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1502:37\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Restore unconfirmed when its reload failed",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Restore unconfirmed when its reload failed:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1519:37\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#queues the next write until the previous refresh has settled",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) queues the next write until the previous refresh has settled:  AssertionError: expected [ …(2) ] to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R1' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R1' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R4' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R4' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 2 to be +0 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R5' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R5' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 2 to be +0 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'R10' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R10' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'include' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'include' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 3 to be 1 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'compact' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'compact' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#serializes 'summary' and confirms saved context before the next Ask after refresh failure",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'summary' and confirms saved context before the next Ask after refresh failure:  AssertionError: the newer write overtook an unsettled write: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1589:84\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved floor unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved floor unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved compact unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved compact unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved summary unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved summary unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved restore unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved restore unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved exclude unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved exclude unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved include unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks a saved include-all unconfirmed when refresh fails and blocks Ask without losing its draft",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include-all unconfirmed when refresh fails and blocks Ask without losing its draft:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1633:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#confirms a lost write response by reading history before sending Ask",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) confirms a lost write response by reading history before sending Ask:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1665:37\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#retries unconfirmed context on backoff and reconnect and cancels retries on disconnect",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) retries unconfirmed context on backoff and reconnect and cancels retries on disconnect:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1682:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#waits for queued context writes before Ask and sends the question once",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) waits for queued context writes before Ask and sends the question once:  AssertionError: Ask used context while its write was unsettled: expected [ { shapeId: 'core.rag-ask', …(5) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:138"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#Include all uses the exclusions saved by an earlier queued action after its failed refresh",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) Include all uses the exclusions saved by an earlier queued action after its failed refresh:  AssertionError: expected [ …(2) ] to deeply equal []\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1861:61\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#automatically confirms saved context when a backoff retry succeeds",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) automatically confirms saved context when a backoff retry succeeds:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-CteEFS/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1877:39\n    at file:///home/elias/dev/justsearch"
+      }
+    ]
+  },
+  "digest": "sha256:8e63f560eb6f0460a47195ebd5e505a06448c6d831df1798c31dfad052a23c81"
+}

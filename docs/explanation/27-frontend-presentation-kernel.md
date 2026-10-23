@@ -154,10 +154,11 @@ come from measurement or review, never from one of them. Two measured checks rep
 them, and both now run on every PR: `scripts/ci/check-contrast-matrix.mjs` (the
 four-palette contrast sweep, inside the required `Public claims` lane via
 `scripts/ci/run-ui-web-gates.mjs`) and `jseval ui-a11y-gate` (real axe-core against the
-rendered page for the 20 surfaces in `governance/ui-a11y-baseline.v1.json`, in the
+rendered page for every surface in `governance/ui-a11y-baseline.v1.json`, in the
 deterministic `--fixtures` state). The axe half only reached CI on 2026-09-05 (ADR-0026
-amendment) and runs as the **advisory** `Measured axe` job — it reports a NEW-vs-known
-verdict and uploads its captures, but it is not a required status check and cannot block
+amendment) and runs as the **advisory** `Measured axe` job — it fails on NEW rules,
+any serious/critical violation (including baselined rules), or missing/errored axe
+results, and uploads its captures. It is not a required status check and cannot block
 a merge, so running it locally before pushing is still the discipline that catches
 things. Nothing static now asserts a control's accessible name or a palette's contrast;
 if you are looking for the gate that would catch a regression there, it is one of these

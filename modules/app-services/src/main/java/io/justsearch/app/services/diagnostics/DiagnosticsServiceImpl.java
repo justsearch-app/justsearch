@@ -348,6 +348,22 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     } catch (Exception e) {
       log.warn("Failed to include crash reports in diagnostics export", e);
     }
+    // Fatal JVM reports are text. Never collect heap dumps: they can contain indexed content.
+    try (var reports = Files.list(crashDir)) {
+      List<Path> latest = reports.filter(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+          .filter(path -> path.getFileName().toString().matches("hs_err_pid.*\\.log"))
+          .sorted(Comparator.comparingLong((Path path) -> {
+            try { return Files.getLastModifiedTime(path).toMillis(); }
+            catch (IOException ignored) { return 0L; }
+          }).reversed().thenComparing(path -> path.getFileName().toString()))
+          .limit(3).toList();
+      for (Path report : latest) {
+        try (InputStream input = Files.newInputStream(report)) {
+          byte[] prefix = input.readNBytes(1024 * 1024);
+          addBytesRedacted(zos, prefix, "crashes/" + report.getFileName());
+        } catch (IOException error) { log.warn("Failed to include JVM crash report {}", report.getFileName(), error); }
+      }
+    } catch (IOException error) { log.warn("Failed to list JVM crash reports", error); }
   }
 
   private void addRuntimeSnapshots(ZipOutputStream zos, EngineContext engineContext) {

@@ -18,6 +18,7 @@ import {
   type RunNotFoundDetail,
 } from '../../api/streams.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { rememberServerConversation } from '../state/conversationListStore.js';
 import { createOperationKey } from '../../api/operationKey.js';
 import { LivenessWatchdog } from '../streaming/LivenessWatchdog.js';
 import { STREAM_WATCHDOG_STALE_MS } from '../../api/generated/stream-liveness-constants.js';
@@ -39,7 +40,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { streamViaHost } from '../plugin-api/pumpHostAiStream.js';
 import { ReasoningController } from './ReasoningController.js';
 // Tempdoc 834 §15.3 — run discovery is the backend's enumeration, not a localStorage pointer.
-import { discoverLiveAgentRun } from './liveRuns.js';
+import { discoverLiveAgentRunRow, type LiveRunRow } from './liveRuns.js';
 // Tempdoc 561 P-B2 — Timeline is a DISTINCT projection of the one action ledger (the workspace
 // activity stream), via the same ActionLedgerClient authority ActionLedgerView uses — not a copy
 // of the Sessions roster. Single-authority: no re-derivation of the activity projection.
@@ -531,6 +532,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * values, so an unknown disposition discloses nothing rather than quietly claiming success.
    */
   terminalDisposition: string | null = null;
+  /** Explicit local Stop or server terminal; transport failure alone cannot settle a held decision. */
+  concludedRunId: string | null = null;
   // Tempdoc 550 N1: the tool calls the agent proposed for the CURRENT turn, announced as one
   // batch (tool_batch_proposed) before any per-call gate — lets a surface preview the whole
   // turn's plan ("the agent wants to do X, Y, Z") ahead of the first approval. Per-call approval
@@ -847,9 +850,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * the full run by default; the view's scrubber calls {@link replaySeek}/{@link replayStepForward}.
    */
   async loadReplay(sessionId: string): Promise<void> {
+    const conversationId = this.conversationId;
     this.replayMode = true;
     this.sessionId = sessionId;
     this.replayEvents = await this.fetchSessionEvents(sessionId);
+    const started = this.replayEvents.find((event) => event.eventType === RUN_STARTED_EVENT);
+    const owner = (started?.payload as { conversationId?: unknown } | undefined)?.conversationId;
+    const serverId = typeof owner === 'string' && owner ? owner : conversationId;
+    if (serverId && this.replayEvents.length > 0) rememberServerConversation(serverId);
     this.replaySeek(this.replayEvents.length);
   }
 
@@ -906,6 +914,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   /** Clears the run-observable state (NOT the roster/tools) so a replay seek re-applies from scratch. */
   private resetRunState(): void {
+    this.concludedRunId = null;
     this.conversation = [];
     this.unconfirmedSteers = [];
     this.toolCalls = {};
@@ -1006,6 +1015,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   onChunk(payload: CoreAgentRunChunkPayload): void {
+    if (!this.replayMode && payload.text && this.conversationId) rememberServerConversation(this.conversationId);
     // Tempdoc 859 §A §1.2 — the `endThinking()` that used to live here is now the chokepoint's
     // `markOutput()`. It was the ONLY text-side region close, and closing on the first prose token
     // is also why reasoning that resumed after a tool call never got a block of its own.
@@ -1290,6 +1300,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   onDone(payload: CoreAgentRunDonePayload): void {
+    this.concludedRunId = this.sessionId;
     this.reasoning.finalize();
     // F2: the run is complete — the turn's proposed batch is no longer pending.
     this.currentToolBatch = [];
@@ -1301,6 +1312,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.lastStreamedAnswer = '';
     this.commitStreamingText();
     const finalResp = payload.finalResponse;
+    if (!this.replayMode && finalResp?.trim() && this.conversationId) rememberServerConversation(this.conversationId);
     if (finalResp?.trim() && finalResp.trim() !== streamedSoFar) {
       this.conversation = [
         ...this.conversation,
@@ -1452,6 +1464,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   onError(payload: unknown): void {
     const data = payload as Record<string, unknown>;
+    if (typeof data.errorCode === 'string') this.concludedRunId = this.sessionId;
     this.errorHandledDuringStream = true;
     this.conversation = [
       ...this.conversation,
@@ -1946,6 +1959,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const stream = new AbortController();
     this.abortController = stream;
     this.sessionId = sessionId;
+    this.concludedRunId = null;
     return stream;
   }
 
@@ -2205,6 +2219,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   async cancelSession(): Promise<void> {
     const sessionId = this.sessionId;
+    this.concludedRunId = sessionId;
     const stream = this.abortController;
     this.abortController = null;
     stream?.abort();
@@ -2375,6 +2390,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * stream's typed 404, which {@link attachToRun} routes here.
    */
   onAttachNotLive(_payload: unknown): void {
+    this.concludedRunId = this.sessionId;
     this.isStreaming = false;
     this.runKind = null;
     this.runPark = null;
@@ -2394,18 +2410,20 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * retires between the enumeration and the attach resolves quietly via {@link onAttachNotLive}.
    * One-shot per controller; the caller (the view's first agent mount) guards against re-entry.
    */
-  async reattachActiveRunOnLoad(): Promise<void> {
+  async reattachActiveRunOnLoad(prepareRecord?: (run: LiveRunRow) => Promise<void>): Promise<void> {
     if (this.isStreaming || this.sessionId) {
       return; // this tab already owns/observes a run — do not steal or double-attach.
     }
     // The conversation guard lives in `discoverLiveAgentRun`: a tab pinned to a SPECIFIC
     // conversation must not adopt a run belonging to a different one, while a fresh tab with no
     // conversation of its own still adopts the newest agent run.
-    const runId = await discoverLiveAgentRun(this.apiBase, this.conversationId);
-    if (runId === null) {
-      return;
-    }
-    await this.attachToRun(runId);
+    const run = await discoverLiveAgentRunRow(this.apiBase, this.conversationId);
+    if (run?.runId == null) return;
+    // The first attach notification precedes its primer. Keep the discovered address through it.
+    this.conversationId ??= run.conversationId ?? null;
+    await prepareRecord?.(run);
+    if (this.isStreaming || this.sessionId) return;
+    await this.attachToRun(run.runId);
   }
 
   async checkAvailability(): Promise<void> {

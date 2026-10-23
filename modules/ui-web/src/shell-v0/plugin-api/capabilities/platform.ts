@@ -9,6 +9,7 @@
 
 import { isTauriRuntime } from '../../../utils/tauriRuntime.js';
 import { pickFolder as nativePickFolder } from '../../../utils/folderPicker.js';
+import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
 import type { PluginHostApi, PluginTrustTier } from '../plugin-types.js';
 
 type PluginPlatform = PluginHostApi['platform'];
@@ -33,29 +34,41 @@ function getCapabilities(): ReadonlySet<string> {
   return cachedCapabilities;
 }
 
+/** External links and local files use distinct, validated native commands. */
 async function openExternalUrl(url: string): Promise<void> {
-  if (isTauriRuntime()) {
-    try {
+  try {
+    if (isTauriRuntime()) {
       const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
       const { invoke } = await import(/* @vite-ignore */ coreSpec) as { invoke: (cmd: string, args: unknown) => Promise<unknown> };
-      await invoke('open_file', { path: url });
+      await invoke('open_external_url', { url });
       return;
-    } catch {
-      // Fall through to window.open
     }
+    globalThis.open(url, '_blank');
+  } catch (error) {
+    emitEphemeralToast({ message: String(error), severity: 'error' });
+    throw error;
   }
-  globalThis.open(url, '_blank');
 }
 
-/**
- * Tempdoc 565 §29 Tier-3 — open a LOCAL file path in the OS (the cited-file affordance). Reuses the
- * ONE `open_file` Tauri command (via {@link openExternalUrl}) so there is a single invoke site; outside
- * Tauri it falls back to `window.open`. The uniquely-local citation affordance: our sources are the
- * user's real files (`parentDocId` is a path), so a citation can open its file — no cloud product can.
- */
+/** Open a local document; a native refusal is reported and returned to the caller. */
 export async function openLocalFile(path: string): Promise<void> {
-  if (!path) return;
-  await openExternalUrl(path);
+  try {
+    if (isTauriRuntime()) {
+      const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
+      const { invoke } = await import(/* @vite-ignore */ coreSpec) as { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+      await invoke('open_file', { path });
+      return;
+    }
+    if (path) globalThis.open(path, '_blank');
+  } catch (error) {
+    emitEphemeralToast({
+      message: String(error),
+      severity: 'error',
+      actionLabel: 'Show in folder',
+      onAction: () => { void revealLocalPath(path).catch(() => { /* Already reported. */ }); },
+    });
+    throw error;
+  }
 }
 
 /**
@@ -69,8 +82,9 @@ export async function revealLocalPath(path: string): Promise<void> {
     const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
     const { invoke } = await import(/* @vite-ignore */ coreSpec) as { invoke: (cmd: string, args: unknown) => Promise<unknown> };
     await invoke('reveal_in_explorer', { path });
-  } catch {
-    // No-op fallback
+  } catch (error) {
+    emitEphemeralToast({ message: String(error), severity: 'error' });
+    throw error;
   }
 }
 

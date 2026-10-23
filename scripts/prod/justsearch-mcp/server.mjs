@@ -64,83 +64,94 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 }
 
 /**
- * The Engine discovery selected: { port, engine, token, pin }, engine being the manifest
- * candidate (null for a pinned port no manifest names), token its session token, pin the
- * operator's pin ('--port <n>' / 'JUSTSEARCH_API_PORT=<n>') when there is one. Every request goes
- * through engine-discovery.cjs engineRequest(), which writes nothing on a new connection until
- * the OS says its server end belongs to the manifest pid, or, for a pin no manifest names, until
- * the connection has fetched its own token (the only token a credentialed request on it carries).
- * A refusal comes back as error.message 'engine_gone', which parseJsonResponse turns into
- * ENGINE_GONE. No handler, and no follow-up request inside one tool call, can reach an endpoint
- * that is not that Engine with the session token.
+ * The Engine discovery selected: { port, engine, token, pin }, engine being the proven manifest
+ * candidate, token its session token (from that validated manifest, or JUSTSEARCH_SESSION_TOKEN
+ * for a pin; '' is dev mode), pin the operator's pin ('--port <n>' / 'JUSTSEARCH_API_PORT=<n>')
+ * when there is one. Every request goes through engine-discovery.cjs engineRequest() with that
+ * target's token, which writes nothing on a new connection until the OS says its server end
+ * belongs to the manifest pid. A refusal comes back as error.message 'engine_gone', which
+ * parseJsonResponse turns into ENGINE_GONE. No handler, and no follow-up request inside one tool
+ * call, can reach an endpoint that is not that Engine with the session token.
  */
 let engineTarget = null;
+/** Discovery as at startup (set by main()); a pinned target is re-selected only on its pin. */
+let rediscover = null;
 
 function transportFailure(err) {
-  if (err?.code === 'ENGINE_NOT_PROVEN') return { message: 'engine_gone', detail: `${err.status}: ${err.detail}` };
-  if (err?.code === 'NO_TOKEN') return { message: 'no_token' }; // nothing was sent (engineRequest fails closed)
-  return { message: err?.message || String(err) };
+  return err?.code === 'ENGINE_NOT_PROVEN'
+    ? { message: 'engine_gone', detail: `${err.status}: ${err.detail}` }
+    : { message: err?.message || String(err), code: err?.code };
+}
+
+/** A failure known to precede execution: refused before writing, no connection, or the token refused. */
+function refusedBeforeExecution(res) {
+  if (res.error?.message === 'engine_gone' || res.error?.code === 'ECONNREFUSED') return true;
+  if (res.statusCode !== 401) return false;
+  try {
+    return JSON.parse(res.text).errorCode === 'UI_TOKEN_REQUIRED';
+  } catch {
+    return false; // not a token refusal
+  }
 }
 
 /**
- * Run one request (run(target) → the http*Once result). A pin accepted through a manifest whose
- * Engine is no longer the one on the port (engine_gone: refused before anything was written) is
- * selected again from the manifests, as at startup but with no fallback to a pin no manifest
- * names; if a proven Engine now serves the pin (it restarted on the same port), the request,
- * which was never sent, is sent to it with its own token. Anything else is returned as it is,
- * so nothing that may have reached an Engine is sent twice.
+ * Run one request (run(target) → the http*Once result). When it failed in a way known to precede
+ * execution, the Engine is selected again (reconnect) and the request, which was never run, is
+ * sent once more to the Engine now proven, with that Engine's token. Anything else is returned
+ * as it is, so nothing that may have reached an Engine is sent twice.
  */
-async function withReselect(run) {
+async function withReconnect(run) {
   const target = engineTarget;
   const res = await run(target);
-  if (res.error?.message !== 'engine_gone' || !target.pin || !target.engine) return res;
-  const next = await reselectPin(target);
+  if (!refusedBeforeExecution(res)) return res;
+  const next = await reconnect(target);
   return next ? run(next) : res;
 }
 
-let reselecting = null;
+let reconnecting = null;
 
-function reselectPin(stale) {
+/**
+ * The target that replaces stale (one selection at a time; concurrent callers share it): for a
+ * pin, the manifest Engine proven on that port now, with no fallback to any other Engine;
+ * otherwise discovery as at startup. null when there is none.
+ */
+function reconnect(stale) {
   if (engineTarget !== stale) return Promise.resolve(engineTarget);
-  if (!reselecting) {
+  if (!reconnecting) {
     const attempts = [];
-    reselecting = pinnedEngine(stale.port, stale.pin, attempts, () => {}, { requireManifest: true })
-      .then((found) => {
-        if (!found) {
+    const found = stale.pin ? pinnedEngine(stale.port, stale.pin, attempts) : rediscover();
+    reconnecting = found
+      .then((backend) => {
+        if (!backend) {
           log(`${stale.pin}: no proven Engine on the pinned port (${attempts.join('; ')})`);
           return null;
         }
-        if (engineTarget === stale) engineTarget = { port: found.port, engine: found.engine, token: found.token, pin: stale.pin };
+        if (engineTarget === stale) engineTarget = targetOf(backend);
         return engineTarget;
       })
+      .catch((err) => {
+        log(`no proven Engine to reconnect to: ${err.message}`);
+        return null;
+      })
       .finally(() => {
-        reselecting = null;
+        reconnecting = null;
       });
   }
-  return reselecting;
+  return reconnecting;
+}
+
+function targetOf(backend) {
+  ensureLoopbackUrl(backend.baseUrl, 'baseUrl');
+  return { port: backend.port, engine: backend.engine, token: backend.token, pin: backend.pin || null };
 }
 
 function engineGoneError(res) {
   const pin = engineTarget?.pin ? `, pinned by ${engineTarget.pin}` : '';
-  if (!engineTarget?.engine) {
-    return makeError(
-      'ENGINE_GONE',
-      `No connection to port ${engineTarget?.port}${pin} could fetch its own session token (${res.error.detail}). ` +
-        'No token was sent. Check what is serving that port, or restart the MCP server.',
-    );
-  }
   return makeError(
     'ENGINE_GONE',
-    `The JustSearch Engine this server connected to (pid ${engineTarget.engine.pid}, port ${engineTarget.port}${pin}) ` +
-      `is no longer the one serving that port (${res.error.detail}). Nothing was sent. Restart the MCP server to reconnect.`,
-  );
-}
-
-function noTokenError() {
-  return makeError(
-    'NO_TOKEN',
-    'Session token unavailable. This JustSearch version may not support the token endpoint. ' +
-      'Update JustSearch to the latest version, or use GET-only tools (suggest, status).',
+    `The JustSearch Engine this server connected to (pid ${engineTarget?.engine?.pid}, port ${engineTarget?.port}${pin}) ` +
+      `is no longer the one serving that port (${res.error.detail}), and no proven Engine was found to take over. ` +
+      'Nothing was sent. Start JustSearch, or restart the MCP server.',
   );
 }
 
@@ -149,10 +160,10 @@ function noTokenError() {
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
 function httpGetTextLimited(urlStr, options) {
-  return withReselect((target) => httpGetOnce(target, urlStr, options));
+  return withReconnect((target) => httpGetOnce(target, urlStr, options));
 }
 
-function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {}, credential = false }) {
+function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -174,7 +185,7 @@ function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {}, creden
         path: u.pathname + u.search,
         timeoutMs,
         headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers },
-        credential,
+        credential: true,
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -220,10 +231,10 @@ function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {}, creden
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
 function httpPostJsonLimited(urlStr, body, options) {
-  return withReselect((target) => httpPostOnce(target, urlStr, body, options));
+  return withReconnect((target) => httpPostOnce(target, urlStr, body, options));
 }
 
-function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {}, credential = false }) {
+function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -255,7 +266,7 @@ function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {},
           ...headers,
         },
         body: bodyStr,
-        credential,
+        credential: true,
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -397,7 +408,6 @@ function makeError(code, message) {
 
 function parseJsonResponse(res, { preserveOperationError = false } = {}) {
   if (res.error?.message === 'engine_gone') return { parsed: null, error: engineGoneError(res) };
-  if (res.error?.message === 'no_token') return { parsed: null, error: noTokenError() };
   // Size-limit abort — check first, regardless of HTTP status code.
   // When the response body exceeds maxBytes, res.destroy() fires res.on('error')
   // which passes through the real HTTP statusCode (e.g. 200), so this check must
@@ -523,23 +533,18 @@ export async function main() {
   process.stdin.on('end', endEarly);
 
   // Discover backend
-  const backend = await discover({ port: args.port, verbose: args.verbose });
+  rediscover = () => discover({ port: args.port, verbose: args.verbose });
+  const backend = await rediscover();
   process.stdin.off('data', keepEarly);
   process.stdin.off('end', endEarly);
   process.stdin.pause();
   for (const chunk of early.reverse()) process.stdin.unshift(chunk);
+  engineTarget = targetOf(backend);
   const { baseUrl, token } = backend;
-  engineTarget = { port: backend.port, engine: backend.engine || null, token, pin: backend.pin || null };
-
-  ensureLoopbackUrl(baseUrl, 'baseUrl');
   log(`Backend: ${baseUrl}`);
-  // token is:
-  //   non-empty string → prod mode, sent on requests made with credential: true
-  //   "" (empty string) → dev mode, no token enforcement (POST works without header)
-  //   null              → endpoint not available (old JustSearch): a credentialed call answers
-  //                       NO_TOKEN once a connection is proven to be that Engine (engineRequest)
-  //   undefined         → a pin no manifest names: each connection carries the token it fetched
-  log(`Token: ${token === undefined ? 'per connection (pinned port)' : token ? 'available (prod mode)' : token === '' ? 'empty (dev mode)' : 'unavailable (old version?)'}`);
+  // token (from the validated manifest, or JUSTSEARCH_SESSION_TOKEN for a pin) is sent on every
+  // request to the proven Engine; "" is dev mode, with no token enforcement.
+  log(`Token: ${token ? 'available (prod mode)' : 'empty (dev mode)'}`);
 
   // Create MCP server
   const mcpServer = new McpServer({
@@ -587,7 +592,6 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        credential: true,
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -624,7 +628,7 @@ export async function main() {
             { field: 'entity_persons_raw', size: 5 },
             { field: 'entity_organizations_raw', size: 5 },
           ]},
-        }, { timeoutMs: 5_000, maxBytes: 100_000, credential: true });
+        }, { timeoutMs: 5_000, maxBytes: 100_000 });
         const facetParsed = facetRes?.statusCode === 200 ? JSON.parse(facetRes.body) : null;
         if (facetParsed?.facets) {
           answerFacets = normalizeEntityFacetKeys(facetParsed.facets);
@@ -672,7 +676,6 @@ export async function main() {
           const citRes = await httpPostJsonLimited(citUrl, citBody, {
             timeoutMs: 10_000,
             maxBytes: 1_000_000,
-            credential: true,
           });
           const { parsed: citParsed } = parseJsonResponse(citRes);
           if (citParsed) {
@@ -762,7 +765,6 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        credential: true,
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -866,10 +868,8 @@ export async function main() {
         timeoutMs: 30_000,
         maxBytes: 2_000_000,
         headers: { 'X-JustSearch-Transport': 'MCP' },
-        credential: true,
       });
       if (res.error?.message === 'engine_gone') return engineGoneError(res);
-      if (res.error?.message === 'no_token') return noTokenError();
 
       let operationResponse;
       let parseError = null;

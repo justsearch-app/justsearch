@@ -195,7 +195,7 @@ It’s easy to misread GPU telemetry as “the summary is still running”.
   - `llama-server` often keeps **VRAM allocated while idle** so the next request is fast.
   - GPU **utilization** should drop close to 0% when the request finishes (other apps can still use the GPU).
 - **Bad (needs intervention)**:
-  - You see **multiple** `llama-server` processes, or the PID **keeps changing** every second → this usually means a stale/orphan `llama-server` is still bound to the port and the Head is repeatedly trying (and failing) to start another one.
+  - You see **multiple** `llama-server` processes, or the PID **keeps changing** every second. Check the process IDs and inference status to identify a leftover process or repeated restart before stopping anything.
 
 Useful commands (Windows):
 
@@ -205,7 +205,8 @@ Get-Process -Name llama-server -ErrorAction SilentlyContinue | Select-Object Id,
 
 # Read the actual llama-server port from /api/inference/status first.
 # Its initial default is 8081 (8082 when API port is 8081 or auto/0); managed launches may use a fresh port.
-Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq <actual-llama-port> } | Select-Object LocalAddress,LocalPort,OwningProcess
+# Find listening ports owned by llama-server processes
+Get-NetTCPConnection -State Listen | Where-Object { $_.OwningProcess -in (Get-Process -Name llama-server -ErrorAction SilentlyContinue).Id } | Select-Object LocalAddress,LocalPort,OwningProcess
 
 # Per-process GPU snapshot (who is actually using SM%)
 nvidia-smi.exe pmon -c 1
@@ -219,7 +220,7 @@ for example `http://127.0.0.1:8085`. This must be a loopback HTTP URL with an ex
 it starts its own server and reports a healthy unowned server as `external_server_ignored`; it does
 not adopt it automatically. See ADR-0051.
 
-Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Indexing/Offline, plus any external-server diagnostics when adoption is in use.
+Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Indexing/Offline, plus any external-server diagnostics when an explicit endpoint is in use.
 
 ## 4. AI Agent Usage Notes
 

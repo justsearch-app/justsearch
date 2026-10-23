@@ -21,14 +21,15 @@ JustSearch ships:
   chat/GGUF model without a CUDA-functional GPU (`InstallPlanner`'s skip reason is literally "CPU
   chat is not supported in this build" — see `Necessity.java`). Without one, JustSearch has no
   chat/RAG capability and is search-only; see `docs/explanation/05-ai-architecture.md`.
-- An **in-app “Install AI” (v1 flow)** that downloads and verifies pinned GGUF model files (after
-  explicit consent) — only offered when a supported NVIDIA GPU is detected.
+- An **in-app “Install AI” (v1 flow)** that downloads and verifies registry-pinned models and runtimes
+  after explicit consent and download-policy approval. GPU-off policy selects CPU variants for search
+  and embeddings; chat packages require functional CUDA, sufficient VRAM and GPU-policy approval.
 - **Offline AI Pack import (v2+)** for models packs and **runtime packs** (zip or folder), allowlist-gated by manifest digest.
 - **Enterprise policy (v2)** loaded from machine/user policy files, exposed via `GET /api/policy/effective`.
 - Diagnostics export (`POST /api/diagnostics/export`) to bundle logs + policy + pack state for support.
 
 v3 adds **GPU Booster Pack** support (runtime variant packs + activation) on top of the same GPU
-requirement for chat; CPU remains the default and only path for search/embeddings, not for chat.
+requirement for chat; search and embeddings also run on CPU.
 
 ## 2. Key directories (“AI Home”)
 
@@ -72,32 +73,34 @@ The restore is directory-based (exe + adjacent DLLs). The shell also supports up
 
 ### 3.3 Runtime variant selection (dev vs production)
 
-Two independent code paths resolve which `llama-server` executable is used. They are separate by design:
+Runtime discovery and explicit activation are separate paths:
 
-**Path A — Discovery (fail-safe, CPU default):**
-`InferenceConfig.findServerExecutable(baseDir)` picks the baseline CPU binary. Resolution order:
+**Path A — Discovery and automatic selection:**
+`InferenceConfig` uses the resolved executable setting first. With no configured executable (or a
+missing saved path that permits bundled fallback), Windows discovery can prefer an installed `cuda12`
+variant when GPU layers are requested. Otherwise,
+it checks the canonical baseline, then sorted legacy subdirectories (skipping `variants/`), with a
+CUDA variant as a final fallback when no baseline is found.
 
-1. `JUSTSEARCH_SERVER_EXE` env var / `justsearch.server.exe` system property (explicit override)
-2. `<baseDir>/native-bin/llama-server/llama-server.exe` (canonical baseline path)
-3. Subdirectory scan under `native-bin/llama-server/` (sorted, **skips `variants/`**)
-4. Fallback to the canonical path (even if missing — validation catches it later)
-
-The `variants/` directory is skipped intentionally. Variants are not auto-discovered — they must be explicitly activated.
+Install AI and Windows boot also have CUDA selection helpers that respect executable overrides.
+GPU-off policy prevents those helpers from selecting CUDA executables or publishing CUDA native
+paths; a failed policy read also blocks those selections. Saved executable and GPU-layer preferences
+remain intact, and owned launches use zero GPU layers and hide CUDA devices while policy forbids GPU use.
 
 **Path B — Activation (opt-in, GPU self-test):**
-`RuntimeActivationService.startActivate(variantId)` installs and verifies a GPU-capable variant:
+`RuntimeActivationService.startActivate(variantId)` verifies an installed GPU-capable variant:
 
-1. Resolves `<variantsRoot>/<variantId>/llama-server.exe` (e.g., `variants/cuda12/`)
+1. Checks activation policy, then resolves `<variantsRoot>/<variantId>/llama-server.exe` (e.g., `variants/cuda12/`)
 2. Runs a bounded self-test (30s timeout): starts the variant on an ephemeral port, sends a health check + small chat request, measures VRAM delta
-3. On success: persists the exe path to UiSettings + sets `justsearch.server.exe` system property (which overrides Path A on next startup)
-4. On failure: rolls back, CPU baseline remains active
+3. On success: applies the executable path through the recorded settings/configuration owner
+4. On a failed or inconclusive self-test: leaves the variant unactivated
 
-This design ensures CPU always works out of the box, while GPU activation is explicit, tested, and reversible.
+Explicit activation requires policy approval and a passing self-test; automatic selection is a separate path.
 
 **For developers:** To test with the GPU variant without the UI activation flow, set the system property directly:
 
 ```text
--Djustsearch.server.exe=modules/ui/native-bin/llama-server/variants/cuda12/llama-server.exe
+-Djustsearch.server.exe=modules/ui/build/llama-server/stage/variants/cuda12/llama-server.exe
 ```
 
 See also: `docs/how-to/test-gpu-locally.md`.
@@ -233,8 +236,8 @@ Also capture snapshots:
 - **Chat requires a supported NVIDIA GPU**: the bundled `llama-server` binary is CPU-capable, but no
   install path offers a chat/GGUF model without a CUDA-functional GPU. Without one, Online mode/chat
   is unavailable and JustSearch is search-only (search and embeddings still run on CPU).
-- **Runtime packs are installed but not auto-activated**: activation is explicit and gated by policy + self-test (v3).
-- **GPU “booster” is NVIDIA-only (v3)**: hardware-awareness chooses a CUDA-capable runtime via an allowlisted offline pack; CPU is the default and only path for search/embeddings, not an alternate path for chat.
+- **Offline runtime-pack activation is explicit** and gated by policy + self-test (v3). Install AI and boot may automatically select an installed CUDA server and publish its native path when GPU policy permits. GPU-off policy prevents those automatic selections and makes Install AI plan for CPU search and embeddings.
+- **GPU acceleration is NVIDIA-only (v3)**: supported Windows hardware can acquire registry-pinned CUDA packages through Install AI or import an allowlisted offline pack. Search and embeddings also run on CPU. Install AI offers chat models only when CUDA is functional, VRAM is sufficient, and GPU acceleration is permitted by policy.
 - **Windows Sandbox GPU validation is environment-dependent**: CUDA tooling may be missing even when a GPU is visible. Prefer real NVIDIA hardware for definitive performance/VRAM validation; see `docs/explanation/16-gpu-booster-pack.md`.
 
 ## 8. System flow (diagram)

@@ -134,7 +134,7 @@ and propagates preparation failures. `ConfigStore.swap` replaces the snapshot an
 a change event; `notifyListeners` is separate so an owner can release its publication lock
 before arbitrary callbacks run. The convenience `update` retains its swap-then-notify
 behavior, with runtime producers excluded by the caller guard. `rebuild` is called only by
-HeadlessApp's post-discovery boot refresh: it publishes remembered CUDA selection and the
+HeadlessApp's post-discovery boot refresh: when GPU policy permits, it publishes remembered CUDA selection and the
 ORT native path before inference initialization, without writing settings.json. The guard
 also restricts entry to that refresh to configuration assembly.
 
@@ -200,14 +200,29 @@ considered and the winner, which is what `/api/debug/effective-config` reports.
 ## Settings → Effective Runtime (AI)
 There are two layers that matter for “what the UI shows” vs “what is running”:
 
-1. **User settings** (`/api/settings/v2`): persisted UI preferences + AI knobs (e.g., model paths, `gpuLayers`, context window, `maxTokens`, `pauseIndexingDuringAi`, and the desired API port).
+1. **User settings** (`/api/settings/v2`): persisted UI preferences + AI knobs (e.g., model paths, `gpuLayers`, context window, `maxTokens`, and the desired API port).
 2. **Effective runtime config** (used by `InferenceLifecycleManager`): derived from `EnvRegistry`, settings contributions, YAML and defaults, with operator system properties and environment variables retaining their higher ordinals.
+
+The optional `indexingPause` object in `ui/settings.json` records `paused`, `untilEpochMs`
+(null for an indefinite pause), and `reason` (`USER_PAUSED` or `SETTINGS_RECOVERY`). The UI-only
+`core.indexing-pause` and `core.indexing-resume` operations use the accepted settings transaction,
+including its witness, conflict detection and keyed retry. The policy is applied before the indexing
+loop activates, and an expired deadline resumes on the next wall-clock read, including after sleep.
+Reset clears the pause. Corrupt-settings recovery starts paused so exclusions can be checked.
+Older settings without the object load normally; an older app may discard it when saving.
+
+`operating.indexing` reports `PAUSING` until extraction, enrichment, picture reading and GPL have
+finished permitted work and published their acknowledgments, then `PAUSED`, including with an empty
+queue. The user reasons precede automatic hold reasons; `untilEpochMs` is the user's deadline and
+`waitingForResume` reports queued work. Discovery, verified deletion, cleanup and cutover may still
+change counts. Automatic hold reasons retain their existing enrichment/GPU meaning. MCP status
+reports the pause and its reason but offers no pause or resume operation.
 
 In the current app:
 * **The settings→system-property promotions are gone** (tempdoc 883 decision 4 and its §C.5c residue). They predated the ordinal chain and were a precedence lie: a GUI value written as a system property resolves at ordinal 500, so `/api/debug/effective-config` reported it as `jvm_arg` and then had to read a second `*.source=ui_settings` marker sysprop to un-tell that. Every settings-borne key now reaches the resolver exactly once, at ordinal 300, via `ConfigStoreRebuilder.contributeUiSettings` — including the last two, `justsearch.index.base_path` and `justsearch.llm.model_path`, whose `/api/debug/effective-config` rows are sourced from the resolver's own provenance and read no marker.
 * **One native-loader setting still becomes a system property:** `HeadlessApp` applies `UiSettings.llamaLibPath` to raw `llama.lib.path` only when blank, because the external JNI loader reads that property directly. It is outside the JustSearch resolver vocabulary. Hardware and disk discovery properties, including ORT native-path discovery, are separate from settings promotion.
 * **Installed ONNX paths use the accepted settings owner.** Each acquisition stage commits its changed eligible paths together, publishes ConfigStore once, and leaves unchanged or pending paths alone. All five model configuration readers consume that snapshot. Reranker/citation status also reads the resolved paths while retaining independent observed session state. The five installer-written ONNX model-path system properties are retired; operator properties retain their normal precedence. ORT native discovery keeps its direct reader fallback and no longer republishes settings/configuration.
-* **Runtime executable selection uses the same precedence chain.** Boot CUDA discovery is remembered at ordinal150; installer selection and explicit activation persist at300 through the accepted settings owner. Activation refuses an environment/JVM winner at400/500. CPU deactivation persists the baseline executable so remembered CUDA discovery cannot undo it. The server-executable ownership marker and all application-written server executable JVM properties are retired. The owner publishes ConfigStore before inference applies; failed inference restores its previous runtime configuration, and a separate accepted settings compensation compares the exact activation witness so it cannot erase a newer mutation.
+* **Runtime executable selection uses the same precedence chain.** When GPU policy permits, boot CUDA discovery is remembered at ordinal150; installer selection and explicit activation persist at300 through the accepted settings owner. Activation refuses an environment/JVM winner at400/500. CPU deactivation persists the baseline executable so remembered CUDA discovery cannot undo it. The server-executable ownership marker and all application-written server executable JVM properties are retired. The owner publishes ConfigStore before inference applies; failed inference restores its previous runtime configuration, and a separate accepted settings compensation compares the exact activation witness so it cannot erase a newer mutation.
 * **`justsearch.llm.model_path.source` now has no writer at all.** The boot promotion went with 883 §C.5c and the installer/pack-import promotions with it, so a chat-model path reaches the resolver once, at ordinal 300. The constant survives only for tempdoc 842's unshipped profile-persistence writer; an absent marker correctly means "operator".
 * **`justsearch.context.size` no longer has a promotion or a `.source` marker.** The window is derived and contributed at ordinal 150 (`auto_detected` / `hardware_probe`); a user override rides `settings.json` at 300; an operator `-D` / env var still wins at 500 / 400 - by the chain, not by a sysprop write. See `05-ai-architecture.md`, section "The context window".
 * **`justsearch.gpu.layers`, `justsearch.server.exe` and `justsearch.ui.exclude_patterns` no longer have promotions or `.source` markers either** (883 decision 4 slice 2). All three ride `settings.json` at 300. Two consequences worth knowing: the VRAM-tier GPU auto-populate contributes `justsearch.gpu.layers=99` to the ordinal-150 probe map ONLY — mirroring it to a sysprop would put a derived number above the user's own setting — and `justsearch.ui.exclude_patterns` gained a `ResolvedConfig.Ui#excludePatterns` accessor, because it was contributed at 300 but never resolved, which is why its readers had to use the promoted sysprop.

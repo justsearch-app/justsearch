@@ -99,6 +99,7 @@ final class OperatingStateAssembler {
   private List<IndexingReason> lastIndexingReasons;
   private String indexingSince;
   private volatile Supplier<BulkWorkGate.Snapshot> bulkWork;
+  private volatile Supplier<io.justsearch.core.scheduling.IndexingHold.Snapshot> indexingHold;
   private volatile Supplier<GpuProfileResolver.Resolution> devicePlan;
   private final Episode unmet = new Episode();
   private final Episode belowP8 = new Episode();
@@ -118,6 +119,10 @@ final class OperatingStateAssembler {
    */
   void setBulkWork(Supplier<BulkWorkGate.Snapshot> source) {
     this.bulkWork = source;
+  }
+
+  void setIndexingHold(Supplier<io.justsearch.core.scheduling.IndexingHold.Snapshot> source) {
+    indexingHold = source;
   }
 
   /**
@@ -405,10 +410,14 @@ final class OperatingStateAssembler {
 
   private OperatingIndexingView indexing(
       PowerStatusView power, WorkerOperationalView worker, long workerSampledAtMs, Instant now) {
-    if (worker == null || worker.core() == null) {
+    var pauseSource = indexingHold;
+    var pause = pauseSource == null ? null : pauseSource.get();
+    boolean userHeld = pause != null
+        && pause.state() != io.justsearch.core.scheduling.IndexingHold.State.RUNNING;
+    if (!userHeld && (worker == null || worker.core() == null)) {
       return null;
     }
-    long pending = Math.max(0L, worker.core().pendingJobs());
+    long pending = worker == null || worker.core() == null ? 0L : Math.max(0L, worker.core().pendingJobs());
     // Energy saver comes from this pass's power view, so the block agrees with the power card;
     // every other reason comes from the bulk-work gate's verdict.
     boolean energyReduced = power != null && power.energyReduced();
@@ -419,10 +428,12 @@ final class OperatingStateAssembler {
     if (energyReduced) present.add(BulkWorkGate.Reason.ENERGY_SAVER);
 
     // IDLE wins with nothing to drain; the present reasons are still listed, as before E1.
-    List<IndexingReason> reasons =
-        present.stream().map(r -> IndexingReason.valueOf(r.name())).toList();
+    EnumSet<IndexingReason> allReasons = EnumSet.noneOf(IndexingReason.class);
+    present.stream().map(r -> IndexingReason.valueOf(r.name())).forEach(allReasons::add);
+    if (userHeld) allReasons.add(IndexingReason.valueOf(pause.reason()));
+    List<IndexingReason> reasons = List.copyOf(allReasons);
     IndexingState state =
-        idle(worker)
+        userHeld ? IndexingState.valueOf(pause.state().name()) : idle(worker)
             ? IndexingState.IDLE
             : switch (BulkWorkPolicy.modeOf(present)) {
               case HOLD -> IndexingState.PAUSED;
@@ -435,7 +446,11 @@ final class OperatingStateAssembler {
       indexingSince = now.toString();
     }
     String reasonCode =
-        state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.GAME_MODE
+        userHeld ? ("SETTINGS_RECOVERY".equals(pause.reason())
+            ? LifecycleReasonCode.INDEXING_PAUSED_SETTINGS_RECOVERY.code()
+            : state == IndexingState.PAUSING ? LifecycleReasonCode.INDEXING_PAUSING_USER.code()
+                : LifecycleReasonCode.INDEXING_PAUSED_USER.code())
+            : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.GAME_MODE
             ? LifecycleReasonCode.INDEXING_PAUSED_GAME_MODE.code()
             : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.ENERGY_SAVER
             ? LifecycleReasonCode.INDEXING_PAUSED_ENERGY_SAVER.code()
@@ -445,7 +460,8 @@ final class OperatingStateAssembler {
                 ? LifecycleReasonCode.INDEXING_SLOWED_CHAT_GENERATING.code()
                 : null;
     List<BulkWorkKind> affects =
-        state == IndexingState.PAUSED || state == IndexingState.SLOWED
+        userHeld ? List.of(BulkWorkKind.INDEXING, BulkWorkKind.VDU)
+            : state == IndexingState.PAUSED || state == IndexingState.PAUSING || state == IndexingState.SLOWED
             ? List.of(BulkWorkKind.INDEXING)
             : List.of();
     return new OperatingIndexingView(
@@ -456,16 +472,20 @@ final class OperatingStateAssembler {
         affects,
         pending,
         null,
-        Instant.ofEpochMilli(workerSampledAtMs).toString());
+        Instant.ofEpochMilli(workerSampledAtMs).toString(),
+        userHeld ? pause.untilEpochMs() : null,
+        userHeld && (pause.waiting() > 0 || worker != null && worker.core() != null && !idle(worker)));
   }
 
   /**
-   * Spec E §1.7: IDLE needs an empty queue and, for each enrichment stage that is enabled and
-   * available, nothing pending. A disabled or unavailable stage is skipped: nothing will drain it.
+   * IDLE needs no runnable file jobs and, for each enrichment stage that is enabled and
+   * available, nothing pending. Retry-only backlog is retained without implying activity.
+   * A disabled or unavailable stage is skipped: nothing will drain it.
    */
   private static boolean idle(WorkerOperationalView worker) {
     CoreIndexView core = worker.core();
-    if (core.pendingJobs() > 0) return false;
+    if ("FAILED".equals(core.indexState())) return true;
+    if (StatusLifecycleHandler.hasActiveIndexWork(worker)) return false;
     if (Boolean.TRUE.equals(core.vduAvailable()) && core.pendingVduCount() > 0) return false;
     EnrichmentProgressView e = worker.enrichment();
     if (e == null) return true;
@@ -508,6 +528,6 @@ final class OperatingStateAssembler {
   private static OperatingIndexingView withIndexingSampledAt(
       OperatingIndexingView i, String sampledAt) {
     return new OperatingIndexingView(i.state(), i.reasons(), i.reasonCode(), i.since(),
-        i.affects(), i.pendingJobs(), i.agingReleaseAt(), sampledAt);
+        i.affects(), i.pendingJobs(), i.agingReleaseAt(), sampledAt, i.untilEpochMs(), i.waitingForResume());
   }
 }

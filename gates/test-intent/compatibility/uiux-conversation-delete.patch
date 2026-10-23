@@ -1,0 +1,43 @@
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java
+@@ -68,6 +68,8 @@
+     this.rootDir = Objects.requireNonNull(rootDir, "rootDir");
+     this.cipher = Objects.requireNonNull(cipher, "cipher");
+   }
++
++  public Map<String, List<String>> pendingDeletions() { return Map.of(); }
+ 
+   @Override
+   public List<Map<String, Object>> loadHistory(String sessionId) {
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+@@ -665,6 +665,10 @@
+      * @param docId the document ID (will be normalized)
+      * @return response indicating success/failure
+      */
++    public DeleteByIdResponse deleteHistoryTranscript(Path path, EngineContext context) {
++        return deleteById(path.toAbsolutePath().toString(), context);
++    }
++
+     public DeleteByIdResponse deleteById(String docId, EngineContext engineContext) {
+         DeleteByIdRequest request = DeleteByIdRequest.newBuilder()
+                 .setDocId(docId)
+--- /dev/null
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationDeletion.java
+@@ -0,0 +1,16 @@
++package io.justsearch.app.services.conversation;
++
++/** Before-state signature bridge only: delegates to the unchanged store deletion behavior. */
++public final class ConversationDeletion {
++  private final FileConversationStore store;
++  private final io.justsearch.agent.AgentRunStore runs;
++  public ConversationDeletion(FileConversationStore store, io.justsearch.agent.AgentRunStore runs,
++      io.justsearch.app.services.agenthistory.AgentHistoryIndexer history,
++      io.justsearch.app.observability.stream.run.RunChannelRegistry channels,
++      io.justsearch.app.services.encryption.DataKeyManager keys) {
++    this.store = store;
++    this.runs = runs;
++  }
++  public int delete(String id) { store.deleteSession(id); return runs.deleteConversationRuns(id); }
++  public void recoverPending() {}
++}

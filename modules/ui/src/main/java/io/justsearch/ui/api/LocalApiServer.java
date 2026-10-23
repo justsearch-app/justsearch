@@ -81,14 +81,6 @@ public class LocalApiServer {
    */
   public static final String MCP_ENDPOINT_PATH = "/mcp";
 
-  /**
-   * The MCP session-token bootstrap path. Shared with {@link
-   * ApiSecurityFilters#setupMcpOriginValidation} for the same reason as {@link #MCP_ENDPOINT_PATH}:
-   * this route hands out the credential that gates every mutating call, so the guarded path and the
-   * routed path must not be able to drift apart.
-   */
-  public static final String MCP_TOKEN_PATH = "/api/mcp/token";
-
   // Tempdoc 374 alpha.21 Bug O: not final because the explicit-port-bind-failure
   // fallback rebuilds a fresh Javalin instance — Javalin/Jetty's lifecycle prohibits
   // re-starting a failed instance. Volatile for safe publication after constructor
@@ -283,7 +275,7 @@ public class LocalApiServer {
             this.HeadAssemblyRef,
             this.settingsController,
             this::getPort,
-            this::resolveLlamaServerPort,
+            this::resolveLlamaServerEndpoint,
             this::getCachedGpuSnapshot,
             () -> (double) inflightRequests.get());
     // Carve-out C1: seed the reassignable knowledgeSearchController field from the Result (it is
@@ -511,8 +503,17 @@ public class LocalApiServer {
                         "errorCode",
                         ApiErrorCode.STORE_LOCKED.name())));
 
+    // Backup source/sink failures use the same unavailable state as the memory API.
+    app.exception(io.justsearch.agent.api.memory.MemoriesUnavailableException.class,
+        (e, ctx) -> ctx.status(503).json(Map.of(
+            "errorCode", ApiErrorCode.MEMORIES_UNAVAILABLE.name(), "error", e.getMessage(), "unavailable", true)));
+
     app.exception(io.justsearch.core.execution.EngineExecutorRejectedException.class,
         (failure, ctx) -> ApiErrorHandler.writeExecutorRefusal(ctx, failure, telemetry));
+
+    app.exception(io.justsearch.agent.api.conversation.ConversationWork.Refused.class,
+        (failure, ctx) -> ctx.status(409).json(Map.of(
+            "ok", false, "errorCode", failure.code(), "error", failure.getMessage())));
 
     // Global fallback: catch any unhandled exception that slips past per-controller try-catch blocks.
     // This ensures all error responses use the standardized ApiErrorHandler shape instead of Javalin's default.
@@ -692,7 +693,6 @@ public class LocalApiServer {
     if (convApi.resolveAddressController() != null) {
       app.post("/api/document/{id}/resolve-address", convApi.resolveAddressController()::handle, ActivityRole.USER_ACTION);
     }
-    app.get(MCP_TOKEN_PATH, this::handleMcpToken, ActivityRole.OBSERVATION);
     if (convApi.mcpProtocolHandler() != null) {
       app.post(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handlePost, ActivityRole.PROTOCOL);
       app.delete(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handleDelete, ActivityRole.PROTOCOL);
@@ -780,11 +780,20 @@ public class LocalApiServer {
   }
 
   /**
-   * The port the running llama-server listens on, for the {@code /v1} proxy. A managed launch binds
-   * a fresh loopback port, never the configured one (ADR-0051 decision 2), so the live runtime's
-   * port wins; the configured port (tempdoc 374 alpha.17 R5, read live from ConfigStore) is the
-   * fallback while no runtime reports one. Defaulting mirrors {@code InferenceConfig.from}.
+   * The current launch's address and private credential for the {@code /v1} proxy. Managed
+   * launches bind fresh loopback ports (ADR-0051 decision 2); their launch owner supplies both
+   * values together. Isolated compositions fall back to numeric external-runtime information
+   * without a managed credential.
    */
+  private io.justsearch.app.inference.LlamaServerEndpoint resolveLlamaServerEndpoint() {
+    if (HeadAssemblyRef != null && HeadAssemblyRef.serviceOut() != null
+        && HeadAssemblyRef.serviceOut().inferenceManager() != null) {
+      return HeadAssemblyRef.serviceOut().inferenceManager().servingEndpoint();
+    }
+    // Isolated API compositions may expose only numeric external-runtime information.
+    return new io.justsearch.app.inference.LlamaServerEndpoint(resolveLlamaServerPort(), null);
+  }
+
   private int resolveLlamaServerPort() {
     if (HeadAssemblyRef != null
         && HeadAssemblyRef.inference().onlineAi()
@@ -799,10 +808,6 @@ public class LocalApiServer {
     if (port > 0) return port;
     int apiPort = rc.ports().apiPort();
     return apiPort > 0 && apiPort != 8081 ? 8081 : 8082;
-  }
-
-  private void handleMcpToken(Context ctx) {
-    ctx.json(Map.of("token", sessionToken != null ? sessionToken : ""));
   }
 
   private void handleDebugDashboard(Context ctx) {
@@ -963,7 +968,7 @@ public class LocalApiServer {
   }
 
   /**
-   * Returns the session token used for non-GET request authentication.
+   * Returns the session token used for non-public request authentication.
    * This is exposed so the desktop host (Tauri) can deliver it to the UI.
    * Returns null if token enforcement is not enabled.
    */

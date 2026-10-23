@@ -1,3 +1,4 @@
+import { runRecoveryCase } from '../recovery-scenario.mjs';
 import { runLifecycle } from '../lifecycle.mjs';
 import { engineRecords } from './dev-runner.mjs';
 import { signalLinuxProcess } from '../../dev/lib/process-identity.cjs';
@@ -66,10 +67,13 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
+export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason, stopOnExhausted = true, failSpawnAt = 0 }) {
+  io.timings?.launch(workDir);
   const child = spawn(
     binary,
     [
+      '--fail-spawn-at', String(failSpawnAt),
+      '--stop-on-exhausted', String(stopOnExhausted),
       '--data-dir', dataDir,
       '--fake-engine', io.fakeEngine,
       '--plan', planPath,
@@ -89,10 +93,13 @@ export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAft
   child.stderr.on('data', (b) => { output.stderr += b.toString(); });
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
   child.on('error', (err) => { output.stderr += `[spawn error] ${err.message}\n`; });
-  return { child, output, exited };
+  const run = { child, output, exited, workDir };
+  io.timings?.attach(run);
+  return run;
 }
 
 export async function runCase({ testCase, policy, io }) {
+  if (testCase.id.startsWith('recovery-')) return runRecoveryCase({ name, testCase, policy, io });
   if (String(testCase.probe).startsWith('updater-')) return runUpdaterHold({ testCase, policy, io });
   if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   const problems = [];
@@ -172,7 +179,7 @@ export async function runCase({ testCase, policy, io }) {
       }));
       // Finish the real loop through its ordinary quit request so its owned child is reaped.
       const manifest = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'manifest.json'));
-      await fetch(`http://127.0.0.1:${manifest.head.apiPort}/api/lifecycle/shutdown`, { method: 'POST' });
+      await fetch(`http://127.0.0.1:${manifest.head.apiPort}/api/lifecycle/shutdown`, { method: 'POST', headers: manifest.head.sessionToken ? { 'X-JustSearch-Session': manifest.head.sessionToken } : {} });
       await Promise.race([run.exited, io.sleep(5000)]);
       return { problems };
     }
@@ -263,8 +270,8 @@ export async function runCase({ testCase, policy, io }) {
             || summary.lastExit?.counted !== counted) {
           problems.push(`incorrect restart exit record: ${JSON.stringify(summary.lastExit)}`);
         }
-        if (!testCase.request && fs.existsSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'))) {
-          problems.push('fileless restart left a shutdown request');
+        if (!testCase.request && summary.shutdownRequestAtCheckpoint !== false) {
+          problems.push('fileless restart left a shutdown request at the restart checkpoint');
         }
       }
       if (['local-handoff-bounds-responsive-close-with-churn',
@@ -309,10 +316,10 @@ export async function runCase({ testCase, policy, io }) {
     }
 
     if (testCase.expect.action === 'exhausted') {
-      if (summary.outcome?.kind !== 'exhausted') {
+      if (summary.outcome?.kind !== 'exhausted' && summary.checkpoint?.state !== 'exhausted') {
         problems.push(`outcome ${JSON.stringify(summary.outcome)}, expected exhausted`);
       }
-      if (!String(summary.outcome?.reason ?? '').startsWith('ENGINE_RESTART_EXHAUSTED')) {
+      if (!String(summary.checkpoint?.reason ?? summary.outcome?.reason ?? '').startsWith('ENGINE_RESTART_EXHAUSTED')) {
         problems.push(`terminal reason ${summary.outcome?.reason}, expected ENGINE_RESTART_EXHAUSTED:<why>`);
       }
       if (testCase.id === 'non-transient-2-exhausts-at-once') {
@@ -351,10 +358,11 @@ export async function runCase({ testCase, policy, io }) {
   } finally {
     try { run.child.kill(); } catch { /* already gone */ }
     await io.sleep(150);
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
-      process.stderr.write(`[keep] ${workDir}\n`);
-    } else {
+    const remove = () => {
       try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
-    }
+    };
+    if (io.deferCleanup) io.deferCleanup(workDir, remove);
+    else if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') process.stderr.write(`[keep] ${workDir}\n`);
+    else remove();
   }
 }

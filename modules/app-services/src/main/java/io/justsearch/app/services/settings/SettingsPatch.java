@@ -25,7 +25,7 @@ final class SettingsPatch {
           ui.highContrast(), ui.density() == null ? null : normalized.getDensity(),
           ui.vimMode(), ui.defaultAction() == null ? null : normalized.getDefaultAction(),
           ui.inspectorWidth() == null ? null : normalized.getInspectorWidth(),
-          ui.pauseIndexingDuringAi(), ui.mode() == null ? null : normalized.getMode(),
+          ui.mode() == null ? null : normalized.getMode(),
           ui.hasSeenTrustLoopNudge(),
           ui.excludePatterns() == null ? null : List.copyOf(normalized.getExcludePatterns()), ui.chatEnabled());
     }
@@ -39,7 +39,7 @@ final class SettingsPatch {
     }
     if (ui != null && ui.theme() == null && ui.highContrast() == null && ui.density() == null
         && ui.vimMode() == null && ui.defaultAction() == null && ui.inspectorWidth() == null
-        && ui.pauseIndexingDuringAi() == null && ui.mode() == null && ui.hasSeenTrustLoopNudge() == null
+        && ui.mode() == null && ui.hasSeenTrustLoopNudge() == null
         && ui.excludePatterns() == null && ui.chatEnabled() == null) ui = null;
     if (llm != null && llm.serverExecutable() == null && llm.contextWindow() == null
         && llm.maxTokens() == null && llm.gpuLayers() == null && llm.modelPath() == null
@@ -76,10 +76,12 @@ final class SettingsPatch {
       if (ui.vimMode() != null) base.setVimMode(ui.vimMode());
       if (ui.defaultAction() != null) base.setDefaultAction(ui.defaultAction());
       if (ui.inspectorWidth() != null) base.setInspectorWidth(ui.inspectorWidth());
-      if (ui.pauseIndexingDuringAi() != null) base.setPauseIndexingDuringAi(ui.pauseIndexingDuringAi());
       if (applyMode && ui.mode() != null) base.setMode(ui.mode());
       if (ui.hasSeenTrustLoopNudge() != null) base.setTrustLoopNudgeSeen(ui.hasSeenTrustLoopNudge());
-      if (ui.excludePatterns() != null) base.setExcludePatterns(ui.excludePatterns());
+      if (ui.excludePatterns() != null) {
+        io.justsearch.configuration.excludes.ExclusionPatterns.validateSavedPatterns(ui.excludePatterns());
+        base.setExcludePatterns(ui.excludePatterns());
+      }
       if (ui.chatEnabled() != null) base.setChatEnabled(ui.chatEnabled());
     }
 

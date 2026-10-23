@@ -13,6 +13,9 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -55,30 +58,33 @@ public final class EnterprisePolicyServiceImpl
 
   @Override
   public EffectivePolicy snapshot() {
-    Path aiHome = resolveAiHome();
-    Path machinePath = resolveMachinePolicyPath();
-    Path userPath = aiHome.resolve("policy.v1.json");
+    return snapshot(resolveMachinePolicyPath(), resolveAiHome().resolve("policy.v1.json"));
+  }
+
+  EffectivePolicy snapshot(Path machinePath, Path userPath) {
 
     PolicyLoad machine = loadPolicy(machinePath);
     PolicyLoad user = loadPolicy(userPath);
 
     // Defaults: permissive (consumer-friendly). Enterprise policy restricts.
+    boolean appUpdatesEnabled = true;
     boolean downloadsEnabled = true;
     boolean onlineAiEnabled = true;
     boolean gpuAccelerationEnabled = true;
     boolean disallowExternalInferenceServers = false;
 
-    // If a machine policy file exists but cannot be loaded, fail closed for AI-related toggles.
+    // If a machine policy file exists but cannot be loaded, fail closed for update and AI toggles.
     // This is a security measure: a corrupt/tampered policy file should not silently allow everything.
     if (machine.present && !machine.loaded) {
       log.error(
           "Machine policy file exists but cannot be loaded: {}. "
               + "Error: {}. "
-              + "AI features are DISABLED until this is resolved. "
+              + "App updates and AI features are DISABLED until this is resolved. "
               + "To fix: (1) correct the JSON syntax in the policy file, or (2) remove the file to use defaults. "
               + "Check /api/policy/effective for details.",
           machinePath,
           machine.error);
+      appUpdatesEnabled = false;
       downloadsEnabled = false;
       onlineAiEnabled = false;
       gpuAccelerationEnabled = false;
@@ -87,6 +93,7 @@ public final class EnterprisePolicyServiceImpl
 
     // Apply machine booleans (if loaded).
     if (machine.policy != null) {
+      appUpdatesEnabled = opt(machine.policy.appUpdatesEnabled, appUpdatesEnabled);
       downloadsEnabled = opt(machine.policy.downloadsEnabled, downloadsEnabled);
       onlineAiEnabled = opt(machine.policy.onlineAiEnabled, onlineAiEnabled);
       gpuAccelerationEnabled = opt(machine.policy.gpuAccelerationEnabled, gpuAccelerationEnabled);
@@ -98,6 +105,7 @@ public final class EnterprisePolicyServiceImpl
     // - enabled flags can only be reduced (AND)
     // - disallow flags can only be increased (OR)
     if (user.policy != null) {
+      appUpdatesEnabled = appUpdatesEnabled && opt(user.policy.appUpdatesEnabled, true);
       downloadsEnabled = downloadsEnabled && opt(user.policy.downloadsEnabled, true);
       onlineAiEnabled = onlineAiEnabled && opt(user.policy.onlineAiEnabled, true);
       gpuAccelerationEnabled = gpuAccelerationEnabled && opt(user.policy.gpuAccelerationEnabled, true);
@@ -159,6 +167,7 @@ public final class EnterprisePolicyServiceImpl
 
     EffectivePolicy effective =
         new EffectivePolicy(
+            appUpdatesEnabled,
             downloadsEnabled,
             onlineAiEnabled,
             gpuAccelerationEnabled,
@@ -274,11 +283,30 @@ public final class EnterprisePolicyServiceImpl
     if (path == null) {
       return new PolicyLoad(false, false, null, null);
     }
-    boolean present = Files.isRegularFile(path);
-    if (!present) {
-      return new PolicyLoad(false, false, null, null);
-    }
     try {
+      // Only a missing directory entry is absent. Dangling links, nonregular paths and
+      // failures to inspect an existing policy must reach the broken-policy branch.
+      try {
+        Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      } catch (NoSuchFileException absent) {
+        // The Unix provider also reports ENOTDIR as NoSuchFileException. A broken
+        // ancestor is not an absent policy (nor is a dangling ancestor symlink).
+        for (Path parent = path.toAbsolutePath().getParent(); parent != null; parent = parent.getParent()) {
+          try {
+            Files.readAttributes(parent, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+          } catch (NoSuchFileException missingParent) {
+            continue;
+          }
+          if (!Files.readAttributes(parent, BasicFileAttributes.class).isDirectory()) {
+            return new PolicyLoad(true, false, "Policy ancestor is not a directory", null);
+          }
+          break;
+        }
+        return new PolicyLoad(false, false, null, null);
+      }
+      if (!Files.readAttributes(path, BasicFileAttributes.class).isRegularFile()) {
+        return new PolicyLoad(true, false, "Policy path is not a regular file", null);
+      }
       EnterprisePolicy p = MAPPER.readValue(path.toFile(), EnterprisePolicy.class);
       if (p == null || p.schemaVersion != 1) {
         return new PolicyLoad(true, false, "Unsupported policy schemaVersion", null);

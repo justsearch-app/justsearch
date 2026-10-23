@@ -2,7 +2,7 @@
 title: Health Readiness Contract
 type: contract
 status: stable
-updated: 2026-09-27
+updated: 2026-10-20
 description: Schema-2 Engine component observations plus diagnostic readiness dimensions and composites.
 ---
 
@@ -77,6 +77,88 @@ only `state`, `reason_code`, and `state_since`. The camel-case
 `readiness.engineComponents.*.stateSince` and snake-case
 `components.*.state_since` values identify the same state epoch; consumers must
 not treat them as two clocks or two authorities.
+
+## Retry waiting and indexed counts
+
+The Worker's `worker.core.indexState` is the queue activity authority. `INDEXING` means at least
+one job is ready (`retry_after` absent or less than or equal to the queue's observation time) or
+processing. `WAITING` means the backlog is positive but every pending job is in retry backoff and
+none is processing. `IDLE` means no unfinished jobs; terminal document failures give `ERROR`, and
+a fatal indexing-loop failure takes precedence as `FAILED`. A waiting backlog can coexist with
+terminal failures. `worker.core.pendingJobs` remains the entire PENDING + PROCESSING backlog;
+`worker.migration` exposes its ready, backoff and processing slices from the same queue observation.
+`worker.failure.nextRetryAtMs` gives the earliest pending retry as Unix epoch milliseconds (0 when
+unavailable). The UI says “Waiting to retry” with that backlog and local retry time, with no progress
+percentage or active-time estimate. Only a fresh Worker observation advances it to indexing; the
+browser clock does not override the queue's eligibility decision. Active-work checks and busy
+sampling consume the Worker's state, so retry-only waiting is not busy or stalled throughput.
+`operating.indexing` retains its vocabulary: without other runnable enrichment it is `IDLE` while
+waiting, and its `pendingJobs` still describes the retained backlog. Waiting never certifies a drain
+or authorizes migration cutover.
+
+`worker.core.indexedDocuments` counts non-chunk parent documents in the serving index, including
+collections searchable through an explicit scope. It never counts DONE queue rows or substitutes
+the building generation. `searchableDocuments` remains the default-scope subset (excluding
+agent-history); `worker.migration.buildingIndexedDocuments` separately describes build progress.
+Health and the status deck prefer a fresh known serving count during migration over a cached
+pre-migration count. They retain the existing last-known fallback when the observation is stale
+or unavailable. With no readable count and no prior count from that reader, `indexedDocumentsUnknown`
+is true.
+Runnable enrichment may continue alongside terminal file failures. Once it settles, those failures
+remain indexing errors in the UI, with their failure count; an empty queue containing failures never
+opens the successful completion window. The same observations
+apply after reopening persisted queues and serving indexes.
+
+Compatibility: `WAITING` is an additional value of the existing unconstrained string, not an enum
+expansion or a new field. Existing status JSON Schema, OpenAPI projections and generated strict
+validators already accept it; no response shape, manual compatibility baseline or Runtime Contract
+version changes. The lifecycle schema-2 subset and serving readiness remain unchanged.
+
+## Automatic indexing holds
+
+`operating.indexing.state` keeps its existing `IDLE`, `RUNNING`, `SLOWED` and
+`PAUSED` vocabulary. With automatic reasons, `PAUSED` describes an enrichment or
+GPU bulk hold; it does not mean that text indexing stopped. Consumers describe
+the reason by the work it holds, rather than displaying the state name alone:
+
+- `energy_saver` defers idle enrichment on both CPU and GPU. Text indexing
+  continues, and sparse enrichment interleaved between files may continue: that
+  path does not check energy saver. An empty file queue with enrichment waiting
+  is deferred idle enrichment, not Ready.
+- `game_mode` and `gpu_busy_external` defer GPU-bound idle enrichment cycles,
+  including mixed CPU/GPU cycles, and **all** sparse enrichment interleaved
+  between files, including CPU sparse work. CPU-only idle enrichment cycles may
+  continue. Placement is not reported in public status, so consumers state these
+  scopes without claiming that a particular idle cycle is on CPU or GPU.
+- `chat_generating` names shared time with chat, not an automatic stop. Only a
+  present reason supports that explanation.
+
+Reasons can be present with `IDLE`; neither that state nor an empty file queue
+proves enrichment is complete. These explanations do not change scheduling.
+
+### Compatibility
+
+Optional field additions are patch changes (ADR-0039, evolution rules), and
+`docs/reference/contributing/common-workflows.md`, "Add a field to a record",
+requires generated boundary validation and preserves the manual compatibility
+baselines for ordinary additions. There is no lockstep-only exception for status
+consumers. Older generated status validators are strict: adding
+`worker.enrichment.backfillGpuBound` would reject the entire observation. WP3.3
+therefore retains the existing public status shape and reports the scheduling
+scopes above using existing reasons. GPU profiles and the previous backfill mode
+are not evidence of the current aggregate idle-cycle placement. Consumers must
+not loosen their local validator to hide drift (ADR-0039).
+
+The UI's shared indexing-progress projection supplies activity wording to the
+status deck, task list, Health (including Now), Library rows and indexing overlay.
+Missing or stale worker observations, including `operating.freshness.staleSources`
+containing `indexing`, are unconfirmed. A fresh observation replaces the explanation;
+cleared reasons do not linger. Folder failures and verification caveats retain
+their own scope. Progress stays below 100% while applicable work remains, including
+stages without denominators; no percentage is shown before evidence of a drain.
+The status deck owns the indexing live announcement and changes its text only
+when the activity description changes, so repeated polls and numeric progress
+updates do not repeat the announcement.
 
 ## Engine Component States
 

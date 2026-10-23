@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -28,11 +29,17 @@ public final class DiagnosticFileRetention {
    * @return number of files successfully deleted
    */
   public static int pruneBefore(Path dir, String prefix, Instant cutoff) {
+    return pruneBefore(dir, prefix, cutoff, path -> true);
+  }
+
+  /** As {@link #pruneBefore(Path, String, Instant)}, filtering names before filesystem access. */
+  public static int pruneBefore(Path dir, String prefix, Instant cutoff, Predicate<Path> include) {
     if (dir == null || !Files.exists(dir)) return 0;
     int deleted = 0;
     try (Stream<Path> entries = Files.list(dir)) {
       for (Path p :
           entries
+              .filter(include)
               .filter(Files::isRegularFile)
               .filter(p -> p.getFileName().toString().startsWith(prefix))
               .toList()) {
@@ -63,11 +70,17 @@ public final class DiagnosticFileRetention {
    * @return number of directories successfully deleted
    */
   public static int pruneDirectoriesBefore(Path parentDir, Instant cutoff) {
+    return pruneDirectoriesBefore(parentDir, cutoff, path -> true);
+  }
+
+  /** As {@link #pruneDirectoriesBefore(Path, Instant)}, filtering names before filesystem access. */
+  public static int pruneDirectoriesBefore(
+      Path parentDir, Instant cutoff, Predicate<Path> include) {
     if (parentDir == null || !Files.exists(parentDir)) return 0;
     int deleted = 0;
     try (Stream<Path> entries = Files.list(parentDir)) {
       for (Path dir :
-          entries.filter(Files::isDirectory).toList()) {
+          entries.filter(include).filter(Files::isDirectory).toList()) {
         try {
           BasicFileAttributes attrs = Files.readAttributes(dir, BasicFileAttributes.class);
           if (attrs.lastModifiedTime().toInstant().isBefore(cutoff)) {

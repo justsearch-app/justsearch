@@ -21,11 +21,12 @@ import {
   answerFrame,
   answerFrameLabel,
   groundingCoverage,
+  coverageHonesty,
   groundingDegraded,
   sourcesAreChunkPrecise,
   type AnswerFrame,
 } from '../../components/chat/evidenceProjection.js';
-import { SV3_ASK_SHAPE_ID } from './sv3-ask.js';
+import { SV3_ASK_SHAPE_ID, SV3_MODEL_SHAPE_ID } from './sv3-ask.js';
 import { CITATIONS_LABEL, SOURCES_LABEL } from './fixtures.js';
 import type { Sv3Turn, Sv3TurnEvidence } from './sv3-sessions.js';
 
@@ -372,6 +373,10 @@ export function sv3TailModelLabel(
  * below asserts.
  */
 export function sv3AnswerFrame(turn: Sv3Turn): AnswerFrame | null {
+  if (turn.kind === 'model') {
+    return answerFrame(SV3_MODEL_SHAPE_ID, 0, groundingCoverage([], ''));
+  }
+  if (turn.status === 'no-evidence') return null;
   const evidence = turn.evidence;
   if (evidence === null) return null;
   return answerFrame(
@@ -381,7 +386,7 @@ export function sv3AnswerFrame(turn: Sv3Turn): AnswerFrame | null {
     // resolver dropped (no verified ref, or one addressing no source) renders no mark, so counting
     // it would claim a verification the reader cannot see. The frame degrades because the evidence
     // degraded — the same read the shipped window makes.
-    groundingCoverage(evidence.marks, turn.answer),
+    groundingCoverage(evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal),
     sourcesAreChunkPrecise(evidence.sources),
     // Settled: the evidence record exists only once the terminal landed, so the matcher has finished
     // and a zero-cite answer can no longer excuse itself as "marks pending".
@@ -394,10 +399,9 @@ export function projectSv3AnswerFrame(
   currentModelLabel: string | null,
   detailed: boolean,
 ): Sv3AnswerFrame | null {
-  // Only a COMPLETED ask carries a frame. A halted, refused or failed turn has its own note saying
-  // what became of it, and framing the grounding of an answer that never landed would be a claim
-  // about text the reader does not have.
-  if (turn.kind !== 'ask' || turn.status !== 'complete') return null;
+  // Model turns always name their provenance, including while streaming or after a failure.
+  // Only a completed Ask gets a grounding frame; its other outcomes have their own notes.
+  if (turn.kind !== 'model' && (turn.kind !== 'ask' || turn.status !== 'complete')) return null;
   const tail = sv3ReceiptTail(
     turn.durationMs,
     sv3TailModelLabel(turn.modelLabel, currentModelLabel, detailed),
@@ -408,7 +412,7 @@ export function projectSv3AnswerFrame(
     return tail === '' ? null : { verdict: null, elaboration: '', tail };
   }
   const sourceCount = turn.evidence?.sources.length ?? 0;
-  const label = answerFrameLabel(frame, groundingDegraded(SV3_ASK_SHAPE_ID, sourceCount));
+  const label = answerFrameLabel(frame, groundingDegraded(turn.kind === 'model' ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID, sourceCount));
   if (label === null && tail === '') return null;
   if (label === null) return { verdict: null, elaboration: '', tail };
   return { ...splitSv3FrameLabel(label), tail };

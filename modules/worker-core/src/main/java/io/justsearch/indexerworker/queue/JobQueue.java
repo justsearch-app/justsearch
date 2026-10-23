@@ -565,6 +565,11 @@ public interface JobQueue extends Closeable {
     return enqueueEntries(entries, null);
   }
 
+  /** Ensures recreated-file work exists without replacing an already pending/issued revision. */
+  default boolean enqueueReappearedFile(EnqueueEntry entry, String collection) {
+    throw new UnsupportedOperationException("Recreated-file admission is unavailable");
+  }
+
   /**
    * Outcome of {@link #reenqueue(EnqueueEntry)} (tempdoc 885 §UD open item 1).
    *
@@ -611,6 +616,12 @@ public interface JobQueue extends Closeable {
    * @return List of pending index jobs
    */
   List<IndexJob> pollPending(int limit);
+
+  /** The preceding poll stopped on its scan budget; retry promptly before entering idle work. */
+  default boolean pollPendingBudgetExhausted() { return false; }
+
+  /** Time-sensitive readiness probe; implementations may use indexed existence reads. */
+  default boolean hasPendingIngestWork() { return jobStateCounts().pendingReadyCount() > 0; }
 
   /**
    * Marks a job as successfully completed.

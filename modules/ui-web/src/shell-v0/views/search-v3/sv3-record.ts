@@ -35,7 +35,7 @@ import type { RetrievalCitation } from '../../components/chat/citationTypes.js';
 // The SHARED authorities this projection reads the record's evidence through (tempdoc 847 S1/S3):
 // the `claimMatches` envelope reader carrying the producer gate, and the ONE claim→mark resolver the
 // live path already uses. Nothing about the evidence is derived here.
-import { claimsFromRecord, matchesFromRecord } from '../../components/chat/recordEvidence.js';
+import { claimsFromRecord, matchesFromRecord, coverageFactsFromRecord } from '../../components/chat/recordEvidence.js';
 import { claimsToCitations } from '../../components/chat/citationResolve.js';
 // Tempdoc 859 §5a — the SAME delegate-plane projection the live terminal writes through, so a
 // delegate turn the reader watched and one they came back to hold one value from one function.
@@ -46,7 +46,12 @@ import type {
 } from '../../../api/generated/shape-handlers/shared.js';
 import type { Sv3RunFeedItem } from './sv3-run.js';
 import { sv3RecordItemStopsRun, sv3WasHalted } from './sv3-honesty.js';
-import { isSv3StoreMessageId, type Sv3Turn, type Sv3TurnEvidence } from './sv3-sessions.js';
+import {
+  isSv3StoreMessageId,
+  type Sv3AnswerMessage,
+  type Sv3Turn,
+  type Sv3TurnEvidence,
+} from './sv3-sessions.js';
 
 /**
  * The label a non-prose record item carries. Deliberately the same closed vocabulary
@@ -193,6 +198,7 @@ function recordEvidenceOf(item: UnifiedTurnItem): Sv3TurnEvidence | null {
     sources,
     matches: matchesFromRecord(claimMatches),
     marks: claimsToCitations(claimsFromRecord(claimMatches), sources),
+    ...coverageFactsFromRecord(claimMatches),
     retrievalMode: '',
     ...retrieval,
   };
@@ -296,6 +302,14 @@ interface Building {
   stopRequested: boolean;
   /** The record opened this turn on a `user` item, rather than on whatever arrived first. */
   openedByUser: boolean;
+  /** Every assistant message of the turn, in record order, with its id — the answer as saved. */
+  answerMessages: Sv3AnswerMessage[];
+  /**
+   * The follow-up's rewritten question (the "Interpreted as" note), off the turn's outcome row —
+   * `''` when the record carries none (not rewritten, or a record written before it was persisted).
+   */
+  standaloneQuestion: string;
+  noEvidence: boolean;
 }
 
 const open = (
@@ -308,6 +322,7 @@ const open = (
   question,
   askedAt,
   openedByUser,
+  noEvidence: false,
   answers: [],
   activity: [],
   tools: 0,
@@ -321,6 +336,8 @@ const open = (
   disposition: null,
   stopRequested: false,
   assistantId: null,
+  answerMessages: [],
+  standaloneQuestion: '',
 });
 
 /**
@@ -332,9 +349,9 @@ const open = (
  * turn with an empty question rather than being dropped: the window renders no ask bubble for it, but
  * a tool call the agent really made is not something to lose because its prompt is missing.
  *
- * The turn's KIND is derived, not declared: a turn that recorded tool calls or notes was an agent
- * run, and a turn that recorded only prose was an ask. Nothing in the record says which tier this
- * window dispatched it from, so deriving it from what happened is the only honest answer available.
+ * The turn's kind reads its declared shape: free chat is a model answer and an agent shape is a run.
+ * Older records without that declaration keep the activity heuristic for distinguishing agent and
+ * Ask turns.
  *
  * `evidence` is PROJECTED from the record (tempdoc 847 §2.4, correcting Phase F6): the persisted
  * assistant message carries its sources and its per-sentence matches, and this module hands both to
@@ -389,6 +406,16 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     // produced before that event and belongs above it. Both collections are filled on every item and
     // exactly one of them is kept at the end (below) — an agent turn renders the interleaved items,
     // an ask turn the stack it has always rendered.
+    // The "Interpreted as" note, persisted on the turn's OUTCOME row — its answer, or its error when
+    // the rewrite was followed by a failure or a Stop — so it is read off either arm, last-wins.
+    const standalone = item.attributes.standaloneQuestion;
+    if (
+      (item.kind === 'assistant' || item.kind === 'error') &&
+      typeof standalone === 'string' &&
+      standalone.trim() !== ''
+    ) {
+      turn.standaloneQuestion = standalone;
+    }
     const blocks = reasoningBlocksFromRecord(item.attributes.reasoning);
     turn.reasoning.push(...blocks);
     blocks.forEach((block, index) => {
@@ -402,6 +429,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     });
     if (item.kind === 'assistant') {
       turn.answers.push(item.content);
+      turn.answerMessages.push({ id: item.id, content: item.content });
       turn.activity.push({ kind: 'text', id: item.id, text: item.content });
       if (isSv3StoreMessageId(item.id)) turn.assistantId = item.id;
       const evidence = recordEvidenceOf(item);
@@ -430,8 +458,16 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       continue;
     }
     if (item.kind === 'error') {
-      turn.errored = true;
-      turn.errorDetail = item.content;
+      // Errors are stored assistant messages too, so later Retry/Edit can fork after this outcome.
+      if (isSv3StoreMessageId(item.id)) turn.assistantId = item.id;
+      // D3: new records carry scope explicitly; legacy NO_CONTENT uses the fixed message.
+      turn.noEvidence = turn.declaredShapeId === 'core.rag-ask'
+        && item.attributes.errorCode === 'NO_CONTENT'
+        && (item.attributes.retrievalScoped === false
+          || (item.attributes.retrievalScoped === undefined
+            && item.content === 'No matching documents found in the index'));
+      turn.errored = !turn.noEvidence;
+      turn.errorDetail = turn.noEvidence ? '' : item.content;
       const evidence = recordEvidenceOf(item);
       if (evidence !== null) turn.evidence = evidence;
       // Owner decision 2026-08-26, applied to the TIMELINE as well as the receipt. The cancel path
@@ -502,6 +538,9 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       (turn.groundingDeltas.length > 0
         ? { ...agentDeltaEvidence(turn.groundingDeltas), retrievalMode: '' }
         : null);
+    const model = turn.declaredShapeId === 'core.free-chat';
+    const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask')
+      && turn.openedByUser && turn.answers.length === 0 && !turn.errored && !turn.noEvidence;
     return {
       id: turn.id,
       // Tempdoc 847 §2.4.3 — the RECORD's own id for this turn, carried as its own field. It is the
@@ -516,9 +555,12 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // rows and read-time run projections and only the former is addressable.
       assistantRecordId: turn.assistantId,
       recordOpenedByUser: turn.openedByUser,
-      kind: agent ? 'agent' : 'ask',
+      kind: agent ? 'agent' : model ? 'model' : 'ask',
+      shapeId: turn.declaredShapeId ?? undefined,
       question: turn.question,
       answer: turn.answers.join('\n\n'),
+      // The same messages, kept apart: what a follow-up's context is built from (S2.0).
+      answerMessages: turn.answerMessages,
       // Live audit 2026-08-25 (D3) — ONE vocabulary for one run. A cancelled run logs an error entry
       // on its way down, so deriving the status from `errored` alone made the record call it `failed`
       // while the live tail called it `stopped by you` — the same run telling the reader two stories,
@@ -539,11 +581,13 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // account the run gives of itself.
       status: turn.stopRequested || sv3WasHalted(turn.disposition)
         ? 'halted'
-        : turn.errored
+        : turn.noEvidence
+          ? 'no-evidence'
+          : turn.errored || unfinished
           ? 'failed'
           : 'complete',
       evidence,
-      detail: turn.errorDetail,
+      detail: unfinished ? 'No answer was saved. This attempt may be unfinished or interrupted; you can try again.' : turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw
@@ -553,12 +597,11 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // Tempdoc 848 §2.7 — the record now carries the turn's THINKING (persisted on the assistant
       // message by `ConversationEngine`, lifted onto the thread event by `InteractionThreadController`
       // / folded from the run journal by `AgentInteractionMapper`), so a cold-loaded turn shows the
-      // blocks the run really produced. Of tempdoc 822 Phase F7's four, that leaves the rewrite note
-      // and the receipt absent from the record (847 closed evidence). Those stay seeded EMPTY rather
-      // than guessed, and {@link ../sv3-sessions.applySv3Record} keeps whatever the live turn
-      // observed — so a cold-loaded turn shows no frame line instead of one built from invented
-      // numbers.
-      standaloneQuestion: '',
+      // blocks the run really produced. The rewrite note is on the record too now (the engine
+      // persists the standalone question on the turn's outcome row); an older record without it
+      // reads as '' — no note — and {@link ../sv3-sessions.applySv3Record} still keeps whatever the
+      // live turn observed. The receipt stays absent from the record and seeded empty.
+      standaloneQuestion: turn.standaloneQuestion,
       // Tempdoc 859 §A §1.9 — ROUTED, not both. An agent turn's thinking is in `activity`, in the
       // position it was produced; rendering the stack as well would put every block on screen twice
       // and put the wall back above the feed that replaced it. An ask turn has one thought and one

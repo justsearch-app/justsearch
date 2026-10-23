@@ -15,7 +15,9 @@ base="http://127.0.0.1:$port"
 file="$out/status-series.csv"
 echo 'ts,indexedDocuments,pendingNerCount,completedNerCount,embeddingCoveragePercent,spladeCoveragePercent,chunkDocCount' > "$file"
 while [[ ! -e $stop ]]; do
-  knowledge=$(curl --noproxy '*' -fsS -m 5 -H "Host: 127.0.0.1:$port" "$base/api/knowledge/status")
+  headers=()
+  if [[ -n ${JUSTSEARCH_SESSION_TOKEN:-} ]]; then headers=(-H "X-JustSearch-Session: $JUSTSEARCH_SESSION_TOKEN"); fi
+  knowledge=$(curl --noproxy '*' -fsS -m 5 -H "Host: 127.0.0.1:$port" "${headers[@]}" "$base/api/knowledge/status")
   status=$(curl --noproxy '*' -fsS -m 5 -H "Host: 127.0.0.1:$port" "$base/api/status")
   node -e '
     const k=JSON.parse(process.argv[1]), s=JSON.parse(process.argv[2]);

@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +33,17 @@ import org.slf4j.LoggerFactory;
 public final class RootWatcherRegistry {
   private static final Logger log = LoggerFactory.getLogger(RootWatcherRegistry.class);
 
+  boolean isUserExcluded(Path file) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    Path normalized = file.toAbsolutePath().normalize();
+    for (Path root = normalized.getParent(); root != null; root = root.getParent()) {
+      if ((subscriptions.containsKey(root) || awaitingVolume.containsKey(root))
+          && patterns.isExcludedPath(root, normalized)) return true;
+    }
+    return false;
+  }
+
   private final Map<Path, Subscription> subscriptions = new ConcurrentHashMap<>();
   /**
    * Task t-20261013-ef3c41, round 5 (S8): roots whose watch waits for the volume recorded for them
@@ -44,8 +56,23 @@ public final class RootWatcherRegistry {
    * even when it was added again in between.
    */
   private final Map<Path, Long> removedAt = new ConcurrentHashMap<>();
+  // Retained while absent and across runtime handovers, never persisted across Engine restarts.
+  private final Map<Path, RootIdentity> returnIdentities = new ConcurrentHashMap<>();
+  private final Set<Path> pendingRecovery = ConcurrentHashMap.newKeySet();
   private long removals;
   private final WorkerMethvinWatcher watcher;
+  /**
+   * Set once a reload's replacement registry took over this one's roots. Watch changes that still
+   * reach this retired registry go to the successor, so none is lost and no removal is undone.
+   */
+  private RootWatcherRegistry successor;
+  private long handoverMark;
+
+  /** How a successor re-registers one handed-over root (a volume check may hold it instead). */
+  @FunctionalInterface
+  interface Rewatch {
+    WatchResult watch(RootWatcherRegistry registry, Path root, String collection);
+  }
 
   public RootWatcherRegistry() {
     this(null);
@@ -56,6 +83,7 @@ public final class RootWatcherRegistry {
   }
 
   synchronized WatchResult watch(String rootPath, String collection) {
+    if (successor != null) return successor.watch(rootPath, collection);
     Path normalized;
     try {
       normalized = Path.of(rootPath).toAbsolutePath().normalize();
@@ -66,6 +94,15 @@ public final class RootWatcherRegistry {
       return new WatchResult(false, "WatchRootRequest.root_path is not a directory: " + normalized);
     }
     String coll = collection == null || collection.isBlank() ? null : collection;
+    RootIdentity expected = io.justsearch.configuration.PlatformPaths.isLinux()
+        ? returnIdentities.get(normalized) : null;
+    try {
+      if (expected != null && !expected.sameReturnedFolder(RootIdentity.capture(normalized))) {
+        return new WatchResult(false, "Watched root is another folder now: " + normalized);
+      }
+    } catch (IOException unavailable) {
+      return new WatchResult(false, "Watched root identity is unavailable: " + normalized);
+    }
     Subscription prior = subscriptions.remove(normalized);
     if (prior != null) retireAndDrain(prior);
     if (watcher != null) {
@@ -76,6 +113,9 @@ public final class RootWatcherRegistry {
     Object watcherEpoch = new Object();
     Subscription candidate;
     try (RootIdentityLease identityLease = RootIdentity.hold(normalized)) {
+      if (expected != null && !expected.sameReturnedFolder(identityLease.identity())) {
+        throw new IOException("Watched root changed before watcher registration");
+      }
       candidate = new Subscription(normalized, coll, watcherEpoch, identityLease.identity());
       if (watcher != null && !watcher.registerRoot(candidate)) {
         return new WatchResult(false, "Failed to register filesystem watcher for root: " + normalized);
@@ -115,6 +155,9 @@ public final class RootWatcherRegistry {
     } else {
       log.debug("Root watcher subscription replaced for {}", normalized);
     }
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) {
+      returnIdentities.put(normalized, candidate.rootIdentity());
+    }
     awaitingVolume.remove(normalized);
     return new WatchResult(true, null);
   }
@@ -126,6 +169,7 @@ public final class RootWatcherRegistry {
    * retired. {@link #resumeAwaitingVolume} registers it once a walk or sync finds the volume back.
    */
   synchronized WatchResult watchWhenVolumeReturns(Path root, String collection) {
+    if (successor != null) return successor.watchWhenVolumeReturns(root, collection);
     Path normalized = root.toAbsolutePath().normalize();
     Subscription prior = subscriptions.remove(normalized);
     if (prior != null) {
@@ -148,22 +192,44 @@ public final class RootWatcherRegistry {
 
   /**
    * Registers the held watch of {@code root}, if there is one, now that the volume recorded for it
-   * is back at its path. Returns whether a watch was registered.
+   * is back at its path, and queues the writer's pending watcher receipts behind it, so a receipt
+   * that waited for this root is applied without a watch call. Returns whether a watch was
+   * registered.
    */
   synchronized boolean resumeAwaitingVolume(Path root) {
+    if (successor != null) return successor.resumeAwaitingVolume(root);
     Path normalized = root.toAbsolutePath().normalize();
+    Subscription registered = subscriptions.get(normalized);
+    if (io.justsearch.configuration.PlatformPaths.isLinux() && registered != null && watcher != null
+        && !watcher.isActive(normalized, registered.watcherEpoch())) {
+      watchWhenVolumeReturns(normalized, registered.collection());
+    }
     String collection = awaitingVolume.get(normalized);
     if (collection == null) {
       return false;
     }
+    if (io.justsearch.configuration.PlatformPaths.isLinux()) pendingRecovery.add(normalized);
     WatchResult result = watch(normalized.toString(), collection);
     if (result.watching()) {
       log.info("Root watcher resumed: the volume first seen at {} is back", normalized);
+      if (watcher != null) {
+        watcher.applyPendingReceiptsLater();
+      }
     }
     return result.watching();
   }
 
+  /** Queues the current writer's pending watcher receipts on the watcher's reconcile thread. */
+  synchronized void applyPendingReceiptsLater() {
+    if (successor != null) {
+      successor.applyPendingReceiptsLater();
+    } else if (watcher != null) {
+      watcher.applyPendingReceiptsLater();
+    }
+  }
+
   synchronized boolean unwatch(String rootPath) {
+    if (successor != null) return successor.unwatch(rootPath);
     Path normalized;
     try {
       normalized = Path.of(rootPath).toAbsolutePath().normalize();
@@ -174,6 +240,8 @@ public final class RootWatcherRegistry {
     if (watcher != null) {
       watcher.forgetRoot(normalized);
     }
+    pendingRecovery.remove(normalized);
+    returnIdentities.remove(normalized);
     boolean wasAwaiting = awaitingVolume.remove(normalized) != null;
     Subscription removed = subscriptions.remove(normalized);
     if (removed != null) {
@@ -210,7 +278,50 @@ public final class RootWatcherRegistry {
     if (removedSince(root, mark)) {
       return new WatchResult(false, "ROOT_REMOVED: " + root + " was removed");
     }
+    if (successor != null) {
+      // Any removal since the handover counts: a removed root is never re-watched from here.
+      return successor.watchUnlessRemovedSince(root, collection, handoverMark);
+    }
     return watch(root.toString(), collection);
+  }
+
+  /** The registry that currently owns this one's roots: itself, or its latest successor. */
+  synchronized RootWatcherRegistry current() {
+    return successor == null ? this : successor.current();
+  }
+
+  /**
+   * Re-registers every watched root, and every root held for its volume, in {@code next}, with its
+   * collection, then retires this registry in its favour. A root removed before the handover is
+   * not here and is never revived; one removed after it is removed from {@code next}. A root whose
+   * watch cannot be registered now is held in {@code next} until its volume is back, not dropped.
+   */
+  synchronized void handOverTo(RootWatcherRegistry next, Rewatch rewatch) {
+    if (successor != null) {
+      successor.handOverTo(next, rewatch);
+      return;
+    }
+    if (next == this) throw new IllegalArgumentException("A registry cannot succeed itself");
+    next.returnIdentities.putAll(returnIdentities);
+    next.pendingRecovery.addAll(pendingRecovery);
+    for (Subscription watched : List.copyOf(subscriptions.values())) {
+      if (io.justsearch.configuration.PlatformPaths.isLinux() && watcher != null
+          && !watcher.isActive(watched.root(), watched.watcherEpoch())) {
+        next.pendingRecovery.add(watched.root());
+      }
+      if (!rewatch.watch(next, watched.root(), watched.collection()).watching()
+          && !next.awaitsVolume(watched.root())) {
+        next.holdUntilVolumeReturns(watched.root(), watched.collection());
+      }
+    }
+    awaitingVolume.forEach(next::holdUntilVolumeReturns);
+    handoverMark = next.removalMark();
+    successor = next;
+  }
+
+  private synchronized void holdUntilVolumeReturns(Path root, String collection) {
+    if (subscriptions.containsKey(root)) return;
+    awaitingVolume.putIfAbsent(root, collection == null ? "" : collection);
   }
 
   @SuppressWarnings("unused") // RootWatcherRegistryTest only; frozen in UnreferencedCodeTest's store.
@@ -232,6 +343,45 @@ public final class RootWatcherRegistry {
       if (normalized.startsWith(root)) return true;
     }
     return false;
+  }
+
+  /** Cheap health checks only: healthy always-present roots incur no filesystem observations. */
+  Set<Path> recoveryRoots() {
+    Set<Path> roots = new java.util.HashSet<>(awaitingVolume.keySet());
+    roots.addAll(pendingRecovery);
+    if (watcher != null) {
+      subscriptions.forEach((root, subscription) -> {
+        if (!watcher.isActive(root, subscription.watcherEpoch())) roots.add(root);
+      });
+    }
+    return roots;
+  }
+
+  boolean hasNestedRoots(Path root) {
+    return java.util.stream.Stream.of(subscriptions.keySet(), awaitingVolume.keySet(), returnIdentities.keySet())
+        .flatMap(Set::stream).anyMatch(other -> !other.equals(root) && other.startsWith(root));
+  }
+
+  /** A nested declaration keeps its own files even while its watcher is held or dead. */
+  boolean ownsPath(Path root, Path file) {
+    Path normalizedRoot = root.toAbsolutePath().normalize();
+    Path normalizedFile = file.toAbsolutePath().normalize();
+    if (!normalizedFile.startsWith(normalizedRoot)) return false;
+    // The retained identities also cover the publication gap while a watcher is replaced.
+    return java.util.stream.Stream.of(subscriptions.keySet(), awaitingVolume.keySet(), returnIdentities.keySet())
+        .flatMap(Set::stream).noneMatch(other -> !other.equals(normalizedRoot)
+            && other.startsWith(normalizedRoot) && normalizedFile.startsWith(other));
+  }
+
+  RootIdentity registeredIdentity(Path root) {
+    if (root == null) return null;
+    Subscription subscription = subscription(root);
+    return subscription == null ? returnIdentities.get(root.toAbsolutePath().normalize())
+        : subscription.rootIdentity();
+  }
+
+  synchronized void recoveryCompleted(Subscription expected) {
+    if (subscriptions.get(expected.root()) == expected) pendingRecovery.remove(expected.root());
   }
 
   /** Immutable registration snapshot used by a root reconciliation admission. */

@@ -116,11 +116,6 @@ async function startMockApi(responses) {
         response.end('{"status":"ok"}');
         return;
       }
-      if (request.method === 'GET' && request.url === '/api/mcp/token') {
-        response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end('{"token":"mock-session-token"}');
-        return;
-      }
       if (request.method === 'GET' && request.url.startsWith('/api/operation-history/')) {
         apiRequests.push({ path: request.url });
         response.writeHead(200, { 'Content-Type': 'application/json' });

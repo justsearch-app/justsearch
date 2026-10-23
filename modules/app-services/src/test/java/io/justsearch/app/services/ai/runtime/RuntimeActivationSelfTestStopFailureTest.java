@@ -148,7 +148,22 @@ final class RuntimeActivationSelfTestStopFailureTest {
               throw new UncheckedIOException(e);
             }
             candidate.createContext("/health", exchange -> answer(exchange, "{\"status\":\"ok\"}"));
+            candidate.createContext("/props", exchange -> {
+              if (("Bearer " + spec.environment().get("LLAMA_API_KEY"))
+                  .equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
+                answer(exchange, "{\"n_ctx\":4096}");
+              } else {
+                exchange.sendResponseHeaders(401, -1);
+                exchange.close();
+              }
+            });
             candidate.createContext("/v1/chat/completions", exchange -> {
+              if (!("Bearer " + spec.environment().get("LLAMA_API_KEY"))
+                  .equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
+                exchange.sendResponseHeaders(401, -1);
+                exchange.close();
+                return;
+              }
               exercised.set(true);
               answer(exchange, "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}");
             });

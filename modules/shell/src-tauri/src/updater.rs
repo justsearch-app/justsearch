@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
@@ -358,7 +359,16 @@ pub fn app_update_status(coordinator: tauri::State<'_, Arc<UpdateCoordinator>>) 
 pub async fn check_for_app_update(
     app: AppHandle,
     coordinator: tauri::State<'_, Arc<UpdateCoordinator>>,
+    automatic: Option<bool>,
 ) -> Result<AppUpdateStatus, String> {
+    match authorize_app_update(&app, automatic.unwrap_or(false)) {
+        Ok(false) => return Ok(coordinator.snapshot()),
+        Ok(true) => (),
+        Err(error) => {
+            set_state(&coordinator, "error", Some(error.clone()));
+            return Err(error);
+        }
+    }
     ensure_no_unresolved_intent(&coordinator)?;
     if coordinator.installing.load(Ordering::Acquire) {
         return Err("An update installation is already in progress".into());
@@ -420,6 +430,7 @@ pub(crate) async fn run_install_now(
     backend: Arc<BackendState>,
     coordinator: Arc<UpdateCoordinator>,
 ) -> Result<(), String> {
+    authorize_app_update(&app, false)?;
     ensure_no_unresolved_intent(&coordinator)?;
     let _install_guard = InstallGuard::begin(&coordinator.installing)?;
     let descriptor = coordinator
@@ -437,7 +448,6 @@ pub(crate) async fn run_install_now(
         .ok_or_else(|| "Authenticated release is no longer available".to_string())?;
     require_closed_set(&descriptor, &update)?;
 
-    set_state(&coordinator, "downloading", None);
     // `on_chunk` and `on_download_finish` are two separate closures alive for the whole call, so
     // shared mutable progress state needs interior mutability rather than two conflicting captures
     // of a bare local. Both closures clone the cheap `Arc`s they need.
@@ -450,7 +460,9 @@ pub(crate) async fn run_install_now(
     let chunk_coordinator = coordinator.clone();
     let finish_progress = progress.clone();
     let finish_coordinator = coordinator.clone();
-    let bytes = update
+    authorize_app_update(&app, false)?;
+    set_state(&coordinator, "downloading", None);
+    let downloaded = update
         .download(
             move |chunk_len, content_length| {
                 let mut state = chunk_progress
@@ -476,20 +488,15 @@ pub(crate) async fn run_install_now(
             },
         )
         .await
-        .map_err(|error| format!("Update download or signature verification failed: {error}"))?;
+        .map_err(|error| format!("Update download or signature verification failed: {error}"));
+    let bytes = checked_installer_bytes(&coordinator, &descriptor, downloaded)?;
     let digest = sha256_bytes(&bytes);
-    if digest != descriptor.artifact.sha256.to_ascii_lowercase()
-        || bytes.len() as u64 != descriptor.artifact.size
-    {
-        return Err("Downloaded installer bytes do not match release descriptor".into());
-    }
-    if bytes.get(0..2) != Some(b"MZ") {
-        return Err("Authenticated updater artifact is not a Windows NSIS executable".into());
-    }
 
     let attempt_id = uuid::Uuid::new_v4().to_string();
-    let staged = stage_installer(&app, &attempt_id, &bytes, &digest)?;
-    validate_staged_artifact(&staged, &staging_root(&app))?;
+    let staged = stage_installer(&app, &attempt_id, &bytes, &digest)
+        .inspect_err(|error| set_state(&coordinator, "error", Some(error.clone())))?;
+    validate_staged_artifact(&staged, &staging_root(&app))
+        .inspect_err(|error| set_state(&coordinator, "error", Some(error.clone())))?;
 
     finish_staged_update(
         &upgrade_root(&app),
@@ -801,7 +808,9 @@ trait UpgradeHandoff: Sync {
     fn wait_for_exit(&self, timeout: Duration) -> bool;
     fn observe_precommit_exit(&self, timeout: Duration) -> Result<(), String> {
         if !self.wait_for_exit(timeout) || self.child_pid().is_some() {
-            return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+            return Err(
+                "Unsent upgrade commit did not obtain an actor exit before the deadline".into(),
+            );
         }
         self.stop_unrecoverable()?;
         Ok(())
@@ -908,28 +917,39 @@ fn resolve_commit_delivery<T>(
     observe_held_exit: impl FnOnce() -> Result<(), String>,
 ) -> Result<T, String> {
     match receipt {
-        Err(error) if error == crate::shell_actuator::UPGRADE_COMMIT_NOT_SENT
-            || error == "Engine exited before upgrade commit request" => {
-                observe_held_exit()?;
-                Err("Engine exited before upgrade commit request".into())
-            }
+        Err(error)
+            if error == crate::shell_actuator::UPGRADE_COMMIT_NOT_SENT
+                || error == "Engine exited before upgrade commit request" =>
+        {
+            observe_held_exit()?;
+            Err("Engine exited before upgrade commit request".into())
+        }
         other => other,
     }
 }
 
-fn finish_held_actor_exit(host: &crate::engine_host::EngineHost, timeout: Duration) -> Result<(), String> {
+fn finish_held_actor_exit(
+    host: &crate::engine_host::EngineHost,
+    timeout: Duration,
+) -> Result<(), String> {
     let deadline = std::time::Instant::now() + timeout;
     if host.quit_started() || !host.replacement_held() {
         return Err("Quit or released hold refuses the pre-commit exit handoff".into());
     }
     if !host.wait_for_exit(timeout) || host.child_pid().is_some() {
-        return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+        return Err(
+            "Unsent upgrade commit did not obtain an actor exit before the deadline".into(),
+        );
     }
     // child_pid can clear during reaping, just before record_exit. Awaiting the
     // actor's terminal publication proves its ledger write has completed too.
     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
     host.post_stop("upgrade", None, remaining)?;
-    if host.supervisor_running() && host.wait_terminal(host.now_ms() + remaining.as_millis() as u64).is_none() {
+    if host.supervisor_running()
+        && host
+            .wait_terminal(host.now_ms() + remaining.as_millis() as u64)
+            .is_none()
+    {
         return Err("Pre-commit actor exit observation timed out".into());
     }
     if host.latest_record().is_some() && host.terminal_outcome().is_none() {
@@ -1062,7 +1082,314 @@ fn write_qualification_result(app: &AppHandle, verdict: &str, detail: &str) {
     }
 }
 
+/// Authorization is independent of the Engine and never changes durable updater state.
+/// Discovery is one operation; installation reauthorizes immediately before artifact download.
+fn authorize_app_update(app: &AppHandle, automatic: bool) -> Result<bool, String> {
+    let home = crate::resolve_app_data_dir(app)?;
+    authorize_app_update_at(
+        machine_update_policy_path().as_deref(),
+        &home.join("policy.v1.json"),
+        automatic,
+        std::env::var("JUSTSEARCH_AUTO_UPDATE_CHECK")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn machine_update_policy_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let root = std::env::var("PROGRAMDATA")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "C:\\ProgramData".into());
+        Some(
+            PathBuf::from(root)
+                .join("JustSearch")
+                .join("policy.v1.json"),
+        )
+    }
+    #[cfg(not(windows))]
+    None
+}
+
+fn authorize_app_update_at(
+    machine: Option<&Path>,
+    user: &Path,
+    automatic: bool,
+    automatic_preference: Option<&str>,
+) -> Result<bool, String> {
+    let machine_allows = match machine.map(read_app_update_policy).transpose() {
+        Ok(value) => value.flatten().unwrap_or(true),
+        Err(error) => return Err(format!(
+            "App updates are blocked by administrator policy: machine policy could not be loaded: {error}"
+        )),
+    };
+    // As in the Engine, a broken user policy is diagnosed by the policy endpoint but
+    // does not override a valid machine policy or the defaults.
+    let user_allows = read_app_update_policy(user).ok().flatten().unwrap_or(true);
+    if !machine_allows || !user_allows {
+        return Err(
+            "App updates are disabled by administrator policy (appUpdatesEnabled=false).".into(),
+        );
+    }
+    Ok(!(automatic && automatic_preference == Some("false")))
+}
+
+/// Read all known field shapes, even though only the update flag is enforced here:
+/// malformed AI/allowlist fields also make the Engine reject a machine policy.
+fn read_app_update_policy(path: &Path) -> Result<Option<bool>, String> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            // Missing parents are fine; existing non-directory or dangling parents
+            // mean attributes could not be read, not that policy is absent.
+            for parent in path.ancestors().skip(1) {
+                match fs::symlink_metadata(parent) {
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(error) => return Err(error.to_string()),
+                    Ok(_) => (),
+                }
+                if !fs::metadata(parent)
+                    .map_err(|error| error.to_string())?
+                    .is_dir()
+                {
+                    return Err("Policy ancestor is not a directory".into());
+                }
+                break;
+            }
+            return Ok(None);
+        }
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => (),
+    }
+    if !fs::metadata(path)
+        .map_err(|error| error.to_string())?
+        .is_file()
+    {
+        return Err("Policy path is not a regular file".into());
+    }
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    let json = policy_json_utf8(&bytes)?;
+    let mut parser = serde_json::Deserializer::from_slice(&json);
+    let policy = AppUpdatePolicy::deserialize(&mut parser).map_err(|error| error.to_string())?;
+    if policy.version != 1 {
+        return Err("Unsupported policy schemaVersion".into());
+    }
+    Ok(Some(policy.allowed.unwrap_or(true)))
+}
+
+// Jackson's file reader detects Unicode BOMs and zero-byte patterns, including
+// UTF-16 output from Windows PowerShell. Preserve valid existing v1 files.
+fn policy_json_utf8(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, String> {
+    use std::borrow::Cow;
+    if let Some(utf8) = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]) {
+        return Ok(Cow::Borrowed(utf8));
+    }
+    let (width, little, skip) = if bytes.starts_with(&[0xff, 0xfe, 0, 0]) {
+        (4, true, 4)
+    } else if bytes.starts_with(&[0, 0, 0xfe, 0xff]) {
+        (4, false, 4)
+    } else if bytes.starts_with(&[0xff, 0xfe]) {
+        (2, true, 2)
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (2, false, 2)
+    } else {
+        match bytes.get(..4) {
+            Some([_, 0, 0, 0]) => (4, true, 0),
+            Some([0, 0, 0, _]) => (4, false, 0),
+            Some([_, 0, _, 0]) => (2, true, 0),
+            Some([0, _, 0, _]) => (2, false, 0),
+            _ => return Ok(Cow::Borrowed(bytes)),
+        }
+    };
+    let encoded = &bytes[skip..];
+    if encoded.len() % width != 0 {
+        return Err("Incomplete policy Unicode character".into());
+    }
+    let text = if width == 2 {
+        let units: Vec<u16> = encoded
+            .chunks_exact(2)
+            .map(|chunk| {
+                let pair = [chunk[0], chunk[1]];
+                if little {
+                    u16::from_le_bytes(pair)
+                } else {
+                    u16::from_be_bytes(pair)
+                }
+            })
+            .collect();
+        String::from_utf16(&units).map_err(|error| error.to_string())?
+    } else {
+        let mut text = String::new();
+        for chunk in encoded.chunks_exact(4) {
+            let quad = [chunk[0], chunk[1], chunk[2], chunk[3]];
+            let code = if little {
+                u32::from_le_bytes(quad)
+            } else {
+                u32::from_be_bytes(quad)
+            };
+            text.push(char::from_u32(code).ok_or("Invalid policy Unicode character")?);
+        }
+        text
+    };
+    Ok(Cow::Owned(text.into_bytes()))
+}
+
+struct AppUpdatePolicy {
+    version: i32,
+    allowed: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for AppUpdatePolicy {
+    fn deserialize<D: serde::Deserializer<'de>>(parser: D) -> Result<Self, D::Error> {
+        struct Fields;
+        impl<'de> serde::de::Visitor<'de> for Fields {
+            type Value = AppUpdatePolicy;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a policy object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut fields: M,
+            ) -> Result<Self::Value, M::Error> {
+                use serde::de::Error;
+                let mut policy = AppUpdatePolicy {
+                    version: 0,
+                    allowed: None,
+                };
+                // Validate each occurrence: Jackson rejects a malformed known field even
+                // when a later duplicate replaces it. Valid duplicates keep the last value.
+                while let Some(key) = fields.next_key::<String>()? {
+                    match key.as_str() {
+                        "schemaVersion" => {
+                            let value = fields.next_value::<&RawValue>()?;
+                            policy.version =
+                                policy_schema_version(value).map_err(M::Error::custom)?;
+                        }
+                        "appUpdatesEnabled"
+                        | "downloadsEnabled"
+                        | "onlineAiEnabled"
+                        | "gpuAccelerationEnabled"
+                        | "disallowExternalInferenceServers" => {
+                            let value = fields.next_value::<&RawValue>()?;
+                            let flag = policy_boolean(value).map_err(M::Error::custom)?;
+                            if key == "appUpdatesEnabled" {
+                                policy.allowed = flag;
+                            }
+                        }
+                        "updatedAt" => {
+                            let value = fields.next_value::<&RawValue>()?;
+                            validate_policy_string(value).map_err(M::Error::custom)?;
+                        }
+                        "allowlists" => {
+                            fields.next_value::<Option<UpdatePolicyAllowlists>>()?;
+                        }
+                        _ => {
+                            fields.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                Ok(policy)
+            }
+        }
+        parser.deserialize_map(Fields)
+    }
+}
+
+struct UpdatePolicyAllowlists;
+impl<'de> Deserialize<'de> for UpdatePolicyAllowlists {
+    fn deserialize<D: serde::Deserializer<'de>>(parser: D) -> Result<Self, D::Error> {
+        struct Lists;
+        impl<'de> serde::de::Visitor<'de> for Lists {
+            type Value = UpdatePolicyAllowlists;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a policy allowlist object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut fields: M,
+            ) -> Result<Self::Value, M::Error> {
+                use serde::de::Error;
+                while let Some(key) = fields.next_key::<String>()? {
+                    match key.as_str() {
+                        "modelSha256" | "packManifestSha256" => {
+                            if let Some(values) = fields.next_value::<Option<Vec<&RawValue>>>()? {
+                                for value in values {
+                                    validate_policy_string(value).map_err(M::Error::custom)?;
+                                }
+                            }
+                        }
+                        _ => {
+                            fields.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                Ok(UpdatePolicyAllowlists)
+            }
+        }
+        parser.deserialize_map(Lists)
+    }
+}
+
+fn policy_schema_version(value: &RawValue) -> Result<i32, String> {
+    let raw = value.get();
+    if raw == "null" {
+        return Ok(0);
+    }
+    if raw.starts_with('"') {
+        let value: String = serde_json::from_str(raw).map_err(|error| error.to_string())?;
+        return match value.trim_matches(|c| c <= '\u{20}') {
+            "" | "null" => Ok(0),
+            value => value
+                .parse()
+                .map_err(|_| "Invalid policy schemaVersion".into()),
+        };
+    }
+    let number: f64 = raw.parse().map_err(|_| "Invalid policy schemaVersion")?;
+    if !number.is_finite() || number < i32::MIN as f64 || number > i32::MAX as f64 {
+        return Err("Invalid policy schemaVersion".into());
+    }
+    Ok(number as i32)
+}
+
+// Jackson's existing scalar coercions are part of the v1 policy input contract.
+// RawValue retains integer/float spelling and arbitrarily large integers rather
+// than rounding them to f64 before checking their accepted field shape.
+fn policy_boolean(value: &RawValue) -> Result<Option<bool>, String> {
+    let raw = value.get();
+    match raw {
+        "null" => Ok(None),
+        "true" => Ok(Some(true)),
+        "false" => Ok(Some(false)),
+        _ if raw.starts_with('"') => {
+            let value: String = serde_json::from_str(raw).map_err(|error| error.to_string())?;
+            match value.trim_matches(|c| c <= '\u{20}') {
+                "true" | "True" | "TRUE" => Ok(Some(true)),
+                "false" | "False" | "FALSE" => Ok(Some(false)),
+                "" | "null" => Ok(None),
+                _ => Err("Invalid policy boolean".into()),
+            }
+        }
+        _ if raw
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || byte == b'-') =>
+        {
+            Ok(Some(raw != "0" && raw != "-0"))
+        }
+        _ => Err("Invalid policy boolean".into()),
+    }
+}
+
+fn validate_policy_string(value: &RawValue) -> Result<(), String> {
+    if value.get().starts_with(['[', '{']) {
+        Err("Invalid policy string".into())
+    } else {
+        Ok(())
+    }
+}
+
 async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, String> {
+    authorize_app_update(app, false)?;
     let descriptor_url = descriptor_url()?;
     ensure_https(&descriptor_url)?;
     let client = reqwest::Client::builder()
@@ -1542,38 +1869,19 @@ async fn post_head<T: for<'de> Deserialize<'de>>(
     path: &str,
     body: Option<serde_json::Value>,
 ) -> Result<T, String> {
-    let port = backend
-        .get_port()
-        .ok_or_else(|| "Backend is unavailable".to_string())?;
-    let token = backend
-        .get_session_token()
-        .ok_or_else(|| "Backend session token is unavailable".to_string())?;
-    let client = reqwest::Client::builder()
-        .timeout(HEAD_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Failed to create backend client: {error}"))?;
-    let mut request = client
-        .post(format!("http://127.0.0.1:{port}{path}"))
-        .header("X-JustSearch-Session", token);
-    if let Some(body) = body {
-        request = request.json(&body);
-    }
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format!("Backend upgrade handshake failed: {error}"))?;
-    let status = response.status();
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format!("Backend upgrade response failed: {error}"))?;
-    if !status.is_success() {
-        return Err(format!(
-            "Backend rejected upgrade handshake with {status}: {}",
-            String::from_utf8_lossy(&bytes)
-        ));
-    }
-    serde_json::from_slice(&bytes)
+    let host = backend.host.clone();
+    let path = path.to_owned();
+    let response = tokio::task::spawn_blocking(move || {
+        crate::shell_actuator::post(
+            &host,
+            &path,
+            &body.unwrap_or_else(|| serde_json::json!({})),
+            HEAD_TIMEOUT.as_millis() as u64,
+        )
+    })
+    .await
+    .map_err(|error| format!("Backend upgrade task failed: {error}"))??;
+    serde_json::from_value(response)
         .map_err(|error| format!("Backend upgrade response was invalid: {error}"))
 }
 
@@ -2071,7 +2379,7 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {
         .map_err(|error| format!("Failed to parse {}: {error}", path.display()))
 }
 
-fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("Path has no parent: {}", path.display()))?;
@@ -2123,6 +2431,28 @@ fn replace_file(source: &Path, target: &Path) -> std::io::Result<()> {
     } else {
         Ok(())
     }
+}
+
+fn checked_installer_bytes(
+    coordinator: &UpdateCoordinator,
+    descriptor: &ReleaseDescriptor,
+    downloaded: Result<Vec<u8>, String>,
+) -> Result<Vec<u8>, String> {
+    let result = downloaded.and_then(|bytes| {
+        if sha256_bytes(&bytes) != descriptor.artifact.sha256.to_ascii_lowercase()
+            || bytes.len() as u64 != descriptor.artifact.size
+        {
+            return Err("Downloaded installer bytes do not match release descriptor".into());
+        }
+        if bytes.get(0..2) != Some(b"MZ") {
+            return Err("Authenticated updater artifact is not a Windows NSIS executable".into());
+        }
+        Ok(bytes)
+    });
+    if let Err(error) = &result {
+        set_state(coordinator, "error", Some(error.clone()));
+    }
+    result
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
@@ -2256,6 +2586,236 @@ fn now_epoch_ms() -> u128 {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // The harness bypasses both startup entry points. A subprocess also prevents any other test
+    // (or the updater plugin) from hiding a missing default provider or changing the trust key.
+    fn in_fresh_process(test: &str) -> bool {
+        let module = module_path!().split_once("::").unwrap().1;
+        let name = format!("{module}::{test}");
+        if std::env::var("JUSTSEARCH_TLS_TEST_CHILD").as_deref() == Ok(name.as_str()) {
+            return true;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &name, "--nocapture"])
+            .env("JUSTSEARCH_TLS_TEST_CHILD", &name)
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let ran_exactly_this_test = stdout.lines().any(|line| line == "running 1 test")
+            && stdout
+                .lines()
+                .any(|line| line.starts_with("test result: ok. 1 passed; 0 failed;"));
+        assert_eq!(
+            (output.status.success(), ran_exactly_this_test),
+            (true, true),
+            "fresh-process check failed:\n{}\n{}",
+            stdout,
+            String::from_utf8_lossy(&output.stderr),
+        );
+        false
+    }
+
+    #[test]
+    fn startup_provider_builds_release_and_backend_clients() {
+        if !in_fresh_process("startup_provider_builds_release_and_backend_clients") {
+            return;
+        }
+        assert!(rustls::crypto::CryptoProvider::get_default().is_none());
+        crate::tls::initialize();
+        let first = rustls::crypto::CryptoProvider::get_default().cloned();
+        crate::tls::initialize();
+        // These are the configurations used by check_release and post_head. Keep the clients
+        // local to this child: a global provider installed by another test must not satisfy this.
+        for timeout in [Duration::from_secs(20), HEAD_TIMEOUT] {
+            let client = std::panic::catch_unwind(|| {
+                reqwest::Client::builder().timeout(timeout).build()
+            });
+            assert!(
+                matches!(client, Ok(Ok(_))),
+                "client construction must not panic or fail",
+            );
+        }
+        let first = first.expect("startup must install a provider");
+        assert!(Arc::ptr_eq(
+            &first,
+            rustls::crypto::CryptoProvider::get_default().unwrap(),
+        ));
+    }
+
+    #[test]
+    fn metadata_signature_rejects_wrong_signature() {
+        if !in_fresh_process("metadata_signature_rejects_wrong_signature") {
+            return;
+        }
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        let key = Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        std::env::set_var(
+            "JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY",
+            base64::engine::general_purpose::STANDARD.encode(key.public_key().as_ref()),
+        );
+        let bytes = b"signed release metadata";
+        let signature = base64::engine::general_purpose::STANDARD.encode(key.sign(bytes).as_ref());
+        assert!(verify_metadata_signature(bytes, &signature).is_ok());
+        assert_eq!(
+            verify_metadata_signature(b"tampered release metadata", &signature).unwrap_err(),
+            "Release metadata signature verification failed",
+        );
+    }
+
+    // The Java loader consumes this identical file. In particular, malformed known AI
+    // fields must deny machine-policy updates even though Rust only enforces updates.
+    #[cfg(unix)]
+    #[test]
+    fn app_update_shared_policy_fixtures() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../app-services/src/test/resources/policy/app-update-policy-cases.json"
+        ))
+        .unwrap();
+        for fixture in fixtures.as_array().unwrap() {
+            let root = tempdir().unwrap();
+            let machine = materialize_update_policy(
+                root.path().join("machine"),
+                &fixture["machine"],
+                fixture["machineKind"].as_str().unwrap(),
+            );
+            let user = materialize_update_policy(
+                root.path().join("user"),
+                &fixture["user"],
+                fixture["userKind"].as_str().unwrap(),
+            );
+            let result = authorize_app_update_at(Some(&machine), &user, false, None);
+            assert_eq!(
+                result.is_ok(),
+                fixture["allowed"].as_bool().unwrap(),
+                "{}: {result:?}",
+                fixture["name"]
+            );
+            if let Err(error) = result {
+                assert!(error.contains("administrator policy"), "{error}");
+            }
+        }
+    }
+
+    #[test]
+    fn app_update_env_suppresses_only_automatic_checks() {
+        let root = tempdir().unwrap();
+        let user = root.path().join("policy.v1.json");
+        assert_eq!(
+            authorize_app_update_at(None, &user, true, Some("false")),
+            Ok(false)
+        );
+        assert_eq!(
+            authorize_app_update_at(None, &user, false, Some("false")),
+            Ok(true)
+        );
+        for preference in [None, Some("true"), Some(""), Some("FALSE")] {
+            assert_eq!(
+                authorize_app_update_at(None, &user, true, preference),
+                Ok(true)
+            );
+        }
+    }
+
+    #[test]
+    fn app_update_policy_beats_env_and_reloads_without_changing_state() {
+        let root = tempdir().unwrap();
+        let user = root.path().join("policy.v1.json");
+        let sequence = root.path().join("sequence.v1.json");
+        let intent = root.path().join("intent.v1.json");
+        fs::write(
+            &sequence,
+            br#"{"schemaVersion":1,"highestAcceptedSequence":42}"#,
+        )
+        .unwrap();
+        fs::write(&intent, b"durable upgrade intent").unwrap();
+        let before_sequence = fs::read(&sequence).unwrap();
+        let before_intent = fs::read(&intent).unwrap();
+        for allowed in [true, false, true] {
+            fs::write(
+                &user,
+                format!(r#"{{"schemaVersion":1,"appUpdatesEnabled":{allowed}}}"#),
+            )
+            .unwrap();
+            for preference in [None, Some("true"), Some("false")] {
+                for automatic in [true, false] {
+                    let result = authorize_app_update_at(None, &user, automatic, preference);
+                    assert_eq!(
+                        result.is_ok(),
+                        allowed,
+                        "{allowed}, {automatic}, {preference:?}: {result:?}"
+                    );
+                }
+            }
+            assert_eq!(fs::read(&sequence).unwrap(), before_sequence);
+            assert_eq!(fs::read(&intent).unwrap(), before_intent);
+        }
+    }
+
+    #[cfg(unix)]
+    fn materialize_update_policy(
+        path: PathBuf,
+        contents: &serde_json::Value,
+        kind: &str,
+    ) -> PathBuf {
+        match kind {
+            "utf16le" | "utf16be" => {
+                let bytes: Vec<u8> = contents
+                    .as_str()
+                    .unwrap()
+                    .encode_utf16()
+                    .flat_map(|unit| {
+                        if kind == "utf16le" {
+                            unit.to_le_bytes()
+                        } else {
+                            unit.to_be_bytes()
+                        }
+                    })
+                    .collect();
+                fs::write(&path, bytes).unwrap();
+            }
+            "utf32le" | "utf32be" => {
+                let bytes: Vec<u8> = contents
+                    .as_str()
+                    .unwrap()
+                    .chars()
+                    .flat_map(|ch| {
+                        if kind == "utf32le" {
+                            (ch as u32).to_le_bytes()
+                        } else {
+                            (ch as u32).to_be_bytes()
+                        }
+                    })
+                    .collect();
+                fs::write(&path, bytes).unwrap();
+            }
+            "directory" => fs::create_dir(&path).unwrap(),
+            "dangling" => {
+                std::os::unix::fs::symlink(path.with_extension("missing"), &path).unwrap();
+            }
+            "inaccessible" => {
+                fs::write(&path, b"not a directory").unwrap();
+                return path.join("policy.v1.json");
+            }
+            "dangling-parent" => {
+                std::os::unix::fs::symlink(path.with_extension("missing"), &path).unwrap();
+                return path.join("policy.v1.json");
+            }
+            _ => {
+                if let Some(contents) = contents.as_str() {
+                    fs::write(&path, contents).unwrap();
+                }
+                if kind == "unreadable" {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+                    assert!(
+                        fs::read(&path).is_err(),
+                        "fixture requires an unprivileged process"
+                    );
+                }
+            }
+        }
+        path
+    }
 
     #[test]
     fn durable_phase_names_are_stable() {
@@ -2662,9 +3222,11 @@ mod tests {
             .find(|store| store.id == "ui-settings")
             .unwrap()
             .current_version = 1;
-        assert!(validate_store_compatibility_against(old_local, &wrong_strategy)
-            .unwrap_err()
-            .contains("ownership or recovery strategy"));
+        assert!(
+            validate_store_compatibility_against(old_local, &wrong_strategy)
+                .unwrap_err()
+                .contains("ownership or recovery strategy")
+        );
     }
 
     #[test]
@@ -2769,38 +3331,62 @@ mod tests {
     #[test]
     fn target_reconciliation_expands_baseline_to_all_installed_owners() {
         let mut intent = test_intent(UpgradePhase::Reconciling);
-        let all: Vec<OwnerExpectation> = current_store_compatibility().into_iter()
-            .map(|store| OwnerExpectation { owner_id: store.owner_id, format_version: store.format_version })
+        let all: Vec<OwnerExpectation> = current_store_compatibility()
+            .into_iter()
+            .map(|store| OwnerExpectation {
+                owner_id: store.owner_id,
+                format_version: store.format_version,
+            })
             .collect();
-        intent.owner_expectations = all.iter().filter(|row| row.owner_id != "operations-db").cloned().collect();
+        intent.owner_expectations = all
+            .iter()
+            .filter(|row| row.owner_id != "operations-db")
+            .cloned()
+            .collect();
         let mut expected = all;
         expected.sort_by(|a, b| a.owner_id.cmp(&b.owner_id));
-        assert_eq!(target_reconciliation_owners(&intent, "1.1.0").unwrap(), expected);
+        assert_eq!(
+            target_reconciliation_owners(&intent, "1.1.0").unwrap(),
+            expected
+        );
     }
 
     #[test]
     fn target_reconciliation_consumes_only_exact_retired_inherited_version() {
         let mut intent = test_intent(UpgradePhase::Reconciling);
-        intent.owner_expectations = current_store_compatibility().into_iter()
+        intent.owner_expectations = current_store_compatibility()
+            .into_iter()
             .map(|store| OwnerExpectation {
-                owner_id: store.owner_id, format_version: store.format_version,
-            }).collect();
+                owner_id: store.owner_id,
+                format_version: store.format_version,
+            })
+            .collect();
         intent.owner_expectations.push(OwnerExpectation {
-            owner_id: "worker-config-snapshot".into(), format_version: 0,
+            owner_id: "worker-config-snapshot".into(),
+            format_version: 0,
         });
         let active = target_reconciliation_owners(&intent, "1.1.0").unwrap();
         let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         assert_eq!(active.len(), local.durable_stores.len());
-        assert!(active.iter().all(|row| row.owner_id != "worker-config-snapshot"));
+        assert!(active
+            .iter()
+            .all(|row| row.owner_id != "worker-config-snapshot"));
         for store in local.durable_stores {
-            assert!(active.iter().any(|row| row.owner_id == store.id
-                && row.format_version == store.current_version));
+            assert!(
+                active
+                    .iter()
+                    .any(|row| row.owner_id == store.id
+                        && row.format_version == store.current_version)
+            );
         }
         intent.owner_expectations.last_mut().unwrap().format_version = 1;
-        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err()
+        assert!(target_reconciliation_owners(&intent, "1.1.0")
+            .unwrap_err()
             .contains("worker-config-snapshot"));
         intent.owner_expectations.last_mut().unwrap().format_version = 0;
-        intent.owner_expectations.push(intent.owner_expectations.last().unwrap().clone());
+        intent
+            .owner_expectations
+            .push(intent.owner_expectations.last().unwrap().clone());
         assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
     }
 
@@ -2809,29 +3395,40 @@ mod tests {
         let intent = test_intent(UpgradePhase::Reconciling);
         let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         local.retired_durable_stores[0].store.id = local.durable_stores[0].id.clone();
-        assert!(target_reconciliation_owners_against(&intent, local).unwrap_err()
+        assert!(target_reconciliation_owners_against(&intent, local)
+            .unwrap_err()
             .contains("retired store identity/disposition"));
         let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         local.retired_durable_stores[0].byte_disposition = "DELETE".into();
-        assert!(target_reconciliation_owners_against(&intent, local).unwrap_err()
+        assert!(target_reconciliation_owners_against(&intent, local)
+            .unwrap_err()
             .contains("retired store identity/disposition"));
         let mut raw: serde_json::Value = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         let retired = raw["retiredDurableStores"][0].clone();
-        raw["retiredDurableStores"].as_array_mut().unwrap().push(retired);
+        raw["retiredDurableStores"]
+            .as_array_mut()
+            .unwrap()
+            .push(retired);
         let local: LocalStoreRegister = serde_json::from_value(raw).unwrap();
         assert!(target_reconciliation_owners_against(&intent, local).is_err());
     }
 
     #[test]
     fn frozen_retired_descriptor_preserves_legacy_installed_owner_identity() {
-        let old: LocalStoreRegister = serde_json::from_str(r#"{"durableStores":[{
+        let old: LocalStoreRegister = serde_json::from_str(
+            r#"{"durableStores":[{
             "id":"worker-config-snapshot", "owner":"HEAD", "recoverability":"DERIVED",
             "currentVersion":0, "reconciliation":"UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START"
-        }]}"#).unwrap();
+        }]}"#,
+        )
+        .unwrap();
         assert!(old.retired_durable_stores.is_empty());
         let frozen = ReleaseStoreCompatibility {
-            owner_id: "worker-config-snapshot".into(), owner: "HEAD".into(), role: "DERIVED".into(),
-            format_version: 0, readable_source_versions: vec![0],
+            owner_id: "worker-config-snapshot".into(),
+            owner: "HEAD".into(),
+            role: "DERIVED".into(),
+            format_version: 0,
+            readable_source_versions: vec![0],
             reconciliation_strategy: "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START".into(),
         };
         validate_store_compatibility_against(old, &test_descriptor(vec![frozen])).unwrap();
@@ -2842,11 +3439,16 @@ mod tests {
         let mut intent = test_intent(UpgradePhase::Reconciling);
         let first = current_store_compatibility().remove(0);
         intent.owner_expectations = vec![OwnerExpectation {
-            owner_id: first.owner_id.clone(), format_version: first.format_version + 1,
+            owner_id: first.owner_id.clone(),
+            format_version: first.format_version + 1,
         }];
-        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err().contains(&first.owner_id));
+        assert!(target_reconciliation_owners(&intent, "1.1.0")
+            .unwrap_err()
+            .contains(&first.owner_id));
         intent.owner_expectations[0].owner_id = "removed-store".into();
-        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err().contains("removed-store"));
+        assert!(target_reconciliation_owners(&intent, "1.1.0")
+            .unwrap_err()
+            .contains("removed-store"));
     }
 
     #[test]
@@ -2856,7 +3458,10 @@ mod tests {
         intent.owner_expectations.clear();
         assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
         let first = current_store_compatibility().remove(0);
-        let owner = OwnerExpectation { owner_id: first.owner_id, format_version: first.format_version };
+        let owner = OwnerExpectation {
+            owner_id: first.owner_id,
+            format_version: first.format_version,
+        };
         intent.owner_expectations = vec![owner.clone(), owner];
         assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
     }
@@ -2951,6 +3556,46 @@ mod tests {
         }
     }
 
+    #[test]
+    fn download_failures_and_rejections_return_to_actionable_error() {
+        for kind in ["transport", "signature", "digest", "size", "executable"] {
+            let coordinator = UpdateCoordinator::default();
+            let mut descriptor = test_descriptor(vec![]);
+            descriptor.artifact.sha256 = sha256_bytes(b"MZfixture");
+            descriptor.artifact.size = 9;
+            *coordinator.pending.lock().unwrap() = Some(descriptor.clone());
+            set_state(&coordinator, "downloading", None);
+            set_download_progress(&coordinator, 7, Some(9));
+            let guard = InstallGuard::begin(&coordinator.installing).unwrap();
+            let downloaded = match kind {
+                "transport" => Err("Connection reset during update download".into()),
+                "signature" => Err("Update signature verification failed".into()),
+                "digest" => Ok(b"MZtampered".to_vec()),
+                "size" => {
+                    descriptor.artifact.size = 99;
+                    Ok(b"MZfixture".to_vec())
+                }
+                _ => {
+                    descriptor.artifact.sha256 = sha256_bytes(b"not an exe");
+                    descriptor.artifact.size = 10;
+                    Ok(b"not an exe".to_vec())
+                }
+            };
+            let error = checked_installer_bytes(&coordinator, &descriptor, downloaded).unwrap_err();
+            drop(guard);
+            let status = coordinator.snapshot();
+            assert_eq!(
+                status.state, "error",
+                "{kind} left recovery actions disabled"
+            );
+            assert_eq!(status.error.as_deref(), Some(error.as_str()));
+            assert_eq!(status.bytes_downloaded, None);
+            assert!(coordinator.pending.lock().unwrap().is_some());
+            assert!(ensure_no_unresolved_intent(&coordinator).is_ok());
+            assert!(InstallGuard::begin(&coordinator.installing).is_ok());
+        }
+    }
+
     fn test_descriptor(compatibility: Vec<ReleaseStoreCompatibility>) -> ReleaseDescriptor {
         ReleaseDescriptor {
             schema_version: 1,
@@ -2983,3 +3628,7 @@ mod commit_delivery_tests;
 #[cfg(test)]
 #[path = "updater_actor_hold_witness_tests.rs"]
 mod actor_hold_witness_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "updater_connection_tests.rs"]
+mod connection_tests;

@@ -102,8 +102,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * energy state from {@link #energyPoller}.
      * The composition rule ("yield GPU-heavy backfill when either holds") lives in the gauge.
      */
-    private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
-        new io.justsearch.core.scheduling.GpuSchedulingGauge();
+    private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling;
 
     /**
      * Spec E step E1: Switch A, the one bulk-work verdict for this Engine, beside the gauge. The
@@ -214,6 +213,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
+        this.gpuScheduling = new io.justsearch.core.scheduling.GpuSchedulingGauge(
+            java.util.Objects.requireNonNullElseGet(workerHost.indexingHold(),
+                io.justsearch.core.scheduling.IndexingHold::new));
         this.bulkWork = java.util.Objects.requireNonNullElseGet(
             workerHost.bulkWork(), io.justsearch.core.scheduling.BulkWorkGate::new);
         this.userActivity = java.util.Objects.requireNonNullElseGet(
@@ -669,6 +671,29 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
     }
 
+    /** Observation-only capture: an intended physical transition defers the sample. */
+    public java.util.Optional<ClientLease> tryCaptureClient() {
+        publicationLock.readLock().lock();
+        try {
+            synchronized (clientLeaseMonitor) {
+                KnowledgeClient captured = client;
+                if (clientRetiring || !clientVerified || captured == null) {
+                    throw new IllegalStateException("Knowledge Server client is unavailable");
+                }
+                var observation = workerHost.tryCaptureHealthView();
+                if (observation.isEmpty() && !workerHost.runtimeReloadInProgress()) {
+                    return java.util.Optional.of(captureClient());
+                }
+                return observation.map(serving -> {
+                    clientHolders++;
+                    return new ClientLease(captured, serving);
+                });
+            }
+        } finally {
+            publicationLock.readLock().unlock();
+        }
+    }
+
     /** Process lock used to capture configuration and this client as one serving view. */
     public java.util.concurrent.locks.ReentrantReadWriteLock publicationLock() {
         return publicationLock;
@@ -828,6 +853,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
             return latchIndexFatal(
                     new WorkerDown(LifecycleReasonCode.INDEX_CORRUPT, INDEX_CORRUPT_DETAIL));
         }
+        if (io.justsearch.ipc.WorkerFatalReasonMarker.MIGRATION_JOURNAL_UNAVAILABLE.equals(fatal)) {
+            return latchIndexFatal(new WorkerDown(
+                    LifecycleReasonCode.INDEX_MIGRATION_JOURNAL_UNAVAILABLE,
+                    "Search is unavailable because an unfinished index migration has lost its job journal. "
+                            + "The database files have been kept for repair."));
+        }
         if (io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH.equals(fatal)) {
             return latchIndexFatal(
                     new WorkerDown(
@@ -891,7 +922,21 @@ public final class KnowledgeServerBootstrap implements Closeable {
     public java.util.Optional<Boolean> tryCheckHealth() {
         if (!initLock.tryLock()) return java.util.Optional.empty();
         try {
-            return java.util.Optional.of(checkHealth());
+            if (client == null) return java.util.Optional.of(false);
+            java.util.Optional<WorkerHost.ServingLease> captured;
+            try {
+                captured = workerHost.tryCaptureHealthView();
+            } catch (RuntimeException failure) {
+                observePhysicalLoss("Health capture failed: " + failure.getMessage());
+                throw failure;
+            }
+            if (captured.isEmpty()) {
+                return workerHost.runtimeReloadInProgress() ? java.util.Optional.empty()
+                    : java.util.Optional.of(checkHealth());
+            }
+            try (var view = captured.orElseThrow()) {
+                return java.util.Optional.of(view.withClient(client, ignored -> checkHealth()));
+            }
         } finally {
             initLock.unlock();
         }
@@ -1073,7 +1118,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /** Version stamp for built-in help files. Bump when help content changes. */
-    private static final String HELP_FILES_VERSION = "v3";
+    private static final String HELP_FILES_VERSION = "v4";
 
     /**
      * Auto-ingests built-in help files if not already done for this version.

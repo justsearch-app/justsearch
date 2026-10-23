@@ -20,10 +20,11 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
 import '../components/OpButton.js';
-import type { OpErrorEventDetail } from '../components/OpButton.js';
+import type { OpErrorEventDetail, OpSuccessEventDetail } from '../components/OpButton.js';
 import '../components/StatusBadge.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
+import '../components/OperationOutcomeDetail.js';
 import '../components/CapabilityMap.js';
 import { parseSseBuffer } from '../../api/sse.js';
 import { summarizeWireDrift } from '../../api/wireDriftTelemetry.js';
@@ -46,6 +47,7 @@ import '../aggregate-substrate/components/JfOperation.js';
 // snapshot types are the generated/poll shapes, re-exported by the store.
 import {
   subscribeAiState,
+  hasLiveDocumentCount,
   type AiState,
   type StatusSnapshot,
   type InferenceSnapshot,
@@ -62,6 +64,7 @@ import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
 import { reasonFor } from '../state/readinessNotice.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
+import '../components/IndexingControls.js';
 import {
   ENRICHMENT_BLOCKED_LABEL,
   ENRICHMENT_IN_PROGRESS_LABEL,
@@ -144,25 +147,6 @@ function formatUptime(ms: number | undefined): string {
   return `${sec}s`;
 }
 
-function formatIndexState(state: string): string {
-  switch (state) {
-    case 'IDLE':
-      return 'Ready';
-    case 'INDEXING':
-      return 'Indexing';
-    case 'NOT_STARTED':
-      return 'Not started';
-    case 'UNAVAILABLE':
-      return 'Unavailable';
-    case 'ERROR':
-      return 'Error';
-    case 'FAILED':
-      return 'Indexing failed';
-    default:
-      return state || 'Unknown';
-  }
-}
-
 export class HealthSurface extends JfElement {
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -179,6 +163,8 @@ export class HealthSurface extends JfElement {
     autoRefresh: { state: true },
     loading: { state: true },
     initialPollComplete: { state: true },
+    bulkOutcomeKey: { state: true },
+    bulkError: { state: true },
     error: { state: true },
     recommendedActions: { state: true },
   };
@@ -210,6 +196,8 @@ export class HealthSurface extends JfElement {
    * pre-first-poll window. (observations.md `#270` fix.)
    */
   declare initialPollComplete: boolean;
+  declare bulkOutcomeKey: string;
+  declare bulkError: OpErrorEventDetail | null;
   declare error: string | null;
   /**
    * Slice 447 §X.11.5 Phase 4: condition → recommended Operation lookup. Populated
@@ -251,6 +239,8 @@ export class HealthSurface extends JfElement {
     this.autoRefresh = true;
     this.loading = false;
     this.initialPollComplete = false;
+    this.bulkOutcomeKey = '';
+    this.bulkError = null;
     this.error = null;
     this.recommendedActions = new Map();
   }
@@ -293,7 +283,12 @@ export class HealthSurface extends JfElement {
   static styles = [
     surfaceLayoutStyles,
     css`
+    :host {
+      min-width: 0;
+      max-width: 100%;
+    }
     .header {
+      flex-wrap: wrap;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -325,6 +320,7 @@ export class HealthSurface extends JfElement {
        (the global button{}/.icon-btn fork is deleted). Tempdoc 571 §11 / 578 — the §11.8 Health|Logs
        tab strip + embedded-log rules are RETIRED (Logs is a sibling System member now). */
     .body {
+      min-width: 0;
       flex: 1;
       overflow-y: auto;
       padding: 1rem 1.5rem;
@@ -594,6 +590,7 @@ export class HealthSurface extends JfElement {
   protected override settleTransients(): void {
     this.loading = false;
     this.error = null;
+    this.bulkError = null;
   }
 
   override disconnectedCallback(): void {
@@ -792,8 +789,11 @@ export class HealthSurface extends JfElement {
     const hasOpenConditions = this.recommendedActions.size > 0;
     const attention =
       hasOpenConditions && (verdict.kind === 'operational' || verdict.kind === 'checking');
-    const label = attention ? 'Attention needed' : present.headline;
-    const tone = attention ? 'warning' : present.tone;
+    const activity = this.indexingProgress().activity;
+    const label = !activity.confirmed
+      ? verdict.kind === 'connecting' ? `${present.headline} — ${activity.summary}` : activity.summary
+      : attention ? 'Attention needed' : present.headline;
+    const tone = !activity.confirmed || attention ? 'warning' : present.tone;
     return html`
       <div class="header">
         <div class="header-left">
@@ -839,12 +839,8 @@ export class HealthSurface extends JfElement {
     const stability = this.aiState?.stability;
     if (!stability || stability.kind !== 'provisional') return nothing;
     if (stability.cause !== 'rebuilding' && stability.cause !== 'generation-switch') return nothing;
-    const migration = this.status?.worker?.migration;
-    const active = migration?.activeIndexedDocuments ?? 0;
-    const building = migration?.buildingIndexedDocuments ?? 0;
-    if (active <= 0) return nothing; // no faithful denominator yet — the badge already says "Rebuilding…"
-    const ratio = Math.min(building / active, 1);
-    const pct = Math.round(ratio * 100);
+    const pct = this.indexingProgress().rebuildPercent;
+    if (pct === null) return nothing;
     return html`
       <div
         class="rebuild-progress"
@@ -859,7 +855,7 @@ export class HealthSurface extends JfElement {
           <span>Rebuilding…</span>
         </div>
         <div class="progress">
-          <div class="progress-bar info" style="width: ${ratio * 100}%"></div>
+          <div class="progress-bar info" style="width: ${pct}%"></div>
         </div>
       </div>
     `;
@@ -867,7 +863,7 @@ export class HealthSurface extends JfElement {
 
   /**
    * Queue-card sub-text (630). The calm status vocabulary: "Catching up…" (a post-resume reconcile
-   * transient) and "Paused — saving energy" (OS energy saver is deferring backfill) sit beside the
+   * transient) and the shared automatic-hold explanation sit beside the
    * working state, and the **terminal "Up to date"** (idle + a verified-healthy index) is the
    * explicit trust close — the Dropbox "Syncing… → Up to date" model, to which "Catching up…" and
    * "Paused…" both resolve once they clear. None of these is a fault — search keeps working.
@@ -878,26 +874,30 @@ export class HealthSurface extends JfElement {
    * reads "Building semantic search — N%", and "Up to date" is reserved for coverage-complete. The number
    * comes from the ONE indexing-progress projection — this card derives none of it privately.
    */
+  private indexingProgress() {
+    return selectIndexingProgress(
+      this.status, this.aiState?.indexingStatusLive ?? false,
+      this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
+    );
+  }
+
   private queueSubLabel(queue: number, known: boolean): string {
+    const progress = this.indexingProgress();
+    if (!progress.activity.confirmed || progress.activity.detail) {
+      return [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ');
+    }
     const stability = this.aiState?.stability;
     if (stability?.kind === 'provisional' && stability.cause === 'catching-up') {
       return 'Catching up…';
     }
     if (this.provisional) return 'Rebuilding…';
-    if (this.status?.power?.energyReduced === true && queue > 0) return 'Paused — saving energy';
     if (!known) return 'Unknown';
-    if (queue > 0) return 'Indexing';
+    if (queue > 0) return progress.activity.summary;
     // 809 finding 1 — the JOB queue draining is not the work finishing. Embedding/SPLADE/NER run
     // afterwards on the backfill scheduler, and until they drain, semantic and hybrid search do not
     // work — so neither the terminal "Up to date" nor "Idle" is true here. Phase comes from the ONE
     // progress projection (which also guards the unknown/zeroed-worker arm); the phrase is the shared
     // enrichment vocabulary the Brain surface and Library rows use, plus the percent when faithful.
-    const progress = selectIndexingProgress(
-      this.status,
-      this.aiState?.snapshotLive ?? false,
-      this.aiState?.episodeMaxPendingJobs ?? 0,
-      this.aiState?.enrichSettleSamples ?? [],
-    );
     if (progress.phase === 'enriching') {
       return progress.enrichingPercent === null
         ? ENRICHMENT_IN_PROGRESS_LABEL
@@ -919,12 +919,13 @@ export class HealthSurface extends JfElement {
     const memRatio = memMax > 0 ? memUsed / memMax : 0;
     // 813 §3b — the Queue card's number comes from the ONE indexing-progress projection, the same
     // authority `queueSubLabel` reads, so the card's value and its sub-text cannot disagree.
-    const queue = selectIndexingProgress(
+    const progress = selectIndexingProgress(
       this.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
-    ).jobsPending;
+    );
+    const queue = progress.jobsPending;
     const memColor = memRatio > 0.9 ? 'red' : memRatio > 0.8 ? 'amber' : 'green';
     const memDot = memRatio > 0.9 ? 'error' : memRatio > 0.8 ? 'warning' : 'healthy';
     // §2.B: when no status has arrived, the honest value is "—" (unknown),
@@ -950,7 +951,9 @@ export class HealthSurface extends JfElement {
     // Size honesty: only surface a last-known size that was actually observed; a settled snap that
     // lacked `indexSizeBytes` retains `null`, and Size falls back to '…' rather than a fake "0 B".
     const lastKnownSize = lastKnownIdx && settled!.indexSizeBytes != null;
-    const filesDisp = lastKnownIdx
+    const currentCount = hasLiveDocumentCount(this.aiState);
+    const lastKnownFiles = lastKnownIdx && !currentCount;
+    const filesDisp = currentCount ? filesVal : lastKnownFiles
       ? formatCount(settled!.documentCount)
       : wkr(filesVal);
     const sizeDisp = lastKnownSize ? formatBytes(settled!.indexSizeBytes!) : wkr(sizeVal);
@@ -960,10 +963,10 @@ export class HealthSurface extends JfElement {
     const statsBody = activeBodyFor(HEALTH_STATS_REGION);
     if (statsBody) {
       const metrics = [
-        { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && known && docs > 0 ? 'success' : 'neutral', sub: lastKnownIdx ? 'Last known' : undefined },
+        { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && known && docs > 0 ? 'success' : 'neutral', sub: lastKnownFiles ? 'Last known' : undefined },
         { label: 'Size', value: sizeDisp, icon: 'database', tone: 'neutral', sub: lastKnownSize ? 'Last known' : undefined },
         { label: 'Memory', value: memVal, icon: 'memory-stick', tone: memDot === 'healthy' ? 'success' : memDot, sub: memMax > 0 ? `of ${formatBytes(memMax)}` : undefined },
-        { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
+        { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
       ];
       // 594 §11.3 #4 — thread THIS surface's 571 altitude (read from the catalog, not re-declared) so
       // the engine renders absent capabilities as "<name> off" on this DIAGNOSTIC surface.
@@ -985,8 +988,8 @@ export class HealthSurface extends JfElement {
             </div>
             <jf-status-dot tone=${!this.provisional && known && docs > 0 ? 'success' : 'neutral'}></jf-status-dot>
           </div>
-          <div class="card-value" title=${lastKnownIdx ? 'Last known — updating' : nothing}>${filesDisp}</div>
-          ${lastKnownIdx ? html`<div class="card-sub">Last known</div>` : nothing}
+          <div class="card-value" title=${lastKnownFiles ? 'Last known — updating' : nothing}>${filesDisp}</div>
+          ${lastKnownFiles ? html`<div class="card-sub">Last known</div>` : nothing}
         </div>
         <div class="card">
           <div class="card-head">
@@ -1031,8 +1034,8 @@ export class HealthSurface extends JfElement {
               <span class="card-label">Queue</span>
             </div>
             <jf-status-dot
-              tone=${!this.provisional && queue > 0 ? 'warning' : 'neutral'}
-              ?live=${!this.provisional && queue > 0}
+              tone=${progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral'}
+              ?live=${progress.activity.confirmed && !this.provisional && queue > 0}
             ></jf-status-dot>
           </div>
           <div class="card-value">${wkr(NUM.format(queue))}</div>
@@ -1052,8 +1055,11 @@ export class HealthSurface extends JfElement {
       : this.connPhase === 'connecting'
         ? 'connecting…'
         : 'disconnected';
-    const rawIndexState = this.status?.worker?.core?.indexState ?? 'UNKNOWN';
-    const indexState = formatIndexState(rawIndexState);
+    const progress = this.indexingProgress();
+    const activity = progress.activity;
+    const indexState = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+    const failure = this.status?.worker?.core?.indexState === 'FAILED' ? 'Indexing failed'
+      : this.status?.worker?.core?.indexState === 'ERROR' ? 'Indexing error' : null;
     // Endpoint / index-state / uptime are content (data), shared by both renders.
     const rows = html`
       <div class="data-row">
@@ -1064,15 +1070,13 @@ export class HealthSurface extends JfElement {
         <span class="key">Index state</span>
         <span
           class="val"
-          style="color: ${rawIndexState === 'IDLE'
-            ? 'var(--accent-success)'
-            : rawIndexState === 'INDEXING'
-              ? 'var(--accent-warning)'
-              : rawIndexState === 'ERROR' || rawIndexState === 'FAILED' || rawIndexState === 'UNAVAILABLE'
-                ? 'var(--accent-danger)'
-                : 'var(--text-secondary)'}"
-          >${indexState}</span
-        >
+          style="color: ${failure ? 'var(--accent-danger)' : !activity.confirmed
+            ? 'var(--text-secondary)'
+            : progress.phase === 'ready' && this.status?.worker?.core?.indexHealthy === true
+              ? 'var(--accent-success)'
+              : 'var(--text-secondary)'}"
+          >${failure ?? indexState}</span>
+        ${failure ? html`<span>${indexState}</span>` : nothing}
       </div>
       <div class="data-row">
         <span class="key">Uptime</span>
@@ -1135,6 +1139,7 @@ export class HealthSurface extends JfElement {
   private renderQueueDb(): TemplateResult | typeof nothing {
     if (!this.status) return nothing;
     const indexHealthy = this.status?.worker?.core?.indexHealthy ?? null;
+    const confirmed = this.indexingProgress().activity.confirmed;
     return html`
       <div class="card section">
         <h3>${icon({ name: 'database', size: 12 })} Queue DB</h3>
@@ -1142,7 +1147,7 @@ export class HealthSurface extends JfElement {
           <span class="key">Status</span>
           <span
             class="val"
-            style="color: ${indexHealthy === true
+            style="color: ${!confirmed ? 'var(--text-secondary)' : indexHealthy === true
               ? 'var(--accent-success)'
               : indexHealthy === false
                 ? 'var(--accent-danger)'
@@ -1151,7 +1156,7 @@ export class HealthSurface extends JfElement {
               ? 'Healthy'
               : indexHealthy === false
                 ? 'Unhealthy'
-                : 'Unknown'}</span
+                : 'Unknown'}${confirmed ? '' : ' (last observed)'}</span
           >
         </div>
         <div class="data-row">
@@ -1171,6 +1176,8 @@ export class HealthSurface extends JfElement {
     const mode = this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown';
     const isOnline = mode === 'online';
     const failure = this.aiState?.chatFailureReason ?? null;
+    const progress = this.indexingProgress();
+    const activity = progress.activity;
     return html`
       <div class="card section">
         <h3>
@@ -1196,20 +1203,21 @@ export class HealthSurface extends JfElement {
                 ? 'Starting…'
                 : // Spec A step 7 (F1): a failed chat says why, in the readiness notice's words.
                   failure
-                  ? reasonFor(failure).wording
+                  ? reasonFor(failure, activity).wording
                   : 'Offline'}</span
           >
         </div>
+        <p data-testid="health-ai-indexing-activity">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>
         <div
           style="display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 0.375rem 1rem; margin-top: 0.5rem; font-size: var(--font-size-sm)"
         >
-          <span class="key" style="color: var(--text-secondary)">Embed queue</span>
+          <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'Embed queue' : 'Last observed embed queue'}</span>
           <span class="val" style="font-family: monospace; text-align: right"
-            >${NUM.format(this.inference.embeddingQueueSize ?? 0)}</span
+            >${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}</span
           >
-          <span class="key" style="color: var(--text-secondary)">VDU queue</span>
+          <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'VDU queue' : 'Last observed VDU queue'}</span>
           <span class="val" style="font-family: monospace; text-align: right"
-            >${NUM.format(this.inference.vduQueueSize ?? 0)}</span
+            >${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}</span
           >
           <span class="key" style="color: var(--text-secondary)">Context (actual)</span>
           <span class="val" style="font-family: monospace; text-align: right"
@@ -1385,21 +1393,25 @@ export class HealthSurface extends JfElement {
     // 'Service degraded' header beside a '✓ All systems operational' footer). The
     // verdict already encodes connecting / transitioning / checking / degraded /
     // unreachable; the footer only adds the green "✓" affordance for operational.
+    const activity = this.indexingProgress().activity;
+    const indexingSummary = html`<p data-testid="health-indexing-summary">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>`;
     if (this.recommendedActions.size === 0) {
       const v = this.verdict;
-      if (v.kind === 'operational') {
+      if (v.kind === 'operational' && activity.confirmed) {
         return html`
           <div class="card section recommended all-healthy">
             <h3>✓ All systems operational</h3>
             <p>No recoverable conditions active.</p>
+            ${indexingSummary}
           </div>
         `;
       }
       const present = presentVerdict(v);
       return html`
         <div class="card section recommended">
-          <h3>${present.headline}</h3>
+          <h3>${v.kind === 'operational' && !activity.confirmed ? activity.summary : present.headline}</h3>
           <p>${present.body}</p>
+          ${indexingSummary}
         </div>
       `;
     }
@@ -1409,6 +1421,7 @@ export class HealthSurface extends JfElement {
     return html`
       <div class="card section recommended">
         <h3>⚡ Fixable now (${entries.length})</h3>
+        ${indexingSummary}
         <div class="actions">
           ${entries.map(([key, invocation]) => {
             const [conditionId, subject] = key.split('|');
@@ -1426,8 +1439,20 @@ export class HealthSurface extends JfElement {
                   context="button"
                   api-base=${this.apiBase}
                   .args=${args}
-                  @op-success=${() => { this.error = null; void this.refresh(); }}
-                  @op-error=${(event: CustomEvent<OpErrorEventDetail>) => { this.error = event.detail.message; }}
+                  @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
+                    if (['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(target)) {
+                      this.bulkError = null;
+                      this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? '');
+                    }
+                    this.error = null; void this.refresh();
+                  }}
+                  @op-error=${(event: CustomEvent<OpErrorEventDetail>) => {
+                    if (['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(target)) {
+                      this.showBulkError(event.detail);
+                    } else {
+                      this.error = event.detail.message;
+                    }
+                  }}
                 ></jf-operation>
                 ${overlay
                   ? html`<span class="overlay-tag" title="Plugin overlay">·plugin</span>`
@@ -1438,6 +1463,12 @@ export class HealthSurface extends JfElement {
         </div>
       </div>
     `;
+  }
+
+  private showBulkError(error: OpErrorEventDetail): void {
+    if (!this.isConnected) return;
+    this.bulkOutcomeKey = '';
+    this.bulkError = error;
   }
 
   private renderActions(): TemplateResult {
@@ -1475,6 +1506,11 @@ export class HealthSurface extends JfElement {
           ></jf-operation>
           <jf-operation
             operation-id="core.rebuild-index"
+            @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
+              this.bulkError = null;
+              this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? '');
+            }}
+            @op-error=${(event: CustomEvent<OpErrorEventDetail>) => this.showBulkError(event.detail)}
             context="button"
             api-base=${this.apiBase}
           ></jf-operation>
@@ -1556,6 +1592,7 @@ export class HealthSurface extends JfElement {
   }
 
   override render(): TemplateResult {
+    const progress = this.indexingProgress();
     // Tempdoc 571 §11 / 578 — the §11.8 hand-rolled Health|Logs tab strip is RETIRED: Logs is now a
     // sibling member of the System hub (one <jf-surface-tabs>), so Health renders only its own body.
     // The System host mounts only the active member, so Health's streams are already tab-scoped (the
@@ -1563,6 +1600,10 @@ export class HealthSurface extends JfElement {
     return html`
       ${this.renderHeader()}
       <div class="body">
+        <div data-testid="health-indexing-pause">
+          ${progress.pause || !progress.activity.confirmed ? html`<p>${progress.activity.summary} — ${progress.activity.detail}</p>` : nothing}
+          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
+        </div>
         ${this.error
           ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.error = null)}
               >${this.error}</jf-error-alert
@@ -1581,6 +1622,12 @@ export class HealthSurface extends JfElement {
         ${this.renderFailed()}
         ${this.renderRecommendedActions()}
         ${this.renderActions()}
+        ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
+          ${this.bulkError.message}
+          ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
+        </jf-error-alert>` : nothing}
+        ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
+          operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}
         ${this.renderEvents()}
       </div>
     `;

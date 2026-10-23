@@ -66,6 +66,8 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
+const entryEpochMs = Date.now();
+process.stdout.write(`[fake-engine] ${new Date(entryEpochMs).toISOString()} entryEpochMs=${entryEpochMs} pid=${process.pid} incarnationRef=${process.env.JUSTSEARCH_ENGINE_INCARNATION ?? ''}\n`);
 const require = createRequire(import.meta.url);
 const ledgerLib = require('../dev/lib/exit-ledger.cjs');
 const { readLinuxProcess } = require('../dev/lib/process-identity.cjs');
@@ -194,7 +196,7 @@ function log(message) {
 }
 
 log(
-  `incarnation=${behaviour.incarnation} mode=${behaviour.mode} exitCode=${behaviour.exitCode} `
+  `entryEpochMs=${entryEpochMs} pid=${process.pid} incarnationRef=${process.env.JUSTSEARCH_ENGINE_INCARNATION ?? ''} incarnation=${behaviour.incarnation} mode=${behaviour.mode} exitCode=${behaviour.exitCode} `
     + `pid=${process.pid} dataDir=${dataDir}`,
 );
 
@@ -352,12 +354,12 @@ function start() {
       return;
     }
     if (url === '/api/status') {
-      res.writeHead(200, { 'content-type': 'application/json' });
       let indexHealthy = true;
       let epochRequest = null;
       if (behaviour.controlEssentialReadiness) {
         try {
           const control = JSON.parse(fs.readFileSync(path.join(dataDir, 'fake-essential-ready.json'), 'utf8'));
+          if (control.statusFail) { fs.writeFileSync(path.join(dataDir, 'fake-status-failure.json'), JSON.stringify({ at: Date.now(), pid: process.pid })); res.writeHead(503); res.end('status unavailable'); return; }
           indexHealthy = control.ready === true;
           epochRequest = control.epoch ?? null;
         } catch { indexHealthy = false; }
@@ -367,6 +369,8 @@ function start() {
       }
       previousEssentialReady = indexHealthy;
       previousEpochRequest = epochRequest;
+      if (behaviour.controlEssentialReadiness) fs.writeFileSync(path.join(dataDir, 'fake-status-observed.json'), JSON.stringify({ at: Date.now(), pid: process.pid, ready: indexHealthy }));
+      res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ lifecycle: 'READY', instanceId,
         readiness: { engineComponents: {
           index: { state: indexHealthy ? 'READY' : 'UNAVAILABLE', stateSince: essentialEpoch },
@@ -467,6 +471,12 @@ function start() {
   // unparseable or unknown-reason file is IGNORED, never guessed at, for the reason B2's register
   // row states: guessing a reason from a file caught mid-write could stop the product.
   setInterval(() => {
+    if (behaviour.controlExit) {
+      try {
+        const exit = JSON.parse(fs.readFileSync(path.join(dataDir, 'fake-exit.json'), 'utf8'));
+        if (exit.incarnation === behaviour.incarnation) process.exit(1);
+      } catch { /* A test has not requested this incarnation's failure. */ }
+    }
     if (!readingRequests) return;
     let request;
     try {

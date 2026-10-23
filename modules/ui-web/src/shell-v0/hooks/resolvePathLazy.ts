@@ -12,7 +12,8 @@ import { OperationClient, type OperationInvocationSuccess } from '../operations/
 import { getResource } from '../../api/registry/ResourceCatalogClient.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 
-/** In-memory cache. Cleared on app reload. */
+/** Bounded session LRU; a long indexing run must not retain every visited path. */
+const MAX_CACHED_LABELS = 512;
 const cache: Map<string, string | null> = new Map();
 const inflight: Map<string, Promise<string | null>> = new Map();
 
@@ -21,6 +22,12 @@ interface ResolvePathOptions {
   apiBase?: string;
   /** Optional fetch override (for tests). */
   fetchImpl?: typeof fetch;
+}
+
+function cacheResolution(key: string, value: string | null): void {
+  cache.delete(key);
+  cache.set(key, value);
+  if (cache.size > MAX_CACHED_LABELS) cache.delete(cache.keys().next().value!);
 }
 
 /**
@@ -44,24 +51,29 @@ export async function resolvePathLazy(
 ): Promise<string | null> {
   const cacheKey = `${resourceId}::${primaryKey}`;
   const cached = cache.get(cacheKey);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    cacheResolution(cacheKey, cached);
+    return cached;
+  }
   const pending = inflight.get(cacheKey);
   if (pending) return pending;
+  // No retained waiting list: a later render can retry when capacity returns.
+  if (inflight.size >= 216) return null;
 
   const resource = getResource(resourceId);
   if (!resource) {
-    cache.set(cacheKey, null);
+    cacheResolution(cacheKey, null);
     return null;
   }
   if (resource.privacy.pathPolicy !== 'HASHED_REQUIRES_RESOLVER') {
     // The caller asked for resolution on a non-hashed resource;
     // probably bug, but return null defensively.
-    cache.set(cacheKey, null);
+    cacheResolution(cacheKey, null);
     return null;
   }
   const resolverId = resource.privacy.resolver;
   if (!resolverId) {
-    cache.set(cacheKey, null);
+    cacheResolution(cacheKey, null);
     return null;
   }
 
@@ -82,7 +94,7 @@ export async function resolvePathLazy(
   // primary-key name pass that name through here.
   const argName = resource.primaryKey;
   if (!argName) {
-    cache.set(cacheKey, null);
+    cacheResolution(cacheKey, null);
     return null;
   }
 
@@ -108,7 +120,7 @@ export async function resolvePathLazy(
     .then((data) => {
       const path = data && data['found'] === true ? data['path'] : null;
       const resolved = typeof path === 'string' ? path : null;
-      cache.set(cacheKey, resolved); // definitive: the resolver answered
+      cacheResolution(cacheKey, resolved); // definitive: the resolver answered
       return resolved;
     })
     .catch(() => null) // NOT cached — retryable
@@ -150,5 +162,5 @@ export function __seedForTest(
   primaryKey: string,
   path: string | null,
 ): void {
-  cache.set(`${resourceId}::${primaryKey}`, path);
+  cacheResolution(`${resourceId}::${primaryKey}`, path);
 }

@@ -1,5 +1,6 @@
 package io.justsearch.app.services.bootstrap.phases;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,54 @@ final class IndexingJobsBridgeWiringTest {
     // collection, scanId)
     return new IndexingJobView(
         pathHash, state, attempts, 1_700_000_000_000L, err, 0L, "default", scanId);
+  }
+
+  @Test void liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      var sink = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      var sinks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      sink.set(frame -> sinks.forEach(consumer -> consumer.accept(frame)));
+      org.mockito.stubbing.Answer<io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream> stream = call -> {
+        java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> consumer = call.getArgument(0);
+        sinks.add(consumer);
+        consumer.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        return () -> sinks.remove(consumer);
+      };
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobOutcomes(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
+          io.justsearch.app.observability.ledger.ActionEventJournal.disabled(),
+          new io.justsearch.app.observability.stream.SseStreamChannel(
+              io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry.STREAM_ID,
+              executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.ledger-delivery",
+                  io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual()));
+      var wired = IndexingJobsBridgeWiring.wire(executors, () -> client,
+          new io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry(
+              new io.justsearch.app.observability.stream.SseStreamChannel(
+                  io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry.STREAM_ID,
+                  executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.jobs-delivery",
+                      io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual())), ledger);
+      try {
+        wired.bridge().start().get(2, java.util.concurrent.TimeUnit.SECONDS);
+        long seq = 2;
+        for (String state : java.util.List.of("DONE", "PENDING", "FAILED", "PENDING", "RETRY_EXHAUSTED", "DONE")) {
+          var row = io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("a".repeat(64))
+              .setState(state).setLastUpdatedMs(seq).setCollection("default").setScanId("scan-42");
+          sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(seq++)
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(row)).build());
+        }
+        assertEquals(4, ledger.store().recent().size(), "later outcomes after retry are still recorded");
+        assertTrue(ledger.store().recent().stream().allMatch(event -> ((ActionEvent.Index) event).scanId().equals("scan-42")));
+        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(seq)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.newBuilder().addItems(
+                io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("historic").setState("FAILED"))).build());
+        assertEquals(4, ledger.store().recent().size(), "reconnect snapshots never replay ledger outcomes");
+      } finally { wired.subscription().close(); wired.bridge().stop(); }
+    }
   }
 
   @Test
@@ -82,4 +131,68 @@ final class IndexingJobsBridgeWiringTest {
     assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(job("h6", "queued", 0, "")).isEmpty());
     assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(null).isEmpty());
   }
+  @Test void terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      var sink = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      var sinks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      sink.set(frame -> sinks.forEach(consumer -> consumer.accept(frame)));
+      org.mockito.stubbing.Answer<io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream> stream = call -> {
+        java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> consumer = call.getArgument(0);
+        sinks.add(consumer);
+        consumer.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        return () -> sinks.remove(consumer);
+      };
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobOutcomes(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
+          io.justsearch.app.observability.ledger.ActionEventJournal.disabled(), testChannel(executors,
+              io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry.STREAM_ID, "test.ledger"));
+      var jobs = new io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry(testChannel(executors,
+          io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry.STREAM_ID, "test.jobs"));
+      var wired = IndexingJobsBridgeWiring.wire(executors, () -> client, jobs, ledger);
+      var entered = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var subscriber = ledger.subscribe(frame -> {
+        entered.countDown();
+        try { release.await(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+      });
+      try {
+        wired.bridge().start().get(1, java.util.concurrent.TimeUnit.SECONDS);
+        for (int i = 2; i <= 3; i++) {
+          int seq = i;
+          var row = io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("terminal-" + i)
+              .setState("DONE").setLastUpdatedMs(i).setScanId("scan-outside-window");
+          var frame = io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(i)
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(row)).build();
+          assertDoesNotThrow(() -> java.util.concurrent.CompletableFuture.runAsync(() -> sink.get().accept(frame),
+              executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.commit-" + seq,
+                  io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual())
+              .get(250, java.util.concurrent.TimeUnit.MILLISECONDS));
+          assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
+        }
+        assertEquals(2, ledger.store().recent().size());
+        assertTrue(ledger.store().recent().stream().allMatch(event -> ((ActionEvent.Index) event).scanId().equals("scan-outside-window")));
+        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(4)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        assertEquals(2, ledger.store().recent().size(), "snapshots never replay terminal activity");
+      } finally {
+        release.countDown(); subscriber.unsubscribe(); wired.subscription().close(); wired.bridge().stop();
+        jobs.channel().close(); ledger.channel().close();
+      }
+    }
+  }
+
+  private static io.justsearch.app.observability.stream.SseStreamChannel testChannel(
+      io.justsearch.core.execution.TestEngineExecutors executors,
+      io.justsearch.app.api.stream.StreamId id, String name) {
+    var owner = executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual(name,
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1));
+    return new io.justsearch.app.observability.stream.SseStreamChannel(id, owner.openVirtual(), owner::close);
+  }
+
 }

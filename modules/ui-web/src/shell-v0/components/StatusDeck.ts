@@ -26,13 +26,14 @@ import './StatusBadge.js';
 import { type NoticeTone } from '../utils/statusTone.js';
 import {
   subscribeAiState,
+  hasLiveDocumentCount,
   statusWithoutVerdictFlavor,
   type AiState,
 } from '../state/aiStateStore.js';
 // Tempdoc 814 §D5 / §B.7 — the chip's yield rule reads the SAME banner-presence authority the chat
 // surface's banner does, and the SAME activeSurface Shell already publishes on every navigation.
 // No new signal, no state fork.
-import { readinessNotice, warrantsSearchDegradationBanner } from '../state/readinessNotice.js';
+import { isIndexingObservation, readinessNotice, warrantsSearchDegradationBanner } from '../state/readinessNotice.js';
 import { getShellContext, subscribeShellContext } from '../state/shellContextState.js';
 import { presentVerdict, type VerdictKind } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineKind } from '../state/aiVerdict.js';
@@ -55,8 +56,9 @@ import { present } from '../display/present.js';
 import { projectFact } from '../display/facts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import './Control.js';
+import './IndexingControls.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
-import { selectIndexingProgress } from '../state/indexingProgress.js';
+import { selectIndexingProgress, indexingTaskStatus } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
 import type { ComponentState } from '../../api/generated/schema-types/status-response.js';
 
@@ -121,6 +123,10 @@ const NUM = new Intl.NumberFormat();
 const BANNER_OWNING_SURFACE_ID = 'core.unified-chat-surface';
 
 export class StatusDeck extends JfElement {
+  private focusedItem: string | null = null;
+  private indexingWasPaused = false;
+  private indexingAnnouncementKey: string | null = null;
+  private indexingAnnouncement = '';
   static properties = {
     apiBase: { type: String, attribute: 'api-base' },
     aiState: { state: true },
@@ -144,7 +150,9 @@ export class StatusDeck extends JfElement {
     container: () => this.renderRoot.querySelector('.adaptive-bar'),
     // 814 §D5 — the measured signature is the label actually RENDERED (which the yield rule can
     // change without `statusLabel` moving), so the adaptive bar re-measures when the chip yields.
-    signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label,
+    signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label + ':' +
+      JSON.stringify([this.status?.operating?.indexing?.state, this.status?.operating?.indexing?.reasons,
+        this.status?.operating?.indexing?.untilEpochMs, this.status?.operating?.indexing?.waitingForResume]) + ':' + this.focusedItem,
     reserve: 40,
     // 559 Authority VI per-item policy — same DOM query/order as items(), so the
     // pinned flags align index-for-index with the measured `.item` elements.
@@ -239,6 +247,8 @@ export class StatusDeck extends JfElement {
       align-items: center;
       gap: 0.375rem;
     }
+    .adaptive-bar .policy-pause { white-space: nowrap; }
+    .overflow-menu .policy-pause { max-width: calc(100vw - 3rem); flex-wrap: wrap; }
     .dot {
       width: 0.4rem;
       height: 0.4rem;
@@ -477,8 +487,18 @@ export class StatusDeck extends JfElement {
    */
   private inferenceChipReadout(): { label: string; tone: NoticeTone } {
     const s = this.aiState;
-    if (s && this.yieldsDegradationToBanner()) return statusWithoutVerdictFlavor(s);
-    return { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
+    const readout = s && this.yieldsDegradationToBanner()
+      ? statusWithoutVerdictFlavor(s)
+      : { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
+    // Runtime mode says who owns the GPU, not whether its enrichment cycle is running.
+    const indexingMode = s?.aiEngine.kind === 'indexing' && readout.label === 'Indexing';
+    const indexingTransition = s?.verdict.kind === 'transitioning' && s.verdict.reasons.some(isIndexingObservation);
+    if (s && (indexingMode || indexingTransition)) {
+      const { activity } = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples);
+      if (!activity.confirmed) return { label: activity.summary, tone: 'neutral' };
+      if (indexingMode) return { label: activity.summary, tone: readout.tone };
+    }
+    return readout;
   }
 
   /**
@@ -503,7 +523,9 @@ export class StatusDeck extends JfElement {
     const lastKnown = provisional && settled !== null;
     // Size honesty: only show a last-known size that was actually observed; otherwise '…'.
     const lastKnownSize = lastKnown && settled!.indexSizeBytes != null;
-    const docsDisp = provisional
+    const currentCount = hasLiveDocumentCount(this.aiState);
+    const lastKnownDocs = lastKnown && !currentCount;
+    const docsDisp = currentCount ? projectFact('core.files', this.aiState).value ?? '—' : provisional
       ? settled
         ? formatCount(settled.documentCount)
         : '…'
@@ -520,7 +542,7 @@ export class StatusDeck extends JfElement {
     // showing one would claim progress that cannot happen.
     const progress = selectIndexingProgress(
       this.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
     );
@@ -551,14 +573,16 @@ export class StatusDeck extends JfElement {
       case 'core.running-job': {
         // Tempdoc 609 §R (T1.3) — the running-job chip: hidden when idle; when work runs it shows the
         // count and (if the job knows its origin) is an operable control returning to that surface.
-        const running = this.runningTasks ?? [];
+        const running = (this.runningTasks ?? []).filter(task =>
+          !progress.activity.confirmed || progress.phase === 'indexing' || !task.id.startsWith('idxjob:'));
         if (running.length === 0) return nothing;
         const target = running.find((t) => t.originSurfaceId)?.originSurfaceId;
         const count = running.length;
-        const text = count === 1 ? running[0]!.label : `${count} running`;
+        const lastKnown = running.some(task => indexingTaskStatus(task, progress.activity, progress.phase) !== task.status);
+        const text = (count === 1 ? running[0]!.label : `${count} running`) + (lastKnown ? ' — indexing last observed' : '');
         if (!target) {
           return html`<span class="group" role="img" aria-label="${name}: ${text}">
-            <span aria-hidden="true">⟳</span><span class="val">${count}</span>
+            <span aria-hidden="true">⟳</span><span class="val">${count}${lastKnown ? ' · indexing last observed' : ''}</span>
           </span>`;
         }
         return html`<jf-control
@@ -566,7 +590,7 @@ export class StatusDeck extends JfElement {
           label="${name}: ${text}. Return to it."
           .onActivate=${() => requestSurfaceNavigation(target)}
         >
-          <span aria-hidden="true">⟳</span><span class="val">${count}</span>
+          <span aria-hidden="true">⟳</span><span class="val">${count}${lastKnown ? ' · indexing last observed' : ''}</span>
         </jf-control>`;
       }
       case 'core.conn': {
@@ -580,11 +604,11 @@ export class StatusDeck extends JfElement {
         return html`<span
           class="group"
           role="img"
-          aria-label="${name}: ${docsDisp}${lastKnown ? ' (last known)' : ''}"
-          title=${lastKnown ? 'Last known — updating' : nothing}
+          aria-label="${name}: ${docsDisp}${lastKnownDocs ? ' (last known)' : ''}"
+          title=${lastKnownDocs ? 'Last known — updating' : nothing}
         >
           ${icon({ name: 'file-text', size: 11 })}
-          <span class="val ${lastKnown ? 'stale' : ''}">${docsDisp}</span>
+          <span class="val ${lastKnownDocs ? 'stale' : ''}">${docsDisp}</span>
         </span>`;
       case 'core.size':
         return html`<span
@@ -620,6 +644,7 @@ export class StatusDeck extends JfElement {
         return html`<jf-control
           class="status-pill group"
           label="${name}: ${mode}. ${actionLabel}"
+          title=${this.aiState?.aiEngine.kind === 'indexing' ? progress.activity.detail ?? nothing : nothing}
           .onActivate=${() =>
             needsBrain ? requestSurfaceNavigation('core.brain-surface') : this.openHealth()}
         >
@@ -627,47 +652,46 @@ export class StatusDeck extends JfElement {
         </jf-control>`;
       }
       case 'core.queue': {
-        if (queue <= 0 && embed <= 0) return nothing;
-        // 630: the global, main-surface home for energy-pause legibility. When the OS energy saver
-        // is deferring deferrable backfill, a queue that sits still should read as "paused to save
-        // energy", not stalled/broken — the calm twin of the Health card's "Paused — saving energy".
-        // (Not routed through the degradation banner: that mechanism is degradation-only, and search
-        // still works. "Catching up…" already shows here via the verdict pill.)
-        const energyPaused = this.status?.power?.energyReduced === true && queue > 0;
-        if (energyPaused) {
+        const content = (() => {
+          if (progress.pause) return html`<span class="val" title=${progress.activity.detail ?? ''}>${progress.activity.summary} — ${progress.activity.detail}</span>`;
+          if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
+          const activity = progress.activity;
+          if (!activity.confirmed || activity.detail) {
+            const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+            const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
+            return html`<span class="group" role="img" aria-label=${label} title=${label}>
+              ${icon({ name: 'zap', size: 11 })}
+              <span class="val">${label}</span>
+            </span>`;
+          }
+          // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
+          // not a raw backlog count: the files are already indexed, the semantic layers are catching
+          // up. Falls back to the count only when the projection has no faithful denominator.
+          const enrichSuffix =
+            enrichingPercent !== null
+              ? `enriching: ${enrichingPercent}%`
+              : embed > 0
+                ? `embed: ${NUM.format(embed)}`
+                : '';
+          const enrichAria =
+            enrichingPercent !== null
+              ? `, enriching ${enrichingPercent}%`
+              : embed > 0
+                ? `, ${NUM.format(embed)} embedding`
+                : '';
           return html`<span
             class="group"
             role="img"
-            aria-label="${name}: ${NUM.format(queue)} job(s) queued — paused to save energy"
+            aria-label="${name}: ${NUM.format(queue)} job(s) queued${enrichAria}"
           >
-            ${icon({ name: 'moon', size: 11 })}
-            <span class="val">queue: ${NUM.format(queue)} · paused</span>
+            ${icon({ name: 'zap', size: 11 })}
+            <span class="val">queue: ${NUM.format(queue)}${
+              enrichSuffix ? html` · ${enrichSuffix}` : nothing
+            }</span>
           </span>`;
-        }
-        // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
-        // not a raw backlog count: the files are already indexed, the semantic layers are catching
-        // up. Falls back to the count only when the projection has no faithful denominator.
-        const enrichSuffix =
-          enrichingPercent !== null
-            ? `enriching: ${enrichingPercent}%`
-            : embed > 0
-              ? `embed: ${NUM.format(embed)}`
-              : '';
-        const enrichAria =
-          enrichingPercent !== null
-            ? `, enriching ${enrichingPercent}%`
-            : embed > 0
-              ? `, ${NUM.format(embed)} embedding`
-              : '';
-        return html`<span
-          class="group"
-          role="img"
-          aria-label="${name}: ${NUM.format(queue)} job(s) queued${enrichAria}"
-        >
-          ${icon({ name: 'zap', size: 11 })}
-          <span class="val">queue: ${NUM.format(queue)}${
-            enrichSuffix ? html` · ${enrichSuffix}` : nothing
-          }</span>
+        })();
+        return html`<span class="group policy-pause">${content}
+          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
         </span>`;
       }
       default:
@@ -691,12 +715,13 @@ export class StatusDeck extends JfElement {
     const left = listStatusBarItems('left')
       .map((item) => ({
         id: item.id,
-        pinned: item.overflow === 'pinned',
+        pinned: item.overflow === 'pinned' || item.id === this.focusedItem,
         content: this.renderLeftContent(item),
       }))
       .filter((e) => e.content !== nothing);
     const allRight = listStatusBarItems('right').filter((i) => i.source !== 'core');
-    const vis = this.overflow.visibleCount;
+    // A status remeasurement may shorten the visible prefix; retain its focused item until blur.
+    const vis = Math.max(this.overflow.visibleCount, left.findIndex(e => e.id === this.focusedItem) + 1);
     const hiddenCount = Number.isFinite(vis) ? Math.max(0, left.length - vis) : 0;
     // 595 §15.1 (E1) — the ONE a11y announcer for system-health verdict changes.
     // A visually-hidden notice mirrors the verdict headline; aria-live announces it
@@ -706,9 +731,40 @@ export class StatusDeck extends JfElement {
     // Tempdoc 663 Design pass 3 — the AI-engine sibling announcer, same pattern, living in this
     // ALWAYS-MOUNTED surface (not BrainSurface's own render) so a transition still announces even if
     // the user has navigated away from the AI Brain page.
-    const aiEngineAnnounce = this.aiState ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
+    // The shared indexing announcer below already owns indexing activity and its holds.
+    const aiEngineAnnounce = this.aiState && this.aiState.aiEngine.kind !== 'indexing'
+      ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
+    const progress = selectIndexingProgress(
+      this.status, this.aiState?.indexingStatusLive ?? false,
+      this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
+    );
+    const indexingTransition = this.aiState?.verdict.kind === 'transitioning' &&
+      this.aiState.verdict.reasons.some(isIndexingObservation);
+    const activityAnnouncement = [indexingTransition && progress.activity.confirmed
+      ? announce?.text ?? progress.activity.summary : progress.activity.summary,
+    progress.activity.detail].filter(Boolean).join(' — ');
+    // Policy edges have stable announcements, independent of waiting counts or observation gaps.
+    // Ordinary activity still announces automatic holds and withdraws stale claims as before.
+    if (progress.activity.confirmed) {
+      const resumedKey = `resumed:${activityAnnouncement}`;
+      if (progress.pause) {
+        if (this.indexingAnnouncementKey !== progress.pause.state) this.indexingAnnouncement = activityAnnouncement;
+        this.indexingAnnouncementKey = progress.pause.state;
+      } else if (this.indexingWasPaused) {
+        this.indexingAnnouncement = 'Indexing resumed.';
+        this.indexingAnnouncementKey = resumedKey;
+      } else if (this.indexingAnnouncementKey !== resumedKey) {
+        this.indexingAnnouncement = activityAnnouncement;
+        this.indexingAnnouncementKey = null;
+      }
+      this.indexingWasPaused = !!progress.pause;
+    } else if (this.indexingAnnouncementKey === null) {
+      this.indexingAnnouncement = activityAnnouncement;
+    }
     return html`
-      ${announce
+      <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer"
+        >${this.indexingAnnouncement}</jf-system-notice>
+      ${announce && !indexingTransition
         ? html`<jf-system-notice
             class="visually-hidden"
             live=${announce.politeness}
@@ -729,6 +785,8 @@ export class StatusDeck extends JfElement {
           (e, i) =>
             html`<span
               class="item"
+              @focusin=${() => { this.focusedItem = e.id; }}
+              @focusout=${() => { this.focusedItem = null; this.requestUpdate(); }}
               ?hidden=${i >= vis}
               data-item=${e.id}
               data-pinned=${e.pinned ? 'true' : 'false'}

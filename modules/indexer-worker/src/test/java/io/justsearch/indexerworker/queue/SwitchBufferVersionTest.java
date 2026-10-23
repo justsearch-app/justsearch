@@ -951,6 +951,8 @@ final class SwitchBufferVersionTest {
           )
           """);
       statement.execute("INSERT INTO switch_buffer VALUES ('same', 'DELETE', 'legacy', 1, 'r1', 1)");
+      statement.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      statement.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       statement.execute("PRAGMA user_version = 20");
     }
 
@@ -1004,6 +1006,8 @@ final class SwitchBufferVersionTest {
           """);
       statement.execute("INSERT INTO switch_buffer VALUES ('a', 'DELETE', 'first', 1)");
       statement.execute("INSERT INTO switch_buffer VALUES ('b', 'DELETE', 'second', 2)");
+      statement.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      statement.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       statement.execute("PRAGMA user_version = 15");
     }
     return db;

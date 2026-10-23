@@ -59,7 +59,10 @@ function stubStream(): FakeStream {
     wake?.();
     wake = null;
   };
-  fetchMock.mockImplementation(async (_url: unknown, init: { signal?: AbortSignal }) => {
+  fetchMock.mockImplementation(async (url: unknown, init: { signal?: AbortSignal }) => {
+    if (!String(url).includes('/api/chat/dispatch')) {
+      return { ok: true, status: 200, json: () => Promise.resolve({ messages: [] }) };
+    }
     signal = init?.signal ?? null;
     return {
       ok: true,

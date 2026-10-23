@@ -731,7 +731,7 @@ export class RetrospectivePanel extends JfElement {
               Actions taken anywhere in this workspace — yours or the agent's — appear here as they
               happen.
             </div>`
-          : rows.map((e) => renderEventRow(e))}
+          : rows.map((e) => renderEventRow(e, { apiBase: this.apiBase }))}
       </div>
     `;
   }
@@ -747,7 +747,7 @@ export class RetrospectivePanel extends JfElement {
           ? html`<div class="empty-state">
               Each tool the agent uses in the current run is listed here — the run has used none yet.
             </div>`
-          : history.map((e) => renderEventRow(e))}
+          : history.map((e) => renderEventRow(e, { apiBase: this.apiBase }))}
       </div>
     `;
   }

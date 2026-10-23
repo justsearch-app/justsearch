@@ -166,6 +166,20 @@ public final class WorkerMutationAdmission {
     }
 
     /**
+     * Withdraws an uncertified successor after a failed same-generation handoff. Callbacks waiting
+     * on this fence then enter the drained prior owner, which records them as durable obligations
+     * instead of refusing them.
+     */
+    public void restorePriorOwner() {
+      requireOpen();
+      if (certified || replayCertificateArmed) {
+        throw new IllegalStateException("A certified or armed successor cannot be withdrawn");
+      }
+      owner = prior;
+      installed = false;
+    }
+
+    /**
      * Arms the replay certificate before durable pointer publication.
      *
      * <p>Once armed, any replay uncertainty marked before this fence closes prevents successor

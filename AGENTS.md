@@ -1,4 +1,4 @@
-<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. Method commit: 0f37ac7ee888. Checksum: badd4b87c541. -->
+<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. Method commit: df4f0a4a6af1. Checksum: beb27cfd4199. -->
 # Working agreement
 
 This is how agents work in this project. The project's maintainer owns these rules; project knowledge
@@ -24,7 +24,9 @@ Every action costs the user something. What is scarce: their attention and verdi
 CPU, memory and disk, CI runners and the merge queue; then complexity and upkeep.
 
 1. **Estimate before starting** any task bigger than a quick answer: a time range, the start time and
-   the stop time (start plus twice the upper end), written in the task record. At the stop time,
+   the stop time (start plus twice the upper end), written in the task record. Every observed time in a
+   task record is UTC read from the clock (`date -u`), never estimated afterwards; the stop time is
+   computed from it, in UTC. At the stop time,
    stop and tell the user what was done, why it overran, the new estimate and the cheaper options.
    Only such a stop moves the stop time: its new estimate covers the whole task from the original
    start, and the new stop time is written down. Never just carry on with a new number.
@@ -43,14 +45,18 @@ CPU, memory and disk, CI runners and the merge queue; then complexity and upkeep
 1. The builder is never the only judge of its work. Above the floor, the orchestrator does not build.
 2. Above the floor, agree the scenarios, implied cases as well as stated ones, before dependent work.
 3. The verifier receives the user's intent, the scenarios, the exact candidate, how to run it and
-   the rules. Never the builder's rationale, self-report or conversation, and never the task record.
+   the rules. Commit the candidate before verifying; untracked files are excluded and named by
+   the launcher. Never the builder's rationale, self-report or conversation, and never the task record.
 4. A check of new or repaired behavior fails before the change, for the reason under test, and
    passes after it and on a known-good version where one exists. Preservation checks pass before
    and after. A skipped, unavailable or merely
    configured check is not a pass.
 5. A reported failure that crosses a boundary is verified on the real interface and running system.
 6. Every agreed scenario links to evidence, or is marked unverified with the reason.
-7. Every delivery asks for the user's verdict on behavior. Silence is not acceptance.
+7. The user's request, or their merge where the project leaves merging to them, is their sign-off
+   on verified work.
+   Ask for their verdict only when a change breaks something they use, changes what they see, or
+   touches their data: one plain question, never a list; until they answer, that change waits.
 
 ## Depth: you decide, before editing or delegating
 
@@ -79,7 +85,8 @@ counterexample you tried; if you edited it yourself, a verifier still checks it.
 - **Builder:** Codex for settled, well-specified work; Claude for work that still needs judgment.
 - **Verifier, challenger, reviewer:** always from the other model family than the author of what
   they check: the builder for code, you for scenarios, designs and documents. Each runs in its own
-  session on its own checkout. Where only one family is available, use a separate session and say
+  session on its own committed checkout for verification; Codex challengers and reviewers read
+  their snapshot through Git. Where only one family is available, use a separate session and say
   that independence comes only from that.
 - **Investigator:** research, analysis or a design draft that changes nothing; either family.
 

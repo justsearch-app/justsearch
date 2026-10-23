@@ -2,10 +2,10 @@
 title: "ADR-0035: Plugin boundary — truth vs presentation"
 type: decision
 status: accepted
-description: "Plugins author presentation (renderers, surfaces, layout, theme) but never own backend truth (Operations/Resources/Prompts). The boundary is a type, not a convention."
+description: "Plugins extend presentation while core backend truth remains backend-owned. The frontend Resource overlay still permits colliding plugin IDs to replace catalog entries; the intended boundary is not fully enforced by types."
 date: 2026-06-09
-probes: none - the plugin boundary is a type, so its enforcement is the compiler plus the contribution-surface gate.
-last_reviewed: 2026-09-02
+probes: none - the contribution-surface gate does not establish namespace safety at the frontend Resource overlay; see the 2026-10-20 amendment.
+last_reviewed: 2026-10-20
 ---
 
 
@@ -21,6 +21,8 @@ last_reviewed: 2026-09-02
 ## Status
 
 Accepted. Cited by `docs/how-to/write-a-plugin.md` (as "ADR 05"). Carried forward by tempdocs 560 (extension substrate) and 569 (user-authored presentation).
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Decision
 
@@ -124,3 +126,19 @@ permissions, namespaces, diagnostics attribution, and failure containment.
 
 - `archive/source-tempdocs/421-extensibility.md`
 - `archive/source-tempdocs/421-stack.md`
+
+## Amendment 2026-10-20: frontend Resource overlay enforcement gap
+
+The truth/presentation split above remains the intended backend ownership
+rule. Its description as a fully enforced type boundary is too strong for the
+frontend Resource overlay: `mergePluginResourceContributions` copies the catalog
+and calls `next.set(merged.id, merged)`, so a plugin entry with a colliding id
+replaces the frontend entry. `PluginRegistry` forwards `resourceContributions`
+without a `core.*` namespace rejection at this seam. Provenance is attached,
+but it does not prevent the collision. This observation is about the frontend
+catalog; it does not establish that a plugin replaces a backend Resource owner.
+Evidence: `modules/ui-web/src/api/registry/ResourceCatalogClient.ts`
+(`mergePluginResourceContributions`) and
+`modules/ui-web/src/shell-v0/plugin-api/PluginRegistry.ts` (`resourceContributions`
+handler). Enforcing the namespace invariant requires a separate code change;
+this amendment does not authorize overriding core truth.

@@ -235,6 +235,7 @@ final class DeclaredSurvivalHttpAdmissionTest {
     HttpResponse<String> get(String path) throws Exception {
       return client.send(HttpRequest.newBuilder(uri(path))
           .timeout(Duration.ofSeconds(5))
+          .header(LocalApiServer.SESSION_TOKEN_HEADER, TOKEN)
           .header("Origin", "tauri://localhost")
           .header("X-JustSearch-Client-Id", "survival-http")
           .header("X-JustSearch-Session-Id", "session-1")

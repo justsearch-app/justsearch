@@ -8,8 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.javalin.Javalin;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.app.inference.chat.ChatActuationRouter;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
 import io.justsearch.app.services.bootstrap.BootstrapInferenceFactory;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -20,6 +23,7 @@ import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.telemetry.Telemetry;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -37,7 +41,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,8 +56,6 @@ import org.slf4j.LoggerFactory;
  * is a separate process ({@link StreamingFakeLlamaServer}).
  */
 final class ProxyStreamAcrossReconfigureTest {
-
-  private static final Duration HELD = Duration.ofSeconds(5);
 
   @TempDir Path directory;
 
@@ -101,6 +103,19 @@ final class ProxyStreamAcrossReconfigureTest {
   @Test
   @Timeout(120)
   void aReconfigureDuringAProxiedStreamCompletesTheReplyThenRelaunches() throws Exception {
+    Field router = InferenceLifecycleManager.class.getDeclaredField("actuationRouter");
+    router.setAccessible(true);
+    Object controller = router.get(manager);
+    Field drainBound = controller.getClass().getDeclaredField("drainBound");
+    drainBound.setAccessible(true);
+    assertEquals(Duration.ofSeconds(30), ChatActuationRouter.DRAIN_BOUND,
+        "the chat drain policy allows thirty seconds");
+    Duration configuredBound = (Duration) drainBound.get(controller);
+    assertEquals(ChatActuationRouter.DRAIN_BOUND, configuredBound,
+        "the controller built by production wiring uses the policy's drain limit");
+    assertEquals(configuredBound,
+        ChatDrainPolicy.forReason(StopReason.RECONFIGURE, configuredBound).bound(),
+        "the reconfiguration policy retains the configured drain limit");
     manager.switchToOnlineMode();
     assertEquals(List.of("model.gguf"), launchedModels(), "chat starts once");
     String first = launches().get(0);
@@ -110,7 +125,7 @@ final class ProxyStreamAcrossReconfigureTest {
       config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
     });
     // The live server's port, as LocalApiServer resolves it: launches bind a fresh loopback port.
-    OpenAiCompatController proxy = proxy(executors, manager::servingPort, manager);
+    OpenAiCompatController proxy = proxy(executors, manager::servingEndpoint, manager);
     app.post("/v1/chat/completions", proxy::handleChatCompletions);
     app.start("127.0.0.1", 0);
 
@@ -128,17 +143,36 @@ final class ProxyStreamAcrossReconfigureTest {
               + new String(body.readAllBytes(), StandardCharsets.UTF_8));
         }
         readAtLeast(body, 32_768);
+        assertEquals(1, manager.generationActivity().inFlight(),
+            "the real proxied stream owns its generation lease");
 
         InferenceConfig target = withModel("b.gguf");
         CompletableFuture<Throwable> reconfigure = background(() -> manager.applyConfig(
             target, InferenceLifecycleManager.RestartPolicy.RESTART_IF_ONLINE));
 
-        long until = System.nanoTime() + HELD.toNanos();
-        while (System.nanoTime() < until) {
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        boolean draining = false;
+        while (!reconfigure.isDone() && System.nanoTime() < until) {
+          try {
+            var probe = manager.admitExchange(
+                io.justsearch.app.inference.chat.GenerationTracker.Kind.AUX, null);
+            probe.close();
+            Thread.sleep(5);
+          } catch (IllegalStateException closedAdmission) {
+            draining = true;
+            break;
+          }
+        }
+        assertTrue(draining, "reconfiguration entered its drain and closed admission");
+        long observationEnd = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (true) {
+          assertEquals(1, manager.generationActivity().inFlight(),
+              "the drain is held by the proxied stream's generation lease");
           assertEquals(List.of("model.gguf"), launchedModels(),
               "no relaunch while the proxied reply is open");
           assertFalse(reconfigure.isDone(), "the reconfigure waits for the proxied reply");
-          Thread.sleep(50);
+          if (System.nanoTime() >= observationEnd) break;
+          Thread.sleep(5);
         }
 
         StreamingFakeLlamaServer.release(home);
@@ -171,7 +205,7 @@ final class ProxyStreamAcrossReconfigureTest {
    * proxy then.
    */
   private static OpenAiCompatController proxy(
-      EngineExecutorRegistry executors, IntSupplier port, InferenceLifecycleManager manager)
+      EngineExecutorRegistry executors, Supplier<io.justsearch.app.inference.LlamaServerEndpoint> port, InferenceLifecycleManager manager)
       throws Exception {
     Class<?> admissionType;
     try {
@@ -199,7 +233,7 @@ final class ProxyStreamAcrossReconfigureTest {
           }
         });
     return (OpenAiCompatController) OpenAiCompatController.class
-        .getConstructor(EngineExecutorRegistry.class, IntSupplier.class, Telemetry.class,
+        .getConstructor(EngineExecutorRegistry.class, Supplier.class, Telemetry.class,
             admissionType)
         .newInstance(executors, port, null, admission);
   }

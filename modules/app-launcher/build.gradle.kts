@@ -166,7 +166,11 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
       })
 }
 
-tasks.named<Test>("test") {
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  // UnreferencedCodeTest imports every production class and indexes all their call sites; with
+  // the other whole-program ArchUnit tests in the same worker that outgrew the convention's 384m
+  // (OutOfMemoryError on main after #910). modules/dead-code-audit runs the same kind of import.
+  maxHeapSize = "768m"
   inputs.file(rootProject.file("governance/store-recoverability.v1.json"))
     .withPropertyName("cliDataVersionStoreRegister").withPathSensitivity(PathSensitivity.RELATIVE)
 

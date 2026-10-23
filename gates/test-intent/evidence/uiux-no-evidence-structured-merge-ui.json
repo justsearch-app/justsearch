@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T06:36:29.511Z",
+  "revision": "61829cb9d29b52ec818f12fc7a64b037825970fd",
+  "tree": "283e38e6bb73f36060833987b0ea0cd16cb6f3f5",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/tmp/no-evidence-merge/test-intent-vitest-3686650-1792737384605.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1878
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d58776bdb85365f67232a700183d73242c075aef5e9b35525a30de595d0c15f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps schema third and model choice fourth, with distinct request and live turn identities",
+          "status": "passed"
+        },
+        {
+          "name": "never classifies a live Structured NO_CONTENT as no-evidence or offers the model action",
+          "status": "passed"
+        },
+        {
+          "name": "cold retry keeps the model turn a persistent model answer",
+          "status": "passed"
+        },
+        {
+          "name": "cold edit keeps the model turn a persistent model answer",
+          "status": "passed"
+        },
+        {
+          "name": "cold retry keeps Structured, awaiting schema review without sending a model answer",
+          "status": "passed"
+        },
+        {
+          "name": "cold edit keeps Structured, awaiting schema review without sending a model answer",
+          "status": "passed"
+        },
+        {
+          "name": "remembered Structured Retry reuses its schema without becoming a model answer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0adcae4f4",
+    "revision": "0adcae4f411595d7476fd790f586444d21c6e6d2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/tmp/no-evidence-merge/test-intent-vitest-3686650-1792737387525.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1818,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/tmp/no-evidence-merge/test-intent-vitest-3686650-1792737387525.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+        "classification": "assertion",
+        "detail": "keeps schema third and model choice fourth, with distinct request and live turn identities:  AssertionError: expected { shapeId: 'core.free-chat', …(4) } to match object { shapeId: 'core.extract', …(2) }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/modules/ui-web/node_modules/@vitest/expect/dist/in | cold retry keeps Structured, awaiting schema review without sending a model answer:  AssertionError: exp"
+      }
+    ]
+  },
+  "digest": "sha256:6a67a2149615ea31d3c29abc1a4a22176db98f0951e8c84195f43bd8103f9b31"
+}

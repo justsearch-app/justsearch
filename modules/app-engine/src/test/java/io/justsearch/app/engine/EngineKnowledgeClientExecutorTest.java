@@ -479,14 +479,19 @@ final class EngineKnowledgeClientExecutorTest {
     var release = new CountDownLatch(1);
     var worker = new AtomicReference<Thread>();
     var independentInterrupt = new java.util.concurrent.atomic.AtomicBoolean();
+    var interruptObserved = new CountDownLatch(1);
     var interruptAtViewRelease = new java.util.concurrent.atomic.AtomicBoolean();
+    var viewReleased = new CountDownLatch(1);
     var search = mock(WorkerSearchService.class);
     when(search.search(any(), any())).thenAnswer(invocation -> {
       worker.set(Thread.currentThread());
       entered.countDown();
       while (release.getCount() != 0) {
         try { release.await(); }
-        catch (InterruptedException expected) { independentInterrupt.set(true); }
+        catch (InterruptedException expected) {
+          independentInterrupt.set(true);
+          interruptObserved.countDown();
+        }
       }
       if (independentInterrupt.get()) Thread.currentThread().interrupt();
       return SearchResponse.getDefaultInstance();
@@ -497,6 +502,7 @@ final class EngineKnowledgeClientExecutorTest {
     when(lease.services()).thenReturn(services);
     org.mockito.Mockito.doAnswer(invocation -> {
       interruptAtViewRelease.set(Thread.currentThread().isInterrupted());
+      viewReleased.countDown();
       return null;
     }).when(lease).close();
     var admission = new EngineAdmissionController(8, 8, 1);
@@ -514,7 +520,10 @@ final class EngineKnowledgeClientExecutorTest {
       assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
           ((io.justsearch.app.api.knowledge.KnowledgeClientException) timeout.getCause()).status());
       worker.get().interrupt();
+      assertTrue(interruptObserved.await(2, TimeUnit.SECONDS),
+          "the independent interrupt is observed before releasing the worker");
       release.countDown();
+      assertTrue(viewReleased.await(2, TimeUnit.SECONDS), "the serving view close completed");
       org.mockito.Mockito.verify(lease, org.mockito.Mockito.timeout(2_000)).close();
       assertTrue(independentInterrupt.get(), "the worker must receive the independent interrupt");
       assertTrue(interruptAtViewRelease.get(),

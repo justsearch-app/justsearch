@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.indexerworker.queue.QueueScaleV24MigrationEvidenceTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-21T09:09:02.608Z" hostname="elias-systemproductname" time="34.216">
+  <properties/>
+  <testcase name="v13AndMainV23MigrateToV24WithCrashReopenAndOlderBinaryRefusal()" classname="io.justsearch.indexerworker.queue.QueueScaleV24MigrationEvidenceTest" time="34.206"/>
+  <system-out><![CDATA[Generated F1 v13 rows=1000000 in 4.186s: /home/elias/dev/justsearch/.claude/worktrees/queue-scale/modules/indexer-worker/build/queue-scale-intent/Q12-v13-main-v23-to-v24.db
+11:09:15.990 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Migrating database from version 13 to 24
+11:09:15.994 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V13 to V14: Ensured durable ingestion attribution
+11:09:15.994 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 14
+11:09:15.994 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V14 to V15: Ensured durable content hash for operation unit recovery
+11:09:15.994 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 15
+11:09:15.994 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V15 to V16: Identified durable switch-buffer replacements
+11:09:15.994 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 16
+11:09:17.657 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V16 to V17: Identified durable queue admissions
+11:09:17.658 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 17
+11:09:17.944 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V17 to V18: Recorded finite-walk coverage and terminal receipts
+11:09:17.944 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 18
+11:09:17.945 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V18 to V19: Captured source plans and immutable sealed members
+11:09:17.946 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 19
+11:09:17.946 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V19 to V20: Persisted exact switch-buffer admission order
+11:09:17.946 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 20
+11:09:17.947 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V20 to V21: Scoped switch-buffer rows to candidate generations
+11:09:17.947 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 21
+11:09:17.947 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V21 to V22: Persisted root-relative ingestion policy boundaries
+11:09:17.947 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 22
+11:09:17.948 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 23
+11:09:18.557 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V23 to V24: Added transactional job counts and claim/readiness indexes
+11:09:18.557 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 24
+11:09:18.697 [Test worker] WARN  i.j.i.queue.SqliteQueueMigrationOps - Repairing job count drift at open: kept={}, actual={DONE=Counts[n=200000, bytes=2472725727265, unknown=18182], RETRY_EXHAUSTED=Counts[n=98984, bytes=1454035395858, unknown=8999], FAILED=Counts[n=1000, bytes=13915428812, unknown=91], PROCESSING=Counts[n=16, bytes=229757142, unknown=1], PENDING=Counts[n=700000, bytes=3786367963658, unknown=63636]}
+11:09:18.761 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Database migration completed successfully (now at version 24)
+Q12 v13 -> V24 1M-row migration=2.772s; crash exit=74, rollback version=13
+11:09:21.479 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Migrating database from version 24 to 24
+11:09:21.646 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Database migration completed successfully (now at version 24)
+Q12 v13 status/counts/bytes/saved fields and ordered 16 claims exact
+11:09:21.939 [Test worker] INFO  i.j.i.queue.SqliteJobQueue - SqliteJobQueue closed
+11:09:21.939 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Migrating database from version 24 to 24
+11:09:22.095 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Database migration completed successfully (now at version 24)
+Q12 v13 -> V24 idempotent reopen=0.300s; counts and admission fence exact
+11:09:22.239 [Test worker] INFO  i.j.i.queue.SqliteJobQueue - SqliteJobQueue closed
+11:09:30.449 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Migrating database from version 23 to 24
+11:09:31.050 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - V23 to V24: Added transactional job counts and claim/readiness indexes
+11:09:31.050 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Applied migration to version 24
+11:09:31.187 [Test worker] WARN  i.j.i.queue.SqliteQueueMigrationOps - Repairing job count drift at open: kept={}, actual={DONE=Counts[n=200000, bytes=2472725727265, unknown=18182], RETRY_EXHAUSTED=Counts[n=98984, bytes=1454035395858, unknown=8999], FAILED=Counts[n=1000, bytes=13915428812, unknown=91], PROCESSING=Counts[n=32, bytes=229759267, unknown=2], PENDING=Counts[n=699984, bytes=3786367961533, unknown=63635]}
+11:09:31.216 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Database migration completed successfully (now at version 24)
+Q12 v23 -> V24 1M-row migration=0.767s; crash exit=74, rollback version=23
+11:09:34.587 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Migrating database from version 24 to 24
+11:09:34.749 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Database migration completed successfully (now at version 24)
+Q12 v23 status/counts/bytes/saved fields and ordered 16 claims exact
+11:09:35.057 [Test worker] INFO  i.j.i.queue.SqliteJobQueue - SqliteJobQueue closed
+11:09:35.057 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Migrating database from version 24 to 24
+11:09:35.223 [Test worker] INFO  i.j.i.queue.SqliteQueueMigrationOps - Database migration completed successfully (now at version 24)
+Q12 v23 -> V24 idempotent reopen=0.322s; counts and admission fence exact
+11:09:35.379 [Test worker] INFO  i.j.i.queue.SqliteJobQueue - SqliteJobQueue closed
+Q13 WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.sqlite.SQLiteJDBCLoader in an unnamed module (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.xerial/sqlite-jdbc/3.51.2.0/35bc8faa2deb1b3fe535a5a75d6d61d54133e357/sqlite-jdbc-3.51.2.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Unsupported jobs database schema version 24 (this binary supports through 23)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

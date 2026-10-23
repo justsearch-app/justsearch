@@ -114,7 +114,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     '--clean', 'none', '--data-dir', path.join(tree, 'tmp/lane-f-e', '${invocation}', label),
     '--api-port', '33221', '--session-id', '${session}', '--lease-duration-sec', '3600',
     '--chat-profile', 'standard'], tree, { mode: 'start',
-      requestsAfterReceipt: ['/api/mcp/token', '/api/health', '/api/status', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
+      requestsAfterReceipt: ['/api/health', '/api/status', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
   const stop = label => cmd(`stop-${label}`, 'node', [runner, 'stop', '--json', '--run', '${runId}',
     '--session-id', '${session}'], tree, { mode: 'stop', acquisitionDependencies: [
       path.join(ROOT, 'scripts/dev/lib/stop-exit-census.cjs'), path.join(ROOT, 'scripts/dev/lib/stop-exit-census.ps1')] });
@@ -393,7 +393,7 @@ export function projectLoad(record, load, calls, values) {
   const valid = windowValidity(load);
   record.clauses['indexing-window-valid'] = valid;
   if (valid !== true) record.gaps['indexing-window-valid'] = valid === false
-    ? 'INVALID: indexing completed before the fixed load window ended'
+    ? 'INVALID: bulk indexing/enrichment was inactive during the fixed load window'
     : 'Missing, stale, discontinuous, or incomplete fixed-window samples';
   record.metrics.searchP95 = load.searchP95 ?? {};
   record.metrics.loadWindow = { startedAtMs: load.startedAtMs, endedAtMs: load.endedAtMs,

@@ -20,6 +20,8 @@ public final class EnterprisePolicy {
   public int schemaVersion = 0;
   public String updatedAt;
 
+  public Boolean appUpdatesEnabled;
+
   public Boolean downloadsEnabled;
   public Boolean onlineAiEnabled;
   public Boolean gpuAccelerationEnabled;

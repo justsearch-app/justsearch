@@ -852,6 +852,12 @@ export const unifiedChatBodyStyles = css`
       font-size: var(--font-size-xs);
       color: var(--text-secondary);
     }
+    /* The reader's own Stop, said on the turn it ended. */
+    .turn-stopped {
+      margin-top: 0.4rem;
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+    }
     .grounding-dot {
       width: 0.5rem;
       height: 0.5rem;

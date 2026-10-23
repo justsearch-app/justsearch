@@ -1,0 +1,387 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T08:24:48.611Z",
+  "revision": "dcdae998335cbf49cfe447d14ae486a4b75e6160",
+  "tree": "433824a10ce92e825c5130c54164eaf54898d491",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/indexingProgress.pause.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-607191-1792743879950.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3859
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.2 follows PAUSING then PAUSED, withholding progress estimates throughout",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d8c5341728c94c407a6980e977e3304e5492ae46690ef99fbcbcd04c0ba57c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 status-owned pause projection S37.2 follows PAUSING then PAUSED, withholding progress estimates throughout",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.3 names the manual deadline and recovery reason, with neutral wording for unknown reasons",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d8c5341728c94c407a6980e977e3304e5492ae46690ef99fbcbcd04c0ba57c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 status-owned pause projection S37.3 names the manual deadline and recovery reason, with neutral wording for unknown reasons",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.6 keeps an empty paused queue visible instead of Ready",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d8c5341728c94c407a6980e977e3304e5492ae46690ef99fbcbcd04c0ba57c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 status-owned pause projection S37.6 keeps an empty paused queue visible instead of Ready",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.5 takes resume from status, never from a reason or stable counts alone",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d8c5341728c94c407a6980e977e3304e5492ae46690ef99fbcbcd04c0ba57c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 status-owned pause projection S37.5 takes resume from status, never from a reason or stable counts alone",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 invokes Pause with the chosen deadline through the existing approval path without optimistic paused state",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 invokes Pause with the chosen deadline through the existing approval path without optimistic paused state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 the progress view pauses indefinitely and a sibling surface resumes from the same observation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 the progress view pauses indefinitely and a sibling surface resumes from the same observation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 reports uncertain invocation failures without claiming paused",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 reports uncertain invocation failures without claiming paused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.4 waiting folder work names Resume and retains failure and searchability evidence",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.4 waiting folder work names Resume and retains failure and searchability evidence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.4 paused unverified folders retain their verification caveat and recovery state",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.4 paused unverified folders retain their verification caveat and recovery state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.7 the status announcer changes once per pause/resume edge, staying silent on repeated polls",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.7 the status announcer changes once per pause/resume edge, staying silent on repeated polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.8 Search v3 offers Resume alongside paused waiting-file context for Search and Ask",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.8 Search v3 offers Resume alongside paused waiting-file context for Search and Ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 the indexing overlay exposes the same Pause and Resume control",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 the indexing overlay exposes the same Pause and Resume control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-task-list exposes Resume even with nothing queued",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-task-list exposes Resume even with nothing queued",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-status-deck exposes Resume even with nothing queued",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-status-deck exposes Resume even with nothing queued",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-health-surface exposes Resume even with nothing queued",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-health-surface exposes Resume even with nothing queued",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-library-surface exposes Resume even with nothing queued",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-library-surface exposes Resume even with nothing queued",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-settings-surface exposes Resume even with nothing queued",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-settings-surface exposes Resume even with nothing queued",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b62fc5921",
+    "revision": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/indexingProgress.pause.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-607191-1792743885014.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3420,
+        "output": "JSON report written to /home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-607191-1792743885014.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.2 follows PAUSING then PAUSED, withholding progress estimates throughout",
+        "classification": "assertion",
+        "detail": "WP3.7 status-owned pause projection S37.2 follows PAUSING then PAUSED, withholding progress estimates throughout:  AssertionError: expected 'indexing' to be 'pausing' // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts:19:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.3 names the manual deadline and recovery reason, with neutral wording for unknown reasons",
+        "classification": "assertion",
+        "detail": "WP3.7 status-owned pause projection S37.3 names the manual deadline and recovery reason, with neutral wording for unknown reasons:  AssertionError: expected { activity: { …(4) }, …(17) } to match object { pause: { …(2) } }\n(25 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.6 keeps an empty paused queue visible instead of Ready",
+        "classification": "assertion",
+        "detail": "WP3.7 status-owned pause projection S37.6 keeps an empty paused queue visible instead of Ready:  AssertionError: expected 'ready' to be 'paused' // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts:48:21\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web/nod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#S37.5 takes resume from status, never from a reason or stable counts alone",
+        "classification": "assertion",
+        "detail": "WP3.7 status-owned pause projection S37.5 takes resume from status, never from a reason or stable counts alone:  AssertionError: expected 'indexing' to be 'paused' // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts:55:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 invokes Pause with the chosen deadline through the existing approval path without optimistic paused state",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 invokes Pause with the chosen deadline through the existing approval path without optimistic paused state:  AssertionError: surface exposes indexing controls: expected null not to be null\n    at controls (/home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:49:60)\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 the progress view pauses indefinitely and a sibling surface resumes from the same observation",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 the progress view pauses indefinitely and a sibling surface resumes from the same observation:  AssertionError: surface exposes indexing controls: expected null not to be null\n    at controls (/home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:49:60)\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 reports uncertain invocation failures without claiming paused",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 reports uncertain invocation failures without claiming paused:  AssertionError: surface exposes indexing controls: expected null not to be null\n    at controls (/home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:49:60)\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.4 waiting folder work names Resume and retains failure and searchability evidence",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.4 waiting folder work names Resume and retains failure and searchability evidence:  AssertionError: expected 'default · Indexing · 3 remaining' to contain 'Waiting for Resume'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:166:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.4 paused unverified folders retain their verification caveat and recovery state",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.4 paused unverified folders retain their verification caveat and recovery state:  AssertionError: expected 'indexing' to be 'unverified' // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:180:21\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.7 the status announcer changes once per pause/resume edge, staying silent on repeated polls",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.7 the status announcer changes once per pause/resume edge, staying silent on repeated polls:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.8 Search v3 offers Resume alongside paused waiting-file context for Search and Ask",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.8 Search v3 offers Resume alongside paused waiting-file context for Search and Ask:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' to contain 'Indexing paused'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:262:40\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 the indexing overlay exposes the same Pause and Resume control",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 the indexing overlay exposes the same Pause and Resume control:  AssertionError: surface exposes indexing controls: expected null not to be null\n    at controls (/home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:49:60)\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-task-list exposes Resume even with nothing queued",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-task-list exposes Resume even with nothing queued:  AssertionError: expected '\\n      \\n        \\n          Tasks\\n…' to contain 'Indexing paused'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:78:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-status-deck exposes Resume even with nothing queued",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-status-deck exposes Resume even with nothing queued:  AssertionError: expected '\\n      Ready — fully searchable\\n   …' to contain 'Indexing paused'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:78:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-health-surface exposes Resume even with nothing queued",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-health-surface exposes Resume even with nothing queued:  AssertionError: expected '\\n      \\n      \\n        \\n         …' to contain 'Indexing paused'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:78:42\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at li"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-library-surface exposes Resume even with nothing queued",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-library-surface exposes Resume even with nothing queued:  AssertionError: expected '\\n      \\n        \\n      \\n      \\n …' to contain 'Indexing paused'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:78:42\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at li"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.1 S37.5 S37.6 jf-settings-surface exposes Resume even with nothing queued",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces S37.1 S37.5 S37.6 jf-settings-surface exposes Resume even with nothing queued:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Indexing paused'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-DkR528/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:78:42\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at li"
+      }
+    ]
+  },
+  "digest": "sha256:57a370bd34a97fbe6964b5dbae61f9e09f1d77d28de3abd54e7ba4ce61d65bef"
+}

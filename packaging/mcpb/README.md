@@ -26,7 +26,8 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    for that answer; a lookup that times out or fails is named in the not-found error). The bridge never
    looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
    installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
-   `<checkout>/modules/ui-web/.dev-data`) or `JUSTSEARCH_API_PORT` to use the dev Engine.
+   `<checkout>/modules/ui-web/.dev-data`) to use the dev Engine (a `JUSTSEARCH_API_PORT` pin
+   alone is refused unless a manifest the bridge reads names that port; see 3.).
    (The production stdio server, `scripts/prod/justsearch-mcp.mjs`, tries more: `--port`,
    `JUSTSEARCH_API_PORT`, the legacy `JUSTSEARCH_HOME` folder, which wins over
    `JUSTSEARCH_DATA_DIR`, then `JUSTSEARCH_DATA_DIR`, the desktop app's folder, a dev
@@ -36,23 +37,21 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    follows the `discovery.desktopAppDataDir` entry of `contracts/platform-paths/spec.v1.json`.
 2. If no running JustSearch is found, it exits with an actionable message that
    names every location it tried (install + launch the desktop app).
-3. It also fetches the desktop session token (`GET /api/mcp/token`) and sends
-   it as `X-JustSearch-Session` on every POST, so the bridge keeps working if
-   the packaged app enforces the token on non-GET requests
-   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Every request to the Engine
-   (probes, token, each message's POST, the GET stream) goes through one function
+3. After proving the Engine, it takes `head.sessionToken` from that validated owner-only
+   runtime manifest and sends `X-JustSearch-Session` on requests, including the GET stream.
+   Discovery probes remain unauthenticated. Every request to the Engine
+   (public probes, each message's POST, the GET stream) goes through one function
    (`engineRequest` in `server/engine-discovery.cjs`) whose keep-alive connections carry
    nothing until the manifest still names the same Engine and the OS reports that pid as the
    owner of the server end of that very connection; a reused connection needs no new proof.
    If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
-   token never reaches whatever took the port. A `JUSTSEARCH_API_PORT` pin that a runtime
-   manifest names is that manifest's Engine, with the same proof (if that proof fails, the pin is
-   refused). A stale manifest (its pid is gone) that names the pinned port is a refusal, and so
-   is a pin accepted through a manifest that is later deleted or corrupted. A pin that no
-   manifest names is trusted with request content from whatever answers
-   it, but never with a session token fetched on another connection: each new connection fetches
-   `GET /api/mcp/token` on itself first (within 2 s, or the connection is refused), and a request
-   carries only that connection's token; when the Engine there offers none, nothing is sent.
+   token never reaches whatever took the port. A `JUSTSEARCH_API_PORT` pin requires
+   `JUSTSEARCH_SESSION_TOKEN` (the bridge fails with a message naming the variable if it is
+   absent), and that token goes only to the Engine of a runtime manifest that names the pinned
+   port, with the same proof; if that proof fails, the pin is refused. A stale manifest (its pid
+   is gone) that names the pinned port is a refusal, and so is a pin that no manifest names:
+   nothing proves what answers it, so it never gets the token. No token HTTP endpoint or stdout
+   line is used.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
@@ -65,7 +64,7 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    arrives from the old session changes nothing). Until a session's own `initialize` has been
    answered (bounded at 10 s), no other message is sent in it: calls wait for it, or for the
    session that replaces it, and a call before any `initialize` is refused unsent. The failed call is sent again once only if it surely did not reach the
-   app (it never had a connection, or the app answered 400/404 for its session);
+   app (it never had a connection, or the app answered 400/401/404 for it);
    otherwise it fails with an error saying its outcome is unknown, so a mutating
    call never runs twice. Idle connections are closed after 25 s, before the
    app's 30 s idle expiry. Closing stdin stops the bridge, also during discovery.
@@ -181,3 +180,6 @@ curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.jus
 Note the registry is in preview (breaking changes / data resets possible).
 MCP clients validate `fileSha256` before installing — a wrong hash breaks
 installs even though the registry itself does not check it.
+
+MCPB 0.3.1 works with the previous Engine release and the new file-based credential boundary.
+Older bundles fail with HTTP 401 against the new Engine; install the updated bundle.

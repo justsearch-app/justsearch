@@ -1,0 +1,28 @@
+18:41:44.722 [main] INFO com.tngtech.archunit.ArchConfiguration -- Reading ArchUnit properties from file:/home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/modules/app-services/build/resources/test/archunit.properties
+password publication step 1: start-to-pause=5377 ms
+password publication step 2: start-to-pause=5219 ms
+18:41:56.334 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-8227722193551063740/encryption/keystore.replica.json
+password publication step 3: start-to-pause=5220 ms
+18:42:02.264 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-8227722193551063740/encryption/keystore.replica.json
+password publication step 4: start-to-pause=5290 ms
+recovery publication step 1: start-to-pause=5127 ms
+recovery publication step 2: start-to-pause=5132 ms
+18:42:19.458 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-8227722193551063740/encryption/keystore.replica.json
+recovery publication step 3: start-to-pause=5281 ms
+18:42:24.990 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-8227722193551063740/encryption/keystore.replica.json
+recovery publication step 4: start-to-pause=5352 ms
+
+Test run finished after 46003 ms
+[         3 containers found      ]
+[         0 containers skipped    ]
+[         3 containers started    ]
+[         0 containers aborted    ]
+[         3 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         1 tests successful      ]
+[         0 tests failed          ]
+

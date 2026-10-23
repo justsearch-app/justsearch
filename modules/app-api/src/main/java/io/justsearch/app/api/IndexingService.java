@@ -145,6 +145,17 @@ public interface IndexingService {
   }
 
   /**
+   * Outcome-carrying prefix deletion for maintenance that must distinguish success from unknown.
+   * A confirmed result means the Worker completed the request, including when no jobs existed.
+   * Implementations with only the legacy best-effort method cannot confirm an outcome.
+   */
+  default PrefixDeletionOutcome deleteDocsByPathPrefixWithOutcome(Path pathPrefix, EngineContext engineContext) {
+    return new PrefixDeletionOutcome(false, 0, "Prefix deletion outcome unavailable");
+  }
+
+  record PrefixDeletionOutcome(boolean confirmed, int deletedJobs, String error) {}
+
+  /**
    * Deletes a single document by exact doc_id (normalized absolute path string).
    *
    * <p>Implementations must delegate deletion to the Worker/index layer (do not touch Lucene/queue DB directly).
@@ -155,6 +166,13 @@ public interface IndexingService {
   default boolean deleteDocById(String docId, EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
+
+  /** Completion-aware deletion; legacy acceptance alone cannot confirm that a request was applied. */
+  default DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
+    return new DeletionOutcome(false, "File deletion outcome unavailable");
+  }
+
+  record DeletionOutcome(boolean confirmed, String error) {}
 
   /**
    * Tempdoc 811 (C-2a) — deletes every document carrying the given collection tag. This is the

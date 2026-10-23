@@ -59,6 +59,10 @@ cloning. For linked worktrees with worktree configuration enabled, use
 The commit hook checks effective author and committer; the push hook also checks
 co-author trailers in outgoing commits. It excludes history already advertised
 by the destination remote and preserves the Git LFS ref-update input.
+For any non-deletion push to a branch other than `main`, the pre-push hook also runs CI's
+test-intent and store-recoverability checks before Git LFS, refusing the push if either fails.
+For deliberate evidence pushes of unaccepted drafts, `JUSTSEARCH_SKIP_PUSH_GATES=1` skips
+only those two checks and prints a notice; identity privacy and Git LFS still run.
 CI checks the introduced commit range; local preflight checks `origin/main..HEAD`.
 Keep the policy's names and approved no-reply identity current when the
 maintainer identity changes. A name-based policy is accidental-disclosure

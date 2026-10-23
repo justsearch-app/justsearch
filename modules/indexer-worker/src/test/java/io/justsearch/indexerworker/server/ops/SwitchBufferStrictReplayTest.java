@@ -24,6 +24,7 @@ import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.indexerworker.server.VouchingRootAuthority;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
@@ -68,7 +69,7 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void exactVersionRemovalMustSucceedToCertifyReplay() {
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(
-        new SwitchBufferCapableQueue.SwitchBufferOp("path:x", "DELETE", "x", 1, "v1")));
+        new SwitchBufferCapableQueue.SwitchBufferOp("path:x", "DELETE", explicitDelete("x"), 1, "v1")));
     when(runtime.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
     when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(context()));
@@ -86,7 +87,7 @@ final class SwitchBufferStrictReplayTest {
 
   @Test
   void promotionReplayRetainsExactVersionsUntilAfterPointerCommit() {
-    var version = new SwitchBufferCapableQueue.SwitchBufferOp("path:x", "DELETE", "x", 1, "v1");
+    var version = new SwitchBufferCapableQueue.SwitchBufferOp("path:x", "DELETE", explicitDelete("x"), 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
     when(runtime.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
     when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
@@ -101,7 +102,7 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void bestEffortCandidateReplayRetainsOrderingWitnessUntilPromotion() {
     var version = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:removed", "DELETE", "removed", 1, "v1");
+        "green", "path:removed", "DELETE", explicitDelete("removed"), 1, "v1");
     when(queue.listSwitchBufferOps()).thenReturn(List.of(version));
     when(runtime.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
     when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
@@ -115,7 +116,7 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void bestEffortBootDrainClearsLegacyRowsAndLeavesCommittedGenerationReceiptsUntouched() {
     var legacy = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "path:legacy", "DELETE", "legacy", 1, "v1");
+        "path:legacy", "DELETE", explicitDelete("legacy"), 1, "v1");
     var committed = new SwitchBufferCapableQueue.SwitchBufferOp(
         "green", "prefix:committed", "DELETE_PREFIX", "committed", 2, "v2");
     when(queue.listSwitchBufferOps()).thenReturn(List.of(legacy, committed));
@@ -350,7 +351,7 @@ final class SwitchBufferStrictReplayTest {
   void approvedFileDeleteSkipsOnlyItsExactFailedJournalRevision() {
     String file = tempDir.resolve("undeleted.txt").toAbsolutePath().toString();
     var failed = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:" + file, "DELETE", file, 1, "v1");
+        "green", "path:" + file, "DELETE", explicitDelete(file), 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(failed));
     var indexing = mock(IndexingCoordinator.class);
     org.mockito.Mockito.doThrow(new IllegalStateException("delete unavailable"))
@@ -363,7 +364,7 @@ final class SwitchBufferStrictReplayTest {
         approvedContext(Set.of(failed))).orElseThrow().versions());
     verify(indexing, org.mockito.Mockito.times(1)).deleteByIdAndChunks(file);
     var replaced = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:" + file, "DELETE", file, 2, "v2");
+        "green", "path:" + file, "DELETE", explicitDelete(file), 2, "v2");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(replaced));
     assertFalse(KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
         approvedContext(Set.of(failed))).isPresent());
@@ -372,9 +373,9 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void candidateReplayLeavesAnotherGenerationUntouched() {
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:green", "DELETE", "green", 1, "v1");
+        "green", "path:green", "DELETE", explicitDelete("green"), 1, "v1");
     var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "abandoned", "path:other", "DELETE", "other", 2, "v2");
+        "abandoned", "path:other", "DELETE", explicitDelete("other"), 2, "v2");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign));
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
     var indexing = mock(IndexingCoordinator.class);
@@ -390,11 +391,11 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void refusalReconcilesOnlyAcceptedCandidateRowsOnSurvivingSource() {
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:removed", "DELETE", "removed", 3, "v3");
+        "green", "path:removed", "DELETE", explicitDelete("removed"), 3, "v3");
     var historical = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "path:historical", "DELETE", "historical", 4, "v4");
+        "path:historical", "DELETE", explicitDelete("historical"), 4, "v4");
     var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "other", "path:other", "DELETE", "other", 5, "v5");
+        "other", "path:other", "DELETE", explicitDelete("other"), 5, "v5");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, historical, foreign));
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
     var indexing = mock(IndexingCoordinator.class);
@@ -465,7 +466,7 @@ final class SwitchBufferStrictReplayTest {
         new SwitchBufferUpsert(file.toString(), null, null, "accepted-revision", hash).encode(),
         1, "v1");
     var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "other", "path:foreign", "DELETE", "foreign", 2, "v2");
+        "other", "path:foreign", "DELETE", explicitDelete("foreign"), 2, "v2");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign));
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
     when(queue.matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash, hash))
@@ -476,10 +477,10 @@ final class SwitchBufferStrictReplayTest {
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
 
     assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
-        scopedContext("green")));
+        scopedContext("green").withPublisher(VouchingRootAuthority.publisher())));
     verify(queue, never()).enqueueEntries(anyList(), isNull());
-    var order = inOrder(queue);
-    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash, hash);
+    var order = inOrder(fields, queue);
+    order.verify(fields).getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
     verify(queue, never()).removeReplayedSwitchBufferOps(List.of(foreign));
   }
@@ -487,8 +488,10 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2() throws Exception {
     String h1 = "a".repeat(64);
-    String h2 = "b".repeat(64);
-    String path = tempDir.resolve("captured-replay.txt").toAbsolutePath().toString();
+    // A refusal settles only on the file's current bytes: the captured H2 is what it holds.
+    Path captured = Files.writeString(tempDir.resolve("captured-replay.txt"), "captured H2");
+    String h2 = SourceContentHash.sha256(captured);
+    String path = captured.toAbsolutePath().toString();
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
         "green", "path:" + path, "UPSERT",
         new SwitchBufferUpsert(path, null, null, "captured-unit", h1).encode(), 1, "v1");
@@ -506,12 +509,13 @@ final class SwitchBufferStrictReplayTest {
     doAnswer(ignored -> { refreshed.set(true); return null; })
         .when(commits).maybeRefreshBlocking();
 
-    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(scopedContext("green")));
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+        scopedContext("green").withPublisher(VouchingRootAuthority.publisher())));
     var order = inOrder(commits, fields, queue);
     order.verify(commits).maybeRefreshBlocking();
     order.verify(fields).getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256);
-    order.verify(queue).matchesAcceptedFileProjection(path, "captured-unit", h1, h2);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+    verify(queue, never()).enqueueEntries(anyList(), any());
   }
 
   @Test
@@ -569,9 +573,9 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void committedNativePointerReplaysExactDeleteAndClearsOnlyItsReceipt() throws Exception {
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:deleted", "DELETE", "deleted", 1, "v1");
+        "green", "path:deleted", "DELETE", explicitDelete("deleted"), 1, "v1");
     var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "other", "path:foreign", "DELETE", "foreign", 2, "v2");
+        "other", "path:foreign", "DELETE", explicitDelete("foreign"), 2, "v2");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign), List.of(foreign));
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
     var indexing = mock(IndexingCoordinator.class);
@@ -594,7 +598,7 @@ final class SwitchBufferStrictReplayTest {
   void committedNativePointerPreflightsLaterUpsertBeforeAnyDelete() throws Exception {
     String path = tempDir.resolve("later.txt").toAbsolutePath().toString();
     var deletion = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:deleted", "DELETE", "deleted", 1, "v1");
+        "green", "path:deleted", "DELETE", explicitDelete("deleted"), 1, "v1");
     var pending = new SwitchBufferCapableQueue.SwitchBufferOp(
         "green", "path:" + path, "UPSERT",
         new SwitchBufferUpsert(path, null, null, "pending-revision", "b".repeat(64)).encode(),
@@ -803,17 +807,22 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void promotedBootCleansOnlyCommittedGenerationAndHistoricalCutoverEntries() {
     var legacy = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "path:legacy", "DELETE", "legacy", 1, "v1");
+        "path:legacy", "DELETE", explicitDelete("legacy"), 1, "v1");
     var promoted = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "green", "path:green", "DELETE", "green", 2, "v2");
+        "green", "path:green", "DELETE", explicitDelete("green"), 2, "v2");
     var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
-        "foreign", "path:foreign", "DELETE", "foreign", 3, "v3");
+        "foreign", "path:foreign", "DELETE", explicitDelete("foreign"), 3, "v3");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(
         List.of(legacy, promoted, foreign), List.of(foreign));
     when(queue.removeReplayedSwitchBufferOps(List.of(legacy, promoted))).thenReturn(2);
 
     assertTrue(KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(queue, "green"));
     verify(queue).removeReplayedSwitchBufferOps(List.of(legacy, promoted));
+  }
+
+  private static String explicitDelete(String path) {
+    return new io.justsearch.indexerworker.queue.SwitchBufferDelete(path,
+        io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode();
   }
 
   private KnowledgeServerMigrationOps.DrainSwitchBufferContext context() {

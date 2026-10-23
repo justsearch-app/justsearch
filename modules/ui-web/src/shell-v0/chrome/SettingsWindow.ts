@@ -35,6 +35,7 @@ import { icon } from '../components/Icon.js';
 import { present } from '../display/present.js';
 import { getSurface, mountSurface, onSurfaceCatalogChange } from '../../api/registry/SurfaceCatalogClient.js';
 import { ensureSurfaceLoaded, isLazySurface } from '../views/lazySurfaceRegistry.js';
+import type { SettingsSurface } from '../views/SettingsSurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 
 /** The one MODAL surface this window hosts (855 Phase 0). */
@@ -60,6 +61,7 @@ export class SettingsWindow extends JfElement {
   // the connected-before-first-open property member intents rely on (§11.2) is never given up —
   // idle mounting only shifts WHEN the (still boot-synchronous, non-open) mount happens.
   private shouldMount = false;
+  private recoveryFocusRequested = false;
   private idleHandle: number | null = null;
   private cancelIdle: (() => void) | null = null;
   // 855 §11.2 merge-blocker: set by `dismiss()` right before `open` flips false, consumed by the
@@ -184,14 +186,26 @@ export class SettingsWindow extends JfElement {
   }
 
   override updated(changed: Map<string, unknown>): void {
-    if (!changed.has('open')) return;
-    if (this.open) {
+    if (changed.has('open') && this.open) {
       this.modal.open();
-    } else {
+    } else if (changed.has('open')) {
       const skipFocusRestore = this.pendingCloseSkipsFocusRestore;
       this.pendingCloseSkipsFocusRestore = false;
       this.modal.close({ skipFocusRestore });
     }
+    if (this.open && this.recoveryFocusRequested && this.mounted) {
+      this.recoveryFocusRequested = false;
+      const surface = this.mounted as SettingsSurface;
+      void surface.updateComplete.then(() => {
+        if (this.open) void surface.focusSettingsRecovery();
+      });
+    }
+  }
+
+  /** Move focus to the existing recovery destination after the Settings window has rendered. */
+  focusSettingsRecovery(): void {
+    this.recoveryFocusRequested = true;
+    this.requestUpdate();
   }
 
   /**

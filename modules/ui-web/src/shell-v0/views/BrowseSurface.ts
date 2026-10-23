@@ -21,7 +21,8 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { subscribeAiState } from '../state/aiStateStore.js';
+import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { unavailableBecause } from '../state/availability.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
@@ -30,6 +31,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import { icon } from '../components/Icon.js';
 import { openContextMenu, type ContextMenuAction } from '../components/ContextMenu.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
+import { openLocalFile } from '../plugin-api/capabilities/platform.js';
 import { compose } from '../utils/compose.js';
 
 interface WatchedRoot {
@@ -83,6 +85,7 @@ export class BrowseSurface extends JfElement {
     refreshing: { state: true },
     error: { state: true },
     provisional: { state: true },
+    aiState: { state: true },
   };
 
   declare apiBase: string;
@@ -97,6 +100,7 @@ export class BrowseSurface extends JfElement {
   declare error: string | null;
   /** 595 §4.3 — backend mid-transition; an empty roots list is "unknown", not "none". */
   declare provisional: boolean;
+  declare aiState: AiState | null;
 
   private aiUnsub: (() => void) | null = null;
 
@@ -113,6 +117,7 @@ export class BrowseSurface extends JfElement {
     this.refreshing = false;
     this.error = null;
     this.provisional = false;
+    this.aiState = null;
   }
 
   static styles = [
@@ -254,6 +259,7 @@ export class BrowseSurface extends JfElement {
     // transition renders as "Rebuilding…", not "No watched folders".
     this.aiUnsub = subscribeAiState((s) => {
       this.provisional = s.stability.kind === 'provisional';
+      this.aiState = s;
     });
   }
 
@@ -357,7 +363,11 @@ export class BrowseSurface extends JfElement {
   }
 
   private async openFile(path: string): Promise<void> {
-    await this.host_.platform.openExternal(path);
+    try {
+      await openLocalFile(path);
+    } catch {
+      // The platform helper has shown the refusal and Show in folder action.
+    }
   }
 
   private matchesFilter(name: string): boolean {
@@ -470,7 +480,7 @@ export class BrowseSurface extends JfElement {
       });
     }
     else if (result === 'reveal') {
-      void this.host_.platform.revealInExplorer(file.path);
+      void this.host_.platform.revealInExplorer(file.path).catch(() => { /* Already reported. */ });
     }
   }
 
@@ -536,6 +546,12 @@ export class BrowseSurface extends JfElement {
       return html`<div class="empty-state">Loading watched roots…</div>`;
     }
     if (this.roots.length === 0) {
+      const s = this.aiState;
+      const activity = selectIndexingProgress(s?.status ?? null, s?.indexingStatusLive ?? false,
+        s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []).activity;
+      if (s && !activity.confirmed) {
+        return html`<div class="empty-state">${activity.summary}. Waiting for a fresh observation of watched folders.</div>`;
+      }
       // 595 §4.3 — a transient/unavailable backend is NOT "no folders configured".
       if (this.provisional) {
         return html`<div class="empty-state">

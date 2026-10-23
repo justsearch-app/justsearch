@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T12:46:31.576Z",
+  "revision": "f324a27cb4570a7db59f77baa403c8e7522e783c",
+  "tree": "4fdaa88292ee7999adfdea69875dacbc58ae338d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsEngineTest.EN2VerifiedDeletionStillRemovesParentAndChunks\" --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsEngineTest.EN2DeclaredNoFileProjectionKeepsEnrichmentEligibility\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4159
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EN2VerifiedDeletionStillRemovesParentAndChunks",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8e8eaf0cad080dd90db2ba69e9ebba196ab6865d44115a7f0d2e9aafcb1d92bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EN2VerifiedDeletionStillRemovesParentAndChunks()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EN2DeclaredNoFileProjectionKeepsEnrichmentEligibility",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8e8eaf0cad080dd90db2ba69e9ebba196ab6865d44115a7f0d2e9aafcb1d92bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EN2DeclaredNoFileProjectionKeepsEnrichmentEligibility()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fd156e2a5df2050dc21a4577429b31bd8d11afe967927d31da2631775c4d8c5e"
+}

@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.observability.ledger;
 
+import io.justsearch.app.api.operations.OperationKeys;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,12 +83,36 @@ public final class AgentRunLedgerProjector {
     Map<String, String> byCall = toolNamesBySession.get(sessionId);
     // Fall back to the callId if the name was not seen (degenerate; keeps the row non-empty).
     String toolName = byCall != null ? byCall.getOrDefault(callId, callId) : callId;
+    // These catalog wire names are transliterations of the canonical operation refs.
+    String operationRef = switch (toolName) {
+      case "core_bulk_reindex" -> "core.bulk-reindex";
+      case "core_rebuild_index" -> "core.rebuild-index";
+      case "core_activate_installed_models" -> "core.activate-installed-models";
+      default -> toolName;
+    };
     boolean success = Boolean.TRUE.equals(payload.get("success"));
     String executionId = payload.get("executionId") instanceof String s ? s : "";
     Instant at = parseTs(record.get("timestamp"));
+    Optional<String> key = switch (operationRef) {
+      case "core.bulk-reindex", "core.rebuild-index", "core.activate-installed-models" -> operationKey(payload);
+      default -> Optional.empty();
+    };
     registry.broadcastActionEvent(
         ActionLedgerProjection.projectAgentToolCompletion(
-            at, toolName, success, executionId, sessionId));
+            at, operationRef, success, executionId, sessionId, key));
+  }
+
+  private static Optional<String> operationKey(Map<String, Object> payload) {
+    if (payload.get("structuredData") instanceof Map<?, ?> data
+        && data.get("operationKey") instanceof String key) {
+      try {
+        OperationKeys.timestampMillis(key);
+        return Optional.of(key);
+      } catch (IllegalArgumentException malformed) {
+        // Legacy or unrecorded tool results retain their execution-based ledger identity.
+      }
+    }
+    return Optional.empty();
   }
 
   private static Instant parseTs(Object raw) {

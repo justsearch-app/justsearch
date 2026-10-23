@@ -1,0 +1,574 @@
+{
+  "ui-base": {
+    "task": ":modules:ui:test",
+    "wallMs": 482076,
+    "suiteMs": 482071,
+    "results": 2022,
+    "uniqueCases": 2022,
+    "failedAttempts": 0,
+    "skipped": 1,
+    "slowest": [
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusIsolationHttpTest",
+        "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+        "time": 1792555589387,
+        "durationMs": 20385,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusLifecycleHandlerManifestFallbackTest",
+        "name": "servedLifecycleAndManifestAgreeAfterSamplingForEveryInputCombination(Path)",
+        "time": 1792555617841,
+        "durationMs": 18478,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusIsolationHttpTest",
+        "name": "busyCadenceReachesHealthyComponentsBeforeTheirObservationsExpire()",
+        "time": 1792555568681,
+        "durationMs": 17295,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusStateFieldsTest",
+        "name": "idleCounterIgnoresMeasurementChanges()",
+        "time": 1792555732877,
+        "durationMs": 16687,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest",
+        "name": "aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline()",
+        "time": 1792555898077,
+        "durationMs": 12234,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusReadDeadlineHttpTest",
+        "name": "freshDeadlineDetachesOutstandingObservationWaiters()",
+        "time": 1792555703189,
+        "durationMs": 11654,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest",
+        "name": "anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit()",
+        "time": 1792555909148,
+        "durationMs": 11070,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.VerifierStatus3Test",
+        "name": "persistentHungWorkerDoesNotGrowProducerThreadsAndClearsAfterRelease()",
+        "time": 1792555822696,
+        "durationMs": 7691,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.LocalApiServerTransportShutdownTest",
+        "name": "selectorTeardownThatNeverReturnsCannotConsumeWholeGrace()",
+        "time": 1792555527549,
+        "durationMs": 7663,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusIsolationHttpTest",
+        "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+        "time": 1792555598020,
+        "durationMs": 7484,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.VerifierStatus2Test",
+        "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+        "time": 1792555779897,
+        "durationMs": 7481,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusPublicationCompletenessTest",
+        "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+        "time": 1792555690190,
+        "durationMs": 7463,
+        "result": "SUCCESS"
+      }
+    ]
+  },
+  "services-base-diagnostic": {
+    "task": ":modules:app-services:test",
+    "wallMs": 687927,
+    "suiteMs": 687921,
+    "results": 3990,
+    "uniqueCases": 3972,
+    "failedAttempts": 3,
+    "skipped": 11,
+    "slowest": [
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.api.runtime.child.GpuSwitchBarrierTest",
+        "name": "aSwitchStartWaitsForTheReleasePollEveryTime()",
+        "time": 1792556271698,
+        "durationMs": 100632,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.ai.install.DownloadLoopbackTest",
+        "name": "stalledRealTransferRetriesAfterProductionSpeedDeadline()",
+        "time": 1792556352277,
+        "durationMs": 62272,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+        "name": "idleChatControlAddsLessThanOnePercentOfACore()",
+        "time": 1792556170924,
+        "durationMs": 22126,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest",
+        "name": "halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress()",
+        "time": 1792556619753,
+        "durationMs": 21182,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduRecoveryTest",
+        "name": "failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand()",
+        "time": 1792556690171,
+        "durationMs": 17896,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest",
+        "name": "noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains()",
+        "time": 1792556409126,
+        "durationMs": 13751,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.chat.SelfTestProcessOwnershipTest",
+        "name": "selfTestDescendantSurvivalBlocksMainReload()",
+        "time": 1792556441868,
+        "durationMs": 13363,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.chat.SelfTestProcessOwnershipTest",
+        "name": "exitedSelfTestWrapperWithLiveDescendantCannotPass()",
+        "time": 1792556428505,
+        "durationMs": 13010,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest",
+        "name": "aPassThatCompletesDocumentsResetsTheCount()",
+        "time": 1792556582391,
+        "durationMs": 11896,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest",
+        "name": "aRefusalMixedWithARealFailureCountsAsProgress()",
+        "time": 1792556510119,
+        "durationMs": 11823,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest",
+        "name": "recordedSettingsStartAFreshFiveAttemptBudget()",
+        "time": 1792556761726,
+        "durationMs": 11156,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest",
+        "name": "humanRequestStartsAFreshFiveAttemptBudget()",
+        "time": 1792556733721,
+        "durationMs": 11011,
+        "result": "SUCCESS"
+      }
+    ]
+  },
+  "ui-fixed": {
+    "task": ":modules:ui:test",
+    "wallMs": 493686,
+    "suiteMs": 493678,
+    "results": 2022,
+    "uniqueCases": 2022,
+    "failedAttempts": 0,
+    "skipped": 1,
+    "slowest": [
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusLifecycleHandlerManifestFallbackTest",
+        "name": "servedLifecycleAndManifestAgreeAfterSamplingForEveryInputCombination(Path)",
+        "time": 1792557449211,
+        "durationMs": 28312,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusIsolationHttpTest",
+        "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+        "time": 1792557410026,
+        "durationMs": 20434,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusIsolationHttpTest",
+        "name": "busyCadenceReachesHealthyComponentsBeforeTheirObservationsExpire()",
+        "time": 1792557389316,
+        "durationMs": 17265,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusStateFieldsTest",
+        "name": "idleCounterIgnoresMeasurementChanges()",
+        "time": 1792557563613,
+        "durationMs": 16266,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest",
+        "name": "aChatTurnWithoutDocumentsWhileModelsLoadAnswersInsideTheRequestDeadline()",
+        "time": 1792557723889,
+        "durationMs": 12049,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusReadDeadlineHttpTest",
+        "name": "freshDeadlineDetachesOutstandingObservationWaiters()",
+        "time": 1792557534180,
+        "durationMs": 11634,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.mcp.McpAnswerModelsLoadingInProcessTest",
+        "name": "anMcpAnswerWhileModelsLoadReturnsKeywordEvidenceWithTheReasonInsideItsLimit()",
+        "time": 1792557734862,
+        "durationMs": 10974,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.VerifierStatus3Test",
+        "name": "persistentHungWorkerDoesNotGrowProducerThreadsAndClearsAfterRelease()",
+        "time": 1792557648843,
+        "durationMs": 7756,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusIsolationHttpTest",
+        "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+        "time": 1792557419193,
+        "durationMs": 7662,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.LocalApiServerTransportShutdownTest",
+        "name": "selectorTeardownThatNeverReturnsCannotConsumeWholeGrace()",
+        "time": 1792557347380,
+        "durationMs": 7652,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.VerifierStatus2Test",
+        "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+        "time": 1792557605950,
+        "durationMs": 7499,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:ui:test",
+        "cls": "io.justsearch.ui.api.StatusPublicationCompletenessTest",
+        "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+        "time": 1792557521241,
+        "durationMs": 7494,
+        "result": "SUCCESS"
+      }
+    ]
+  },
+  "services-fixed": {
+    "task": ":modules:app-services:test",
+    "wallMs": 683880,
+    "suiteMs": 683872,
+    "results": 3989,
+    "uniqueCases": 3989,
+    "failedAttempts": 0,
+    "skipped": 11,
+    "slowest": [
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.api.runtime.child.GpuSwitchBarrierTest",
+        "name": "aSwitchStartWaitsForTheReleasePollEveryTime()",
+        "time": 1792557867036,
+        "durationMs": 100788,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.ai.install.DownloadLoopbackTest",
+        "name": "stalledRealTransferRetriesAfterProductionSpeedDeadline()",
+        "time": 1792557946413,
+        "durationMs": 62278,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+        "name": "idleChatControlAddsLessThanOnePercentOfACore()",
+        "time": 1792557766086,
+        "durationMs": 22105,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest",
+        "name": "halfOpenProbeBacksOffFiveTenTwentyFortyThenSixtyAndClosesOnProgress()",
+        "time": 1792558220683,
+        "durationMs": 21178,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduRecoveryTest",
+        "name": "failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand()",
+        "time": 1792558290352,
+        "durationMs": 17794,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest",
+        "name": "noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains()",
+        "time": 1792558003975,
+        "durationMs": 13756,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest",
+        "name": "aRefusalMixedWithARealFailureCountsAsProgress()",
+        "time": 1792558107488,
+        "durationMs": 13391,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.chat.SelfTestProcessOwnershipTest",
+        "name": "selfTestDescendantSurvivalBlocksMainReload()",
+        "time": 1792558036580,
+        "durationMs": 13373,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.chat.SelfTestProcessOwnershipTest",
+        "name": "exitedSelfTestWrapperWithLiveDescendantCannotPass()",
+        "time": 1792558023207,
+        "durationMs": 12967,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest",
+        "name": "aPassThatCompletesDocumentsResetsTheCount()",
+        "time": 1792558183256,
+        "durationMs": 11715,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest",
+        "name": "humanRequestStartsAFreshFiveAttemptBudget()",
+        "time": 1792558333754,
+        "durationMs": 11134,
+        "result": "SUCCESS"
+      },
+      {
+        "event": "end",
+        "task": ":modules:app-services:test",
+        "cls": "io.justsearch.app.services.vdu.AutomaticVduRetryBudgetTest",
+        "name": "preparedSettingsStartAFreshFiveAttemptBudget()",
+        "time": 1792558344816,
+        "durationMs": 11062,
+        "result": "SUCCESS"
+      }
+    ]
+  },
+  "coverage": {
+    "omittedMainCases": [],
+    "addedBranchCases": [
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsBridgeWiringTest",
+        "liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsBridgeWiringTest",
+        "terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "activationReturnsWhileRegistrationIsPendingAndPreservesTheBarrier()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "cancellationClosesARowHandleThatReturnsAfterStop()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "producerCompletionBeforeAcknowledgementFailsReadinessWithoutOpeningRows()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "registrationFailureFailsReadinessWithoutOpeningRows()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "stopBeforeAcknowledgementReleasesReadinessAndPreventsALateRowSubscription()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsRecoveryTest",
+        "firstOverflowIsImmediateEvenWithANegativeMonotonicClock()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsRecoveryTest",
+        "successfulSnapshotsResetTheDelayAndAttemptCount()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsRecoveryTest",
+        "typedOverflowRecoversImmediatelyButSnapshotLoopsStayRateLimited()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsSubscriptionFenceTest",
+        "completedSubscriptionCannotDeliverAnyMoreFrames()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsSubscriptionFenceTest",
+        "olderActiveSnapshotsDeltasAndPresenceNeverMoveTheCursorOrReplayActivity()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsSubscriptionFenceTest",
+        "restartingWorkerCursorKeepsTheHeadMonotonicAndAcceptsFollowingDeltas()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsSubscriptionFenceTest",
+        "retiredHigherSequenceFramesAndTerminalCallbacksCannotTouchTheReplacement()"
+      ],
+      [
+        "io.justsearch.app.services.worker.IndexingJobsSubscriptionFenceTest",
+        "synchronousOverflowCannotInstallItsLateHandleOverTheNewSubscription()"
+      ],
+      [
+        "io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest",
+        "statePresenceOutsideWindowInvalidatesButHeartbeatCountsAndReconnectDoNot()"
+      ],
+      [
+        "io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest",
+        "sustainedChurnAndReconnectConvergeToBoundedWindowWithoutPhantoms()"
+      ]
+    ],
+    "newLifecycleCases": [
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "stopBeforeAcknowledgementReleasesReadinessAndPreventsALateRowSubscription()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "cancellationClosesARowHandleThatReturnsAfterStop()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "registrationFailureFailsReadinessWithoutOpeningRows()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "activationReturnsWhileRegistrationIsPendingAndPreservesTheBarrier()"
+      ],
+      [
+        "io.justsearch.app.services.bootstrap.phases.IndexingJobsRegistrationLifecycleTest",
+        "producerCompletionBeforeAcknowledgementFailsReadinessWithoutOpeningRows()"
+      ]
+    ],
+    "previousQueueBranchAddedCases": 12
+  }
+}

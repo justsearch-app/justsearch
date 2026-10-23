@@ -32,11 +32,10 @@ public final class VduResultWriter {
 
   /**
    * Applies one result; the caller must cover success with its existing commit boundary.
-   * A false result means the parent was absent. Exceptions preserve failure for the caller.
+   * A false result means the parent was absent or its revision changed. Exceptions preserve failure for the caller.
    */
-  public static boolean apply(
-      RunningRuntime runtime, UpdateVduResultRequest request, boolean chunkSpladeEnabled)
-      throws IOException {
+  static boolean apply(RunningRuntime runtime, UpdateVduResultRequest request,
+      boolean chunkSpladeEnabled, Map<String, Object> expectedRevision) throws IOException {
     validate(request);
     String docId = request.getDocId();
     var outcome = effectiveOutcome(request);
@@ -85,7 +84,7 @@ public final class VduResultWriter {
       ChunkDocumentWriter.regenerateChunksFromExistingParent(
           runtime.documentFieldOps(), runtime.indexingCoordinator(), docId, content, chunkSpladeEnabled);
     }
-    return runtime.indexingCoordinator().updateDocument(docId, updates);
+    return runtime.indexingCoordinator().updateDocumentIf(docId, expectedRevision, updates);
   }
 
   // Permanent compatibility: the legacy vdu_status string remains a supported input.

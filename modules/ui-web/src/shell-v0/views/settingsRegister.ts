@@ -176,6 +176,10 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
     labelKey: 'settings.group.app',
     categories: [
       {
+        id: 'indexing', kind: 'native', labelKey: 'settings.category.indexing',
+        sections: [{ key: 'indexing', labelKey: 'settings.section.indexing' }],
+      },
+      {
         id: 'desktop',
         kind: 'native',
         labelKey: 'settings.category.desktop',

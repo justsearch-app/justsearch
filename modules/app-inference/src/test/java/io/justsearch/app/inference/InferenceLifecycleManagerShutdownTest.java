@@ -113,14 +113,14 @@ final class InferenceLifecycleManagerShutdownTest {
 
   private static void startManagedChild(LlamaServerOps server, ChildSpec spec) throws Exception {
     var start = LlamaServerOps.class.getDeclaredMethod("startManagedChild",
-        ChildSpec.class, Path.class, LlamaServerOps.StartResult.class, int.class);
+        ChildSpec.class, Path.class, LlamaServerOps.StartResult.class, LlamaServerEndpoint.class);
     start.setAccessible(true);
     var result = new LlamaServerOps.StartResult(
         new LlamaServerConfigContext(fakeConfig(), ResolvedConfig.builder().build()),
         LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
         LlamaServerOps.StartDisposition.LAUNCHED_MANAGED,
         "declared");
-    start.invoke(server, spec, Path.of("llama.log"), result, 9991);
+    start.invoke(server, spec, Path.of("llama.log"), result, new LlamaServerEndpoint(9991, null));
   }
 
   /** A real, long-lived stand-in llama-server: ManagedLlamaAdoptionTest's sleeping child. */
@@ -217,7 +217,7 @@ final class InferenceLifecycleManagerShutdownTest {
     try {
       manager.stopServerForTerminalShutdown(Duration.ofMillis(25));
       var start = LlamaServerOps.class.getDeclaredMethod("startManagedChild",
-          ChildSpec.class, Path.class, LlamaServerOps.StartResult.class, int.class);
+          ChildSpec.class, Path.class, LlamaServerOps.StartResult.class, LlamaServerEndpoint.class);
       start.setAccessible(true);
       var result = new LlamaServerOps.StartResult(
           new LlamaServerConfigContext(fakeConfig(), ResolvedConfig.builder().build()),
@@ -225,7 +225,7 @@ final class InferenceLifecycleManagerShutdownTest {
           LlamaServerOps.StartDisposition.LAUNCHED_MANAGED,
           "declared");
       var refused = assertThrows(java.lang.reflect.InvocationTargetException.class,
-          () -> start.invoke(server, spec(), Path.of("llama.log"), result, 9991));
+          () -> start.invoke(server, spec(), Path.of("llama.log"), result, new LlamaServerEndpoint(9991, null)));
       assertInstanceOf(IOException.class, refused.getCause());
       assertTrue(control.started.isEmpty(), "the fenced launch never reaches ChildControl.start");
     } finally {

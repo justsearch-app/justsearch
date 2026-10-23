@@ -134,6 +134,14 @@ describe('HelpSurface — keyboard shortcuts (tempdoc 586 P-3)', () => {
     document.querySelectorAll('jf-help-surface').forEach((el) => el.remove());
   });
 
+  it('SC12 explains the desktop summon, focus exceptions and command-line alternative', async () => {
+    const el = await mountHelp();
+    const text = collectShadowText(el);
+    expect(text).toContain('Alt + Shift + Space');
+    expect(text).toContain('--focus-search');
+    expect(text).toContain('dialogs, palettes, renaming and other text edits');
+  });
+
   it('lists only shortcuts that actually fire; the defunct `/` and `??` rows are gone', async () => {
     const el = await mountHelp();
     const text = collectShadowText(el);

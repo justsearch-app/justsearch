@@ -1,0 +1,89 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/containment/WindowsJobWitness.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/containment/WindowsJobWitness.java
+index 6f03bb6b2..6f2749fb6 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/containment/WindowsJobWitness.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/containment/WindowsJobWitness.java
+@@ -31,15 +31,15 @@ final class WindowsJobWitness implements AutoCloseable {
+   private static final int ABNORMAL_EXIT_PROCESS = 8;
+   private static final int QUERY_AND_SYNCHRONIZE = 0x101000;
+   private static final int MAX_PENDING = 4096;
+-  private final Native calls = new Native();
++  private final Native calls;
+   private final MemorySegment job;
+   private final MemorySegment port;
++  private final java.util.function.LongSupplier nanoTime;
+   private final Map<Long, Held> processes = new HashMap<>(); // observer thread only
+   private final Map<Long, String> unproven = new HashMap<>();
+   private final ArrayDeque<Event> pending = new ArrayDeque<>();
+   private LedgerSink ledger;
+-  private final java.util.concurrent.locks.ReentrantLock recordingGate =
+-      new java.util.concurrent.locks.ReentrantLock();
++  private final java.util.concurrent.locks.ReentrantLock recordingGate;
+   private EngineIdentity owner;
+   private int dropped;
+   private boolean writing;
+@@ -82,6 +82,9 @@ final class WindowsJobWitness implements AutoCloseable {
+   private record Event(LedgerRecordType type, Map<String, Object> fields) {}
+ 
+   private WindowsJobWitness(MemorySegment job) throws Throwable {
++    calls = new Native();
++    nanoTime = System::nanoTime;
++    recordingGate = new java.util.concurrent.locks.ReentrantLock();
+     this.job = job;
+     port = (MemorySegment) calls.createPort.invokeExact(MemorySegment.ofAddress(-1L),
+         MemorySegment.NULL, 0L, 1);
+@@ -97,6 +100,16 @@ final class WindowsJobWitness implements AutoCloseable {
+     }
+   }
+ 
++  /** Storage-fence harness: no native observation, with controlled time and storage scheduling. */
++  WindowsJobWitness(java.util.function.LongSupplier nanoTime,
++      java.util.concurrent.locks.ReentrantLock recordingGate) {
++    this.nanoTime = java.util.Objects.requireNonNull(nanoTime);
++    this.recordingGate = java.util.Objects.requireNonNull(recordingGate);
++    calls = null;
++    job = MemorySegment.NULL;
++    port = MemorySegment.NULL;
++  }
++
+   static WindowsJobWitness associate(MemorySegment job) throws Throwable {
+     return new WindowsJobWitness(job);
+   }
+@@ -389,17 +402,17 @@ final class WindowsJobWitness implements AutoCloseable {
+   }
+ 
+   void finish(java.time.Duration max) {
+-    long started = System.nanoTime();
++    long started = nanoTime.getAsLong();
+     long allowance = Math.max(0, max.toNanos());
+     long deadline = started + allowance;
+     // 500 forced appends on Windows: measured p99 3.4-9.8 ms. Keep 150 ms for an in-flight
+     // append, including a 100 ms storage stall, without extending the total allowance.
+-    long drainDeadline = deadline - Math.min(allowance, 150_000_000L);
++    long drainDeadline = deadline;
+     synchronized (this) {
+       if (ledger == null) return;
+       while (!recordingFinished && (observedThrough < started + 50_000_000L
+           || liveHelpers > 0 || writing || !pending.isEmpty())) {
+-        long left = drainDeadline - System.nanoTime();
++        long left = drainDeadline - nanoTime.getAsLong();
+         if (left <= 0) break;
+         try { wait(Math.max(1, Math.min(25, left / 1_000_000L))); }
+         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
+@@ -410,7 +423,7 @@ final class WindowsJobWitness implements AutoCloseable {
+       pending.clear();
+     }
+     try {
+-      if (!recordingGate.tryLock(Math.max(0, deadline - System.nanoTime()),
++      if (!recordingGate.tryLock(Math.max(0, deadline - nanoTime.getAsLong()),
+           java.util.concurrent.TimeUnit.NANOSECONDS)) {
+         throw new IllegalStateException("Exit witness storage is still active; retain the instance lock");
+       }
+@@ -429,7 +442,7 @@ final class WindowsJobWitness implements AutoCloseable {
+   @Override public synchronized void close() {
+     closed = true;
+     notifyAll();
+-    closeHandle(port);
++    if (calls != null) closeHandle(port);
+   }
+ 
+   private static final class Native {

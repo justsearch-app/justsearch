@@ -41,6 +41,7 @@ final class FileConversationStoreTest {
   @DisplayName("appendMessage synthesizes id + hash on every write")
   void appendAddsIdAndHash(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s1", "core.free-chat");
     store.appendMessage("s1", "core.free-chat", userMsg("hello"));
     List<Map<String, Object>> history = store.loadHistory("s1");
     assertEquals(1, history.size());
@@ -55,6 +56,7 @@ final class FileConversationStoreTest {
   @DisplayName("new metadata writes declare schema v1")
   void metadataWritesSchemaVersion(@TempDir Path tmp) throws Exception {
     var store = new FileConversationStore(tmp);
+    store.createSession("s1", "core.free-chat");
     store.appendMessage("s1", "core.free-chat", userMsg("hello"));
     String meta = Files.readString(tmp.resolve("s1").resolve("meta.json"));
     assertTrue(meta.contains("\"schemaVersion\":1"));
@@ -130,6 +132,7 @@ final class FileConversationStoreTest {
     var key = new FakeKey();
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(key);
     var store = new FileConversationStore(tmp, cipher);
+    store.createSession("s1", "core.free-chat");
     store.appendMessage("s1", "core.free-chat", userMsg("SENSITIVE-first-message"));
 
     // The first user message is sealed in meta.json — plaintext is NOT on disk.
@@ -158,6 +161,7 @@ final class FileConversationStoreTest {
     var key = new FakeKey();
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(key);
     var store = new FileConversationStore(tmp, cipher);
+    store.createSession("s1", "core.free-chat");
     store.appendMessage("s1", "core.free-chat", userMsg("SENSITIVE-content"));
 
     // The line on disk is ciphertext, not plaintext — proves the message was actually sealed.
@@ -184,6 +188,7 @@ final class FileConversationStoreTest {
     var key = new FakeKey();
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(key);
     var store = new FileConversationStore(tmp, cipher);
+    store.createSession("s1", "core.free-chat");
     store.appendMessage("s1", "core.free-chat", userMsg("q1"));
     store.appendMessage("s1", "core.free-chat", assistantMsg("a1"));
 
@@ -243,6 +248,7 @@ final class FileConversationStoreTest {
   @DisplayName("branchFrom creates a child session whose loadHistory prepends parent prefix")
   void branchFromPrependsPrefix(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("parent", "core.free-chat");
     store.appendMessage("parent", "core.free-chat", userMsg("q1"));
     store.appendMessage("parent", "core.free-chat", assistantMsg("a1"));
     store.appendMessage("parent", "core.free-chat", userMsg("q2"));
@@ -259,6 +265,7 @@ final class FileConversationStoreTest {
     assertEquals("a1", branchHistory.get(1).get("content"));
 
     // Branch's own messages append on top of the parent prefix.
+    store.createSession("branchA", "core.free-chat");
     store.appendMessage("branchA", "core.free-chat", userMsg("q2-alt"));
     store.appendMessage("branchA", "core.free-chat", assistantMsg("a2-alt"));
     List<Map<String, Object>> branchHistoryAfter = store.loadHistory("branchA");
@@ -274,6 +281,7 @@ final class FileConversationStoreTest {
   @DisplayName("listSessions exposes parent pointers for branched sessions")
   void listSessionsExposesParentPointers(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("root", "core.free-chat");
     store.appendMessage("root", "core.free-chat", userMsg("root msg"));
     List<Map<String, Object>> rootHistory = store.loadHistory("root");
     String branchPoint = (String) rootHistory.get(0).get("id");
@@ -297,6 +305,7 @@ final class FileConversationStoreTest {
   @DisplayName("Slice 515 FIX-2: branchFrom rejects non-existent branch point")
   void branchFromRejectsUnknownBranchPoint(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("p", "core.free-chat");
     store.appendMessage("p", "core.free-chat", userMsg("only"));
     assertThrows(
         IllegalArgumentException.class,
@@ -344,6 +353,7 @@ final class FileConversationStoreTest {
   @DisplayName("Slice 515 FIX-9: branch's prefix is bounded by branch-point — parent appends after branch are NOT inherited")
   void branchPrefixIsBoundedByBranchPoint(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("p", "core.free-chat");
     store.appendMessage("p", "core.free-chat", userMsg("q1"));
     store.appendMessage("p", "core.free-chat", assistantMsg("a1"));
     var parentHistory = store.loadHistory("p");
@@ -367,6 +377,7 @@ final class FileConversationStoreTest {
   @DisplayName("Slice 515 FIX-3: deleteSession blocks when child branches exist")
   void deleteSessionBlocksWhenChildBranchesExist(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("p", "core.free-chat");
     store.appendMessage("p", "core.free-chat", userMsg("q1"));
     var history = store.loadHistory("p");
     String branchPoint = (String) history.get(0).get("id");
@@ -385,6 +396,7 @@ final class FileConversationStoreTest {
   @DisplayName("Slice 515 FIX-3: deleteSession of a leaf session succeeds")
   void deleteSessionOfLeafSucceeds(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("leaf", "core.free-chat");
     store.appendMessage("leaf", "core.free-chat", userMsg("only"));
     store.deleteSession("leaf");
     assertFalse(tmp.resolve("leaf").toFile().exists());
@@ -394,6 +406,7 @@ final class FileConversationStoreTest {
   @DisplayName("Slice 515 FIX-7: getSessionMeta returns SessionSummary for known session")
   void getSessionMetaForKnownSession(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("hi"));
     var meta = store.getSessionMeta("s");
     assertTrue(meta.isPresent());
@@ -416,6 +429,7 @@ final class FileConversationStoreTest {
     var store = new FileConversationStore(tmp);
     // Set up a parent with a child branch so the bypass actually matters —
     // were a non-throwaway session forged here, the deletion would 409.
+    store.createSession("parent", "core.free-chat");
     store.appendMessage("parent", "core.free-chat", userMsg("hi"));
     var history = store.loadHistory("parent");
     String branchPoint = (String) history.get(0).get("id");
@@ -423,6 +437,7 @@ final class FileConversationStoreTest {
     // Throwaway session with matching prefix; its meta points at parent as
     // if it were a branch, but the bypass should still permit deletion
     // since the prefix says "internal cleanup."
+    store.createSession(ConversationStore.THROWAWAY_SESSION_PREFIX + "auto-1", "core.free-chat");
     store.appendMessage(
         ConversationStore.THROWAWAY_SESSION_PREFIX + "auto-1",
         "core.free-chat", userMsg("title-gen"));
@@ -465,6 +480,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610: empty-prefix branch inherits NOTHING from parent")
   void emptyPrefixBranchInheritsNothing(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("parent", "core.free-chat");
     store.appendMessage("parent", "core.free-chat", userMsg("q1"));
     store.appendMessage("parent", "core.free-chat", assistantMsg("a1"));
 
@@ -475,6 +491,7 @@ final class FileConversationStoreTest {
         "empty-prefix branch must start with no inherited messages");
 
     // Its own messages still append normally.
+    store.createSession("fresh", "core.free-chat");
     store.appendMessage("fresh", "core.free-chat", userMsg("q1-edited"));
     List<Map<String, Object>> after = store.loadHistory("fresh");
     assertEquals(1, after.size());
@@ -489,6 +506,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610: branchFrom accepts the empty-prefix sentinel without an existence check")
   void branchFromAcceptsEmptyPrefixSentinel(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("p", "core.free-chat");
     store.appendMessage("p", "core.free-chat", userMsg("only"));
     // The sentinel is not a real message id; branchFrom must NOT throw for it
     // (contrast branchFromRejectsUnknownBranchPoint, which rejects a real-looking
@@ -503,6 +521,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610: context floor trims loadEffectiveContext but not loadHistory")
   void contextFloorTrimsEffectiveContextOnly(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
     store.appendMessage("s", "core.free-chat", userMsg("q2"));
@@ -533,6 +552,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610 §E.3: excludeMessage drops a turn from effective context, not the transcript")
   void excludeMessageFiltersEffectiveContextOnly(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
     store.appendMessage("s", "core.free-chat", userMsg("q2"));
@@ -560,6 +580,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610 §J.3: excludeSource round-trips independently of excludeMessage")
   void excludeSourceRoundTrips(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     // The real id is unit-separator-joined (parentDocId + 0x1F + chunkIndex) - exercise the meta.json control-char round-trip.
     String sourceId = "C:/docs/reliability.md" + (char) 0x1F + "2";
@@ -582,6 +603,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610 §E.3: per-message exclusion applies BEFORE the floor trim")
   void excludeAppliesBeforeFloor(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
     store.appendMessage("s", "core.free-chat", userMsg("q2"));
@@ -600,9 +622,29 @@ final class FileConversationStoreTest {
   }
 
   @Test
+  void excludingTheFloorMessageKeepsTheFloor(@TempDir Path tmp) {
+    var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
+    store.appendMessage("s", "core.free-chat", userMsg("q1"));
+    store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
+    store.appendMessage("s", "core.free-chat", userMsg("q2"));
+    store.appendMessage("s", "core.free-chat", assistantMsg("a2"));
+    List<Map<String, Object>> full = store.loadHistory("s");
+    String floorId = (String) full.get(2).get("id"); // q2
+
+    store.setContextFloor("s", floorId);
+    store.excludeMessage("s", floorId, true);
+
+    // The floor still starts the prompt at q2; q2 itself is excluded, so a2 is all that is left.
+    List<Map<String, Object>> eff = store.loadEffectiveContext("s");
+    assertEquals(List.of("a2"), eff.stream().map(m -> m.get("content")).toList());
+  }
+
+  @Test
   @DisplayName("Tempdoc 610: loadEffectiveContext fails safe to full history for an unknown floor id")
   void contextFloorUnknownIdFailsSafe(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
     store.setContextFloor("s", "no-such-id");
@@ -614,6 +656,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610: with no floor, loadEffectiveContext equals loadHistory")
   void noFloorEffectiveEqualsHistory(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
     assertEquals(
@@ -624,6 +667,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 610: compactContext prepends the summary to effective context, clears on rewind")
   void compactPrependsSummary(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("q1"));
     store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
     store.appendMessage("s", "core.free-chat", userMsg("q2"));
@@ -656,6 +700,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 838: a title round-trips, with its provenance, and DELETE clears both")
   void titleRoundTrips(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("why did the renewal fail?"));
 
     store.setTitle("s", "Renewal postmortem", ConversationStore.TITLE_SOURCE_USER);
@@ -680,6 +725,8 @@ final class FileConversationStoreTest {
         "no conversation is minted for a name");
     assertTrue(store.getSessionMeta("missing").isEmpty());
 
+    store.createSession("s", "core.free-chat");
+
     store.appendMessage("s", "core.free-chat", userMsg("why did the renewal fail?"));
     assertTrue(store.setTitleIfUntitled("s", "Renewal lock failure", ConversationStore.TITLE_SOURCE_AUTO));
     assertEquals("Renewal lock failure", store.getSessionMeta("s").orElseThrow().title());
@@ -696,6 +743,7 @@ final class FileConversationStoreTest {
   void titleIfUntitledSeesASealedName(@TempDir Path tmp) {
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(new FakeKey());
     var store = new FileConversationStore(tmp, cipher);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("first"));
     store.setTitle("s", "Renewal postmortem", ConversationStore.TITLE_SOURCE_USER);
     assertFalse(store.setTitleIfUntitled("s", "Legacy", ConversationStore.TITLE_SOURCE_USER));
@@ -708,6 +756,7 @@ final class FileConversationStoreTest {
     var key = new FakeKey();
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(key);
     var store = new FileConversationStore(tmp, cipher);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("why did the renewal fail?"));
     store.setTitle("s", "Renewal postmortem", ConversationStore.TITLE_SOURCE_USER);
 
@@ -740,6 +789,7 @@ final class FileConversationStoreTest {
     var key = new FakeKey();
     var cipher = new io.justsearch.agent.api.encryption.StoreCipher(key);
     var store = new FileConversationStore(tmp, cipher);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("first"));
     store.setTitle("s", "SENSITIVE-conversation-name", ConversationStore.TITLE_SOURCE_USER);
 
@@ -774,6 +824,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 838: an over-long title is capped at 200 characters, trimmed first")
   void titleIsCappedAndTrimmed(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("first"));
 
     store.setTitle("s", "  Renewal postmortem  ", ConversationStore.TITLE_SOURCE_USER);
@@ -787,6 +838,7 @@ final class FileConversationStoreTest {
   @DisplayName("Tempdoc 838: an unrecognised provenance is stored as the reader's, never verbatim")
   void unknownProvenanceFallsBackToUser(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);
+    store.createSession("s", "core.free-chat");
     store.appendMessage("s", "core.free-chat", userMsg("first"));
     store.setTitle("s", "Renewal postmortem", "something-else");
     // The controller rejects an unknown source with a 400; the store still refuses to persist one,
@@ -803,6 +855,7 @@ final class FileConversationStoreTest {
     // what `listSessions(shapeId, …)` returns for it and what `UnifiedChatView` re-tags its entire
     // transcript as. 863 made a delegate turn an appender, turning a pre-existing sharp edge routine.
     var store = new FileConversationStore(tmp);
+    store.createSession("mixed", "core.free-chat");
     store.appendMessage("mixed", "core.free-chat", userMsg("hello"));
     store.appendMessage("mixed", "core.agent-run", userMsg("now delegate"));
     assertEquals("core.free-chat", store.getSessionMeta("mixed").orElseThrow().shapeId());
@@ -817,6 +870,8 @@ final class FileConversationStoreTest {
         sessionDir.resolve("meta.json"),
         "{\"shapeId\":\"\",\"createdAtMs\":0,\"lastActiveAtMs\":0,\"messageCount\":0}",
         StandardCharsets.UTF_8);
+
+    store.createSession("blank", "core.rag-ask");
 
     store.appendMessage("blank", "core.rag-ask", userMsg("and now?"));
 
