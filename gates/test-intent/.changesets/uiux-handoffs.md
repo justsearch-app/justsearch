@@ -7,7 +7,7 @@ author-session: wp1.3b-uiux-handoffs-builder
 
 # Test-intent entries
 
-These tests are durable. The evidence launcher adds only --cache=false and --maxWorkers=2 to Vitest through a temporary npx wrapper; all assertions and evidence classification use the repository runner unchanged. Sources follow the builder brief's adopted-scenario/delegated-choice classifications.
+These tests are durable. The evidence launcher adds only --cache=false and --maxWorkers=2 to Vitest through a temporary npx wrapper; all assertions and evidence classification use the repository runner unchanged. HO/HN scenarios and design decisions are agent-adopted choices under the quoted design delegation, as the agreed source specifies.
 
 ```json
 {
@@ -20,25 +20,28 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Durable hand-off reception, source fidelity, isolation and refusal checks; repaired expectations must fail by assertion on 77587606f.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO6",
-          "quote": "S15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO6 — agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO9",
-          "quote": "S15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO9 — agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN2",
-          "quote": "HN2 While the old window is the main window it receives every hand-off as today, except the S15.6 repair and any shared Summarize change from D12.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN2 — agent-adopted scenario:\nHN2 While the old window is the main window it receives every hand-off as today, except the S15.6 repair and any shared Summarize change from D12.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -65,116 +68,132 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Durable hand-off reception, source fidelity, isolation and refusal checks; repaired expectations must fail by assertion on 77587606f.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO1",
-          "quote": "S15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO1 — agent-adopted scenario:\nS15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO2",
-          "quote": "S15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO2 — agent-adopted scenario:\nS15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO3",
-          "quote": "S15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for…\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO3 — agent-adopted scenario:\nS15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for…\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO4",
-          "quote": "S15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO6",
-          "quote": "S15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO6 — agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO7",
-          "quote": "S15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO7 — agent-adopted scenario:\nS15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO8",
-          "quote": "S15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO8 — agent-adopted scenario:\nS15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO9",
-          "quote": "S15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO9 — agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO10",
-          "quote": "S15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO10 — agent-adopted scenario:\nS15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO11",
-          "quote": "S15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=…&shape=…`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO11 — agent-adopted scenario:\nS15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=…&shape=…`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO12",
-          "quote": "S15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO12 — agent-adopted scenario:\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO13",
-          "quote": "S15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN1",
-          "quote": "HN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN1 — agent-adopted scenario:\nHN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN3",
-          "quote": "HN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN3 — agent-adopted scenario:\nHN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN4",
-          "quote": "HN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN4 — agent-adopted scenario:\nHN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -223,116 +242,132 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Preserve promptless summaries, unreadable Ask refusal, Engine admission refusals and keyboard palette behaviour.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO1",
-          "quote": "S15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO1 — agent-adopted scenario:\nS15.1 [HO1] (S3.10) Opening Search v3 with a query in its address shows that query in the composer in Search mode with its results, sending the same search requests as typing it (S1.3). `#`, `&`, `%`, quotes, non-Latin script and long text arrive intact. A blank query runs nothing.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO2",
-          "quote": "S15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO2 — agent-adopted scenario:\nS15.2 [HO2] (S3.11) Reload and Back/Forward after a query arrived never run a question or an agent; the search re-runs only as decision D2 allows. Query text is not kept in saved navigation or per-tab state beyond what WP1.1 keeps.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO3",
-          "quote": "S15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for…\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO3 — agent-adopted scenario:\nS15.3 [HO3] (S3.12, ch. 15) Delivered to Search v3 through the real navigation path, every hand-off form today's in-app senders produce (query; docIds with ask or summarize; each selection kind; forced shape; answer verb) lands as S15.1-S15.13 require. Verified on the exact WP1.3b candidate. Each real sender (palette \"Search for…\" and its fallback, \"Find related to selection\", the router's query verb, every compose() caller) end to end into Search v3 is verified on the WP1.5 cutover candidate (D1).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO4",
-          "quote": "S15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO6",
-          "quote": "S15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO6 — agent-adopted scenario:\nS15.6 [HO6] (S3.14, ch. 5; broken today in both windows by code reading) Browse \"Ask about\" and Browse \"Summarize\" use the right-clicked file, with no other selection and with an unrelated selection active, in both windows, checked on the request sent and on the answer's source. Today compose() resolves the forced shape from the caller's absent affordance, so Ask becomes free chat and Summarize carries no document; both fall back to whatever is selected (D8).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO7",
-          "quote": "S15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO7 — agent-adopted scenario:\nS15.7 [HO7] (S3.15) Retry and Edit of a Summarize turn or a file-limited turn re-run the same kind on the same document, or say visibly what they will do instead; they never silently become an Ask over all files, live or after reload.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO8",
-          "quote": "S15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO8 — agent-adopted scenario:\nS15.8 [HO8] (S3.16, ch. 11) A hand-off arriving while a conversation is open, streaming, running an agent, waiting for a decision or locked does not append to, steer, approve or stop it, and it stays one click away (D5). The unsent draft and chosen files of the place the user was in are kept with that place. Conflicting incoming state (query, conversationId, mode, forced shape, a restored pointer or draft) resolves by one rule (D5) to one visible task. A hand-off arriving before Search v3 has opened (cold start, first navigation) is applied exactly once; two in quick succession leave the later one prepared and nothing runs twice; an older asynchronous result (search response, record load) never overwrites a later hand-off.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO9",
-          "quote": "S15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO9 — agent-adopted scenario:\nS15.9 [HO9] (S3.17) One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO10",
-          "quote": "S15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO10 — agent-adopted scenario:\nS15.10 [HO10] (S3.18) With chat unavailable, an Ask, Summarize or Structured hand-off still lands in Search v3 with the existing unavailable reason; prepared text and files are kept; never a silent no-op. Search hand-offs work fully.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO11",
-          "quote": "S15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=…&shape=…`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO11 — agent-adopted scenario:\nS15.11 [HO11] (S3.19, ch. 14) An answer link (`justsearch://answer?q=…&shape=…`, or the router's answer verb) prepares an Ask, or a Summarize or Structured run when the link names one, and behaves on arrival as decision D6. No link starts a Delegate or agent run, whatever extra state (shape, affordance, conversationId) it carries; an unknown shape is refused visibly or falls back visibly to Ask.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO12",
-          "quote": "S15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO12 — agent-adopted scenario:\nS15.12 [HO12] (S3.20) After any hand-off, keyboard focus is in the composer; what was prepared (mode, files or document) is visible and announced; holds in both themes, forced colours and at narrow width; the palette path works by keyboard alone.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO13",
-          "quote": "S15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN1",
-          "quote": "HN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN1 — agent-adopted scenario:\nHN1 Search v3 conversation links (`?conversationId=`), Back/Forward between conversations and results, per-tab restore (the address outranks the pointer, SearchV3View restoreLastViewed).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN3",
-          "quote": "HN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN3 — agent-adopted scenario:\nHN3 WP1.1 S1.x and WP1.2 S2.x on the merged baseline.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN4",
-          "quote": "HN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN4 — agent-adopted scenario:\nHN4 Ask and Delegate streaming, stop and late stop, sidebar, context bar, J/K.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -356,32 +391,36 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Durable hand-off reception, source fidelity, isolation and refusal checks; repaired expectations must fail by assertion on 77587606f.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO4",
-          "quote": "S15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO13",
-          "quote": "S15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN5",
-          "quote": "HN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -407,32 +446,36 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Durable hand-off reception, source fidelity, isolation and refusal checks; repaired expectations must fail by assertion on 77587606f.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO4",
-          "quote": "S15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO13",
-          "quote": "S15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN5",
-          "quote": "HN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -466,32 +509,36 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Preserve promptless summaries, unreadable Ask refusal, Engine admission refusals and keyboard palette behaviour.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO4",
-          "quote": "S15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO13",
-          "quote": "S15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN5",
-          "quote": "HN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -515,32 +562,36 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "behaviour": "Preserve promptless summaries, unreadable Ask refusal, Engine admission refusals and keyboard palette behaviour.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO4",
-          "quote": "S15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO4 — agent-adopted scenario:\nS15.4 [HO4] (S3.13) \"Ask about this\" from Browse, a search hit, a result set, a citation, a text selection or a plugin prepares an Ask limited to exactly the chosen files (S1.6/S1.7: fixed when asked, never widened; proved with an unchosen file holding a unique answer). For a text selection or citation the answer is about that passage. Suggested wording lands in the composer and the window waits for the user's send (D4).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO13",
-          "quote": "S15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO13 — agent-adopted scenario:\nS15.13 [HO13] (S3.21) Bad hand-off data (no files, a deleted or missing file, an unknown mode or shape) never becomes a question over the whole index or a crash: the window says what is wrong and opens normally. A link that cannot be parsed runs nothing and changes nothing in the current place.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HN5",
-          "quote": "HN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HN5 — agent-adopted scenario:\nHN5 Recorded summarize and file-limited ask turns parse for /history, /api/thread, MCP and API; Summarize citations, including short documents (WP4.4), as today.",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -569,11 +620,12 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
       "whatMoved": "Register the optional UserPromptInjector in the real summary-engine test fixture. All admission-refusal assertions and inline-content/citation fallback assertions remain. The result-set refusal expectation is separately sourced and evidenced above.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "HO5",
-          "quote": "S15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b hand-off designs and scenarios, agent-adopted under the design delegation; agreed source tmp/verify/agreed/wp1.3b.md.",
+          "choice": "HO5 — agent-adopted scenario:\nS15.5 [HO5] (S3.14, ch. 12) \"Summarize\" from Browse, a search hit, a result set or a text selection, and \"Explain why this result\", produce after the user's send a summary of exactly that document, passage or ranking trace, as a turn in Search v3, the same live and after reload, with its sources (WP4.4 short-document behaviour). An instruction the composer lets the user edit actually reaches the model; otherwise the task is presented as fixed (D12).",
+          "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
@@ -584,6 +636,29 @@ These tests are durable. The evidence launcher adds only --cache=false and --max
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Exact shared Explain sender accepts its valid ranking trace despite docIds:[]; a forced mode that ignores chosen files visibly becomes an Ask over exactly those files.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.3b HO3/HO5 and HO4/HO13, including independent-verifier follow-up decisions.",
+          "choice": "HO3/HO5: the exact whyThisResult.ts sender payload, including docIds:[], must dispatch its valid search-trace selection as Summarize and survive reload.\nHO4/HO13 orchestrator decision: when chosen files arrive with a forced shape that cannot read files, prepare a file-limited Ask over exactly those files and say visibly that the requested mode was replaced; never show a file limit on a send that ignores it.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-followup.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask"
+      ],
+      "repaired": true
     }
   ]
 }

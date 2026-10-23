@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { render } from 'lit';
+import { renderWhyDisclosure } from '../../components/searchResults/whyThisResult.js';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
@@ -116,6 +118,36 @@ it('HO3 HO5 HO9 a selection is local to its prepared turn', async () => {
   await drain(view);
   expect(takePendingSelection()).toBeNull();
   expect((await send(view)).selection).toEqual(selection);
+});
+it('HO3 HO5 the real Explain sender with empty docIds sends the ranking trace', async () => {
+  const view = await mount(); const source = document.createElement('div'); document.body.append(source);
+  let state: Record<string, string | string[]> | undefined;
+  let navigation: Promise<void> | undefined;
+  document.addEventListener('navigate-with-context', event => {
+    state = (event as CustomEvent).detail.state as Record<string, string | string[]>;
+    navigation = navigate(state);
+  }, { once: true });
+  render(renderWhyDisclosure({ title: 'chosen-orchard.md', trace: [
+    { id: 'sparse-retrieval', rank: 1, score: 12.4 }, { id: 'cross-encoder', rank: 1, score: 0.98 },
+  ] }), source);
+  source.querySelector<HTMLButtonElement>('[data-testid="hit-why-explain"]')!.click();
+  await navigation; await drain(view);
+  const prompt = 'Explain why this result ("chosen-orchard.md") ranked where it did.';
+  expect(state).toEqual({ query: prompt, affordance: 'none', docIds: [], forceShapeId: 'core.summarize' });
+  expect(dispatches()).toHaveLength(0);
+  const body = await send(view);
+  expect(body.shapeId).toBe('core.summarize'); expect(body.prompt).toBe(prompt);
+  expect(body.selection).toEqual({ kind: 'search-trace', scope: 'hit', summary: 'sparse-retrieval #1 12.40 · cross-encoder #1 0.98' });
+});
+it('HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask', async () => {
+  const view = await mount();
+  await navigate({ query: 'Who leads this project?', mode: 'ask', forceShapeId: 'core.free-chat', docIds: ['chosen.md'] });
+  await drain(view); const notice = (await composer(view)).shadowRoot!.textContent;
+  expect(dispatches()).toHaveLength(0);
+  const body = await send(view);
+  expect(body.shapeId).toBe('core.rag-ask'); expect(body.docIds).toEqual(['chosen.md']);
+  expect(body.selection).toEqual({ kind: 'result-set', items: [{ id: 'chosen.md', kind: 'doc' }] });
+  expect(notice).toMatch(/cannot read files.*Prepared in Ask/s);
 });
 it('HO8 two arrivals replace preparation without sending', async () => {
   const view = await mount();

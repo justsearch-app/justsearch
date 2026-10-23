@@ -3006,7 +3006,7 @@ export class SearchV3View extends JfElement {
     this.tier = shape === null ? 'search' : shape === 'core.extract' ? 'structured' : 'ask';
     this.tierFollowsPlace = false;
     const allowed = ['core.rag-ask', 'core.free-chat', 'core.summarize', 'core.extract'];
-    const shapeId: ShapeId | 'core.summarize' = allowed.includes(shape ?? '') ? shape as ShapeId | 'core.summarize' : 'core.rag-ask';
+    let shapeId: ShapeId | 'core.summarize' = allowed.includes(shape ?? '') ? shape as ShapeId | 'core.summarize' : 'core.rag-ask';
     if (shape !== null && !allowed.includes(shape)) this.handoffNotice = 'This shape is unavailable. Prepared in Ask; review before sending.';
     let paths: string[] = [];
     if (Array.isArray(state.docIds)) paths = state.docIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '');
@@ -3020,6 +3020,10 @@ export class SearchV3View extends JfElement {
       }
     }
     paths = [...new Set(paths)].filter(path => typeof path === 'string' && path.trim() !== '');
+    if (paths.length > 0 && shapeId === 'core.free-chat') {
+      shapeId = 'core.rag-ask';
+      this.handoffNotice = 'This mode cannot read files. Prepared in Ask over the chosen files; review before sending.';
+    }
     const invalidSelection = selection !== null &&
       (!['item', 'text-range', 'citation', 'result-set', 'search-trace', 'health-condition'].includes(selection.kind) ||
        ['item', 'text-range', 'citation', 'result-set'].includes(selection.kind) && paths.length === 0);
@@ -3028,7 +3032,7 @@ export class SearchV3View extends JfElement {
     if (shape !== null) {
       this.preparedHandoff = { shapeId, selection: selection ?? (paths.length > 0
         ? { kind: 'result-set', items: paths.map(id => ({ id, kind: 'doc' as const })) } : null) };
-      if (Object.hasOwn(state, 'docIds') && paths.length === 0 && shapeId !== 'core.extract' ||
+      if (Object.hasOwn(state, 'docIds') && paths.length === 0 && shapeId !== 'core.extract' && selection === null ||
           shapeId === 'core.summarize' && paths.length === 0 && selection === null) {
         this.handoffBlocked = true;
         this.handoffNotice = 'No readable document was supplied. Choose a file before sending.';
