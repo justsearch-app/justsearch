@@ -64,6 +64,7 @@ public final class ObservationJustifications {
       Map.entry("GET /api/indexing-jobs/stream", "CONSUMER: ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.ts via ui-web/src/shell-v0/chrome/Shell.ts ongoing job subscription started on shell connect"),
       Map.entry("GET /api/indexing-roots/substrate", "CONSUMER: ui-web/src/shell-v0/views/LibrarySurface.ts automatic roots refresh on mount and status updates"),
       Map.entry("GET /api/indexing/failed-jobs", "CONSUMER: ui-web/src/shell-v0/views/HealthSurface.ts failed-job mount hydration"),
+      Map.entry("GET /api/indexing/excludes", "CONSUMER: ui-web/src/shell-v0/views/LibrarySurface.ts loadExcludesPolicy hydrates the effective exclusion list and its winning source before Preview or Apply"),
       Map.entry("GET /api/indexing/roots", "CONSUMER: ui-web/src/shell-v0/views/BrowseSurface.ts mount hydration via api/domains/indexing.ts"),
       Map.entry("GET /api/inference/encoders", "STATUS: currently loaded encoder runtime and device state (encoderRuntimeHandler)"),
       Map.entry("GET /api/inference/status", "STATUS: inference readiness/state"),

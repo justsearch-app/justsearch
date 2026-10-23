@@ -90,6 +90,8 @@ export interface BackendLedgerEntry {
 
 /** A single row in the unified activity stream — backend record OR FE-local effect. */
 export interface UnifiedActionEntry {
+  /** Read details from the existing receipt rather than duplicating them in the audit journal. */
+  readonly operationOutcomeKey?: string;
   /** Stable event id (the one ActionEvent schema's key) — a render key + dedup handle. */
   readonly id: string;
   /** Where the record came from: an authoritative backend record, or a FE-local effect. */
@@ -302,6 +304,10 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // tempdoc 558 Deepening 3 — structured outcome (operation rows: SUCCESS/FAILURE/UNDONE; absent
     // elsewhere). Conditional-spread so an absent outcome stays absent (exactOptionalPropertyTypes-safe).
     ...(e.outcome ? { outcome: e.outcome } : {}),
+    ...(e.kind === 'operation'
+      && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')
+      && /^operation:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(e.id)
+      ? { operationOutcomeKey: e.id.slice('operation:'.length) } : {}),
     // Tempdoc 613 §6/§10 + 612 §3/§L — flag routine direct-user rows so the default Activity feed can
     // exclude them (the de-flood): navigation + witnessed local-ack/preference effects, and insignificant
     // user operations (LOW/no-confirm/no-affects). Everything else stays foreground.

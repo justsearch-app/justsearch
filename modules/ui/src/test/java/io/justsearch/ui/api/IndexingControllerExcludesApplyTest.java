@@ -286,15 +286,15 @@ class IndexingControllerExcludesApplyTest {
     }
 
     @Override
-    public int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
+    public PrefixDeletionOutcome deleteDocsByPathPrefixWithOutcome(Path pathPrefix, EngineContext engineContext) {
       deletedByPathPrefixes.add(pathPrefix.toAbsolutePath().normalize());
-      return 3;
+      return new PrefixDeletionOutcome(true, 3, "");
     }
 
     @Override
-    public boolean deleteDocById(String docId, EngineContext engineContext) {
+    public DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
       deletedDocIds.add(docId);
-      return true;
+      return new DeletionOutcome(true, "");
     }
   }
 }

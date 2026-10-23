@@ -23,7 +23,18 @@ public record OperationHistoryEntry(
     Optional<String> diagnosticsLink,
     InvocationProvenance provenance,
     Optional<String> executionId,
-    Optional<String> operationKey) {
+    Optional<String> operationKey,
+    Optional<String> message) {
+
+  /** Explanations are derived on reads, never stored in the operation receipt. */
+  public OperationHistoryEntry(OperationRef operationId, String actor, Instant startTime, Instant endTime,
+      OperationOutcome outcome, Optional<String> diagnosticsLink, InvocationProvenance provenance,
+      Optional<String> executionId, Optional<String> operationKey) {
+    this(operationId, actor, startTime, endTime, outcome, diagnosticsLink, provenance, executionId,
+        operationKey, outcome == OperationOutcome.FAILURE
+            ? diagnosticsLink.map(code -> io.justsearch.app.api.operations.BulkReindexFailureMessage
+                .forOperation(operationId.value(), code)) : Optional.empty());
+  }
 
   /** Legacy live observations have no committed invocation key. */
   public OperationHistoryEntry(OperationRef operationId, String actor, Instant startTime, Instant endTime,
@@ -42,6 +53,7 @@ public record OperationHistoryEntry(
     Objects.requireNonNull(provenance, "provenance");
     Objects.requireNonNull(executionId, "executionId");
     Objects.requireNonNull(operationKey, "operationKey");
+    Objects.requireNonNull(message, "message");
     operationKey.ifPresent(key -> {
       if (key.isBlank()) throw new IllegalArgumentException("operationKey must be non-blank when present");
     });

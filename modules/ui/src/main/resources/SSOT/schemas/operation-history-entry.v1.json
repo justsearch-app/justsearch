@@ -15,6 +15,9 @@
     "executionId" : {
       "type" : [ "string", "null" ]
     },
+    "message" : {
+      "type" : [ "string", "null" ]
+    },
     "operationId" : {
       "type" : "string",
       "pattern" : "^(core|vendor\\.[a-z][a-z0-9-]*)\\.[a-z][a-z0-9-]*$"

@@ -37,9 +37,11 @@
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import type { SseEnvelope } from '../streaming/envelope-types.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
-import { requestAuthorization, type AuthorizationPrompt } from './authorizationBroker.js';
-import { getOperationClient } from './OperationClient.js';
+import { requestAuthorization, withdrawAuthorization, type AuthorizationPrompt } from './authorizationBroker.js';
+import { getOperationClient, isStaleAuthorization } from './OperationClient.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
+import { openActionLedgerStream } from './ActionLedgerClient.js';
+import { subscribeStatus } from '../utils/statusPoll.js';
 
 /** Wire shape of the SLIMMED `PendingAuthorizationEvent` — routing info only, no decision content. */
 interface PendingAuthorizationPayload {
@@ -75,6 +77,27 @@ export function startPendingAuthorizationBridge(
   // live REST caller (unlikely for MCP, always true for the browser's own 428s, which are
   // broadcast here too for a uniform signal) would otherwise be presented twice.
   const handledIds = new Map<string, true>();
+  const waiting = new Map<string, { checking: boolean }>();
+  let stopped = false;
+
+  // Reuse the existing operation stream for prompt completion, and the shared status cadence
+  // for expiry / Engine restart. Only requests with an open ceremony are read; no new timer.
+  const reconcile = (): void => {
+    for (const [id, entry] of waiting) {
+      if (entry.checking) continue;
+      entry.checking = true;
+      void getOperationClient(apiBase).peekPending(id).then(detail => {
+        if (!stopped && waiting.get(id) === entry && !detail) {
+          waiting.delete(id);
+          withdrawAuthorization(id);
+        }
+      }).catch(() => {
+        // A transport failure is not evidence that a request was answered or expired.
+      }).finally(() => { entry.checking = false; });
+    }
+  };
+  const stopActivity = openActionLedgerStream({ multiplex, onActivity: reconcile });
+  const stopStatus = subscribeStatus(snapshot => { if (snapshot) reconcile(); });
 
   const stopSub = multiplex.subscribe<{ lastPayload: PendingAuthorizationPayload | null }>(
     SHELL_EVENT_STREAM_IDS.PENDING_AUTHORIZATIONS,
@@ -103,18 +126,27 @@ export function startPendingAuthorizationBridge(
         if (oldest === undefined) break;
         handledIds.delete(oldest);
       }
-      void presentAndExecute(apiBase, payload);
+      const entry = { checking: false };
+      waiting.set(payload.pendingId, entry);
+      void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(payload.pendingId!) === entry)
+        .finally(() => waiting.delete(payload.pendingId!));
     },
   );
 
   return () => {
+    stopped = true;
+    stopActivity();
+    stopStatus();
     stopSub();
+    for (const id of waiting.keys()) withdrawAuthorization(id);
+    waiting.clear();
   };
 }
 
 async function presentAndExecute(
   apiBase: string,
   payload: PendingAuthorizationPayload,
+  isCurrent: () => boolean,
 ): Promise<void> {
   const pendingId = payload.pendingId as string;
   const client = getOperationClient(apiBase);
@@ -129,7 +161,9 @@ async function presentAndExecute(
     console.warn('Tempdoc 655: failed to fetch pending authorization detail', err);
     return;
   }
+  if (!isCurrent()) return;
   if (!detail) {
+    withdrawAuthorization(pendingId);
     return;
   }
 
@@ -143,15 +177,14 @@ async function presentAndExecute(
     ...(detail.requestedBy ? { requestedBy: detail.requestedBy } : {}),
   };
   const decision = await requestAuthorization(prompt);
-  if (!decision.approved) {
+  if (!isCurrent() || decision.superseded) return;
+  if (decision.failedClosed) {
     // Tempdoc 807 item 4: an explicit human deny is a decision and needs no message — but a
     // FAIL-CLOSED outcome (no host mounted, or a mounted host torn down with this ceremony still
     // open) is a failure wearing a deny's clothes. Round 13 saw exactly that shape: the modal
     // dismissed, nothing dispatched, and nothing told the user why. Same channel as every other
     // outcome this function reports.
-    if (decision.failedClosed) {
-      reportExecutionFailure(prompt, 'the approval ceremony closed before the decision was sent');
-    }
+    reportExecutionFailure(prompt, 'the approval ceremony closed before the decision was sent');
     // The pending record itself expires server-side (5-minute TTL) if never approved; there is no
     // separate "reject" round trip to make for an MCP-originated pending.
     return;
@@ -170,10 +203,12 @@ async function presentAndExecute(
   } catch (err) {
     console.warn('Tempdoc 655 fix pass: re-peek before approve failed, proceeding anyway', err);
   }
+  if (!isCurrent()) return;
   if (!stillPending) {
-    reportExecutionFailure(prompt, 'the request expired before the approval could be completed');
+    reportNoLongerPending(prompt);
     return;
   }
+  if (!decision.approved) return;
 
   try {
     const result = await client.approveAndExecutePending(pendingId, decision.allowAlways);
@@ -189,6 +224,10 @@ async function presentAndExecute(
       reportExecutionFailure(prompt, result.executeMessage ?? 'the action did not complete');
     }
   } catch (err) {
+    if (isStaleAuthorization(err)) {
+      reportNoLongerPending(prompt);
+      return;
+    }
     // Best-effort: the approval ceremony already resolved (the human said yes), so there's no
     // live caller awaiting this promise to report a failure to, unlike the REST-triggered path
     // (invokeWithConsent), which throws back into its own call stack. Unlike before the fix pass,
@@ -197,6 +236,13 @@ async function presentAndExecute(
     // exactly this "nobody is synchronously awaiting this promise" shape.
     reportExecutionFailure(prompt, err instanceof Error ? err.message : String(err));
   }
+}
+
+function reportNoLongerPending(prompt: AuthorizationPrompt): void {
+  emitEphemeralToast({
+    message: `Request for '${prompt.operationId}' is no longer pending (answered or expired).`,
+    severity: 'info',
+  });
 }
 
 /**
