@@ -766,7 +766,8 @@ public final class ConversationEngine {
           mergedDoneEntries.putAll(result.donePayloadEntries());
         }
         mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
-        if ("core.extract".equals(shape.id().value()) && !injectorRun.citations.isEmpty()) {
+        if (("core.extract".equals(shape.id().value()) || "core.summarize".equals(shape.id().value()))
+            && !injectorRun.citations.isEmpty()) {
           mergedDoneEntries.put("citations", injectorRun.citations);
         }
 

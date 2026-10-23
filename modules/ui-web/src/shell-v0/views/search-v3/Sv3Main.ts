@@ -2094,7 +2094,7 @@ export class Sv3Main extends JfElement {
   /** WP1.1 S1.6 — the files this question was limited to, said under it; nothing when unlimited. */
   private scopeLine(turn: Sv3Turn): TemplateResult | typeof nothing {
     const scope = this.turnScopes?.get(turn.id) ?? null;
-    if (scope === null) return nothing;
+    if (scope === null) return turn.shapeId === 'core.summarize' ? html`<p class="ask-scope">Summarize. Retry/Edit requires the original files or passage; after reload, choose them again before sending.</p>` : nothing;
     return html`<p class="ask-scope" data-testid="sv3-turn-scope">Limited to ${sv3ScopeLabel(scope)}</p>`;
   }
 
@@ -2135,7 +2135,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+        ${turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
       </p>
       <div class="ask-edit-acts">
         <jf-control

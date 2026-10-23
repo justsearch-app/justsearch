@@ -44,6 +44,7 @@
  * checkpoint that actually does something.
  */
 
+import { parkSearchV3Handoff, takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../utils/compose.js';
 import { coerceAndValidate } from './stateValidator.js';
 import { getSurfaceStateSchema, resolveSurfaceStateSchema } from './surfaceSchemas.js';
 import type { StoreAdapter } from './storeRegistry.js';
@@ -184,6 +185,18 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
         }
         config.openModal?.(addr.target, addr.state, { pushed });
         return;
+      }
+
+      // A hand-off is read once, never URL-projected. Its verb's task outranks a conversation id.
+      if (addr.target === 'core.search-v3-surface' &&
+          ['query', 'docIds', 'forceShapeId', 'mode'].some(key => Object.hasOwn(addr.state, key))) {
+        parkSearchV3Handoff(addr.state);
+        addr = { ...addr, state: {} };
+      } else {
+        takeSearchV3Handoff();
+        if (addr.target !== 'core.unified-chat-surface') {
+          takePendingForceShape(); takePendingSelection(); takePendingAutoRun();
+        }
       }
 
       // 1. Distribute state to registered StoreAdapters per the schema.

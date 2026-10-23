@@ -83,7 +83,7 @@ export const SHAPE_LABELS: Record<ShapeId, string> = {
 };
 
 export function buildRequestBody(
-  shapeId: ShapeId,
+  shapeId: ShapeId | 'core.summarize',
   text: string,
   sessionId: string,
   schemaDraft: string,
@@ -99,6 +99,12 @@ export function buildRequestBody(
       // to the referenced docs instead of silently degrading to open-retrieval.
       // Empty array preserves the open-retrieval fallback in RAGAskShape.
       body.docIds = docIds;
+      break;
+    case 'core.summarize':
+      body.prompt = text;
+      if (!selection && docIds.length > 0) {
+        body.selection = { kind: 'result-set', items: [...new Set(docIds)].map(id => ({ id, kind: 'doc' })) };
+      }
       break;
     case 'core.extract':
       body.prompt = text;

@@ -1,0 +1,399 @@
+// @vitest-environment happy-dom
+// SPDX-License-Identifier: Apache-2.0
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import './SearchV3View.js';
+import type { SearchV3View } from './SearchV3View.js';
+import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
+import { __resetConversationListForTest } from '../../state/conversationListStore.js';
+import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
+import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
+import { setLastViewedConversation } from '../../controllers/lastViewedConversation.js';
+import { resetSearchState } from '../../state/searchState.js';
+
+import type { StatusSnapshot } from '../../utils/statusPoll.js';
+
+import { getAgentSessionController, __resetAgentSessionStore } from '../../state/agentSessionStore.js';
+import { registerCoreStores } from '../../router/bootstrap.js';
+import { createNavigationHandler } from '../../router/navigationHandler.js';
+import { createIntentRouter } from '../../router/intentRouter.js';
+import { deactivateProjection } from '../../router/URLProjector.js';
+import * as contextMenus from '../../components/ContextMenu.js';
+import { setPendingSelection, setPendingForceShape, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../../utils/compose.js';
+
+type ElementView = HTMLElement & { updateComplete: Promise<unknown> };
+let fetchMock: ReturnType<typeof vi.fn>;
+const answer = 'summary';
+const q = <T extends Element = HTMLElement>(host: ElementView, id: string): T | null =>
+  host.shadowRoot?.querySelector<T>(`[data-testid="${id}"]`) ?? null;
+const dispatches = (): unknown[][] => fetchMock.mock.calls.filter(c => String(c[0]).includes('/api/chat/dispatch'));
+async function drain(view: ElementView): Promise<void> {
+  for (let i = 0; i < 6; i++) await new Promise<void>(resolve => setTimeout(resolve, 0));
+  await view.updateComplete;
+}
+async function composer(view: ElementView): Promise<ElementView> {
+  const c = view.shadowRoot!.querySelector('jf-sv3-composer') as ElementView;
+  await c.updateComplete; return c;
+}
+async function mount(): Promise<SearchV3View> {
+  const view = document.createElement('jf-sv3-window') as SearchV3View;
+  document.body.append(view); await drain(view); return view;
+}
+async function navigate(state: Record<string, string | string[]>): Promise<void> {
+  registerCoreStores();
+  await createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} })
+    .handle({ kind: 'navigate', target: 'core.search-v3-surface', state });
+}
+async function send(view: SearchV3View): Promise<Record<string, unknown>> {
+  const c = await composer(view); q<HTMLButtonElement>(c, 'sv3-composer-send')!.click();
+  await drain(view);
+  expect(dispatches()).toHaveLength(1);
+  return JSON.parse((dispatches()[0]![1] as RequestInit).body as string);
+}
+beforeEach(() => {
+  registerCoreStores();
+  sessionStorage.clear(); localStorage.clear();
+  __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest();
+  __resetAiStateForTest();
+  __feedForTest({ inference: { mode: 'online', available: true } as never,
+    status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
+  __feedContactForTest();
+  fetchMock = vi.fn(async (url: unknown) => {
+    if (!String(url).includes('/api/chat/dispatch')) return { ok: true, status: 200, json: async () => ({}) };
+    const encoder = new TextEncoder();
+    const frames = [
+      ['rag.citations', { citations: [{ parentDocId: 'docs/a.md', chunkIndex: 0, excerpt: 'source' }] }],
+      ['chunk', { text: '{rejected}' }],
+      ['chunk', { text: answer }],
+      ['done', { finalResponse: answer }],
+    ].map(([event, data]) => ({ done: false, value: encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) }));
+    return { ok: true, status: 200, body: { getReader: () => ({
+      read: async () => frames.shift() ?? { done: true }, releaseLock: () => {}, cancel: () => {},
+    }) } };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+});
+afterEach(async () => {
+  deactivateProjection();
+  takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
+  document.body.replaceChildren();
+  // Disconnect closes the window's subscriptions and stream; settle its outstanding promises.
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
+  resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();
+  vi.unstubAllGlobals(); vi.restoreAllMocks();
+});
+it('HO1 HO2 a cold address query arrives intact and is consumed from the address', async () => {
+  const text = '# & % "日本語" ' + 'long '.repeat(100);
+  await navigate({ query: text, conversationId: 'ignored' });
+  const view = await mount(); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe(text);
+  expect(c.getAttribute('tier')).toBe('search');
+  expect(window.location.hash).not.toContain('query=');
+  expect(dispatches()).toHaveLength(0);
+});
+it.each(['core.rag-ask', 'core.summarize', 'core.extract'])('HO3 HO4 HO5 %s prepares the chosen files and waits', async shape => {
+  const view = await mount();
+  setPendingForceShape(shape);
+  await navigate({ query: 'Describe risks', forceShapeId: shape, docIds: ['chosen.md'] });
+  await drain(view); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('Describe risks');
+  expect(c.shadowRoot!.textContent).toContain('chosen.md');
+  expect(dispatches()).toHaveLength(0);
+  if (shape === 'core.extract') return; // schema must be supplied by the reader
+  const body = await send(view);
+  expect(body.shapeId).toBe(shape);
+  if (shape === 'core.rag-ask') {
+    expect(body.docIds).toEqual(['chosen.md']);
+    expect(body.selection).toEqual({ kind: 'result-set', items: [{ id: 'chosen.md', kind: 'doc' }] });
+  }
+  else expect(body.selection).toEqual({ kind: 'result-set', items: [{ id: 'chosen.md', kind: 'doc' }] });
+  expect(takePendingForceShape()).toBeNull();
+});
+it('HO3 HO5 HO9 a selection is local to its prepared turn', async () => {
+  const view = await mount();
+  const selection = { kind: 'text-range', address: { coords: 'canonical', docId: 'chosen.md', startChar: 2, endChar: 7 }, selectionText: 'slice', hostEntity: { kind: 'doc', id: 'chosen.md' } } as const;
+  setPendingSelection(selection); setPendingForceShape('core.summarize');
+  await navigate({ query: 'Summarize the passage', forceShapeId: 'core.summarize' });
+  await drain(view);
+  expect(takePendingSelection()).toBeNull();
+  expect((await send(view)).selection).toEqual(selection);
+});
+it('HO8 two arrivals replace preparation without sending', async () => {
+  const view = await mount();
+  await navigate({ query: 'first', forceShapeId: 'core.summarize', docIds: ['first.md'] });
+  await navigate({ query: 'later', forceShapeId: 'core.rag-ask', docIds: ['later.md'] });
+  await drain(view); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('later');
+  expect((await send(view)).docIds).toEqual(['later.md']);
+});
+it('HO8 an incoming query replaces typed Search without creating a conversation place', async () => {
+  const view = await mount(); const c = await composer(view);
+  const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+  input.value = 'previous search'; input.dispatchEvent(new Event('input')); await drain(view);
+  await navigate({ query: 'replacement search' }); await drain(view);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('replacement search');
+  expect((view as unknown as { sessions: { sessions: unknown[] } }).sessions.sessions).toHaveLength(0);
+  expect(dispatches()).toHaveLength(0);
+});
+it('HO8 a cold hand-off keeps the restored draft with its previous conversation', async () => {
+  savedBackend(); const previous = await mount(); const oldComposer = await composer(previous);
+  const input = q<HTMLTextAreaElement>(oldComposer, 'sv3-composer-input')!;
+  input.value = 'draft before cold navigation'; input.dispatchEvent(new Event('input')); await drain(previous);
+  window.dispatchEvent(new Event('pagehide')); previous.remove();
+  __resetConversationListForTest();
+  await navigate({ query: 'incoming cold task', forceShapeId: 'core.rag-ask', docIds: ['chosen.md'] });
+  const view = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('incoming cold task');
+  view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
+    bubbles: true, composed: true, detail: { id: 'saved' },
+  })); await drain(view);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('draft before cold navigation');
+  expect((await composer(view)).getAttribute('tier')).toBe('ask');
+  expect(dispatches()).toHaveLength(0);
+});
+it('HO11 an answer link ignores agent affordance and conversation and waits', async () => {
+  const view = await mount();
+  const nav = createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} });
+  const router = createIntentRouter({ navigationHandler: nav, invocationHandler: { handle: vi.fn() },
+    isKnownSurface: () => true, resolveSurface: id => ({ status: 'resolved', id }),
+    resolveOperation: id => ({ status: 'resolved', id }), answerSurfaceId: 'core.search-v3-surface' });
+  await router.dispatch({ transport: 'URL_DEEPLINK', address: { kind: 'answer', prompt: 'question', shape: 'core.agent-run', state: { affordance: 'agent', conversationId: 'unrelated' } } });
+  await drain(view); const c = await composer(view);
+  expect(c.getAttribute('tier')).toBe('ask');
+  expect(dispatches()).toHaveLength(0);
+  expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/api/chat/agent'))).toBe(false);
+  expect(takePendingAutoRun()).toBe(false);
+  expect(c.shadowRoot!.textContent).toContain('Ask');
+});
+it('HO13 an empty file hand-off cannot widen to the whole index', async () => {
+  const view = await mount();
+  await navigate({ query: 'question', forceShapeId: 'core.rag-ask', docIds: [] });
+  await drain(view); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('question');
+  q<HTMLButtonElement>(c, 'sv3-composer-send')?.click(); await drain(view);
+  expect(dispatches()).toHaveLength(0);
+  expect(c.shadowRoot!.textContent).toMatch(/file|document/i);
+});
+const savedUserId = '11111111-2222-4333-8444-555555555550';
+const savedAnswerId = '11111111-2222-4333-8444-555555555551';
+function savedBackend(historyOverrides: Record<string, unknown> = {}): void {
+  const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
+  const messages = [
+    { id: savedUserId, role: 'user', content: 'saved summary', shapeId: 'core.summarize' },
+    { id: savedAnswerId, role: 'assistant', content: answer, shapeId: 'core.summarize' },
+  ];
+  fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
+    const href = String(url);
+    const reply = (body: unknown): object => ({ ok: true, status: 200, json: async () => body });
+    if (href.includes('/branch?')) return reply({ sessionId: 'fork' });
+    if (href.includes('/history')) return reply({ sessionId: href.includes('/saved/') ? 'saved' : 'fork',
+      messages: href.includes('/saved/') ? messages : [], ...historyOverrides });
+    if (href.includes('/api/thread/')) return reply({ conversationId: 'saved', events: href.endsWith('/saved')
+      ? messages.map((m, i) => ({ id: m.id, occurredAt: `2026-08-19T10:00:0${i}Z`,
+          kind: i === 0 ? 'USER_MESSAGE' : 'ASSISTANT_MESSAGE', originator: m.role,
+          content: m.content, attributes: { shapeId: m.shapeId } })) : [] });
+    if (href.endsWith('/api/chat/conversations') || href.includes('/api/chat/conversations?')) return reply({ sessions: [{ sessionId: 'saved',
+      createdAtMs: 1, lastActiveAtMs: 2, messageCount: 2, firstUserMessage: 'saved summary', shapeId: 'core.summarize' }] });
+    return previous(url, init);
+  });
+  setLastViewedConversation('saved');
+}
+
+
+it('HO7 a reloaded summary Retry menu names the original summary inputs', async () => {
+  savedBackend(); const menu = vi.spyOn(contextMenus, 'openContextMenu').mockResolvedValue(null);
+  const view = await mount();
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView; await main.updateComplete;
+  const turnId = (q(main, 'sv3-turn-question')!.getAttribute('data-item-id') ?? '').replace(/:q$/, '');
+  main.dispatchEvent(new CustomEvent('sv3-context-menu', { bubbles: true, composed: true, detail: { turnId, x: 1, y: 1 } }));
+  await drain(view);
+  const retry = menu.mock.calls[0]?.[0].actions.find(item => item.id === 'retry');
+  expect(retry).toBeDefined();
+  expect(retry!.label).toMatch(/Summarize.*original (files|input|passage)/i);
+  expect(retry!.label).not.toContain('all files');
+});
+it.each(['retry', 'edit'])('HO7 a reloaded summary %s states its missing inputs and never sends an all-files Ask', async action => {
+  savedBackend(); const view = await mount();
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView; await main.updateComplete;
+  const turnId = (q(main, 'sv3-turn-question')!.getAttribute('data-item-id') ?? '').replace(/:q$/, '');
+  main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true,
+    detail: { action, turnId, ...(action === 'edit' ? { text: 'edited summary' } : {}) } }));
+  await drain(view); const c = await composer(view);
+  expect(dispatches()).toHaveLength(0);
+  expect(c.shadowRoot!.textContent).toMatch(/summary|summarize/i);
+  expect(c.shadowRoot!.textContent).toMatch(/input|file|passage/i);
+});
+it('HO8 an outgoing conversation keeps its unsent draft and files one click away', async () => {
+  const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
+  const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+  input.value = 'unsent draft'; input.dispatchEvent(new Event('input'));
+  (view as unknown as { search: { prepare(scope: { paths: string[] }): void } }).search.prepare({ paths: ['previous.md'] });
+  await navigate({ query: 'incoming task', forceShapeId: 'core.summarize', docIds: ['incoming.md'] });
+  await drain(view);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('incoming task');
+  const sidebar = view.shadowRoot!.querySelector('jf-sv3-sidebar')!;
+  sidebar.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } }));
+  await drain(view);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('unsent draft');
+  expect((view as unknown as { search: { pendingScope: unknown } }).search.pendingScope).toEqual({ paths: ['previous.md'] });
+  expect(dispatches()).toHaveLength(0);
+});
+
+it('HO9 abandoning a prepared selection cannot attach it to another mode send', async () => {
+  const view = await mount();
+  setPendingSelection({ kind: 'item', itemKind: 'browse-node', itemId: 'old.md' });
+  await navigate({ query: 'question', forceShapeId: 'core.summarize' }); await drain(view);
+  const c = await composer(view);
+  c.dispatchEvent(new CustomEvent('sv3-tier-change', { bubbles: true, composed: true, detail: { tier: 'search' } }));
+  c.dispatchEvent(new CustomEvent('sv3-tier-change', { bubbles: true, composed: true, detail: { tier: 'ask' } }));
+  await drain(view);
+  const body = await send(view);
+  expect(body.shapeId).toBe('core.rag-ask'); expect(body.selection).toBeUndefined(); expect(body.docIds).toEqual([]);
+});
+it('HO9 abandoning a hand-off for an unvisited conversation clears its file scope', async () => {
+  savedBackend(); sessionStorage.clear();
+  await navigate({ query: 'incoming summary', forceShapeId: 'core.summarize', docIds: ['chosen.md'] });
+  const view = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('incoming summary');
+  expect((view as unknown as { search: { pendingScope: unknown } }).search.pendingScope).toEqual({ paths: ['chosen.md'] });
+  view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
+    bubbles: true, composed: true, detail: { id: 'saved' },
+  })); await drain(view);
+  expect((view as unknown as { sessions: { activeId: string } }).sessions.activeId).toBe('saved');
+  expect((view as unknown as { search: { pendingScope: unknown } }).search.pendingScope).toBeNull();
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = 'different question'; input.dispatchEvent(new Event('input')); await drain(view);
+  const body = await send(view);
+  expect(body.shapeId).toBe('core.rag-ask'); expect(body.selection).toBeUndefined(); expect(body.docIds).toEqual([]);
+});
+it('HO9 leaving the window retires prepared context while a layout reparent keeps it', async () => {
+  const view = await mount();
+  await navigate({ query: 'incoming summary', forceShapeId: 'core.summarize', docIds: ['chosen.md'] }); await drain(view);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('incoming summary');
+  view.remove(); document.body.append(view); await drain(view);
+  expect((view as unknown as { search: { pendingScope: unknown } }).search.pendingScope).toEqual({ paths: ['chosen.md'] });
+  view.remove(); await drain(view); document.body.append(view); await drain(view);
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = 'unrelated question after return'; input.dispatchEvent(new Event('input')); await drain(view);
+  const body = await send(view);
+  expect(body.shapeId).toBe('core.rag-ask'); expect(body.selection).toBeUndefined(); expect(body.docIds).toEqual([]);
+});
+it('HO10 unavailable chat still shows the prepared task and chosen files', async () => {
+  const view = await mount();
+  __feedForTest({ inference: { mode: 'unavailable', available: false } as never });
+  await navigate({ query: 'summarize the risks', forceShapeId: 'core.summarize', docIds: ['chosen.md'] });
+  await drain(view); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('summarize the risks');
+  expect(c.shadowRoot!.textContent).toContain('chosen.md');
+  expect(q(c, 'sv3-composer-notice')?.textContent?.trim()).toBeTruthy();
+  expect(dispatches()).toHaveLength(0);
+});
+it('HO12 an incoming task puts keyboard focus in the composer', async () => {
+  const view = await mount(); const elsewhere = document.createElement('input'); document.body.append(elsewhere); elsewhere.focus();
+  await navigate({ query: 'question', forceShapeId: 'core.rag-ask', docIds: ['chosen.md'] }); await drain(view);
+  const c = await composer(view);
+  expect(c.shadowRoot!.activeElement).toBe(q(c, 'sv3-composer-input'));
+});
+it('HO13 malformed selection data is refused visibly without a crash', async () => {
+  const view = await mount(); setPendingSelection({ kind: 'text-range' } as never);
+  await expect(navigate({ query: 'question', forceShapeId: 'core.summarize' })).resolves.toBeUndefined(); await drain(view);
+  const c = await composer(view);
+  expect(c.shadowRoot!.textContent).toContain('Invalid selection');
+  expect(dispatches()).toHaveLength(0);
+});
+
+it('HO8 a streaming Ask stays live and keeps its draft and files across a hand-off', async () => {
+  let stream!: ReadableStreamDefaultController<Uint8Array>;
+  const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
+  fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
+    if (!String(url).includes('/api/chat/dispatch')) return previous(url, init);
+    return new Response(new ReadableStream<Uint8Array>({ start(c) { stream = c; } }));
+  });
+  const view = await mount();
+  const c = await composer(view);
+  c.dispatchEvent(new CustomEvent('sv3-tier-change', { bubbles: true, composed: true, detail: { tier: 'ask' } }));
+  await drain(view);
+  const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+  input.value = 'first question'; input.dispatchEvent(new Event('input')); await drain(view);
+  const body = await send(view); const id = body.conversationId as string;
+  input.value = 'unfinished follow-up'; input.dispatchEvent(new Event('input'));
+  (view as unknown as { search: { prepare(scope: { paths: string[] }): void } }).search.prepare({ paths: ['kept.md'] });
+  await navigate({ query: 'new task', forceShapeId: 'core.summarize', docIds: ['new.md'] }); await drain(view);
+  expect(q(await composer(view), 'sv3-composer-stop')).toBeNull();
+  const signal = (dispatches()[0]![1] as RequestInit).signal!;
+  expect(signal.aborted).toBe(false);
+  view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
+    bubbles: true, composed: true, detail: { id },
+  })); await drain(view);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('unfinished follow-up');
+  expect(q(await composer(view), 'sv3-composer-stop')).not.toBeNull();
+  expect((view as unknown as { search: { pendingScope: unknown } }).search.pendingScope).toEqual({ paths: ['kept.md'] });
+  expect(signal.aborted).toBe(false);
+  stream.enqueue(new TextEncoder().encode('event: chunk\ndata: {"text":"still running"}\n\nevent: done\ndata: {}\n\n')); stream.close();
+  await drain(view);
+  expect(q(await composer(view), 'sv3-composer-stop')).toBeNull();
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('HO8 a held real controller keeps its decision and reopens from the sidebar', async () => {
+  const view = await mount();
+  const ctrl = getAgentSessionController('');
+  ctrl.isStreaming = true; ctrl.sessionId = 'run-held'; ctrl.conversationId = 'held';
+  ctrl.budgetGate = { tokensNeeded: 100, tokensRemaining: 0, totalTokensConsumed: 100 };
+  const resolve = vi.spyOn(ctrl, 'resolveBudgetGate'); const stop = vi.spyOn(ctrl, 'cancelSession');
+  (view as unknown as { onAgentUpdate(): void }).onAgentUpdate();
+  await navigate({ conversationId: 'held' }); await drain(view);
+  await navigate({ query: 'prepared task', forceShapeId: 'core.rag-ask', docIds: ['chosen.md'] }); await drain(view);
+  const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('prepared task');
+  expect(q(c, 'sv3-composer-answer')).toBeNull();
+  expect(ctrl.budgetGate).not.toBeNull(); expect(resolve).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled();
+  view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
+    bubbles: true, composed: true, detail: { id: 'held' },
+  })); await drain(view);
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView; await main.updateComplete;
+  expect(q(main, 'sv3-run-prompt')).not.toBeNull();
+  expect(ctrl.budgetGate).not.toBeNull(); expect(resolve).not.toHaveBeenCalled();
+});
+it('HO8 a locked conversation is left intact by incoming preparation', async () => {
+  const view = await mount(); await navigate({ conversationId: 'locked' }); await drain(view);
+  __feedForTest({ status: { conversationProtection: { state: 'locked' } } as unknown as StatusSnapshot });
+  await navigate({ query: 'keep this instruction', forceShapeId: 'core.summarize', docIds: ['chosen.md'] }); await drain(view);
+  const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('keep this instruction');
+  expect(c.shadowRoot!.textContent).toContain('chosen.md'); expect(dispatches()).toHaveLength(0);
+  expect(fetchMock.mock.calls.filter(call => (call[1] as RequestInit | undefined)?.method === 'POST')).toHaveLength(0);
+});
+it('HO13 a refused unreadable-document hand-off keeps the instruction and files', async () => {
+  const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
+  fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
+    if (!String(url).includes('/api/chat/dispatch')) return previous(url, init);
+    return new Response('event: error\ndata: {"errorCode":"DOC_UNAVAILABLE","error":"Cannot read selected file: deleted.md"}\n\n');
+  });
+  const view = await mount(); await navigate({ query: 'Only summarize risks', forceShapeId: 'core.summarize', docIds: ['deleted.md'] });
+  await drain(view); await send(view); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('Only summarize risks');
+  expect(c.shadowRoot!.textContent).toContain('deleted.md');
+  const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView; await main.updateComplete;
+  expect(main.shadowRoot!.textContent).toContain('Cannot read selected file');
+});
+it('HO3 D7 a Structured hand-off with no files uses typed text and waits for send', async () => {
+  const view = await mount(); await navigate({ query: 'Extract owner: Lin', forceShapeId: 'core.extract', docIds: [] }); await drain(view);
+  const c = await composer(view); const schema = q<HTMLTextAreaElement>(c, 'sv3-composer-schema')!;
+  expect(schema).not.toBeNull();
+  schema.value = '{"type":"object"}'; schema.dispatchEvent(new Event('input')); await drain(view);
+  expect(c.shadowRoot!.textContent).toContain('typed text'); expect(dispatches()).toHaveLength(0);
+  const body = await send(view); expect(body.shapeId).toBe('core.extract'); expect(body.selection).toBeUndefined();
+});
+it('HO12 keyboard palette search after a hand-off returns focus to the composer', async () => {
+  const view = await mount(); await navigate({ query: 'Northfield', forceShapeId: 'core.summarize', docIds: ['chosen.md'] }); await drain(view);
+  const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!; input.focus();
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, composed: true })); await drain(view);
+  const palette = view.shadowRoot!.querySelector('jf-sv3-palette') as ElementView;
+  const field = q<HTMLInputElement>(palette, 'sv3-palette-input'); expect(field).not.toBeNull();
+  field!.value = 'Search everything'; field!.dispatchEvent(new Event('input')); await drain(view);
+  field!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); await drain(view);
+  const current = await composer(view);
+  expect(current.getAttribute('tier')).toBe('search');
+  expect(current.shadowRoot!.activeElement).toBe(q(current, 'sv3-composer-input'));
+  expect(dispatches()).toHaveLength(0);
+});

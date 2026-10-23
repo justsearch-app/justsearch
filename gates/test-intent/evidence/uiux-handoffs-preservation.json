@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T09:46:17.560Z",
+  "revision": "77587606ff8871c1bbc5e9f7bcbce47152470690",
+  "tree": "787afe097723ec0ec81bb8b75b674b08a008b7dd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.promptlessContentKeepsDefaultTask\" --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.promptlessDocumentKeepsDefaultTaskAndCitation\" --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.unreadableAskSelectionIsRefused\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.documentInjectorRefusalsTerminateRealSummaryDispatch\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3940
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java#promptlessContentKeepsDefaultTask",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74bb19da51748c4f86bda5ac741add602f83179d311906f71d93c20000da238e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "promptlessContentKeepsDefaultTask()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java#promptlessDocumentKeepsDefaultTaskAndCitation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74bb19da51748c4f86bda5ac741add602f83179d311906f71d93c20000da238e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "promptlessDocumentKeepsDefaultTaskAndCitation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java#unreadableAskSelectionIsRefused",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74bb19da51748c4f86bda5ac741add602f83179d311906f71d93c20000da238e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableAskSelectionIsRefused()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#documentInjectorRefusalsTerminateRealSummaryDispatch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b113090037bb28b41cc223c07c185a173aea44eed908a5ff3dcecc2bc3395315",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "documentInjectorRefusalsTerminateRealSummaryDispatch()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b0396ef11384c39aa170d97923bf7d4b33b3faf04647661747b8313ababc2094"
+}

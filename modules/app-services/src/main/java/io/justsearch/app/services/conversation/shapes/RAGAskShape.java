@@ -12,6 +12,7 @@ import io.justsearch.agent.api.registry.ConversationShapeRef;
 import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
+import io.justsearch.app.services.conversation.spi.SelectionContextInjector;
 import io.justsearch.app.services.conversation.spi.AnswerShapeGrammar;
 import io.justsearch.app.services.conversation.spi.ExternalContextInjector;
 import io.justsearch.app.services.conversation.spi.QueryRewriteInjector;
@@ -65,7 +66,7 @@ public final class RAGAskShape {
         // identity/style first, then the output-shape rules. Ask tier only, by decision.
         List.of(RAGQAStyle.ID, AnswerShapeGrammar.ID),
         // 603 C2 — QueryRewriteInjector runs BEFORE RAGContext: decontextualize a follow-up, then retrieve.
-        List.of(ExternalContextInjector.ID, QueryRewriteInjector.ID, RAGContext.ID),
+        List.of(ExternalContextInjector.ID, SelectionContextInjector.ID, QueryRewriteInjector.ID, RAGContext.ID),
         // Tempdoc 561 P-E: the passive learning producer runs on RAG-ask turns too.
         List.of(
             StreamingCitationMatcher.ID,

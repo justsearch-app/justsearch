@@ -54,6 +54,46 @@ final class SubstrateDrivenEngineTest {
   @org.junit.jupiter.api.io.TempDir java.nio.file.Path retrievalStoreDir;
 
   @Test
+  void summarySourcesSurviveReloadForDocumentsAndSelections() {
+    for (boolean selected : List.of(false, true)) {
+      var directory = retrievalStoreDir.resolve(selected ? "selection" : "document");
+      var docs = summaryDocuments(new IllegalStateException("unused document"), false);
+      var shape = io.justsearch.app.services.conversation.shapes.SummarizeShape.definition();
+      var engine = newEngineWithStore(shape,
+          List.of(io.justsearch.app.services.conversation.spi.SummarizationStyle.INSTANCE),
+          List.of(new io.justsearch.app.services.conversation.spi.DocAccess(docs),
+              new io.justsearch.app.services.conversation.spi.SelectionContextInjector(docs),
+              io.justsearch.app.services.conversation.spi.UserPromptInjector.INSTANCE),
+          List.of(new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs),
+              io.justsearch.app.services.conversation.spi.SummaryDoneEnricher.INSTANCE),
+          List.of(), new ScriptedAi(List.of("A healthy document.")), new FileConversationStore(directory));
+      var body = new LinkedHashMap<String, Object>();
+      body.put("conversationId", "summary-record");
+      body.put("prompt", "Summarize this document.");
+      if (selected) body.put("selection", Map.of("kind", "result-set", "items",
+          List.of(Map.of("id", "healthy", "kind", "doc"))));
+      else body.put("docId", "healthy");
+      var live = new ArrayList<SseEvent>();
+      engine.run(shape.id(), body, Audience.USER, live::add,
+          io.justsearch.app.services.TestEngineContexts.internal());
+      assertTrue(live.stream().anyMatch(e -> e.name().equals("rag.citations")), "sources were shown live");
+      var history = new FileConversationStore(directory).loadHistory("summary-record");
+      assertEquals(2, history.size());
+      var answer = history.get(1);
+      assertEquals("core.summarize", answer.get("shapeId"));
+      assertEquals("A healthy document.", answer.get("content"));
+      assertNotNull(answer.get("citations"), "Summarize sources must survive reopening the record");
+      var citations = (List<?>) answer.get("citations");
+      assertEquals(1, citations.size());
+      var citation = (Map<?, ?>) citations.getFirst();
+      assertEquals("healthy", citation.get("parentDocId"));
+      assertEquals("healthy document", citation.get("excerpt"));
+      assertEquals(0, ((Number) citation.get("startChar")).intValue());
+      assertEquals("healthy document".length(), ((Number) citation.get("endChar")).intValue());
+    }
+  }
+
+  @Test
   void retrievalExplanationIsRecordedWithTheCompletedAnswer() {
     ContextInjector injector = new ContextInjector() {
       @Override public String id() { return "core.test-retrieval-metadata"; }
@@ -864,7 +904,7 @@ final class SubstrateDrivenEngineTest {
       var events = new ArrayList<SseEvent>();
       summaryEngine(shape, docs, llm).run(shape.id(), body, Audience.USER, events::add,
           io.justsearch.app.services.TestEngineContexts.internal());
-      boolean fallback = List.of("single", "hierarchical", "citation", "result-set").contains(path);
+      boolean fallback = List.of("single", "hierarchical", "citation").contains(path);
       assertEquals(fallback ? 1 : 0, llm.calls.size(), path);
       if (!fallback) {
         String code = path.equals("batch") ? "NO_CONTENT" : path.equals("item") ? "ITEM_UNAVAILABLE" : "DOC_UNAVAILABLE";
@@ -884,7 +924,8 @@ final class SubstrateDrivenEngineTest {
     return newEngine(shape, List.of(io.justsearch.app.services.conversation.spi.SummarizationStyle.INSTANCE),
         List.of(new io.justsearch.app.services.conversation.spi.DocAccess(docs),
             new io.justsearch.app.services.conversation.spi.BatchDocAccess(docs),
-            new io.justsearch.app.services.conversation.spi.SelectionContextInjector(docs)),
+            new io.justsearch.app.services.conversation.spi.SelectionContextInjector(docs),
+            io.justsearch.app.services.conversation.spi.UserPromptInjector.INSTANCE),
         List.of(new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs),
             io.justsearch.app.services.conversation.spi.SummaryDoneEnricher.INSTANCE,
             io.justsearch.app.services.conversation.spi.BatchSummaryDoneEnricher.INSTANCE), List.of(), llm);
