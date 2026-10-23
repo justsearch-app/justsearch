@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T13:54:20.751Z",
+  "revision": "8592620d0b42b8f337c4205bdfde11fca03ef79c",
+  "tree": "fdb6d67144a76bc8b1d55d408f6764d77f6efe84",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesWholeValuesAndWindowLocalEligibility\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.rejectsLongMalformedSourceWithoutRecursion\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesNonLatinClaimAgainstLongMalformedSource\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7181
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesWholeValuesAndWindowLocalEligibility",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesWholeValuesAndWindowLocalEligibility()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#rejectsLongMalformedSourceWithoutRecursion",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsLongMalformedSourceWithoutRecursion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesNonLatinClaimAgainstLongMalformedSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesNonLatinClaimAgainstLongMalformedSource()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d1a89b0a0d0b5f6686011224e0fcde8b040214353bae75341678fb9a18373d20"
+}
