@@ -12,7 +12,7 @@
     {
       "registryType": "mcpb",
       "identifier": "https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/justsearch-mcp.mcpb",
-      "fileSha256": "5aea7450d26f71d9b7b409da95203f7e5d7c8dba7fca4e16b4461a643f3c2593",
+      "fileSha256": "2ebb74ad4f87d37f3686c65651f7021a1591e434ef3084e60f07f6e545fe7426",
       "transport": {
         "type": "stdio"
       }

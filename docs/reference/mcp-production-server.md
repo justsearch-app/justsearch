@@ -203,7 +203,8 @@ An explicit `--port` or `JUSTSEARCH_API_PORT` override requires `JUSTSEARCH_SESS
 without that variable discovery fails with a message naming it. The override selects which
 Engine to use, not whether to prove it: the token is sent only to the Engine of a runtime
 manifest that names the pinned port, after the same live identity and socket-owner proof. A
-pinned port that no manifest names, or whose manifest Engine is not proven, is refused.
+pinned port that no manifest names, or whose manifest Engine is not proven, is refused, and
+discovery ends with that refusal: it never falls back to another Engine.
 
 Production authenticates every request, including reads and streams, except `OPTIONS` and
 `GET`/`HEAD` on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,

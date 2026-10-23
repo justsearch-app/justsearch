@@ -71,6 +71,8 @@ function actionableUnreachableMessage(tried) {
  * Order: JUSTSEARCH_API_PORT pin (the proven Engine of the manifest naming that port, with
  * JUSTSEARCH_SESSION_TOKEN, which the pin requires), then validated runtime manifests
  * (engine-discovery.cjs; engine is the selected candidate, token the one in its manifest).
+ * A refused pin ends discovery (null, with the refusal in triedOut): it never falls back to
+ * another Engine, whose data the operator did not choose.
  */
 async function discoverEngine(triedOut) {
   const tried = triedOut || [];
@@ -89,6 +91,7 @@ async function discoverEngine(triedOut) {
     } else {
       tried.push(`${pin}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`);
     }
+    return null;
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
   tried.push(...describeTried(folders.filter((f) => !f.ok)));

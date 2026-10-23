@@ -104,7 +104,9 @@ export async function pinnedEngine(port, label, attempts) {
  *
  * A pin (1, 2) is used through pinnedEngine(): only as the proven Engine of a manifest naming it,
  * with JUSTSEARCH_SESSION_TOKEN. There is no port probe: a port with no validated manifest behind
- * it is never used. A manifest Engine's session token is the one in that validated manifest.
+ * it is never used. A refused pin ends discovery with the refusal: it never falls back to another
+ * Engine, whose data the operator did not choose. A manifest Engine's session token is the one in
+ * that validated manifest.
  *
  * @param {{ port?: number, verbose?: boolean }} opts
  * @returns {Promise<{ port: number, baseUrl: string, token: string, instanceId: string, dataDir: string, source: string, engine: object, pin?: string }>}
@@ -120,6 +122,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
     log(`Trying explicit port ${explicitPort}...`);
     const found = await pinnedEngine(explicitPort, `--port ${explicitPort}`, attempts);
     if (found) return found;
+    throw notFound(attempts);
   }
 
   // 2. JUSTSEARCH_API_PORT env var (legacy operator override).
@@ -128,6 +131,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
     log(`Trying JUSTSEARCH_API_PORT=${envPort}...`);
     const found = await pinnedEngine(envPort, `JUSTSEARCH_API_PORT=${envPort}`, attempts);
     if (found) return found;
+    throw notFound(attempts);
   }
 
   // 3. Validated runtime manifests (tempdoc 501 — the canonical discovery path).
@@ -151,7 +155,12 @@ export async function discover({ port: explicitPort, verbose } = {}) {
     };
   }
 
-  throw new Error(
+  throw notFound(attempts);
+}
+
+/** The error discover() ends with: every location tried, and how to point it at an Engine. */
+function notFound(attempts) {
+  return new Error(
     'Could not find a running JustSearch instance.\n' +
       'Tried:\n' +
       attempts.map((a) => `  - ${a}`).join('\n') +

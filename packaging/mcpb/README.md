@@ -50,8 +50,9 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    absent), and that token goes only to the Engine of a runtime manifest that names the pinned
    port, with the same proof; if that proof fails, the pin is refused. A stale manifest (its pid
    is gone) that names the pinned port is a refusal, and so is a pin that no manifest names:
-   nothing proves what answers it, so it never gets the token. No token HTTP endpoint or stdout
-   line is used.
+   nothing proves what answers it, so it never gets the token. A refused pin ends discovery
+   with that refusal; the bridge never falls back to another Engine. No token HTTP endpoint or
+   stdout line is used.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a

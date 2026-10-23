@@ -136,8 +136,19 @@ function cleanup(t) {
   return held;
 }
 
+/**
+ * Where test machines live: outside the checkout even when TMPDIR points inside it, since a
+ * machine there would resolve the checkout's node_modules and dev data folders (POSIX: /tmp).
+ */
+const SCRATCH_BASE = (() => {
+  const tmp = fs.realpathSync(os.tmpdir());
+  const rel = path.relative(fs.realpathSync(repoRoot), tmp);
+  const inside = !rel.startsWith('..') && !path.isAbsolute(rel);
+  return inside && process.platform !== 'win32' ? '/tmp' : tmp;
+})();
+
 function tempRoot(t) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'js-engine-discovery-')));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(SCRATCH_BASE, 'js-engine-discovery-')));
   cleanup(t).roots.push(root);
   return root;
 }
@@ -1363,19 +1374,28 @@ for (const kind of Object.keys(PINS)) {
 }
 
 for (const kind of ['--port', 'JUSTSEARCH_API_PORT', 'bundle']) {
-  test(`P3 (${kind}): a pin no runtime manifest names is refused — even a real Engine there is sent nothing, JUSTSEARCH_SESSION_TOKEN included, and the error says to point JUSTSEARCH_DATA_DIR at its data folder`, async (t) => {
-    const root = tempRoot(t);
-    const m = machine(root);
-    const engine = await startService(t);
-    const res = kind === 'bundle'
-      ? await bridgeSession(m, bundle(root), bundlePin(engine.port))
-      : await prodDiscover(m, pinDiscover(kind, engine.port));
-    const label = kind === '--port' ? `--port ${engine.port}` : `JUSTSEARCH_API_PORT=${engine.port}`;
-    assert.notEqual(res.code, 0, `refused\n${res.stderr}`);
-    assert.ok(res.stderr.includes(`${label}: refused, no runtime manifest names this port`), res.stderr);
-    assert.match(res.stderr, /set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found/);
-    assert.deepEqual(engine.requests, [], 'nothing reaches the unnamed pin');
-    assert.equal(engine.stats.connections, 0, 'not even a connection');
+  test(`P3/S2 (${kind}): a refused pin (no runtime manifest names it, or the one that does is not proven) ends discovery with the refusal while a desktop Engine is also up — the client never starts against it, nothing reaches either, and the error says how to fix it`, async (t) => {
+    for (const refusal of ['unnamed', 'not proven']) {
+      const root = tempRoot(t);
+      const m = machine(root);
+      const desktop = await startService(t);
+      nameInManifest(m, desktop);
+      const pinned = await startService(t);
+      const env = {};
+      if (refusal === 'not proven') {
+        env.JUSTSEARCH_DATA_DIR = path.join(root, 'named-data');
+        writeManifest(env.JUSTSEARCH_DATA_DIR, { schemaVersion: 2, pid: await deadPid(), instanceId: 'gone-instance', lifecycle: 'LIFECYCLE_STATE_READY', head: { apiPort: pinned.port } });
+      }
+      const pin = PINS[kind === 'bundle' ? 'JUSTSEARCH_API_PORT' : kind](pinned.port);
+      const res = await bridgeSession(m, kind === 'bundle' ? bundle(root) : PROD_MCP_ENTRY, { ...pin.envExtra, ...env }, { args: pin.args ?? [] });
+      const why = `${refusal}\n${res.stderr}`;
+      assert.notEqual(res.code, 0, `refused: ${why}`);
+      assert.equal(res.messages.find((x) => x.id === 1)?.result, undefined, `no MCP session is set up: ${why}`);
+      assert.ok(res.stderr.includes(`${pin.label}: refused, ${refusal === 'unnamed' ? 'no runtime manifest names this port' : 'the manifest naming this port is not proven'}`), why);
+      if (refusal === 'unnamed') assert.match(res.stderr, /set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found/);
+      assert.deepEqual(pinned.requests, [], `${refusal}: nothing reaches the refused pin`);
+      assert.deepEqual(desktop.requests, [], `${refusal}: discovery ends at the refusal, so the desktop Engine is not even probed`);
+    }
   });
 }
 
