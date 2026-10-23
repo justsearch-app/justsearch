@@ -1,0 +1,139 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T21:00:48.592Z",
+  "revision": "a471ee4358077dcb856d407ebbd1a2c162546c4c",
+  "tree": "20508b36568392bd2b52e844e3ab72e867a93ce0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1257426-1792789243362.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2105
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e815714695475e4df35e7cd25ca114697e24f538a3348d418900d07ed5c648b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 never confirms a held Enter, including its release (typed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "F1 never confirms a held Enter, including its release (typed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "F1 blocks repeat activation of the native confirm button (Enter)",
+          "status": "passed"
+        },
+        {
+          "name": "F1 blocks repeat activation of the native confirm button ( )",
+          "status": "passed"
+        },
+        {
+          "name": "F1 requires release of a fresh Enter before confirming",
+          "status": "passed"
+        },
+        {
+          "name": "preserves one native confirm activation with a fresh 'Enter' press (typed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "preserves one native confirm activation with a fresh ' ' press (typed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "preserves one native confirm activation with a fresh 'Enter' press (typed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "preserves one native confirm activation with a fresh ' ' press (typed=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6c20ccecd2419993de9a3fe09fbe3ef09c217b2c13fa1b93a536f776ffbe5940",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 refuses repeated keydown activation of a Forget trigger",
+          "status": "passed"
+        },
+        {
+          "name": "F2 refuses consent after the memory changes its content",
+          "status": "passed"
+        },
+        {
+          "name": "F2 refuses consent after the memory changes its createdAt",
+          "status": "passed"
+        },
+        {
+          "name": "F2 does not delete an item that vanished during confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "F3 manual reconciliation announces and focuses its resolved outcome (present=false)",
+          "status": "passed"
+        },
+        {
+          "name": "F3 manual reconciliation announces and focuses its resolved outcome (present=true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a471ee435",
+    "revision": "a471ee4358077dcb856d407ebbd1a2c162546c4c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1257426-1792789246740.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1685,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1257426-1792789246740.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+        "classification": "assertion",
+        "detail": "F1 never confirms a held Enter, including its release (typed=false):  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 11 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      CustomEvent {\n        \"AT_TARGET\": 2,\n        \"BUBBLING_PHASE\": 3,\n        \"CAPTURING_PHASE\": 1,\n        \"NONE\": 0,\n        Symbol(composed): true, | F1 never confirms a held Enter, including its release (typed=true):  AssertionError: expected \"vi.fn()\" to not be called at all, but ac"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+        "classification": "assertion",
+        "detail": "F1 refuses repeated keydown activation of a Forget trigger:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/2mvykff3/tmp/test-intent-before-WCHkRA/modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts:56:37\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elia | F2 refuses consent after the memory changes its content:  AssertionError: expected [ '/api/memory/one' ] to have a length of +0 but got "
+      }
+    ]
+  },
+  "digest": "sha256:f476c2764ca3c5a09006e355a73ef9cf0abe8dd6640138fffdcc24a70b37e811"
+}

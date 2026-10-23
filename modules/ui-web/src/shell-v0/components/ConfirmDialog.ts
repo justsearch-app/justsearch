@@ -47,6 +47,7 @@ export class ConfirmDialog extends JfElement {
   declare typedConfirmWord?: string;
   declare typedInput: string;
 
+  private keyPress?: { key: string; target: EventTarget | null };
   private boundKey = (e: KeyboardEvent) => this.onKey(e);
 
   constructor() {
@@ -165,12 +166,15 @@ export class ConfirmDialog extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    document.addEventListener('keydown', this.boundKey);
+    document.addEventListener('keydown', this.boundKey, true);
+    document.addEventListener('keyup', this.boundKey, true);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('keydown', this.boundKey);
+    document.removeEventListener('keydown', this.boundKey, true);
+    document.removeEventListener('keyup', this.boundKey, true);
+    this.keyPress = undefined;
   }
 
   /** The FULL modal contract (574 §22.G) — native `<dialog>` (inert + focus-trap + Top Layer) +
@@ -192,6 +196,7 @@ export class ConfirmDialog extends JfElement {
 
   override updated(changed: Map<string, unknown>): void {
     if (!changed.has('open')) return;
+    this.keyPress = undefined;
     if (this.open) {
       this.modal.open(); // 574 §22.G — enter + showModal + focus, atomically by construction
     } else {
@@ -202,15 +207,28 @@ export class ConfirmDialog extends JfElement {
 
   private onKey(e: KeyboardEvent): void {
     if (!this.open) return;
-    // Escape is handled natively by <dialog> (the @cancel handler in render); here only Enter.
-    if (e.key !== 'Enter' || this.confirmDisabled()) return;
-    // Focus can be several shadow roots deep. Focused controls own Enter (including the
-    // native Confirm button and the typed input); only the dialog itself uses this shortcut.
+    const pending = this.keyPress;
+    this.keyPress = undefined;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const dialog = this.shadowRoot?.querySelector('dialog');
+    const path = e.composedPath();
     const active = deepActiveElement();
-    if (active && active !== document.body && active !== this &&
-        active !== this.shadowRoot?.querySelector('dialog')) return;
+    // Cancel, Close and other controls retain their native keyboard activation. Only confirmation
+    // owns this guard; the typed field still accepts spaces as text.
+    const confirmation = path.includes(this.shadowRoot?.querySelector('jf-button.confirm') as Element)
+      || (e.key === 'Enter' && (path.includes(this.shadowRoot?.querySelector('input') as Element)
+        || !active || active === document.body || active === this || active === dialog));
+    if (!confirmation) return;
     e.preventDefault();
-    this.confirm();
+    e.stopPropagation();
+    const target = path[0] ?? e.target;
+    if (e.type === 'keydown') {
+      // A destructive keyboard activation completes on release. Any repeat invalidates the press,
+      // including a key held before showModal or one that starts on the confirmation itself.
+      if (!e.repeat && dialog?.open && !this.confirmDisabled()) this.keyPress = { key: e.key, target };
+    } else if (pending?.key === e.key && pending.target === target && dialog?.open && !this.confirmDisabled()) {
+      this.confirm();
+    }
   }
 
   private confirmDisabled(): boolean {
@@ -282,12 +300,6 @@ export class ConfirmDialog extends JfElement {
                     .value=${this.typedInput}
                     @input=${(e: Event) =>
                       (this.typedInput = (e.target as HTMLInputElement).value)}
-                    @keydown=${(e: KeyboardEvent) => {
-                      if (e.key === 'Enter' && !this.confirmDisabled()) {
-                        e.preventDefault();
-                        this.confirm();
-                      }
-                    }}
                   />
                 </div>
               `

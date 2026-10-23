@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T15:58:05.957Z",
-  "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
-  "tree": "e124923fef59b9b5e82a5c6547a45fa5d5cde352",
+  "createdAt": "2026-10-23T21:01:43.821Z",
+  "revision": "a471ee4358077dcb856d407ebbd1a2c162546c4c",
+  "tree": "be1b437bbd1504e1789bb947ca1068d56d482031",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,16 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/g5fua543/tmp/test-intent-vitest-99889-1792771082639.json\"",
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789295203.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3317
+      "durationMs": 2631
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" \"src/shell-v0/views/MemorySurface.retention.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789297834.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1186
     }
   ],
   "checks": [
@@ -54,8 +60,201 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cb868cf27f8598842631ea29ffdd1b1a8471465281012adbccf1e201ca3151e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness shows unavailable on first open and revisit, then reloads after recovery",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness hides a stale list when a revisit fails to load",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness renders the LOCKED state and never the empty state when the read reports locked",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness still shows the empty state when the store is readable and genuinely empty",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness disables the remember input with a reason while locked (D5 — prevent, do not report)",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness a 423 remember does NOT render as success: the draft survives and the failure is shown",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness a 423 forget does NOT make the fact vanish: it stays listed and the failure is shown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1ca89a2d8c6a4e9ded22496d8eb7688e787e7db4d1352d36c55861a004e48880",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MemorySurface retained navigation keeps fresh memories and Remember enabled after a stale failure",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface retained navigation keeps the spinner and Remember loading reason after a stale rejection during a fresh load",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface retained navigation keeps the fresh error and Remember refusal after a stale success finishes reading its body",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface retained navigation keeps a visible load error until leaving, clears it on hide, and reloads on return",
+          "status": "passed"
+        },
+        {
+          "name": "MemorySurface retained navigation clears an in-flight spinner on hide and starts a fresh load on return",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh 'Enter' press (typed=false)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e815714695475e4df35e7cd25ca114697e24f538a3348d418900d07ed5c648b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserves one native confirm activation with a fresh 'Enter' press (typed=false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh ' ' press (typed=false)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e815714695475e4df35e7cd25ca114697e24f538a3348d418900d07ed5c648b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserves one native confirm activation with a fresh ' ' press (typed=false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh 'Enter' press (typed=true)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e815714695475e4df35e7cd25ca114697e24f538a3348d418900d07ed5c648b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserves one native confirm activation with a fresh 'Enter' press (typed=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh ' ' press (typed=true)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e815714695475e4df35e7cd25ca114697e24f538a3348d418900d07ed5c648b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserves one native confirm activation with a fresh ' ' press (typed=true)",
+          "status": "passed"
+        }
+      ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:fb2b5a33c74f0d209133f4cc5a7c2683b8d3faab8ba02a64dc74c86634bb5210"
+  "failBefore": {
+    "ref": "bcab79eeb",
+    "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789300081.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2283,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789300081.json\n\n"
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" \"src/shell-v0/views/MemorySurface.retention.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789302364.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1269,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789302364.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#preserves the wide dialog width (S53.7 preservation)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#keeps the page inert and returns from native browser focus with Tab and Shift+Tab (S53.7 preservation)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh 'Enter' press (typed=false)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh ' ' press (typed=false)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh 'Enter' press (typed=true)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts#preserves one native confirm activation with a fresh ' ' press (typed=true)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:1fa905d6a02f742509617f30823b65a151927da7dd20f9fabe6a54f5f8821460"
 }

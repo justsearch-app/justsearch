@@ -2,14 +2,15 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-memory-builder-mzl00urp
+author-session: uiux-memory-builder-2mvykff3
 ---
 
 # Test-intent entries
 
 WP5.3a. These scenarios are agent-adopted (delegated-choice), never owner-adopted.
 The pass-2 amendment supersedes the original lost-response clause in S53.3.
-N53.2 and N53.3 are preservation checks; existing test expectations are unchanged.
+N53.2 and N53.3 are preservation checks; existing expected outcomes are unchanged.
+F1–F3 continuation: confirmation inputs now include key release; confirmed Forget fixtures include the new pre-delete read. Neither adaptation weakens an oracle.
 
 ```json
 {
@@ -128,6 +129,88 @@ N53.2 and N53.3 are preservation checks; existing test expectations are unchange
         "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#keeps the page inert and returns from native browser focus with Tab and Shift+Tab (S53.7 preservation)"
       ],
       "preservationEvidence": "gates/test-intent/evidence/uiux-memory-preservation.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+        "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A held/repeated Enter or Space never confirms deletion; confirmation needs a fresh down/up pair after showModal, with no repeat. Forget triggers reject repeat keydowns. After confirmation, Memory re-reads the store and refuses deletion if any existing displayed-record field or createdAt/sourceConversationId changed, or the item disappeared. Fresh consent is required for a replacement. Automatic and manual reconciliation announce confirmed presence or absence in the same live region and restore useful focus. Mouse, fresh Enter and Space confirmation remain usable with and without a matching typed phrase.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a F1–F3 repair explicitly assigned by the orchestrator continuation on 2026-10-23.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F1 / S53.3 / S53.7",
+          "quote": "a key held down can never confirm a deletion, and can never carry over into another item's Forget.\nConfirming needs a fresh, separate activation that begins after the dialog is shown. Repeat keydowns and a key held since before the dialog opened do nothing.\nCheck the other ConfirmDialog callers still confirm with a normal press and with Enter and Space.",
+          "choice": "a key held down can never confirm a deletion, and can never carry over into another item's Forget.\nConfirming needs a fresh, separate activation that begins after the dialog is shown. Repeat keydowns and a key held since before the dialog opened do nothing.\nCheck the other ConfirmDialog callers still confirm with a normal press and with Enter and Space.",
+          "continuationLocation": "task t-20261019-bd718f orchestrator continuation F1–F3, 2026-10-23"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a F1–F3 repair explicitly assigned by the orchestrator continuation on 2026-10-23.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F2 / S53.3",
+          "quote": "consent covers what was shown.\nIf the memory API or store offers a conditional delete (a version, timestamp or content match), use it.\nOtherwise, re-read the item right before deleting. If it changed or is gone, do not delete; show what is now there and ask again. Record the remaining read-then-delete window as a limit, and only if there is no conditional option in the owner's code.",
+          "choice": "consent covers what was shown.\nIf the memory API or store offers a conditional delete (a version, timestamp or content match), use it.\nOtherwise, re-read the item right before deleting. If it changed or is gone, do not delete; show what is now there and ask again. Record the remaining read-then-delete window as a limit, and only if there is no conditional option in the owner's code.",
+          "continuationLocation": "task t-20261019-bd718f orchestrator continuation F1–F3, 2026-10-23"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a F1–F3 repair explicitly assigned by the orchestrator continuation on 2026-10-23.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F3 / S53.3 amendment / S53.7",
+          "quote": "When that reload confirms absence or presence, announce the outcome in the same live region and wording style as automatic reconciliation.\nPut focus somewhere useful, the way automatic reconciliation does, never on BODY.",
+          "choice": "When that reload confirms absence or presence, announce the outcome in the same live region and wording style as automatic reconciliation.\nPut focus somewhere useful, the way automatic reconciliation does, never on BODY.",
+          "continuationLocation": "task t-20261019-bd718f orchestrator continuation F1–F3, 2026-10-23"
+        }
+      ],
+      "conflictSearch": "The F1–F3 continuation explicitly amends shared confirmation and Memory consent/reconciliation in WP5.3a. No conditional delete exists in MemoryStore, FileMemoryStore or MemoryController. Existing createdAt is compared; no API field or Engine change is introduced. The permitted read/delete race remains. Initial focus, native modality and visible design are unchanged.",
+      "evidence": "gates/test-intent/evidence/uiux-memory-safety.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
+        "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts"
+      ],
+      "repaired": true,
+      "cumulativeEvidence": "gates/test-intent/evidence/uiux-memory-repair.json",
+      "liveEvidence": "tmp/memory-fixes/before/live-fixes.json and tmp/memory-fixes/after/live-fixes.json",
+      "remainingLimit": "Without an owner conditional-delete API/store operation, replacement in the interval between the final GET and DELETE cannot be detected atomically.",
+      "preservationEvidence": "gates/test-intent/evidence/uiux-memory-preservation.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.test.ts",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Existing ordinary Enter activations now dispatch keyup after keydown. All original expected confirmations/cancellations, phrase matching, ownership checks, and observations are retained. F1 requires confirmation on fresh release so that a subsequent repeat can invalidate the activation. The matching-input handler is now part of the shared capture guard; the retargeted-host case still cannot confirm while the input owns focus.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a F1–F3 repair explicitly assigned by the orchestrator continuation on 2026-10-23.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F1 / S53.3 / S53.7",
+          "quote": "a key held down can never confirm a deletion, and can never carry over into another item's Forget.\nConfirming needs a fresh, separate activation that begins after the dialog is shown. Repeat keydowns and a key held since before the dialog opened do nothing.\nCheck the other ConfirmDialog callers still confirm with a normal press and with Enter and Space.",
+          "choice": "a key held down can never confirm a deletion, and can never carry over into another item's Forget.\nConfirming needs a fresh, separate activation that begins after the dialog is shown. Repeat keydowns and a key held since before the dialog opened do nothing.\nCheck the other ConfirmDialog callers still confirm with a normal press and with Enter and Space.",
+          "continuationLocation": "task t-20261019-bd718f orchestrator continuation F1–F3, 2026-10-23"
+        }
+      ]
     }
   ]
 }
