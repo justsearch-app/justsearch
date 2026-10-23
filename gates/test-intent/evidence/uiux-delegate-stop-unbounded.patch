@@ -1,0 +1,19 @@
+diff --git a/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts b/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts
+index 8a770add2..50c0d0446 100644
+--- a/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts
++++ b/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts
+@@ -1541,10 +1541,11 @@ export class SearchV3View extends JfElement {
+           emitEphemeralToast({ message: stop.text });
+         }
+         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
+-        // A completed run can still acquire its late Stop note. Conversely, a saved Stop can
+-        // precede the final output/checkpoint: read through both edges before retiring the refresh.
++        // DONE cannot prove that no Stop is coming: another window's DELETE can arrive after
++        // this observer read completion. Keep reconciling until Stop is saved, even when this
++        // window never requested Halt. A saved Stop can also precede the final checkpoint.
+         if ((state === 'DONE' || state === 'ERROR' || state === 'CANCELLED')
+-          && (stop !== undefined || (!local.haltRequested && state !== 'CANCELLED'))) {
++          && (stop !== undefined || (!local.haltRequested && state === 'ERROR'))) {
+           this.pendingRunRecords.delete(id);
+         }
+       }

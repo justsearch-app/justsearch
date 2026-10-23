@@ -309,6 +309,7 @@ interface Building {
    * `''` when the record carries none (not rewritten, or a record written before it was persisted).
    */
   standaloneQuestion: string;
+  noEvidence: boolean;
 }
 
 const open = (
@@ -321,6 +322,7 @@ const open = (
   question,
   askedAt,
   openedByUser,
+  noEvidence: false,
   answers: [],
   activity: [],
   tools: 0,
@@ -347,9 +349,9 @@ const open = (
  * turn with an empty question rather than being dropped: the window renders no ask bubble for it, but
  * a tool call the agent really made is not something to lose because its prompt is missing.
  *
- * The turn's KIND is derived, not declared: a turn that recorded tool calls or notes was an agent
- * run, and a turn that recorded only prose was an ask. Nothing in the record says which tier this
- * window dispatched it from, so deriving it from what happened is the only honest answer available.
+ * The turn's kind reads its declared shape: free chat is a model answer and an agent shape is a run.
+ * Older records without that declaration keep the activity heuristic for distinguishing agent and
+ * Ask turns.
  *
  * `evidence` is PROJECTED from the record (tempdoc 847 §2.4, correcting Phase F6): the persisted
  * assistant message carries its sources and its per-sentence matches, and this module hands both to
@@ -456,8 +458,16 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       continue;
     }
     if (item.kind === 'error') {
-      turn.errored = true;
-      turn.errorDetail = item.content;
+      // Errors are stored assistant messages too, so later Retry/Edit can fork after this outcome.
+      if (isSv3StoreMessageId(item.id)) turn.assistantId = item.id;
+      // D3: new records carry scope explicitly; legacy NO_CONTENT uses the fixed message.
+      turn.noEvidence = turn.declaredShapeId === 'core.rag-ask'
+        && item.attributes.errorCode === 'NO_CONTENT'
+        && (item.attributes.retrievalScoped === false
+          || (item.attributes.retrievalScoped === undefined
+            && item.content === 'No matching documents found in the index'));
+      turn.errored = !turn.noEvidence;
+      turn.errorDetail = turn.noEvidence ? '' : item.content;
       const evidence = recordEvidenceOf(item);
       if (evidence !== null) turn.evidence = evidence;
       // Owner decision 2026-08-26, applied to the TIMELINE as well as the receipt. The cancel path
@@ -528,6 +538,9 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       (turn.groundingDeltas.length > 0
         ? { ...agentDeltaEvidence(turn.groundingDeltas), retrievalMode: '' }
         : null);
+    const model = turn.declaredShapeId === 'core.free-chat';
+    const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask')
+      && turn.openedByUser && turn.answers.length === 0 && !turn.errored && !turn.noEvidence;
     return {
       id: turn.id,
       // Tempdoc 847 §2.4.3 — the RECORD's own id for this turn, carried as its own field. It is the
@@ -542,7 +555,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // rows and read-time run projections and only the former is addressable.
       assistantRecordId: turn.assistantId,
       recordOpenedByUser: turn.openedByUser,
-      kind: agent ? 'agent' : 'ask',
+      kind: agent ? 'agent' : model ? 'model' : 'ask',
       shapeId: turn.declaredShapeId ?? undefined,
       question: turn.question,
       answer: turn.answers.join('\n\n'),
@@ -568,11 +581,13 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // account the run gives of itself.
       status: turn.stopRequested || sv3WasHalted(turn.disposition)
         ? 'halted'
-        : turn.errored
+        : turn.noEvidence
+          ? 'no-evidence'
+          : turn.errored || unfinished
           ? 'failed'
           : 'complete',
       evidence,
-      detail: turn.errorDetail,
+      detail: unfinished ? 'No answer was saved. This attempt may be unfinished or interrupted; you can try again.' : turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw

@@ -1,0 +1,135 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T06:41:38.635Z",
+  "revision": "dccd09b02f0bf346857cc5cf43eb0b25ae772f0a",
+  "tree": "9617e7c50dbbc349690e77d6d4e2e0763402154b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" \"src/api/streams.observeAccept.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/evidence-tmp/test-intent-vitest-3712946-1792737669470.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7174
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:37a1c435e5a6c5e37ad1cbca0ad7f5dafa22bfd8588126d6195910d4f7a33c9d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS1 DS2 DS3 DS8 delayed cancellation appears once without reload or focus movement",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS4 keeps completed output and disposition when completion wins Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 DS7 remote cancellation with an early record read recovers once without generic failure",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 both windows reconcile one Stop and keep a different conversation untouched",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS7 a dropped observer retries a failed record fallback without inventing Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 DS7 cold attach keeps the named conversation and its already loaded record turn",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DN2 an old-window Halt updates the observing Search turn and preserves saved partial output",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held budget decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held context decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held approval decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 a dropped transport alone does not remove the held decision",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 preserves genuine complete without inventing Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 preserves genuine failure without inventing Stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/streams.observeAccept.test.ts",
+      "file": "modules/ui-web/src/api/streams.observeAccept.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1a64e7d5789f947830896ff476986b813defda3f80c4a4eba1f317b35892e01",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS5 DS7 a reattaching observer negotiates the managed event stream",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "dccd09b02",
+    "revision": "dccd09b02f0bf346857cc5cf43eb0b25ae772f0a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" \"src/api/streams.observeAccept.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/evidence-tmp/test-intent-vitest-3712946-1792737678284.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 20036,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/evidence-tmp/test-intent-vitest-3712946-1792737678284.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record DS1 DS2 DS3 DS8 delayed cancellation appears once without reload or focus movement:  Error: expected +0 to be 1 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/ | Delegate Stop reconciles the addressed "
+      },
+      {
+        "id": "modules/ui-web/src/api/streams.observeAccept.test.ts",
+        "classification": "assertion",
+        "detail": "DS5 DS7 a reattaching observer negotiates the managed event stream:  AssertionError: expected 'Error: Stream ended without terminal …' to be undefined\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-delegate-stop/tmp/delegate-stop/test-intent-before-7UvzSn/modules/ui-web/src/api/streams.observeAccept.test.ts:27:19\n    at processTicksAndRejections (node:inter"
+      }
+    ]
+  },
+  "digest": "sha256:66ef133d601cb5c5991bc30978429963af254bf58cf0869045845c2605c2601b"
+}

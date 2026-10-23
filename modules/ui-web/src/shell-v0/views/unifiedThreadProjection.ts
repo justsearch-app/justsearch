@@ -142,6 +142,8 @@ export interface UnifiedTurnItem {
   readonly id: string;
   /** Epoch milliseconds parsed from {@link ThreadEvent.occurredAt} — the sort key. */
   readonly ts: number;
+  /** Fraction of a millisecond retained from the Engine's higher-precision timestamp. */
+  readonly subMillisecond?: number;
   readonly kind: UnifiedTurnKind;
   /** Tempdoc 565 §12.3.C — the declared composition prominence (answer-first hierarchy). */
   readonly prominence: TurnProminence;
@@ -305,6 +307,8 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
 
   const items: UnifiedTurnItem[] = [...passthrough, ...mergedToolByCall.values()].map((e) => {
     const kind = KIND_MAP[e.kind];
+    const fraction = subMillisecondOf(e.occurredAt);
+    const precision = fraction === 0 ? {} : { subMillisecond: fraction };
     if (e.kind === 'UNKNOWN') {
       // Tempdoc S4a — a forward-deployed backend event kind this build doesn't recognize yet degrades
       // to a generic SECONDARY item labelled from its raw kind, instead of the whole thread failing to
@@ -315,6 +319,7 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
       return {
         id: e.id,
         ts: toMillis(e.occurredAt),
+        ...precision,
         kind,
         prominence: 'secondary',
         originator: e.originator,
@@ -331,6 +336,7 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
       return {
         id: e.id,
         ts: toMillis(e.occurredAt),
+        ...precision,
         kind,
         prominence: 'secondary',
         originator: e.originator,
@@ -341,6 +347,7 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
     return {
       id: e.id,
       ts: toMillis(e.occurredAt),
+      ...precision,
       kind,
       prominence: prominenceFor(kind),
       originator: e.originator,
@@ -349,8 +356,8 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
     };
   });
 
-  // Authoritative-timestamp order; stable id tiebreaker so equal timestamps are deterministic.
-  items.sort((a, b) => a.ts - b.ts || a.id.localeCompare(b.id));
+  // Keep the record's precision: random ids must not reverse a fast question/outcome pair.
+  items.sort(compareUnifiedTurnItems);
   // Tempdoc 565 §26.A — stamp run-structure segments (workflow node grouping) over the ordered stream.
   return assignRunSegments(items);
 }
@@ -358,6 +365,18 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
 function toMillis(iso: string): number {
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? 0 : ms;
+}
+
+function subMillisecondOf(iso: string): number {
+  const tail = /\.\d{3}(\d+)(?:Z|[+-]\d{2}:?\d{2})?$/i.exec(iso)?.[1];
+  return tail !== undefined && Number.isFinite(Date.parse(iso)) ? Number(`0.${tail}`) : 0;
+}
+
+/** The shared chronological order, also used when the old window merges record and live items. */
+export function compareUnifiedTurnItems(a: UnifiedTurnItem, b: UnifiedTurnItem): number {
+  // Subtract the whole timestamps first: adding a tiny fraction to an epoch number loses precision.
+  return (a.ts - b.ts) + (a.subMillisecond ?? 0) - (b.subMillisecond ?? 0)
+    || a.id.localeCompare(b.id);
 }
 
 /**
@@ -603,7 +622,7 @@ export function projectLiveAgentActivity(
     ...it,
     prominence: prominenceFor(it.kind),
   }));
-  withProminence.sort((a, b) => a.ts - b.ts || a.id.localeCompare(b.id));
+  withProminence.sort(compareUnifiedTurnItems);
   // Tempdoc 565 §26.A — stamp run-structure segments (workflow node grouping) over the ordered stream.
   return assignRunSegments(withProminence);
 }

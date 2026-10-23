@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T20:21:48.296Z",
+  "revision": "c9cb35c3ebdaea324d5140186a1a8e7cbbbb8c30",
+  "tree": "d7dc105a7c390b21d3155c994a5d8b76fc4d6914",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-854025-1792786905657.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2637
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts#gates surface switching in a Windows Tauri shell on first use",
+      "file": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f5ba41bef18c4fdee987dfb29d82210d2efee65a6bc78ba0d3c0644f65da414",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "viewTransition (tempdoc 609 §R T1.1) gates surface switching in a Windows Tauri shell on first use",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts#gates surface switching in a macOS Tauri shell on first use",
+      "file": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f5ba41bef18c4fdee987dfb29d82210d2efee65a6bc78ba0d3c0644f65da414",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "viewTransition (tempdoc 609 §R T1.1) gates surface switching in a macOS Tauri shell on first use",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts#gates surface switching in a Linux browser on first use",
+      "file": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f5ba41bef18c4fdee987dfb29d82210d2efee65a6bc78ba0d3c0644f65da414",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "viewTransition (tempdoc 609 §R T1.1) gates surface switching in a Linux browser on first use",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a Windows Tauri shell",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Windows Tauri shell",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a macOS Tauri shell",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a macOS Tauri shell",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a Linux browser",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux browser",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a API absent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a API absent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a reduced motion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a reduced motion",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:346079615951540db6d76c6c291da62a3340d378185e7e2a18b0577aa82c578a"
+}

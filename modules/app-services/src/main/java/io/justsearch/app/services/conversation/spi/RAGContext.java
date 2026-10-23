@@ -456,6 +456,7 @@ public final class RAGContext implements ContextInjector {
         }
         Map<String, Object> err =
             errorPayload("No matching documents found in the index", "NO_CONTENT");
+        err.put("retrievalScoped", false);
         return terminalRetrievalError(err, ragMeta);
       }
       // Tempdoc 610 §J.3 — mirror the worker fallback: never re-inject (via whole-doc fetch) a parent
@@ -464,6 +465,7 @@ public final class RAGContext implements ContextInjector {
       String fallback = fallbackDocIds.isEmpty() ? null : fetchBatchFallback(fallbackDocIds, engineContext);
       if (fallback == null || fallback.isBlank()) {
         Map<String, Object> err = errorPayload("No content in selected files", "NO_CONTENT");
+        err.put("retrievalScoped", true);
         err.put("docIds", docIds);
         return terminalRetrievalError(err, ragMeta);
       }
