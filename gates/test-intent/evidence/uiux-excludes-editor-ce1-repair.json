@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T23:30:13.893Z",
+  "revision": "bdb95254314df624be4fdf7c96825ea61563c184",
+  "tree": "8ef5806e568a6491b3053b335651dbbc0134a445",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ce1/test-intent-vitest-1451093-1792711810786.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 932
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Cancel to native activation (typed=true)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 leaves Enter on Cancel to native activation (typed=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Cancel to native activation (typed=false)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 leaves Enter on Cancel to native activation (typed=false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Close to native activation",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 leaves Enter on Close to native activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on another focused control (a)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 leaves Enter on another focused control (a)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bdb952543",
+    "revision": "bdb95254314df624be4fdf7c96825ea61563c184",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ce1/test-intent-vitest-1451093-1792711812746.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 978,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ce1/test-intent-vitest-1451093-1792711812746.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Cancel to native activation (typed=true)",
+        "classification": "assertion",
+        "detail": "CE1 leaves Enter on Cancel to native activation (typed=true):  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      CustomEvent {\n        \"AT_TARGET\": 2,\n        \"BUBBLING_PHASE\": 3,\n        \"CAPTURING_PHASE\": 1,\n        \"NONE\": 0,\n        Symbol(composed): true,"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Cancel to native activation (typed=false)",
+        "classification": "assertion",
+        "detail": "CE1 leaves Enter on Cancel to native activation (typed=false):  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      CustomEvent {\n        \"AT_TARGET\": 2,\n        \"BUBBLING_PHASE\": 3,\n        \"CAPTURING_PHASE\": 1,\n        \"NONE\": 0,\n        Symbol(composed): true,"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on Close to native activation",
+        "classification": "assertion",
+        "detail": "CE1 leaves Enter on Close to native activation:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      CustomEvent {\n        \"AT_TARGET\": 2,\n        \"BUBBLING_PHASE\": 3,\n        \"CAPTURING_PHASE\": 1,\n        \"NONE\": 0,\n        Symbol(composed): true,"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on another focused control (a)",
+        "classification": "assertion",
+        "detail": "CE1 leaves Enter on another focused control (a):  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      CustomEvent {\n        \"AT_TARGET\": 2,\n        \"BUBBLING_PHASE\": 3,\n        \"CAPTURING_PHASE\": 1,\n        \"NONE\": 0,\n        Symbol(composed): true,"
+      }
+    ]
+  },
+  "digest": "sha256:689b38568822e46fa6d54fdce05c4faa1a5a60ed9663f9c191065b6fa5246c39"
+}

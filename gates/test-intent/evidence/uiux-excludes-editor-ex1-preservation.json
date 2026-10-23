@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T14:31:32.468Z",
+  "revision": "4a7f96624d99f227ce85511b9eea4d0cc80c237a",
+  "tree": "2f0d9926643e55818856753e6d1196cd1c0dbddc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsEngineTest.EX1AppliedMatchesStayAbsentThroughMaintenanceScansExplicitIngestAndBootWalk\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9122
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX1AppliedMatchesStayAbsentThroughMaintenanceScansExplicitIngestAndBootWalk",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:766229e5ea2b17ccbed38d5f1d61d925a84d2e9b29d3403e1e58dd81701dbee6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EX1AppliedMatchesStayAbsentThroughMaintenanceScansExplicitIngestAndBootWalk()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4a7f96624",
+    "revision": "4a7f96624d99f227ce85511b9eea4d0cc80c237a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsEngineTest.EX1AppliedMatchesStayAbsentThroughMaintenanceScansExplicitIngestAndBootWalk\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5822
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX1AppliedMatchesStayAbsentThroughMaintenanceScansExplicitIngestAndBootWalk",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:3778b2aa810824e7813be1f19e501032086af04c266b24c7952e843f4f13d50c"
+}

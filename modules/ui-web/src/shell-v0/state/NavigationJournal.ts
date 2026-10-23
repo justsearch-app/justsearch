@@ -30,6 +30,7 @@ import { CORE_PROVENANCE } from '../primitives/provenance.js';
 
 const STORAGE_KEY = 'justsearch.navigationJournal.v1';
 const CAPACITY = 50;
+const CONVERSATION_SURFACE = 'core.search-v3-surface';
 
 export interface NavigationJournalEntry {
   readonly id: string;
@@ -143,6 +144,19 @@ export function recordNavigation(
   ensureInitialized();
   if (isNavigatingHistory) return;
 
+  // A browser traversal/reload already moved to an existing view. Its browser-state marker
+  // names this journal's entry, so restore the cursor rather than appending a return trip.
+  if (surfaceId === CONVERSATION_SURFACE && transport === 'URL_BAR' && typeof window !== 'undefined') {
+    const entryId = window.history.state?.navigationJournalId;
+    const restored = entries.findIndex(entry => entry.id === entryId && entry.url === url);
+    if (restored >= 0) {
+      cursor = restored;
+      persist();
+      fireListeners();
+      return;
+    }
+  }
+
   // Tempdoc 543 §13.2.2 — Effect Journal consumer wire. Record EVERY
   // navigation as a typed Effect, including same-surface URL changes
   // (search refinements, filter toggles) that NavigationJournal
@@ -163,8 +177,14 @@ export function recordNavigation(
   // Fix A: capture the departing surface's final state before recording the new entry.
   snapshotCurrentEntry();
 
-  // Fix B: de-duplicate consecutive same-surface navigations.
-  if (cursor >= 0 && cursor < entries.length && entries[cursor]!.surfaceId === surfaceId) {
+  // Refinements within one view coalesce; opening another conversation replaces the subject
+  // even though it stays on Search v3, and must remain reachable with the app's Back control.
+  const current = entries[cursor];
+  const from = surfaceId === CONVERSATION_SURFACE && current ? parseUrl(current.url) : null;
+  const to = surfaceId === CONVERSATION_SURFACE ? parseUrl(url) : null;
+  const changedConversation = from?.kind === 'navigate' && to?.kind === 'navigate'
+    && from.state.conversationId !== to.state.conversationId;
+  if (current?.surfaceId === surfaceId && !changedConversation) {
     entries[cursor] = { ...entries[cursor]!, url, label, transport, timestamp: Date.now() };
     persist();
     fireListeners();

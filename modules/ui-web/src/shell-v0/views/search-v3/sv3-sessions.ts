@@ -128,6 +128,8 @@ export type Sv3TurnReasoning = ReasoningBlock;
 
 /** One exchange: what was asked, and what came back. */
 export interface Sv3Turn {
+  /** The dispatch shape, shared with the canonical record. */
+  readonly shapeId?: string;
   /**
    * The turn's STABLE handle, minted once when the turn is opened and never rewritten. Every piece
    * of UI state about a turn is keyed on it — `Sv3Main`'s `expandedSources` and `copiedTurnId`, the
@@ -493,12 +495,14 @@ export function submitInSession(
   kind: Sv3TurnKind,
   /** The store-minted conversation id, used only when this submit OPENS a conversation. */
   newId: string,
+  shapeId?: string,
 ): Sv3SessionList {
   const text = question.trim();
   if (text === '') return list;
   const active = list.activeId === null ? null : sessionById(list, list.activeId);
   if (active === null) {
-    const created = openSession(newId, text, now, kind, now);
+    const opened = openSession(newId, text, now, kind, now);
+    const created = { ...opened, turns: opened.turns.map(turn => ({ ...turn, shapeId })) };
     return {
       sessions: [created, ...list.sessions],
       activeId: created.id,
@@ -510,7 +514,7 @@ export function submitInSession(
       session.id === active.id
         ? {
             ...session,
-            turns: [...session.turns, openTurn(session.id, session.turns.length, text, now, kind)],
+            turns: [...session.turns, { ...openTurn(session.id, session.turns.length, text, now, kind), shapeId }],
             updatedAt: now,
             // Asking in a conversation IS visiting it, so a follow-up cannot leave the session
             // holding an unread bit against a reader who is sitting in it.

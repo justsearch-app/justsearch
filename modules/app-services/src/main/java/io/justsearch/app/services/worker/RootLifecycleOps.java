@@ -487,6 +487,36 @@ final class RootLifecycleOps {
         }
     }
 
+    /** Explicit maintenance needs the Worker outcome, rather than the legacy zero-on-failure value. */
+    IndexingService.PrefixDeletionOutcome deleteDocsByPathPrefixWithOutcome(
+            Path pathPrefix, EngineContext engineContext) {
+        if (pathPrefix == null) {
+            return new IndexingService.PrefixDeletionOutcome(false, 0, "Path unavailable");
+        }
+        Path normalized = pathPrefix.toAbsolutePath().normalize();
+        try {
+            DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
+            if (response == null || !response.getError().isEmpty()) {
+                return new IndexingService.PrefixDeletionOutcome(false, 0,
+                        response == null ? "Worker deletion outcome unavailable" : response.getError());
+            }
+            if (response.getDeletedJobs() < 0 || response.getDeletedJobs() > Integer.MAX_VALUE) {
+                return new IndexingService.PrefixDeletionOutcome(false, 0,
+                        "Worker deletion outcome unavailable: invalid job count");
+            }
+            if (response.getBuffered()) {
+                return new IndexingService.PrefixDeletionOutcome(false, 0,
+                        "Removal completes when the index rebuild finishes");
+            }
+            return new IndexingService.PrefixDeletionOutcome(
+                    true, (int) response.getDeletedJobs(), "");
+        } catch (Exception failure) {
+            // Unlike legacy callers, Apply retains progress and reports refusals in its result.
+            return new IndexingService.PrefixDeletionOutcome(false, 0,
+                    failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+        }
+    }
+
     boolean deleteDocById(String docId, EngineContext engineContext) {
         if (docId == null || docId.isBlank()) {
             return false;
@@ -501,6 +531,30 @@ final class RootLifecycleOps {
             EngineRefusals.rethrow(e);
             log.warn("deleteById RPC failed for {}", docId, e);
             return false;
+        }
+    }
+
+    IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
+        if (docId == null || docId.isBlank()) {
+            return new IndexingService.DeletionOutcome(false, "Document path unavailable");
+        }
+        try {
+            DeleteByIdResponse response = deleteByIdFn.apply(docId, engineContext);
+            if (response == null) {
+                return new IndexingService.DeletionOutcome(false, "Worker deletion outcome unavailable");
+            }
+            if (!response.getError().isEmpty() || !response.getSuccess()) {
+                return new IndexingService.DeletionOutcome(false,
+                        response.getError().isEmpty() ? "Worker did not confirm deletion" : response.getError());
+            }
+            if (response.getBuffered()) {
+                return new IndexingService.DeletionOutcome(false,
+                        "Removal completes when the index rebuild finishes");
+            }
+            return new IndexingService.DeletionOutcome(true, "");
+        } catch (Exception failure) {
+            return new IndexingService.DeletionOutcome(false,
+                    failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
         }
     }
 

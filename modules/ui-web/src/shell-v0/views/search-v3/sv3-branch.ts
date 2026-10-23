@@ -133,15 +133,15 @@ export function sv3FirstOwnTurnIndex(
  * takes and for the same reason: what the window renders, what its menu offers and what it writes are
  * all derived from ONE reading of one record.
  *
- * `conversations` is the already-loaded list from the shared store. The version sets are a pure read
- * over it ({@link siblingSessionsAt}) — no endpoint, because a branch's parent pointers are already
- * on every row `listSessions` returns.
+ * Search v3 supplies complete fork reads through `readVersions`. Other callers retain the
+ * loaded-list projection. A pending or failed complete read returns null, never a partial count.
  */
 export function projectSv3TurnLineage(
   turns: readonly Sv3Turn[],
   history: Sv3SessionHistory | null,
   sessionId: string,
   conversations: readonly Conversation[],
+  readVersions?: (baseId: string, key: string) => readonly string[] | null,
 ): readonly Sv3TurnLineage[] {
   const firstOwn = sv3FirstOwnTurnIndex(turns, history);
   const parent = history?.parentSessionId ?? '';
@@ -163,7 +163,7 @@ export function projectSv3TurnLineage(
       forkKey,
       forkFromId: index === firstOwn && parent !== '' && point !== '' ? parent : sessionId,
       canEdit: own && userMsgId !== null && forkKey !== null,
-      versions: versionsAt(turns, index, firstOwn, history, sessionId, conversations),
+      versions: versionsAt(turns, index, firstOwn, history, sessionId, conversations, readVersions),
     };
   });
 }
@@ -210,21 +210,24 @@ function versionsAt(
   history: Sv3SessionHistory | null,
   sessionId: string,
   conversations: readonly Conversation[],
+  readVersions?: (baseId: string, key: string) => readonly string[] | null,
 ): Sv3VersionSet | null {
-  if (conversations.length === 0) return null;
-  const rows = [...conversations];
+  if (index < firstOwn) return null;
+  const read = readVersions ?? ((base: string, key: string) => siblingSessionsAt([...conversations], base, key));
   const parent = history?.parentSessionId ?? '';
   const point = history?.branchPointMessageId ?? '';
   if (index === firstOwn && parent !== '' && point !== '') {
-    const sessions = siblingSessionsAt(rows, parent, point);
-    if (sessions.length > 1) {
-      return { sessions, index: Math.max(0, sessions.indexOf(sessionId)) };
+    const sessions = read(parent, point);
+    const current = sessions?.indexOf(sessionId) ?? -1;
+    if (sessions !== null && sessions.length > 1 && current >= 0) {
+      return { sessions, index: current };
     }
+    return null;
   }
   const key = forkKeyAt(turns, index, firstOwn, history);
   if (key === null) return null;
-  const sessions = siblingSessionsAt(rows, sessionId, key);
-  return sessions.length > 1 ? { sessions, index: 0 } : null;
+  const sessions = read(sessionId, key);
+  return sessions !== null && sessions.length > 1 ? { sessions, index: 0 } : null;
 }
 
 export const sv3LineageFor = (

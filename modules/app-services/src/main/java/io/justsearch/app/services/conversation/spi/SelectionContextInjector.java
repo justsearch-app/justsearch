@@ -392,9 +392,18 @@ public final class SelectionContextInjector implements ContextInjector {
     List<SelectionPayload.ResultRef> refs = rs.items();
     if (refs.isEmpty()) return InjectorResult.empty();
     List<ResultContent> selected = new ArrayList<>();
+    boolean extracting = "core.extract".equals(ctx.shapeId());
+    if (extracting && refs.stream().map(SelectionPayload.ResultRef::id).distinct().count() > MAX_RESULT_SET_DOCS) {
+      return InjectorResult.terminalError(errorEvent("Choose at most " + MAX_RESULT_SET_DOCS + " files for extraction", "TOO_MANY_FILES"));
+    }
+    java.util.Set<String> seen = new java.util.HashSet<>();
     for (SelectionPayload.ResultRef ref : refs) {
+      if (extracting && !seen.add(ref.id())) continue;
       if (selected.size() >= MAX_RESULT_SET_DOCS) break;
       String content = fetchDocContent(ref.id(), engineContext);
+      if (extracting && (content == null || content.isBlank())) {
+        return InjectorResult.terminalError(errorEvent("Cannot read selected file: " + ref.id(), "DOC_UNAVAILABLE"));
+      }
       if (content != null && !content.isBlank()) selected.add(new ResultContent(ref.id(), content));
     }
     if (selected.isEmpty()) {
@@ -415,6 +424,9 @@ public final class SelectionContextInjector implements ContextInjector {
     // hold). MAX_RESULT_SET_DOCS stays a document COUNT: it is not a window quantity.
     int perDocChars = Math.max(1, selectionCapChars(ctx) / MAX_RESULT_SET_DOCS);
     for (ResultContent result : selected) {
+      if (extracting && result.content().length() > perDocChars) {
+        return InjectorResult.terminalError(errorEvent("Selected file exceeds the extraction per-document budget: " + result.id(), "INPUT_TOO_LARGE"));
+      }
       String truncated =
           truncateToBudget(result.content(), "result-set document", result.id(), perDocChars);
       appendResult(concat, result.id(), truncated);
@@ -521,6 +533,9 @@ public final class SelectionContextInjector implements ContextInjector {
   }
 
   private InjectorResult summaryLimitRejection(ConversationContext ctx, String source) {
+    if ("core.extract".equals(ctx.shapeId()) && source.length() > selectionCapChars(ctx)) {
+      return InjectorResult.terminalError(errorEvent("Selected input exceeds the extraction context budget", "INPUT_TOO_LARGE"));
+    }
     if (!SUMMARIZE_SHAPE_ID.equals(ctx.shapeId())) return null;
     SseEvent rejection = summaryInputLimit.rejection(source, ctx.engineContext());
     return rejection == null ? null : InjectorResult.terminalError(rejection);
