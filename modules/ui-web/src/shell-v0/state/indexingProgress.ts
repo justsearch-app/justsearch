@@ -32,7 +32,7 @@ import { formatCount } from '../display/format.js';
  * reachable (`unreachable-seed-green`). It is deliberately NOT folded into `enriching`: nothing is
  * running, so no percent moves and no estimate exists.
  */
-export type IndexingPhase = 'indexing' | 'waiting' | 'error' | 'enriching' | 'blocked' | 'ready' | 'unknown';
+export type IndexingPhase = 'indexing' | 'pausing' | 'paused' | 'waiting' | 'error' | 'enriching' | 'blocked' | 'ready' | 'unknown';
 
 /**
  * 813 §4 — which PARENT enrichment stages are applicable to this deployment, index-wide.
@@ -88,6 +88,8 @@ export interface EnrichSettleSample {
 }
 
 export interface IndexingProgress {
+  /** WP3.7: Engine-confirmed policy hold, distinct from automatic enrichment holds. */
+  pause?: { state: 'pausing' | 'paused'; reason: string; untilEpochMs: number | null; waiting: boolean } | null;
   /** WP3.3: one account of current activity and automatic holds for every status surface. */
   activity: {
     summary: string;
@@ -225,6 +227,7 @@ export function isWorkerReportedIndex(status: StatusResponse | null | undefined)
 }
 
 const EMPTY: IndexingProgress = {
+  pause: null,
   activity: { summary: 'Indexing status unconfirmed', detail: null, confirmed: false, enrichmentDeferred: false },
   phase: 'unknown',
   jobsPending: 0,
@@ -423,7 +426,25 @@ export function selectIndexingPhase(status: StatusResponse | null | undefined): 
   if (!isWorkerReportedIndex(status) || !core) return 'unknown';
   // The counts remain real, but no progress or completion claim survives a fatal loop death.
   if (core.indexState === 'FAILED') return 'unknown';
-  return derivePhase(core.indexState, count(core.pendingJobs), readEnrichmentWork(status));
+  return policyPause(status)?.state ?? derivePhase(core.indexState, count(core.pendingJobs), readEnrichmentWork(status));
+}
+
+// Automatic PAUSED is a narrower hold: text indexing can still run (WP3.3).
+const AUTOMATIC_REASONS: ReadonlySet<string> = new Set([
+  'game_mode', 'gpu_busy_external', 'energy_saver', 'chat_generating',
+]);
+const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
+  ['user_paused', 'Paused by you.'],
+  ['settings_recovery', 'Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.'],
+]);
+
+function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
+  const indexing = status?.operating?.indexing;
+  if (!indexing || (indexing.state !== 'PAUSING' && indexing.state !== 'PAUSED')) return null;
+  const reason = indexing.reasons.find(r => !AUTOMATIC_REASONS.has(r));
+  if (!reason) return null;
+  return { state: indexing.state === 'PAUSING' ? 'pausing' : 'paused', reason: reason ?? '',
+    untilEpochMs: indexing.untilEpochMs, waiting: indexing.waitingForResume };
 }
 
 /**
@@ -602,8 +623,21 @@ export function selectIndexingProgress(
     ? Math.min(work.rawPending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100))
     : null;
 
-  const phase = derivePhase(core.indexState, jobsPending, work);
-  const activity = indexingActivity(status, indexingStatusLive, phase, work.rawPending);
+  const confirmed = indexingStatusLive && status.meta?.workerRpcStale !== true &&
+    !status.operating?.freshness?.staleSources?.includes('indexing');
+  const reportedPause = confirmed ? policyPause(status) : null;
+  const pause = reportedPause ? { ...reportedPause,
+    waiting: reportedPause.waiting || jobsPending > 0 || work.rawPending > 0 || count(core.pendingVduCount) > 0 } : null;
+  const phase = pause?.state ?? derivePhase(core.indexState, jobsPending, work);
+  const activity = pause ? {
+    summary: pause.state === 'pausing' ? 'Pausing — finishing current files' : 'Indexing paused',
+    detail: [PAUSE_REASON_WORDING.get(pause.reason) ?? 'Indexing is on hold; reason unavailable.',
+      pause.reason === 'user_paused' && pause.untilEpochMs != null
+        ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
+      pause.waiting && pause.reason !== 'settings_recovery' ? 'Work is waiting for Resume.' : '',
+    ].filter(Boolean).join(' '),
+    confirmed: true, enrichmentDeferred: true,
+  } : indexingActivity(status, indexingStatusLive, phase, work.rawPending);
 
   // 813 §19 (W2) — the high-water denominator. `episodeMax > jobsPending` is the whole admission
   // test: it is simultaneously "a drain was observed" and "the denominator is positive", so the
@@ -615,6 +649,7 @@ export function selectIndexingProgress(
       : null;
 
   return {
+    pause,
     activity,
     phase,
     jobsPending,
@@ -641,7 +676,7 @@ export function selectIndexingProgress(
         ? deriveEtaSeconds(core.recentDocsPerSec, core.recentJobQueueDepth, jobsPending)
         : null,
     indexingPercent,
-    rebuildPercent: activity.confirmed && count(migration?.activeIndexedDocuments) > 0
+    rebuildPercent: !pause && activity.confirmed && count(migration?.activeIndexedDocuments) > 0
       ? Math.min(99, Math.round(count(migration?.buildingIndexedDocuments) / count(migration?.activeIndexedDocuments) * 100))
       : null,
     pendingBytes: derivePendingBytes(

@@ -43,6 +43,8 @@ import { present } from '../display/present.js';
 import { projectFact } from '../display/facts.js';
 import { formatCount } from '../display/format.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { selectIndexingProgress } from '../state/indexingProgress.js';
+import '../components/IndexingControls.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalog.js';
 import { applyAppearance, getSurfaceMode, setSurfaceMode } from '../state/themeState.js';
 // Tempdoc 874 — the Search v3 chat-column width preset (FE-only, user-state document).
@@ -447,6 +449,12 @@ export class SettingsSurface extends JfElement {
       display: flex;
       flex-direction: column;
       gap: 1rem;
+    }
+    @media (max-width: 600px) {
+      .settings-shell { flex-direction: column; }
+      jf-settings-nav { width: 100%; flex: 0 0 10rem; height: 10rem; border-bottom: 1px solid var(--border-subtle); }
+      .settings-content-pane { min-width: 0; }
+      .settings-content-inner { padding: 1rem; }
     }
     .empty-member {
       padding: 1.5rem;
@@ -1710,6 +1718,16 @@ export class SettingsSurface extends JfElement {
    * surfaces and operations.
    * AGENT is reserved for the agent runtime, not user-selectable.
    */
+  /** Recovery navigation selects existing controls; it never changes tier or invokes Reset. */
+  async focusSettingsRecovery(): Promise<void> {
+    const user = this.viewerAudience === 'USER';
+    if (user) this.activateSearchHit('developer', 'view-tier');
+    await this.updateComplete;
+    const target = this.shadowRoot?.getElementById(user ? 'settings-view-tier' : 'settings-reset');
+    target?.scrollIntoView({ block: 'nearest' });
+    target?.focus();
+  }
+
   private renderViewerAudience(): TemplateResult {
     const audience: Audience = this.viewerAudience;
     const options: OptionButtonGroupOption[] = [
@@ -1718,7 +1736,7 @@ export class SettingsSurface extends JfElement {
       { value: 'DEVELOPER', label: 'Developer', description: 'Show everything', icon: 'database' },
     ];
     return html`
-      <div class="section">
+      <div class="section" id="settings-view-tier" tabindex="-1" role="group" aria-label="View tier settings">
         <h3>${icon({ name: 'shield', size: 12 })} View tier</h3>
         ${this.renderSettingRow(
           'View tier preference',
@@ -2771,7 +2789,7 @@ export class SettingsSurface extends JfElement {
               ? html`<span style="font-size: var(--font-size-xs); color: var(--text-tint)">Saving…</span>`
               : nothing}
             ${!this.readOnly
-              ? html`<span
+              ? html`<span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
                   @op-success=${() => this.handleResetSuccess()}
                   @op-error=${(e: CustomEvent<OpErrorEventDetail>) =>
                     this.handleResetError(e)}
@@ -2847,6 +2865,7 @@ export class SettingsSurface extends JfElement {
    *  the redesign re-parents sections, it does not rewrite them). */
   private sectionRenderers(): Record<string, () => TemplateResult | typeof nothing> {
     return {
+      indexing: () => this.renderIndexing(),
       interface: () => this.renderInterfaceRegion(),
       theme: () => this.renderThemes(),
       accessibility: () => this.renderAccessibility(),
@@ -2868,6 +2887,18 @@ export class SettingsSurface extends JfElement {
       'workspace-profiles': () => this.renderWorkspaceProfilesDeveloper(),
       data: () => this.renderData(),
     };
+  }
+
+  private renderIndexing(): TemplateResult {
+    const s = this.aiSnapshot;
+    const progress = selectIndexingProgress(s?.status, s?.indexingStatusLive ?? false,
+      s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []);
+    return html`<section class="section" data-testid="settings-indexing">
+      <h3>Indexing</h3>
+      <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
+      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>` : nothing}
+      <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
+    </section>`;
   }
 
   /** Tempdoc 855 §4 — Feedback capture moves from nested-inside-Security-pointer to its own
