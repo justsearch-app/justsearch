@@ -2753,3 +2753,14 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   "note": "Accept signature adaptation: all four oracles are byte-identical after adding the former adapter's always-true predicate. All four tests pass before/after; the real ArchUnit violation disappears. Rule/store unchanged. The explicit origin/main gate's nine uncovered items also exist before."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "c3n26f5a-verifier",
+  "verdict": "accept",
+  "digest": "sha256:7192e82217ac534f542a32760c101117c0b6dfa29e1071d1f1a2604d20a48017",
+  "note": "Accept fixture/evidence refresh on ee16edcc7: both baseline history tests throw No such conversation and both pass after setup creates sessions. Removing the two createSession lines restores the baseline test byte for byte; production uses that precondition. Generated nine-check evidence has current file/producer digests and records all nine passed without skips. Independently reran history and full app-services (4225 executed, 11 skipped); missing/deleted/restarted append preservation passed before and after. Optional duplicate cross-module reruns were cancelled while queued, not counted as passes."
+}
+```
