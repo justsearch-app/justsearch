@@ -61,3 +61,13 @@ frozen scope of durable removal receipts; both use the same prefix scope rule. E
 checks remain unchanged except the signature adaptations above.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-nested-3",
+  "verdict": "accept",
+  "digest": "sha256:87ee03acc9a8149c7dcdc180731186fdc80bcbb32ff6ad6ab3269bf6cec6ff40"
+}
+```
