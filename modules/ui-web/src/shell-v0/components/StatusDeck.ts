@@ -125,7 +125,8 @@ const BANNER_OWNING_SURFACE_ID = 'core.unified-chat-surface';
 export class StatusDeck extends JfElement {
   private focusedItem: string | null = null;
   private indexingWasPaused = false;
-  private indexingResumed = false;
+  private indexingAnnouncementKey: string | null = null;
+  private indexingAnnouncement = '';
   static properties = {
     apiBase: { type: String, attribute: 'api-base' },
     aiState: { state: true },
@@ -739,18 +740,30 @@ export class StatusDeck extends JfElement {
     );
     const indexingTransition = this.aiState?.verdict.kind === 'transitioning' &&
       this.aiState.verdict.reasons.some(isIndexingObservation);
-    // Migration and holds are one indexing subject, including when its observation expires.
-    if (progress.activity.confirmed) {
-      if (progress.pause) this.indexingResumed = false;
-      else if (this.indexingWasPaused) this.indexingResumed = true;
-      this.indexingWasPaused = !!progress.pause;
-    }
-    const indexingAnnounce = [this.indexingResumed && progress.activity.confirmed ? 'Indexing resumed.' : '', indexingTransition && progress.activity.confirmed
+    const activityAnnouncement = [indexingTransition && progress.activity.confirmed
       ? announce?.text ?? progress.activity.summary : progress.activity.summary,
     progress.activity.detail].filter(Boolean).join(' — ');
+    // Policy edges have stable announcements, independent of waiting counts or observation gaps.
+    // Ordinary activity still announces automatic holds and withdraws stale claims as before.
+    if (progress.activity.confirmed) {
+      const resumedKey = `resumed:${progress.phase}:${this.status?.operating?.indexing?.reasons?.join(',')}`;
+      if (progress.pause) {
+        if (this.indexingAnnouncementKey !== progress.pause.state) this.indexingAnnouncement = activityAnnouncement;
+        this.indexingAnnouncementKey = progress.pause.state;
+      } else if (this.indexingWasPaused) {
+        this.indexingAnnouncement = 'Indexing resumed.';
+        this.indexingAnnouncementKey = resumedKey;
+      } else if (this.indexingAnnouncementKey !== resumedKey) {
+        this.indexingAnnouncement = activityAnnouncement;
+        this.indexingAnnouncementKey = null;
+      }
+      this.indexingWasPaused = !!progress.pause;
+    } else if (this.indexingAnnouncementKey === null) {
+      this.indexingAnnouncement = activityAnnouncement;
+    }
     return html`
       <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer"
-        >${indexingAnnounce}</jf-system-notice>
+        >${this.indexingAnnouncement}</jf-system-notice>
       ${announce && !indexingTransition
         ? html`<jf-system-notice
             class="visually-hidden"

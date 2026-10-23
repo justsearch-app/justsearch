@@ -200,6 +200,32 @@ describe('WP3.7 shared pause surfaces', () => {
     } finally { observer.disconnect(); }
   });
 
+  it('S37.7 announces confirmed pause and resume once across details and unconfirmed blips', async () => {
+    feed('RUNNING', 0);
+    const el = await mount('jf-status-deck');
+    const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const changes: string[] = [];
+    const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
+    observer.observe(announcer, { subtree: true, childList: true, characterData: true });
+    const blip = async (state: string, pending: number) => {
+      const stale = snapshot(state, pending);
+      stale.meta = { ...stale.meta, workerRpcStale: true } as typeof stale.meta;
+      __feedForTest({ status: stale }); __feedContactForTest(); await settle(el);
+      feed(state, pending); await settle(el);
+    };
+    try {
+      feed('PAUSED', 0); await settle(el);
+      feed('PAUSED', 4); await settle(el);
+      expect(el.shadowRoot!.textContent).toContain('waiting for Resume');
+      await blip('PAUSED', 4);
+      feed('RUNNING', 4); await settle(el);
+      feed('RUNNING', 0); await settle(el);
+      await blip('RUNNING', 0);
+      expect(changes.filter(s => s.includes('Indexing paused'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('Indexing resumed'))).toHaveLength(1);
+    } finally { observer.disconnect(); }
+  });
+
   it('S37.8 Search v3 offers Resume alongside paused waiting-file context for Search and Ask', async () => {
     feed('PAUSED');
     __feedForTest({ inference: { mode: 'online', available: true, activeModelId: 'test-model' } as never });

@@ -331,6 +331,30 @@ these two product test files are durable. No acceptance record is authored by th
         "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#F5 keeps a mature folder semantic-install caveat and pending glyph through Pause"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The existing live region retains the last confirmed announcement across detail changes and observation gaps; a confirmed pause/resume edge is announced once in each window. Visible details keep updating.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 scenarios; pause/resume announcements and Health contrast repair continuation.",
+          "choice": "S37.7 confirmed pause and resume announce once per window.",
+          "quote": "Make each window announce a confirmed state change once (paused, resumed), keyed on the state itself, not on detail text; detail changes and unconfirmed-then-confirmed readings of the same state do not announce again.",
+          "location": "task t-20261019-bd718f WP3.7 announce pause and resume once; Health label contrast continuation",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-ui-announcements.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#S37.7 announces confirmed pause and resume once across details and unconfirmed blips"
+      ],
+      "repaired": true
     }
   ]
 }
