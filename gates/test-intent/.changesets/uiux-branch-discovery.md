@@ -264,3 +264,14 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
   "note": "Expectations match delegated intent; repaired checks fail before and pass after. Product verdict fails S16.2 cross-window invalidation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "te2j8wtm",
+  "verdict": "accept",
+  "digest": "sha256:3712cf5d6b0398ef08f246d3acf390fac4b71f1a451f0a5b8260c0a9c94f6fb7",
+  "note": "Expectations follow delegated intent. Repair UI assertions fail on b1e8223b8 and pass on the candidate; BF2a preservation passes live on c5285b8ca and the candidate. Product verdict fails S16.4 visible app Back; broader Java suite failures remain."
+}
+```
