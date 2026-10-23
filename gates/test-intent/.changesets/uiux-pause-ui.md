@@ -171,3 +171,14 @@ these two product test files are durable. No acceptance record is authored by th
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp37-verifier-mlzrt9kc",
+  "verdict": "accept",
+  "digest": "sha256:d8ee7175f8018bf1909bf03ed2a3ffa91fba434622f3b5ee224d312c95bf2d05",
+  "note": "Expectations follow the delegated S37/N37 scenarios; all 17 repaired checks pass and assertion-fail before, preservation passes. Acceptance covers test intent only; the unknown-reason HTTP decoder probe fails separately and does not receive product sign-off."
+}
+```
