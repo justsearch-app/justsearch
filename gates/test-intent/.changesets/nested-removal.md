@@ -172,3 +172,13 @@ data loss" (task t-20261023-nested-removal user turn 6). The old revision check 
 decision after conversion; this check is the product repair, separately from fixture adaptation.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-nested-3",
+  "verdict": "accept",
+  "digest": "sha256:352165ee9d97c57c337b3f464ddbad66b9d348e318a0551ce36d51b8e57215b0"
+}
+```
