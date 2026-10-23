@@ -650,44 +650,46 @@ export class StatusDeck extends JfElement {
         </jf-control>`;
       }
       case 'core.queue': {
-        if (progress.pause) return html`<span class="group policy-pause" title=${progress.activity.detail ?? ''}>
-          <span class="val">${progress.activity.summary} — ${progress.activity.detail}</span>
-          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
-        </span>`;
-        if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
-        const activity = progress.activity;
-        if (!activity.confirmed || activity.detail) {
-          const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
-          const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
-          return html`<span class="group" role="img" aria-label=${label} title=${label}>
+        const content = (() => {
+          if (progress.pause) return html`<span class="val" title=${progress.activity.detail ?? ''}>${progress.activity.summary} — ${progress.activity.detail}</span>`;
+          if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
+          const activity = progress.activity;
+          if (!activity.confirmed || activity.detail) {
+            const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+            const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
+            return html`<span class="group" role="img" aria-label=${label} title=${label}>
+              ${icon({ name: 'zap', size: 11 })}
+              <span class="val">${label}</span>
+            </span>`;
+          }
+          // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
+          // not a raw backlog count: the files are already indexed, the semantic layers are catching
+          // up. Falls back to the count only when the projection has no faithful denominator.
+          const enrichSuffix =
+            enrichingPercent !== null
+              ? `enriching: ${enrichingPercent}%`
+              : embed > 0
+                ? `embed: ${NUM.format(embed)}`
+                : '';
+          const enrichAria =
+            enrichingPercent !== null
+              ? `, enriching ${enrichingPercent}%`
+              : embed > 0
+                ? `, ${NUM.format(embed)} embedding`
+                : '';
+          return html`<span
+            class="group"
+            role="img"
+            aria-label="${name}: ${NUM.format(queue)} job(s) queued${enrichAria}"
+          >
             ${icon({ name: 'zap', size: 11 })}
-            <span class="val">${label}</span>
+            <span class="val">queue: ${NUM.format(queue)}${
+              enrichSuffix ? html` · ${enrichSuffix}` : nothing
+            }</span>
           </span>`;
-        }
-        // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
-        // not a raw backlog count: the files are already indexed, the semantic layers are catching
-        // up. Falls back to the count only when the projection has no faithful denominator.
-        const enrichSuffix =
-          enrichingPercent !== null
-            ? `enriching: ${enrichingPercent}%`
-            : embed > 0
-              ? `embed: ${NUM.format(embed)}`
-              : '';
-        const enrichAria =
-          enrichingPercent !== null
-            ? `, enriching ${enrichingPercent}%`
-            : embed > 0
-              ? `, ${NUM.format(embed)} embedding`
-              : '';
-        return html`<span
-          class="group"
-          role="img"
-          aria-label="${name}: ${NUM.format(queue)} job(s) queued${enrichAria}"
-        >
-          ${icon({ name: 'zap', size: 11 })}
-          <span class="val">queue: ${NUM.format(queue)}${
-            enrichSuffix ? html` · ${enrichSuffix}` : nothing
-          }</span>
+        })();
+        return html`<span class="group policy-pause">${content}
+          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
         </span>`;
       }
       default:

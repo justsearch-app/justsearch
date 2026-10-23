@@ -1718,6 +1718,16 @@ export class SettingsSurface extends JfElement {
    * surfaces and operations.
    * AGENT is reserved for the agent runtime, not user-selectable.
    */
+  /** Recovery navigation selects existing controls; it never changes tier or invokes Reset. */
+  async focusSettingsRecovery(): Promise<void> {
+    const user = this.viewerAudience === 'USER';
+    if (user) this.activateSearchHit('developer', 'view-tier');
+    await this.updateComplete;
+    const target = this.shadowRoot?.getElementById(user ? 'settings-view-tier' : 'settings-reset');
+    target?.scrollIntoView({ block: 'nearest' });
+    target?.focus();
+  }
+
   private renderViewerAudience(): TemplateResult {
     const audience: Audience = this.viewerAudience;
     const options: OptionButtonGroupOption[] = [
@@ -1726,7 +1736,7 @@ export class SettingsSurface extends JfElement {
       { value: 'DEVELOPER', label: 'Developer', description: 'Show everything', icon: 'database' },
     ];
     return html`
-      <div class="section">
+      <div class="section" id="settings-view-tier" tabindex="-1" role="group" aria-label="View tier settings">
         <h3>${icon({ name: 'shield', size: 12 })} View tier</h3>
         ${this.renderSettingRow(
           'View tier preference',
@@ -2779,7 +2789,7 @@ export class SettingsSurface extends JfElement {
               ? html`<span style="font-size: var(--font-size-xs); color: var(--text-tint)">Saving…</span>`
               : nothing}
             ${!this.readOnly
-              ? html`<span
+              ? html`<span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
                   @op-success=${() => this.handleResetSuccess()}
                   @op-error=${(e: CustomEvent<OpErrorEventDetail>) =>
                     this.handleResetError(e)}
@@ -2886,7 +2896,7 @@ export class SettingsSurface extends JfElement {
     return html`<section class="section" data-testid="settings-indexing">
       <h3>Indexing</h3>
       <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
-      <p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>
+      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
     </section>`;
   }

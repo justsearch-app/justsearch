@@ -1569,10 +1569,10 @@ export class HealthSurface extends JfElement {
     return html`
       ${this.renderHeader()}
       <div class="body">
-        ${progress.pause ? html`<div data-testid="health-indexing-pause">
-          <p>${progress.activity.summary} — ${progress.activity.detail}</p>
+        <div data-testid="health-indexing-pause">
+          ${progress.pause || !progress.activity.confirmed ? html`<p>${progress.activity.summary} — ${progress.activity.detail}</p>` : nothing}
           <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
-        </div>` : nothing}
+        </div>
         ${this.error
           ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.error = null)}
               >${this.error}</jf-error-alert

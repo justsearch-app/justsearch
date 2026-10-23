@@ -742,6 +742,7 @@ export class LibrarySurface extends JfElement {
         enrichmentBlocked: this.enrichmentBlocked,
         retryWaiting: this.retryWaiting,
         indexingPaused: this.indexProgress.pause?.state === 'paused',
+        indexingPauseReason: this.indexProgress.pause?.reason,
         // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
         // re-queue window, when the wire row reports the failures as in-flight instead.
         lastKnownFailed: this.lastKnownFailed[pathHash],
@@ -1511,6 +1512,7 @@ export class LibrarySurface extends JfElement {
       enrichmentBlocked: this.enrichmentBlocked,
         retryWaiting: this.retryWaiting,
         indexingPaused: this.indexProgress.pause?.state === 'paused',
+        indexingPauseReason: this.indexProgress.pause?.reason,
       // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });
@@ -1728,10 +1730,10 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
-      ${this.indexProgress.pause ? html`<div data-testid="library-indexing-pause">
-        <p>${this.indexingActivity.summary} — ${this.indexingActivity.detail}</p>
+      <div data-testid="library-indexing-pause">
+        ${this.indexProgress.pause || !this.indexProgress.activity.confirmed ? html`<p>${this.indexingActivity.summary} — ${this.indexingActivity.detail}</p>` : nothing}
         <jf-indexing-controls .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
-      </div>` : nothing}
+      </div>
       ${this.renderReindexDecision()}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>

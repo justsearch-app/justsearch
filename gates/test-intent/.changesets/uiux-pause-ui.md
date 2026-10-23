@@ -165,10 +165,121 @@ these two product test files are durable. No acceptance record is authored by th
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#N37.1 automatic holds keep their work-specific explanations and active text indexing"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "CR37 repairs focus continuity across status uncertainty, keeps impossible actions focusable with explanations and retains Engine refusals. CR37a/b replaces recovery Resume with tier-aware navigation to existing View tier or Reset controls, without invoking Reset or changing tier. Existing manual behavior is preserved.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "Keyboard focus on Pause or Resume (or the duration choice), then a status observation that does not make the action impossible (for example an unavailable AI runtime, queued work, an activity reading briefly unconfirmed) \u2014 focus stays on the control; Enter or Space afterwards performs the action (S37.1, S37.7)",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "Keyboard focus on Pause or Resume (or the duration choice), then a status observation that does not make the action impossible (for example an unavailable AI runtime, queued work, an activity reading briefly unconfirmed)",
+          "quote": "focus stays on the control; Enter or Space afterwards performs the action (S37.1, S37.7)",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "A status observation that does make the action impossible \u2014 the control says why where it is; focus is not dropped to the page body",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "A status observation that does make the action impossible",
+          "quote": "the control says why where it is; focus is not dropped to the page body",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "Paused for settings recovery (reason settings_recovery) \u2014 every paused surface says the saved settings were damaged and replaced by defaults, that indexing stays held until the reset is confirmed in Settings, and to check exclusions; instead of Resume it offers a keyboard-reachable control that opens Settings at the existing Reset to defaults action; it never promises \"held until you resume\"",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "Paused for settings recovery (reason settings_recovery)",
+          "quote": "every paused surface says the saved settings were damaged and replaced by defaults, that indexing stays held until the reset is confirmed in Settings, and to check exclusions; instead of Resume it offers a keyboard-reachable control that opens Settings at the existing Reset to defaults action; it never promises \"held until you resume\"",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "Paused for settings recovery, View tier User \u2014 same explanation, plus the route in words: in Settings, set View tier to Operator, then Reset to defaults; the control opens Settings at the View tier row; switching tier there then shows the Reset action without a reload",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "Paused for settings recovery, View tier User",
+          "quote": "same explanation, plus the route in words: in Settings, set View tier to Operator, then Reset to defaults; the control opens Settings at the View tier row; switching tier there then shows the Reset action without a reload",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "Paused for settings recovery, View tier Operator or Developer \u2014 as CR37a: the control opens Settings at the existing Reset to defaults action",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "Paused for settings recovery, View tier Operator or Developer",
+          "quote": "as CR37a: the control opens Settings at the existing Reset to defaults action",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "Any refused Pause or Resume (including SETTINGS_RECOVERY_REQUIRED reached another way) \u2014 the Engine's refusal message is shown where it was pressed; the state stays as status reports; never shown as done",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "Any refused Pause or Resume (including SETTINGS_RECOVERY_REQUIRED reached another way)",
+          "quote": "the Engine's refusal message is shown where it was pressed; the state stays as status reports; never shown as done",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "Agreed WP3.7 pause UI, CR37 rows 1, 2 and 5, CR37a and CR37b; Reset behavior and audience unchanged.",
+          "choice": "Ordinary manual pause \u2014 unchanged: Resume as before",
+          "label": "agent choice; agent-adopted (delegated-choice)",
+          "case": "Ordinary manual pause",
+          "quote": "unchanged: Resume as before",
+          "location": "task t-20261019-bd718f CR37/CR37a/CR37b agreed continuation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-pause-ui-cr37.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-task-list retains focused Resume across unconfirmed observations and accepts activation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-task-list explains damaged settings and navigates to the existing reset without offering Resume",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-status-deck retains focused Resume across unconfirmed observations and accepts activation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-status-deck explains damaged settings and navigates to the existing reset without offering Resume",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-health-surface retains focused Resume across unconfirmed observations and accepts activation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-health-surface explains damaged settings and navigates to the existing reset without offering Resume",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-library-surface retains focused Resume across unconfirmed observations and accepts activation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-library-surface explains damaged settings and navigates to the existing reset without offering Resume",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-settings-surface retains focused Resume across unconfirmed observations and accepts activation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-settings-surface explains damaged settings and navigates to the existing reset without offering Resume",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-sv3-window retains focused Resume across unconfirmed observations and accepts activation",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-sv3-window explains damaged settings and navigates to the existing reset without offering Resume",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37b OPERATOR recovery opens at the existing Reset action without changing tier",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37b DEVELOPER recovery opens at the existing Reset action without changing tier",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains Pause and duration focus during uncertain observations and pending requests",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 explains an impossible action in place without removing its focused control",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_RECOVERY_REQUIRED where pressed across status polls",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_READ_ONLY where pressed across status polls"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
+
+CR37/CR37a/CR37b continuation: agent-adopted under the same delegation. The original entries above are retained as historical intent; the new entry supersedes recovery Resume wording with the approved tier-aware route. Browser checks under `tmp/pause-ui-cr37b/` are scaffolding; the appended product checks are durable. Schedule and battery remain deferred to WP3.8. The independent verifier must append a fresh acceptance after this continuation.
 
 ## Acceptance records
 

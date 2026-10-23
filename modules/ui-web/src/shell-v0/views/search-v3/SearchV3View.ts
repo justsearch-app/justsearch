@@ -4101,8 +4101,9 @@ export class SearchV3View extends JfElement {
         @sv3-version-select=${this.onVersionSelect}
       >
         <jf-sv3-topbar window-title=${WINDOW_TITLE} data-testid="sv3-topbar"></jf-sv3-topbar>
-        ${indexing.pause?.waiting ? html`<div class="indexing-pause-note" data-testid="sv3-indexing-pause">
-          <p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>
+        ${indexing.pause?.waiting || !indexing.activity.confirmed || this.shadowRoot?.querySelector('jf-indexing-controls:focus-within')
+          ? html`<div class="indexing-pause-note" data-testid="sv3-indexing-pause">
+          ${indexing.pause?.waiting ? html`<p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>` : nothing}
           <jf-indexing-controls .progress=${indexing} api-base=${this.apiBase}></jf-indexing-controls>
         </div>` : nothing}
         <jf-sv3-main

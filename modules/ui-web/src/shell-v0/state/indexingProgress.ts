@@ -435,7 +435,7 @@ const AUTOMATIC_REASONS: ReadonlySet<string> = new Set([
 ]);
 const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
   ['user_paused', 'Paused by you.'],
-  ['settings_recovery', 'Settings recovery — indexing is held until you resume.'],
+  ['settings_recovery', 'Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.'],
 ]);
 
 function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
@@ -634,7 +634,7 @@ export function selectIndexingProgress(
     detail: [PAUSE_REASON_WORDING.get(pause.reason) ?? 'Indexing is on hold; reason unavailable.',
       pause.reason === 'user_paused' && pause.untilEpochMs != null
         ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
-      pause.waiting ? 'Work is waiting for Resume.' : '',
+      pause.waiting && pause.reason !== 'settings_recovery' ? 'Work is waiting for Resume.' : '',
     ].filter(Boolean).join(' '),
     confirmed: true, enrichmentDeferred: true,
   } : indexingActivity(status, indexingStatusLive, phase, work.rawPending);

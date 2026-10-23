@@ -10,6 +10,7 @@ import '../views/LibrarySurface.js';
 import '../views/search-v3/SearchV3View.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
+import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
 import { folderStatus } from '../state/folderStatus.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { setAuthorizationPresenter } from '../operations/authorizationBroker.js';
@@ -228,4 +229,156 @@ describe('WP3.7 shared pause surfaces', () => {
     await settle(el);
     expect(button(await controls(el)).textContent).toContain('Resume indexing');
   });
+});
+
+
+describe('CR37 keyboard continuity and recovery', () => {
+  const tags = ['jf-task-list', 'jf-status-deck', 'jf-health-surface', 'jf-library-surface', 'jf-settings-surface', 'jf-sv3-window'];
+  function observe(state: string, reason = 'user_paused', stale = false): void {
+    const status = snapshot(state);
+    status.operating!.indexing!.reasons = [reason] as never;
+    status.meta = { ...status.meta, workerRpcStale: stale } as typeof status.meta;
+    __feedForTest({ status });
+    __feedContactForTest();
+  }
+
+  for (const tag of tags) {
+    it(`CR37 ${tag} retains focused Resume across unconfirmed observations and accepts activation`, async () => {
+      observe('PAUSED');
+      const el = await mount(tag);
+      const control = await controls(el);
+      const resume = button(control);
+      resume.focus();
+      observe('PAUSED', 'user_paused', true);
+      await settle(el);
+      expect(el.shadowRoot!.querySelector('jf-indexing-controls'), 'poll must retain the control').toBe(control);
+      expect(control.shadowRoot!.activeElement, 'poll must retain keyboard focus').toBe(resume);
+      expect(resume.disabled, 'uncertain activity does not make Resume impossible').toBe(false);
+      fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' }));
+      resume.click();
+      await settle(control);
+      expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/core.indexing-resume/invoke'))).toBe(true);
+    });
+
+    it(`CR37a ${tag} explains damaged settings and navigates to the existing reset without offering Resume`, async () => {
+      observe('PAUSED', 'settings_recovery');
+      const el = await mount(tag);
+      const text = el.shadowRoot!.textContent!;
+      expect(text).toContain('saved settings were damaged and replaced by defaults');
+      expect(text).toContain('reset is confirmed in Settings');
+      expect(text).toContain('Check exclusions');
+      expect(text).not.toMatch(/held until you resume|waiting for Resume/i);
+      const control = await controls(el);
+      expect(control.shadowRoot!.textContent).not.toContain('Resume indexing');
+      const open = button(control);
+      expect(open.textContent).toContain('Open Settings at View tier');
+      expect(control.shadowRoot!.textContent).toContain('In Settings, set View tier to Operator, then Reset to defaults.');
+      open.focus();
+      expect(control.shadowRoot!.activeElement).toBe(open);
+      const navigate = vi.fn();
+      document.addEventListener('jf-navigate-to-surface', navigate);
+      try { open.click(); await settle(control); }
+      finally { document.removeEventListener('jf-navigate-to-surface', navigate); }
+      expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ detail: {
+        surfaceId: 'core.settings-surface', state: { focusSettingsRecovery: true },
+      } }));
+      expect(fetchMock.mock.calls.filter(c => /core\.(indexing-resume|reset-settings)\/invoke/.test(String(c[0])))).toHaveLength(0);
+    });
+  }
+
+  it('CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings', async () => {
+    const status = snapshot('PAUSED');
+    status.operating!.indexing!.reasons = ['settings_recovery'];
+    const progress = selectIndexingProgress(status, true, 3, []);
+    const overlay = await mount('jf-indexing-overlay');
+    Object.assign(overlay, { progress, activity: progress.activity });
+    await settle(overlay);
+    expect(overlay.shadowRoot!.textContent).toContain('saved settings were damaged and replaced by defaults');
+    expect(button(await controls(overlay)).textContent).toContain('Open Settings at View tier');
+    const row = { status: 'indexed', fileCount: 10, inFlightCount: 3, failedCount: 2 } as IndexedRootView;
+    const ctx = { relativeTime: '', verifiedRelativeTime: '', provisional: false, indexingPaused: true,
+      indexingPauseReason: 'settings_recovery' };
+    const waiting = folderStatus(row, ctx);
+    expect(waiting.metaText).toContain('Waiting for Settings reset');
+    expect(waiting.metaText).not.toContain('Resume');
+    expect(waiting.failed).toBe(2);
+  });
+
+  for (const tier of ['OPERATOR', 'DEVELOPER'] as const) {
+    it(`CR37b ${tier} recovery opens at the existing Reset action without changing tier`, async () => {
+      const original = getViewerAudience();
+      setViewerAudience(tier);
+      try {
+        observe('PAUSED', 'settings_recovery');
+        const el = await mount('jf-task-list');
+        const control = await controls(el);
+        expect(button(control).textContent).toContain('Open Settings at Reset to defaults');
+        expect(control.shadowRoot!.textContent).not.toContain('set View tier to Operator');
+        const navigate = vi.fn();
+        document.addEventListener('jf-navigate-to-surface', navigate);
+        try { button(control).click(); await settle(control); }
+        finally { document.removeEventListener('jf-navigate-to-surface', navigate); }
+        expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ detail: {
+          surfaceId: 'core.settings-surface', state: { focusSettingsRecovery: true },
+        } }));
+        expect(getViewerAudience()).toBe(tier);
+      } finally { setViewerAudience(original); }
+    });
+  }
+
+  it('CR37 retains Pause and duration focus during uncertain observations and pending requests', async () => {
+    observe('RUNNING');
+    const el = await mount('jf-settings-surface');
+    const control = await controls(el);
+    const duration = control.shadowRoot!.querySelector<HTMLSelectElement>('select')!;
+    duration.focus();
+    observe('RUNNING', 'user_paused', true);
+    await settle(el);
+    expect(control.shadowRoot!.activeElement).toBe(duration);
+    expect(duration.disabled).toBe(false);
+    let finish!: (response: Response) => void;
+    fetchMock.mockImplementation(() => new Promise<Response>(resolve => { finish = resolve; }));
+    const pause = button(control);
+    pause.focus(); pause.click();
+    await control.updateComplete;
+    try {
+      expect(control.shadowRoot!.activeElement).toBe(pause);
+      expect(pause.disabled).toBe(false);
+      expect(pause.getAttribute('aria-disabled')).toBe('true');
+      expect(control.shadowRoot!.textContent).toContain('Request in progress');
+    } finally { finish(Response.json({ success: true, message: 'Accepted' })); await settle(control); }
+  });
+
+  it('CR37 explains an impossible action in place without removing its focused control', async () => {
+    observe('PAUSED');
+    const el = await mount('jf-settings-surface');
+    const control = await controls(el);
+    const resume = button(control);
+    resume.focus();
+    observe('RUNNING');
+    await settle(el);
+    expect(control.shadowRoot!.activeElement).toBe(resume);
+    expect(resume.textContent).toContain('Resume indexing');
+    expect(resume.getAttribute('aria-disabled')).toBe('true');
+    expect(control.shadowRoot!.textContent).toContain('Indexing is already running');
+    resume.click(); await settle(control);
+    expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/core.indexing-resume/invoke'))).toBe(false);
+  });
+
+  for (const [state, code, message] of [
+    ['PAUSED', 'SETTINGS_RECOVERY_REQUIRED', 'Settings history cannot be verified'],
+    ['RUNNING', 'SETTINGS_READ_ONLY', 'Settings persistence is disabled'],
+  ]) {
+    it(`CR37 retains the Engine refusal ${code} where pressed across status polls`, async () => {
+      observe(state!);
+      const el = await mount('jf-settings-surface');
+      const control = await controls(el);
+      fetchMock.mockResolvedValue(Response.json({ success: false, errorClass: 'HANDLER_FAILURE', errorCode: code, message }));
+      button(control).click(); await settle(control);
+      expect(control.shadowRoot!.textContent).toContain(message);
+      observe(state!); await settle(el); await settle(control);
+      expect(control.shadowRoot!.textContent).toContain(message);
+      expect(control.shadowRoot!.textContent).not.toContain('Waiting for status');
+    });
+  }
 });

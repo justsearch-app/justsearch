@@ -663,8 +663,8 @@ export class TaskList extends JfElement {
         </div>
         ${this.progress.activity.detail ? html`<div class="counts">${this.progress.activity.detail}</div>` : nothing}
         ${this.renderAggregate()}
-        ${this.progress.activity.confirmed && (isActivePhase(this.progress.phase) || this.progress.pause || this.progress.phase === 'waiting' || this.progress.phase === 'error')
-          ? html`<jf-indexing-controls allow-pause .progress=${this.progress} api-base=${this.apiBase}></jf-indexing-controls>` : nothing}
+        <jf-indexing-controls .allowPause=${isActivePhase(this.progress.phase) || this.progress.phase === 'waiting' || this.progress.phase === 'error'}
+          .progress=${this.progress} api-base=${this.apiBase}></jf-indexing-controls>
         ${this.queueCounts ? html`
           <div class="counts" data-testid="task-queue-totals">
             ${this.progress.live ? '' : 'Last reported: '}${formatCount(this.queueCounts.processing)} processing · ${formatCount(this.queueCounts.failed)} failed
