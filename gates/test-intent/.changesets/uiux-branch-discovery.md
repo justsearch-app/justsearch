@@ -216,3 +216,14 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "eknk22a5",
+  "verdict": "accept",
+  "digest": "sha256:332fccb46e94ef3e3e2afcde449707326783b4158c81d9519a8a1bef6c8a3307",
+  "note": "Expectations match delegated intent; repaired checks fail before and pass after. Product verdict fails S16.2 cross-window invalidation."
+}
+```
