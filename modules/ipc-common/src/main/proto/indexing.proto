@@ -1060,6 +1060,8 @@ message DeleteByPathRequest {
 message DeleteByPathResponse {
   int64 deleted_jobs = 1;
   string error = 2;
+  // True only when queued during index switching rather than applied. Legacy readers ignore it.
+  bool buffered = 3;
 }
 
 // === Delete by Collection (tempdoc 811 C-2a) ===
@@ -1092,6 +1094,8 @@ message DeleteByIdRequest {
 message DeleteByIdResponse {
   bool success = 1;
   string error = 2;
+  // True only when queued during index switching rather than applied. Defaults to false.
+  bool buffered = 3;
 }
 
 // === Prune Missing Files ===

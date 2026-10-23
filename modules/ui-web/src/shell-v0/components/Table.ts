@@ -319,7 +319,7 @@ export class Table<T extends Record<string, unknown> = Record<string, unknown>>
             ? meta.format(raw)
             : String(raw ?? '');
           return html`
-            <div class="cell" role="cell" title=${String(display)}>${display}</div>
+            <div class="cell" role="cell" title=${typeof display === 'object' ? '' : String(display)}>${display}</div>
           `;
         })}
         ${actionsRenderer

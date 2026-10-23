@@ -63,10 +63,19 @@ public final class ActionLedgerProjection {
    */
   public static ActionEvent projectAgentToolCompletion(
       Instant occurredAt, String toolName, boolean success, String executionId, String sessionId) {
+    return projectAgentToolCompletion(
+        occurredAt, toolName, success, executionId, sessionId, Optional.empty());
+  }
+
+  /** Accepted recorded tools carry the same keyed identity as the operation-history projection. */
+  public static ActionEvent projectAgentToolCompletion(
+      Instant occurredAt, String toolName, boolean success, String executionId, String sessionId,
+      Optional<String> operationKey) {
     String outcome = success ? "SUCCESS" : "FAILURE";
     String exec = executionId == null ? "" : executionId;
     return new ActionEvent.Operation(
-        deterministicId("operation", occurredAt, toolName, outcome, exec),
+        operationKey.map(key -> "operation:" + key)
+            .orElseGet(() -> deterministicId("operation", occurredAt, toolName, outcome, exec)),
         occurredAt,
         originatorOf(TransportTag.AGENT_LOOP),
         TransportTag.AGENT_LOOP.name(),

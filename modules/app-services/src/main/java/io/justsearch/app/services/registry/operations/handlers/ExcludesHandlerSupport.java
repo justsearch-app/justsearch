@@ -80,6 +80,7 @@ final class ExcludesHandlerSupport {
       perPattern.add(Map.of("pattern", pm.pattern(), "matches", pm.matches()));
     }
     LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+    if (r.effectivePolicy() != null) out.put("effectivePolicy", r.effectivePolicy());
     out.put("dryRun", r.dryRun());
     out.put("patterns", r.patterns());
     out.put("rootsProcessed", r.rootsProcessed());
@@ -88,6 +89,9 @@ final class ExcludesHandlerSupport {
     out.put("matchedFiles", r.matchedFiles());
     out.put("capped", r.capped());
     out.put("perPattern", perPattern);
+    out.put("confirmedRemovals", r.confirmedRemovals());
+    out.put("uncheckedScopes", r.uncheckedScopes().stream().map(scope ->
+        Map.of("path", scope.path(), "status", scope.status(), "reason", scope.reason())).toList());
     return out;
   }
 }

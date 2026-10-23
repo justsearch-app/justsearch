@@ -11,9 +11,11 @@ interface LibrarySettings extends HTMLElement {
   excludesLoaded: boolean;
   excludesBusy: boolean;
   error: string | null;
+  excludesError: string | null;
   updateComplete: Promise<unknown>;
   refresh(): Promise<void>;
   loadExcludes(): Promise<void>;
+  handleSaveExcludes(): Promise<void>;
   handlePreviewExcludes(): Promise<void>;
   handleApplyExcludes(): Promise<void>;
 }
@@ -27,9 +29,19 @@ function complete(init?: { body?: unknown }): Response {
 }
 function fixture() {
   const send = vi.fn<PluginHostApi['data']['fetch']>();
+  // Policy observation is independent of the retained settings-attempt transport.
+  let savedPatterns: string[] = [];
+  const fetchPolicy: PluginHostApi['data']['fetch'] = async (path, init) => {
+    if (path === '/api/indexing/excludes') return json({ source: 'settings.json', sourceDetail: null, patterns: savedPatterns });
+    const response = await send(path, init);
+    const body = await response.clone().json();
+    if (body.ui?.excludePatterns) savedPatterns = body.ui.excludePatterns;
+    if (body.state === 'COMPLETE' && init?.body) savedPatterns = JSON.parse(String(init.body)).ui.excludePatterns;
+    return response;
+  };
   const invoke = vi.fn().mockResolvedValue({ success: true });
   const library = document.createElement('jf-library-surface') as LibrarySettings;
-  library.host_ = createMockHostApi({ data: { fetch: send, invokeOperation: invoke } });
+  library.host_ = createMockHostApi({ data: { fetch: fetchPolicy, invokeOperation: invoke }, ui: { showConfirmDialog: vi.fn().mockResolvedValue(true) } });
   library.refresh = vi.fn().mockResolvedValue(undefined);
   return { library, send, invoke };
 }
@@ -65,7 +77,7 @@ describe('Library retained-base exclusions', () => {
     await library.handleApplyExcludes();
     expect(send).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenNthCalledWith(1, 'core.preview-excludes', {});
-    expect(invoke).toHaveBeenNthCalledWith(2, 'core.apply-excludes', {});
+    expect(invoke).toHaveBeenNthCalledWith(2, 'core.apply-excludes', {}, { consented: true });
     expect(library.excludesText).toBe('[legacy\nprivate');
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -94,13 +106,13 @@ describe('Library retained-base exclusions', () => {
       .mockImplementationOnce(async (_, init) => complete(init));
     await library.loadExcludes();
     library.excludesText = 'old\nnew';
-    await library.handlePreviewExcludes();
+    await library.handleSaveExcludes();
     const first = JSON.parse(String(send.mock.calls[1]?.[1]?.body));
     expect(first.witness).toEqual(observed);
     expect(first.ui.excludePatterns).toEqual(['old', 'new']);
-    expect(invoke).toHaveBeenCalledWith('core.preview-excludes', {});
+    expect(invoke).not.toHaveBeenCalled();
     library.excludesText = 'third';
-    await library.handleApplyExcludes();
+    await library.handleSaveExcludes();
     const second = JSON.parse(String(send.mock.calls[2]?.[1]?.body));
     expect(second.witness).toEqual({ acceptedRevision: 5, lastCommittedOperationKey: first.operationKey });
     expect(second.operationKey).not.toBe(first.operationKey);
@@ -111,7 +123,7 @@ describe('Library retained-base exclusions', () => {
     const { library, send, invoke } = fixture();
     send.mockResolvedValue(json({ ui: { excludePatterns: ['untrusted'] } }, status));
     await library.loadExcludes();
-    await library.handleApplyExcludes();
+    await library.handleSaveExcludes();
     expect(library.excludesLoaded).toBe(false);
     expect(library.excludesText).toBe('');
     expect(library.error).toBeTruthy();
@@ -127,41 +139,40 @@ describe('Library retained-base exclusions', () => {
       .mockImplementationOnce(async (_, init) => complete(init));
     await library.loadExcludes();
     library.excludesText = 'my draft';
-    await library.handleApplyExcludes();
+    await library.handleSaveExcludes();
     expect(invoke).not.toHaveBeenCalled();
     expect(library.excludesText).toBe('my draft');
     expect(library.excludesLoaded).toBe(false);
-    expect(library.error).toContain('Reload and review');
-    await library.handlePreviewExcludes();
+    expect(library.excludesError).toContain('Reload and review');
+    await library.handleSaveExcludes();
     expect(send).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalled();
     await library.loadExcludes();
     expect(library.excludesText).toBe('elsewhere');
     library.excludesText += '\nreviewed';
-    await library.handleApplyExcludes();
-    expect(invoke).toHaveBeenCalledTimes(1);
+    await library.handleSaveExcludes();
+    expect(invoke).not.toHaveBeenCalled();
     const oldAttempt = JSON.parse(String(send.mock.calls[1]?.[1]?.body));
     const freshAttempt = JSON.parse(String(send.mock.calls[3]?.[1]?.body));
     expect(freshAttempt.operationKey).not.toBe(oldAttempt.operationKey);
     expect(freshAttempt.witness.acceptedRevision).toBe(6);
   });
 
-  it('waits through open202 before Preview and rejects overlapping clicks', async () => {
+  it('waits through open202 during Save and rejects overlapping clicks', async () => {
     const { library, send, invoke } = fixture();
     send.mockResolvedValueOnce(json({ ui: { excludePatterns: [] }, witness: observed }))
       .mockImplementationOnce(async (_, init) => json({ state: 'RUNNING', operationKey: JSON.parse(String(init?.body)).operationKey }, 202))
       .mockImplementationOnce(async (_, init) => complete(init));
     await library.loadExcludes();
     library.excludesText = 'one';
-    const result = library.handlePreviewExcludes();
+    const result = library.handleSaveExcludes();
     await vi.advanceTimersByTimeAsync(249);
     expect(library.excludesBusy).toBe(true);
     expect(invoke).not.toHaveBeenCalled();
-    await library.handleApplyExcludes();
+    await library.handleSaveExcludes();
     await vi.advanceTimersByTimeAsync(1);
     await result;
-    expect(invoke).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenCalledWith('core.preview-excludes', {});
+    expect(invoke).not.toHaveBeenCalled();
     expect(send.mock.calls[1]?.[1]?.body).toBe(send.mock.calls[2]?.[1]?.body);
     expect(library.excludesBusy).toBe(false);
   });
@@ -173,16 +184,16 @@ describe('Library retained-base exclusions', () => {
       .mockImplementationOnce(async (_, init) => complete(init));
     await library.loadExcludes();
     library.excludesText = 'pending';
-    const first = library.handleApplyExcludes();
+    const first = library.handleSaveExcludes();
     await vi.advanceTimersByTimeAsync(10_000);
     await first;
-    expect(library.error).toContain('timed out');
+    expect(library.excludesError).toContain('timed out');
     expect(invoke).not.toHaveBeenCalled();
     await library.loadExcludes();
     expect(send).toHaveBeenCalledTimes(2);
-    await library.handleApplyExcludes();
+    await library.handleSaveExcludes();
     expect(send.mock.calls[2]?.[1]?.body).toBe(send.mock.calls[1]?.[1]?.body);
-    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
     expect(send.mock.calls[1]?.[1]?.signal?.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -193,7 +204,7 @@ describe('Library retained-base exclusions', () => {
       .mockResolvedValueOnce(json({ errorCode: 'VERSION_CONFLICT', state: 'FAILED' }, 409));
     await library.loadExcludes();
     library.excludesText = 'my unsaved draft';
-    await library.handleApplyExcludes();
+    await library.handleSaveExcludes();
     document.body.appendChild(library);
     await library.updateComplete;
     const textarea = library.shadowRoot?.querySelector('textarea');
@@ -241,15 +252,15 @@ describe('Library retained-base exclusions', () => {
       const patterns = Array.from({ length: count }, (_, index) => makePattern(index));
       const draft = patterns.join('\n');
       library.excludesText = draft;
-      await library.handlePreviewExcludes();
+      await library.handleSaveExcludes();
       expect(JSON.parse(String(send.mock.calls[1]?.[1]?.body)).ui.excludePatterns).toEqual(patterns);
       expect(invoke).not.toHaveBeenCalled();
       expect(library.excludesText).toBe(draft);
-      expect(library.error).toBe(message);
+      expect(library.excludesError).toBe(message);
       expect(library.excludesBusy).toBe(false);
       document.body.appendChild(library);
       await library.updateComplete;
-      expect(library.shadowRoot?.querySelector('.error-banner')?.textContent).toContain(message);
+      expect(library.shadowRoot?.querySelector('#excludes-error[role="alert"]')?.textContent).toContain(message);
       library.remove();
       await vi.advanceTimersByTimeAsync(0);
       expect(vi.getTimerCount()).toBe(0);
