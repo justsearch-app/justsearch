@@ -57,6 +57,51 @@ function sh(command, cwd) {
   // Native test extraction must be private to this invocation and checkout. Sharing the default
   // path with another Gradle run silently skips app-services' native checks on Windows.
   const env = { ...process.env };
+  if (/gradlew/.test(command)) {
+    // Isolate Gradle tests and their children, including historical builds without the convention.
+    // Retain Gradle's cache location before replacing HOME/USERPROFILE.
+    env.GRADLE_USER_HOME ||= path.join(os.homedir(), '.gradle');
+    const profile = path.join(cwd, 'build', 'test-evidence-profile');
+    const home = path.join(profile, 'home');
+    const data = path.join(home, '.justsearch');
+    const paths = {
+      HOME: home, USERPROFILE: home,
+      APPDATA: path.join(home, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(home, 'AppData', 'Local'),
+      XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: path.join(home, '.local', 'share'),
+      XDG_CACHE_HOME: path.join(home, '.cache'), XDG_STATE_HOME: path.join(home, '.local', 'state'),
+      JUSTSEARCH_HOME: data, JUSTSEARCH_DATA_DIR: data,
+    };
+    for (const [key, directory] of Object.entries(paths)) {
+      fs.mkdirSync(directory, { recursive: true });
+      env[key] = directory;
+    }
+    // JVM properties are not inherited by Gradle test workers. An init script also protects
+    // --before checkouts, whose Test tasks may predate the shared isolation convention.
+    const initScript = 'build/test-evidence-profile.init.gradle';
+    fs.writeFileSync(path.join(cwd, initScript), `
+allprojects {
+  tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+    def profileDirectory = layout.buildDirectory.dir("test-profile/" + name)
+    doFirst {
+      def profile = profileDirectory.get().asFile
+      def home = new File(profile, "home")
+      def data = new File(home, ".justsearch")
+      def paths = [HOME: home, USERPROFILE: home,
+        APPDATA: new File(home, "AppData/Roaming"), LOCALAPPDATA: new File(home, "AppData/Local"),
+        XDG_CONFIG_HOME: new File(home, ".config"), XDG_DATA_HOME: new File(home, ".local/share"),
+        XDG_CACHE_HOME: new File(home, ".cache"), XDG_STATE_HOME: new File(home, ".local/state"),
+        JUSTSEARCH_HOME: data, JUSTSEARCH_DATA_DIR: data]
+      paths.values().each { it.mkdirs() }
+      systemProperty "user.home", home.absolutePath
+      systemProperty "justsearch.data.dir", data.absolutePath
+      systemProperty "justsearch.home", data.absolutePath
+      paths.each { key, directory -> environment key, directory.absolutePath }
+    }
+  }
+}
+`, 'utf8');
+    command += ` --init-script ${initScript}`;
+  }
   if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
     // Resolve the named directory itself (it may be a junction); links inside it are not followed.
     const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);

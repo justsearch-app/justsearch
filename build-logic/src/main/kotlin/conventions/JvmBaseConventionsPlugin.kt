@@ -108,6 +108,30 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       val isWindowsHost = HostPlatform.isWindows
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
+        // Test profiles belong to the task, never to the developer running Gradle. Resolve at
+        // execution time so absolute checkout paths do not become build/configuration-cache inputs.
+        val testProfile = project.layout.buildDirectory.dir("test-profile/$name")
+        doFirst {
+          val profile = testProfile.get().asFile
+          val home = profile.resolve("home")
+          val data = home.resolve(".justsearch")
+          val paths = mapOf(
+              "HOME" to home, "USERPROFILE" to home,
+              "APPDATA" to home.resolve("AppData/Roaming"),
+              "LOCALAPPDATA" to home.resolve("AppData/Local"),
+              "XDG_CONFIG_HOME" to home.resolve(".config"),
+              "XDG_DATA_HOME" to home.resolve(".local/share"),
+              "XDG_CACHE_HOME" to home.resolve(".cache"),
+              "XDG_STATE_HOME" to home.resolve(".local/state"),
+              "JUSTSEARCH_HOME" to data, "JUSTSEARCH_DATA_DIR" to data)
+          paths.values.forEach { it.mkdirs() }
+          (this as Test).apply {
+            systemProperty("user.home", home.absolutePath)
+            systemProperty("justsearch.data.dir", data.absolutePath)
+            systemProperty("justsearch.home", data.absolutePath)
+            paths.forEach { (key, path) -> environment(key, path.absolutePath) }
+          }
+        }
         // Keep the known Linux flake cases visible on main, while PRs prove the remaining cases.
         if (!isWindowsHost && project.providers.environmentVariable("JUSTSEARCH_PR_CI").orNull == "true") {
           project.rootProject.file("scripts/ci/pr-flakes.tsv").readLines()

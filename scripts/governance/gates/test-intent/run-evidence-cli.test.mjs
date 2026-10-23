@@ -47,6 +47,13 @@ async function fixture(options, check) {
   try {
     fs.mkdirSync(root);
     fs.mkdirSync(beforeRoot);
+    if (options.profile) {
+      const inherited = path.join(scratch, 'developer-profile');
+      for (const key of ['HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME',
+        'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'JUSTSEARCH_HOME', 'JUSTSEARCH_DATA_DIR']) env[key] = inherited;
+      env.GRADLE_USER_HOME = path.join(scratch, 'gradle-cache');
+      env.PROBE_PROFILE = '1';
+    }
     git('init', '-q');
     // Override even a machine-wide true setting: the runner must supply long-path support.
     git('config', 'core.longpaths', 'false');
@@ -61,6 +68,12 @@ async function fixture(options, check) {
 const fs = require('node:fs'), path = require('node:path');
 const before = process.cwd() !== process.env.PROBE_ROOT;
 const control = process.env.PROBE_CONTROL;
+if (process.env.PROBE_PROFILE) {
+  fs.writeFileSync(path.join(control, before ? 'before-profile.json' : 'candidate-profile.json'),
+    JSON.stringify({ cwd: process.cwd(), env: process.env,
+      init: fs.existsSync('build/test-evidence-profile.init.gradle')
+        ? fs.readFileSync('build/test-evidence-profile.init.gradle', 'utf8') : null }));
+}
 if (before && process.env.PROBE_LOCK) {
   const locked = path.join(process.cwd(), 'held-file');
   fs.writeFileSync(locked, 'held without delete sharing');
@@ -182,7 +195,7 @@ try {
       assert.match(interrupted.output, /interrupted: CTRL_BREAK_EVENT/);
       assert.match(fs.readFileSync(path.join(scratch, 'interrupt-identity'), 'utf8'), /^\d+\/\d+$/);
     }
-    await check({ result, output, out, beforeRoot, git });
+    await check({ result, output, out, beforeRoot, git, scratch });
   } finally {
     fs.writeFileSync(path.join(scratch, 'lock-release'), 'release');
     if (locker) {
@@ -240,5 +253,24 @@ test('CLI: long paths work with core.longpaths disabled in the fixture repositor
     assert.deepEqual(fs.readdirSync(beforeRoot), []);
     assert.equal((git('worktree', 'list', '--porcelain').match(/^worktree /gm) ?? []).length, 1);
     assert.equal(git('config', '--local', 'core.longpaths'), 'false', 'the runner must not mutate repository configuration');
+  });
+});
+
+
+test('CLI: candidate and historical runners isolate profiles while retaining Gradle caches', async () => {
+  await fixture({ profile: true }, ({ result, output, scratch }) => {
+    assert.equal(result.status, 0, output);
+    for (const label of ['candidate', 'before']) {
+      const probe = JSON.parse(fs.readFileSync(path.join(scratch, `${label}-profile.json`), 'utf8'));
+      const profile = path.join(probe.cwd, 'build', 'test-evidence-profile');
+      for (const key of ['HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME',
+        'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'JUSTSEARCH_HOME', 'JUSTSEARCH_DATA_DIR']) {
+        assert.ok(probe.env[key].startsWith(profile + path.sep), `${label} ${key} must use its checkout profile`);
+      }
+      assert.equal(probe.env.GRADLE_USER_HOME, path.join(scratch, 'gradle-cache'));
+      assert.match(probe.init, /tasks.withType\(org.gradle.api.tasks.testing.Test\).configureEach/);
+      assert.match(probe.init, /systemProperty "user.home", home.absolutePath/);
+      assert.match(probe.init, /systemProperty "justsearch.data.dir", data.absolutePath/);
+    }
   });
 });
