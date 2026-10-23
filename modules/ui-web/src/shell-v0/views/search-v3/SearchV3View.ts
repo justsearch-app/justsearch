@@ -171,6 +171,7 @@ import {
 // channel every region's fix-it control leaves through.
 import {
   deriveSv3HistoryLocked,
+  sv3RecordItemStopsRun,
   projectSv3Corpus,
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
@@ -255,7 +256,7 @@ import {
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
-import { discoverLiveAgentRun } from '../../controllers/liveRuns.js';
+import { discoverLiveAgentRun, type LiveRunRow } from '../../controllers/liveRuns.js';
 import {
   getAgentSessionController,
   peekAgentSessionController,
@@ -358,6 +359,11 @@ import './Sv3Palette.js';
 import './Sv3Pane.js';
 
 const COMPOSER_STATE_ATTR = 'composer-state';
+
+// Stop disappears on DONE; an in-flight DELETE can still lag (DS4 observed ~1.1s).
+// Allow 5s for cross-window/network delivery. The Engine has no finished-run deadline;
+// this bounds clean-DONE reads, never our own Halt or Stop awaiting its checkpoint.
+const COMPLETED_RECORD_GRACE_MS = 5000;
 
 /** Tempdoc 867 — a stable empty-set identity for when no run controller exists yet. */
 const EMPTY_EVIDENCE_PATHS: ReadonlySet<string> = new Set();
@@ -920,7 +926,14 @@ export class SearchV3View extends JfElement {
 
   private convListUnsubscribe: (() => void) | null = null;
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
-  private recordAbort: AbortController | null = null;
+  private readonly recordReads = new Map<string, AbortController>();
+  /** A local terminal can precede the Engine's journal and checkpoint writes. */
+  private readonly pendingRunRecords = new Map<string, {
+    local: Sv3RunLocal; runId: string; doneGraceUntil?: number;
+  }>();
+  private readonly announcedStops = new Set<string>();
+  private recordRetryTimer: number | null = null;
+  private reattachRecordTurn: { runId: string; sessionId: string; turnId: string } | null = null;
   /** Reads are ordered within each conversation without cancelling another conversation's read. */
   private historyReads = new Map<string, AbortController>();
   /** A write includes its response AND saved-history refresh; later controls queue behind it. */
@@ -1194,8 +1207,9 @@ export class SearchV3View extends JfElement {
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
     this.clearForkReads();
-    this.recordAbort?.abort();
-    this.recordAbort = null;
+    for (const read of this.recordReads.values()) read.abort();
+    this.recordReads.clear();
+    this.clearRecordRetry();
     for (const [id, read] of this.historyReads) {
       this.markContextUnconfirmed(id);
       read.abort();
@@ -1509,24 +1523,82 @@ export class SearchV3View extends JfElement {
    * caller's live state, which is right and was also completely silent. `onFailure` is the out-of-band
    * signal; the notice is raised and the merge is SKIPPED, so a failure never re-renders the thread.
    */
-  private async refreshRecord(conversationId: string): Promise<void> {
-    this.recordAbort?.abort();
+  private async refreshRecord(conversationId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+    this.recordReads.get(conversationId)?.abort();
     const abort = new AbortController();
-    this.recordAbort = abort;
+    this.recordReads.set(conversationId, abort);
     let failed = false;
     const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
       failed = true;
     });
-    // A superseded claim's response must not land on the conversation the reader moved to.
-    if (abort.signal.aborted) return;
-    if (this.recordAbort === abort) this.recordAbort = null;
-    this.recordNotice = failed;
-    if (failed) return;
-    this.sessions = applySv3Record(
-      this.sessions,
-      conversationId,
-      projectSv3RecordTurns(record.events),
-    );
+    // Reads supersede only their own conversation; a pending Stop can settle after navigation.
+    if (abort.signal.aborted) return false;
+    this.recordReads.delete(conversationId);
+    if (this.sessions.activeId === conversationId) this.recordNotice = failed;
+    if (!failed) {
+      this.sessions = applySv3Record(
+        this.sessions,
+        conversationId,
+        projectSv3RecordTurns(record.events),
+      );
+      const stopIds = new Set(record.events
+        .filter((e) => sv3RecordItemStopsRun(e.kind.toLowerCase(), e.attributes))
+        .map((e) => e.id));
+      for (const [id, pending] of this.pendingRunRecords) {
+        const { local, runId } = pending;
+        if (local.sessionId !== conversationId) continue;
+        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        if (turn === undefined) {
+          this.pendingRunRecords.delete(id);
+          continue;
+        }
+        const stop = turn.activity.find((item) => item.kind === 'note' && stopIds.has(item.id));
+        if (stop?.kind === 'note' && !this.announcedStops.has(runId)) {
+          this.announcedStops.add(runId);
+          emitEphemeralToast({ message: stop.text });
+        }
+        const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
+        if (state === 'DONE' && stop === undefined && !local.haltRequested) {
+          pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
+        } else {
+          delete pending.doneGraceUntil;
+        }
+        // A saved Stop can precede the final checkpoint; keep reading through both edges.
+        if ((state === 'DONE' || state === 'ERROR' || state === 'CANCELLED')
+          && (stop !== undefined || (!local.haltRequested && state === 'ERROR'))) {
+          this.pendingRunRecords.delete(id);
+        }
+      }
+    }
+    this.scheduleRecordRetry();
+    return !failed;
+  }
+
+  private clearRecordRetry(): void {
+    if (this.recordRetryTimer !== null) window.clearTimeout(this.recordRetryTimer);
+    this.recordRetryTimer = null;
+  }
+
+  private retireExpiredRecordReads(): void {
+    const now = Date.now();
+    for (const [id, pending] of this.pendingRunRecords) {
+      if (!pending.local.haltRequested && pending.doneGraceUntil !== undefined
+        && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
+    }
+  }
+
+  private scheduleRecordRetry(): void {
+    this.retireExpiredRecordReads();
+    if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
+    if (!this.isConnected || this.pendingRunRecords.size === 0 || this.recordRetryTimer !== null) return;
+    this.recordRetryTimer = window.setTimeout(() => {
+      this.recordRetryTimer = null;
+      this.retireExpiredRecordReads();
+      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+        void this.refreshRecord(id);
+      }
+    }, 500);
   }
 
   /**
@@ -1599,6 +1671,10 @@ export class SearchV3View extends JfElement {
   }
 
   private retryContextOnReconnect = (): void => {
+    this.clearRecordRetry();
+    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+      void this.refreshRecord(id);
+    }
     this.clearContextRetry();
     this.contextRetryDelay = 1000;
     const id = this.sessions.activeId;
@@ -2171,17 +2247,33 @@ export class SearchV3View extends JfElement {
     this.reattachChecked = true;
     const existing = peekAgentSessionController();
     if (existing !== null) {
-      void existing.reattachActiveRunOnLoad();
+      void existing.reattachActiveRunOnLoad(this.prepareReattachedRecord);
       return;
     }
     if ((await discoverLiveAgentRun(this.apiBase)) === null) return;
-    void getAgentSessionController(this.apiBase).reattachActiveRunOnLoad();
+    if (!this.isConnected) return;
+    void getAgentSessionController(this.apiBase).reattachActiveRunOnLoad(this.prepareReattachedRecord);
     // The mount-time presence look already ran, synchronously, while this round-trip was still in
     // flight — and it found no controller because there was none yet to find. Take it again now
     // that there is one, so a recovered run reaches the window on this path directly rather than
     // only through whatever the controller happens to notify next.
     this.syncRunPresence();
   }
+
+  /** Bind an observer to the canonical turn before its first notification can create a placeholder. */
+  private prepareReattachedRecord = async (run: LiveRunRow): Promise<void> => {
+    const id = run.conversationId;
+    if (!this.isConnected || !id || !run.runId) return;
+    const now = Date.now();
+    this.sessions = mergeStoreConversations(this.sessions, [
+      { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
+    ]);
+    if (!await this.refreshRecord(id) || !this.isConnected) return;
+    const turn = sessionById(this.sessions, id)?.turns.at(-1);
+    if (turn?.kind === 'agent' && turn.recordId !== null) {
+      this.reattachRecordTurn = { runId: run.runId, sessionId: id, turnId: turn.id };
+    }
+  };
 
   /* ── The lock (tempdoc 822 Phase F7; inventory E4/E5) ─────────────────────────────────────── */
 
@@ -3571,7 +3663,11 @@ export class SearchV3View extends JfElement {
       sv3RunPresenceTitle(ctrl),
       Date.now(),
       ctrl.conversationId ?? createConversationId(),
+      this.reattachRecordTurn?.runId === ctrl.sessionId
+        && this.reattachRecordTurn.sessionId === ctrl.conversationId
+        ? this.reattachRecordTurn.turnId : null,
     );
+    this.reattachRecordTurn = null;
     this.sessions = list;
     this.run = {
       sessionId: ref.sessionId,
@@ -3761,6 +3857,9 @@ export class SearchV3View extends JfElement {
       // cut-short badge.
       terminalBelongsToThisRun && ctrl !== null ? ctrl.terminalDisposition : null,
     );
+    if (local.acknowledged && ctrl?.sessionId != null) {
+      this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
+    }
     // The live feed was ATTENTION; the record is what survives it. Refreshing at the terminal is what
     // makes the yield happen (inventory D1): the settled turn re-renders from the canonical record's
     // interleaved items instead of vanishing with the controller that produced them.
@@ -4071,6 +4170,12 @@ export class SearchV3View extends JfElement {
   /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
   private forgetDeletedConversations(ids: readonly string[]): void {
     for (const gone of ids) {
+      this.recordReads.get(gone)?.abort();
+      this.recordReads.delete(gone);
+      for (const [id, pending] of this.pendingRunRecords) {
+        if (pending.local.sessionId === gone) this.pendingRunRecords.delete(id);
+      }
+      if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
       if (this.sessions.activeId === gone) this.resetToHero();
       if (readLastViewedConversation() === gone) clearLastViewedConversation();
       if (this.renamingId === gone) this.renamingId = null;
