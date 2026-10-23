@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.justsearch.reranker.NumericCitationScorerIntegrationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:39:05.033Z" hostname="elias-systemproductname" time="5.85">
+<testsuite name="io.justsearch.reranker.NumericCitationScorerIntegrationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-23T19:42:23.291Z" hostname="elias-systemproductname" time="6.331">
   <properties/>
-  <testcase name="reportsFiveRunScorerSuiteMeasurement()" classname="io.justsearch.reranker.NumericCitationScorerIntegrationTest" time="1.211"/>
+  <testcase name="reportsFiveRunScorerSuiteMeasurement()" classname="io.justsearch.reranker.NumericCitationScorerIntegrationTest" time="1.591"/>
   <system-out><![CDATA[NUMERIC_MODEL model.onnx sha256=a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50
 NUMERIC_MODEL tokenizer.json sha256 d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66
 NUMERIC_MODEL config.json sha256=d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e
 NUMERIC_FIXTURES sha256=894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69 fixtures=[Fixture[answer=Vespera Observatory opened in 2099., passages=[Vespera Observatory opened in 1883.]], Fixture[answer=Vespera Observatory opened in 1923., passages=[Vespera Observatory opened in 1883.]], Fixture[answer=Vespera Observatory opened in 1923., passages=[Vespera Observatory opened in 1883., Vespera Observatory opened in 1923.]], Fixture[answer=The engine owns the index., passages=[The engine owns the index and handles local searches., The kitchen is warm.]], Fixture[answer=افتتح المرصد في ١٨٨٣., passages=[The observatory opened in 1883.]], Fixture[answer=The array is `[4]`., passages=[The array is empty., The array contains 4.]]]
-NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=6.091796875
-NUMERIC_RUN 0 suiteNanos=161996736 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=6.091796875
-NUMERIC_RUN 1 suiteNanos=162582232 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=6.091796875
-NUMERIC_RUN 2 suiteNanos=163714610 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=6.091796875
-NUMERIC_RUN 3 suiteNanos=160174061 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=6.091796875
-NUMERIC_RUN 4 suiteNanos=164201639 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=6.091796875
-NUMERIC_MEDIAN suiteNanos=162582232
+NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.29833984375
+NUMERIC_RUN 0 suiteNanos=253540575 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.29833984375
+NUMERIC_RUN 1 suiteNanos=203664117 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.29833984375
+NUMERIC_RUN 2 suiteNanos=205134107 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.29833984375
+NUMERIC_RUN 3 suiteNanos=212761322 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.29833984375
+NUMERIC_RUN 4 suiteNanos=193676706 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.29833984375
+NUMERIC_MEDIAN suiteNanos=205134107
 ]]></system-out>
   <system-err><![CDATA[SLF4J(W): No SLF4J providers were found.
 SLF4J(W): Defaulting to no-operation (NOP) logger implementation
 SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
-Oct 23, 2026 3:39:05 PM io.justsearch.core.util.Sha256SidecarCache getOrCompute
-INFO: Computed SHA-256 for model.onnx in 27ms: a13ec391ca99f498...
-Oct 23, 2026 3:39:05 PM io.justsearch.core.util.Sha256SidecarCache getOrCompute
-INFO: Computed SHA-256 for source.onnx in 17ms: a13ec391ca99f498...
+Oct 23, 2026 9:42:23 PM io.justsearch.core.util.Sha256SidecarCache getOrCompute
+INFO: Computed SHA-256 for model.onnx in 48ms: a13ec391ca99f498...
+Oct 23, 2026 9:42:23 PM io.justsearch.core.util.Sha256SidecarCache getOrCompute
+INFO: Computed SHA-256 for source.onnx in 19ms: a13ec391ca99f498...
 ]]></system-err>
 </testsuite>

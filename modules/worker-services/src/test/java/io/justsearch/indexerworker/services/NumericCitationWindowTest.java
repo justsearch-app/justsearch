@@ -57,7 +57,7 @@ class NumericCitationWindowTest extends io.justsearch.adapters.lucene.runtime.Lu
     when(lease.run(anyMap())).thenAnswer(call -> {
       float[] scores = new float[scoredPassages.size()];
       for (int i = 0; i < scores.length; i++) {
-        scores[i] = scoredPassages.get(i).startsWith("alternative") ? 0.4f : 0.976f;
+        scores[i] = belowThreshold(scoredPassages.get(i)) ? 0.4f : 0.976f;
       }
       var tensor = mock(OnnxTensor.class);
       when(tensor.getValue()).thenReturn(scores);
@@ -150,6 +150,37 @@ class NumericCitationWindowTest extends io.justsearch.adapters.lucene.runtime.Lu
     });
   }
 
+  @Test
+  void scoresCombiningMarksAcrossWindowBoundary() {
+    // NFKC(prefix) has length 1500; NFKC(source) has length 1499.
+    assertAll(
+        () -> checkPair("The shipment contains 1200.", "x".repeat(1498) + "L\u0304\u0323", false),
+        () -> checkPair("The shipment contains 1200.", "1200" + "x".repeat(1494) + "L\u0304\u0323", true));
+  }
+
+  @Test
+  void keepsCombiningBoundaryValuesWindowLocal() {
+    assertAll(
+        // The value is confined to the below-threshold first window.
+        () -> checkPair("The shipment contains 1200.",
+            "alternative" + "x".repeat(1483) + "1200L\u0304\u0323", false),
+        // Prefix normalization must not move this value into the preceding high-scoring window.
+        () -> checkPair("The shipment contains 1200.",
+            "x".repeat(1498) + "L\u0304\u0323" + "1200below-threshold", false));
+  }
+
+  @Test
+  void preservesOtherLengthChangingUnicodeAtWindowBoundaries() {
+    assertAll(
+        // Lowercasing for admission expands İ; ß is never uppercased in this path.
+        () -> checkPair("The shipment contains 1200.", "İß".repeat(100) + "x".repeat(1296) + "1200.", true),
+        () -> checkPair("The shipment contains 1200.", "ﬃ".repeat(100) + "x".repeat(1396) + "１２００.", true),
+        () -> checkPair("The shipment contains 1200.", "x".repeat(1499) + "\u1100\u1161 1200.", true),
+        () -> checkPair("The shipment contains 1200.", "x".repeat(1499) + "ｶﾞ 1200.", true),
+        () -> checkPair("The shipment contains 1200.", "😀".repeat(746) + "𝟙𝟚𝟘𝟘.", true),
+        () -> checkPair("The shipment contains 1200.", "x".repeat(1493) + "１２０００００.", false));
+  }
+
   private static String groupedSpaceSource() {
     return "Shipment ledger.\n" + " ".repeat(1456) + "The shipment contains 1 200 000.";
   }
@@ -166,6 +197,7 @@ class NumericCitationWindowTest extends io.justsearch.adapters.lucene.runtime.Lu
       ops.setCitationScorer(scorer);
       var response = ops.execute(answer, List.of(DOC_A), List.of(0),
           supplied ? List.of(passage) : List.of(), 0.5, InferenceRequest.foreground());
+      assertEquals("CROSS_ENCODER", response.getScorer(), "supplied=" + supplied + ": " + label);
       assertEquals(compatible ? 1 : 0, response.getMatchesCount(), "Worker cross-encoder supplied=" + supplied + ": " + label);
       assertEquals(compatible ? 1 : 0, response.getSentencesMatched(), label);
       assertEquals(1, response.getSentencesScored(), label);
@@ -177,6 +209,7 @@ class NumericCitationWindowTest extends io.justsearch.adapters.lucene.runtime.Lu
       }
     }, () -> {
       var cosine = execute(answer, List.of(DOC_A), supplied ? List.of(passage) : List.of(), 0.5);
+      assertEquals("EMBEDDING_COSINE", cosine.getScorer(), "supplied=" + supplied + ": " + label);
       assertEquals(compatible ? 1 : 0, cosine.getMatchesCount(), "raw cosine supplied=" + supplied + ": " + label);
       assertEquals(compatible ? 1 : 0, cosine.getSentencesMatched(), label);
       assertEquals(1, cosine.getSentencesScored(), label);
@@ -217,10 +250,14 @@ class NumericCitationWindowTest extends io.justsearch.adapters.lucene.runtime.Lu
     runtime.commitOps().maybeRefreshBlocking();
   }
 
+  private static boolean belowThreshold(String text) {
+    return text.startsWith("alternative") || text.endsWith("below-threshold");
+  }
+
   /** Deliberately ignores numbers: the incompatible source wins unless the real guard intervenes. */
   private static final class FixedEmbeddings implements EmbeddingProvider {
     @Override public float[] embedDocument(String text) {
-      return text.startsWith("alternative") ? new float[] {0.4f, (float) Math.sqrt(0.84)} : new float[] {1, 0};
+      return belowThreshold(text) ? new float[] {0.4f, (float) Math.sqrt(0.84)} : new float[] {1, 0};
     }
     @Override public float[] embedQuery(String text) { return new float[] {1, 0}; }
     @Override public List<float[]> embedDocumentBatch(List<String> texts) {

@@ -79,21 +79,30 @@ public final class NumericConsistency {
     var sourceNumbers = new HashMap<String, Set<String>>();
     return new NumericConsistency(claims, windows.stream().map(window -> {
       String source = window.source();
-      String normalized = normalizedSources.computeIfAbsent(source, NumericConsistency::normalizeDigits);
-      // ASCII sources keep their offsets; compatibility expansion can change UTF-16 lengths.
+      String normalized = normalizedSources.computeIfAbsent(source, NumericConsistency::normalizePassage);
+      // NFKD has additive lengths across cuts; NFKC composition of a prefix does not.
       int start = normalized.equals(source) ? window.start()
-          : normalizeDigits(source.substring(0, window.start())).length();
+          : normalizePassage(source.substring(0, window.start())).length();
       int end = normalized.equals(source) ? window.end()
-          : normalizeDigits(source.substring(0, window.end())).length();
+          : normalizePassage(source.substring(0, window.end())).length();
+      if (start < 0 || start > end || end > normalized.length()) return Set.of();
       List<Value> complete = sourceValues.computeIfAbsent(source, ignored -> readValues(normalized, false));
       // Preserve existing window readings only when that whole value occurs in the source.
-      var supported = new HashSet<>(values(normalized.substring(start, end), false));
+      var supported = new HashSet<>(values(normalizeDigits(source.substring(window.start(), window.end())), false));
       supported.retainAll(sourceNumbers.computeIfAbsent(source, ignored -> complete.stream()
           .map(Value::value).collect(Collectors.toUnmodifiableSet())));
       complete.stream().filter(value -> value.start() < end && value.end() > start)
           .map(Value::value).forEach(supported::add);
       return Set.copyOf(supported);
     }));
+  }
+
+  /**
+   * Composition-free passage coordinates: NFKC/digit folding still defines numeric forms.
+   * Further canonical decomposition changes no numeric token and cannot reorder across a digit.
+   */
+  private static String normalizePassage(String text) {
+    return Normalizer.normalize(normalizeDigits(text), Normalizer.Form.NFKD);
   }
 
   public boolean supports(int sentenceIndex, int passageIndex) {

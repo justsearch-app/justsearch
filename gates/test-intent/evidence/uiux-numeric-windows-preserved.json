@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T13:54:20.751Z",
-  "revision": "8592620d0b42b8f337c4205bdfde11fca03ef79c",
-  "tree": "fdb6d67144a76bc8b1d55d408f6764d77f6efe84",
+  "createdAt": "2026-10-23T19:43:53.478Z",
+  "revision": "631837df732a2ff668ecf434f54c5791e5f17f95",
+  "tree": "81594ddb1f1c4a41edaa350f700e0aa3a57a38ba",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesWholeValuesAndWindowLocalEligibility\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.rejectsLongMalformedSourceWithoutRecursion\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesNonLatinClaimAgainstLongMalformedSource\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesWholeValuesAndWindowLocalEligibility\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.rejectsLongMalformedSourceWithoutRecursion\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesNonLatinClaimAgainstLongMalformedSource\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesOtherLengthChangingUnicodeAtWindowBoundaries\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7181
+      "durationMs": 5503
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesWholeValuesAndWindowLocalEligibility",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#rejectsLongMalformedSourceWithoutRecursion",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesNonLatinClaimAgainstLongMalformedSource",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a9f69184990c4f434303c2dd07598eeae5ee26c2f10304219864477c4c24d340",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -84,8 +84,23 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesOtherLengthChangingUnicodeAtWindowBoundaries",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesOtherLengthChangingUnicodeAtWindowBoundaries()",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d1a89b0a0d0b5f6686011224e0fcde8b040214353bae75341678fb9a18373d20"
+  "digest": "sha256:5d70d229cdd137b0c39cf55276925287f4ad580f652541c62274d2b2a5973f34"
 }

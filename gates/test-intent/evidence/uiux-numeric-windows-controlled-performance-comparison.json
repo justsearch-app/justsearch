@@ -5,32 +5,32 @@
     {
       "side": "before",
       "repeat": 1,
-      "medianNanos": 162582232
+      "medianNanos": 205134107
     },
     {
       "side": "after",
       "repeat": 1,
-      "medianNanos": 161744798
+      "medianNanos": 158099065
     },
     {
       "side": "before",
       "repeat": 2,
-      "medianNanos": 163428188
+      "medianNanos": 169654048
     },
     {
       "side": "after",
       "repeat": 2,
-      "medianNanos": 161618622
+      "medianNanos": 200968327
     },
     {
       "side": "before",
       "repeat": 3,
-      "medianNanos": 173572697
+      "medianNanos": 357160615
     },
     {
       "side": "after",
       "repeat": 3,
-      "medianNanos": 171498121
+      "medianNanos": 239954076
     }
   ],
   "before": {
@@ -38,11 +38,11 @@
       {
         "repeat": 1,
         "xml": "uiux-numeric-windows-controlled-performance-before-1.xml",
-        "medianNanos": 162582232,
+        "medianNanos": 205134107,
         "suites": [
           {
             "run": 0,
-            "suiteNanos": 161996736,
+            "suiteNanos": 253540575,
             "scored": [
               1,
               1,
@@ -62,7 +62,7 @@
           },
           {
             "run": 1,
-            "suiteNanos": 162582232,
+            "suiteNanos": 203664117,
             "scored": [
               1,
               1,
@@ -82,7 +82,7 @@
           },
           {
             "run": 2,
-            "suiteNanos": 163714610,
+            "suiteNanos": 205134107,
             "scored": [
               1,
               1,
@@ -102,7 +102,7 @@
           },
           {
             "run": 3,
-            "suiteNanos": 160174061,
+            "suiteNanos": 212761322,
             "scored": [
               1,
               1,
@@ -122,7 +122,7 @@
           },
           {
             "run": 4,
-            "suiteNanos": 164201639,
+            "suiteNanos": 193676706,
             "scored": [
               1,
               1,
@@ -157,17 +157,17 @@
         ],
         "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
         "resources": [
-          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=6.091796875"
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.29833984375"
         ]
       },
       {
         "repeat": 2,
         "xml": "uiux-numeric-windows-controlled-performance-before-2.xml",
-        "medianNanos": 163428188,
+        "medianNanos": 169654048,
         "suites": [
           {
             "run": 0,
-            "suiteNanos": 163428188,
+            "suiteNanos": 165136856,
             "scored": [
               1,
               1,
@@ -187,7 +187,7 @@
           },
           {
             "run": 1,
-            "suiteNanos": 159428564,
+            "suiteNanos": 161631213,
             "scored": [
               1,
               1,
@@ -207,7 +207,7 @@
           },
           {
             "run": 2,
-            "suiteNanos": 165455207,
+            "suiteNanos": 169654048,
             "scored": [
               1,
               1,
@@ -227,7 +227,7 @@
           },
           {
             "run": 3,
-            "suiteNanos": 163670511,
+            "suiteNanos": 176646949,
             "scored": [
               1,
               1,
@@ -247,7 +247,7 @@
           },
           {
             "run": 4,
-            "suiteNanos": 162109563,
+            "suiteNanos": 182589920,
             "scored": [
               1,
               1,
@@ -282,17 +282,17 @@
         ],
         "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
         "resources": [
-          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=5.30224609375"
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=7.89892578125"
         ]
       },
       {
         "repeat": 3,
         "xml": "uiux-numeric-windows-controlled-performance-before-3.xml",
-        "medianNanos": 173572697,
+        "medianNanos": 357160615,
         "suites": [
           {
             "run": 0,
-            "suiteNanos": 164387138,
+            "suiteNanos": 362468939,
             "scored": [
               1,
               1,
@@ -312,7 +312,7 @@
           },
           {
             "run": 1,
-            "suiteNanos": 171175968,
+            "suiteNanos": 323855993,
             "scored": [
               1,
               1,
@@ -332,7 +332,7 @@
           },
           {
             "run": 2,
-            "suiteNanos": 180713258,
+            "suiteNanos": 317202581,
             "scored": [
               1,
               1,
@@ -352,7 +352,7 @@
           },
           {
             "run": 3,
-            "suiteNanos": 182052778,
+            "suiteNanos": 357160615,
             "scored": [
               1,
               1,
@@ -372,7 +372,7 @@
           },
           {
             "run": 4,
-            "suiteNanos": 173572697,
+            "suiteNanos": 357856951,
             "scored": [
               1,
               1,
@@ -407,22 +407,22 @@
         ],
         "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
         "resources": [
-          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=5.4130859375"
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.64501953125"
         ]
       }
     ],
-    "medianNanos": 163428188
+    "medianNanos": 205134107
   },
   "after": {
     "runs": [
       {
         "repeat": 1,
         "xml": "uiux-numeric-windows-controlled-performance-after-1.xml",
-        "medianNanos": 161744798,
+        "medianNanos": 158099065,
         "suites": [
           {
             "run": 0,
-            "suiteNanos": 160181987,
+            "suiteNanos": 160822858,
             "scored": [
               1,
               1,
@@ -442,7 +442,7 @@
           },
           {
             "run": 1,
-            "suiteNanos": 160477282,
+            "suiteNanos": 155939831,
             "scored": [
               1,
               1,
@@ -462,7 +462,7 @@
           },
           {
             "run": 2,
-            "suiteNanos": 163579120,
+            "suiteNanos": 158099065,
             "scored": [
               1,
               1,
@@ -482,7 +482,7 @@
           },
           {
             "run": 3,
-            "suiteNanos": 162583942,
+            "suiteNanos": 157845745,
             "scored": [
               1,
               1,
@@ -502,7 +502,7 @@
           },
           {
             "run": 4,
-            "suiteNanos": 161744798,
+            "suiteNanos": 158489944,
             "scored": [
               1,
               1,
@@ -537,17 +537,17 @@
         ],
         "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
         "resources": [
-          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=5.6767578125"
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.1943359375"
         ]
       },
       {
         "repeat": 2,
         "xml": "uiux-numeric-windows-controlled-performance-after-2.xml",
-        "medianNanos": 161618622,
+        "medianNanos": 200968327,
         "suites": [
           {
             "run": 0,
-            "suiteNanos": 161444307,
+            "suiteNanos": 220727095,
             "scored": [
               1,
               1,
@@ -567,7 +567,7 @@
           },
           {
             "run": 1,
-            "suiteNanos": 163916053,
+            "suiteNanos": 193566595,
             "scored": [
               1,
               1,
@@ -587,7 +587,7 @@
           },
           {
             "run": 2,
-            "suiteNanos": 161618622,
+            "suiteNanos": 200968327,
             "scored": [
               1,
               1,
@@ -607,7 +607,7 @@
           },
           {
             "run": 3,
-            "suiteNanos": 165750564,
+            "suiteNanos": 202633678,
             "scored": [
               1,
               1,
@@ -627,7 +627,7 @@
           },
           {
             "run": 4,
-            "suiteNanos": 159979952,
+            "suiteNanos": 186704456,
             "scored": [
               1,
               1,
@@ -662,17 +662,17 @@
         ],
         "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
         "resources": [
-          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=5.5185546875"
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=7.34619140625"
         ]
       },
       {
         "repeat": 3,
         "xml": "uiux-numeric-windows-controlled-performance-after-3.xml",
-        "medianNanos": 171498121,
+        "medianNanos": 239954076,
         "suites": [
           {
             "run": 0,
-            "suiteNanos": 169968449,
+            "suiteNanos": 245245611,
             "scored": [
               1,
               1,
@@ -692,7 +692,7 @@
           },
           {
             "run": 1,
-            "suiteNanos": 175562631,
+            "suiteNanos": 239236217,
             "scored": [
               1,
               1,
@@ -712,7 +712,7 @@
           },
           {
             "run": 2,
-            "suiteNanos": 170278131,
+            "suiteNanos": 239954076,
             "scored": [
               1,
               1,
@@ -732,7 +732,7 @@
           },
           {
             "run": 3,
-            "suiteNanos": 180207129,
+            "suiteNanos": 235373995,
             "scored": [
               1,
               1,
@@ -752,7 +752,7 @@
           },
           {
             "run": 4,
-            "suiteNanos": 171498121,
+            "suiteNanos": 244299290,
             "scored": [
               1,
               1,
@@ -787,12 +787,12 @@
         ],
         "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
         "resources": [
-          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=5.1396484375"
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=9.5361328125"
         ]
       }
     ],
-    "medianNanos": 161744798
+    "medianNanos": 200968327
   },
-  "ratio": 0.9896995125467585,
+  "ratio": 0.9796924067824567,
   "withinTenPercent": true
 }
