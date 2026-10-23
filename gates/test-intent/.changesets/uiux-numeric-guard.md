@@ -2742,3 +2742,14 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   "note": "NX3-NX3d expectations follow the agreed sources; repaired checks assertion-fail before and pass after. Runtime verification rejects delivery for V9-F1, independently of test-intent acceptance."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16808-6d8f-7a80-8218-40619bc8ac46",
+  "verdict": "accept",
+  "digest": "sha256:22a1a2ba8f05e038bc87efc05953aee648e6e9b01cab3632b6e4d5d4212ce24b",
+  "note": "Accept signature adaptation: all four oracles are byte-identical after adding the former adapter's always-true predicate. All four tests pass before/after; the real ArchUnit violation disappears. Rule/store unchanged. The explicit origin/main gate's nine uncovered items also exist before."
+}
+```
