@@ -247,6 +247,64 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#BF2a refreshes base and branch versions after existing list reads without typing reads"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/router/sv3ConversationUrl.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The modeled browser history now retains per-entry history.state and models replaceState without a URL as a state-only replacement. Existing browser push/replace/back/forward expectations are unchanged. Journal state is reset between tests; the new S16.4 check uses the same URLSource/handler/store/projector loop plus the real app NavigationJournal. No existing check removed or weakened.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.4, agent-adopted; orchestrator clarification 2026-10-23 explicitly includes the visible app Back, preserves browser Back/reload/restart, and requires reuse of the existing app navigation history.",
+          "choice": "Opening the original shows the parent conversation; Back returns to the branch.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.4, agent-adopted; orchestrator clarification 2026-10-23 explicitly includes the visible app Back, preserves browser Back/reload/restart, and requires reuse of the existing app navigation history.",
+          "choice": "Make Open original record the branch as an earlier view in the app's own back history, the same way the app already records other in-app navigation that its Back control can return to (reuse that mechanism; do not add a second history). The browser Back behaviour, reload and restart cases that already pass must keep passing, and Back from the branch afterwards must not loop between the two.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/router/sv3ConversationUrl.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "S16.4: the conversation claim made by Open original records the departing branch in the existing app journal. App Back restores the branch, another Back does not loop, app Forward restores the parent, and native browser Back restores the existing journal cursor rather than creating a reverse navigation. Durable regression check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.4, agent-adopted; orchestrator clarification 2026-10-23 explicitly includes the visible app Back, preserves browser Back/reload/restart, and requires reuse of the existing app navigation history.",
+          "choice": "Opening the original shows the parent conversation; Back returns to the branch.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.4, agent-adopted; orchestrator clarification 2026-10-23 explicitly includes the visible app Back, preserves browser Back/reload/restart, and requires reuse of the existing app navigation history.",
+          "choice": "Make Open original record the branch as an earlier view in the app's own back history, the same way the app already records other in-app navigation that its Back control can return to (reuse that mechanism; do not add a second history). The browser Back behaviour, reload and restart cases that already pass must keep passing, and Back from the branch afterwards must not loop between the two.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-branch-discovery-app-back-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/router/sv3ConversationUrl.test.ts#S16.4 app Back returns an original-navigation claim to its branch without looping"
+      ],
+      "repaired": true
     }
   ]
 }
