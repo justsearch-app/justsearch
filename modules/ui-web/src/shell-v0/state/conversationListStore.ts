@@ -353,6 +353,24 @@ export function rememberServerConversation(id: string): void {
   if (!state.deletedIds.includes(id)) serverConversations.add(id);
 }
 
+/** Complete, lock-safe versions of one fork; never changes the recent/sidebar roster. */
+export async function loadForkConversations(
+  parentSessionId: string,
+  branchPointMessageId: string,
+  signal: AbortSignal,
+): Promise<Conversation[] | null> {
+  try {
+    const query = new URLSearchParams({ parentSessionId, branchPointMessageId });
+    const response = await authorizedFetch(`${apiBase}/api/chat/conversations?${query}`, { signal });
+    if (!response.ok) return null;
+    const data = await response.json();
+    // An older Engine ignores unknown filters. Its recent window is not a complete fork answer.
+    if (data.fork?.parentSessionId !== parentSessionId
+      || data.fork?.branchPointMessageId !== branchPointMessageId || !Array.isArray(data.sessions)) return null;
+    return data.sessions.map((row: Record<string, unknown>) => toConversation(row, listRequests, {}));
+  } catch { return null; }
+}
+
 export async function loadConversations(): Promise<void> {
   watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
@@ -607,9 +625,8 @@ export function restoreActiveConversation(id: string | null): void {
  * branches that share `(parentSessionId === baseId, branchPointMessageId ===
  * branchKey)` follow, ordered by creation time. Returns `[baseId]` alone when
  * there are no branches (callers render the pager only when length > 1). This
- * is a pure read-side projection over the already-loaded conversation list —
- * no new endpoint (the siblings are discoverable from listSessions' parent
- * pointers).
+ * is a pure projection over the supplied rows: a complete fork read in Search v3,
+ * or the loaded recent list in the legacy window.
  */
 export function siblingSessionsAt(
   conversations: Conversation[],

@@ -42,7 +42,7 @@ public final class ObservationJustifications {
       Map.entry("GET /api/boot/phases", "READINESS: boot phase progress"),
       Map.entry("GET /api/chat/agent/tools", "CONSUMER: ui-web/src/shell-v0/controllers/AgentSessionController.ts startPolling/checkAvailability hydrates available tools"),
       Map.entry("GET /api/chat/approval", "STATUS: pending approval state"),
-      Map.entry("GET /api/chat/conversations", "CONSUMER: ui-web/src/shell-v0/state/conversationListStore.ts via ui-web/src/shell-v0/views/UnifiedChatView.ts conversation-list hydration on connect"),
+      Map.entry("GET /api/chat/conversations", "CONSUMER: ui-web/src/shell-v0/state/conversationListStore.ts via ui-web/src/shell-v0/views/UnifiedChatView.ts and ui-web/src/shell-v0/views/search-v3/SearchV3View.ts for recent-list hydration and complete fork reads on connect and after branch/delete changes"),
       Map.entry("GET /api/chat/conversations/{sessionId}/history", "CONSUMER: ui-web/src/shell-v0/state/conversationListStore.ts reads a conversation's stored messages when the web UI restores it on load, refreshes their ids after a streamed send (fetchMessageIds), and loads it when a person opens it; that person's click or key press is reported by the presence signal, and no MCP tool or script reads this route"),
       Map.entry("GET /api/chat/runs/live", "STATUS: current live run roster"),
       Map.entry("GET /api/condition-recovery-index", "HEALTH: current recoverable conditions"),
