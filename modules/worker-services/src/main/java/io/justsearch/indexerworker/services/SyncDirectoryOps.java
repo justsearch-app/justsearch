@@ -551,17 +551,14 @@ final class SyncDirectoryOps {
    * {@code null} for "no terminal state, continue".
    */
   SyncDirectoryResponse execute(String rootPath, boolean force,
-      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled) {
-    return execute(rootPath, force, provenance, cancelled, null);
-  }
-
-  SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection) {
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
-      return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
+      return syncDirectoryErrorResponse(
+          (io.justsearch.configuration.PlatformPaths.isLinux() ? "ROOT_NOT_DIRECTORY: " : "")
+              + "Root path does not exist or is not a directory");
     }
 
     int filesAdded = 0;
@@ -570,7 +567,7 @@ final class SyncDirectoryOps {
     try {
       var scope = prefixScopeFactory.apply(root);
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
-      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled, scope);
+      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled);
 
       SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
       if (pruneAbort != null) {
@@ -599,7 +596,7 @@ final class SyncDirectoryOps {
 
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
-          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection, scope);
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection);
       filesAdded = walk.filesAdded();
 
       if (cancelled.getAsBoolean()) {
@@ -686,8 +683,7 @@ final class SyncDirectoryOps {
   }
 
   private PruneOps.PruneResult pruneOrphansForSync(Path root, boolean force,
-      java.util.function.BooleanSupplier cancelled,
-      PathPrefixScope scope) {
+      java.util.function.BooleanSupplier cancelled) {
     if (pruneOps == null) {
       return new PruneOps.PruneResult(0, PruneOps.Completion.COMPLETE);
     }
@@ -701,7 +697,7 @@ final class SyncDirectoryOps {
     PruneOps.PresenceGuard guard = new PruneOps.PresenceGuard() {
       @Override public boolean rootCurrent() { return authority.rootCurrent(); }
       @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
-        return scope.excludes(file.toString())
+        return prefixScopeFactory.apply(root).excludes(file.toString())
             ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : authority.presence(file);
       }
     };
@@ -735,7 +731,7 @@ final class SyncDirectoryOps {
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
       Path root, boolean force, Set<String> indexedPaths,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
-      String collection, PathPrefixScope scope) throws IOException {
+      String collection) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {
@@ -749,7 +745,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
               if (stopped()) return FileVisitResult.TERMINATE;
-              if (scope.excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
+              if (prefixScopeFactory.apply(root).excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
               if (dir.equals(root)) return FileVisitResult.CONTINUE;
               String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
               if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
@@ -761,7 +757,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
               if (stopped()) return FileVisitResult.TERMINATE;
-              if (scope.excludes(file.toString())) return FileVisitResult.CONTINUE;
+              if (prefixScopeFactory.apply(root).excludes(file.toString())) return FileVisitResult.CONTINUE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
               if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
               if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
@@ -826,7 +822,9 @@ final class SyncDirectoryOps {
           () -> cancelled.getAsBoolean() || walkInterrupted[0]
               || Thread.currentThread().isInterrupted(), entries -> {
             // Recheck scoped policy at admission while retaining the spool's bounded batches.
+            var admissionScope = prefixScopeFactory.apply(root);
             var admitted = entries.stream()
+                .filter(entry -> !admissionScope.excludes(entry.path().toString()))
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();

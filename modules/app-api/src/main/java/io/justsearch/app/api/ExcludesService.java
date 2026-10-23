@@ -30,15 +30,28 @@ public interface ExcludesService {
    * @param dryRun true for preview-excludes (LOW); false for apply-excludes
    *               (HIGH-DESTRUCTIVE)
    * @return summary of the operation
-   * @throws Exception on Worker IO failure, walk failure, or filesystem error
+   * @throws Exception if the policy or watched roots cannot be obtained; per-scope failures are returned
    */
   ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception;
 
+  /** Effective matcher policy and the resolver's winning source; reading it does not walk disk. */
+  default ExcludesPolicy effectivePolicy() {
+    throw new UnsupportedOperationException("Effective exclusion policy unavailable");
+  }
+
+  record ExcludesPolicy(String source, String sourceDetail, List<String> patterns) {
+    public ExcludesPolicy {
+      java.util.Objects.requireNonNull(source, "source");
+      patterns = List.copyOf(patterns);
+    }
+  }
+
   /**
    * Result of an apply (or preview) operation. Mirrors the pre-existing
-   * {@code POST /api/indexing/excludes/apply} response shape (FE-side
-   * {@code ApplyExcludesResponse}) so the wire surface is unchanged when the
-   * Operation handlers serialize this back into {@code structuredData}.
+   * {@code POST /api/indexing/excludes/apply} response shape. Existing fields are retained;
+   * confirmedRemovals counts Worker-confirmed file or folder deletion requests, including
+   * matches that were not indexed. Unchecked scopes distinguish partial coverage from completion.
+   * Both HTTP and Operation handlers expose these additions.
    */
   record ExcludesResult(
       boolean dryRun,
@@ -49,7 +62,33 @@ public interface ExcludesService {
       int matchedFiles,
       List<PatternMatch> perPattern,
       boolean capped,
-      String message) {
+      String message,
+      int confirmedRemovals,
+      List<UncheckedScope> uncheckedScopes,
+      ExcludesPolicy effectivePolicy) {
+
+    /** Retain the existing result constructor for callers without policy metadata. */
+    public ExcludesResult(boolean dryRun, int patterns, int rootsProcessed, int deletedByPathJobs,
+        int deletedById, int matchedFiles, List<PatternMatch> perPattern, boolean capped, String message,
+        int confirmedRemovals, List<UncheckedScope> uncheckedScopes) {
+      this(dryRun, patterns, rootsProcessed, deletedByPathJobs, deletedById, matchedFiles, perPattern,
+          capped, message, confirmedRemovals, uncheckedScopes, null);
+    }
+
+    /** Keep the previous source/serialization fields usable by existing callers. */
+    public ExcludesResult(boolean dryRun, int patterns, int rootsProcessed, int deletedByPathJobs,
+        int deletedById, int matchedFiles, List<PatternMatch> perPattern, boolean capped, String message) {
+      this(dryRun, patterns, rootsProcessed, deletedByPathJobs, deletedById, matchedFiles, perPattern,
+          capped, message, 0, List.of(new UncheckedScope("Watched folders", "not_checked", "Deletion coverage unavailable")));
+    }
+
+    public ExcludesResult {
+      perPattern = List.copyOf(perPattern);
+      uncheckedScopes = List.copyOf(uncheckedScopes);
+    }
+
+    /** An unchecked disk scope or an unconfirmed deletion; never counted as removed. */
+    public record UncheckedScope(String path, String status, String reason) {}
 
     /** Per-pattern match count. */
     public record PatternMatch(String pattern, int matches) {}

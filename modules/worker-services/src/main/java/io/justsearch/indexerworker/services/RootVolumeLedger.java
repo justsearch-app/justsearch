@@ -342,12 +342,8 @@ final class RootVolumeLedger {
 
   /**
    * Drops the record, the pending seeding and the explicit-file folder record of every folder at
-   * or under {@code pathPrefix}.
+   * or under {@code pathPrefix}, except the frozen excluded subtrees of surviving declarations.
    */
-  void forgetUnder(String pathPrefix) throws IOException {
-    forgetUnder(pathPrefix, java.util.List.of());
-  }
-
   void forgetUnder(String pathPrefix, java.util.List<String> excludedSubtrees) throws IOException {
     if (!enabled() || pathPrefix == null || pathPrefix.isBlank()) {
       return;

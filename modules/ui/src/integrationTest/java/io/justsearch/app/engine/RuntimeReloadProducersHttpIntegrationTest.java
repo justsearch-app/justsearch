@@ -577,8 +577,10 @@ final class RuntimeReloadProducersHttpIntegrationTest {
 
   private record WatchedFiles(Path root, Path gone, Path kept) {}
 
-  private final class Fixture implements AutoCloseable {
+  final class Fixture implements AutoCloseable {
     final ConfigStore previous = ConfigStore.globalOrNull();
+    final String previousHome = System.getProperty("user.home");
+    final String previousDataDir = System.getProperty(EnvRegistry.DATA_DIR.configKey());
     final EngineRoot root;
     final KnowledgeServerBootstrap bootstrap;
     final KnowledgeServer server;
@@ -592,7 +594,12 @@ final class RuntimeReloadProducersHttpIntegrationTest {
      * {@code production}: root membership persists in the data folder and the bootstrap's automatic
      * root producers run, so a restart restores and re-watches persisted roots by itself.
      */
-    Fixture(boolean production) throws Exception {
+    Fixture(boolean production) throws Exception { this(production, null); }
+
+    Fixture(boolean production,
+        io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook migrationHook) throws Exception {
+      System.setProperty("user.home", Files.createDirectories(directory.resolve("home")).toString());
+      System.setProperty(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       var builder = ResolvedConfig.builder();
       builder.putDefault(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       builder.putDefault(EnvRegistry.INDEX_BASE_PATH.configKey(), directory.resolve("index").toString());
@@ -602,6 +609,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       for (var key : new EnvRegistry[] {EnvRegistry.AI_EMBED_ENABLED, EnvRegistry.SPLADE_ENABLED,
           EnvRegistry.NER_ENABLED, EnvRegistry.BGE_M3_ENABLED, EnvRegistry.RERANK_ENABLED,
           EnvRegistry.CITATION_SCORER_ENABLED}) builder.putDefault(key.configKey(), "false");
+      if (migrationHook != null) builder.putDefault("index.schema_mismatch.policy", "blue_green_migrate");
       var configuration = builder.build();
       ConfigStore.setGlobal(new ConfigStore(configuration));
       var built = new java.util.concurrent.atomic.AtomicReference<KnowledgeServer>();
@@ -611,6 +619,16 @@ final class RuntimeReloadProducersHttpIntegrationTest {
             var result = new KnowledgeServer(executors, worker, new InProcessWorkerSignalBus(gauge),
                 io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, index,
                 encoders, configuration);
+            if (migrationHook != null) {
+              try {
+                var install = KnowledgeServer.class.getDeclaredMethod("installMigrationBarrierForTests",
+                    io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook.class);
+                install.setAccessible(true);
+                install.invoke(result, migrationHook);
+              } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException("Cannot install migration observation barrier", failure);
+              }
+            }
             built.set(result);
             return result;
           }, 5_000, 100, ignored -> {}, () -> {}, production
@@ -823,6 +841,10 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       finally {
         try { root.close(); root.processResources().close(); }
         finally {
+          if (previousDataDir == null) System.clearProperty(EnvRegistry.DATA_DIR.configKey());
+          else System.setProperty(EnvRegistry.DATA_DIR.configKey(), previousDataDir);
+          if (previousHome == null) System.clearProperty("user.home");
+          else System.setProperty("user.home", previousHome);
           if (previous != null) ConfigStore.setGlobal(previous);
           else {
             var clear = ConfigStore.class.getDeclaredMethod("clearGlobal");

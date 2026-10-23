@@ -16,6 +16,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Stable directory identity, independent of mutable timestamps and path spelling. */
@@ -57,6 +58,26 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     if (!equals(current)) {
       throw new IOException("Reconciliation root identity changed: " + root);
     }
+  }
+
+  /** Return-path comparison only. An operation's held lease still uses strict equality. */
+  boolean sameReturnedFolder(RootIdentity current) {
+    return current != null && matchesReceipt(current.toString());
+  }
+
+  /** Accepts existing receipt strings; the device number alone may change on a proven Linux UUID. */
+  boolean matchesReceipt(String recorded) {
+    if (toString().equals(recorded)) return true;
+    if (!(stableFileIdentity instanceof LinuxFileIdentity linux)
+        || linux.volume() == null || !LinuxRootIdentityLease.validVolume(linux.volume())) return false;
+    var key = Pattern.compile("\\(dev=[0-9a-f]+,ino=([0-9]+)\\)")
+        .matcher(linux.fileKey().toString());
+    if (!key.matches()) return false;
+    String prefix = "RootIdentity[realPath=" + realPath
+        + ", stableFileIdentity=LinuxFileIdentity[fileKey=(dev=";
+    String suffix = ",ino=" + key.group(1) + "), volume=" + linux.volume() + "]]";
+    return recorded != null && Pattern.matches(
+        Pattern.quote(prefix) + "[0-9a-f]+" + Pattern.quote(suffix), recorded);
   }
 
   private static Path normalize(Path root) throws IOException {
