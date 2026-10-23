@@ -1078,3 +1078,14 @@ CE1 entries appended by builder session 8b7469qf. Official evidence uses default
   "note": "Sources, before-state tests and diff independently reviewed. OV1 repairs fail assertions before and pass after; preservation checks pass. Expectations follow S32, AX, WX and delegated XA1/OV1. Test intent accepted; product verdict fails F1 reflow and F2 Enter on Cancel."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp32-verifier6-u3fn4n6l",
+  "verdict": "accept",
+  "digest": "sha256:42a664893dd64ed408655bbe4d3ee034bce56a918f45aae4f951328852b712b4",
+  "note": "Sources, before-state oracles and diff independently reviewed. New behavior follows S32 and delegated AX/WX/XA1/OV1/CE1; adaptations preserve existing oracles. Independent scratch CE1 repairs fail assertions before and preservation passes; all candidate checks pass. Historical UI comparisons reproduce repair/preservation distinctions. Real private Engine/Worker and headless Library checks confirm the CE1 repair, partial outcomes and saved-policy semantics. This accepts test intent; environment reruns and product verification are reported separately."
+}
+```
