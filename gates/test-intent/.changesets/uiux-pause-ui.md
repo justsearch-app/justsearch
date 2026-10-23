@@ -409,3 +409,14 @@ Five-findings continuation: the four checks appended to `IndexingPause.test.ts` 
   "note": "Independent intent review on 62cbe2049: scratch run-evidence passes all 40 repaired checks and proves assertion failures on their original before refs (b62fc5921, 30f3617ea, d7714b374); preservation passes. Expectations follow delegated S37/N37, CR37/CR37a/b and the five-findings continuation. Selector unknown-reason coverage is defensive only under RS37. Test intent accepted separately from the live-system product verdict."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp37-verifier-zz8r8auj",
+  "verdict": "accept",
+  "digest": "sha256:6f90905ae6c70d6c7379a469a2f0e1d58fcfe60a37b94ae47e9c2a826fd5e76c",
+  "note": "Independent source and before-test review on 247aff3ab: scratch run-evidence passes all 41 repair checks with assertion failures on their original before refs (b62fc5921, 30f3617ea, d7714b374, dfc1cb885); preservation passes. Expectations follow delegated S37/N37 and CR37a/b scope. RS37 unknown-reason selector coverage supplies no wire claim. Acceptance covers test intent; real-system verification is reported separately."
+}
+```
