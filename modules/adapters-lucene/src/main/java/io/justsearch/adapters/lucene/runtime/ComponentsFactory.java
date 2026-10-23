@@ -27,7 +27,10 @@ import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LiveIndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.NoMergePolicy;
+import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper;
 import org.apache.lucene.index.SoftDeletesRetentionMergePolicy;
 import org.apache.lucene.index.TieredMergePolicy;
@@ -56,13 +59,37 @@ final class ComponentsFactory {
 
   private ComponentsFactory() {}
 
-  /** Owns the disposable RAM writer lifecycle while borrowing the session's analyzer. */
-  static void probeDocument(Analyzer analyzer, Document document) throws IOException {
+  /** Owns the disposable RAM writer lifecycle while borrowing the live indexing components. */
+  static void probeDocument(LiveIndexWriterConfig live, Document document) throws IOException {
     try (var directory = new ByteBuffersDirectory();
-        var canary = new IndexWriter(directory,
-            new IndexWriterConfig(analyzer).setCommitOnClose(false))) {
+        var canary = new IndexWriter(directory, probeConfig(live))) {
       WritePathOps.probeDocument(canary, document);
     }
+  }
+
+  /** Lucene has no config copy API; parity tests guard every public live setting. */
+  private static IndexWriterConfig probeConfig(LiveIndexWriterConfig live) {
+    var config = new IndexWriterConfig(live.getAnalyzer())
+        .setIndexCreatedVersionMajor(live.getIndexCreatedVersionMajor())
+        .setSimilarity(live.getSimilarity())
+        .setCodec(live.getCodec())
+        .setMaxBufferedDocs(live.getMaxBufferedDocs())
+        .setRAMBufferSizeMB(live.getRAMBufferSizeMB())
+        .setRAMPerThreadHardLimitMB(live.getRAMPerThreadHardLimitMB())
+        .setUseCompoundFile(live.getUseCompoundFile())
+        .setReaderPooling(live.getReaderPooling())
+        .setInfoStream(live.getInfoStream())
+        .setMergedSegmentWarmer(live.getMergedSegmentWarmer())
+        .setLeafSorter(live.getLeafSorter())
+        .setCheckPendingFlushUpdate(live.isCheckPendingFlushOnUpdate())
+        .setSoftDeletesField(live.getSoftDeletesField())
+        .setParentField(live.getParentField())
+        .setIndexWriterEventListener(live.getIndexWriterEventListener())
+        .setMergePolicy(NoMergePolicy.INSTANCE)
+        .setMergeScheduler(new SerialMergeScheduler())
+        .setCommitOnClose(false);
+    if (live.getIndexSort() != null) config.setIndexSort(live.getIndexSort());
+    return config;
   }
 
   /**

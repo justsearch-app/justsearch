@@ -247,6 +247,9 @@ public final class WorkerIngestService {
             indexingLoop,
             signalBus,
             migrationSwitchingMaxDurationMs);
+    if (ingestLifecycle != null) {
+      this.statusOps.setWriterTragic(ingestLifecycle::hasTragicWriterException);
+    }
     this.statusOps.setOpenedRuntimePaths(
         searchLifecycle == null ? null : searchLifecycle.openedIndexPath(),
         ingestLifecycle == null ? null : ingestLifecycle.openedIndexPath());

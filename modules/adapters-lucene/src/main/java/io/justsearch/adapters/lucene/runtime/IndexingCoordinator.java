@@ -103,7 +103,7 @@ public final class IndexingCoordinator {
         for (var field : session.fieldMapper.fieldDefs().values()) {
           if ("text".equals(field.type)) fields.put(field.id, "JustSearch ingestion canary");
         }
-        ComponentsFactory.probeDocument(snapshot.writer().getAnalyzer(),
+        ComponentsFactory.probeDocument(snapshot.writer().getConfig(),
             session.fieldMapper.toDocument(fields, null));
         String name = null;
         try {
