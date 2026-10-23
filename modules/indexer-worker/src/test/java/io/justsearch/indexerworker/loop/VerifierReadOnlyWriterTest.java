@@ -104,7 +104,7 @@ final class VerifierReadOnlyWriterTest extends LuceneExecutorTestBase {
       Files.setPosixFilePermissions(index,
           Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
       assertFalse(Files.isWritable(index));
-      var failure = assertThrows(IndexRuntimeIOException.class, () -> {
+      var failure = assertThrows(IndexWriterUnavailableException.class, () -> {
         for (int i = 0; i < 2; i++) {
           runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
               SchemaFields.DOC_ID, "healthy-" + i,

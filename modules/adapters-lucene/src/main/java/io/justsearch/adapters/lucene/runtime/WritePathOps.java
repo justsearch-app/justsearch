@@ -121,7 +121,7 @@ public final class WritePathOps {
       }
       throw closed;
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to add document");
+      throw indexingFailure(e, "Failed to add document");
     }
   }
 
@@ -160,8 +160,17 @@ public final class WritePathOps {
       }
       throw closed;
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to apply batch");
+      throw indexingFailure(e, "Failed to apply batch");
     }
+  }
+
+  private RuntimeException indexingFailure(IOException failure, String message) {
+    LifecycleSnapshot snapshot = session.snapshot;
+    if (snapshot != null && snapshot.writer() != null
+        && snapshot.writer().getTragicException() != null) {
+      return new IndexWriterUnavailableException(message, failure);
+    }
+    return IndexRuntimeIOException.fromIndexOperation(failure, message);
   }
 
   void appendSoftDeleteMaintenanceFields(Document doc, Map<String, Object> fields) {

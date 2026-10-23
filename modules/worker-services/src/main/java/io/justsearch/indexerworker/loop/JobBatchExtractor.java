@@ -401,7 +401,8 @@ public final class JobBatchExtractor {
                 entry, extractionFailures.retryAtMs());
             else jobQueue.markClaimFailed(claim, original, entry);
           });
-      if (!BatchServiceFailures.sourceFailure(e, filePath)
+      if (ingestionAuthority.presence(filePath, claim.ingestionRoot()) != SourcePresence.Verdict.ABSENT
+          && !BatchServiceFailures.sourceFailure(e, filePath)
           && !(e instanceof IOException io && sourceAccessOutcome(claim, io) != null)) {
         extractionFailures.failure(e, record);
       } else record.accept(false);

@@ -33,8 +33,8 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 | O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
-| O10 open writer with broken shared write-path components, including native token/norm validation | [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
-| K2 failures on the source itself stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
+| O10 full mapped document with the live writer configuration, including token/norm/doc-values validation | [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
+| K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
 | K5 document values exceed store limit | [real SQLITE_LIMIT_LENGTH on long document path, normal probe succeeds](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
@@ -821,7 +821,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "label": "agent choice under adopted orchestrator design"
         }
       ],
-      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-pipeline-health.json",
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-full-mapping.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
@@ -1076,6 +1076,166 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10: an input-independent broken shared DocValuesFormat fails the mapped canary and never charges healthy files in a real running loop.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round14 full mapped canary and confirmed-absent alias repair, with unchanged lifecycle/queue/status/retry logic and acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "Orchestrator round14 decision: populate every field type the ordinary mapper emits via the same mapping path, and apply per-file policy when SourcePresence confirms the source absent, whatever the canary says. FieldMapper supplies small representative values and calls its ordinary toDocument: text, scalar/multi-valued keyword, long, boolean, unit dense vectors at configured positive dimensions, and sparse FeatureField weights. No embedding model is invoked. Zero-dimensional test-catalog vectors are disabled and cannot form a valid Lucene field. Unsupported catalog types, currently double, are skipped exactly as ordinary addFields skips them; implementing those types is outside this repair. The extractor uses WorkerIngestionAuthority.presence/SourcePresence ABSENT, including its root identity/listability and repeated absence confirmation, before shared-failure classification. It retains the existing per-file outcome and lets admission handle subsequent confirmed absence; no deletion or path-text heuristic is introduced. The orchestrator explicitly accepts content-dependent faults missed by the full representative canary as visible per-file residuals. The real native codec/vanished-alias regressions preserve verifier intent, changing only fixture/class names. A separate captured-document check pins every implemented mapped field family, including dense and sparse vectors. D13 recorded two pre-injection failures in a shared full-suite JVM; the unchanged ExtractionInfrastructureTest class runs in a fresh isolated JVM within the same combined Gradle invocation, with no skipped or weakened assertions. The supplied verifier task disables Lucene library assertions to match its original production-mode launcher; module-suite assertion settings stay unchanged. This is an orchestrator decision and an agent implementation choice, never owner-words. The first full candidate proved that mapping alone was insufficient: the initial buffered write set the peer-success flag, then a synchronous DocValues flush made the writer tragic, and its first IOException was still reported as generic per-operation I/O. An earlier buffered peer cannot prove a now-tragic service healthy. indexDocument and applyBatch therefore retain the existing typed writer-unavailable fast path for the IOException that actually makes the live writer tragic, using its real getTragicException state under the existing write barrier. Nontragic document I/O keeps its original classification; peer proof, canary frequency and backoff rules are unchanged. The unchanged real DocValues regression isolates this boundary defect as well as mapped coverage. The first failed full candidate is retained under mapped-peer-failure, never relabeled as passing."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-full-mapping.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "K2/U19: a source admitted through a canonical alias that vanishes during parsing retains per-file policy even while the writer is unavailable; its healthy peer remains uncounted.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round14 full mapped canary and confirmed-absent alias repair, with unchanged lifecycle/queue/status/retry logic and acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "Orchestrator round14 decision: populate every field type the ordinary mapper emits via the same mapping path, and apply per-file policy when SourcePresence confirms the source absent, whatever the canary says. FieldMapper supplies small representative values and calls its ordinary toDocument: text, scalar/multi-valued keyword, long, boolean, unit dense vectors at configured positive dimensions, and sparse FeatureField weights. No embedding model is invoked. Zero-dimensional test-catalog vectors are disabled and cannot form a valid Lucene field. Unsupported catalog types, currently double, are skipped exactly as ordinary addFields skips them; implementing those types is outside this repair. The extractor uses WorkerIngestionAuthority.presence/SourcePresence ABSENT, including its root identity/listability and repeated absence confirmation, before shared-failure classification. It retains the existing per-file outcome and lets admission handle subsequent confirmed absence; no deletion or path-text heuristic is introduced. The orchestrator explicitly accepts content-dependent faults missed by the full representative canary as visible per-file residuals. The real native codec/vanished-alias regressions preserve verifier intent, changing only fixture/class names. A separate captured-document check pins every implemented mapped field family, including dense and sparse vectors. D13 recorded two pre-injection failures in a shared full-suite JVM; the unchanged ExtractionInfrastructureTest class runs in a fresh isolated JVM within the same combined Gradle invocation, with no skipped or weakened assertions. The supplied verifier task disables Lucene library assertions to match its original production-mode launcher; module-suite assertion settings stay unchanged. This is an orchestrator decision and an agent implementation choice, never owner-words. The first full candidate proved that mapping alone was insufficient: the initial buffered write set the peer-success flag, then a synchronous DocValues flush made the writer tragic, and its first IOException was still reported as generic per-operation I/O. An earlier buffered peer cannot prove a now-tragic service healthy. indexDocument and applyBatch therefore retain the existing typed writer-unavailable fast path for the IOException that actually makes the live writer tragic, using its real getTragicException state under the existing write barrier. Nontragic document I/O keeps its original classification; peer proof, canary frequency and backoff rules are unchanged. The unchanged real DocValues regression isolates this boundary defect as well as mapped coverage. The first failed full candidate is retained under mapped-peer-failure, never relabeled as passing."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-full-mapping.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10 mapping coverage: the actual canary document contains every configured field emitted by the mapper, including sorted/sorted-set/numeric doc values, stored fields, points, text, dense vectors and sparse features.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round14 full mapped canary and confirmed-absent alias repair, with unchanged lifecycle/queue/status/retry logic and acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "Orchestrator round14 decision: populate every field type the ordinary mapper emits via the same mapping path, and apply per-file policy when SourcePresence confirms the source absent, whatever the canary says. FieldMapper supplies small representative values and calls its ordinary toDocument: text, scalar/multi-valued keyword, long, boolean, unit dense vectors at configured positive dimensions, and sparse FeatureField weights. No embedding model is invoked. Zero-dimensional test-catalog vectors are disabled and cannot form a valid Lucene field. Unsupported catalog types, currently double, are skipped exactly as ordinary addFields skips them; implementing those types is outside this repair. The extractor uses WorkerIngestionAuthority.presence/SourcePresence ABSENT, including its root identity/listability and repeated absence confirmation, before shared-failure classification. It retains the existing per-file outcome and lets admission handle subsequent confirmed absence; no deletion or path-text heuristic is introduced. The orchestrator explicitly accepts content-dependent faults missed by the full representative canary as visible per-file residuals. The real native codec/vanished-alias regressions preserve verifier intent, changing only fixture/class names. A separate captured-document check pins every implemented mapped field family, including dense and sparse vectors. D13 recorded two pre-injection failures in a shared full-suite JVM; the unchanged ExtractionInfrastructureTest class runs in a fresh isolated JVM within the same combined Gradle invocation, with no skipped or weakened assertions. The supplied verifier task disables Lucene library assertions to match its original production-mode launcher; module-suite assertion settings stay unchanged. This is an orchestrator decision and an agent implementation choice, never owner-words. The first full candidate proved that mapping alone was insufficient: the initial buffered write set the peer-success flag, then a synchronous DocValues flush made the writer tragic, and its first IOException was still reported as generic per-operation I/O. An earlier buffered peer cannot prove a now-tragic service healthy. indexDocument and applyBatch therefore retain the existing typed writer-unavailable fast path for the IOException that actually makes the live writer tragic, using its real getTragicException state under the existing write barrier. Nontragic document I/O keeps its original classification; peer proof, canary frequency and backoff rules are unchanged. The unchanged real DocValues regression isolates this boundary defect as well as mapped coverage. The first failed full candidate is retained under mapped-peer-failure, never relabeled as passing."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-full-mapping.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java"
+      ],
+      "class": "New",
+      "behaviour": "U17 typed boundary preservation: the actual filesystem AccessDeniedException that makes the live writer tragic is surfaced as IndexWriterUnavailableException; the native cause and eight uncounted batch deferrals remain required.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round14 full mapped canary and confirmed-absent alias repair, with unchanged lifecycle/queue/status/retry logic and acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "Orchestrator round14 decision: populate every field type the ordinary mapper emits via the same mapping path, and apply per-file policy when SourcePresence confirms the source absent, whatever the canary says. FieldMapper supplies small representative values and calls its ordinary toDocument: text, scalar/multi-valued keyword, long, boolean, unit dense vectors at configured positive dimensions, and sparse FeatureField weights. No embedding model is invoked. Zero-dimensional test-catalog vectors are disabled and cannot form a valid Lucene field. Unsupported catalog types, currently double, are skipped exactly as ordinary addFields skips them; implementing those types is outside this repair. The extractor uses WorkerIngestionAuthority.presence/SourcePresence ABSENT, including its root identity/listability and repeated absence confirmation, before shared-failure classification. It retains the existing per-file outcome and lets admission handle subsequent confirmed absence; no deletion or path-text heuristic is introduced. The orchestrator explicitly accepts content-dependent faults missed by the full representative canary as visible per-file residuals. The real native codec/vanished-alias regressions preserve verifier intent, changing only fixture/class names. A separate captured-document check pins every implemented mapped field family, including dense and sparse vectors. D13 recorded two pre-injection failures in a shared full-suite JVM; the unchanged ExtractionInfrastructureTest class runs in a fresh isolated JVM within the same combined Gradle invocation, with no skipped or weakened assertions. The supplied verifier task disables Lucene library assertions to match its original production-mode launcher; module-suite assertion settings stay unchanged. This is an orchestrator decision and an agent implementation choice, never owner-words. The first full candidate proved that mapping alone was insufficient: the initial buffered write set the peer-success flag, then a synchronous DocValues flush made the writer tragic, and its first IOException was still reported as generic per-operation I/O. An earlier buffered peer cannot prove a now-tragic service healthy. indexDocument and applyBatch therefore retain the existing typed writer-unavailable fast path for the IOException that actually makes the live writer tragic, using its real getTragicException state under the existing write barrier. Nontragic document I/O keeps its original classification; peer proof, canary frequency and backoff rules are unchanged. The unchanged real DocValues regression isolates this boundary defect as well as mapped coverage. The first failed full candidate is retained under mapped-peer-failure, never relabeled as passing. The completed full candidate passes all new regressions and all 59 supplied verifier checks, but an existing direct filesystem policy check expects the former generic IndexRuntimeIOException wrapper. Change only that exact type oracle to IndexWriterUnavailableException for the actual triggering tragic I/O. Preserve its AccessDeniedException cause assertion, real permission fault and all eight free-deferral assertions. This tightens the explicit service-boundary signal; it does not relax source-attempt or outage requirements. The changed type oracle receives its own exact29f315fb1 assertion fail-before and fresh three-method candidate run, while unchanged full suites are retained under compiled-class and source hashes."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-full-mapping.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -1294,6 +1454,8 @@ Round 12 O10 replaces the superseded manual token-consumption probe with native 
 Round13 follow-up: the real native tragedy exposed a baseline worker-status precedence defect (WAITING instead of I6 ERROR); the recovery-only comparison remains in [pre-status history](../../../tmp/builder/round13/pre-status-history). The orchestrator explicitly decided: "fix the status, narrowly" and "When the writer has a tragic exception, ERROR takes precedence over the outage WAITING status (and over INDEXING) until the runtime is reopened." The status producer now observes the current ingestion writer's actual tragic exception and selects ERROR/isHealthy=false before ordinary loop/outage/queue state. The runtime observation is read-only and does not run the canary, invoke callbacks or change recovery. Reopening supplies a new runtime/writer. No queue or retry logic changes.
 
 The exact df6092ffe fail-before check is reused with an identical test-source hash: actual native tragedy and callback1, public status WAITING, both healthy rows charged1/minute and no prompt recovery. The same ERROR assertion remains unchanged. One combined candidate invocation reruns all round10–13 targets, I7/WAITING/INDEXING/capped backlog, I6 and supplied D9–D12 verifier checks, plus main/test compile and PMD for adapters-lucene, worker-services and indexer-worker. Completed in one successful Gradle call: all126 targeted executions pass with zero skips, including the37-case matrix, U19, I7/WAITING/INDEXING/capped backlog, I6 and every round10–13 target. All56 supplied verifier product checks plus1 environment check pass with zero skips. Main/test compile and all six PMD reports pass with zero violations. The unchanged native check now observes ERROR, the actual fatal callback once, and both files DONE/attempts0 after restart in1193ms (supplied equivalent1191ms), preserving second-scale durable deadlines without source, enqueue or deadline edits. Status repair alone is+20/-2; complete round13 product delta is+52/-7 (net+45), five existing classes. [Before](../../../tmp/builder/round13/before.txt), [after](../../../tmp/builder/round13/after.txt), [fresh execution summary](../../../tmp/builder/round13/status-verification-summary.json), [single Gradle command/output](../../../tmp/builder/round13/status-after-gradle.log), [report](../../../tmp/builder/round13/report.md), [execution evidence](../evidence/systemic-batch-deferral-live-config.json). The initial failed status evidence remains archived, never relabeled. Existing acceptance records below remain byte-for-byte unchanged; independent acceptance is pending.
+
+Round14 implements full mapped canary coverage and confirmed-absent source policy (entries22–24), plus the exact typed tragic-writer boundary assertion (entry25). Product +38/-8 (net +30), four existing classes. Exact29f315fb1: three native/coverage assertion failures and the focused generic-versus-typed boundary assertion fail as intended. After:129 U17/U19 targets including37 matrix states,59 supplied verifier product checks and1 environment check pass without skips. Main/test compile and6 PMD reports pass. Full module results retain one known launcher-NOTE environment failure and48 existing skips; the unchanged eight extraction checks run in a fresh JVM in the same combined call. A failed mapping-only candidate and the subsequent outdated type-oracle failure remain archived; the final single-line type-oracle correction reruns all three filesystem-policy methods, retaining all unchanged results under hashes. The native AccessDeniedException and eight free-deferral assertions are preserved. No schema/acceptance-record changes or commit. [Report and decisions](../../../tmp/builder/round14/report.md), [before](../../../tmp/builder/round14/before.txt), [after](../../../tmp/builder/round14/after.txt), [counts/retention](../../../tmp/builder/round14/verification-summary.json), [field audit](../../../tmp/builder/round14/field-coverage-audit.md), [execution evidence](../evidence/systemic-batch-deferral-full-mapping.json).
 
 ## Acceptance records
 

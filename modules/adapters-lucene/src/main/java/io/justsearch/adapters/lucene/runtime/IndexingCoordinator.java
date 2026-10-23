@@ -99,12 +99,8 @@ public final class IndexingCoordinator {
         var snapshot = session.snapshot;
         var tragic = snapshot.writer().getTragicException();
         if (tragic != null) throw new IndexWriterUnavailableException("IndexWriter failed", tragic);
-        var fields = new HashMap<String, Object>();
-        for (var field : session.fieldMapper.fieldDefs().values()) {
-          if ("text".equals(field.type)) fields.put(field.id, "JustSearch ingestion canary");
-        }
         ComponentsFactory.probeDocument(snapshot.writer().getConfig(),
-            session.fieldMapper.toDocument(fields, null));
+            session.fieldMapper.ingestionCanaryDocument());
         String name = null;
         try {
           try (var output = snapshot.directory().createTempOutput(
