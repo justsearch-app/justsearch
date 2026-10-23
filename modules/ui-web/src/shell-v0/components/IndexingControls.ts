@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 import { SignalWatcher } from '@lit-labs/signals';
-import { getViewerAudience } from '../state/viewerAudienceState.js';
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { selectIndexingProgress, type IndexingProgress } from '../state/indexingProgress.js';
@@ -111,7 +110,6 @@ class IndexingControls extends SignalWatcher(JfElement) {
     if (!this.action) return nothing;
     const resume = this.action === 'resume';
     const unavailable = this.unavailableReason;
-    const userRecovery = this.action === 'settings' && getViewerAudience() === 'USER';
     return html`<div class="actions" aria-busy=${this.pending ? 'true' : 'false'}
       @focusin=${() => { this.focused = true; }}
       @focusout=${(event: FocusEvent) => {
@@ -126,9 +124,9 @@ class IndexingControls extends SignalWatcher(JfElement) {
           <option value="3600000">1 hour</option>
         </select></label>` : nothing}
       <button type="button" aria-disabled=${unavailable ? 'true' : 'false'} aria-describedby="control-state"
-        @click=${() => void this.invoke()}>${this.action === 'settings' ? userRecovery ? 'Open Settings at View tier' : 'Open Settings at Reset to defaults' : resume ? 'Resume indexing' : 'Pause indexing'}</button>
+        @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : resume ? 'Resume indexing' : 'Pause indexing'}</button>
     </div>
-    <p id="control-state" role="status">${[userRecovery ? 'In Settings, set View tier to Operator, then Reset to defaults.' : '', unavailable, this.message].filter(Boolean).join(' ')}</p>`;
+    <p id="control-state" role="status">${[unavailable, this.message].filter(Boolean).join(' ')}</p>`;
   }
 }
 

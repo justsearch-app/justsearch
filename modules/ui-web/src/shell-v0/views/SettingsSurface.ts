@@ -25,6 +25,7 @@ import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '
 // plain `.value=` binding sees no change and skips the update. `live()` compares against the live
 // DOM property, which is the only comparison that can notice.
 import { live } from 'lit/directives/live.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { JfElement } from '../primitives/JfElement.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 // Tempdoc 511 §511-followup-B: reset-settings now routes through
@@ -189,6 +190,8 @@ function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
 }
 
 export class SettingsSurface extends JfElement {
+  private restoreRecoveryResetFocus = false;
+
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
@@ -1013,6 +1016,7 @@ export class SettingsSurface extends JfElement {
    *  (recoverable), so they are deliberately KEPT — resetting them would re-introduce the draft-loss 609
    *  fixes. Settings data + activeTab are also untouched. */
   protected override settleTransients(): void {
+    this.restoreRecoveryResetFocus = false;
     this.saving = false;
     this.deleting = false;
     this.error = null;
@@ -1059,6 +1063,20 @@ export class SettingsSurface extends JfElement {
     this.workspaceProfilesUnsub = null;
     this.consentUnsub = null;
     this.teardownAnchorObservers();
+  }
+
+  protected override willUpdate(): void {
+    // The recovery-only audience exception can disappear on the next status poll.
+    // Move focus before the nested operation renderer removes its focused button.
+    if (!this.settingsRecovery) {
+      const reset = this.shadowRoot?.getElementById('settings-reset');
+      const focused = this.shadowRoot?.activeElement;
+      if (this.viewerAudience === 'USER' && ((focused && reset?.contains(focused))
+        || (this.restoreRecoveryResetFocus && document.activeElement === document.body))) {
+        this.shadowRoot?.querySelector<HTMLElement>('h2')?.focus();
+      }
+      this.restoreRecoveryResetFocus = false;
+    }
   }
 
   override updated(changed: PropertyValues): void {
@@ -1289,6 +1307,7 @@ export class SettingsSurface extends JfElement {
   }
 
   private handleResetError(e: CustomEvent<OpErrorEventDetail>): void {
+    this.restoreRecoveryResetFocus = false;
     const msg = e.detail?.message;
     this.error = typeof msg === 'string' ? msg : 'Reset failed.';
   }
@@ -1720,10 +1739,14 @@ export class SettingsSurface extends JfElement {
    */
   /** Recovery navigation selects existing controls; it never changes tier or invokes Reset. */
   async focusSettingsRecovery(): Promise<void> {
-    const user = this.viewerAudience === 'USER';
-    if (user) this.activateSearchHit('developer', 'view-tier');
     await this.updateComplete;
-    const target = this.shadowRoot?.getElementById(user ? 'settings-view-tier' : 'settings-reset');
+    const operation = this.shadowRoot?.querySelector<JfElement>('#settings-reset jf-operation');
+    await operation?.updateComplete;
+    const opButton = operation?.querySelector<JfElement>('jf-op-button');
+    await opButton?.updateComplete;
+    const action = opButton?.shadowRoot?.querySelector<JfElement>('jf-action-button');
+    await action?.updateComplete;
+    const target = action?.shadowRoot?.querySelector('button');
     target?.scrollIntoView({ block: 'nearest' });
     target?.focus();
   }
@@ -2778,7 +2801,7 @@ export class SettingsSurface extends JfElement {
       <div class="settings-root">
         <div class="header">
           <div>
-            <h2>Settings</h2>
+            <h2 tabindex="-1">Settings</h2>
             <p class="subtitle">Customize your experience</p>
           </div>
           <div class="row">
@@ -2790,6 +2813,12 @@ export class SettingsSurface extends JfElement {
               : nothing}
             ${!this.readOnly
               ? html`<span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
+                  @action-invoke=${() => {
+                    // Confirmation removes its focused Yes button before the status receipt arrives.
+                    const reset = this.shadowRoot?.getElementById('settings-reset');
+                    this.restoreRecoveryResetFocus = this.settingsRecovery
+                      && !!this.shadowRoot?.activeElement && !!reset?.contains(this.shadowRoot.activeElement);
+                  }}
                   @op-success=${() => this.handleResetSuccess()}
                   @op-error=${(e: CustomEvent<OpErrorEventDetail>) =>
                     this.handleResetError(e)}
@@ -2797,6 +2826,7 @@ export class SettingsSurface extends JfElement {
                   <jf-operation
                     operation-id="core.reset-settings"
                     context="button"
+                    viewer-audience=${ifDefined(this.settingsRecovery ? 'OPERATOR' : undefined)}
                     api-base=${this.apiBase}
                   ></jf-operation>
                 </span>`
@@ -2899,6 +2929,13 @@ export class SettingsSurface extends JfElement {
       ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
     </section>`;
+  }
+
+  /** UI visibility exception for the Engine's settings-recovery hold; the catalog stays unchanged. */
+  private get settingsRecovery(): boolean {
+    const s = this.aiSnapshot;
+    return selectIndexingProgress(s?.status, s?.indexingStatusLive ?? false,
+      s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []).pause?.reason === 'settings_recovery';
   }
 
   /** Tempdoc 855 §4 — Feedback capture moves from nested-inside-Security-pointer to its own
