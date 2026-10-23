@@ -11,6 +11,9 @@
     "historySince" : {
       "type" : "integer"
     },
+    "message" : {
+      "type" : "string"
+    },
     "phase" : {
       "type" : "string"
     },
