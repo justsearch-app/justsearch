@@ -444,3 +444,14 @@ Five-findings continuation: the four checks appended to `IndexingPause.test.ts` 
   "note": "Independent source and before-test review on 247aff3ab: scratch run-evidence passes all 41 repair checks with assertion failures on their original before refs (b62fc5921, 30f3617ea, d7714b374, dfc1cb885); preservation passes. Expectations follow delegated S37/N37 and CR37a/b scope. RS37 unknown-reason selector coverage supplies no wire claim. Acceptance covers test intent; real-system verification is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp37-verifier-6-l8hhhrow",
+  "verdict": "accept",
+  "digest": "sha256:bf7644c0c4434a5697b053813adcaacc130b96adc800e6719cb26ef7db96af1e",
+  "note": "Independent source and before-test review on bd38f93a7: scratch run-evidence executes 42 repair checks, all pass on the candidate and assertion-fail on their original before refs (b62fc5921, 30f3617ea, d7714b374, dfc1cb885, dcdae9983); preservation passes. Expectations follow delegated S37/N37, CR37a/b and the stated repair scope. RS37 unknown-reason selector coverage supplies no wire claim. Test intent accepted separately from the real-system product verdict."
+}
+```
