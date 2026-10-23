@@ -1311,3 +1311,14 @@ Round 12 O10 replaces the superseded manual token-consumption probe with native 
   "note": "The real writer canary passes a shared invalid-position analyzer, charges healthy files, and retains minute-scale retries after recovery."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16870-0323-7b30-ac3b-0f01ad4882ba",
+  "verdict": "reject",
+  "digest": "sha256:c09cc1b580357c14bc1b06cd564300a52450118e8eb0b65d0d1330fc3a207bc8",
+  "note": "The disposable canary uses a different Similarity than the real writer, so a shared invalid-norm outage charges healthy files and leaves minute-scale retries after recovery."
+}
+```
