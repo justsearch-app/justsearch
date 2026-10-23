@@ -1607,7 +1607,8 @@ export class SearchV3View extends JfElement {
           label:
             item.id === 'retry'
               ? `${item.label} · ${session.turns.find(turn => turn.id === detail.turnId)?.kind === 'model'
-                ? 'This answer does not search your files.' : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
+                ? 'This answer does not search your files.' : session.turns.find(turn => turn.id === detail.turnId)?.shapeId === 'core.extract'
+                  ? this.structuredNote(detail.turnId) : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
               : item.label,
           icon: 'git-branch' as const,
           category: 'ai' as const,
@@ -1818,14 +1819,30 @@ export class SearchV3View extends JfElement {
     const lineage = sv3LineageFor(this.turnLineage(), detail.turnId);
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
-    const tier = turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
+    const tier: Sv3ComposerTier | 'model' = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
+    if (tier === 'structured' && detail.action !== 'branch') {
+      const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
+      if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
+      const inputs = this.structuredInputs.get(detail.turnId);
+      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier)) return;
+      this.tier = 'structured';
+      this.tierFollowsPlace = false;
+      if (inputs === undefined) {
+        this.writeDraft(text);
+        this.requestUpdate();
+      } else {
+        await this.runAsk(text, inputs.scope, inputs.schema);
+      }
+      return;
+    }
     switch (detail.action) {
       case 'branch':
         if (lineage.branchFromId === null) return;
         // A branch re-sends nothing; it continues the conversation in the tier of the turn it forked
         // after, so the next send from a Delegate turn's branch is a delegation.
-        if ((await this.branchInto(session.id, lineage.branchFromId, null, tier)) && tier === 'delegate') {
-          this.tier = 'delegate';
+        if ((await this.branchInto(session.id, lineage.branchFromId, null, tier)) && (tier === 'delegate' || tier === 'structured')) {
+          this.tier = tier;
+          this.tierFollowsPlace = false;
         }
         return;
       case 'retry': {
@@ -1926,7 +1943,7 @@ export class SearchV3View extends JfElement {
         this.writeDraft(resend);
         return true;
       }
-      await this.runAsk(resend, scope, tier === 'model');
+      await this.runAsk(resend, scope, undefined, tier === 'model');
     }
     return true;
   }
@@ -2616,6 +2633,10 @@ export class SearchV3View extends JfElement {
       this.delegate(text);
       return;
     }
+    if (detail?.tier === 'structured') {
+      void this.runAsk(text, this.search.pendingScope, this.schemaDraft);
+      return;
+    }
     // The prepared files belong to an Ask sent FROM the result list, and to that one Ask only.
     void this.runAsk(text, this.search.showing ? this.search.takeScope() : null);
   }
@@ -2788,6 +2809,9 @@ export class SearchV3View extends JfElement {
     const detail = (event as CustomEvent<CardSelectionDetail>).detail;
     if (detail === undefined) return;
     this.search.select(detail.ids);
+    if (this.tier === 'structured' && this.search.showing && this.search.prepareFromSelection() === null) {
+      this.search.clearScope();
+    }
   }
 
   /** Open a hit in the document pane — the one pane writer, with no citation to anchor. */
@@ -2851,7 +2875,7 @@ export class SearchV3View extends JfElement {
   private onModelAnswer(event: Event): void {
     const id = (event as CustomEvent<{ turnId?: string }>).detail?.turnId;
     const turn = this.activeSession?.turns.at(-1);
-    if (turn === undefined || turn.id !== id || this.streaming
+    if (turn === undefined || turn.shapeId === 'core.extract' || turn.id !== id || this.streaming
       || this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true) return;
     if (turn.status !== 'no-evidence'
       && !(turn.kind === 'model' && ['failed', 'halted', 'refused'].includes(turn.status))) return;
@@ -2860,7 +2884,7 @@ export class SearchV3View extends JfElement {
       emitEphemeralToast({ message: reason, severity: 'warning' });
       return;
     }
-    void this.runAsk(turn.question, null, true);
+    void this.runAsk(turn.question, null, undefined, true);
     void this.focusComposer();
   }
 
@@ -2912,15 +2936,32 @@ export class SearchV3View extends JfElement {
     return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
   }
 
+  private schemaDraft = '';
+  private structuredError = '';
+  private readonly structuredInputs = new Map<string, { schema: string; scope: Sv3AskScope | null }>();
+
+  private structuredNote(turnId: string): string {
+    const inputs = this.structuredInputs.get(turnId);
+    return inputs === undefined
+      ? 'Opens in Structured with the current composer schema and stated inputs; review and send.'
+      : `Runs Structured with schema ${inputs.schema}; inputs: ${inputs.scope?.paths.join(', ') ?? 'typed text'} and this conversation.`;
+  }
+
   /**
    * The ONE path a question takes. There is no second entry: the composer refuses an unavailable or
    * busy send before it leaves, and the model action checks its own gate. This method
    * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
-  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, modelAnswer = false): Promise<void> {
+  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false): Promise<void> {
     const question = rawQuestion.trim();
     if (question === '' || this.streaming) return;
     if (modelAnswer && this.modelAnswerUnavailableReason !== '') return;
+    if (schema !== undefined && (scope?.paths.length ?? 0) > 5) {
+      this.structuredError = 'Choose at most 5 files for one extraction.';
+      this.requestUpdate();
+      return;
+    }
+    this.structuredError = '';
     const composer = this.composer;
     const draftRevision = composer?.draftRevision;
     const sessionId = this.sessions.activeId;
@@ -2942,15 +2983,17 @@ export class SearchV3View extends JfElement {
       }
     }
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId());
+    const shapeId = modelAnswer ? SV3_MODEL_SHAPE_ID : schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract';
+    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
+    if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (!modelAnswer && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
+    if (!modelAnswer && schema === undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -2989,7 +3032,7 @@ export class SearchV3View extends JfElement {
     // to stop this turn however the reader reaches it.
     setAiActivity({
       state: 'streaming',
-      shapeId: modelAnswer ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID,
+      shapeId,
       startedAtMs: Date.now(),
       canCancel: true,
       cancel: stop,
@@ -3020,6 +3063,14 @@ export class SearchV3View extends JfElement {
           // transcript re-read after a model swap still names the one that wrote each answer.
           this.currentModelLabel,
         );
+        if (schema !== undefined && (status === 'complete' || status === 'failed' || status === 'refused')) {
+          // The existing window message channel supplies the polite live region. Failures also
+          // stay in the transcript; this notice must not interrupt speech or take keyboard focus.
+          emitEphemeralToast({
+            message: status === 'complete' ? 'Extraction complete.' : `Extraction failed: ${detail}`,
+            severity: 'info',
+          });
+        }
       }
       // Only THIS dispatch's terminal may clear the window's busy state: a later ask has already
       // installed its own controller, and clearing it here would strand a live stream with a Send
@@ -3036,6 +3087,7 @@ export class SearchV3View extends JfElement {
     await sv3Ask(
       {
         apiBase: this.apiBase,
+        schema,
         question,
         conversationId: ref.sessionId,
         modelAnswer,
@@ -3065,6 +3117,8 @@ export class SearchV3View extends JfElement {
           this.sessions = setTurnRewrite(this.sessions, ref, standalone);
         },
         onDone: (usage) => {
+          if (schema !== undefined && this.search.pendingScope === scope) this.search.clearScope();
+          if (schema !== undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
           // Tempdoc 610 §E.4 — the occupancy this turn reported, recorded on the CONVERSATION that
           // spent it (a terminal that reported none leaves the previous reading standing rather than
           // replacing it with a zero the backend never sent).
@@ -3096,7 +3150,7 @@ export class SearchV3View extends JfElement {
         },
         onLeft: () => settle('left'),
         onFailed: (message, code) => {
-          const noEvidence = !modelAnswer && code === 'NO_CONTENT' && scope === null;
+          const noEvidence = !modelAnswer && schema === undefined && code === 'NO_CONTENT' && scope === null;
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
@@ -3126,6 +3180,9 @@ export class SearchV3View extends JfElement {
     if (!isSv3Tier(tier)) return;
     this.tier = tier;
     this.tierFollowsPlace = false;
+    if (tier === 'structured' && this.search.showing && this.search.pendingScope === null) {
+      this.search.prepareFromSelection();
+    }
     // WP1.1 S1.10 — beside the result list, Search mode's text is the query: text written in another
     // mode is searched as it stands, so the composer and the list never describe different queries.
     if (tier === 'search' && this.search.showing) this.search.type(this.currentDraft());
@@ -4054,7 +4111,7 @@ export class SearchV3View extends JfElement {
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
     const pendingPrompt = run !== null && run.prompts.length > 0;
-    const scope = this.search.showing ? this.search.pendingScope : null;
+    const scope = this.search.showing || this.tier === 'structured' ? this.search.pendingScope : null;
     const slot = sv3PrimaryAction({
       pendingPrompt,
       running: this.isRunning(run),
@@ -4109,6 +4166,10 @@ export class SearchV3View extends JfElement {
         class="column"
         data-testid="sv3-column"
         @sv3-composer-state-request=${this.onStateRequest}
+        @sv3-schema-change=${(event: CustomEvent<{ text: string }>) => {
+          this.schemaDraft = event.detail.text;
+          this.requestUpdate();
+        }}
         @sv3-composer-submit=${this.onComposerSubmit}
         @sv3-composer-draft=${this.onComposerDraft}
         @sv3-composer-scope-clear=${() => this.search.clearScope()}
@@ -4142,6 +4203,7 @@ export class SearchV3View extends JfElement {
           .turnScopes=${this.search.scopesByTurn}
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
           ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}
+          .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.structuredNote(t.id)]))}
           .run=${run}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
           .unconfirmedSteerNotes=${this.unconfirmedSteerNotes}
@@ -4185,6 +4247,8 @@ export class SearchV3View extends JfElement {
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
           effort=${this.effort}
           tier=${this.tier}
+          .schemaDraft=${this.schemaDraft}
+          .structuredError=${this.structuredError}
           scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"

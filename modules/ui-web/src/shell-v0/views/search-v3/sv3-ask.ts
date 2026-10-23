@@ -196,6 +196,8 @@ export function sv3EffortParams(effort: Sv3Effort): Readonly<Record<string, unkn
 
 export interface Sv3AskRequest {
   readonly apiBase: string;
+  /** Present only for Structured; the existing dispatch and terminal rules are shared. */
+  readonly schema?: string;
   readonly question: string;
   /** The window's session id — stamped on every dispatch so the backend records the turn. */
   readonly conversationId: string;
@@ -376,11 +378,14 @@ function claimsOf(acc: Map<number, ClaimAcc>, scorer: string | null): Claim[] {
  * An Ask carries its chosen files and the effective follow-up context.
  */
 export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void> {
-  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID, req.question, req.conversationId, '', [
+  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract', req.question, req.conversationId, req.schema ?? '', [
     ...(req.docIds ?? []),
   ]);
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
+  if (req.schema !== undefined && (req.docIds?.length ?? 0) > 0) {
+    body.selection = { kind: 'result-set', items: [...new Set(req.docIds)].map(id => ({ id, kind: 'search-hit' })) };
+  }
   // The effort rung's parameters, added AFTER the shared builder rather than inside it: the builder
   // is the shipped window's authority over the per-shape body and this window may not widen it. The
   // fields land beside `conversationId`, which arrives the same way and for the same reason.
@@ -427,6 +432,10 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   const handlers: CoreRagAskHandlers = {
     onDone(payload: unknown) {
       usage = readSv3ContextUsage(payload);
+      if (req.schema !== undefined) {
+        const final = (payload as { finalResponse?: unknown } | null)?.finalResponse;
+        if (typeof final === 'string') sink.onDelta(final);
+      }
     },
     onReasoningChunk(payload: unknown) {
       sink.onReasoning(payload);
@@ -439,7 +448,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     onChunk(payload: unknown) {
       const p = payload as { text?: unknown } | string | null;
       const delta = typeof p === 'string' ? p : typeof p?.text === 'string' ? p.text : '';
-      if (delta === '') return;
+      if (delta === '' || req.schema !== undefined) return;
       sink.onDelta(delta);
     },
     onRagMeta(payload: unknown) {

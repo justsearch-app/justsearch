@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T01:55:45.935Z",
+  "revision": "00e614b2cacbc04410a14a2d2b85d7ceaa25a8d6",
+  "tree": "737def9bccdff6338df0523c333e9cccb8bf27c2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/UnifiedChatView.stopTurn.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-sixth-repair/test-intent-vitest-3800696-1792720537415.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2320
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stopTurn.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stopTurn.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:379b8e56a0d7da67ea1d87f7ae972e41950173b02ec7610a09aff3bd5ab38fa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT7 old Structured Stop names the dispatched Engine turn and keeps its stream for the cancelled terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 activity cancellation uses the same Structured Stop and coalesces repeated presses",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 a refused Structured Stop leaves the stream running and permits a retry",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary none Stop retains the old local-abort contract",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary documents Stop retains the old local-abort contract",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary summarize Stop retains the old local-abort contract",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 leaving the Structured window aborts locally without asking the Engine to stop",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "00e614b2c",
+    "revision": "00e614b2cacbc04410a14a2d2b85d7ceaa25a8d6",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/UnifiedChatView.stopTurn.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-sixth-repair/test-intent-vitest-3800696-1792720541031.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4745,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-sixth-repair/test-intent-vitest-3800696-1792720541031.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.stopTurn.test.ts",
+        "classification": "assertion",
+        "detail": "XT7 old Structured Stop names the dispatched Engine turn and keeps its stream for the cancelled terminal:  AssertionError: Stop must reach the Engine, not merely abort its response: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-structured/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonym | XT7 activity cancellation uses the same Structured Stop and coalesces repeated presses:  A"
+      }
+    ]
+  },
+  "digest": "sha256:4ce523361032c7d97bec996eb02d43afe6ba0e7e57122ecc3ebd17766921a969"
+}

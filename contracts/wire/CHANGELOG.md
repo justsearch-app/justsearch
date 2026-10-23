@@ -18,6 +18,8 @@ the V1.5 follow-up per slice 3a-1-8f.
 
 ### Added
 
+- Wire 3.0.2: OperationHistoryEntry field 12 `message` mirrors the existing optional
+  read-time refusal explanation, including its support code. Additive optional; no stored state.
 - Operation history includes OPERATION_OUTCOME_UNDONE for successful undo (Lane F C2).
 - Wire 3.0.1: StatusResponse field 36 `operating` (OperatingStateView) reports chat, indexing
   and GPU operating state (ADR-0050), including the external-use reading

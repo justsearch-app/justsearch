@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -164,12 +165,19 @@ final class ExcludePatternsResolutionTest {
   }
 
   @Test
-  void applyExcludesPreservesWrappedDeletionRefusal(@TempDir Path root) throws Exception {
+  void applyExcludesReportsWrappedDeletionRefusal(@TempDir Path root) throws Exception {
     Files.writeString(root.resolve("noisy.log"), "x");
     publishSettings(List.of("**/*.log"));
     var refusal = new io.justsearch.app.api.EngineAdmissionException(
         io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
-    var indexing = org.mockito.Mockito.mock(IndexingService.class);
+    var indexing = org.mockito.Mockito.mock(IndexingService.class, call -> {
+      if (call.getMethod().getName().equals("deleteDocByIdWithOutcome")) {
+        boolean completed = ((IndexingService) call.getMock()).deleteDocById(call.getArgument(0), call.getArgument(1));
+        return call.getMethod().getReturnType().getConstructor(boolean.class, String.class)
+            .newInstance(completed, completed ? "" : "Worker did not confirm deletion");
+      }
+      return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+    });
     org.mockito.Mockito.when(indexing.getWatchedRoots(
         org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
         .thenReturn(List.of(new IndexingService.WatchedRoot("default", root)));
@@ -181,9 +189,16 @@ final class ExcludePatternsResolutionTest {
 
     var handler = new io.justsearch.app.services.registry.operations.handlers.ApplyExcludesHandler(
         () -> new ExcludesServiceImpl(() -> indexing));
-    org.junit.jupiter.api.Assertions.assertSame(refusal,
-        assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
-            () -> handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal())));
+    var result = assertDoesNotThrow(
+        () -> handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal()),
+        "WX1: a deletion refusal is a partial outcome, retaining any prior progress");
+    assertTrue(result.success());
+    assertEquals(0, result.structuredData().get("confirmedRemovals"));
+    var scopes = new tools.jackson.databind.ObjectMapper().valueToTree(result.structuredData().get("uncheckedScopes"));
+    assertEquals(1, scopes.size());
+    assertEquals(root.resolve("noisy.log").toString(), scopes.get(0).path("path").asText());
+    assertEquals("not_removed", scopes.get(0).path("status").asText());
+    assertTrue(scopes.get(0).path("reason").asText().contains(refusal.getMessage()));
   }
 
   private static final class RecordingIndexingService implements IndexingService {

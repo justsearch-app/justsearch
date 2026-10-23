@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { localizeError } from '../../i18n/errorCatalog.js';
-import { OperationError } from './OperationClient.js';
+import { OperationError, isStaleAuthorization } from './OperationClient.js';
 
 /** Shell failure copy projects the existing handler code and retry hint. Dispatch classes
  * remain a separate axis; raw exception messages can contain operation IDs and paths. */
 export function operationFailureMessage(error: unknown, undo = false): string {
+  if (isStaleAuthorization(error)) return 'This approval request is no longer pending.';
   const fallback = undo ? 'The action could not be undone.' : 'The action could not be completed.';
   if (!(error instanceof OperationError)) {
     return `${fallback} Open Health for details.`;

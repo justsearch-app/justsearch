@@ -629,6 +629,7 @@ public final class ConversationEngine {
       // as well as the turns whose retrieval or rewrite reported what happened.
       if (retrievalRecordId != null && conversationStore != null
           && (!injectorRun.retrievalMetadata.isEmpty() || standalone != null
+              || "core.extract".equals(shape.id().value())
               || shape.contextInjectorIds().contains(
                   io.justsearch.app.services.conversation.spi.RAGContext.ID))
           && injectorRun.terminalError != null) {
@@ -711,6 +712,15 @@ public final class ConversationEngine {
       for (int i = 0; i < hardCap; i++) {
         answerRecorded = false;
         List<Map<String, Object>> llmInput = buildLlmInput(systemPrompt, ctx.messages());
+        if ("core.extract".equals(shape.id().value())
+            && estimatePhaseTokens(llmInput) > io.justsearch.app.services.conversation.spi.RAGContext
+                .budgetFor(onlineAiSupplier, ctx).inputBudget()) {
+          String reason = "Extraction input exceeds the model context budget; shorten the instruction, schema or inputs.";
+          emitError(sink, reason, "INPUT_TOO_LARGE");
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+              reason, "INPUT_TOO_LARGE");
+          return;
+        }
 
         String finalText;
         AtomicReference<OnlineAiService.AiUsage> usageRef = new AtomicReference<>();
@@ -766,6 +776,9 @@ public final class ConversationEngine {
           mergedDoneEntries.putAll(result.donePayloadEntries());
         }
         mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
+        if ("core.extract".equals(shape.id().value()) && !injectorRun.citations.isEmpty()) {
+          mergedDoneEntries.put("citations", injectorRun.citations);
+        }
 
         // Tempdoc 610 §E.4 / §G — surface the prompt-token occupancy on the done payload so the FE can
         // render a context-budget meter. The model context window (the meter's denominator) is FE-side
@@ -786,8 +799,7 @@ public final class ConversationEngine {
         // Tempdoc 610 §I.2 — the per-phase split rides the done payload alongside the real total.
         mergedDoneEntries.put("contextBreakdown", contextBreakdown);
 
-        // Append the assistant message and any consumer message deltas before the next
-        // iteration's decision + LLM call.
+        // Keep attempts in this retry context, but persist Extract only after acceptance.
         Map<String, Object> assistantMsg = assistantMessage(finalText);
         // The turn's last answer is saved as complete below, so a Stop from here on changes nothing,
         // and says so; one that landed before carries the turn's work, and the check below sees it.
@@ -795,24 +807,6 @@ public final class ConversationEngine {
         checkWork(work);
         ctx.appendMessage(assistantMsg);
         ctx.appendMessages(aggregateDeltas);
-        // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
-        // producer calibration from the done-payload), so the unified thread surfaces grounding FROM the
-        // record, not an FE-side content re-match. Evidence is kept off the LLM-context copy so it never
-        // pollutes the next prompt. PERSISTENT shapes record under sessionId; recordsToThread ephemeral
-        // shapes (RAG) record under threadId (the request's conversationId).
-        if (sessionId != null && conversationStore != null) {
-          conversationStore.appendMessage(
-              sessionId,
-              shape.id().value(),
-              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
-        } else if (threadId != null && conversationStore != null) {
-          conversationStore.appendMessage(
-              threadId,
-              shape.id().value(),
-              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
-        }
-        answerRecorded = true;
-
         // Iteration decision.
         IterationDecision decision;
         try {
@@ -825,6 +819,26 @@ public final class ConversationEngine {
           return;
         }
 
+        boolean accepted = !"core.extract".equals(shape.id().value())
+            || decision == IterationDecision.STOP_SUCCESS;
+        // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
+        // producer calibration from the done-payload), so the unified thread surfaces grounding FROM the
+        // record, not an FE-side content re-match. Evidence is kept off the LLM-context copy so it never
+        // pollutes the next prompt. PERSISTENT shapes record under sessionId; recordsToThread ephemeral
+        // shapes (RAG) record under threadId (the request's conversationId).
+        if (accepted && sessionId != null && conversationStore != null) {
+          conversationStore.appendMessage(
+              sessionId,
+              shape.id().value(),
+              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+        } else if (accepted && threadId != null && conversationStore != null) {
+          conversationStore.appendMessage(
+              threadId,
+              shape.id().value(),
+              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+        }
+        answerRecorded = accepted;
+
         switch (decision) {
           case STOP_SUCCESS -> {
             checkWork(work);
@@ -832,9 +846,10 @@ public final class ConversationEngine {
             return;
           }
           case STOP_ERROR -> {
-            emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
+            String reason = String.valueOf(ctx.attributes().getOrDefault("validation.reason", "Conversation terminated with error"));
+            emitError(sink, reason, "CONTROLLER_STOP");
             persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-                "Conversation terminated with error", "CONTROLLER_STOP");
+                reason, "CONTROLLER_STOP");
             return;
           }
           case CONTINUE -> ctx.incrementIteration();
@@ -844,7 +859,13 @@ public final class ConversationEngine {
       // Reached hard cap without STOP_*
       LOG.warn("Substrate-driven shape {} reached iteration hard cap {}", shape.id().value(), hardCap);
       checkWork(work);
-      emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+      if ("core.extract".equals(shape.id().value())) {
+        emitError(sink, "Extraction validation retry limit reached", "CONTROLLER_STOP");
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+            "Extraction validation retry limit reached", "CONTROLLER_STOP");
+      } else {
+        emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+      }
     } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
       // The reader's Stop landed after the text was produced but before the answer was recorded
       // (while its citations were checked, say): the text is saved, as stopped.

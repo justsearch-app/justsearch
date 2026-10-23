@@ -36,6 +36,7 @@ import {
   subscribeShortViewport,
 } from '../primitives/compositionLayout.js';
 import { friendlyStreamError } from '../utils/streamError.js';
+import { sv3StopAsk } from './search-v3/sv3-ask.js';
 import {
   chatRefusalOf,
   requestLoadAnyway,
@@ -718,6 +719,7 @@ export class UnifiedChatView extends JfElement {
   // lock-safe backend conversation list at render time, never from a client-side plaintext cache.
   private recentSession: { sessionId: string; timestamp: number } | null = null;
   private abortController: AbortController | null = null;
+  private stopExtraction: (() => void) | null = null;
   readonly reasoning = new ReasoningController(() => this.requestUpdate());
   private sessionId: string;
   private storeUnsubscribe: (() => void) | null = null;
@@ -2351,8 +2353,9 @@ export class UnifiedChatView extends JfElement {
    * while an agent run is in flight; submitting dispatches an `interject` directive through the ONE
    * control-intent seam, which the backend drains at the run's next step boundary and folds into the
    * next LLM call. (Peers: `halt` = the seam's session stop `dispatchRunControl({kind:'halt'})` →
-   * `cancelSession`; the composer's inline cancel does a lighter `abortController.abort()` stream
-   * teardown. `set-posture` = the autonomy dial → the global 561 P-D store, a peer channel.)
+   * `cancelSession`; ordinary composer cancellation does a lighter `abortController.abort()` stream
+   * teardown, while Structured turns use the Engine's turn Stop. `set-posture` = the autonomy dial
+   * → the global 561 P-D store, a peer channel.)
    */
   private renderSteerInput(): TemplateResult | typeof nothing {
     // Tempdoc 565 §33 — show ONLY for a steerable, in-flight agent run. Gate on the CONTROLLER's
@@ -3043,7 +3046,7 @@ export class UnifiedChatView extends JfElement {
         }}
         @composer-submit=${() => this.handleComposerSubmit()}
         @composer-submit-alt=${() => this.handleComposerSubmitAlt()}
-        @composer-cancel=${() => this.abortController?.abort()}
+        @composer-cancel=${() => this.cancelCurrentAnswer()}
         @keydown=${(e: KeyboardEvent) => this.handleComposerKeydown(e)}
       ></jf-composer>
     `;
@@ -6215,6 +6218,11 @@ export class UnifiedChatView extends JfElement {
     return [...ids];
   }
 
+  private cancelCurrentAnswer(): void {
+    if (this.stopExtraction) this.stopExtraction();
+    else this.abortController?.abort();
+  }
+
   private async send(): Promise<void> {
     const text = this.inputDraft.trim();
     if (!text || this.isStreaming) return;
@@ -6304,6 +6312,24 @@ export class UnifiedChatView extends JfElement {
     setLastViewedConversation(this.sessionId);
     this.inputDraft = '';
     this.abortController = new AbortController();
+    this.stopExtraction = null;
+    const abort = this.abortController;
+    const streamSessionId = this.sessionId;
+    if (shapeId === 'core.extract') {
+      // Reuse Search v3's turn Stop. Closing the response alone lets the Engine accept unseen JSON.
+      const turnId = crypto.randomUUID();
+      body.turnId = turnId;
+      let stopping = false;
+      this.stopExtraction = () => {
+        if (stopping) return;
+        stopping = true;
+        void sv3StopAsk(this.apiBase || '', streamSessionId, turnId).then(taken => {
+          if (taken || this.abortController !== abort) return;
+          stopping = false;
+          this.errorMessage = 'Could not stop extraction. Try Stop again.';
+        });
+      };
+    }
     this.isStreaming = true;
     this.startRenderTick();
     setAiActivity({
@@ -6311,7 +6337,7 @@ export class UnifiedChatView extends JfElement {
       shapeId,
       startedAtMs: Date.now(),
       canCancel: true,
-      cancel: () => this.abortController?.abort(),
+      cancel: () => this.cancelCurrentAnswer(),
     });
     this.streamingText = '';
     this.reasoning.reset();
@@ -6325,7 +6351,6 @@ export class UnifiedChatView extends JfElement {
     this.rewriteNote = null;
     this.claims = [];
 
-    const streamSessionId = this.sessionId;
     const url = (this.apiBase || '') + '/api/chat/dispatch';
 
     const handlers: Record<string, (payload: unknown) => void> = {
@@ -6399,16 +6424,14 @@ export class UnifiedChatView extends JfElement {
         // "Interpreted as: …" line persists past the live stream (mirrors citations/ragMeta).
         if (this.rewriteNote) msg.standaloneQuestion = this.rewriteNote.standalone;
         // Tempdoc 941 R19-F1 — the `done` payload carries the substrate's authoritative answer
-        // (`ConversationEngine.emitDone` -> `finalResponse`). Streamed `chunk` text is the same
-        // text arriving incrementally, so prefer it when we have it; but when no chunk text
-        // accumulated in this view (a handler throw is swallowed by `consumeShapeStream`, a
-        // reconnect drops the chunk frames, or the shape answers in one shot) the turn used to be
-        // dropped at the `streamingText.trim()` guard below: no message, no notice, no error, and
-        // the composer already cleared. Read the contract field instead of losing the answer —
-        // same house pattern as `AgentSessionController.onDone`.
-        const settledText = this.streamingText.trim()
-          ? this.streamingText
-          : (donePayload?.finalResponse ?? '');
+        // (`ConversationEngine.emitDone` -> `finalResponse`). Chunks can include rejected
+        // extraction attempts, so only the terminal answer belongs in the completed card and
+        // subsequent context. Ordinary shapes can send an empty terminal after streaming their
+        // answer. Preserve those chunks; an explicitly empty extraction must not accept attempts.
+        const finalResponse = donePayload?.finalResponse;
+        const settledText = shapeId === 'core.extract'
+          ? finalResponse ?? this.streamingText
+          : finalResponse || this.streamingText;
         msg.content = settledText;
         if (settledText.trim()) {
           rememberServerConversation(streamSessionId);
@@ -6441,6 +6464,8 @@ export class UnifiedChatView extends JfElement {
           (p?.error as string) ??
           (p?.message as string) ??
           'An error occurred';
+        // Rejected extraction attempts are transient, never a completed answer or future context.
+        if (shapeId === 'core.extract') this.streamingText = '';
         this.isStreaming = false;
         this.stopRenderTick();
         setAiActivity({ state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null });
@@ -6659,12 +6684,24 @@ export class UnifiedChatView extends JfElement {
         this.noteRefusedWhileLocked(text);
       } else if (refusal) {
         this.noteChatRefused(text, refusal);
-      } else if (!(err instanceof Error && err.name === 'AbortError')) {
+      } else if (err instanceof Error && (err.name === 'AbortError'
+        || (shapeId === 'core.extract' && (err as Error & { code?: string }).code === 'CANCELLED'))) {
+        if (shapeId === 'core.extract') this.errorMessage = 'Extraction stopped. No completed result was added to the conversation.';
+      } else {
         this.errorMessage = friendlyStreamError(err);
       }
     } finally {
+      // Error events, transport loss, EOF, timeouts and cancellation all settle here. Extraction
+      // chunks can be rejected attempts or partial JSON; only onDone may commit an accepted result.
+      if (shapeId === 'core.extract') {
+        this.streamingText = '';
+        this.reasoning.finalize();
+        this.stopRenderTick();
+        setAiActivity({ state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null });
+      }
       this.isStreaming = false;
       this.abortController = null;
+      this.stopExtraction = null;
     }
   }
 

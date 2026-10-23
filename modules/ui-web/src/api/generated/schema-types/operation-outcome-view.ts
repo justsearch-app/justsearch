@@ -14,6 +14,7 @@ export interface OperationOutcomeView {
   acceptedAt?: number;
   completedAt?: number;
   historySince: number;
+  message?: string;
   phase?: string;
   reason?: string;
   result?: {
@@ -40,6 +41,7 @@ export const operationOutcomeViewSchema = z.strictObject({
   "acceptedAt": z.number().int().optional(),
   "completedAt": z.number().int().optional(),
   "historySince": z.number().int(),
+  "message": z.string().optional(),
   "phase": z.string().optional(),
   "reason": z.string().optional(),
   "result": z.strictObject({

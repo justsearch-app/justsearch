@@ -1,0 +1,153 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T10:11:28.439Z",
+  "revision": "ae50fbc4e94d5c9f6909b893985af38f1cd10811",
+  "tree": "408ee9ec22f865ff878dffab0d66d725c3f8bd02",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.ExclusionLimitTest\" --tests \"io.justsearch.app.services.settings.LegacyExclusionUpgradeTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4212
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerExcludesApplyTest\" --tests \"io.justsearch.ui.api.ExclusionSaveHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18070
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/ExclusionLimitTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/ExclusionLimitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f2ed39a0aa6746a14947f69319f06a741f6c4e302b57b0c6ebc56af71f268c7d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EX4PreviewAndApplyCountFilesAndRemoveExactMembership()",
+          "status": "passed"
+        },
+        {
+          "name": "EN1ResolvedOperatorOverridesPreserveBareNameMatching()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4InputOverflowRefusesWithoutReplacingPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4SeparatorsAndNativeCaseRuleArePreserved()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4QualifiedDirectoryPatternsIncludeDescendants()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4DoubleStarAloneMatchesAllFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4MalformedGlobIsRefusedBeforeSaving()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4WindowsCaseRuleIncludesUnicodeNames()",
+          "status": "passed"
+        },
+        {
+          "name": "EN1PatternLimitsKeepCompleteSupportedLists()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4ExpandedOverflowRefusesWithoutReplacingPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "EX4AcceptedMetacharactersMatchExactCorpusMembership()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:07cc18254428c1b0b85bae91beede89028eb8478dc8590788e5128319b8ab9ba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AX1EditorProjectionNamesEveryInvalidEntryWithoutReplacingSavedList()",
+          "status": "passed"
+        },
+        {
+          "name": "EN1AX1ListWrittenByBeforeVersionKeepsLiteralAndValidMatchesAfterRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "AX1PreviewApplyKeepTheSavedListAndLiteralMembership()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerExcludesApplyTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerExcludesApplyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d62b25e374b9b266742007cfc4f8f1f31484b426f0cc64f16e436f1728bdd7c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "dry-run perPattern counts attribute matches to the correct pattern index",
+          "status": "passed"
+        },
+        {
+          "name": "POST /api/indexing/excludes/apply?dryRun=true counts matches without deleting",
+          "status": "passed"
+        },
+        {
+          "name": "POST /api/indexing/excludes/apply deletes excluded dirs and files (delegated to IndexingService)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionSaveHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionSaveHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7daca96345a899b8c482d4e24fff06eba8614dbfa91d2c6dc9c32ae67273a831",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S326InputExpansionAndSyntaxRefusalsPreserveSavedPolicyThroughHttp()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:364ad547097ad06596f3f0328e221a5dd7288ba9dca75fdd28a52c54600d6bb7"
+}
