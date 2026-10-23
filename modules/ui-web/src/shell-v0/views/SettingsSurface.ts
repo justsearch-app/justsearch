@@ -190,6 +190,8 @@ function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
 }
 
 export class SettingsSurface extends JfElement {
+  // Last reported recovery hold: freshness or a missing receipt cannot clear it.
+  private settingsRecovery = false;
   private restoreRecoveryResetFocus = false;
   private recoveryFocusRequested = false;
 
@@ -920,6 +922,8 @@ export class SettingsSurface extends JfElement {
     // Tempdoc 883 D-A.7 — the shared always-on AI snapshot feeds the DERIVED context-window
     // readout. No second poll: this is the same store Brain and the status bar read.
     this.aiStateUnsub = subscribeAiState((s) => {
+      const indexing = s.status?.operating?.indexing;
+      if (indexing) this.settingsRecovery = indexing.reasons.includes('settings_recovery');
       this.aiSnapshot = s;
     });
     // 569 Move 1/3 — track the active presentation so the Interface region re-renders
@@ -2952,13 +2956,6 @@ export class SettingsSurface extends JfElement {
       ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
     </section>`;
-  }
-
-  /** UI visibility exception for the Engine's settings-recovery hold; the catalog stays unchanged. */
-  private get settingsRecovery(): boolean {
-    const s = this.aiSnapshot;
-    return selectIndexingProgress(s?.status, s?.indexingStatusLive ?? false,
-      s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []).pause?.reason === 'settings_recovery';
   }
 
   /** Tempdoc 855 §4 — Feedback capture moves from nested-inside-Security-pointer to its own

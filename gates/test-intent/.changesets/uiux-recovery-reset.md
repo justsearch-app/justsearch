@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-recovery-reset-builder-59pqifis
+author-session: uiux-recovery-reset-builder-4_t_bkji
 ---
 
 # Test-intent entries
@@ -21,7 +21,7 @@ mode, with a temporary `npx` launcher adding `--cache=false --maxWorkers=2 --con
 to avoid writes to the shared UI dependency tree. No acceptance record is authored here.
 
 Continuation after independent check of 53aecead5: seven durable R2 checks cover pending
-focus and its cancellation. Four repair checks assertion-fail on 53aecead5; three cancellation
+focus and its cancellation. Three retained repair checks assertion-fail on 53aecead5; three cancellation
 checks pass before and after. The real-interface reproduction delays the first /api/status
 response from a private Engine; on 53aecead5 Reset appears while focus stays on Close Settings.
 The repaired interface focuses Reset, and preserves user focus after movement or leaving Settings.
@@ -39,6 +39,19 @@ Real Engine delayed-status, fresh-page, history, timing and User/Operator visual
 scaffolding under `tmp/recovery-reset-url/`. Chromium alone uses its explicitly requested short
 `/tmp/jsv-XXXXXX` temporary profile; all private processes are owned and stopped. No acceptance
 record is authored by the builder.
+
+Continuation after independent check of b649e9aa6: the real User confirmation disappears after
+about ten seconds while every Engine response still reports recovery; Operator survives 31 seconds.
+Settings now retains the last reported hold until an explicit no-hold indexing status, independently
+of freshness and missing receipts. Three tier-specific durable R1/R4 checks include a stale sample,
+a null-status gap, a worker-stale receipt, and actual clearance with the existing focus hand-off.
+The prior R2 oracle that required Reset to hide on a stale recovery observation is superseded by the
+verbatim continuation requirement and replaced by a positive stale-hold focus check. It moves from
+the earlier focus evidence group into the polling repair evidence below; the other earlier oracles stay.
+A durable R2 journal check rejects copying an incoming recovery URL onto the departing surface's entry.
+All earlier evidence is refreshed in default dependency-link mode. Private browser scripts, status
+samples, screenshots and logs under `tmp/recovery-reset-poll/` are scaffolding. Existing acceptance
+or rejection records are preserved; no record is authored or amended by this builder.
 
 ```json
 {
@@ -140,7 +153,7 @@ record is authored by the builder.
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
       ],
       "class": "New",
-      "behaviour": "R2 retains the existing recovery route focus intent until Reset renders, including an unconfirmed recovery observation; user focus movement cancels an asynchronous focus walk. A repeated route registers its intent before another window render, so intervening focus movement cancels it.",
+      "behaviour": "R2 retains the existing recovery route focus intent until Reset renders; user focus movement cancels an asynchronous focus walk. A repeated route registers its intent before another window render, so intervening focus movement cancels it.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -166,7 +179,6 @@ record is authored by the builder.
       "evidence": "gates/test-intent/evidence/uiux-recovery-reset-focus-repair.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains recovery route focus until the first status reveals the hold",
-        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains recovery intent through an unconfirmed recovery observation until Reset appears",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 never steals focus moved during the existing asynchronous focus walk",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 cancels a repeated recovery route when the user moves focus before the window updates"
       ],
@@ -315,6 +327,194 @@ record is authored by the builder.
       "evidence": "gates/test-intent/evidence/uiux-recovery-reset-url-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 does not focus Reset for a false recovery URL flag"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+        "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "R1/R4 retains the existing confirmation and Yes focus through stale polling, missing status and worker-stale receipts, until an explicit no-hold status. The former stale-observation-hidden oracle is replaced by the explicitly revised freshness-independent exception: pending recovery focus is fulfilled from the reported hold. R2 departing journal snapshots must belong to that surface, so an incoming Settings URL cannot leave its consumed focus flag on a unified-chat entry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R1: While the Engine reports the settings_recovery hold, Settings shows \"Reset to defaults\" in every view tier, the default User tier included. It works the same as today: its existing confirmation, result and error handling, and clearing the hold.",
+          "quote": "While the Engine reports the settings_recovery hold, Settings shows \"Reset to defaults\" in every view tier, the default User tier included. It works the same as today: its existing confirmation, result and error handling, and clearing the hold.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R2: While the hold is shown, every place that routes the user to recovery goes straight to that control, in every tier. This covers the IndexingControls pause control and any other route WP3.7 added (Settings indexing section, Library, Search v3 pause notice; find them all). The \"set View tier to Operator\" wording and the View-tier detour are removed for this state. Focus lands on the control.",
+          "quote": "While the hold is shown, every place that routes the user to recovery goes straight to that control, in every tier. This covers the IndexingControls pause control and any other route WP3.7 added (Settings indexing section, Library, Search v3 pause notice; find them all). The \"set View tier to Operator\" wording and the View-tier detour are removed for this state. Focus lands on the control.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R3: Outside the hold, nothing changes: in User tier \"Reset to defaults\" stays hidden, and in Operator tier it shows as today. When the hold ends (after the reset, or the Engine clears it), the control returns to its normal audience without a reload. If it disappears while focused, focus goes to a sensible place.",
+          "quote": "Outside the hold, nothing changes: in User tier \"Reset to defaults\" stays hidden, and in Operator tier it shows as today. When the hold ends (after the reset, or the Engine clears it), the control returns to its normal audience without a reload. If it disappears while focused, focus goes to a sensible place.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R4: Keyboard, screen reader name, both themes, forced colors and narrow width hold for the newly visible control and routes.",
+          "quote": "Keyboard, screen reader name, both themes, forced colors and narrow width hold for the newly visible control and routes.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R1/R4 recovery reset and R3 focus hand-off, including the stale-poll confirmation failure reported after independent checking of b649e9aa6.",
+          "choice": "The recovery exception ends only when a status actually reports no settings_recovery hold. Neither the freshness boundary of the last known status nor a polling gap ends it.",
+          "quote": "The recovery exception ends only when a status actually reports no settings_recovery hold. Neither the freshness boundary of the last known status nor a polling gap ends it.",
+          "location": "task t-20261019-bd718f polling continuation after independent check of b649e9aa6 (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R1/R4 recovery reset and R3 focus hand-off, including the stale-poll confirmation failure reported after independent checking of b649e9aa6.",
+          "choice": "An open confirmation and its focus survive ordinary polling for as long as the hold lasts, in every tier.",
+          "quote": "An open confirmation and its focus survive ordinary polling for as long as the hold lasts, in every tier.",
+          "location": "task t-20261019-bd718f polling continuation after independent check of b649e9aa6 (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R1/R4 recovery reset and R3 focus hand-off, including the stale-poll confirmation failure reported after independent checking of b649e9aa6.",
+          "choice": "When the hold really ends, keep your existing focus hand-off.",
+          "quote": "When the hold really ends, keep your existing focus hand-off.",
+          "location": "task t-20261019-bd718f polling continuation after independent check of b649e9aa6 (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "Continuation explicitly delegates whether the focus flag stays in the URL after it has been acted on.",
+          "choice": "Consume the focus flag in browser history and the navigation journal when handing it to Settings; Back, Forward and reload restore the Settings destination without re-firing the one-shot focus request.",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-poll-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 fulfills pending recovery focus from a stale reported recovery hold",
+        "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts#R2 keeps an incoming recovery URL out of the departing surface journal entry"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserves Operator and Developer confirmations and their Yes focus through polling freshness expiry, a missing status receipt, worker-stale samples and explicit hold clearance; their normal audience remains available.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R1: While the Engine reports the settings_recovery hold, Settings shows \"Reset to defaults\" in every view tier, the default User tier included. It works the same as today: its existing confirmation, result and error handling, and clearing the hold.",
+          "quote": "While the Engine reports the settings_recovery hold, Settings shows \"Reset to defaults\" in every view tier, the default User tier included. It works the same as today: its existing confirmation, result and error handling, and clearing the hold.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R2: While the hold is shown, every place that routes the user to recovery goes straight to that control, in every tier. This covers the IndexingControls pause control and any other route WP3.7 added (Settings indexing section, Library, Search v3 pause notice; find them all). The \"set View tier to Operator\" wording and the View-tier detour are removed for this state. Focus lands on the control.",
+          "quote": "While the hold is shown, every place that routes the user to recovery goes straight to that control, in every tier. This covers the IndexingControls pause control and any other route WP3.7 added (Settings indexing section, Library, Search v3 pause notice; find them all). The \"set View tier to Operator\" wording and the View-tier detour are removed for this state. Focus lands on the control.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R3: Outside the hold, nothing changes: in User tier \"Reset to defaults\" stays hidden, and in Operator tier it shows as today. When the hold ends (after the reset, or the Engine clears it), the control returns to its normal audience without a reload. If it disappears while focused, focus goes to a sensible place.",
+          "quote": "Outside the hold, nothing changes: in User tier \"Reset to defaults\" stays hidden, and in Operator tier it shows as today. When the hold ends (after the reset, or the Engine clears it), the control returns to its normal audience without a reload. If it disappears while focused, focus goes to a sensible place.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "WP3.7b settings-recovery reset visibility and direct recovery routes, under CR37c; UI-only exception to the existing pause reason.",
+          "choice": "CR37c R4: Keyboard, screen reader name, both themes, forced colors and narrow width hold for the newly visible control and routes.",
+          "quote": "Keyboard, screen reader name, both themes, forced colors and narrow width hold for the newly visible control and routes.",
+          "location": "task t-20261019-bd718f agreement CR37c (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R1/R4 recovery reset and R3 focus hand-off, including the stale-poll confirmation failure reported after independent checking of b649e9aa6.",
+          "choice": "The recovery exception ends only when a status actually reports no settings_recovery hold. Neither the freshness boundary of the last known status nor a polling gap ends it.",
+          "quote": "The recovery exception ends only when a status actually reports no settings_recovery hold. Neither the freshness boundary of the last known status nor a polling gap ends it.",
+          "location": "task t-20261019-bd718f polling continuation after independent check of b649e9aa6 (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R1/R4 recovery reset and R3 focus hand-off, including the stale-poll confirmation failure reported after independent checking of b649e9aa6.",
+          "choice": "An open confirmation and its focus survive ordinary polling for as long as the hold lasts, in every tier.",
+          "quote": "An open confirmation and its focus survive ordinary polling for as long as the hold lasts, in every tier.",
+          "location": "task t-20261019-bd718f polling continuation after independent check of b649e9aa6 (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R1/R4 recovery reset and R3 focus hand-off, including the stale-poll confirmation failure reported after independent checking of b649e9aa6.",
+          "choice": "When the hold really ends, keep your existing focus hand-off.",
+          "quote": "When the hold really ends, keep your existing focus hand-off.",
+          "location": "task t-20261019-bd718f polling continuation after independent check of b649e9aa6 (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "Continuation explicitly delegates whether the focus flag stays in the URL after it has been acted on.",
+          "choice": "Consume the focus flag in browser history and the navigation journal when handing it to Settings; Back, Forward and reload restore the Settings destination without re-firing the one-shot focus request.",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-poll-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (OPERATOR)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)"
       ],
       "repaired": false
     }

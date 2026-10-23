@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T23:00:27.454Z",
+  "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
+  "tree": "5aca2e3660341ae45c417a2cdb9c4d16bb353eef",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/state/NavigationJournal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2822265-1792796421679.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2311
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 fulfills pending recovery focus from a stale reported recovery hold",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 fulfills pending recovery focus from a stale reported recovery hold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts#R2 keeps an incoming recovery URL out of the departing surface journal entry",
+      "file": "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:09b8577ed98a383eeba2d0d8834bc572575973f02f199a5e6096bbebaa2d6df9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NavigationJournal recording R2 keeps an incoming recovery URL out of the departing surface journal entry",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b649e9aa6",
+    "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/state/NavigationJournal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2822265-1792796425155.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2094,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2822265-1792796425155.json\n\nEvidence resource flags: --cache=false --maxWorkers=2 --configLoader runner\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER):  AssertionError: freshness expiry must keep the existing confirmation: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-before-0cYm4X/modules/ui-web/src/shell-v0/views/SettingsSurfa"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 fulfills pending recovery focus from a stale reported recovery hold",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 fulfills pending recovery focus from a stale reported recovery hold:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-before-0cYm4X/modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts:164:39\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts#R2 keeps an incoming recovery URL out of the departing surface journal entry",
+        "classification": "assertion",
+        "detail": "NavigationJournal recording R2 keeps an incoming recovery URL out of the departing surface journal entry:  AssertionError: expected 'justsearch://surface/core.settings-su…' to be 'justsearch://surface/core.unified-cha…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-before-0cYm4X/modules/ui-web/src/shell-v0/st"
+      }
+    ]
+  },
+  "digest": "sha256:0b3138d1904ae8a1dc3944c1b73634dbbaffe31c52c3c29ffc3dd0b9e49e2733"
+}

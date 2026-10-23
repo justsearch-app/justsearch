@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T21:44:19.120Z",
-  "revision": "25ea79f4a990de983916d477b4dd698d84954648",
-  "tree": "81eb9aa672a32262e20ee586f99b5e98a0141c51",
+  "createdAt": "2026-10-23T23:00:19.709Z",
+  "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
+  "tree": "d826ab7ecc77292783ae904b7d123881853cb4e7",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-url/evidence-tmp/test-intent-vitest-1699305-1792791849359.json\"",
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2821679-1792796414250.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9757
+      "durationMs": 5458
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:cf6180c5eac4cada06c97e7a183d5182b91da98358ed2fe996ebda819131f419"
+  "digest": "sha256:89ba3708b65c4c30e09e9b394d147a227348275a0e48bd06d7f87e7f8ab45580"
 }

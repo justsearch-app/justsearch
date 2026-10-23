@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:23:05.993Z",
-  "revision": "53aecead5417c2a91c29fabc582e774d2938d240",
-  "tree": "913fcfa951a2f625cb244e769b413d089e277417",
+  "createdAt": "2026-10-23T22:59:58.132Z",
+  "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
+  "tree": "522d6d2b13b661ddda3d22446020aae0e44cdb53",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-focus/test-intent-vitest-870040-1792786983448.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2820193-1792796395830.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2543
+      "durationMs": 2301
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus when the user moves focus, even if they return",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ee74a019c76858092058e66c7e465867cd12a55ba001084625e3d42a88f49807",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus when Settings closes and is reopened normally",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ee74a019c76858092058e66c7e465867cd12a55ba001084625e3d42a88f49807",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus when the first status reports no recovery hold",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ee74a019c76858092058e66c7e465867cd12a55ba001084625e3d42a88f49807",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -72,5 +72,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:58cdada9261650b7af0f92193a1cd16429ab9a18de3ba95ed8e3d5a8295b5b98"
+  "digest": "sha256:cab283a630ea1ceedf3fdc228931f0a4481a7b6dbd97a78402688f636226f8c0"
 }

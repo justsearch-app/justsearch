@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T23:00:31.684Z",
+  "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
+  "tree": "33249b424da9673fe4fe3650baca98b6f2290ce3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2823313-1792796429396.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2287
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (OPERATOR)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (OPERATOR)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:945ca2a1a7458d22f94618fab7f41f7d6f749e90a31bb47a470da7e9a86e7f9f"
+}

@@ -153,7 +153,7 @@ describe('CR37c settings recovery', () => {
     expect(deepActiveElement()).toBe(other);
   });
 
-  it('R2 retains recovery intent through an unconfirmed recovery observation until Reset appears', async () => {
+  it('R2 fulfills pending recovery focus from a stale reported recovery hold', async () => {
     const surface = await mount();
     const other = document.createElement('button');
     document.body.append(other); other.focus();
@@ -161,9 +161,9 @@ describe('CR37c settings recovery', () => {
     const status = observe('settings_recovery');
     __feedForTest({ status: { ...status, meta: { ...status.meta, workerRpcStale: true } } as StatusSnapshot });
     await settle(surface);
-    expect(invokeButton(surface)).toBeNull();
-    observe('settings_recovery'); await settle(surface);
     expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(invokeButton(surface));
+    observe('settings_recovery'); await settle(surface);
     expect(deepActiveElement()).toBe(invokeButton(surface));
   });
 
@@ -189,6 +189,42 @@ describe('CR37c settings recovery', () => {
     await window.updateComplete; await settle(surface);
     expect(deepActiveElement()).toBe(search);
   });
+
+  for (const tier of ['USER', 'OPERATOR', 'DEVELOPER'] as const) {
+    it(`R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (${tier})`, async () => {
+      setViewerAudience(tier);
+      const status = observe('settings_recovery');
+      const surface = await mount();
+      invokeButton(surface)!.click(); await settle(surface);
+      const yes = [...action(surface)!.shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Yes')!;
+      yes.focus();
+      const now = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 31_000);
+      try {
+        __feedContactForTest(); await settle(surface);
+        expect(surface.aiSnapshot?.indexingStatusLive).toBe(false);
+        expect(surface.aiSnapshot?.status?.operating?.indexing?.reasons).toContain('settings_recovery');
+        expect(yes.isConnected, 'freshness expiry must keep the existing confirmation').toBe(true);
+        expect(deepActiveElement()).toBe(yes);
+        __feedForTest({ status: null }); await settle(surface);
+        expect(yes.isConnected, 'no status receipt is not a hold-clear receipt').toBe(true);
+        expect(deepActiveElement()).toBe(yes);
+        __feedForTest({ status: { ...status, meta: { ...status.meta, workerRpcStale: true } } as StatusSnapshot });
+        await settle(surface);
+        expect(yes.isConnected).toBe(true);
+        expect(deepActiveElement()).toBe(yes);
+        expect(action(surface)!.shadowRoot!.textContent).toContain('Cancel');
+        observe(null); await settle(surface);
+        if (tier === 'USER') {
+          expect(invokeButton(surface)).toBeNull();
+          expect(deepActiveElement()).toBe(surface.shadowRoot!.querySelector('h2'));
+        } else {
+          expect(yes.isConnected).toBe(true);
+          expect(deepActiveElement()).toBe(yes);
+        }
+      } finally { clock.mockRestore(); }
+    });
+  }
 
   it('R1 exposes the existing reset in every tier only for the observed recovery hold', async () => {
     const surface = await mount();

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:22:51.597Z",
-  "revision": "53aecead5417c2a91c29fabc582e774d2938d240",
-  "tree": "ade1c34665bf01d99af48c57523d11fb8e99f32a",
+  "createdAt": "2026-10-23T22:59:45.822Z",
+  "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
+  "tree": "601ceffaa27db537fcb9d4fa5860fe0e752a82b0",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-focus/test-intent-vitest-864848-1792786969472.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2818920-1792796383586.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2123
+      "durationMs": 2234
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (null)",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ee74a019c76858092058e66c7e465867cd12a55ba001084625e3d42a88f49807",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (user_paused)",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ee74a019c76858092058e66c7e465867cd12a55ba001084625e3d42a88f49807",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (game_mode)",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ee74a019c76858092058e66c7e465867cd12a55ba001084625e3d42a88f49807",
+      "contentDigest": "sha256:7fb17a93825c2ac30e9e08d87946a0b441dacebb8a995430f84b0a40c0c62cb2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -72,5 +72,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:7fc11824aea4497d07727c1ce7407c0cb256770dbc90bd0618bbce0a5d7237b1"
+  "digest": "sha256:7ec247e3d876c0a15a558cbd5e8db0b21d6aa9d92ddd2bfbc256bdc33a3eb89b"
 }
