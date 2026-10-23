@@ -76,6 +76,7 @@ final class StoppedExtractionHistoryTest {
 
   @Test void completedExtractionStillDisplaysAndReachesContext() {
     var store = new FileConversationStore(dir);
+    store.createSession("completed", "core.extract");
     store.appendMessage("completed", "core.extract", Map.of("role", "user", "content", "extract"));
     store.appendMessage("completed", "core.extract", Map.of("role", "assistant", "content", "{\"city\":\"Paris\"}"));
     assertEquals("{\"city\":\"Paris\"}", store.loadHistory("completed").get(1).get("content"));
@@ -85,6 +86,7 @@ final class StoppedExtractionHistoryTest {
   private void seed(String shape) { seed(new FileConversationStore(dir), shape); }
 
   private void seed(FileConversationStore store, String shape) {
+    store.createSession("stopped", shape);
     store.appendMessage("stopped", shape, Map.of("role", "user", "content", "extract the city"));
     store.appendMessage("stopped", shape, Map.of("role", "assistant", "content", PARTIAL,
         "disposition", "CANCELLED", "id", "stopped-answer", "hash", "saved-hash"));

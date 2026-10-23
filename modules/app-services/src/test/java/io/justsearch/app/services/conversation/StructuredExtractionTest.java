@@ -71,6 +71,7 @@ final class StructuredExtractionTest {
 
   @Test void crashedExtractIsNotACompletedAnswer() {
     var store = new FileConversationStore(dir);
+    store.createSession("crashed", "core.extract");
     store.appendMessage("crashed", "core.extract", Map.of("role", "user", "content", "extract"));
     store.appendMessage("crashed", "core.extract", Map.of("role", "assistant", "content", "{\"city\":42}"));
     store.setTurnOpen("crashed", true);

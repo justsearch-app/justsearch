@@ -33,10 +33,15 @@ const partial = '{"city":';
 let requests: Array<Record<string, unknown>>;
 let view: TestView | undefined;
 let interrupt: (failure: 'connection' | 'eof' | 'timeout') => void;
+let endCancelled: () => void;
 
 beforeEach(() => {
   sessionStorage.clear(); localStorage.clear(); vi.clearAllMocks(); requests = [];
   vi.stubGlobal('fetch', vi.fn(async (url: unknown, options?: RequestInit) => {
+    if (String(url).endsWith('/stop')) {
+      endCancelled();
+      return new Response('{}', { status: 200 });
+    }
     if (!String(url).endsWith('/api/chat/dispatch')) throw new TypeError('Test backend unavailable');
     requests.push(JSON.parse(String(options?.body)) as Record<string, unknown>);
     let removeAbort = () => {};
@@ -47,6 +52,11 @@ beforeEach(() => {
         const abort = () => controller.error(new DOMException('Request cancelled', 'AbortError'));
         options?.signal?.addEventListener('abort', abort, { once: true });
         removeAbort = () => options?.signal?.removeEventListener('abort', abort);
+        endCancelled = () => {
+          removeAbort();
+          controller.enqueue(new TextEncoder().encode('event: error\ndata: {"errorCode":"CANCELLED","error":"Turn stopped."}\n\n'));
+          controller.close();
+        };
         interrupt = failure => {
           removeAbort();
           if (failure === 'eof') controller.close();

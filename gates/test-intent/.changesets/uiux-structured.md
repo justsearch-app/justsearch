@@ -833,6 +833,187 @@ All checks are durable. UI expectations add Structured behavior; the Engine entr
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/StoppedExtractionHistoryTest.java"
       ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/StoppedExtractionHistoryTest.java"
+      ],
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The merged store requires an existing conversation. Replace implicit append-time creation with explicit createSession for stopped and completed fixtures, exactly as main tests do. Each assertion, input text, disposition, id/hash, reopen/branch/floor and later-model observation is unchanged. Original repair evidence is regenerated against 83d72ffb5 in uiux-structured-stopped-history-repair.json; all three original repair assertions must still fail there, with preservation controls passing.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix the fixtures the way main's own tests now create conversations; keep each assertion unchanged, and show each still fails on f8002f421-era code for its original reason where it did before (run-evidence --before 83d72ffb5 for those repair checks).",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT7",
+          "quote": "S14.7 [XT7] (S3.6, ch. 8) Stop during a Structured run stops it; the turn shows as stopped live and after reload (the WP1.2 rule). If the Engine dies after a rejected attempt or during an attempt, after restart the turn shows as not completed, never as a completed extraction, and nothing re-runs without the user's action. Partial JSON is never shown as complete.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT10",
+          "quote": "S14.10 [XT10] (S3.9) A Structured follow-up sends the conversation's context the way Ask does: excluded messages and the context floor are honoured (S2.0), so \"extract the dates from the answer above\" works.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/StructuredExtractionTest.java"
+      ],
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Explicitly create crashed before the two appends, restoring the same crash-open fixture under main's append precondition. All seven test cases and every assertion are retained. The original uiux-structured-java.json evidence is regenerated against its original 738e6a443 baseline, retaining the original crash/validation assertion failures.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix the fixtures the way main's own tests now create conversations; keep each assertion unchanged, and show each still fails on f8002f421-era code for its original reason where it did before (run-evidence --before 83d72ffb5 for those repair checks).",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT7",
+          "quote": "S14.7 [XT7] (S3.6, ch. 8) Stop during a Structured run stops it; the turn shows as stopped live and after reload (the WP1.2 rule). If the Engine dies after a rejected attempt or during an attempt, after restart the turn shows as not completed, never as a completed extraction, and nothing re-runs without the user's action. Partial JSON is never shown as complete.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.interruptedOutput.test.ts"
+      ],
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Extend only the fake backend to answer the existing turn Stop route and emit the Engine CANCELLED terminal. The same composer-cancel action still injects reader Stop; all connection/EOF/timeout injections, inputs and assertions are unchanged. Regenerate uiux-structured-interruption-focus-repair.json against f8002f421, preserving its original assertion failures.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Make the old window's Stop end the Engine-side run the way Search v3's Stop does (reuse that path; do not add a second cancel mechanism), so the turn is saved CANCELLED and your round-5 reader repair applies.",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT7",
+          "quote": "S14.7 [XT7] (S3.6, ch. 8) Stop during a Structured run stops it; the turn shows as stopped live and after reload (the WP1.2 rule). If the Engine dies after a rejected attempt or during an attempt, after restart the turn shows as not completed, never as a completed extraction, and nothing re-runs without the user's action. Partial JSON is never shown as complete.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.stopTurn.test.ts"
+      ],
+      "repaired": true,
+      "behaviour": "Durable XT7/XN1 checks: old Structured composer Stop and activity Stop name the dispatched Engine turn through the existing Search v3 Stop route, keep the stream for its CANCELLED terminal and preserve the stopped note without an answer; repeated presses coalesce, refused Stop leaves the answer running and permits retry. Ordinary free-chat, grounded Ask and summaries retain their existing local abort and dispatch body. Leaving a Structured window aborts locally without stopping the Engine. Three repair assertions fail before 00e614b2c; four preservation cases pass before and after.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT7",
+          "quote": "S14.7 [XT7] (S3.6, ch. 8) Stop during a Structured run stops it; the turn shows as stopped live and after reload (the WP1.2 rule). If the Engine dies after a rejected attempt or during an attempt, after restart the turn shows as not completed, never as a completed extraction, and nothing re-runs without the user's action. Partial JSON is never shown as complete.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT10",
+          "quote": "S14.10 [XT10] (S3.9) A Structured follow-up sends the conversation's context the way Ask does: excluded messages and the context floor are honoured (S2.0), so \"extract the dates from the answer above\" works.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XN4",
+          "quote": "XN4 Recorded extract turns still parse for /history, /api/thread, MCP and API readers; extract turns saved before the change load as before (a turn whose `turnOpen` was left set by an earlier crash now shows as not completed, per S14.7).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Make the old window's Stop end the Engine-side run the way Search v3's Stop does (reuse that path; do not add a second cancel mechanism), so the turn is saved CANCELLED and your round-5 reader repair applies.",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Do not change how ordinary (non-Structured) stopped answers in the old window are saved or used as context, beyond what reusing the same cancel path already does for them today in Search v3; if reusing it would change ordinary chat in the old window, stop and come back with what it would change.",
+          "location": "task t-20261019-bd718f request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3: after reload Retry/Edit prepare the instruction using the current schema and stated inputs and wait for send.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3b: schema is per-window memory only; reload discards it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D7: no-file extraction reads typed text and this conversation.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D10: validate parse and schema conformance in the shared Engine with its existing networknt dependency.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D11: refuse omitted Extract inputs rather than silently skipping or cutting.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-structured-old-stop-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.stopTurn.test.ts"
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "gates/test-intent/compatibility/uiux-structured-create-session-before.patch"
+      ],
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Historical before-only signature bridge for the three newly explicit fixture createSession calls. Both historical stores create sessions inside their unchanged appendMessage implementation. The bridge validates StoreIds and defers creation to that same append; no current cancellation, output validation, display or context repair is transplanted. run-evidence records the patch digest for the 83d72ffb5 stopped-history and original 738e6a443 extraction comparisons. Candidate production and all test assertions are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix the fixtures the way main's own tests now create conversations; keep each assertion unchanged, and show each still fails on f8002f421-era code for its original reason where it did before (run-evidence --before 83d72ffb5 for those repair checks).",
+          "location": "task t-20261019-bd718f request"
+        }
+      ]
     }
   ]
 }
@@ -847,6 +1028,10 @@ Third repair entries appended by builder session 84aj3121 on 2026-10-22. The exi
 Fourth-verifier repair entries appended by builder session z9p1afsx on 2026-10-22. Evidence uses f8002f421 and default dependency linking. Existing entries and acceptance records are retained; independent acceptance is pending.
 
 Fifth-verifier repair entries appended by builder session 4mgytu7d on 2026-10-22. Evidence uses 83d72ffb5 with default dependency linking. Earlier entries and acceptance records are retained; independent acceptance is pending.
+
+Sixth-verifier repair entries appended by builder session 673oohjv on 2026-10-23. Fixture assertions and earlier entries/acceptance records are unchanged. Evidence is regenerated only by run-evidence in default link mode. Independent acceptance is pending.
+
+Historical evidence scaffolding appended by builder session 673oohjv: the historical stores predate createSession, so the evidence uses a before-only signature bridge while retaining their original implicit append-time creation. The initial compile failure is retained in the task evidence and is not counted as fail-before.
 
 ## Acceptance records
 
