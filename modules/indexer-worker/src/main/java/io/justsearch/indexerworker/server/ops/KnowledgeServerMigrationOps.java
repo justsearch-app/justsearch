@@ -977,17 +977,17 @@ public final class KnowledgeServerMigrationOps {
 
   private static void scopeLegacyPrefixes(SwitchBufferCapableQueue queue, RunningRuntime runtime,
       WorkerIngestService publisher) {
-    if (publisher != null) {
-      queue.scopeLegacyPrefixReceipts(publisher::prefixScope);
-      return;
-    }
     var declarations = new AtomicReference<Set<Path>>();
     queue.scopeLegacyPrefixReceipts(prefix -> {
+      if (publisher != null) return publisher.prefixScope(prefix);
       if (declarations.get() == null) {
         var configuration = runtime == null ? null : runtime.resolvedConfig();
+        if (configuration == null) {
+          throw new IllegalStateException("Legacy prefix conversion requires watched-root declarations");
+        }
         try {
           declarations.set(io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(
-              configuration == null ? null : configuration.paths().dataDir()));
+              configuration.paths().dataDir()));
         } catch (IOException unreadable) {
           throw new java.io.UncheckedIOException(unreadable);
         }
@@ -2402,13 +2402,18 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public static int enqueueAllFilesUnderRoots(EnqueueContext context) throws IOException {
+    return enqueueAllFilesUnderRoots(context, null);
+  }
+
+  /** Scan roots may omit nested declarations; freeze legacy receipts using replay's authority. */
+  public static int enqueueAllFilesUnderRoots(EnqueueContext context, WorkerIngestService publisher)
+      throws IOException {
     requireEnumerationRunning(context);
     if (context.jobQueue() == null || context.roots() == null) {
       throw new IOException("Missing migration queue or roots");
     }
     if (context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
-      queue.scopeLegacyPrefixReceipts(prefix -> scopeFromDeclarations(prefix,
-          context.roots().stream().map(ResolvedConfig.FileSource::path).toList()));
+      scopeLegacyPrefixes(queue, null, publisher);
     }
     int total = 0;
     int batchSize = 2_000;

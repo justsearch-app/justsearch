@@ -79,9 +79,36 @@ The acceptor (not the author) appends the acceptance record under the heading at
           "location": "task t-20261023-nested-removal request"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/MigrationEnumerationCompletenessTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The resumed prefix-delete enumeration fixture supplies its live Worker declaration authority to the enumeration overload. Its source root, raw legacy receipt, initial enumeration, queue deletion, resumed count and no-resurrection assertions are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "every conversion of a legacy prefix receipt into a scoped one, including the one in migration enumeration, must freeze the exclusions for live nested roots under the prefix, the same way replay does; there must be a single conversion rule, not two.",
+          "location": "task t-20261023-nested-removal user turn 5"
+        }
+      ]
     }
   ]
 }
 ```
+
+## K7 enumeration follow-up checks
+
+`LegacyPrefixEnumerationTest` is an isolated new check source. It exercises the server's
+migration enumeration with worker-only, held and Head-persisted nested declarations missing
+from its scan plan. The receipt must freeze C's exclusion before enumeration, retain that
+scope when the queue is reopened without declarations, preserve C's documents and jobs on
+replay, and remove P's documents. Enumeration without declaration authority must leave a raw
+receipt unconverted. These expectations follow from K7 and the owner's follow-up quoted above;
+the old scan-root conversion froze an empty scope and lost C.
 
 ## Acceptance records
