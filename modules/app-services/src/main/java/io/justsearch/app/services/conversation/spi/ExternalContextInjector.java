@@ -91,6 +91,12 @@ public final class ExternalContextInjector implements ContextInjector {
       offeredTokens += TokenEstimation.estimateTokens((String) msg.get("content"));
     }
 
+    if ("core.extract".equals(ctx.shapeId()) && offeredTokens > cap) {
+      return InjectorResult.terminalError(new io.justsearch.agent.api.conversation.SseEvent("error", Map.of(
+          "error", "Conversation context exceeds the extraction budget; reduce the context before extracting.",
+          "errorCode", "INPUT_TOO_LARGE")));
+    }
+
     // Keep most recent messages that fit within the token budget.
     // Walk backwards from newest, accumulating until budget is exhausted. The walk STOPS at the
     // first message that does not fit rather than skipping it: what survives must be a contiguous

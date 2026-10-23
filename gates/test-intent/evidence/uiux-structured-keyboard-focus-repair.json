@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T21:38:29.289Z",
+  "revision": "83d72ffb536c40fd4136faf2bed028a53236a7f3",
+  "tree": "07e22cc6f17363262fbd0a095618a298eb87aecc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fifth-repair/test-intent-vitest-256527-1792705095578.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4742
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:47eeb28eed58e0e5aaeb8567ec14df4cd5d7a7b8c0b03673b7ccb2e042d136a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XD2 keeps a retained toast mounted during focusout to its retargeted host",
+          "status": "passed"
+        },
+        {
+          "name": "XD2 keeps a retained toast mounted during focusout to its nested native control",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "83d72ffb5",
+    "revision": "83d72ffb536c40fd4136faf2bed028a53236a7f3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fifth-repair/test-intent-vitest-256527-1792705105458.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3406,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-structured/tmp/wp1.3a-fifth-repair/test-intent-vitest-256527-1792705105458.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts",
+        "classification": "assertion",
+        "detail": "XD2 keeps a retained toast mounted during focusout to its retargeted host:  AssertionError: moving between controls must not detach the retained toast: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/4mgytu7d/tmp/test-intent-before-dhGjCs/modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts:40:93\n    at process | XD2 keeps a retained toast mounted during focusout to its nested native control:  AssertionError: moving between controls"
+      }
+    ]
+  },
+  "digest": "sha256:37249e1f3bca9bcd74a4a0a77a3d2ae5e4f9b614796c392003bc248a5cab0375"
+}
