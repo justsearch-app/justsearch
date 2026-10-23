@@ -2314,3 +2314,14 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   "note": "Reject source provenance: four NX3a warrants in entries 11 and 14 are owner-adopted-scenario, but the supplied agreement labels NX3a agent-adopted under delegation. Use delegated-choice with the delegation and scope. The three fresh repair checks pass after and assertion-fail before; implementation separately fails grouping and compatibility-code cases."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp45-nx3b-6tqc3sbs",
+  "verdict": "accept",
+  "digest": "sha256:6765109e7e83acdfc0b696e271c6bb3b2922e24c0d9090f97bd012058e935aff",
+  "note": "Expectations accepted under NX3/NX3a/NX3b; corrected NX3a/NX3b warrants faithfully cite delegated choices. Fresh scratch evidence executes all three repair checks: assertion failures on 5e74587b1, pass without skips on 79c03f13c. Independent private-model checks preserve the NX3/NX3a tables. This is test-intent acceptance only; implementation fails NG1/NG3 on V7-F1 (200 accepted against 1 200 000.5.1)."
+}
+```
