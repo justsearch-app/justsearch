@@ -1126,7 +1126,7 @@ public final class WorkerIngestService {
   }
 
   /** Linux return detection is independent of the Head's one-root-per-minute scan queue. */
-  public java.util.Set<Path> watcherRecoveryRoots() {
+  public Set<Path> watcherRecoveryRoots() {
     return rootWatcherRegistry.recoveryRoots();
   }
 
@@ -3687,7 +3687,7 @@ public final class WorkerIngestService {
         Path held = rootOnAnotherVolume(rootPath);
         Path parsed = parsedRoot(rootPath);
         if (held == null && io.justsearch.configuration.PlatformPaths.isLinux()
-            && parsed != null && !java.nio.file.Files.isDirectory(parsed)) held = parsed;
+            && parsed != null && !Files.isDirectory(parsed)) held = parsed;
         RootWatcherRegistry.WatchResult result =
             held != null
                 ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
