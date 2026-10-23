@@ -39,3 +39,13 @@ Main's "Unit tests (app-ui-services)" job fails since #910 (c949c4dab): `:module
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-heap-1",
+  "verdict": "accept",
+  "digest": "sha256:cf08db18dcc2b48a76d575370fd7a047cff32662bb45e33b422d6995883b7d0e"
+}
+```
