@@ -986,7 +986,7 @@ public final class KnowledgeServerMigrationOps {
           throw new IllegalStateException("Legacy prefix conversion requires watched-root declarations");
         }
         try {
-          declarations.set(io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(
+          declarations.set(WatchedRootsFormat.declaredPaths(
               configuration.paths().dataDir()));
         } catch (IOException unreadable) {
           throw new java.io.UncheckedIOException(unreadable);

@@ -851,7 +851,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               "UPDATE switch_buffer SET payload = ?, revision = ? "
                   + "WHERE generation = ? AND key = ? AND revision = ?")) {
             update.setString(1, payload);
-            update.setString(2, java.util.UUID.randomUUID().toString());
+            update.setString(2, UUID.randomUUID().toString());
             update.setString(3, op.generation());
             update.setString(4, op.key());
             update.setString(5, op.revision());
