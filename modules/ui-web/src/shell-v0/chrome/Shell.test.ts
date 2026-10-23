@@ -20,6 +20,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../chrome/Shell.js';
+import { setAuthorizationPresenter } from '../operations/authorizationBroker.js';
 import {
   __resetForTest as resetSurfaceCatalog,
   __seedForTest as seedSurfaceCatalog,
@@ -229,6 +230,45 @@ describe('Shell — slice 492 substrate integration', () => {
     expect(shown.onAction).toBeUndefined();
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain(kind === 'invoke' ? '/api/operations/' : '/api/undo/');
+  });
+
+  it.each([
+    ['invoke', 'gone'], ['undo', 'gone'], ['invoke', 'withdrawn'], ['undo', 'withdrawn'],
+    ['invoke', 'denied-gone'], ['undo', 'denied-gone'],
+  ] as const)('XA1: %s reports a %s approval as a neutral closed request', async (kind, state) => {
+    let invocations = 0;
+    let approvals = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/operations/') || url.includes('/api/undo/')) {
+        invocations++;
+        return new Response(JSON.stringify({ errorClass: 'CONFIRMATION_REQUIRED',
+          message: 'Confirmation required', pendingId: 'pa-gone', gateBehavior: 'TYPED_CONFIRM' }), { status: 428 });
+      }
+      if (url.includes('/api/authorizations/pending/')) {
+        return new Response('{}', { status: state === 'denied-gone' ? 404 : 200 });
+      }
+      if (url.endsWith('/api/authorizations/approve')) {
+        approvals++;
+        return new Response(JSON.stringify({ error: 'pending authorization not found or expired' }), { status: 410 });
+      }
+      return new Response(JSON.stringify({ entries: [] }), { status: 200 });
+    }));
+    await renderShell();
+    setAuthorizationPresenter(async () => state === 'withdrawn'
+      ? { approved: false, allowAlways: false, superseded: true }
+      : { approved: state !== 'denied-gone', allowAlways: false });
+    const toast = new Promise<EphemeralToastSpec>((resolve) => document.addEventListener(
+      EPHEMERAL_TOAST_EVENT, (e) => resolve((e as CustomEvent<EphemeralToastSpec>).detail), { once: true }));
+    document.dispatchEvent(new CustomEvent(kind === 'invoke' ? 'jf-invoke-operation' : 'jf-undo-operation', {
+      detail: { operationId: 'private-operation-id', executionId: 'execution-1', originator: 'user' },
+    }));
+    const shown = await toast;
+    expect(shown.severity, 'a stale approval is a neutral closure, not an execution failure').toBe('info');
+    expect(shown.message).toMatch(/no longer pending/i);
+    expect(shown.message).not.toMatch(/failed|Health|private-operation-id/);
+    expect(invocations).toBe(1);
+    expect(approvals).toBe(state === 'gone' ? 1 : 0);
   });
 
   it('906: an uncertain mutation response asks users to check its effect, without retrying', async () => {

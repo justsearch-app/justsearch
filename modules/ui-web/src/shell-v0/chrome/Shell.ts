@@ -42,7 +42,7 @@ import {
   onSurfaceCatalogChange,
 } from '../../api/registry/SurfaceCatalogClient.js';
 import type { Surface } from '../../api/types/surface.js';
-import { OperationClient } from '../operations/OperationClient.js';
+import { OperationClient, isStaleAuthorization } from '../operations/OperationClient.js';
 import { operationFailureMessage } from '../operations/operationFailureMessage.js';
 import { originatorToTransport } from '../operations/originatorTransport.js';
 import { startDragDetect, type DragKind } from '../utils/dragDetect.js';
@@ -1203,7 +1203,9 @@ export class Shell extends JfElement {
         .invokeWithConsent(
           operationId,
           { args: detail.args ?? {}, transport },
-          { consented: detail?.consented === true, requestConsent: requestAuthorization },
+          { consented: detail?.consented === true,
+            requestConsent: prompt => requestAuthorization(prompt,
+              async () => await client.peekPending(prompt.pendingId) !== null) },
         )
         .then((result) => {
           if (taskId) completeTask(taskId, 'succeeded');
@@ -1222,7 +1224,7 @@ export class Shell extends JfElement {
           if (taskId) completeTask(taskId, 'failed');
           emitEphemeralToast({
             message: operationFailureMessage(err),
-            severity: 'error',
+            severity: isStaleAuthorization(err) ? 'info' : 'error',
           });
         });
     };
@@ -1251,12 +1253,13 @@ export class Shell extends JfElement {
         this.operationClient ?? new OperationClient({ apiBase: this.apiBase });
       void client
         .undoWithConsent(operationId, executionId, {
-          requestConsent: requestAuthorization,
+          requestConsent: prompt => requestAuthorization(prompt,
+            async () => await client.peekPending(prompt.pendingId) !== null),
         })
         .catch((err) => {
           emitEphemeralToast({
             message: operationFailureMessage(err, true),
-            severity: 'error',
+            severity: isStaleAuthorization(err) ? 'info' : 'error',
           });
         });
     };

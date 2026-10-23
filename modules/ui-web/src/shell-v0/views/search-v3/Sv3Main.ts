@@ -486,6 +486,8 @@ export class Sv3Main extends JfElement {
          the question, so it sits with it, one step below the bubble's own text. */
       .ask-scope {
         margin: 0;
+        overflow-wrap: anywhere;
+        max-inline-size: 100%;
         color: var(--secondary-label);
         font-size: var(--font-size-sv3-xs);
       }
@@ -588,6 +590,7 @@ export class Sv3Main extends JfElement {
          markdown renderer, so the block-level rhythm is the renderer's and this box no longer
          preserves source whitespace (a 'pre-wrap' around block children would re-introduce the
          template's own newlines as vertical space). */
+      .structured-json { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; font-family: var(--font-mono, monospace); }
       .answer {
         position: relative;
         min-width: 0;
@@ -1312,6 +1315,7 @@ export class Sv3Main extends JfElement {
     view: { attribute: false },
     turns: { attribute: false },
     turnScopes: { attribute: false },
+    structuredNotes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
     unconfirmedSteerNotes: { attribute: false },
@@ -1353,6 +1357,7 @@ export class Sv3Main extends JfElement {
    * WP1.1 S1.7 — which turns this window limited to chosen files. Window-local: a reloaded turn is
    * not in it, and its Edit then says it searches all files, which is what it will do.
    */
+  declare structuredNotes: ReadonlyMap<string, string>;
   declare turnScopes: ReadonlyMap<string, Sv3AskScope>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
@@ -1604,6 +1609,7 @@ export class Sv3Main extends JfElement {
     this.state = COMPOSER_STATE_DEFAULT;
     this.view = SV3_RESULTS_IDLE;
     this.turns = [];
+    this.structuredNotes = new Map();
     this.turnScopes = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
@@ -1994,7 +2000,9 @@ export class Sv3Main extends JfElement {
                     // it cannot disagree about what this answer stood on. Without them the block
                     // rendered at the renderer's default `'grounded'` and let an unverified `[n]` the
                     // model wrote pose as a reference on a sourced answer.
-                    html`<jf-markdown-block
+                    turn.shapeId === 'core.extract'
+                      ? html`<pre class="structured-json" data-testid="sv3-turn-json">${turn.answer}</pre>`
+                      : html`<jf-markdown-block
                       class="sv3-markdown"
                       prose
                       data-testid="sv3-turn-markdown"
@@ -2071,6 +2079,7 @@ export class Sv3Main extends JfElement {
            id space by construction (feed ids are the controller's entry/call ids). -->
       <div class="ask-bubble" data-testid="sv3-turn-question" data-item-id=${`${turn.id}:q`}>${turn.question}</div>
       ${this.scopeLine(turn)}
+      ${turn.shapeId === 'core.extract' ? html`<p class="ask-scope">${this.structuredNotes.get(turn.id) ?? 'Structured Retry/Edit opens the instruction with the current composer schema and stated inputs; review and send.'}</p>` : nothing}
       ${canEdit && !this.streaming
         ? html`<jf-control
             class="ask-edit"
@@ -2131,7 +2140,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+        ${turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
       </p>
       <div class="ask-edit-acts">
         <jf-control

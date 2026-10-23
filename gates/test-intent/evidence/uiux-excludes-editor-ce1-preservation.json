@@ -1,0 +1,207 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T23:30:18.825Z",
+  "revision": "bdb95254314df624be4fdf7c96825ea61563c184",
+  "tree": "b076d6f893cc8def68988ce6864c3f20262336ac",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ce1/test-intent-vitest-1451996-1792711815858.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 853
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on another focused control (select)",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 leaves Enter on another focused control (select)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves Enter confirmation on the dialog itself",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves Enter confirmation on the dialog itself",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves exactly one Enter confirmation in the matching phrase field",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves exactly one Enter confirmation in the matching phrase field",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with cancel focused",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves no confirmation for an unmatched phrase with cancel focused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with close focused",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves no confirmation for an unmatched phrase with close focused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with confirm focused",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves no confirmation for an unmatched phrase with confirm focused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with input focused",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves no confirmation for an unmatched phrase with input focused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with dialog focused",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b19d78cbbe05b654362bde04b48c097317e1f79a8f30e9dc202c34da49b05bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CE1 preserves no confirmation for an unmatched phrase with dialog focused",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bdb952543",
+    "revision": "bdb95254314df624be4fdf7c96825ea61563c184",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ce1/test-intent-vitest-1451996-1792711817763.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 911,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp32-ce1/test-intent-vitest-1451996-1792711817763.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 leaves Enter on another focused control (select)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves Enter confirmation on the dialog itself",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves exactly one Enter confirmation in the matching phrase field",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with cancel focused",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with close focused",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with confirm focused",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with input focused",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.keyboard-ownership.test.ts#CE1 preserves no confirmation for an unmatched phrase with dialog focused",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:42306ae229fb353f70da0a88a18312b0ed263c9bcc90a6192ef4b618691e5d3e"
+}

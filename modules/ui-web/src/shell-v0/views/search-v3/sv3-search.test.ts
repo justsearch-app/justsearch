@@ -25,12 +25,12 @@ import {
 
 const hit = (id: string, path: string): { id: string; path: string } => ({ id, path });
 
-describe('S1.1 — the composer offers three modes, Search by default', () => {
-  it('offers Search, Ask and Delegate, and nothing else', () => {
+describe('S1.1 / XT1 — the composer offers four modes, Search by default', () => {
+  it('offers Search, Ask, Delegate and Structured, and nothing else', () => {
     // Membership and count only: the order of the modes is not specified.
     const ids = SV3_TIER_OPTIONS.map((option) => option.id);
-    expect(ids).toHaveLength(3);
-    expect([...ids].sort()).toEqual(['ask', 'delegate', 'search']);
+    expect(ids).toHaveLength(4);
+    expect([...ids].sort()).toEqual(['ask', 'delegate', 'search', 'structured']);
     expect(isSv3Tier('search')).toBe(true);
   });
 

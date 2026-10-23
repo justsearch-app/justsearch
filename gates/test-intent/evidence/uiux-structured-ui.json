@@ -1,0 +1,132 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T14:15:14.900Z",
+  "revision": "738e6a443c9d6ce82383e9c938c264a3a20fb506",
+  "tree": "33b092b9445666561eb786ff68d29b44369faa48",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.structured.test.ts\" \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hxq51l9r/tmp/test-intent-vitest-331546-1792592112541.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2357
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fddbe3b7f989b08edc9d2a2eb0d7e8f3b8a4332ff1d5c8238d64fcdff53a9135",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT1 XT9 offers Structured by keyboard with a labelled multiline schema kept within this window",
+          "status": "passed"
+        },
+        {
+          "name": "XT2 XT4 sends extraction schema and instruction and renders only terminal JSON literally with sources",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 rejects schema {bad} at the box without sending or clearing",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 rejects schema [] at the box without sending or clearing",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 rejects schema null at the box without sending or clearing",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 XD1 keeps undelivered extraction drafts and drops the unrecorded failed turn on reload",
+          "status": "passed"
+        },
+        {
+          "name": "XT6 keeps schema and instruction when chat is unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "XT8 reloaded retry forks and preserves Structured without sending",
+          "status": "passed"
+        },
+        {
+          "name": "XT8 reloaded edit forks and preserves Structured without sending",
+          "status": "passed"
+        },
+        {
+          "name": "XT8 reloaded branch forks and preserves Structured without sending",
+          "status": "passed"
+        },
+        {
+          "name": "XT4 retains instruction schema and files when the chosen file count is refused",
+          "status": "passed"
+        },
+        {
+          "name": "XT4 sends deduplicated chosen files as selection inputs",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 Structured forwards the same saved conversation context as Ask",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 honours both the context floor and excluded messages",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Stop ends Structured as stopped without presenting partial JSON as complete",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask, Delegate and Structured, and nothing else",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:be1ef33421d243883a00e1c44d2c140793cdfe0703932f436acb2c251a52e347",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default offers Search, Ask, Delegate and Structured, and nothing else",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#puts the ONE scroller inside the content surface",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6d4656710f22ac792abb43e8a3ceed30dbefa9499dcdd48c43f22dc2c179f759",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window never scrolls; one inner region does puts the ONE scroller inside the content surface",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:09a80dd0424b61d86b1907138daf1765d3bfbcdb0fee3e2f65d74920393909e5"
+}

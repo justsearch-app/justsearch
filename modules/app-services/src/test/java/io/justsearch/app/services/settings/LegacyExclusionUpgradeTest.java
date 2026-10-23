@@ -93,13 +93,13 @@ class LegacyExclusionUpgradeTest {
     var context = io.justsearch.app.services.TestEngineContexts.durableInternal();
     IndexingService indexing = mock(IndexingService.class);
     when(indexing.getWatchedRoots(context)).thenReturn(List.of(new IndexingService.WatchedRoot("docs", root)));
-    when(indexing.deleteDocsByPathPrefix(any(), eq(context))).thenAnswer(call -> {
+    when(indexing.deleteDocsByPathPrefixWithOutcome(any(), eq(context))).thenAnswer(call -> {
       Path prefix = call.getArgument(0);
       int size = indexed.size();
       indexed.removeIf(p -> p.startsWith(prefix));
-      return size - indexed.size();
+      return new IndexingService.PrefixDeletionOutcome(true, size - indexed.size(), "");
     });
-    when(indexing.deleteDocById(anyString(), eq(context))).thenAnswer(call -> indexed.remove(Path.of((String) call.getArgument(0))));
+    when(indexing.deleteDocByIdWithOutcome(anyString(), eq(context))).thenAnswer(call -> new IndexingService.DeletionOutcome(indexed.remove(Path.of((String) call.getArgument(0))), ""));
     var previous = ConfigStore.globalOrNull();
     var installed = new ConfigStore(ConfigStoreRebuilder.prepare(settings));
     ConfigStore.setGlobal(installed);
