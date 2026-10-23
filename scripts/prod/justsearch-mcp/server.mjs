@@ -12,7 +12,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-import { discover } from './discovery.mjs';
+import { discover, pinnedEngine } from './discovery.mjs';
 import { engineRequest } from '../../../packaging/mcpb/server/engine-discovery.cjs';
 import {
   AnswerInputSchema,
@@ -64,32 +64,18 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 }
 
 /**
- * The Engine discovery selected: { port, engine }, engine being the manifest candidate (null for
- * --port / JUSTSEARCH_API_PORT, the operator's choice). Every request goes through
- * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS says
- * its server end belongs to the manifest pid; a refusal comes back as error.message
- * 'engine_gone', which parseJsonResponse turns into ENGINE_GONE. No handler, and no follow-up
- * request inside one tool call, can reach an endpoint that is not that Engine.
+ * The Engine discovery selected: { port, engine, token, pin }, engine being the proven manifest
+ * candidate, token its session token (from that validated manifest, or JUSTSEARCH_SESSION_TOKEN
+ * for a pin; '' is dev mode), pin the operator's pin ('--port <n>' / 'JUSTSEARCH_API_PORT=<n>')
+ * when there is one. Every request goes through engine-discovery.cjs engineRequest() with that
+ * target's token, which writes nothing on a new connection until the OS says its server end
+ * belongs to the manifest pid. A refusal comes back as error.message 'engine_gone', which
+ * parseJsonResponse turns into ENGINE_GONE. No handler, and no follow-up request inside one tool
+ * call, can reach an endpoint that is not that Engine with the session token.
  */
 let engineTarget = null;
+/** Discovery as at startup (set by main()); a pinned target is re-selected only on its pin. */
 let rediscover = null;
-
-/** Retry only failures known to precede execution; never replay an ambiguous POST failure. */
-async function withReconnect(send) {
-  const result = await send();
-  let tokenRejected = false;
-  if (result.statusCode === 401) {
-    try { tokenRejected = JSON.parse(result.text).errorCode === 'UI_TOKEN_REQUIRED'; } catch { /* not a token refusal */ }
-  }
-  if (!rediscover || !(tokenRejected || result.error?.message === 'engine_gone' || result.error?.code === 'ECONNREFUSED')) return result;
-  try { await rediscover(); } catch { return result; }
-  return send();
-}
-
-
-function sessionHeaders() {
-  return engineTarget?.token ? { 'X-JustSearch-Session': engineTarget.token } : {};
-}
 
 function transportFailure(err) {
   return err?.code === 'ENGINE_NOT_PROVEN'
@@ -97,11 +83,75 @@ function transportFailure(err) {
     : { message: err?.message || String(err), code: err?.code };
 }
 
+/** A failure known to precede execution: refused before writing, no connection, or the token refused. */
+function refusedBeforeExecution(res) {
+  if (res.error?.message === 'engine_gone' || res.error?.code === 'ECONNREFUSED') return true;
+  if (res.statusCode !== 401) return false;
+  try {
+    return JSON.parse(res.text).errorCode === 'UI_TOKEN_REQUIRED';
+  } catch {
+    return false; // not a token refusal
+  }
+}
+
+/**
+ * Run one request (run(target) → the http*Once result). When it failed in a way known to precede
+ * execution, the Engine is selected again (reconnect) and the request, which was never run, is
+ * sent once more to the Engine now proven, with that Engine's token. Anything else is returned
+ * as it is, so nothing that may have reached an Engine is sent twice.
+ */
+async function withReconnect(run) {
+  const target = engineTarget;
+  const res = await run(target);
+  if (!refusedBeforeExecution(res)) return res;
+  const next = await reconnect(target);
+  return next ? run(next) : res;
+}
+
+let reconnecting = null;
+
+/**
+ * The target that replaces stale (one selection at a time; concurrent callers share it): for a
+ * pin, the manifest Engine proven on that port now, with no fallback to any other Engine;
+ * otherwise discovery as at startup. null when there is none.
+ */
+function reconnect(stale) {
+  if (engineTarget !== stale) return Promise.resolve(engineTarget);
+  if (!reconnecting) {
+    const attempts = [];
+    const found = stale.pin ? pinnedEngine(stale.port, stale.pin, attempts) : rediscover();
+    reconnecting = found
+      .then((backend) => {
+        if (!backend) {
+          log(`${stale.pin}: no proven Engine on the pinned port (${attempts.join('; ')})`);
+          return null;
+        }
+        if (engineTarget === stale) engineTarget = targetOf(backend);
+        return engineTarget;
+      })
+      .catch((err) => {
+        log(`no proven Engine to reconnect to: ${err.message}`);
+        return null;
+      })
+      .finally(() => {
+        reconnecting = null;
+      });
+  }
+  return reconnecting;
+}
+
+function targetOf(backend) {
+  ensureLoopbackUrl(backend.baseUrl, 'baseUrl');
+  return { port: backend.port, engine: backend.engine, token: backend.token, pin: backend.pin || null };
+}
+
 function engineGoneError(res) {
+  const pin = engineTarget?.pin ? `, pinned by ${engineTarget.pin}` : '';
   return makeError(
     'ENGINE_GONE',
-    `The JustSearch Engine this server connected to (pid ${engineTarget?.engine?.pid}, port ${engineTarget?.port}) ` +
-      `is no longer the one serving that port (${res.error.detail}). Nothing was sent. Restart the MCP server to reconnect.`,
+    `The JustSearch Engine this server connected to (pid ${engineTarget?.engine?.pid}, port ${engineTarget?.port}${pin}) ` +
+      `is no longer the one serving that port (${res.error.detail}), and no proven Engine was found to take over. ` +
+      'Nothing was sent. Start JustSearch, or restart the MCP server.',
   );
 }
 
@@ -109,8 +159,12 @@ function engineGoneError(res) {
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
-function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
-  return withReconnect(() => new Promise((resolve) => {
+function httpGetTextLimited(urlStr, options) {
+  return withReconnect((target) => httpGetOnce(target, urlStr, options));
+}
+
+function httpGetOnce(target, urlStr, { timeoutMs, maxBytes, headers = {} }) {
+  return new Promise((resolve) => {
     let u;
     try {
       u = new URL(urlStr);
@@ -126,11 +180,12 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
     };
 
     const req = engineRequest(
-      engineTarget,
+      target,
       {
         path: u.pathname + u.search,
         timeoutMs,
-        headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers, ...sessionHeaders() },
+        headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers },
+        credential: true,
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -168,16 +223,19 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
       req.destroy(new Error('timeout'));
     });
     req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
-    req.end();
-  }));
+  });
 }
 
 /**
  * HTTP POST with JSON body, size limiting, and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
-function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
-  return withReconnect(() => new Promise((resolve) => {
+function httpPostJsonLimited(urlStr, body, options) {
+  return withReconnect((target) => httpPostOnce(target, urlStr, body, options));
+}
+
+function httpPostOnce(target, urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
+  return new Promise((resolve) => {
     let u;
     try {
       u = new URL(urlStr);
@@ -195,7 +253,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
     };
 
     const req = engineRequest(
-      engineTarget,
+      target,
       {
         method: 'POST',
         path: u.pathname + u.search,
@@ -206,8 +264,9 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
           Accept: 'application/json',
           'User-Agent': 'justsearch-mcp/0.1.0',
           ...headers,
-          ...sessionHeaders(),
         },
+        body: bodyStr,
+        credential: true,
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -245,9 +304,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
       req.destroy(new Error('timeout'));
     });
     req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
-    req.write(bodyStr);
-    req.end();
-  }));
+  });
 }
 
 /**
@@ -464,13 +521,30 @@ export async function main() {
 
   log('Starting JustSearch production MCP server...');
 
-  rediscover = async () => {
-    const backend = await discover({ port: args.port, verbose: args.verbose });
-    ensureLoopbackUrl(backend.baseUrl, 'baseUrl');
-    engineTarget = { port: backend.port, engine: backend.engine || null, token: backend.token };
-    return backend;
+  // Closing stdin stops startup too: read it during discovery, keeping what arrives for the
+  // stdio transport, which takes over the stream once the backend is found.
+  const early = [];
+  const keepEarly = (chunk) => early.push(chunk);
+  const endEarly = () => {
+    log('stdin closed during startup — exiting');
+    process.exit(0);
   };
-  const { baseUrl } = await rediscover();
+  process.stdin.on('data', keepEarly);
+  process.stdin.on('end', endEarly);
+
+  // Discover backend
+  rediscover = () => discover({ port: args.port, verbose: args.verbose });
+  const backend = await rediscover();
+  process.stdin.off('data', keepEarly);
+  process.stdin.off('end', endEarly);
+  process.stdin.pause();
+  for (const chunk of early.reverse()) process.stdin.unshift(chunk);
+  engineTarget = targetOf(backend);
+  const { baseUrl, token } = backend;
+  log(`Backend: ${baseUrl}`);
+  // token (from the validated manifest, or JUSTSEARCH_SESSION_TOKEN for a pin) is sent on every
+  // request to the proven Engine; "" is dev mode, with no token enforcement.
+  log(`Token: ${token ? 'available (prod mode)' : 'empty (dev mode)'}`);
 
   // Create MCP server
   const mcpServer = new McpServer({
@@ -501,7 +575,6 @@ export async function main() {
     async (rawArgs) => {
       const input = AnswerInputSchema.parse(rawArgs);
 
-
       const url = `${baseUrl}/api/knowledge/retrieve-context`;
       const body = {
         query: input.query,
@@ -519,7 +592,6 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        headers: {},
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -604,7 +676,6 @@ export async function main() {
           const citRes = await httpPostJsonLimited(citUrl, citBody, {
             timeoutMs: 10_000,
             maxBytes: 1_000_000,
-            headers: {},
           });
           const { parsed: citParsed } = parseJsonResponse(citRes);
           if (citParsed) {
@@ -648,7 +719,6 @@ export async function main() {
     },
     async (rawArgs) => {
       const input = SearchInputSchema.parse(rawArgs);
-
 
       const url = `${baseUrl}/api/knowledge/search`;
       // Note: Zod defaults (limit=10, mode='hybrid', querySyntax='SIMPLE') are always populated,
@@ -695,7 +765,6 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        headers: {},
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -783,7 +852,6 @@ export async function main() {
     },
     async (rawArgs) => {
       const input = IngestInputSchema.parse(rawArgs);
-
 
       const url = `${baseUrl}/api/knowledge/ingest`;
       const body = {
@@ -931,6 +999,7 @@ export async function main() {
   // -------------------------------------------------------------------------
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
+  process.stdin.resume(); // paused after discovery; what arrived meanwhile is read first
 
   log('Server started. Waiting for MCP messages on stdio...');
 }
