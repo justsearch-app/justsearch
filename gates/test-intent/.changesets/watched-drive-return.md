@@ -172,3 +172,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Re-reviewed all six entries under docs/reference/testing/test-intent.md using the exact owner delegation and task-turn locations supplied in the current user turn. Entries 1/5 are the narrow delegated P1 unavailable-classifier defect fix, preserving zero deletions and non-Linux behavior; entry 2 is isolated real-volume fixture/recovery coverage within assigned scenarios; entries 3/6 retain all existing oracles and only add fixture instrumentation; entry 4 retains reverse acquisition cleanup for every owner. Repeated stronger-source conflict search found none. Delegation does not authorize overriding established contracts; strict leases, no deletion on uncertainty, original A1/A2/A3 amendments and explicit R1/R2 exclusions remain. Verified all six before/after item blobs match the prior independent verification and only citation fields changed since HEAD~1. Accept the current digest. Detailed per-entry review: tmp/verify-evidence/citation-review/review.txt. Independent PR 910 audit remains a separate subsequent step."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:3b4265c2ce7d302187489eee9d8cb045bdae3871d2bb52d850650424cc717d6f",
+  "note": "Re-audit of revised sources: the owner quotes and their original context are supplied in the audit request. P1 classification and its Linux-only checks fall within the owners fix-or-defer delegation and agreed P1; real-filesystem fixtures, shared instrumentation, watcher/receipt checks and executor cleanup fall within delegated work decisions and the agreed D/P scenarios with A1-A3. No stronger conflicting source found. Classes, items, choices, test content and execution evidence are unchanged from the prior audit; the missing owner delegation is now supplied. No must-fix findings. Real bind mounts remain unverified under A3; no Gradle rerun."
+}
+```
