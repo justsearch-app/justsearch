@@ -64,6 +64,9 @@ export interface FolderStatus {
 }
 
 export interface FolderStatusContext {
+  /** Policy pause confirmed by the shared progress selector; folder facts stay independent. */
+  readonly indexingPaused?: boolean;
+  readonly indexingPauseReason?: string;
   /** All pending jobs wait for retry, as reported by the shared index-wide projection. */
   readonly retryWaiting?: boolean;
   /** Pre-formatted relative time of the last walk (host util), or '' if never. */
@@ -306,9 +309,10 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     // truthful ("Indexing · N remaining" — that IS what the queue is doing) and the carried count is
     // flagged as last-known so the chip can say so rather than assert it as a present fact.
     return {
-      state: ctx.retryWaiting ? 'waiting' : 'indexing',
-      glyph: 'pending',
-      metaText: `${collection} · ${ctx.retryWaiting ? 'Waiting to retry' : 'Indexing'} · ${inFlight.toLocaleString()} remaining`,
+      state: ctx.indexingPaused && deleteDetectionUnverified ? 'unverified'
+        : ctx.indexingPaused || ctx.retryWaiting ? 'waiting' : 'indexing',
+      glyph: ctx.indexingPaused && deleteDetectionUnverified ? 'unverified' : 'pending',
+      metaText: `${collection} · ${ctx.indexingPaused ? ctx.indexingPauseReason === 'settings_recovery' ? 'Waiting for Settings reset' : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Indexing'} · ${inFlight.toLocaleString()} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — reindex to be sure" : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,

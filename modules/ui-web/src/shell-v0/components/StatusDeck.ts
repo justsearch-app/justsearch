@@ -56,6 +56,7 @@ import { present } from '../display/present.js';
 import { projectFact } from '../display/facts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import './Control.js';
+import './IndexingControls.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
 import { selectIndexingProgress, indexingTaskStatus } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
@@ -122,6 +123,10 @@ const NUM = new Intl.NumberFormat();
 const BANNER_OWNING_SURFACE_ID = 'core.unified-chat-surface';
 
 export class StatusDeck extends JfElement {
+  private focusedItem: string | null = null;
+  private indexingWasPaused = false;
+  private indexingAnnouncementKey: string | null = null;
+  private indexingAnnouncement = '';
   static properties = {
     apiBase: { type: String, attribute: 'api-base' },
     aiState: { state: true },
@@ -145,7 +150,9 @@ export class StatusDeck extends JfElement {
     container: () => this.renderRoot.querySelector('.adaptive-bar'),
     // 814 §D5 — the measured signature is the label actually RENDERED (which the yield rule can
     // change without `statusLabel` moving), so the adaptive bar re-measures when the chip yields.
-    signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label,
+    signature: () => this.leftItemIds().join('|') + ':' + this.inferenceChipReadout().label + ':' +
+      JSON.stringify([this.status?.operating?.indexing?.state, this.status?.operating?.indexing?.reasons,
+        this.status?.operating?.indexing?.untilEpochMs, this.status?.operating?.indexing?.waitingForResume]) + ':' + this.focusedItem,
     reserve: 40,
     // 559 Authority VI per-item policy — same DOM query/order as items(), so the
     // pinned flags align index-for-index with the measured `.item` elements.
@@ -240,6 +247,8 @@ export class StatusDeck extends JfElement {
       align-items: center;
       gap: 0.375rem;
     }
+    .adaptive-bar .policy-pause { white-space: nowrap; }
+    .overflow-menu .policy-pause { max-width: calc(100vw - 3rem); flex-wrap: wrap; }
     .dot {
       width: 0.4rem;
       height: 0.4rem;
@@ -643,40 +652,46 @@ export class StatusDeck extends JfElement {
         </jf-control>`;
       }
       case 'core.queue': {
-        if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
-        const activity = progress.activity;
-        if (!activity.confirmed || activity.detail) {
-          const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
-          const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
-          return html`<span class="group" role="img" aria-label=${label} title=${label}>
+        const content = (() => {
+          if (progress.pause) return html`<span class="val" title=${progress.activity.detail ?? ''}>${progress.activity.summary} — ${progress.activity.detail}</span>`;
+          if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
+          const activity = progress.activity;
+          if (!activity.confirmed || activity.detail) {
+            const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+            const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
+            return html`<span class="group" role="img" aria-label=${label} title=${label}>
+              ${icon({ name: 'zap', size: 11 })}
+              <span class="val">${label}</span>
+            </span>`;
+          }
+          // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
+          // not a raw backlog count: the files are already indexed, the semantic layers are catching
+          // up. Falls back to the count only when the projection has no faithful denominator.
+          const enrichSuffix =
+            enrichingPercent !== null
+              ? `enriching: ${enrichingPercent}%`
+              : embed > 0
+                ? `embed: ${NUM.format(embed)}`
+                : '';
+          const enrichAria =
+            enrichingPercent !== null
+              ? `, enriching ${enrichingPercent}%`
+              : embed > 0
+                ? `, ${NUM.format(embed)} embedding`
+                : '';
+          return html`<span
+            class="group"
+            role="img"
+            aria-label="${name}: ${NUM.format(queue)} job(s) queued${enrichAria}"
+          >
             ${icon({ name: 'zap', size: 11 })}
-            <span class="val">${label}</span>
+            <span class="val">queue: ${NUM.format(queue)}${
+              enrichSuffix ? html` · ${enrichSuffix}` : nothing
+            }</span>
           </span>`;
-        }
-        // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
-        // not a raw backlog count: the files are already indexed, the semantic layers are catching
-        // up. Falls back to the count only when the projection has no faithful denominator.
-        const enrichSuffix =
-          enrichingPercent !== null
-            ? `enriching: ${enrichingPercent}%`
-            : embed > 0
-              ? `embed: ${NUM.format(embed)}`
-              : '';
-        const enrichAria =
-          enrichingPercent !== null
-            ? `, enriching ${enrichingPercent}%`
-            : embed > 0
-              ? `, ${NUM.format(embed)} embedding`
-              : '';
-        return html`<span
-          class="group"
-          role="img"
-          aria-label="${name}: ${NUM.format(queue)} job(s) queued${enrichAria}"
-        >
-          ${icon({ name: 'zap', size: 11 })}
-          <span class="val">queue: ${NUM.format(queue)}${
-            enrichSuffix ? html` · ${enrichSuffix}` : nothing
-          }</span>
+        })();
+        return html`<span class="group policy-pause">${content}
+          <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
         </span>`;
       }
       default:
@@ -700,12 +715,13 @@ export class StatusDeck extends JfElement {
     const left = listStatusBarItems('left')
       .map((item) => ({
         id: item.id,
-        pinned: item.overflow === 'pinned',
+        pinned: item.overflow === 'pinned' || item.id === this.focusedItem,
         content: this.renderLeftContent(item),
       }))
       .filter((e) => e.content !== nothing);
     const allRight = listStatusBarItems('right').filter((i) => i.source !== 'core');
-    const vis = this.overflow.visibleCount;
+    // A status remeasurement may shorten the visible prefix; retain its focused item until blur.
+    const vis = Math.max(this.overflow.visibleCount, left.findIndex(e => e.id === this.focusedItem) + 1);
     const hiddenCount = Number.isFinite(vis) ? Math.max(0, left.length - vis) : 0;
     // 595 §15.1 (E1) — the ONE a11y announcer for system-health verdict changes.
     // A visually-hidden notice mirrors the verdict headline; aria-live announces it
@@ -724,13 +740,30 @@ export class StatusDeck extends JfElement {
     );
     const indexingTransition = this.aiState?.verdict.kind === 'transitioning' &&
       this.aiState.verdict.reasons.some(isIndexingObservation);
-    // Migration and holds are one indexing subject, including when its observation expires.
-    const indexingAnnounce = [indexingTransition && progress.activity.confirmed
+    const activityAnnouncement = [indexingTransition && progress.activity.confirmed
       ? announce?.text ?? progress.activity.summary : progress.activity.summary,
     progress.activity.detail].filter(Boolean).join(' — ');
+    // Policy edges have stable announcements, independent of waiting counts or observation gaps.
+    // Ordinary activity still announces automatic holds and withdraws stale claims as before.
+    if (progress.activity.confirmed) {
+      const resumedKey = `resumed:${activityAnnouncement}`;
+      if (progress.pause) {
+        if (this.indexingAnnouncementKey !== progress.pause.state) this.indexingAnnouncement = activityAnnouncement;
+        this.indexingAnnouncementKey = progress.pause.state;
+      } else if (this.indexingWasPaused) {
+        this.indexingAnnouncement = 'Indexing resumed.';
+        this.indexingAnnouncementKey = resumedKey;
+      } else if (this.indexingAnnouncementKey !== resumedKey) {
+        this.indexingAnnouncement = activityAnnouncement;
+        this.indexingAnnouncementKey = null;
+      }
+      this.indexingWasPaused = !!progress.pause;
+    } else if (this.indexingAnnouncementKey === null) {
+      this.indexingAnnouncement = activityAnnouncement;
+    }
     return html`
       <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer"
-        >${indexingAnnounce}</jf-system-notice>
+        >${this.indexingAnnouncement}</jf-system-notice>
       ${announce && !indexingTransition
         ? html`<jf-system-notice
             class="visually-hidden"
@@ -752,6 +785,8 @@ export class StatusDeck extends JfElement {
           (e, i) =>
             html`<span
               class="item"
+              @focusin=${() => { this.focusedItem = e.id; }}
+              @focusout=${() => { this.focusedItem = null; this.requestUpdate(); }}
               ?hidden=${i >= vis}
               data-item=${e.id}
               data-pinned=${e.pinned ? 'true' : 'false'}
