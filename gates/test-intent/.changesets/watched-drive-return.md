@@ -205,3 +205,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Accept current digest after reviewing both signature adaptations under docs/reference/testing/test-intent.md. RootPresenceGuardTest expands the removed forgetUnder default with ignored -> true; all seven SyncDirectoryOpsWalkSkipPolicyTest call edits expand the removed execute default with explicit null collection. Every test input, precondition, assertion, parameterization and condition is preserved; the original six entries are unchanged. Regenerated evidence uses the same check IDs, overlay file set and resolved b62fc5921 baseline; producer and current file hashes match, all four cases execute/pass without skips, and every before check fails assertions for the intended watcher/status/classifier defect. Evidence regenerated at 1d8d4efdd and only committed by HEAD 39259d1dd. Original scope exclusions remain; no broader runtime reverification claimed. Detailed review: tmp/verify-evidence/signature-review-v2/review.txt. Separate independent audit for PR 910 follows."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:7b1c6711ff3b66ed7287c2deb96b827d72eb4959fbd0c4c4919859a90bd40ee4",
+  "note": "Reviewed the new entry in documented order: before-state tests and forwarding overloads, agreed scenarios and class table, provisional Adaptation, then candidate diff. The ledger call passes the exact always-true predicate formerly supplied by its overload; all seven sync calls pass the exact null collection formerly supplied by theirs. Inputs, preconditions, assertions, fault injection, tags and conditions are preserved. Remaining production edits only remove these forwarding methods and use existing imports; prior six entries are unchanged. Refreshed evidence retains the same check IDs, overlay set and resolved before revision; all four cases execute/pass without skips and before checks retain intended assertion failures. No must-fix findings. No Gradle rerun; prior A1-A3 limitations remain."
+}
+```
