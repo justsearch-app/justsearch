@@ -790,13 +790,14 @@ jobs:
   measured-axe:
     needs: changes
     if: needs.changes.outputs.frontend != 'false'
-    name: Measured axe (advisory)
+    name: Measured axe
     # Tempdoc 930 §22.2 follow-up 5. Chunk H retired twelve static a11y/token oracles in
     # favour of measurement, but only half the replacement ran on PRs: the four-palette
     # contrast sweep (`check-contrast-matrix`, inside the required `Public claims` lane via
     # run-ui-web-gates.mjs). The other half — `jseval ui-a11y-gate`, real axe-core against
     # the rendered page — was local-only. This sweep runs on PRs, pushes to main and
-    # manual dispatch as advisory, gathering stability evidence before promotion to required.
+    # manual dispatch. The stable advisory record supports promotion to required
+    # (ADR-0026 / ADR-0044 amendments, 2026-10-24).
     #
     # Nothing about that gate needs the backend, which is why it can run here: `--fixtures`
     # intercepts every `/api/*` request in Playwright and serves committed schema-valid
@@ -806,17 +807,9 @@ jobs:
     # dev stack. Measured locally at 350s wall for the register's 20 surfaces including a
     # cold Vite start, exit 0.
     #
-    # ADVISORY: deliberately absent from
-    # scripts/ci/workflow-signal-policy.v1.json's requiredStatusChecks and from
-    # scripts/ci/public-ci-local-repro.v1.json (adding an entry to the latter while the job
-    # is not a required check FAILS validatePublicCiLocalRepro by design). Promotion to a
-    # required check is a separate decision that wants stability evidence from this lane
-    # first — the path `jseval-suite` walked between §18.1 row 7 and §22.2 follow-up 4.
-    # Recorded as the 2026-09-05 amendment to ADR-0026, which is why the gate's own
-    # docstrings no longer say "not CI-wired". Also absent from
-    # scripts/ci/ci-walltime-policy.v1.json: every lane there carries a `requiredCheck`
-    # and the reporter's one loud finding is `missing-required-lane`, so a non-required
-    # job has no honest row to occupy until it is promoted.
+    # Required as "Measured axe" in the signal policy, local reproduction inventory and
+    # wall-clock policy. Like jseval-suite, an unselected PR reports this literal job as
+    # skipped; main pushes and dispatch always select it through the classifier.
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -2308,11 +2301,11 @@ jobs:
     name: CI wall-clock attribution
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # `jseval-suite` is in this list because it is a required lane with a wall-clock
-    # budget: `report-ci-walltime-attribution.mjs` drops any job with no end time, so an
-    # attribution taken while the ~6.5-minute suite still runs would omit it entirely and
+    # Required lanes including jseval-suite and measured-axe must finish before the
+    # snapshot: `report-ci-walltime-attribution.mjs` drops any job with no end time, so an
+    # attribution taken while a required lane still runs would omit it entirely and
     # `report-ci-walltime-budget.mjs` would warn `missing-required-lane` on every run.
-    needs: [public-claims, license-and-notices, build, unit-tests-search-worker, unit-tests-platform-contracts, app-ui, windows-native-tests, shell-rust-tests, shell-rust-tests-linux, integration-tests, module-integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
+    needs: [public-claims, license-and-notices, build, unit-tests-search-worker, unit-tests-platform-contracts, app-ui, windows-native-tests, shell-rust-tests, shell-rust-tests-linux, integration-tests, module-integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite, measured-axe]
     if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     steps:
       - name: Checkout

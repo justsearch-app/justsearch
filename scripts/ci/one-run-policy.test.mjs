@@ -6,8 +6,8 @@ import { load } from 'js-yaml';
 const read = (path) => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 const workflow = load(read('.github/workflows/ci.yml'));
 const signal = JSON.parse(read('scripts/ci/workflow-signal-policy.v1.json'));
-const required = ['cla-assistant', 'Public claims', 'License and notices', 'Build (no model blobs)', 'Unit tests (app-ui)', 'Unit tests (search-worker)', 'Unit tests (platform-contracts)', 'Secret scan', 'Windows-native tests', 'Shell crate tests (Rust)', 'jseval Python suite', 'Engine lifecycle tests (model-free)'];
-test('all twelve required names have literal jobs or aggregates on every PR', () => {
+const required = ['cla-assistant', 'Public claims', 'License and notices', 'Build (no model blobs)', 'Unit tests (app-ui)', 'Unit tests (search-worker)', 'Unit tests (platform-contracts)', 'Secret scan', 'Windows-native tests', 'Shell crate tests (Rust)', 'jseval Python suite', 'Engine lifecycle tests (model-free)', 'Measured axe'];
+test('all thirteen required names have literal jobs or aggregates on every PR', () => {
   const declared = signal.workflows.flatMap((row) => row.requiredStatusChecks ?? []);
   assert.deepEqual([...declared].sort(), [...required].sort());
   const cla = load(read('.github/workflows/cla.yml'));
@@ -60,7 +60,21 @@ test('main keeps the running run and runs all slow tiers without masking failure
   const axe = workflow.jobs['measured-axe'];
   assert.equal(axe.needs, 'changes');
   assert.equal(axe.if, "needs.changes.outputs.frontend != 'false'");
-  assert.equal(axe.name, 'Measured axe (advisory)');
+  assert.equal(axe.name, 'Measured axe');
+  assert.equal(axe.strategy, workflow.jobs['jseval-suite'].strategy, 'unselected literal jobs report skipped');
+  assert.equal(axe['continue-on-error'], undefined);
+  const gate = axe.steps.find(step => step.name === 'Measured axe over the a11y baseline register');
+  assert.equal(gate.if, undefined);
+  assert.equal(gate['continue-on-error'], undefined);
+  assert.match(gate.run, /set -o pipefail/);
+  assert.match(gate.run, /python -m jseval ui-a11y-gate --output-dir build\/ci\/ui-a11y/);
+  assert.ok(workflow.jobs['ci-walltime'].needs.includes('measured-axe'));
+  const walltime = JSON.parse(read('scripts/ci/ci-walltime-policy.v1.json'));
+  const budget = walltime.lanes.find(lane => lane.job === axe.name);
+  assert.equal(budget?.requiredCheck, axe.name);
+  assert.equal(budget.hardTimeoutSeconds, axe['timeout-minutes'] * 60);
+  assert.ok(budget.advisoryBudgets.maxWallSeconds > 0);
+  assert.ok(budget.advisoryBudgets.maxWallSeconds <= budget.hardTimeoutSeconds * 0.8);
   const node = workflow.jobs['windows-native-node'];
   assert.equal(node.if, "needs.changes.outputs.devrunner != 'false'");
   const conformance = node.steps.find(step => step.name === 'Supervisor conformance (dev-runner adapter)');

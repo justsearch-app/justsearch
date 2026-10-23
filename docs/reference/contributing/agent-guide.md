@@ -348,7 +348,7 @@ The public repository has two CI postures:
   pushes to `main`, and can also be dispatched manually. ADR-0044 owns this
   public hosted lane, amended by ADR-0053. PRs run affected lanes; main and manual dispatch
   run the full suite, including the slow tiers. Every required name reports on every PR.
-  Measured axe stays advisory; on PRs it runs for affected frontend inputs, and it runs
+  Measured axe is required; on PRs it runs for affected frontend inputs, and it runs
   on pushes to main and manual dispatch.
 - Self-hosted, release, and benchmark/specialty workflows stay manually dispatched unless a
   later ADR changes their trigger policy. ADR-0026 remains the historical basis for that posture.
@@ -607,6 +607,9 @@ record, then enables squash auto-merge bound to the validated head, title and bo
 requires a new enqueue. The PR runs the union of lanes that consume its changed files; all
 required names report, including intentional skips. Unknown inputs run every lane. Strict stays
 off, so an older green base needs no update push. There is no merge queue.
+`Measured axe` is required: serious and critical accessibility violations block merges.
+It runs for frontend inputs on PRs and always on main pushes and dispatch; unselected PRs
+report skipped, as the required `jseval Python suite` does.
 
 After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
 suite, including both integration tiers (system-tests and module), Windows stop-census, supervisor
