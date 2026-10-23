@@ -17,6 +17,7 @@
  * transition never breaks the app (worst case: no animation).
  */
 import { appLog } from '../../utils/logger.js';
+import { isTauriRuntime } from '../../utils/tauriRuntime.js';
 
 interface ViewTransitionDocument {
   startViewTransition?: (cb: () => Promise<void> | void) => unknown;
@@ -91,8 +92,11 @@ export function adoptTransitionPromises(transition: unknown): void {
   }
 }
 
-/** True iff same-document View Transitions are available AND the user has not requested reduced motion. */
+/** True iff same-document View Transitions are safe, available and motion is allowed. */
 export function surfaceTransitionsEnabled(): boolean {
+  // WebKit bugs 321683, 323949, 324730, 304067: Linux shells can crash without acceleration.
+  // Remove this gate when the minimum WebKitGTK includes the fix.
+  if (isTauriRuntime() && /Linux/i.test(navigator.userAgent)) return false;
   const doc = document as unknown as ViewTransitionDocument;
   if (typeof doc.startViewTransition !== 'function') return false;
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;

@@ -634,7 +634,7 @@ export async function consumeShapeStream(
 
   const response = await authorizedFetch(target, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify(body ?? {}),
     signal,
   });
