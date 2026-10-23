@@ -227,3 +227,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Accept current digest after reviewing updated Adaptation/signature entry, regenerated evidence and compatibility patch. All seven test-call changes expand the removed five-argument default with null ownsPath; null collection was already explicit, and every oracle/input/condition remains. First six entries unchanged. Applied the before patch to exact b62fc5921 source: it adds only a six-argument shim, rejects non-null owner filters and delegates unchanged arguments to the original five-argument pipeline; removing it restores byte-identical baseline source. No repaired behavior is added. Evidence hashes match current producer/check/patch files; all four cases across three checks execute/pass after with no skips and fail assertions before for the original dead watcher/unavailable status/reason defects, not compilation or shim refusal. Same checks, fixture overlays and resolved baseline as previous run. Prior scope limitations remain. Review: tmp/verify-evidence/sixarg-review/review.txt. Separate PR 910 audit follows."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:bb8098375a6a05490044e75d034e644fd0cfd1956f177942c4be77cde794564b",
+  "note": "Re-audited in documented order: before-state test and forwarding implementation, agreed scenarios and updated entry, provisional Adaptation, then candidate diff. All seven test calls now explicitly pass the same null collection and null owner filter formerly forwarded; assertions, inputs, preconditions, parameterization and conditions remain intact. The compatibility patch only adds a six-argument bridge that rejects non-null owner filters and delegates to the unchanged baseline five-argument implementation. It adds no classifier, watcher recovery or other repaired behavior; the exercised null-filter path is identical to baseline. Refreshed evidence retains check IDs, overlay set and baseline revision, matches current test hashes, records all four cases executed/passed without skips and intended assertion fail-before. No must-fix findings; no Gradle rerun; prior scope limitations remain."
+}
+```
