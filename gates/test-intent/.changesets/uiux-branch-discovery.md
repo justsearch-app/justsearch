@@ -333,3 +333,14 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
   "note": "Expectations follow delegated intent. Repair UI assertions fail on b1e8223b8 and pass on the candidate; BF2a preservation passes live on c5285b8ca and the candidate. Product verdict fails S16.4 visible app Back; broader Java suite failures remain."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "qx3spfv2",
+  "verdict": "accept",
+  "digest": "sha256:4c312f2b8657c219a4ad9a52606439bd9ab9bbe552eac8176f09bd2114504455",
+  "note": "Expectations follow delegated intent. Fresh UI and Java repair checks assert-fail before and pass on ca5e3732f. Product verdict fails C1/C2 rapid conversation-to-Library journal ordering; Java UI suites share the missing-esbuild environment failure."
+}
+```
