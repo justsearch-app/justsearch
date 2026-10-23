@@ -295,12 +295,7 @@ public final class CitationScorer implements Closeable {
    * amortize), splitting the sweep into sub-batches costs approximately nothing and lets the
    * deadline actually bind.
    */
-  static BestOf scoreSentence(String[] chunks, long deadlineNanos, BatchScorer batchScorer)
-      throws OrtException {
-    return scoreSentence(chunks, deadlineNanos, _ -> true, batchScorer);
-  }
-
-  private static BestOf scoreSentence(String[] chunks, long deadlineNanos,
+  static BestOf scoreSentence(String[] chunks, long deadlineNanos,
       java.util.function.IntPredicate compatible, BatchScorer batchScorer) throws OrtException {
     double bestScore = 0.0;
     int bestIdx = -1;

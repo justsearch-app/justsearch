@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx3d
+author-session: uiux-numeric-guard-ci-914
 ---
 
 # NX3d literal contract (recorded before implementation)
@@ -2113,6 +2113,23 @@ and its existing native runtime; no dependency lock or frontend manifest changes
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3dTest.java#preservesNx3dTwoDigitBoundariesValidGroupsAndAttachedContinuations"
       ]
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerSubBatchTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The four existing sub-batch tests call the production-used four-argument scoreSentence overload with the same always-true compatibility predicate that the removed three-argument adapter supplied. All passage inputs, deadlines, RecordingScorer fault injection, observations, assertions, display names, tags and conditions are unchanged. No oracle is added, removed or relaxed.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-bd718f request",
+          "quote": "Fix by removing dead code or calling it from production as designed; never by adding a line to the frozen store and never by weakening the rule. No behaviour change: all numeric checks (NX3-NX3d tests) must stay green."
+        }
+      ]
     }
   ]
 }
@@ -2603,6 +2620,38 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   remain unverified because the dev stack is unavailable. Private shared clone
   and script-created before worktrees were removed after comparisons. No manual
   process stops; test-owned lifecycle cleanup only. Changes remain uncommitted.
+
+## CI #914 builder observations (2026-10-23; no acceptance verdict)
+
+- The unchanged candidate 5c3163526 reported exactly one new frozen method-rule
+  violation: CitationScorer.scoreSentence(String[], long, BatchScorer). It was
+  previously called by production, but WP4.5 moved production to the numeric-aware
+  overload and left the old overload alive only through four sub-batch tests.
+- Removed that adapter; the already production-used overload is package-private
+  so those same tests call it with the adapter's unchanged always-true predicate.
+  The four existing test cases pass before and after. This is the signature
+  Adaptation entry above, with no assertion, fixture, tag or condition change.
+- The local whole architecture run also OOMs on clean origin/main b8f86eb10:
+  Java heap space at ArchUnit ReverseDependencies / ImmutableMap.entryOf with
+  the configured 384 MB test-worker heap. Thus that local import failure is not
+  specific to this branch. No heap, Gradle or rule settings were changed.
+  CI permits two retries; its supplied log shows the rule failure twice before
+  its OOM. The precise CI OOM's causality is not established by that sequence.
+- The full post-fix local architecture invocation still OOMed. A temporary
+  scoped diagnostic using the original rule helpers, production bytecode and a
+  private copy of the frozen store passed (16 imported types; 552 production
+  references). The diagnostic source and bytecode were removed, not committed.
+- The actual ciUnitTest1 task with the UnreferencedCodeTest filter passed all
+  11 selected architecture checks, including all three UnreferencedCodeTest
+  rules. The committed frozen store and rule source are byte-for-byte unchanged.
+- Full reranker suite: 100 passed, four model-gated skips. Those four CPU-model
+  tests were then explicitly enabled and all passed. Full worker-services suite:
+  1986 passed, 18 skipped; all NX3–NX3d numeric tests executed and passed.
+  Reranker/worker-services/app-launcher compilation and focused PMD passed.
+- CUDA_VISIBLE_DEVICES=-1 applied throughout. Checks used private checkouts,
+  their own build folders, shared Gradle caches/slot locks and read-only local
+  CPU model files. No owner application or dev stack was used. No manual
+  process stops. Detailed outputs and skipped-check list: tmp/ci-914/.
 
 ## Acceptance records
 
