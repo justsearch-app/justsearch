@@ -2682,3 +2682,14 @@ legacy-history rendering (GN3), production Ask NG8 and NG9.
   "note": "Expectations follow owner NX3 and delegated NX3a-c. Fresh repair evidence fails before by assertion and passes after; all four preservation/history checks execute and pass. Test intent accepted; implementation still fails NX3c extra-whitespace-group neighbours (verifier-8 evidence)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "tdnscnks",
+  "verdict": "accept",
+  "digest": "sha256:64fea3433b989417e609488e4f8d7834485fca7866ea865e9347a52a24cd1631",
+  "note": "NX3-NX3d expectations follow the agreed sources; repaired checks assertion-fail before and pass after. Runtime verification rejects delivery for V9-F1, independently of test-intent acceptance."
+}
+```
