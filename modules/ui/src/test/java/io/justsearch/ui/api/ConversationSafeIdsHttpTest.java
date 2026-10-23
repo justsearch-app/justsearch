@@ -22,6 +22,39 @@ class ConversationSafeIdsHttpTest {
   record Route(String method, String path, Handler handler) {}
 
   @Test
+  void throwawayParentsKeepSavedChildrenAndRefuseNewBranches(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp) throws Exception {
+    var store = new io.justsearch.app.services.conversation.FileConversationStore(tmp);
+    store.createSession("_title_x", "core.free-chat");
+    store.appendMessage("_title_x", "core.free-chat", java.util.Map.of("id", "q", "role", "user", "content", "question"));
+    store.appendMessage("_title_x", "core.free-chat", java.util.Map.of("id", "a", "role", "assistant", "content", "answer"));
+    java.nio.file.Files.createDirectory(tmp.resolve("uc-child"));
+    java.nio.file.Files.writeString(tmp.resolve("uc-child/meta.json"),
+        "{\"parentSessionId\":\"_title_x\",\"branchPointMessageId\":\"a\",\"shapeId\":\"core.free-chat\"}");
+    var chat = new ChatController(new TestEngineExecutors(), null, new SseWriter(null), null, store);
+    var app = Javalin.create(c -> c.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()));
+    try {
+      app.delete("/conversations/{sessionId}", chat::handleDeleteConversation);
+      app.post("/conversations/{sessionId}/branch", chat::handleBranchConversation);
+      app.start(0);
+      try (var client = HttpClient.newHttpClient()) {
+        var base = "http://localhost:" + app.port() + "/conversations/_title_x";
+        var deleted = client.send(HttpRequest.newBuilder(URI.create(base)).DELETE().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(409, deleted.statusCode(), deleted.body());
+        var body = JsonMapper.builder().build().readTree(deleted.body());
+        assertEquals("BRANCHES_PREVENT_DELETION", body.get("errorCode").asString());
+        assertEquals("uc-child", body.get("childSessionIds").get(0).asString());
+        assertEquals(2, store.loadHistory("uc-child").size());
+        var branched = client.send(HttpRequest.newBuilder(URI.create(base + "/branch?fromMsgId=a"))
+            .POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, branched.statusCode(), branched.body());
+        assertEquals("INVALID_REQUEST", JsonMapper.builder().build().readTree(branched.body()).get("errorCode").asString());
+        assertEquals(1, store.listSessions(null, 20).stream()
+            .filter(row -> "_title_x".equals(row.parentSessionId())).count());
+      }
+    } finally { app.stop(); chat.shutdown(); }
+  }
+
+  @Test
   void rejectsEncodedIdsOnEveryAddressedRouteWithoutTouchingStores() throws Exception {
     var store = mock(ConversationStore.class);
     var agent = mock(AgentService.class);

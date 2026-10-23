@@ -494,6 +494,57 @@ Agent choices adopted under the user's quoted delegation; never owner words. All
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 status changes cause no conversation reads without an unconfirmed delete"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "U1: legacy saved children retain inherited messages because throwaway-parent deletion is refused; new branches (including empty-prefix branches) cannot depend on temporary parents; real HTTP retains 409/child ids and 400/INVALID_REQUEST response styles. All other saved-id operations remain unchanged. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "U1",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX work, including WP1.4b deleting conversations without losing dependent history; orchestrator U1 repair decision.",
+          "choice": "Keep the child check for throwaway sessions too. A throwaway session without children still deletes as today (that is TN4: auto-title clean-up keeps working). Also refuse to branch from a throwaway session if the branch endpoint can be reached with one. Return the endpoint's existing error style, so no new child can depend on it.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-u1.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java#throwawayParentWithExistingChildCannotLoseInheritedHistory",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java#throwawayParentCannotAcquireNewBranches",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#preservesCreatedAndLegacyIdsWithoutRewritingSavedData",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java#throwawayParentsKeepSavedChildrenAndRefuseNewBranches"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "rename"
+      ],
+      "whatMoved": "Rename the misleading deleteThrowawaySessionBypassesBranchesCheck to deleteThrowawaySessionWithoutChildren and correct its comments/display name. Its inputs and all assertions remain: a childless temporary session deletes and an ordinary parent with a child refuses deletion. No child of the throwaway ever existed in that older check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "U1",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX work, including WP1.4b deleting conversations without losing dependent history; orchestrator U1 repair decision.",
+          "choice": "Keep the child check for throwaway sessions too. A throwaway session without children still deletes as today (that is TN4: auto-title clean-up keeps working). Also refuse to branch from a throwaway session if the branch endpoint can be reached with one. Return the endpoint's existing error style, so no new child can depend on it.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ]
     }
   ]
 }
