@@ -2,8 +2,29 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx3b
+author-session: uiux-numeric-guard-nx3c
 ---
+
+# NX3c literal contract (recorded before implementation)
+
+Start 2026-10-23 01:05:23 UTC; estimate 1 h; return by 03:05:23 UTC.
+Before-state 4765b85b3. Repair checks use production segmentation, real CE
+selection, and raw cosine with supplied and indexed passages; controls run
+before and after. No indentation or saved-state behavior is changed.
+
+### Clarification NX3c (agent-adopted, orchestrator 2026-10-23, under the user's delegation "you dont need to wait for my opinion regarding the designs, i agree with you on them"; origin: verifier-7 V7-F1 and the whitespace note)
+
+A run of digits that starts as a valid grouped number but continues into something no agreed form reads (more decimal points, a further digit group) is not a number the check can read: it supplies no value to a passage and no value to a claim, so a claim's value cannot be found inside it. Separators that never form a group (lists such as "3, 4, 5") still separate whole values as in NX3/NX3a.
+
+| Case | Expected |
+|---|---|
+| Claim "The shipment contains 200." vs passage "The shipment contains 1 200 000.5.1." | not verified (as before the guard) |
+| Claim 1200000 vs passage "1 200 000.5.1" | not verified |
+| Claim 1200000.5 vs passage "1 200 000.5" | verified (NX3b, must keep) |
+| Claim 200 vs passage "1 200 000." | not verified (NX3b, must keep) |
+| Claim 4 vs passage "values 3, 4, 5" | verified (NX3a, must keep) |
+| Claim 1.2 vs passage "version 1.2.3" | as on the before-state |
+| Answer prose indented by four or more spaces (a Markdown code block) | split and keyed by Markdown block rules, as the candidate does; unindented answers keep their sentence keys, scores and counts exactly (GN1); saved answers are not re-judged (D11) |
 
 # NX3b literal contract (recorded before implementation)
 
@@ -1849,6 +1870,113 @@ and its existing native runtime; no dependency lock or frontend manifest changes
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java#preservesNx3bAsciiReferencesAndNx3aControls"
       ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3c literal cases and separator neighbours traverse production segmentation, real CE selection and raw cosine matching with supplied/indexed passages. Malformed grouped passages cannot supply fragment values; controls preserve exact scores, keys, scored/matched counts, thresholds and skipped claims. Fixed logits/embeddings isolate numeric eligibility.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard in WP4.5: consume malformed grouped runs without supplying fragment values, preserve list-separated values and NX3b grouping/code behavior. Preserve Markdown indentation, unindented sentence keys/scores/counts, thresholds and saved historical verdicts.",
+          "choice": "A run of digits that starts as a valid grouped number but continues into something no agreed form reads (more decimal points, a further digit group) is not a number the check can read: it supplies no value to a passage and no value to a claim, so a claim's value cannot be found inside it. Separators that never form a group (lists such as \"3, 4, 5\") still separate whole values as in NX3/NX3a.\n\n| Case | Expected |\n|---|---|\n| Claim \"The shipment contains 200.\" vs passage \"The shipment contains 1 200 000.5.1.\" | not verified (as before the guard) |\n| Claim 1200000 vs passage \"1 200 000.5.1\" | not verified |\n| Claim 1200000.5 vs passage \"1 200 000.5\" | verified (NX3b, must keep) |\n| Claim 200 vs passage \"1 200 000.\" | not verified (NX3b, must keep) |\n| Claim 4 vs passage \"values 3, 4, 5\" | verified (NX3a, must keep) |\n| Claim 1.2 vs passage \"version 1.2.3\" | as on the before-state |\n| Answer prose indented by four or more spaces (a Markdown code block) | split and keyed by Markdown block rules, as the candidate does; unindented answers keep their sentence keys, scores and counts exactly (GN1); saved answers are not re-judged (D11) |",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3c-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java#rejectsNx3cFragmentsOfMalformedGroupedPassages"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3c literal cases and separator neighbours traverse production segmentation, real CE selection and raw cosine matching with supplied/indexed passages. Malformed grouped passages cannot supply fragment values; controls preserve exact scores, keys, scored/matched counts, thresholds and skipped claims. Fixed logits/embeddings isolate numeric eligibility.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG4",
+          "quote": "Reference literals such as [4], list numbering and the answer's own markers are not treated as stated values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "GN1",
+          "quote": "Sentences without numbers get exactly the same matches as before on a fixed corpus.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard in WP4.5: consume malformed grouped runs without supplying fragment values, preserve list-separated values and NX3b grouping/code behavior. Preserve Markdown indentation, unindented sentence keys/scores/counts, thresholds and saved historical verdicts.",
+          "choice": "A run of digits that starts as a valid grouped number but continues into something no agreed form reads (more decimal points, a further digit group) is not a number the check can read: it supplies no value to a passage and no value to a claim, so a claim's value cannot be found inside it. Separators that never form a group (lists such as \"3, 4, 5\") still separate whole values as in NX3/NX3a.\n\n| Case | Expected |\n|---|---|\n| Claim \"The shipment contains 200.\" vs passage \"The shipment contains 1 200 000.5.1.\" | not verified (as before the guard) |\n| Claim 1200000 vs passage \"1 200 000.5.1\" | not verified |\n| Claim 1200000.5 vs passage \"1 200 000.5\" | verified (NX3b, must keep) |\n| Claim 200 vs passage \"1 200 000.\" | not verified (NX3b, must keep) |\n| Claim 4 vs passage \"values 3, 4, 5\" | verified (NX3a, must keep) |\n| Claim 1.2 vs passage \"version 1.2.3\" | as on the before-state |\n| Answer prose indented by four or more spaces (a Markdown code block) | split and keyed by Markdown block rules, as the candidate does; unindented answers keep their sentence keys, scores and counts exactly (GN1); saved answers are not re-judged (D11) |",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3c-preserved.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java#preservesNx3cLiteralControlsAndSkippedClaims",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3cTest.java#preservesNx3cMarkdownKeysScoresAndCounts"
+      ]
     }
   ]
 }
@@ -2257,6 +2385,48 @@ Gradle/npm caches and slot locks plus read-only CPU-model files. No owner app,
 dev stack, GPU or display service was used or stopped. .agents/preflight is absent.
 Remaining unverified: full live/cold Engine/browser NG1/NG6 combinations, browser
 legacy-history rendering (GN3), production Ask NG8 and NG9.
+
+## NX3c builder observations (2026-10-23; no acceptance verdict)
+
+- Production change is confined to NumericConsistency: an invalid run with a
+  whole grouped prefix cannot enter passage splitting. A four-digit list item
+  (0x10,1883 or 0x10 1883) never supplies a partial three-digit grouped prefix.
+- Durable NumericCitationNx3cTest covers all NX3c table rows and neighbours:
+  24 repaired pairs and 39 preservation pairs, each through direct CE selection,
+  Worker CE supplied/indexed paths and raw cosine supplied/indexed paths.
+  It also asserts exact scores, keys, counts and non-promotion below threshold.
+- Final tests on unchanged 4765b85b3: repair method assertion-fails (CE expected
+  [], got a 0.976 match; raw cosine expected 0 matches, got 1). Both preservation
+  methods pass. The separate 75-check preservation suite passes before and after.
+- The initial prefix predicate regressed three existing methods on 0x10,1883
+  and 0x10 1883. A whole-group boundary corrected that defect without changing
+  existing tests. Actual failed output remains in tmp/nx3c/attempt-1/.
+- Final focused numeric suite: 94 passed, zero skips. Additional affected
+  app-services suite: 48 passed, zero skips. PMD passed for reranker,
+  worker-services, app-services, app-agent and ui. Full build -x test passed;
+  its existing UI integration suite ran 42 checks and skipped one Windows-only
+  machine-policy check. No frontend, manifest, lockfile or saved-history edit.
+- D10 reused the fixed six literal fixtures and unchanged CPU model hashes,
+  two warm-up suites, five timed suite sums and the same 2000 ms deadline.
+  Paired median: 158082977 ns before, 159546617 ns after (+0.9259%); all six
+  fixtures remained scored in every run. Resources: Java 25.0.4.1, ORT 1.24.3,
+  20 reported processors, unreserved load 7.0396 before / 6.9214 after.
+  Fresh XML lives in uiux-numeric-guard-nx3c-controlled-performance-*.xml.
+- Fresh run-evidence JSON (nx3c-repaired / nx3c-preserved) passed in default
+  link mode, repair before-state 4765b85b3. The existing historical evidence,
+  intent entries and acceptance records are unchanged. Test-intent reports
+  acceptance-stale only; the builder did not author an acceptance record.
+- Operation, execution, register-resolution and wire gates passed (npm ci for
+  scripts/wire-contract ran before wire). Gitleaks flagged only the tokenizer
+  hash labels in the new performance XML; changing sha256= to sha256 plus a
+  space preserved hashes and timings. The final scan found no leaks.
+- Checks used shared Gradle/npm caches and slot locks, read-only local models
+  for CPU scoring, and the full build's stock GPU/NVML capability probes.
+  No owner app or dev stack was used. NG8 production Ask coverage/timing and
+  NG9 rag-qa Ask counts remain unverified because the dev stack is unavailable.
+  The private shared before clone and script-created before worktrees were
+  removed after comparisons. No processes other than test-owned resources
+  were stopped. Changes remain uncommitted.
 
 ## Acceptance records
 

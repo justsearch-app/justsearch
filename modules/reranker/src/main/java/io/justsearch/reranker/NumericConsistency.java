@@ -20,6 +20,7 @@ public final class NumericConsistency {
   private static final Pattern NUMBER = Pattern.compile("(?>" + GROUPED_NUMBER + ")(?![0-9]|[.,][0-9])"
       + "|(?:[0-9]+|\\.[0-9]+)(?:[.,\\p{Zs}][0-9]+)*");
   private static final Pattern UNGROUPED_NUMBER = Pattern.compile("[0-9]+(?:\\.[0-9]+)*");
+  private static final Pattern GROUPED_PREFIX = Pattern.compile(GROUPED_NUMBER + "(?![0-9])");
   private static final Pattern PLAIN_NUMBER = Pattern.compile(
       "[0-9]+(?:\\.[0-9]+)?|" + GROUPED_NUMBER + "|\\.[0-9]+");
   private static final Pattern REFERENCE =
@@ -77,8 +78,8 @@ public final class NumericConsistency {
                 && plainBoundary(text, numbers.end(), false)))) {
           values.add(canonical(numbers.group()));
         }
-      } else if (!plainOnly) {
-        // Non-grouping commas/spaces separate passage values; decimal pieces never do.
+      } else if (!plainOnly && !GROUPED_PREFIX.matcher(numbers.group()).lookingAt()) {
+        // Only non-grouping commas/spaces separate values; malformed grouped runs stay whole.
         var parts = UNGROUPED_NUMBER.matcher(text).region(numbers.start(), numbers.end());
         while (parts.find()) {
           if (PLAIN_NUMBER.matcher(parts.group()).matches()
