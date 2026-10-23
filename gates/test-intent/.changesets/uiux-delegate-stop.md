@@ -193,3 +193,14 @@ The observer repair originally failed on b06ad571f. The bounded-grace repair fai
   "note": "Test-intent acceptance: DS6 delegated-choice source and before-state test reviewed before diff; concurrent/repeated held-run Stop expectations are warranted. Scratch run-evidence passes on 1b5a5cd60 and fails by duplicate-note assertion on c90299280; frontend evidence rerun passes with assertion fail-before on dccd09b02. Acceptance concerns test intent; real-system verdict is separate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "253k2uzv",
+  "verdict": "accept",
+  "digest": "sha256:5551445536d1b030a91d738035577b821b2665a1b55b5cd9c47e597be6e996d9",
+  "note": "Expectations follow delegated DS/DN scenarios and bounded-grace choice; additions weaken no existing oracle. Reviewed script-produced assertion fail-before evidence; candidate full and targeted vitest pass. Test-intent acceptance; real-system verdict is separate."
+}
+```
