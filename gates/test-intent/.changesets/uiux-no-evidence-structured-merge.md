@@ -77,3 +77,14 @@ quotes the merge continuation brief verbatim. Existing test expectations remain 
   "note": "New expectations follow the agent-adopted delegated-choice scenarios reviewed before the diff. Independent evidence: 7 frontend cases and 1 Java case pass with zero skips; both fail before by assertions for the intended repair. The recorded dependency-copy adapter preserves internal links. Product verification is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a168ce-c6e2-7d71-b529-62b0b59158ae",
+  "verdict": "accept",
+  "digest": "sha256:d37e0b47043ee5bd1d53619a9a3c757aff18168ed4693b5fef6e0b43aac7fc44",
+  "note": "Audited both entries as New within delegated integration scope: schema/model identity and Retry/Edit remain distinct; extraction and D5 persistence rules save exactly once, including overlap. Independently confirmed 7 frontend passes and assertion fail-before. Reviewed digest-valid Java evidence: 1 pass after and the intended assertion failure before. Optional local Java rerun was not executed due to the shared queue. Existing expectations are not weakened; test-intent acceptance only."
+}
+```

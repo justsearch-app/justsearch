@@ -579,3 +579,14 @@ scenario id is carried in agreedScenario. No independent acceptance is authored 
   "note": "Reaffirmed original test-intent acceptance: current digest exactly matches the prior accepted sha256:7ce824ce3d74dda78f4eb986c31a40af2909c3ca57dab13a5fb8ff53cb335072. The merge leaves the covered tests, entries and producer evidence unchanged; the original agent-adopted delegated-choice intent still applies. Product verification is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a168ce-c6e2-7d71-b529-62b0b59158ae",
+  "verdict": "accept",
+  "digest": "sha256:7ce824ce3d74dda78f4eb986c31a40af2909c3ca57dab13a5fb8ff53cb335072",
+  "note": "Audited all 7 entries as New: expectations follow the agreed WP4.2b delegated choices; the superseded no-content oracle is warranted and existing old-window/fallback/Stop assertions are retained. Independently confirmed 34 frontend passes and assertion fail-before; preservation checks pass both versions. Reviewed digest-valid Java evidence: 14 passes after, 12 assertion failures and 2 preservation passes before. Optional local Java rerun cancelled while queued, never executed. Test-intent acceptance only."
+}
+```
