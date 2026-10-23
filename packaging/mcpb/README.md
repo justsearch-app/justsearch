@@ -22,10 +22,12 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    see 3.), answers `GET /api/runtime/live` with the same pid and instance id, and
    `GET /api/health` answers 200 (a proven Engine still starting, 503, is re-checked for up to
    30 s, so starting the host and the app together works); there is no default-port guess. On Windows, when `%APPDATA%`
-   is unset in its environment, it also asks Windows for the Roaming folder. The bridge never
+   is unset in its environment, it also asks Windows for the Roaming folder (waiting up to 30 s
+   for that answer; a lookup that times out or fails is named in the not-found error). The bridge never
    looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
    installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
-   `<checkout>/modules/ui-web/.dev-data`) or `JUSTSEARCH_API_PORT` to use the dev Engine.
+   `<checkout>/modules/ui-web/.dev-data`) to use the dev Engine (a `JUSTSEARCH_API_PORT` pin
+   alone is refused unless a manifest the bridge reads names that port; see 3.).
    (The production stdio server, `scripts/prod/justsearch-mcp.mjs`, tries more: `--port`,
    `JUSTSEARCH_API_PORT`, the legacy `JUSTSEARCH_HOME` folder, which wins over
    `JUSTSEARCH_DATA_DIR`, then `JUSTSEARCH_DATA_DIR`, the desktop app's folder, a dev
@@ -43,16 +45,30 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    nothing until the manifest still names the same Engine and the OS reports that pid as the
    owner of the server end of that very connection; a reused connection needs no new proof.
    If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
-   token never reaches whatever took the port (a `JUSTSEARCH_API_PORT` pin is the operator's
-   choice and is used as given).
-   An explicit `JUSTSEARCH_API_PORT` requires `JUSTSEARCH_SESSION_TOKEN`; the bridge fails
-   with a message naming the variable if absent. No token HTTP endpoint or stdout line is used.
+   token never reaches whatever took the port. A `JUSTSEARCH_API_PORT` pin requires
+   `JUSTSEARCH_SESSION_TOKEN` (the bridge fails with a message naming the variable if it is
+   absent), and that token goes only to the Engine of a runtime manifest that names the pinned
+   port, with the same proof; if that proof fails, the pin is refused. A stale manifest (its pid
+   is gone) that names the pinned port is a refusal, and so is a pin that no manifest names:
+   nothing proves what answers it, so it never gets the token. A refused pin ends discovery
+   with that refusal; the bridge never falls back to another Engine. No token HTTP endpoint or
+   stdout line is used.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
-   different port mid-session, the bridge re-runs that discovery,
-   re-initializes the session with the cached `initialize` params, and replays
-   the failed call once before giving up.
+   different port mid-session, or another Engine answers the pinned port, the
+   bridge re-runs that discovery, drops everything negotiated with the old Engine
+   (the `Mcp-Session-Id`, which is only ever sent to the Engine that issued it, the
+   `MCP-Protocol-Version` and the server stream; also when it assigned no session id), and re-initializes the session with
+   the cached `initialize` params, sent exactly as a first `initialize` is; the
+   version is negotiated again from the new Engine's answer (an answer or event that still
+   arrives from the old session changes nothing). Until a session's own `initialize` has been
+   answered (bounded at 10 s), no other message is sent in it: calls wait for it, or for the
+   session that replaces it, and a call before any `initialize` is refused unsent. The failed call is sent again once only if it surely did not reach the
+   app (it never had a connection, or the app answered 400/401/404 for it);
+   otherwise it fails with an error saying its outcome is unknown, so a mutating
+   call never runs twice. Idle connections are closed after 25 s, before the
+   app's 30 s idle expiry. Closing stdin stops the bridge, also during discovery.
 
 The bridge is **dependency-free** (Node builtins only) and never touches the
 network beyond `127.0.0.1` — no npx fetches, no downloads, ever.
