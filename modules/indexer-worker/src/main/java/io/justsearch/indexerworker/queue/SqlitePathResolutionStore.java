@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.queue;
 
 import io.justsearch.indexerworker.path.PathResolutionStore;
+import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -85,6 +86,36 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
    * (the file came back).
    */
   @Override
+  public void probe() {
+    lock.lock();
+    try {
+      Connection conn = openConnection();
+      boolean autoCommit = conn.getAutoCommit();
+      if (autoCommit) conn.setAutoCommit(false);
+      var savepoint = conn.setSavepoint();
+      try {
+        String hash = DocumentIdentityStore.pathHash("justsearch-ingestion-canary");
+        record(hash, "justsearch-ingestion-canary", System.currentTimeMillis());
+        if (lookup(hash).isEmpty()) throw new SQLException("Ingestion health round trip returned no row");
+      } finally {
+        try {
+          conn.rollback(savepoint);
+          conn.releaseSavepoint(savepoint);
+          if (autoCommit) conn.setAutoCommit(true);
+        } catch (SQLException cleanup) {
+          closed = true;
+          try { conn.close(); } catch (SQLException closeFailure) { cleanup.addSuppressed(closeFailure); }
+          throw cleanup;
+        }
+      }
+    } catch (SQLException e) {
+      throw SqliteServiceAvailability.failure("Ingestion health round trip failed", e);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public void record(String pathHash, String normalizedPath, long nowMs) {
     Objects.requireNonNull(pathHash, "pathHash");
     Objects.requireNonNull(normalizedPath, "normalizedPath");
@@ -106,10 +137,7 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
         stmt.executeUpdate();
       }
     } catch (SQLException e) {
-      if (SqliteServiceAvailability.unavailable(e)) {
-        throw SqliteServiceAvailability.failure("Path resolution service unavailable", e);
-      }
-      log.warn("PathResolutionStore.record failed for hash {}: {}", pathHash, e.getMessage());
+      throw SqliteServiceAvailability.failure("Path resolution record failed", e);
     } finally {
       lock.unlock();
     }

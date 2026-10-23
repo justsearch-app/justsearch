@@ -125,6 +125,11 @@ public interface DocumentIdentityStore {
   /** Looks up an identity by path hash. */
   Optional<Identity> lookup(String pathHash);
 
+  /** Checks a normal-width identity write/read under the store lock, rolling back all effects. */
+  default void probe() {
+    throw new IngestionServiceUnavailableException("Identity health probe is unavailable");
+  }
+
   /** SHA-256 hex over the already-normalized absolute path. */
   static String pathHash(String normalizedPath) {
     return PathHash.sha256(normalizedPath);

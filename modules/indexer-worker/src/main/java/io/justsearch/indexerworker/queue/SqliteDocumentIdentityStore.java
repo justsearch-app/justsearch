@@ -61,6 +61,36 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
   }
 
   @Override
+  public void probe() {
+    lock.lock();
+    try {
+      Connection conn = openConnection();
+      boolean autoCommit = conn.getAutoCommit();
+      if (autoCommit) conn.setAutoCommit(false);
+      var savepoint = conn.setSavepoint();
+      try {
+        String hash = DocumentIdentityStore.pathHash("justsearch-ingestion-canary");
+        resolve(hash, System.currentTimeMillis());
+        if (lookup(hash).isEmpty()) throw new SQLException("Ingestion health round trip returned no row");
+      } finally {
+        try {
+          conn.rollback(savepoint);
+          conn.releaseSavepoint(savepoint);
+          if (autoCommit) conn.setAutoCommit(true);
+        } catch (SQLException cleanup) {
+          closed = true;
+          try { conn.close(); } catch (SQLException closeFailure) { cleanup.addSuppressed(closeFailure); }
+          throw cleanup;
+        }
+      }
+    } catch (SQLException e) {
+      throw SqliteServiceAvailability.failure("Ingestion health round trip failed", e);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public Identity resolve(String pathHash, long nowMs) {
     requireHash(pathHash);
     lock.lock();

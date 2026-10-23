@@ -71,8 +71,8 @@ final class OutageLifecycleTest extends LuceneExecutorTestBase {
   @Test
   void stopDuringCappedOutagePauseWakesWithoutInterruptingOrChargingRows() throws Exception {
     var writer = mock(IndexingCoordinator.class);
-    doThrow(new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_FULL,
-        "outage during shutdown", null)).when(writer).indexSingle(any());
+    doThrow(new io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException(
+        "outage during shutdown")).when(writer).indexSingle(any());
     loop = newLoop(writer, mock(CommitOps.class));
     enqueue("stop-a.txt", "stop-b.txt");
     loop.start();

@@ -80,8 +80,7 @@ public final class ExtractionSandboxChild {
       return SandboxExtractionResponse.failed(
           request.requestId(), ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
     } catch (Exception e) {
-      boolean unavailable = e instanceof IngestionServiceUnavailableException
-          || cache.ownedPaths.ownsFailure(e, Path.of(request.path()));
+      boolean unavailable = e instanceof IngestionServiceUnavailableException;
       return SandboxExtractionResponse.failed(
           request.requestId(), ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed",
           unavailable ? SandboxExtractionResponse.SERVICE_UNAVAILABLE : "PARSER_FAILED");
@@ -96,7 +95,6 @@ public final class ExtractionSandboxChild {
    * the JVM's own stderr signature, and answering from a poisoned heap is not reliable.
    */
   static final class ExtractorCache implements AutoCloseable {
-    private final EngineOwnedPaths ownedPaths = new EngineOwnedPaths(null);
     private TikaExtractionPolicy policy;
     private OcrRoutingConfig ocrConfig;
     private PolicyDrivenTikaExtractor extractor;

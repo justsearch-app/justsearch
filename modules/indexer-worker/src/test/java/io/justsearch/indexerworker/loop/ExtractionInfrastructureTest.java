@@ -58,7 +58,7 @@ final class ExtractionInfrastructureTest {
         if (mode.startsWith("readonly")) Files.setPosixFilePermissions(scratch, permissions);
         else Files.createDirectory(scratch);
         h.assertRecovery();
-        assertEquals(0, h.probes.get(), "proven snapshot path needs no canary");
+        assertTrue(h.probes.get() >= 4, "shared snapshot failures are proved by the actual canary every pause");
       } finally {
         if (!Files.exists(scratch)) Files.createDirectory(scratch);
         Files.setPosixFilePermissions(scratch, permissions);
@@ -71,10 +71,10 @@ final class ExtractionInfrastructureTest {
     try (var h = new Fixture()) {
       h.unknown.set(true);
       h.start(); h.assertOutageBeyondGrace();
-      assertEquals(1, h.probes.get(), "at most one canary at the fourth pause step, shared across rows");
+      assertEquals(4, h.probes.get(), "one canary per failed batch, immediately and shared across rows");
       assertEquals(0, h.writes.get(), "canary must never write an index document");
       h.unknown.set(false); h.assertRecovery();
-      assertEquals(1, h.probes.get(), "healthy batches never probe");
+      assertEquals(4, h.probes.get(), "healthy batches never probe");
       assertTrue(h.errors.stream().allMatch(e -> e instanceof ContentExtractor.ExtractionException),
           "O8 has no typed availability or filesystem provenance signal");
     }
@@ -252,7 +252,9 @@ final class ExtractionInfrastructureTest {
     }
 
     void assertOutageBeyondGrace() throws Exception {
-      await(() -> errors.size() >= 8 && paused() || rows().stream().anyMatch(r -> r.attempts() > 0), 20_000);
+      await(() -> (errors.size() >= 8 && paused()
+          && rows().stream().allMatch(r -> r.retry() >= System.currentTimeMillis() + 6_000))
+          || rows().stream().anyMatch(r -> r.attempts() > 0), 20_000);
       var rows = rows();
       System.out.println("round9 outage errors=" + errors.size() + " probes=" + probes + " rows=" + rows);
       assertTrue(rows.stream().allMatch(r -> r.attempts() == 0), "shared infrastructure must never charge healthy source files");

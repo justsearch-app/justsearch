@@ -1,12 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
-import io.justsearch.indexerworker.extract.EngineOwnedPaths;
+import io.justsearch.indexerworker.extract.SandboxServiceUnavailableException;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
-import java.sql.SQLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.FileSystemException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -14,13 +17,7 @@ import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Single-threaded service history, separate for the writer and identity store. A successful peer
- * makes unknown failures document-specific. Without one, only explicit infrastructure signals prove an outage;
- * unknown failures get three grace batches, then a shared extraction canary before the file ladder.
- * History is constant-size and resets on service success or worker restart. Restart grants three
- * new grace batches but never resets persisted attempts or exhaustion.
- */
+/** Paced, summarized failures; only current full-pipeline health permits a file charge. */
 final class BatchServiceFailures {
   private static final Logger log = LoggerFactory.getLogger(BatchServiceFailures.class);
   private static final long MAX_DELAY_MS = 8_000;
@@ -28,56 +25,61 @@ final class BatchServiceFailures {
   private final List<Failure> pending = new ArrayList<>();
   private boolean active;
   private boolean succeeded;
-  private int ambiguousBatches;
   private long nextDelayMs = 1_000;
   private long delayMs;
   private long retryAtMs;
   private long lastLogNs;
   private long unreportedFailures;
   private Throwable sample;
-  private boolean canaryFailed;
-  private EngineOwnedPaths ownedPaths;
-
-  void useOwnedPaths(EngineOwnedPaths paths) { ownedPaths = paths; }
-
-  boolean ownsFailure(Throwable failure, java.nio.file.Path source) {
-    return ownedPaths != null && ownedPaths.ownsFailure(failure, source);
-  }
-
+  private boolean healthy;
   void begin() {
     pending.clear();
     succeeded = false;
     delayMs = 0;
     sample = null;
-    canaryFailed = false;
+    healthy = false;
     active = true;
   }
 
   void success() {
     succeeded = true;
-    ambiguousBatches = 0;
     nextDelayMs = 1_000;
   }
 
-  void failure(Throwable failure, java.nio.file.Path source, Consumer<Boolean> record) {
-    if (ownsFailure(failure, source)) unavailable(failure, record);
-    else if (EngineOwnedPaths.sourceFailure(failure, source)) record.accept(false);
+  boolean succeeded() { return succeeded; }
+
+  void failure(Throwable failure, Path source, Consumer<Boolean> record) {
+    if (sourceFailure(failure, source)) record.accept(false);
     else failure(failure, record);
   }
 
   void failure(Throwable failure, Consumer<Boolean> record) {
     noteFailure(failure);
-    if (active && !(failure instanceof IllegalArgumentException) && !(failure instanceof Error)) {
-      pending.add(new Failure(failure, record, false));
-    } else {
-      record.accept(false);
+    if (active) pending.add(new Failure(record, unavailable(failure)));
+    else record.accept(false);
+  }
+
+  // Source IO remains per-file even if a simultaneous infrastructure probe would fail.
+  static boolean sourceFailure(Throwable failure, Path source) {
+    Throwable cause = failure;
+    for (int depth = 0; cause != null && depth < 16; depth++, cause = cause.getCause()) {
+      if (cause instanceof FileSystemException fs && fs.getFile() != null) {
+        try {
+          Path failed = Path.of(fs.getFile());
+          if (source.toAbsolutePath().normalize().equals(failed.toAbsolutePath().normalize())
+              || Files.isSameFile(source, failed)) return true;
+        } catch (IOException | java.nio.file.InvalidPathException inaccessible) {
+          // Admission/presence separately handles sources that cannot be opened at all.
+        }
+      }
     }
+    return false;
   }
 
   void unavailable(Throwable failure, Consumer<Boolean> record) {
     noteFailure(failure);
     if (active) {
-      pending.add(new Failure(failure, record, true));
+      pending.add(new Failure(record, true));
     } else {
       // Standalone writes have no batch finalizer; preserve their immediate uncounted outcome.
       retryAtMs = System.currentTimeMillis() + 1_000;
@@ -115,9 +117,8 @@ final class BatchServiceFailures {
 
   private long prepareRetry(long minimumDelayMs, BooleanSupplier canary) {
     active = false;
-    boolean ambiguous = pending.stream().anyMatch(f -> !f.unavailable() && !provenOutage(f.error()));
-    if (!succeeded && ambiguous) ambiguousBatches = Math.min(4, ambiguousBatches + 1);
-    if (!succeeded && ambiguous && ambiguousBatches > 3) canaryFailed = !canary.getAsBoolean();
+    if (pending.stream().anyMatch(f -> !f.unavailable())) healthy = canary.getAsBoolean();
+    if (healthy) success();
     if (pending.stream().anyMatch(this::systemic)) {
       delayMs = Math.max(nextDelayMs, Math.min(MAX_DELAY_MS, minimumDelayMs));
       nextDelayMs = Math.min(MAX_DELAY_MS, delayMs * 2);
@@ -126,8 +127,7 @@ final class BatchServiceFailures {
   }
 
   private boolean systemic(Failure failure) {
-    return failure.unavailable() || provenOutage(failure.error()) || canaryFailed
-        || (!succeeded && ambiguousBatches <= 3);
+    return failure.unavailable() || !healthy;
   }
 
   void finish() {
@@ -154,31 +154,15 @@ final class BatchServiceFailures {
     }
   }
 
-  private static boolean provenOutage(Throwable failure) {
-    if (failure instanceof EngineExecutorRejectedException) return true;
-    if (failure instanceof IndexWriterUnavailableException
-        || failure instanceof IngestionServiceUnavailableException) return true;
-    // Untagged DISK_IO can concern a document; the Lucene boundary tags index-owned IO.
-    if (failure instanceof IndexRuntimeIOException indexError) {
-      if (indexError.isIndexStorageFailure()) return true;
-      return switch (indexError.reason()) {
-        case DISK_FULL, LOCKED, CORRUPT_INDEX, SCHEMA_MISMATCH, BACKPRESSURE, DRAINING -> true;
-        default -> false;
-      };
-    }
-    // SQLite wraps SQLException in IllegalStateException. Constraints and unknown SQL errors
-    // are ambiguous; these primary result codes specifically describe shared store availability.
-    Throwable cause = failure;
-    for (int depth = 0; cause != null && depth < 8; depth++, cause = cause.getCause()) {
-      if (cause instanceof SQLException sql) {
-        return switch (sql.getErrorCode() & 0xff) {
-          case 5, 6, 8, 10, 11, 13, 14, 26 -> true; // BUSY, LOCKED, READONLY, IOERR, CORRUPT, FULL, CANTOPEN, NOTADB
-          default -> false;
-        };
-      }
-    }
-    return false;
+  private static boolean unavailable(Throwable failure) {
+    if (failure instanceof EngineExecutorRejectedException
+        || failure instanceof IndexWriterUnavailableException
+        || failure instanceof IngestionServiceUnavailableException
+        || failure instanceof SandboxServiceUnavailableException) return true;
+    return failure instanceof IndexRuntimeIOException indexError
+        && (indexError.reason() == IndexRuntimeIOException.Reason.DRAINING
+            || indexError.reason() == IndexRuntimeIOException.Reason.BACKPRESSURE);
   }
 
-  private record Failure(Throwable error, Consumer<Boolean> record, boolean unavailable) {}
+  private record Failure(Consumer<Boolean> record, boolean unavailable) {}
 }

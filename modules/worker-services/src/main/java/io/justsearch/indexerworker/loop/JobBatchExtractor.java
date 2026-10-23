@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
-import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
@@ -158,9 +157,9 @@ public final class JobBatchExtractor {
     return extracted;
   }
 
-  void useOwnedPaths(EngineOwnedPaths paths) {
-    identityFailures.useOwnedPaths(paths);
-    extractionFailures.useOwnedPaths(paths);
+  void pipelineSucceeded() {
+    identityFailures.success();
+    extractionFailures.success();
   }
 
   long prepareRetry(BooleanSupplier canary) {
@@ -214,7 +213,6 @@ public final class JobBatchExtractor {
 
     long startTime = System.currentTimeMillis();
     FileEnvelope envelope = null;
-    boolean extracting = false;
 
     try {
       SourceAdmission admission = ingestionAuthority.admit(claim);
@@ -262,7 +260,6 @@ public final class JobBatchExtractor {
             envelope.pathHash(), envelope.normalizedPath(), envelope.observedAtMs());
         identityStore = documentIdentityStoreSupplier.get();
         docUid = identityStore.resolve(envelope.pathHash(), envelope.observedAtMs()).docUid();
-        identityFailures.success();
       } catch (RuntimeException identityError) {
         FileEnvelope admittedEnvelope = envelope;
         Consumer<Boolean> recordFailure = systemic -> {
@@ -324,10 +321,7 @@ public final class JobBatchExtractor {
       String sourceSha256 = SourceContentHash.sha256(filePath);
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
-        extracting = true;
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
-        extracting = false;
-        extractionFailures.success();
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
         artifact = rawArtifact.validate(contentExtractor.extractionPolicy(), sourcePathHash);
       } finally {
@@ -393,23 +387,6 @@ public final class JobBatchExtractor {
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
-    } catch (BudgetExceededException e) {
-      log.warn("Extraction budget exceeded for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "BUDGET_EXCEEDED",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.BUDGET_EXCEEDED,
-                      e.reasonCode(),
-                      IngestionRetryPolicy.NONE,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
     } catch (IOException | ContentExtractor.ExtractionException | RuntimeException | Error e) {
       if (e instanceof VirtualMachineError fatal) throw fatal;
       FileEnvelope admittedEnvelope = envelope;
@@ -424,8 +401,7 @@ public final class JobBatchExtractor {
                 entry, extractionFailures.retryAtMs());
             else jobQueue.markClaimFailed(claim, original, entry);
           });
-      if (extractionFailures.ownsFailure(e, filePath)) extractionFailures.unavailable(e, record);
-      else if (extracting && !EngineOwnedPaths.sourceFailure(e, filePath)
+      if (!BatchServiceFailures.sourceFailure(e, filePath)
           && !(e instanceof IOException io && sourceAccessOutcome(claim, io) != null)) {
         extractionFailures.failure(e, record);
       } else record.accept(false);
@@ -436,6 +412,7 @@ public final class JobBatchExtractor {
   }
 
   private static IngestionOutcomeClass extractionFailureClass(Throwable failure) {
+    if (failure instanceof BudgetExceededException) return IngestionOutcomeClass.BUDGET_EXCEEDED;
     if (failure instanceof IOException) return IngestionOutcomeClass.IO_FAILED;
     if (failure instanceof ExtractionTimeoutException) return IngestionOutcomeClass.PARSER_TIMEOUT;
     if (failure instanceof SandboxExtractionException) return IngestionOutcomeClass.SANDBOX_FAILED;
@@ -444,6 +421,9 @@ public final class JobBatchExtractor {
 
   private IngestionOutcome extractionOutcome(JobQueue.IndexJob claim, Throwable failure,
       IngestionOutcomeClass outcomeClass) {
+    if (failure instanceof BudgetExceededException budget) {
+      return journal.outcome(outcomeClass, budget.reasonCode(), IngestionRetryPolicy.NONE, failureDetail(failure));
+    }
     if (failure instanceof IOException io) {
       IngestionOutcome source = sourceAccessOutcome(claim, io);
       if (source != null) return source;

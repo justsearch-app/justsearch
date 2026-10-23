@@ -56,6 +56,10 @@ final class OutageWaitingStatusTest {
       written.incrementAndGet();
       return null;
     }).when(writer).indexSingle(any());
+    doAnswer(call -> {
+      if (unavailable.get()) throw new IllegalStateException("shared writer unavailable");
+      return null;
+    }).when(writer).probeIngestion();
     var identities = mock(DocumentIdentityStore.class);
     when(identities.resolve(anyString(), anyLong())).thenAnswer(call -> {
       if (unavailable.get() && (service.equals("identity")

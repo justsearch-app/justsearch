@@ -115,7 +115,7 @@ public final class WritePathOps {
       }
       throw closed;
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to add document", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to add document");
     }
   }
 
@@ -154,7 +154,7 @@ public final class WritePathOps {
       }
       throw closed;
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to apply batch", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to apply batch");
     }
   }
 
@@ -186,7 +186,7 @@ public final class WritePathOps {
       TelemetryEvents te = session.telemetryEvents;
       if (te != null) te.onHardDelete();
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete document", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete document");
     }
   }
 
@@ -218,7 +218,7 @@ public final class WritePathOps {
       TelemetryEvents te = session.telemetryEvents;
       if (te != null) te.onHardDelete();
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete document and chunks", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete document and chunks");
     }
   }
 
@@ -246,7 +246,7 @@ public final class WritePathOps {
       if (te != null) te.onHardDelete();
       log.debug("deleteChunksForParentDocId: submitted delete for chunks of {}", parentDocId);
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete chunks for parent", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete chunks for parent");
     }
   }
 
@@ -276,7 +276,7 @@ public final class WritePathOps {
       session.bulkDeleteEpoch.incrementAndGet();
       log.info("deleteByPathPrefix: deletion submitted for path prefix: {}", normalized);
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete by path prefix", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete by path prefix");
     }
   }
 
@@ -328,7 +328,7 @@ public final class WritePathOps {
           matched);
       return matched;
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete by collection", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete by collection");
     }
   }
 
@@ -1029,7 +1029,7 @@ public final class WritePathOps {
           readModifyWrite(searcher, docId, updates, new ParentSliceCache(), expectedFields));
     } catch (IOException e) {
       log.error("Failed to update document {}", docId, e);
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document");
     }
   }
 
@@ -1057,7 +1057,7 @@ public final class WritePathOps {
       return result;
     } catch (IOException e) {
       log.error("Failed to batch-update {} documents", batchUpdates.size(), e);
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to batch update documents", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to batch update documents");
     }
   }
 
@@ -1122,7 +1122,7 @@ public final class WritePathOps {
         return new LuceneRuntimeTypes.BatchUpdateResult(updated, updates.size() - updated);
       });
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update");
     }
   }
 
@@ -1139,7 +1139,7 @@ public final class WritePathOps {
       return bridge.withSearcherNoRefresh(searcher -> updateDocumentPaths(searcher, oldPath, newPath));
     } catch (IOException e) {
       log.error("Failed to update document paths {} -> {}", oldPath, newPath, e);
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document paths", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document paths");
     }
   }
 
@@ -1176,7 +1176,7 @@ public final class WritePathOps {
           expungeDeletesOnly,
           expungeDeletesOnly ? 0 : Math.max(1, maxSegments));
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to settle index", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to settle index");
     }
   }
 
@@ -1192,7 +1192,7 @@ public final class WritePathOps {
       session.bulkDeleteEpoch.incrementAndGet(); // tempdoc 809 finding 3 — see deleteByPathPrefix
       log.info("deleteAll: all documents deleted from index");
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete all documents", session);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete all documents");
     }
   }
 

@@ -83,8 +83,7 @@ final class VerifierReadOnlyWriterTest extends LuceneExecutorTestBase {
     var deferred = new ArrayList<Boolean>();
     service.begin();
     service.success();
-    service.failure(new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_FULL,
-        "shared index storage", null), deferred::add);
+    service.failure(new IndexWriterUnavailableException("shared index storage unavailable"), deferred::add);
     service.finish();
     assertEquals(List.of(true), deferred,
         "a successful earlier write does not turn a proven storage outage into a document failure");
@@ -119,7 +118,11 @@ final class VerifierReadOnlyWriterTest extends LuceneExecutorTestBase {
       for (int batch = 0; batch < 8; batch++) {
         service.begin();
         service.failure(failure, deferred::add);
-        service.finish();
+        long delay = service.prepareRetry(() -> {
+          assertThrows(IndexWriterUnavailableException.class, runtime.indexingCoordinator()::probeIngestion);
+          return false;
+        });
+        service.finish(System.currentTimeMillis() + delay);
       }
       assertEquals(Collections.nCopies(8, true), deferred,
           "actual index-directory I/O must remain free beyond ambiguous grace");

@@ -7,6 +7,35 @@ author-session: 01a15fc2-b9f6-7a13-9835-bda855d20c35
 
 # Test-intent entries
 
+Round ten is the current rule. Historical entries 1–4, 6–8, 10 and 12–13 are retained and explicitly superseded where classification/fixture evidence changed; their independent acceptance records remain byte-for-byte unchanged. Entries 5, 9 and 11 retain their accepted obligations. Current proof is in entries 14–15. No schema change or commit.
+
+Removed expectations: `successResetsAmbiguousGrace` is replaced by `healthyBatchCannotRenewFreeGraceForPoison`; `poisonEventuallyUsesLadder` checks the first batch instead of waiting four batches; snapshot checks expect immediate canaries instead of no canary, and the untyped extraction case expects one probe at each of four pause steps instead of only the fourth. `EngineOwnedPathsTest` is retired with the removed classifier and replaced by real canonical-source/companion/analyzer checks. Mock shared outages now fail their service health probe as well as their normal operation. The direct policy tests explicitly supply failed health or a typed unavailable signal instead of relying on exception reason codes. No ladder, terminal-state, recovery, status or shutdown assertion is relaxed. The copied analyzer fixture now compares Path.getFileName exactly: a portability edit using a bare poison.txt suffix also selected healthy-after-poison.txt. The first baseline exposed that fixture mistake. Eleven unchanged-source baseline executions are retained under hashes; the corrected two-case analyzer class reruns before the single full candidate invocation. Original source, XML and log remain explicitly archived as the preliminary fixture result, never as a passing preservation check.
+
+Round-ten follow-up: the first full candidate exposed an implementation defect in the rollback-only probes: releasing Xerial JDBC's implicit outer savepoint ended the transaction, so restoring auto-commit attempted a second COMMIT and closed a healthy store. Both probes now start an explicit outer transaction. The final producer reruns the changed GeneralCases three executions and Infrastructure eight executions on the cached exact baseline, retaining ten unchanged baseline executions. It then compiles main/test and runs PMD main/test for all four touched modules plus the full indexer-worker suite. The other three full suites and their worker-services target are retained only after verifying identical compiled main/test/fixture classes. Original failed results remain archived and are never relabelled.
+
+The corrected full round-ten run passed all other 107 targeted cases, including the complete37-state matrix; its only indexer failure was the K5 fixture. A native JDBC control showed that SQLITE_LIMIT_LENGTH=260 on a cold connection rejects even a four-character value because decoding the shared schema also exceeds the limit. Loading the schema first admits that short value and still rejects a400-character value. K5 now reads the schema before lowering the limit, retaining every oversized-document, attempt, retry and rollback assertion. The final producer reruns all five PipelineHealthProof cases on exact91dc01358 and the candidate; it retains the other103 targeted passes and full-suite metadata only under unchanged-source and2131 compiled-class hashes. Both failed full invocations and the native diagnostic remain archived, never relabelled.
+
+Final round-ten evidence: exact91dc01358 has17 intended assertion failures and4 preservation passes across21 executions. The candidate has108 targeted passes with no skips, including the37-state matrix and every retained U17/U19 check. Main/test compile and all8 PMD checks pass for worker-core, adapters-lucene, worker-services and indexer-worker. Full module results, with the five-case fixture correction executed freshly and all other2131 class files unchanged, report 4773 tests, 55 skips and the single known argFileEncodingRoundTripsThroughTheJdkParser launcher-NOTE environment failure. Earlier failed full results remain in execution history. Independent acceptance is pending.
+
+| Case | Current check (real running loop unless direct SQL guard) |
+|---|---|
+| O1 writer lifecycle | [37-state matrix: WRITER_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) and [closed-runtime/stop](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java) |
+| O2 index folder | [real unwritable Lucene writer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java) |
+| O3 identity/path stores | [37-state matrix: IDENTITY_*/PATH_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
+| O4 jobs.db | [persistent READONLY, poll and committed outcomes](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java) |
+| O5 sandbox/executor | [37-state matrix: EXTRACTION_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
+| O6 registry | [37-state matrix: EXTRACTOR_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
+| O7 snapshot/temp | [four real parent/child missing/read-only cases](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
+| O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
+| O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
+| K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
+| K2 source IO and aliases | [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
+| K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
+| K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
+| K5 document values exceed store limit | [real SQLITE_LIMIT_LENGTH on long document path, normal probe succeeds](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
+| K6 accepted behavior | [64-row/16-batch and mixed deadlines](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java), [status/queue pacing](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java), [U19 ladder/revive](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueRetryLadderTest.java) |
+
+
 U17 and U19 were adopted by the owner on 2026-10-20 with "i agree, proceed accordingly".
 Their text below is verbatim. The classification, ambiguity trade-off, eight-second cap and logging
 policy are delegated agent choices. No jobs.db schema change. Existing unreadable-source,
@@ -37,8 +66,8 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java"
       ],
-      "class": "New",
-      "behaviour": "Whole-batch writer/identity outages keep attempts zero during short outages, retry within 1\u20135 seconds in persisted row deadlines, recover all rows in one claim, and finish without spending attempts. Three ambiguous grace batches retain this bound. A running loop pauses between failed batches even while fresh backlog remains ready, including draining.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: Whole-batch writer/identity outages keep attempts zero during short outages, retry within 1–5 seconds in persisted row deadlines, recover all rows in one claim, and finish without spending attempts. Three ambiguous grace batches retain this bound. A running loop pauses between failed batches even while fresh backlog remains ready, including draining.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -72,8 +101,16 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Align the U17 batch retry deadline and loop pause without changing #892 status or U19.",
-          "choice": "The one-second minimum backoff is a batch window that includes persisting outcomes, not a second full sleep after that persistence. Preserve the >=1000ms no-hot-loop assertion measured between batch polls, and add a second assertion that the next poll cannot precede the persisted first-batch deadline. The old post-return measurement was997\u2013999ms because the2\u20133ms ledger persistence correctly consumes that same window. Fresh fail-before comparisons execute the changed oracle on d05fb4bbac5c; all other expectations stay unchanged.",
+          "choice": "The one-second minimum backoff is a batch window that includes persisting outcomes, not a second full sleep after that persistence. Preserve the >=1000ms no-hot-loop assertion measured between batch polls, and add a second assertion that the next poll cannot precede the persisted first-batch deadline. The old post-return measurement was997–999ms because the2–3ms ledger persistence correctly consumes that same window. Fresh fail-before comparisons execute the changed oracle on d05fb4bbac5c; all other expectations stay unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-repaired.json",
@@ -83,14 +120,17 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#repeatedSystemicFaultsStayBoundedWithoutChargingAttempts",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#systemicOutagePausesBetweenBatchesEvenWithReadyBacklog"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java"
       ],
-      "class": "New",
-      "behaviour": "Per-file writer/identity failures retain their counted minute-scale ladder, including an invalid document with no healthy peers; healthy peers and later enqueued files still finish.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: Per-file writer/identity failures retain their counted minute-scale ladder, including an invalid document with no healthy peers; healthy peers and later enqueued files still finish.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -113,6 +153,14 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "U17 systemic writer/identity failure classification and bounded short retry, preserving U19; no schema change.",
           "choice": "Judge each service separately after the batch: a successful peer makes unknown failures per-file. IllegalArgumentException and nonfatal Error use the ladder immediately. Other unknown runtime failures (including IllegalStateException, NullPointerException, Lucene DISK_IO and CONFIGURATION) get at most  three consecutive unsuccessful grace batches for that service; the fourth and subsequent batches charge attempts and use the existing durable ladder/exhaustion until a service success. This uses constant-size in-memory service history, not per-row memory. A restart grants three new grace batches but preserves existing persisted attempts, first_failed_at and exhaustion. A generic outage and all-poison batch cannot be distinguished; favor bounded retries and retained RETRY_EXHAUSTED rows that existing re-enqueue revives, rather than infinite free retries. Proven infrastructure signals remain uncounted: writer DISK_FULL, LOCKED, CORRUPT_INDEX, SCHEMA_MISMATCH, BACKPRESSURE and DRAINING; identity SQLException primary availability codes BUSY/LOCKED/READONLY/IOERR/CORRUPT/FULL/CANTOPEN/NOTADB, including wrapped causes. SQL constraints/unknown codes are ambiguous. A successful peer makes failures per-file except the existing DRAINING sentinel. The running service pause grows 1, 2, 4, 8 seconds and caps at 8 seconds; any success of that service resets its pause and ambiguous grace. Existing SQL deferClaim still schedules all rows for one second, so no schema/API change is needed and recovery detection takes at most eight seconds plus batch processing. Continue visiting every document, and log at most one error summary per service per minute, retaining per-file failure details in the durable ledger. The explicit DocumentIdentityStore.UNAVAILABLE receiver is also proven service unavailability, like the existing draining sentinel; it defers without attempts and uses the capped service pause even beyond grace and even if binding becomes available for a later peer.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-repaired.json",
@@ -120,14 +168,17 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#isolatedWriterFailureUsesLadderAndDoesNotStarveLaterFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#isolatedIdentityFailureUsesLadderAndDoesNotStarveLaterFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#documentArgumentFailureUsesLadderEvenWithoutSuccessfulPeers"
-      ]
+      ],
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java"
       ],
-      "class": "New",
-      "behaviour": "Singleton and all-poison ambiguous writer/identity failures leave the three-batch grace window, spend an attempt, follow the minute-scale ladder and exhaust without deleting rows; later healthy work completes. Service success resets ambiguity. Proven writer/SQLite outages survive beyond the eight-second cap at zero attempts, recover the whole batch and newly queued healthy work, grow and cap their pause, reset after success, and emit one rate-limited batch summary instead of per-document/per-second errors.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: Singleton and all-poison ambiguous writer/identity failures leave the three-batch grace window, spend an attempt, follow the minute-scale ladder and exhaust without deleting rows; later healthy work completes. Service success resets ambiguity. Proven writer/SQLite outages survive beyond the eight-second cap at zero attempts, recover the whole batch and newly queued healthy work, grow and cap their pause, reset after success, and emit one rate-limited batch summary instead of per-document/per-second errors.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -150,6 +201,14 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "U17 systemic writer/identity failure classification and bounded short retry, preserving U19; no schema change.",
           "choice": "Judge each service separately after the batch: a successful peer makes unknown failures per-file. IllegalArgumentException and nonfatal Error use the ladder immediately. Other unknown runtime failures (including IllegalStateException, NullPointerException, Lucene DISK_IO and CONFIGURATION) get at most  three consecutive unsuccessful grace batches for that service; the fourth and subsequent batches charge attempts and use the existing durable ladder/exhaustion until a service success. This uses constant-size in-memory service history, not per-row memory. A restart grants three new grace batches but preserves existing persisted attempts, first_failed_at and exhaustion. A generic outage and all-poison batch cannot be distinguished; favor bounded retries and retained RETRY_EXHAUSTED rows that existing re-enqueue revives, rather than infinite free retries. Proven infrastructure signals remain uncounted: writer DISK_FULL, LOCKED, CORRUPT_INDEX, SCHEMA_MISMATCH, BACKPRESSURE and DRAINING; identity SQLException primary availability codes BUSY/LOCKED/READONLY/IOERR/CORRUPT/FULL/CANTOPEN/NOTADB, including wrapped causes. SQL constraints/unknown codes are ambiguous. A successful peer makes failures per-file except the existing DRAINING sentinel. The running service pause grows 1, 2, 4, 8 seconds and caps at 8 seconds; any success of that service resets its pause and ambiguous grace. Existing SQL deferClaim still schedules all rows for one second, so no schema/API change is needed and recovery detection takes at most eight seconds plus batch processing. Continue visiting every document, and log at most one error summary per service per minute, retaining per-file failure details in the durable ledger. The explicit DocumentIdentityStore.UNAVAILABLE receiver is also proven service unavailability, like the existing draining sentinel; it defers without attempts and uses the capped service pause even beyond grace and even if binding becomes available for a later peer.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-poison.json",
@@ -158,14 +217,17 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#successResetsAmbiguousGrace",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java#provenOutageBacksOffCapsLogsAndResets"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java"
       ],
-      "class": "New",
-      "behaviour": "A wrapped SQLite READONLY identity-store failure remains an uncounted shared-service outage through eight consecutive unsuccessful batches, beyond the three-batch ambiguous grace.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: A wrapped SQLite READONLY identity-store failure remains an uncounted shared-service outage through eight consecutive unsuccessful batches, beyond the three-batch ambiguous grace.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -188,13 +250,24 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "U17 systemic writer/identity failure classification and bounded short retry, preserving U19; no schema change.",
           "choice": "SQLite READONLY (primary result code8, including extended codes through the existing low-byte mask) describes the identity database being unwritable, independently of document content. Preserve its uncounted outage policy beyond the ambiguous grace window. This is separate from a genuinely unreadable source file, whose existing retry ladder and retry-until-available remain unchanged. The first bounded candidate omitted this availability code; pin that regression with eight consecutive batch decisions, before and after its one-line classification repair. No schema change. The explicit DocumentIdentityStore.UNAVAILABLE receiver is also proven service unavailability, like the existing draining sentinel; it defers without attempts and uses the capped service pause even beyond grace and even if binding becomes available for a later peer.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-readonly.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java#readOnlyStoreRemainsUncountedBeyondAmbiguousGrace"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
@@ -236,8 +309,8 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java"
       ],
-      "class": "New",
-      "behaviour": "A cooperative stop during the capped eight-second outage pause finishes within the five-second join budget without interrupting the Lucene owner, losing queue rows or charging attempts. A real closed Lucene runtime remains a proven outage beyond three grace batches; the running loop completes deferred and newly queued healthy rows without attempts after a replacement runtime is opened.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: A cooperative stop during the capped eight-second outage pause finishes within the five-second join budget without interrupting the Lucene owner, losing queue rows or charging attempts. A real closed Lucene runtime remains a proven outage beyond three grace batches; the running loop completes deferred and newly queued healthy rows without attempts after a replacement runtime is opened.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -253,6 +326,14 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "U17 systemic writer availability and bounded cooperative outage retry, preserving round-two classification and U19; no schema change.",
           "choice": "Use a timed monitor wait with a monotonic deadline and the existing running flag; every cooperative stop signals the monitor, including shutdown, upgrade quiescence and profiling reset. Spurious wakes retain the remaining delay, and stop-before-wait cannot lose a notification. Never interrupt the Lucene owner. All nine existing null-writer guards in WritePathOps/CommitOps throw IndexWriterUnavailableException, a dedicated IllegalStateException subtype preserving their messages and existing catches. No exact-class consumer of these writer errors was found; unrelated exact-class VDU and offline-operation checks concern their own errors. The batch classifier recognizes this lifecycle type as proven service unavailability; generic IllegalStateException and poison rules remain unchanged. Runtime restart still uses a replacement single-shot RunningRuntime, with a test-side forwarding port to its active instance; no production lifecycle wrapper is added.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-lifecycle.json",
@@ -260,14 +341,17 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java#stopDuringCappedOutagePauseWakesWithoutInterruptingOrChargingRows",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java#closedLuceneRuntimeDefersBeyondGraceAndRecoversThroughTheRunningLoop"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java"
       ],
-      "class": "New",
-      "behaviour": "An actual unwritable index directory throws AccessDeniedException while the real running loop writes extracted healthy content. Its row stays PENDING with zero attempts and DEFER_WITHOUT_ATTEMPT beyond the three ambiguous grace batches. A proven shared-service outage remains uncounted even after an earlier peer succeeds. The original real index-directory IOException also remains an uncounted outage across eight policy batches, independently of the writer closing after its first failure.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: An actual unwritable index directory throws AccessDeniedException while the real running loop writes extracted healthy content. Its row stays PENDING with zero attempts and DEFER_WITHOUT_ATTEMPT beyond the three ambiguous grace batches. A proven shared-service outage remains uncounted even after an earlier peer succeeds. The original real index-directory IOException also remains an uncounted outage across eight policy batches, independently of the writer closing after its first failure.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -290,6 +374,14 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "Classify index-directory/filesystem failures as proven writer outages while preserving U19, poison retries, pacing, logging and existing acceptance records; no schema change.",
           "choice": "The Lucene write/commit catches now retain an explicit index-storage flag on IndexRuntimeIOException. Within a bounded eight-cause walk, an absolute FileSystemException path inside the index directory proves storage origin; an explicit outside/invalid/relative path remains unproven. For actual FSDirectory instances the canonical directory path comes from the directory itself, including symlink roots. Plain checked IO is proven by org.apache.lucene.store stack frames; typed CorruptIndexException and LockObtainFailedException also prove storage origin. The decision never inspects exception message text. Existing diagnostic reason classification runs only after storage origin is proven; otherwise checked operation IO stays untagged DISK_IO. Legacy manually specified shared-service reasons remain supported. This separates malformed-chunk/parent reconstruction IO in WritePathOps read-modify-write APIs (wrapped as DISK_IO) from index storage faults; FieldMapper.toDocument materializes values and does not read source files. Source readability/locking remains handled before writing by the existing unreadable-source authority and retry-until-available ladder. Untagged DISK_IO, generic runtime poison and CONFIGURATION retain their ambiguous grace/ladder. All nine existing absent-writer guards also check IndexWriter.isOpen, because a real filesystem failure can abort the writer while its snapshot remains non-null. Proven outages override peer success; peer success still makes unknown failures per-file. Eight-second capped/resetting backoff and minute summaries are unchanged. The copied verifier method retains every assertion and its real POSIX fault; its otherwise unavailable fixture is embedded with equivalent queue/store/content/commit wiring. The two real POSIX permission checks are disabled on Windows, where that fixture API is unsupported; the pure peer-policy test remains enabled. Linux before/after verification executes all three checks. An additional actual-Directory check reuses the captured original AccessDenied IOException for eight policy batches, so the closed-writer guard cannot mask missing index-storage provenance.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-index-filesystem.json",
@@ -298,14 +390,17 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java"
       ],
-      "class": "New",
-      "behaviour": "During capped writer, identity, draining and mixed-service outage pauses, both durable rows stay uncounted and ineligible, public status is WAITING with the exact shared next retry time, and clearing the fault resumes both within seconds and completes them without lost rows. Equivalent of verifier D4 I7, extended across service paths.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: During capped writer, identity, draining and mixed-service outage pauses, both durable rows stay uncounted and ineligible, public status is WAITING with the exact shared next retry time, and clearing the fault resumes both within seconds and completes them without lost rows. Equivalent of verifier D4 I7, extended across service paths.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -338,13 +433,24 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "U17 systemic deferral deadline and bounded service pause, preserving U19 and #892 status logic; no schema change.",
           "choice": "At batch completion, classify both services, select their maximum current 1/2/4/8-second backoff, and persist that single absolute retry_after for every systemic deferral, including draining and the unavailable identity receiver. Complete identity outcomes after the write phase so mixed outages agree. Sleep only until that deadline, subtracting outcome/claim-return time; keep cooperative stop signaling. The existing queue claim ownership and supersession checks remain; add a deadline overload with the existing overload retaining its one-second default. Restart reads the persisted deadline and resets only existing in-memory backoff history. This supersedes earlier entries' fixed one-second row scheduling; poison classification, ladder, rate limiting and service-success reset remain unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-waiting.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java#outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
@@ -397,8 +503,8 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
       ],
-      "class": "New",
-      "behaviour": "Every audited shared ingestion availability state defers healthy files without attempts beyond grace, with bounded shared deadlines, WAITING status and prompt recovery through a running loop; document poison, source access ladders and revive remain unchanged. Round eight extends the original32-state matrix with closed/empty/closing registry and retired Tika/structured providers; each remains an uncounted, paced outage and recovers promptly.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: Every audited shared ingestion availability state defers healthy files without attempts beyond grace, with bounded shared deadlines, WAITING status and prompt recovery through a running loop; document poison, source access ladders and revive remain unchanged. Round eight extends the original32-state matrix with closed/empty/closing registry and retired Tika/structured providers; each remains an uncounted, paced outage and recovers promptly.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -449,13 +555,24 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "Repair the actual outage-pause status, persistent jobs.db availability retries and extraction lifecycle boundaries while retaining all prior U17/U19 scenarios, schemas and acceptance records.",
           "choice": "Publish a volatile absolute service-outage pause deadline only around the cooperative wait and clear it in finally; the status path reads it once, uses WAITING ahead of raw ready/processing counts and reports that actual resume deadline as next retry. Keep queue slices honest, including fresh rows; a stopped loop exposes no outage pause. This explicitly supersedes the earlier choice to derive status solely from deferred row counts; no schema or wire-protocol change. Queue poll availability SQL errors now propagate a typed IngestionServiceUnavailableException instead of being logged and mistaken for an empty queue. Closed/lost queue connections are checked under the queue lock, including JDBC isClosed. Reuse BatchServiceFailures for queue control recovery, growing 1/2/4/8 seconds, retaining the current writer/extractor cap when cleanup fails after an existing outage pause. Reset queue history only after successful queue control with no outstanding failed committed outcome; a read-only query does not prove outcome writes are healthy. Failed exact claim returns and committed ledger writes retain their owners/transitions, rate-limit their summaries to once per minute and pause through the same cooperative stop monitor. No per-file attempt is spent by queue failures. Registry closed/select/empty-provider states throw the existing IllegalStateException-compatible unavailable type under the registry monitor; an admitted provider failure racing registry close is reclassified under the same monitor. A populated registry with no handler for one file remains a file-specific parser/routing error. Input factory close now records closed under its own monitor and rejects subsequent prepare/snapshot admission, preventing retired Tika/structured providers from silently creating new scratch after close. Existing timebox and parser-pool typed propagation, poison/parser/source policies and selective deadline extension are unchanged. In-memory pause/backoff/log counters reset on worker restart; durable attempts, claims and retry deadlines remain the queue authority. New matrix cases reopen/rebind real owners for recovery, with no production auto-recreation. Exact-source before comparison is 29f2a76f8; prior32 matrix cases are preservation checks and five added extraction lifecycle cases are repair checks. Recovery publishes a replacement parser pool only after a real healthy parse proves it ready; keep the existing nine-second completion oracle, without counting cold parser startup as outage-recovery latency. The preliminary baseline showed four original pool states safely deferring, then missing that completion budget while a cold child started; final exact-source matrix reruns all37 cases on the reused baseline. Queue growth probes observe poll/drain counts before asserting intervals, then require the actual pause; no baseline setup waits for repaired behavior.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-outage-boundaries.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
@@ -515,8 +632,8 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
       ],
-      "class": "New",
-      "behaviour": "O7 shared snapshot storage missing/read-only in the real parent and real parser child never charges healthy >1MiB sources beyond grace, preserves WAITING and seconds-scale deadlines and recovers. O8 untyped all-file infrastructure failure is diagnosed by one bounded extraction canary. K1/K4 poison with healthy infrastructure is charged/terminal FAILED; healthy peers progress and all-poison input has a passing real canary.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: O7 shared snapshot storage missing/read-only in the real parent and real parser child never charges healthy >1MiB sources beyond grace, preserves WAITING and seconds-scale deadlines and recovers. O8 untyped all-file infrastructure failure is diagnosed by one bounded extraction canary. K1/K4 poison with healthy infrastructure is charged/terminal FAILED; healthy peers progress and all-poison input has a passing real canary.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -539,20 +656,31 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "Implement the orchestrator's complete round-nine provenance/canary decision and case table while preserving U17/U19, schemas, typed lifecycle signals and existing acceptance records.",
           "choice": "Use one EngineOwnedPaths classifier for resolved data/index roots and java.io.tmpdir (including snapshot, spool, canary and parser temp files), retaining lexical and canonical roots. Walk exception causes and FileSystemException paths; exact source-path failures take precedence even when a source is below temp/data. Never parse messages. Writer and identity callbacks use the same classifier as extraction. Existing SQLite availability codes and Lucene Directory tags remain necessary for pathless native errors; typed closed/closing guards remain. Carry child-side provenance across the existing response reasonCode as SERVICE_UNAVAILABLE before the child discards causes; parent decodes it as SandboxServiceUnavailableException, without a protocol/schema version change. General extraction failures are classified after peer outcomes rather than charged immediately. After three unsuccessful ambiguous batches, probe one built-in tiny RTF through the same timebox/sandbox/parser before charging. RTF materializes a snapshot even at tiny size and routes to process isolation when routing is enabled. Share the memoized probe result across the batch's services, never probe a successful service batch, and never write its artifact to the index. The probe is bounded by min(normal timeout, five seconds), reuses one tiny source until loop close, and uses the existing executor replacement/child cleanup semantics. A probe failure keeps rows free with existing 1/2/4/8-second pause/deadline extension and minute summaries; a pass retains each original per-file outcome/ladder/terminal policy. Probe timeouts suppress the timebox's separate repeated timeout/replacement warnings; the batch summary owns that diagnostic. Healthy-peer poison is per-file without probing, as required by the never-in-a-healthy-batch rule; all-poison batches demonstrate a passing real snapshot/parser canary and terminal FAILED/attempt1. Known unreadable source errors bypass ambiguous grace and retain retry-until-available. Service grace, probe memo and backoff are in memory and reset on restart; persisted attempts, deadlines and claims are unchanged. File-type-specific parser-resource outages can still be charged if the RTF canary passes, the residual explicitly accepted in the orchestrator decision. Source: ~/.cache/justsearch-upgrade-reports/deferral-round9-decision.md, read in full; its words are orchestrator decisions, not owner-words. A valid SERVICE_UNAVAILABLE child response passes through before the legacy malformed-protocol catch; it does not recycle a healthy child or lose its typed signal. The real >1MiB snapshot checks measure both rows claimed together at the persisted deadline (no earlier, within one second after D), then allow the normal two five-second parse budgets for completion. A builder-chosen nine-second total completion bound mixed the eight-second pause with >1second of real parsing; it was replaced with this stronger deadline-specific eligibility/claim oracle, not by weakening existing matrix recovery checks. The first candidate also exposed the new SSU being caught as malformed protocol; that source defect is repaired and the full suites run again. Final claim instrumentation delegates to the actual opened SqliteJobQueue instead of spying/copying an owning store: its switch-buffer helper captures the original receiver, so a spy can falsely report a closed connection through public status. Only this fixture changed after the final production full run. The producer verifies the retained evidence self-digest and unchanged production/other test hashes, retains88 passed executions, and freshly executes the corrected8 before and after with both modules compile/PMD. All96 targets pass without skips; the original five fixture-status failures remain explicitly recorded in the full-run evidence, not relabelled.",
           "label": "agent choice under the adopted orchestrator design"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-provenance-canary.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
       ],
-      "repaired": true
+      "repaired": true,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
     },
     {
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EngineOwnedPathsTest.java"
       ],
-      "class": "New",
-      "behaviour": "The shared path classifier recognizes data, external index and parser/temp storage independent of reason text; exact source failures remain per-file even under temp/data roots, relative paths and message-only IOException do not invent ownership.",
+      "class": "Obsolete",
+      "behaviour": "SUPERSEDED in round ten. Historical: The shared path classifier recognizes data, external index and parser/temp storage independent of reason text; exact source failures remain per-file even under temp/data roots, relative paths and message-only IOException do not invent ownership.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -575,11 +703,130 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "Implement the orchestrator's complete round-nine provenance/canary decision and case table while preserving U17/U19, schemas, typed lifecycle signals and existing acceptance records.",
           "choice": "Use one EngineOwnedPaths classifier for resolved data/index roots and java.io.tmpdir (including snapshot, spool, canary and parser temp files), retaining lexical and canonical roots. Walk exception causes and FileSystemException paths; exact source-path failures take precedence even when a source is below temp/data. Never parse messages. Writer and identity callbacks use the same classifier as extraction. Existing SQLite availability codes and Lucene Directory tags remain necessary for pathless native errors; typed closed/closing guards remain. Carry child-side provenance across the existing response reasonCode as SERVICE_UNAVAILABLE before the child discards causes; parent decodes it as SandboxServiceUnavailableException, without a protocol/schema version change. General extraction failures are classified after peer outcomes rather than charged immediately. After three unsuccessful ambiguous batches, probe one built-in tiny RTF through the same timebox/sandbox/parser before charging. RTF materializes a snapshot even at tiny size and routes to process isolation when routing is enabled. Share the memoized probe result across the batch's services, never probe a successful service batch, and never write its artifact to the index. The probe is bounded by min(normal timeout, five seconds), reuses one tiny source until loop close, and uses the existing executor replacement/child cleanup semantics. A probe failure keeps rows free with existing 1/2/4/8-second pause/deadline extension and minute summaries; a pass retains each original per-file outcome/ladder/terminal policy. Probe timeouts suppress the timebox's separate repeated timeout/replacement warnings; the batch summary owns that diagnostic. Healthy-peer poison is per-file without probing, as required by the never-in-a-healthy-batch rule; all-poison batches demonstrate a passing real snapshot/parser canary and terminal FAILED/attempt1. Known unreadable source errors bypass ambiguous grace and retain retry-until-available. Service grace, probe memo and backoff are in memory and reset on restart; persisted attempts, deadlines and claims are unchanged. File-type-specific parser-resource outages can still be charged if the RTF canary passes, the residual explicitly accepted in the orchestrator decision. Source: ~/.cache/justsearch-upgrade-reports/deferral-round9-decision.md, read in full; its words are orchestrator decisions, not owner-words. A valid SERVICE_UNAVAILABLE child response passes through before the legacy malformed-protocol catch; it does not recycle a healthy child or lose its typed signal. The real >1MiB snapshot checks measure both rows claimed together at the persisted deadline (no earlier, within one second after D), then allow the normal two five-second parse budgets for completion. A builder-chosen nine-second total completion bound mixed the eight-second pause with >1second of real parsing; it was replaced with this stronger deadline-specific eligibility/claim oracle, not by weakening existing matrix recovery checks. The first candidate also exposed the new SSU being caught as malformed protocol; that source defect is repaired and the full suites run again. Final claim instrumentation delegates to the actual opened SqliteJobQueue instead of spying/copying an owning store: its switch-buffer helper captures the original receiver, so a spy can falsely report a closed connection through public status. Only this fixture changed after the final production full run. The producer verifies the retained evidence self-digest and unchanged production/other test hashes, retains88 passed executions, and freshly executes the corrected8 before and after with both modules compile/PMD. All96 targets pass without skips; the original five fixture-status failures remain explicitly recorded in the full-run evidence, not relabelled.",
           "label": "agent choice under the adopted orchestrator design"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-provenance-canary.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EngineOwnedPathsTest.java"
+      ],
+      "repaired": false,
+      "supersededBy": "Round ten entries 14–15 (pipeline health proof), replacing historical classification or fixture evidence only.",
+      "historicalClass": "New",
+      "conflictSearch": "Decision records searched for a conflict: the supplied round-ten orchestrator decision explicitly supersedes round-nine provenance/extraction-only canary and all earlier grace-batch choices. U17/U19 and prior accepted queue/deadline/shutdown behavior remain authoritative."
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineTestFixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/extract/VerifierParserChild.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/extract/VerifierProtocolChild.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/extract/VerifierNoOpAgent.java"
+      ],
+      "class": "New",
+      "behaviour": "Round-ten O8/O9/K1–K5: D9 real unknown child/protocol outages summarize logs and recover at zero attempts; a native identity capacity failure stays free despite passing real extraction; interleaved poison is charged immediately, follows its ladder or terminal FAILED policy; canonical source aliases, source-specific companions and actual document analyzer IO below temp remain per-file; normal canary operations prove a real document-only SQLite value limit and roll back synthetic identity/path rows.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-pipeline-health.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round-ten O1–O7/K6 preservation with the agreed health rule: real service probe faults share the outage state; all 37 lifecycle states, WAITING, 64-row cap extension, per-file ladder/revival and cooperative stop survive. Poison is charged on its first failure when the pipeline canary passes; healthy batches cannot renew grace, because grace no longer exists. Snapshot and unknown extraction failures now run one canary immediately per failed batch rather than relying on path ownership or three grace batches.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the complete orchestrator round-ten full-pipeline health decision and case table; preserve U17/U19, typed lifecycle boundaries, queue pacing/deadlines/status and acceptance records.",
+          "choice": "The orchestrator decision ~/.cache/justsearch-upgrade-reports/deferral-round10-decision.md was read in full. Charge only with a same-batch complete extract/identity/write peer or a passing immediate, memoized pipeline canary. Remove all grace and engine-owned-path provenance. The SQL probes explicitly begin an outer transaction before the rollback-only savepoint: the installed Xerial driver releases an implicit outermost savepoint by ending its transaction, so restoring JDBC auto-commit afterward would otherwise fail and close a healthy store. The first full candidate exposed this defect; the corrected full indexer suite is re-executed, retaining only unchanged executable suites in the other three modules. Infrastructure checks observe the actual fourth eight-second pause rather than count exceptions, because immediate canaries also fail and increase that count. Canary runs the existing tiny RTF through the real extraction timebox/sandbox with normal artifact-policy validation, a normal-width reserved identity resolve/read rolled back under the store lock, a path-store write/read rolled back under its lock, and Lucene Directory create/write/delete checks for the destination and optional active lexical projection under their writer barrier/dispatch locks, checking open/tragic state. It adds no index document, commits no pending index work and retains no synthetic store row. Interface defaults fail closed when a store cannot implement the rollback contract. Explicit typed lifecycle and existing store-availability signals remain fast paths; source IO, including aliases, always retains its own policy. General per-file failures retain the original outcome/terminal/ladder once health is proved. Pipeline success resets the capped 1/2/4/8-second delay; failed probes keep the existing shared forward-only deadlines, cooperative pause and WAITING state. The probe memo and pacing state reset on restart; persisted attempts, failures and deadlines do not. Sandbox recycle counters keep exact metrics and summarize WARNs at most once per minute per pool; per-spawn logs are removed while the child registry and lifecycle counters remain. The accepted residual remains a format-specific parser fault when the canary format succeeds. This is an implementation choice under an orchestrator design, never owner-words.",
+          "label": "agent choice under adopted orchestrator design"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-pipeline-health.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java#outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java#readOnlyStoreRemainsUncountedBeyondAmbiguousGrace",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
       ],
       "repaired": false
     }

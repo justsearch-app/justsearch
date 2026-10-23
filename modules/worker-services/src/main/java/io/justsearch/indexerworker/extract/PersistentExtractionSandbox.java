@@ -75,6 +75,8 @@ import tools.jackson.databind.json.JsonMapper;
  * {@link TimeboxedContentExtractor.ExtractionTimeoutException} (PARSER_TIMEOUT), exactly as before.
  */
 public final class PersistentExtractionSandbox implements ExtractionSandbox {
+  private long lastRecycleLogNs;
+  private long unreportedRecycles;
   private static final Logger log = LoggerFactory.getLogger(PersistentExtractionSandbox.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
@@ -517,7 +519,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (catalog != null) {
       catalog.sandboxRestartTotal.increment(ExtractionSandboxRestartTags.of(reason));
     }
-    log.warn("Extraction sandbox child recycled (reason={}, pid={})", reason, child.pid);
+    synchronized (this) {
+      unreportedRecycles++;
+      long now = System.nanoTime();
+      if (lastRecycleLogNs == 0 || now - lastRecycleLogNs >= 60_000_000_000L) {
+        log.warn("Extraction sandbox child recycled (reason={}, pid={}, since last report={})",
+            reason, child.pid, unreportedRecycles);
+        unreportedRecycles = 0;
+        lastRecycleLogNs = now;
+      }
+    }
   }
 
   /**
@@ -671,7 +682,6 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (catalog != null) {
       catalog.sandboxSpawnTotal.increment(EmptyTags.INSTANCE);
     }
-    log.info("Extraction sandbox child spawned (pid={})", handle.pid());
     return new Child(handle, maxStderrBytes);
   }
 

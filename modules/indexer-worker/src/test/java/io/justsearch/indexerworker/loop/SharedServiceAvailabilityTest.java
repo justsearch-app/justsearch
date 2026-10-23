@@ -192,6 +192,10 @@ final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
             }
             return null;
           }).when(unavailable).indexSingle(any());
+          doAnswer(call -> {
+            try (var candidate = builder(opening).open()) { candidate.indexingCoordinator().probeIngestion(); }
+            return null;
+          }).when(unavailable).probeIngestion();
           writer.set(unavailable);
         }
         case IDENTITY_UNWIRED -> identities.set(DocumentIdentityStore.UNAVAILABLE);
@@ -427,23 +431,27 @@ final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
         catch (RuntimeException failure) { errors.add(failure); throw failure; }
         return null;
       }).when(routedWriter).indexSingle(any());
+      doAnswer(call -> { writer.get().probeIngestion(); return null; }).when(routedWriter).probeIngestion();
       var routedIdentities = mock(DocumentIdentityStore.class);
       when(routedIdentities.resolve(anyString(), anyLong())).thenAnswer(call -> {
         try { return identities.get().resolve(call.getArgument(0), call.getArgument(1)); }
         catch (RuntimeException failure) { errors.add(failure); throw failure; }
       });
+      doAnswer(call -> { identities.get().probe(); return null; }).when(routedIdentities).probe();
       var routedPaths = mock(PathResolutionStore.class);
       doAnswer(call -> {
         try { paths.get().record(call.getArgument(0), call.getArgument(1), call.getArgument(2)); }
         catch (RuntimeException failure) { errors.add(failure); throw failure; }
         return null;
       }).when(routedPaths).record(anyString(), anyString(), anyLong());
+      doAnswer(call -> { paths.get().probe(); return null; }).when(routedPaths).probe();
       var routedContent = mock(TimeboxedContentExtractor.class);
       when(routedContent.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
       when(routedContent.extractArtifact(any())).thenAnswer(call -> {
         try { return extractor.get().extractArtifact(call.getArgument(0)); }
         catch (java.io.IOException | ContentExtractor.ExtractionException | RuntimeException failure) { errors.add(failure); throw failure; }
       });
+      when(routedContent.probeArtifact(any())).thenAnswer(call -> extractor.get().probeArtifact(call.getArgument(0)));
       var commits = mock(CommitOps.class);
       doAnswer(call -> { runtime.commitOps().commitAndTrack(call.getArgument(0)); return null; })
           .when(commits).commitAndTrack(any());

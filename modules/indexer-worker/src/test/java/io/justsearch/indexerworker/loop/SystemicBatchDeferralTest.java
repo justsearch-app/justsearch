@@ -37,6 +37,7 @@ final class SystemicBatchDeferralTest {
   private IndexingLoop loop;
   private IndexingCoordinator writer;
   private DocumentIdentityStore identities;
+  private final AtomicBoolean infrastructureDown = new AtomicBoolean();
   private Path db;
 
   @BeforeEach
@@ -46,6 +47,10 @@ final class SystemicBatchDeferralTest {
     queue.open();
     writer = mock(IndexingCoordinator.class);
     identities = mock(DocumentIdentityStore.class);
+    doAnswer(call -> { if (infrastructureDown.get()) throw new IllegalStateException("shared identity unavailable"); return null; })
+        .when(identities).probe();
+    doAnswer(call -> { if (infrastructureDown.get()) throw new IllegalStateException("shared writer unavailable"); return null; })
+        .when(writer).probeIngestion();
     when(identities.resolve(anyString(), anyLong())).thenAnswer(call ->
         new DocumentIdentityStore.Identity(call.getArgument(0), "uid-" + call.getArgument(0),
             call.getArgument(1), call.getArgument(1)));
@@ -70,30 +75,35 @@ final class SystemicBatchDeferralTest {
 
   @Test
   void writerOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly() throws Exception {
+    infrastructureDown.set(true);
     var files = enqueue("writer-a.txt", "writer-b.txt", "writer-c.txt");
     doThrow(new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO,
         "writer unavailable", null)).when(writer).indexSingle(any());
     assertShortDeferral(files);
     doNothing().when(writer).indexSingle(any());
+    infrastructureDown.set(false);
     recover(files);
   }
 
   @Test
   void identityOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly() throws Exception {
+    infrastructureDown.set(true);
     var files = enqueue("identity-a.txt", "identity-b.txt", "identity-c.txt");
     when(identities.resolve(anyString(), anyLong()))
         .thenThrow(new IllegalStateException("identity store unavailable"));
     assertShortDeferral(files);
-    verifyNoInteractions(writer);
+    verify(writer, never()).indexSingle(any());
     doAnswer(call -> new DocumentIdentityStore.Identity(
         call.getArgument(0), "uid-" + call.getArgument(0),
         call.getArgument(1), call.getArgument(1)))
         .when(identities).resolve(anyString(), anyLong());
+    infrastructureDown.set(false);
     recover(files);
   }
 
   @Test
   void repeatedSystemicFaultsStayBoundedWithoutChargingAttempts() throws Exception {
+    infrastructureDown.set(true);
     var files = enqueue("repeat-a.txt", "repeat-b.txt");
     doThrow(new IllegalStateException("writer closed")).when(writer).indexSingle(any());
     for (int round = 0; round < 3; round++) {
@@ -101,10 +111,12 @@ final class SystemicBatchDeferralTest {
       waitUntilDue(files);
     }
     doNothing().when(writer).indexSingle(any());
+    infrastructureDown.set(false);
     recover(files);
     // A later outage starts with the same short bound, independent of earlier failures.
     var later = enqueue("later-a.txt", "later-b.txt");
     doThrow(new IllegalStateException("writer closed again")).when(writer).indexSingle(any());
+    infrastructureDown.set(true);
     assertShortDeferral(later);
   }
 
@@ -125,6 +137,7 @@ final class SystemicBatchDeferralTest {
   void systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(
       boolean identityFailure, RuntimeException outage)
       throws Exception {
+    infrastructureDown.set(true);
     var files = enqueue("a.txt", "b.txt", "c.txt", "d.txt");
     if (identityFailure) {
       when(identities.resolve(anyString(), anyLong())).thenThrow(outage);
@@ -241,7 +254,7 @@ final class SystemicBatchDeferralTest {
         .mapToObj(i -> "poison-" + i + ".txt").toArray(String[]::new));
     if (identityFailure) when(identities.resolve(anyString(), anyLong())).thenThrow(failure);
     else doThrow(failure).when(writer).indexSingle(any());
-    for (int batch = 0; batch < 4; batch++) {
+    for (int batch = 0; batch < 1; batch++) {
       makeDue();
       process(queue.pollPending(10));
     }
@@ -249,7 +262,7 @@ final class SystemicBatchDeferralTest {
       Row state = row(file);
       System.out.println("poison batch size=" + count + " attempts=" + state.attempts()
           + " policy=" + state.policy());
-      assertEquals(1, state.attempts(), "ambiguous poison must leave the free-retry grace window");
+      assertEquals(1, state.attempts(), "a passing full-pipeline canary charges poison immediately");
       assertEquals("RETRY_WITH_BACKOFF", state.policy());
       assertTrue(state.retryAfter() >= System.currentTimeMillis() + 59_000);
     }
@@ -272,32 +285,20 @@ final class SystemicBatchDeferralTest {
   }
 
   @Test
-  void successResetsAmbiguousGrace() throws Exception {
+  void healthyBatchCannotRenewFreeGraceForPoison() throws Exception {
     var poison = enqueue("poison.txt");
-    doThrow(new IllegalStateException("ambiguous")).when(writer).indexSingle(any());
-    for (int batch = 0; batch < 3; batch++) {
-      makeDue();
-      process(queue.pollPending(10));
-    }
-    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
-        var query = connection.prepareStatement("UPDATE jobs SET retry_after = ? WHERE state = 'PENDING'")) {
-      query.setLong(1, System.currentTimeMillis() + 60_000);
-      query.executeUpdate();
-    }
+    doThrow(new IllegalStateException("document poison")).when(writer).indexSingle(any());
+    process(queue.pollPending(10));
+    assertEquals(1, row(poison.getFirst()).attempts(), "a passing canary charges the first poison batch");
     var healthy = enqueue("healthy.txt");
     doNothing().when(writer).indexSingle(any());
     process(queue.pollPending(10));
     commit();
     assertEquals("DONE", row(healthy.getFirst()).state());
-    doThrow(new IllegalStateException("ambiguous again")).when(writer).indexSingle(any());
+    doThrow(new IllegalStateException("same poison")).when(writer).indexSingle(any());
     makeDue();
     process(queue.pollPending(10));
-    assertEquals(0, row(poison.getFirst()).attempts(), "service success grants a fresh grace window");
-    for (int batch = 0; batch < 3; batch++) {
-      makeDue();
-      process(queue.pollPending(10));
-    }
-    assertEquals(1, row(poison.getFirst()).attempts());
+    assertEquals(2, row(poison.getFirst()).attempts(), "healthy interleaving never grants a free poison retry");
   }
 
   @org.junit.jupiter.params.ParameterizedTest(name = "provenOutageBacksOffCapsLogsAndResets({0})")
@@ -305,6 +306,11 @@ final class SystemicBatchDeferralTest {
   void provenOutageBacksOffCapsLogsAndResets(boolean identityFailure) throws Exception {
     var files = enqueue("outage-a.txt", "outage-b.txt");
     var fault = new AtomicBoolean(true);
+    if (identityFailure) {
+      doAnswer(call -> { if (fault.get()) throw new IllegalStateException("identity down"); return null; }).when(identities).probe();
+    } else {
+      doAnswer(call -> { if (fault.get()) throw new IllegalStateException("writer down"); return null; }).when(writer).probeIngestion();
+    }
     if (identityFailure) {
       doAnswer(call -> {
         if (fault.get()) throw new IllegalStateException("shared SQLite busy",

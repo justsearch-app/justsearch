@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
-import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
@@ -124,7 +123,7 @@ public final class JobBatchWriter {
     return writeFailures.retryDelayMs();
   }
 
-  void useOwnedPaths(EngineOwnedPaths paths) { writeFailures.useOwnedPaths(paths); }
+  boolean pipelineSucceeded() { return writeFailures.succeeded(); }
 
   long prepareRetry(BooleanSupplier canary) {
     return writeFailures.prepareRetry(canary);
@@ -368,9 +367,8 @@ public final class JobBatchWriter {
       }
       return false;
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e,
-          "Cannot read serving document fields before lexical projection: " + ex.filePath(),
-          lexicalSource.openedIndexPath());
+      throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO,
+          "Cannot read serving document fields before lexical projection: " + ex.filePath(), e);
     }
   }
 

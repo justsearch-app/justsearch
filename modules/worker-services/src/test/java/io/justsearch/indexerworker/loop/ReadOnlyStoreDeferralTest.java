@@ -19,7 +19,8 @@ final class ReadOnlyStoreDeferralTest {
     for (int batch = 0; batch < 8; batch++) {
       service.begin();
       service.failure(failure, deferred::add);
-      service.finish();
+      long delay = service.prepareRetry(() -> false);
+      service.finish(System.currentTimeMillis() + delay);
     }
     assertEquals(Collections.nCopies(8, true), deferred,
         "a read-only shared store must not turn into counted document retries");

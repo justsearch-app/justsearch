@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
-import io.justsearch.indexerworker.extract.EngineOwnedPaths;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
@@ -53,6 +52,7 @@ import io.opentelemetry.context.Scope;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -123,7 +123,7 @@ public class IndexingLoop implements Closeable {
   /** Tempdoc 885 item 3: the duty-cycle policy that replaced the breath-hold pause. */
   private final IndexingPacing indexingPacing;
   private final TimeboxedContentExtractor contentExtractor;
-  private final ExtractionCanary canary;
+  private final PipelineCanary canary;
   // Tempdoc 516 Slice 4c: embeddingProvider / embeddingServiceForLifecycle / embeddingEvents
   // / embeddingCompatController are now owned by EmbeddingProviderLifecycle. The lifecycle's
   // own field declarations preserve the trust + JMM semantics (volatile + the lifecycle lock).
@@ -158,7 +158,7 @@ public class IndexingLoop implements Closeable {
   private volatile boolean detailedTracing;
 
   // 312 Phase 4: when true, inline embedding is enabled during migration rebuilds.
-  private volatile java.util.function.BooleanSupplier migrationActiveSupplier = () -> false;
+  private volatile BooleanSupplier migrationActiveSupplier = () -> false;
 
   // Tempdoc 400 LR2-d.2: supplies the current commit user-data map for
   // attaching commit.* identity attributes to indexing.batch spans. Default
@@ -380,7 +380,12 @@ public class IndexingLoop implements Closeable {
     this.contentExtractor = contentExtractor != null
         ? contentExtractor
         : ExtractionSandboxFactory.inProcessStructured(ocrRegistration, timeboxRegistration, extractionCatalog);
-    this.canary = new ExtractionCanary(this.contentExtractor);
+    this.canary = new PipelineCanary(this.contentExtractor,
+        () -> this.documentIdentityStore, () -> this.pathResolutionStore.probe(), () -> {
+          indexingCoordinator.probeIngestion();
+          RunningRuntime source = activeLexicalSource.get();
+          if (source != null) source.indexingCoordinator().probeIngestion();
+        });
     this.pipelineCatalog = pipelineCatalog;
     this.outcomeWriteFailureCounter =
         ingestionOutcomeCatalog == null
@@ -473,9 +478,7 @@ public class IndexingLoop implements Closeable {
             this::recordStageMs,
             () -> detailedTracing,
             (long delta) -> indexedSinceCommit += delta);
-    var ownedPaths = new EngineOwnedPaths(resolvedConfigSupplier.get());
-    this.extractor.useOwnedPaths(ownedPaths);
-    this.writer.useOwnedPaths(ownedPaths);
+
     // Tempdoc 516 Slice 4d (W6): construct the scheduler. Encoder/service suppliers read
     // IndexingLoop's volatile fields so the async-load swap-on-the-fly semantics persist.
     this.backfillScheduler =
@@ -1037,7 +1040,10 @@ public class IndexingLoop implements Closeable {
       // A stopped/failed batch may not visit every polled claim. Written claims retain their
       // existing commit owner; the remainder return only after synchronous batch execution exits.
       if (!fatal) {
-        long delayMs = Math.max(writer.prepareRetry(canary), extractor.prepareRetry(canary));
+        boolean peerSucceeded = writer.pipelineSucceeded();
+        if (peerSucceeded) extractor.pipelineSucceeded();
+        BooleanSupplier healthy = () -> peerSucceeded || canary.getAsBoolean();
+        long delayMs = Math.max(writer.prepareRetry(healthy), extractor.prepareRetry(healthy));
         retryAtMs = System.currentTimeMillis() + delayMs;
         try {
           writer.finishBatch(retryAtMs);

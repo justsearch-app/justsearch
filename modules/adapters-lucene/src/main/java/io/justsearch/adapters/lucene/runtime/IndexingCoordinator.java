@@ -89,6 +89,35 @@ public final class IndexingCoordinator {
   // Tempdoc 402: write-op dispatch
   // ==========================================================================
 
+  /** Proves writer and Directory health without adding a document or committing pending work. */
+  public void probeIngestion() {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try {
+        var snapshot = session.snapshot;
+        var tragic = snapshot.writer().getTragicException();
+        if (tragic != null) throw new IndexWriterUnavailableException("IndexWriter failed", tragic);
+        String name = null;
+        try {
+          try (var output = snapshot.directory().createTempOutput(
+              "justsearch-ingestion-canary", "probe", org.apache.lucene.store.IOContext.DEFAULT)) {
+            name = output.getName();
+            output.writeByte((byte) 1);
+          }
+        } finally {
+          if (name != null) snapshot.directory().deleteFile(name);
+        }
+      } finally {
+        dispatchLock.unlock();
+      }
+    } catch (org.apache.lucene.store.AlreadyClosedException | IOException failure) {
+      throw new IndexWriterUnavailableException("Index storage unavailable", failure);
+    } finally {
+      releaseWriteBarrierAndReport();
+    }
+  }
+
   /**
    * Synchronous op dispatch serialized against concurrent callers via {@link #dispatchLock}.
    * Used by the convenience mirrors ({@link #updateDocument(String, Map)} etc.) so

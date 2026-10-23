@@ -128,7 +128,7 @@ public final class CommitOps {
         } catch (org.apache.lucene.store.AlreadyClosedException closed) {
           throw new IndexWriterUnavailableException("Index storage closed during commit", closed);
         } catch (IOException e) {
-          throw IndexRuntimeIOException.fromIndexOperation(e, "Commit failed", session);
+          throw IndexRuntimeIOException.fromIndexOperation(e, "Commit failed");
         }
       }
     } finally {

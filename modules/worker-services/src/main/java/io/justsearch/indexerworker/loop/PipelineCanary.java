@@ -4,18 +4,29 @@ package io.justsearch.indexerworker.loop;
 import io.justsearch.indexerworker.extract.ContentExtractor;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import java.io.IOException;
+import io.justsearch.indexerworker.identity.DocumentIdentityStore;
+import java.util.function.Supplier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.BooleanSupplier;
 
-/** One tiny known-good parse per ambiguous pause step, shared by the batch's services. */
-final class ExtractionCanary implements BooleanSupplier, AutoCloseable {
+/** One bounded full-pipeline health proof per failed batch; no index document or durable identity. */
+final class PipelineCanary implements BooleanSupplier, AutoCloseable {
   private final TimeboxedContentExtractor extractor;
+  private final Supplier<DocumentIdentityStore> identities;
+  private final Runnable pathProbe;
+  private final Runnable writerProbe;
   private Path input;
   private Boolean healthy;
   private boolean prepared;
 
-  ExtractionCanary(TimeboxedContentExtractor extractor) { this.extractor = extractor; }
+  PipelineCanary(TimeboxedContentExtractor extractor, Supplier<DocumentIdentityStore> identities,
+      Runnable pathProbe, Runnable writerProbe) {
+    this.extractor = extractor;
+    this.identities = identities;
+    this.pathProbe = pathProbe;
+    this.writerProbe = writerProbe;
+  }
 
   void beginBatch() { healthy = null; }
 
@@ -31,6 +42,9 @@ final class ExtractionCanary implements BooleanSupplier, AutoCloseable {
         prepared = true;
       }
       extractor.probeArtifact(input);
+      identities.get().probe();
+      pathProbe.run();
+      writerProbe.run();
       healthy = true;
     } catch (IOException | ContentExtractor.ExtractionException | RuntimeException failure) {
       healthy = false;

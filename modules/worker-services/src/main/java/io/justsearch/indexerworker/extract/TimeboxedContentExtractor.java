@@ -190,7 +190,9 @@ public final class TimeboxedContentExtractor implements AutoCloseable {
 
   /** Same sandbox and parser path; bounded probe failures are summarized by the batch owner. */
   public ExtractionArtifact probeArtifact(Path file) throws IOException, ExtractionException {
-    return extractArtifact(file, Math.min(timeout.toMillis(), 5_000), false);
+    ExtractionArtifact artifact = extractArtifact(file, Math.min(timeout.toMillis(), 5_000), false);
+    artifact.validate(extractionPolicy(), null);
+    return artifact;
   }
 
   private ExtractionArtifact extractArtifact(Path file, long maximumWaitMs, boolean report)
