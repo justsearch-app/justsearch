@@ -146,3 +146,14 @@ The repair cases fail by assertion before the change; the preservation cases pas
   "note": "Test-intent acceptance only: DS/DN sources reviewed; 14 checks pass, 11 fail by assertion before, 3 preservation checks pass before. Real-model system scenarios remain unverified pending the conflicting machine rule."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "3pn0slu3",
+  "verdict": "accept",
+  "digest": "sha256:439d2b0a56244b512e484f436818bfcbacefa3ea979bb3e4461abc776c86fd45",
+  "note": "Test-intent acceptance: DS6 delegated-choice source and before-state test reviewed before diff; concurrent/repeated held-run Stop expectations are warranted. Scratch run-evidence passes on 1b5a5cd60 and fails by duplicate-note assertion on c90299280; frontend evidence rerun passes with assertion fail-before on dccd09b02. Acceptance concerns test intent; real-system verdict is separate."
+}
+```
