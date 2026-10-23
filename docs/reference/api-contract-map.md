@@ -767,7 +767,25 @@ Conversation management (slice 513 + 515):
 
 Header: `X-JustSearch-Audience` (optional; defaults to `USER`).
 
-SSE event vocabulary varies per shape (see `modules/ui-web/src/api/generated/shape-handlers/` for typed event interfaces). Common events: `chunk`, `done`, `error`. Shape-specific events: `rag.meta`, `rag.citations`, `rag.citation_delta`, `rag.citation_matches`, `progress`, `navigate.url_extracted`, `navigate.url_dispatched`.
+SSE event vocabulary varies per shape (see `modules/ui-web/src/api/generated/shape-handlers/` for typed event interfaces). Common events: `chunk`, `done`, `error`. Shape-specific events: `rag.meta`, `rag.citations`, `rag.citation_delta`, `rag.citation_checking`, `rag.citation_matches`, `progress`, `navigate.url_extracted`, `navigate.url_dispatched`.
+
+The Ask stream (`core.rag-ask`) emits `rag.citation_checking` with an empty object immediately
+before starting its authoritative citation check, after the final text chunk. It is absent for
+blank answers or missing verification sources, and is not emitted by model answers, Summarize or
+Delegate. The signal is transient: it is never saved or replayed. Readers may ignore unknown
+events. Checking ends at `rag.citation_matches` or at any terminal/disconnection, whichever comes
+first; later finishing steps do not extend it. Existing text → citation-matches → done ordering
+is preserved.
+
+An unfinished citation check (timeout, failure or no scorer result) emits
+`rag.citation_matches` with `{ "matches": [], "groundingIncomplete": true }`. The same envelope
+is stored as the assistant message's `claimMatches`. `groundingIncomplete` is optional; absence
+in historical records remains an unknown fact, not an inferred failure. An unfinished check
+reports no sentence or source-coverage counts. A completed check with zero matches still reports
+its real coverage facts and does not set `groundingIncomplete`. The field is carried as an
+additive key in the existing JSON map; history, thread and MCP readers keep accepting older and
+newer records without a migration. The SSE vocabulary is declared by the shape event descriptors
+and their generated handlers, separately from the worker IPC protobuf contract.
 
 Source: slices 491 (substrate), 496 (FreeChat + Extract), 497 (dynamic dispatch).
 

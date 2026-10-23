@@ -48,7 +48,7 @@ public final class RAGAskShape {
           "chunk", "reasoning_chunk", "rag.meta", "rag.citations", "rag.citation_delta",
           // Tempdoc 603 C2 — the decontextualized standalone question (transparency, conversation-layer).
           "rag.rewrite",
-          "rag.citation_matches", "done", "error");
+          "rag.citation_checking", "rag.citation_matches", "done", "error");
 
   private RAGAskShape() {}
 

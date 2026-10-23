@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T15:03:15.498Z",
+  "revision": "fc0c268eb9303507749034cb342d17cdcf906325",
+  "tree": "0772c6de7db7ab5cd6bcbc8098f5933fae4b6970",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/search-v3/sv3-ask.test.ts\" \"src/shell-v0/views/search-v3/sv3-record.evidenceProjection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/pz8kayz9/tmp/test-intent-vitest-3858134-1792767787084.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3269
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#checks only from the Engine signal through the citation result, preserving the streamed text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccc3d73f2b139c99a3e6c32b83b779d33a8d51012c94d862e021d880e3e45504",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the transcript is the session, in order checks only from the Engine signal through the citation result, preserving the streamed text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on error even without a result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccc3d73f2b139c99a3e6c32b83b779d33a8d51012c94d862e021d880e3e45504",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the transcript is the session, in order clears checking and its announcement on error even without a result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on CANCELLED even without a result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccc3d73f2b139c99a3e6c32b83b779d33a8d51012c94d862e021d880e3e45504",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the transcript is the session, in order clears checking and its announcement on CANCELLED even without a result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on done even without a result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccc3d73f2b139c99a3e6c32b83b779d33a8d51012c94d862e021d880e3e45504",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the transcript is the session, in order clears checking and its announcement on done even without a result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on drop even without a result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccc3d73f2b139c99a3e6c32b83b779d33a8d51012c94d862e021d880e3e45504",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the transcript is the session, in order clears checking and its announcement on drop even without a result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#keeps the explicit unfinished-check fact without inventing coverage counts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:12bb678b6cb43cdb1e013d48716ae6cde421a82870c19366d3709f4f4efdb6fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the search v3 ask path reads the producer off the payload (847 §1.5) keeps the explicit unfinished-check fact without inventing coverage counts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.evidenceProjection.test.ts#distinguishes an unfinished Ask check from zero matches and historical missing facts on cold load",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.evidenceProjection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2e35f23623a02e20df37d44b9e7a2b066e28b0baacb7b232d5fc6caed9b5ad49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "T6 — the ANSWER plane is untouched by the discrimination distinguishes an unfinished Ask check from zero matches and historical missing facts on cold load",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fc0c268eb",
+    "revision": "fc0c268eb9303507749034cb342d17cdcf906325",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/search-v3/sv3-ask.test.ts\" \"src/shell-v0/views/search-v3/sv3-record.evidenceProjection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/pz8kayz9/tmp/test-intent-vitest-3858134-1792767791761.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3581,
+        "output": "JSON report written to /home/elias/.cache/am/pz8kayz9/tmp/test-intent-vitest-3858134-1792767791761.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#checks only from the Engine signal through the citation result, preserving the streamed text",
+        "classification": "assertion",
+        "detail": "the transcript is the session, in order checks only from the Engine signal through the citation result, preserving the streamed text:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-checking-status/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on error even without a result",
+        "classification": "assertion",
+        "detail": "the transcript is the session, in order clears checking and its announcement on error even without a result:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/pz8kayz9/tmp/test-intent-before-r2t8I6/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:396:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-checking-status/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on CANCELLED even without a result",
+        "classification": "assertion",
+        "detail": "the transcript is the session, in order clears checking and its announcement on CANCELLED even without a result:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/pz8kayz9/tmp/test-intent-before-r2t8I6/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:396:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-checking-status/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on done even without a result",
+        "classification": "assertion",
+        "detail": "the transcript is the session, in order clears checking and its announcement on done even without a result:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/pz8kayz9/tmp/test-intent-before-r2t8I6/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:396:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-checking-status/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on drop even without a result",
+        "classification": "assertion",
+        "detail": "the transcript is the session, in order clears checking and its announcement on drop even without a result:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/pz8kayz9/tmp/test-intent-before-r2t8I6/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:396:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-checking-status/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#keeps the explicit unfinished-check fact without inventing coverage counts",
+        "classification": "assertion",
+        "detail": "the search v3 ask path reads the producer off the payload (847 §1.5) keeps the explicit unfinished-check fact without inventing coverage counts:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/pz8kayz9/tmp/test-intent-before-r2t8I6/modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts:130:42\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.evidenceProjection.test.ts#distinguishes an unfinished Ask check from zero matches and historical missing facts on cold load",
+        "classification": "assertion",
+        "detail": "T6 — the ANSWER plane is untouched by the discrimination distinguishes an unfinished Ask check from zero matches and historical missing facts on cold load:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/pz8kayz9/tmp/test-intent-before-r2t8I6/modules/ui-web/src/shell-v0/views/search-v3/sv3-record.evidenceProjection.test.ts:152:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-checking-st"
+      }
+    ]
+  },
+  "digest": "sha256:8d184c01564429aa27d8c599059a40f2c30436eaa69bfe9633d9b0acdb8c1e98"
+}

@@ -607,7 +607,7 @@ public final class ConversationEngine {
     if (stoppedByUser(work)) {
       // Stopped before it began (a Stop that overtook the dispatch): nothing was rewritten,
       // retrieved or answered.
-      recordStopped(retrievalRecordId, shape, body, false, Map.of(), List.of(), null, "", null, sink);
+      recordStopped(retrievalRecordId, shape, body, false, Map.of(), List.of(), null, "", null, null, sink);
       return;
     }
 
@@ -621,7 +621,7 @@ public final class ConversationEngine {
       // Stopped while the question was being rewritten or its documents retrieved: nothing was
       // answered, and the question has not been recorded yet.
       recordStopped(retrievalRecordId, shape, body, false, injectorRun.retrievalMetadata,
-          injectorRun.citations, standalone, "", null, sink);
+          injectorRun.citations, standalone, "", null, null, sink);
       return;
     }
     if (injectorRun.terminated) {
@@ -734,7 +734,7 @@ public final class ConversationEngine {
         } catch (LlmStreamException e) {
           if (stoppedByUser(work)) {
             recordStopped(retrievalRecordId, shape, body, true, injectorRun.retrievalMetadata,
-                injectorRun.citations, standalone, e.partialText, e.reasoning, sink);
+                injectorRun.citations, standalone, e.partialText, e.reasoning, null, sink);
             return;
           }
           emitError(sink, e.getMessage(), e.errorCode);
@@ -761,7 +761,7 @@ public final class ConversationEngine {
           checkWork(work);
           StreamConsumerResult result;
           try {
-            result = consumer.onDone(finalText, ctx);
+            result = consumer.onDone(finalText, ctx, sink);
           } catch (Exception e) {
             // A consumer cut off by the reader's Stop has not failed: the turn was stopped.
             if (stoppedByUser(work)) checkWork(work);
@@ -871,7 +871,8 @@ public final class ConversationEngine {
       // (while its citations were checked, say): the text is saved, as stopped.
       if (answerRecorded || !stoppedByUser(work)) throw cancelled;
       recordStopped(retrievalRecordId, shape, body, true, injectorRun.retrievalMetadata,
-          injectorRun.citations, standalone, accumulatedFinalText, stoppedReasoning, sink);
+          injectorRun.citations, standalone, accumulatedFinalText, stoppedReasoning,
+          mergedDoneEntries.get("claimMatches"), sink);
     }
   }
 
@@ -1321,7 +1322,7 @@ public final class ConversationEngine {
   private void recordStopped(String recordId, ConversationShape shape, Map<String, Object> body,
       boolean questionRecorded, Map<String, Object> retrievalMetadata,
       List<Map<String, Object>> citations, String standaloneQuestion, String text,
-      List<ReasoningTrace> reasoning, Consumer<SseEvent> sink) {
+      List<ReasoningTrace> reasoning, Object claimMatches, Consumer<SseEvent> sink) {
     if (recordId != null && conversationStore != null) {
       if (!questionRecorded) {
         conversationStore.createSession(recordId, shape.id().value());
@@ -1330,6 +1331,7 @@ public final class ConversationEngine {
       Map<String, Object> outcome = new LinkedHashMap<>(retrievalMetadata);
       outcome.put("citations", citations);
       outcome.put("disposition", STOPPED_DISPOSITION);
+      putIfPresent(outcome, "claimMatches", claimMatches);
       conversationStore.appendMessage(recordId, shape.id().value(),
           persistedAssistant(assistantMessage(text), outcome, reasoning, standaloneQuestion));
     }

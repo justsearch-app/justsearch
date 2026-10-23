@@ -152,6 +152,12 @@ public final class StreamingCitationMatcher implements StreamConsumer {
 
   @Override
   public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
+    return onDone(fullText, ctx, ignored -> {});
+  }
+
+  @Override
+  public StreamConsumerResult onDone(
+      String fullText, ConversationContext ctx, java.util.function.Consumer<SseEvent> progress) {
     var engineContext = ctx.engineContext();
     if (fullText == null || fullText.isBlank()) {
       return StreamConsumerResult.empty();
@@ -166,13 +172,16 @@ public final class StreamingCitationMatcher implements StreamConsumer {
               configProvider == null
                   ? threshold.getAsDouble()
                   : configProvider.resolve(engineContext).rag().citationMatchThreshold());
+      if ("core.rag-ask".equals(ctx.shapeId())) {
+        progress.accept(new SseEvent("rag.citation_checking", Map.of()));
+      }
       CitationMatchResult result =
           documents
               .matchCitationsAgainst(fullText, sources, effectiveThreshold, engineContext)
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-      if (result == null) {
-        return StreamConsumerResult.empty();
+      if (result == null || result.scorer() == DocumentService.ScorerKind.NONE) {
+        return unfinishedCheck();
       }
       // Tempdoc 836 S2S3-A.2 — a ZERO-MATCH result is still an answer to "what happened?", and it
       // is the case where the difference matters most: "nothing was examined" and "everything was
@@ -191,9 +200,17 @@ public final class StreamingCitationMatcher implements StreamConsumer {
           List.of(),
           Map.of("claimMatches", payload));
     } catch (Exception e) {
+      if (e instanceof InterruptedException) Thread.currentThread().interrupt();
       LOG.debug("Authoritative citation matching failed (non-fatal): {}", e.getMessage());
-      return StreamConsumerResult.empty();
+      return unfinishedCheck();
     }
+  }
+
+  private static StreamConsumerResult unfinishedCheck() {
+    Map<String, Object> payload = Map.of("matches", List.of(), "groundingIncomplete", true);
+    return new StreamConsumerResult(
+        List.of(new SseEvent("rag.citation_matches", payload)), List.of(), List.of(),
+        Map.of("claimMatches", payload));
   }
 
   /**

@@ -335,6 +335,74 @@ describe('a send asks the local model, once, through the one site', () => {
 });
 
 describe('the transcript is the session, in order', () => {
+  it('checks only from the Engine signal through the citation result, preserving the streamed text', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'who owns Cobalt?');
+    const main = await region(el, 'jf-sv3-main');
+    stream.emit('rag.citations', { citations: [source(0)] });
+    stream.emit('chunk', { text: 'Ada owns Cobalt [1].' });
+    await settle(el);
+    expect(q(main, 'sv3-citation-checking')).toBeNull();
+    const textBefore = answerTextIn(turnsOf(main)[0] as HTMLElement);
+    stream.emit('rag.citation_checking', {});
+    await settle(el);
+    const checking = q(main, 'sv3-citation-checking');
+    expect(checking?.textContent).toContain('Checking the answer against your sources');
+    expect(answerTextIn(turnsOf(main)[0] as HTMLElement)).toBe(textBefore);
+    const live = q(main, 'sv3-checking-announcement');
+    expect(live?.getAttribute('role')).toBe('status');
+    expect(live?.closest('[aria-busy="true"]')).toBeNull();
+    expect(live?.textContent).toContain('Checking the answer against your sources');
+    stream.emit('rag.citation_checking', {});
+    await settle(el);
+    expect(q(main, 'sv3-checking-announcement')).toBe(live);
+    expect(q(main, 'sv3-citation-checking')).toBe(checking);
+    stream.emit('rag.citation_matches', { matches: [], groundingIncomplete: true });
+    await settle(el);
+    expect(q(main, 'sv3-citation-checking')).toBeNull();
+    expect(q(main, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+    // A later finishing step still holds the turn open; checking has already ended.
+    expect(turnsOf(main)[0]?.getAttribute('data-status')).not.toBe('complete');
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+    expect(q(main, 'sv3-citation-checking')).toBeNull();
+    expect(textIn(turnsOf(main)[0] as HTMLElement, 'sv3-turn-coverage')).toContain('Grounding check did not complete');
+    const next = stubStream();
+    await ask(el, 'and when?');
+    expect(q(main, 'sv3-citation-checking')).toBeNull();
+    next.emit('chunk', { text: 'Since Tuesday.' });
+    next.emit('rag.citation_checking', {});
+    await settle(el);
+    expect(turnsOf(main)[0]?.querySelector('[data-testid="sv3-citation-checking"]')).toBeNull();
+    expect(turnsOf(main)[1]?.querySelector('[data-testid="sv3-citation-checking"]')).not.toBeNull();
+    next.emit('done', {});
+    next.end();
+    await settle(el);
+  });
+
+  it.each(['error', 'CANCELLED', 'done', 'drop'])(
+    'clears checking and its announcement on %s even without a result', async (outcome) => {
+      aiOnline();
+      const stream = stubStream();
+      const el = await mount();
+      await ask(el, 'who owns Cobalt?');
+      const main = await region(el, 'jf-sv3-main');
+      stream.emit('chunk', { text: 'Ada owns Cobalt.' });
+      stream.emit('rag.citation_checking', {});
+      await settle(el);
+      expect(q(main, 'sv3-citation-checking')).not.toBeNull();
+      if (outcome === 'done') stream.emit('done', {});
+      else if (outcome !== 'drop') stream.emit('error', { error: 'ended', errorCode: outcome });
+      stream.end();
+      await settle(el);
+      expect(q(main, 'sv3-citation-checking')).toBeNull();
+      expect(q(main, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+    },
+  );
+
   it('renders each turn as question-then-answer, oldest first, and appends deltas as they arrive', async () => {
     aiOnline();
     const first = stubStream();

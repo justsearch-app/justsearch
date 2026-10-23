@@ -211,6 +211,34 @@ final class ChatStopTurnHttpTest {
   }
 
   @Test
+  void stoppedAnswerKeepsTheCheckFactAlreadyShownLive() throws Exception {
+    var later = heldStep();
+    Map<String, Object> fact = Map.of("matches", List.of(), "groundingIncomplete", true);
+    StreamConsumer check = new StreamConsumer() {
+      @Override public String id() { return "core.test-incomplete-check"; }
+      @Override public StreamConsumerResult onChunk(String text, ConversationContext ctx) {
+        return StreamConsumerResult.empty();
+      }
+      @Override public StreamConsumerResult onDone(String text, ConversationContext ctx) {
+        return new StreamConsumerResult(List.of(new SseEvent("rag.citation_matches", fact)),
+            List.of(), List.of(), Map.of("claimMatches", fact));
+      }
+    };
+    start(List.of("Ada owns"), List.of(), List.of(check, later.consumer()));
+    ai.release.countDown();
+    try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {
+      turn.awaitEvent("rag.citation_matches");
+      assertTrue(later.reached.await(5, TimeUnit.SECONDS));
+      stop("conv-1", "t-1");
+      turn.close();
+      later.step.countDown();
+      Map<String, Object> saved = awaitOutcome("conv-1").get(1);
+      assertEquals("CANCELLED", saved.get("disposition"));
+      assertEquals(fact, saved.get("claimMatches"), "a Stop preserves the fact already shown live");
+    }
+  }
+
+  @Test
   void lateStopSavesWhatStreamedAsStopped() throws Exception {
     start(List.of("Half an ans"));
     try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {

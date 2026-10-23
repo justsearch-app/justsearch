@@ -68,4 +68,13 @@ public interface StreamConsumer {
    * @return events/side-effects/message-deltas produced at stream end (may be empty)
    */
   StreamConsumerResult onDone(String fullText, ConversationContext ctx);
+
+  /**
+   * Finish with an emitter for progress that must reach the reader before this call returns.
+   * Existing consumers retain their two-argument contract; final events still belong in the result.
+   */
+  default StreamConsumerResult onDone(
+      String fullText, ConversationContext ctx, java.util.function.Consumer<SseEvent> progress) {
+    return onDone(fullText, ctx);
+  }
 }

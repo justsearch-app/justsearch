@@ -802,7 +802,8 @@ export class Sv3Main extends JfElement {
         margin: var(--space-2) 0 0;
         overflow-wrap: anywhere;
       }
-      .coverage-note {
+      .coverage-note,
+      .citation-checking {
         margin: var(--space-2) 0 0;
         color: var(--secondary-label);
         font-size: var(--font-size-sv3-sm);
@@ -1345,6 +1346,7 @@ export class Sv3Main extends JfElement {
     floorSummary: { attribute: false },
     streaming: { type: Boolean },
     stopping: { attribute: false },
+    checkingTurnId: { attribute: false },
     modelAnswerUnavailableReason: { attribute: false },
     modelAnswerBusy: { type: Boolean, attribute: 'model-answer-busy' },
     showFloorSummary: { state: true },
@@ -1468,6 +1470,7 @@ export class Sv3Main extends JfElement {
    * until then the turn says "Stopping…", or that the Stop did not reach the Engine.
    */
   declare stopping: Sv3StopState | null;
+  declare checkingTurnId: string | null;
   /** The divider's disclosure — the summary is a paragraph of the model's words, not a label. */
   declare showFloorSummary: boolean;
   declare editingFloorSummary: boolean;
@@ -1639,6 +1642,7 @@ export class Sv3Main extends JfElement {
     this.continuationVersions = null;
     this.floorSummary = null;
     this.streaming = false;
+    this.checkingTurnId = null;
     this.stopping = null;
     this.showFloorSummary = false;
     this.editingFloorSummary = false;
@@ -1872,6 +1876,9 @@ export class Sv3Main extends JfElement {
    */
   private transcript(turns: readonly Sv3Turn[]): TemplateResult {
     return html`
+      <div class="visually-hidden" role="status" aria-atomic="true" data-testid="sv3-checking-announcement">${
+        turns.some((turn) => this.isChecking(turn)) ? 'Checking the answer against your sources…' : ''
+      }</div>
       <div
         class="scroller sv3-scroller"
         data-testid="sv3-main-scroller"
@@ -2038,9 +2045,15 @@ export class Sv3Main extends JfElement {
                     ></jf-markdown-block>`}
               </div>
             `}
+        ${this.isChecking(turn) ? html`<p class="citation-checking" data-testid="sv3-citation-checking">Checking the answer against your sources…</p>` : nothing}
         ${this.coverageNote(turn)}${this.cutShortNotice(turn, liveForTurn)}${this.tail(turn)}${this.modelAnswerAction(turn)}${this.citations(turn)}
       </div>
     `;
+  }
+
+  private isChecking(turn: Sv3Turn): boolean {
+    return turn.id === this.checkingTurnId && turn.kind === 'ask'
+      && turn.shapeId !== 'core.extract' && turn.status === 'streaming';
   }
 
   private modelActionTurn(turn: Sv3Turn | undefined): boolean {
@@ -2070,7 +2083,7 @@ export class Sv3Main extends JfElement {
     const evidence = turn.evidence;
     const note = coverageNote(groundingCoverage(
       evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal,
-    ));
+    ), evidence.groundingIncomplete);
     return note === null ? nothing : html`<p class="coverage-note" data-testid="sv3-turn-coverage">${note}</p>`;
   }
 
