@@ -107,6 +107,28 @@ The repair cases fail by assertion before the change; the preservation cases pas
         "modules/ui-web/src/api/streams.observeAccept.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Concurrent and repeated cancellations of an approval-held Delegate run append exactly one durable Stop note per run, including after the store is reopened. Cancellation releases the pending approval and never executes the held operation. These scenarios are agent-adopted (delegated-choice), not owner-adopted.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Search v3 designs; the orchestrator adopted DS1–DS8 and DN1–DN2 in wp1.2c under this delegation, after a challenger pass. Agent-adopted, never owner-adopted.",
+          "choice": "DS6 Stop on a run held at a budget, context or approval decision, and Stop repeated while cancellation is pending (also from another window): once cancelled, no held decision or active-work control remains, and neither live nor reload shows the Stop note twice.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-delegate-stop-concurrent.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#concurrentCancellationAtApprovalRecordsOneStop"
+      ],
+      "repaired": true
     }
   ]
 }
