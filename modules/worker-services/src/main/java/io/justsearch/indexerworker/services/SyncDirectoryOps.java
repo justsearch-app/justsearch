@@ -531,12 +531,6 @@ final class SyncDirectoryOps {
    * no {@link WorkerServiceException}. The phase helpers below return the terminal response, or
    * {@code null} for "no terminal state, continue".
    */
-  SyncDirectoryResponse execute(String rootPath, boolean force,
-      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
-      String collection) {
-    return execute(rootPath, force, provenance, cancelled, collection, null);
-  }
-
   /** Return recovery may touch only files owned by this root, preserving nested subscriptions. */
   SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,

@@ -141,7 +141,7 @@ The transition deadline amendment is the orchestrator's decision under the deleg
       "moved": [
         "signature"
       ],
-      "whatMoved": "The one-argument RootVolumeLedger.forgetUnder(prefix), which only this test still called after production moved to the owner-filtered form, was removed (the unreferenced-code rule flagged it). The test now calls forgetUnder(prefix, ignored -> true), exactly what the one-argument form did. Likewise the four-argument SyncDirectoryOps.execute was removed; SyncDirectoryOpsWalkSkipPolicyTest now passes the null collection the removed overload passed. Every input, precondition, assertion and scenario is unchanged."
+      "whatMoved": "The one-argument RootVolumeLedger.forgetUnder(prefix), which only this test still called after production moved to the owner-filtered form, was removed (the unreferenced-code rule flagged it). The test now calls forgetUnder(prefix, ignored -> true), exactly what the one-argument form did. Likewise the four- and five-argument SyncDirectoryOps.execute overloads were removed (production now uses only the six-argument form); SyncDirectoryOpsWalkSkipPolicyTest now passes the null collection and null owner filter the removed overloads passed. Every input, precondition, assertion and scenario is unchanged."
     }
   ]
 }
