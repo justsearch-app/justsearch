@@ -194,3 +194,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Re-audit of revised sources: the owner quotes and their original context are supplied in the audit request. P1 classification and its Linux-only checks fall within the owners fix-or-defer delegation and agreed P1; real-filesystem fixtures, shared instrumentation, watcher/receipt checks and executor cleanup fall within delegated work decisions and the agreed D/P scenarios with A1-A3. No stronger conflicting source found. Classes, items, choices, test content and execution evidence are unchanged from the prior audit; the missing owner delegation is now supplied. No must-fix findings. Real bind mounts remain unverified under A3; no Gradle rerun."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-remount-1",
+  "verdict": "accept",
+  "digest": "sha256:7b1c6711ff3b66ed7287c2deb96b827d72eb4959fbd0c4c4919859a90bd40ee4",
+  "note": "Accept current digest after reviewing both signature adaptations under docs/reference/testing/test-intent.md. RootPresenceGuardTest expands the removed forgetUnder default with ignored -> true; all seven SyncDirectoryOpsWalkSkipPolicyTest call edits expand the removed execute default with explicit null collection. Every test input, precondition, assertion, parameterization and condition is preserved; the original six entries are unchanged. Regenerated evidence uses the same check IDs, overlay file set and resolved b62fc5921 baseline; producer and current file hashes match, all four cases execute/pass without skips, and every before check fails assertions for the intended watcher/status/classifier defect. Evidence regenerated at 1d8d4efdd and only committed by HEAD 39259d1dd. Original scope exclusions remain; no broader runtime reverification claimed. Detailed review: tmp/verify-evidence/signature-review-v2/review.txt. Separate independent audit for PR 910 follows."
+}
+```
