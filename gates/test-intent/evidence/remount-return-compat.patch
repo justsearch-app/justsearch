@@ -1,0 +1,17 @@
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java	2026-10-23 09:18:10.366817582 +0200
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java	2026-10-23 09:18:10.376313312 +0200
+@@ -536,6 +536,14 @@
+     return execute(rootPath, force, provenance, cancelled, null);
+   }
+ 
++  /** Compatibility scaffolding for the candidate's check: the owner filter is absent before. */
++  SyncDirectoryResponse execute(String rootPath, boolean force,
++      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
++      String collection, java.util.function.Predicate<Path> ownsPath) {
++    if (ownsPath != null) throw new UnsupportedOperationException("owner filter not in the before-state");
++    return execute(rootPath, force, provenance, cancelled, collection);
++  }
++
+   SyncDirectoryResponse execute(String rootPath, boolean force,
+       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
+       String collection) {

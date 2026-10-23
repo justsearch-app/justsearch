@@ -20,10 +20,11 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
 import '../components/OpButton.js';
-import type { OpErrorEventDetail } from '../components/OpButton.js';
+import type { OpErrorEventDetail, OpSuccessEventDetail } from '../components/OpButton.js';
 import '../components/StatusBadge.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
+import '../components/OperationOutcomeDetail.js';
 import '../components/CapabilityMap.js';
 import { parseSseBuffer } from '../../api/sse.js';
 import { summarizeWireDrift } from '../../api/wireDriftTelemetry.js';
@@ -162,6 +163,8 @@ export class HealthSurface extends JfElement {
     autoRefresh: { state: true },
     loading: { state: true },
     initialPollComplete: { state: true },
+    bulkOutcomeKey: { state: true },
+    bulkError: { state: true },
     error: { state: true },
     recommendedActions: { state: true },
   };
@@ -193,6 +196,8 @@ export class HealthSurface extends JfElement {
    * pre-first-poll window. (observations.md `#270` fix.)
    */
   declare initialPollComplete: boolean;
+  declare bulkOutcomeKey: string;
+  declare bulkError: OpErrorEventDetail | null;
   declare error: string | null;
   /**
    * Slice 447 §X.11.5 Phase 4: condition → recommended Operation lookup. Populated
@@ -234,6 +239,8 @@ export class HealthSurface extends JfElement {
     this.autoRefresh = true;
     this.loading = false;
     this.initialPollComplete = false;
+    this.bulkOutcomeKey = '';
+    this.bulkError = null;
     this.error = null;
     this.recommendedActions = new Map();
   }
@@ -583,6 +590,7 @@ export class HealthSurface extends JfElement {
   protected override settleTransients(): void {
     this.loading = false;
     this.error = null;
+    this.bulkError = null;
   }
 
   override disconnectedCallback(): void {
@@ -1431,8 +1439,20 @@ export class HealthSurface extends JfElement {
                   context="button"
                   api-base=${this.apiBase}
                   .args=${args}
-                  @op-success=${() => { this.error = null; void this.refresh(); }}
-                  @op-error=${(event: CustomEvent<OpErrorEventDetail>) => { this.error = event.detail.message; }}
+                  @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
+                    if (['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(target)) {
+                      this.bulkError = null;
+                      this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? '');
+                    }
+                    this.error = null; void this.refresh();
+                  }}
+                  @op-error=${(event: CustomEvent<OpErrorEventDetail>) => {
+                    if (['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(target)) {
+                      this.showBulkError(event.detail);
+                    } else {
+                      this.error = event.detail.message;
+                    }
+                  }}
                 ></jf-operation>
                 ${overlay
                   ? html`<span class="overlay-tag" title="Plugin overlay">·plugin</span>`
@@ -1443,6 +1463,12 @@ export class HealthSurface extends JfElement {
         </div>
       </div>
     `;
+  }
+
+  private showBulkError(error: OpErrorEventDetail): void {
+    if (!this.isConnected) return;
+    this.bulkOutcomeKey = '';
+    this.bulkError = error;
   }
 
   private renderActions(): TemplateResult {
@@ -1480,6 +1506,11 @@ export class HealthSurface extends JfElement {
           ></jf-operation>
           <jf-operation
             operation-id="core.rebuild-index"
+            @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
+              this.bulkError = null;
+              this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? '');
+            }}
+            @op-error=${(event: CustomEvent<OpErrorEventDetail>) => this.showBulkError(event.detail)}
             context="button"
             api-base=${this.apiBase}
           ></jf-operation>
@@ -1591,6 +1622,12 @@ export class HealthSurface extends JfElement {
         ${this.renderFailed()}
         ${this.renderRecommendedActions()}
         ${this.renderActions()}
+        ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
+          ${this.bulkError.message}
+          ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
+        </jf-error-alert>` : nothing}
+        ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
+          operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}
         ${this.renderEvents()}
       </div>
     `;
