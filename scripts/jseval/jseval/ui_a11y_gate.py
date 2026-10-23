@@ -12,10 +12,10 @@ and the ONE split `ui_measure.split_new_vs_known` for baseline-relative rule rep
 The gate also enforces severity and requires a successful axe measurement.
 
 Runs BOTH locally and on PRs (tempdoc 930 §22.2 follow-up 5, ADR-0026 amendment 2026-09-05):
-the `--fixtures` capture state needs no backend, so the `Measured axe (advisory)` job in
-`.github/workflows/ci.yml` runs this same sweep on a hosted Linux runner. That lane is
-ADVISORY — not a required status check — so it reports without blocking; local-first
-discipline still applies, run it before you push.
+the `--fixtures` capture state needs no backend, so the `Measured axe` job in
+`.github/workflows/ci.yml` runs this same sweep on a hosted Linux runner. That lane is a
+required status check since 2026-10-24 (ADR-0044 amendment), so a failure blocks the merge;
+local-first discipline still applies, run it before you push.
 """
 from __future__ import annotations
 
