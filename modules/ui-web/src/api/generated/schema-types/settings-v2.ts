@@ -41,9 +41,14 @@ export interface SettingsV2 {
     excludePatterns?: string[] | null;
     hasSeenTrustLoopNudge?: boolean | null;
     highContrast?: boolean | null;
+    indexingPause?: {
+      paused?: boolean;
+      reason?: string | null;
+      untilEpochMs?: number | null;
+    };
     inspectorWidth?: number | null;
+    invalidExcludePatterns?: string[] | null;
     mode?: string | null;
-    pauseIndexingDuringAi?: boolean | null;
     theme?: string | null;
     vimMode?: boolean | null;
   } | null;
@@ -83,9 +88,14 @@ export const settingsV2Schema = z.strictObject({
     "excludePatterns": z.array(z.string()).nullable().optional(),
     "hasSeenTrustLoopNudge": z.boolean().nullable().optional(),
     "highContrast": z.boolean().nullable().optional(),
+    "indexingPause": z.strictObject({
+      "paused": z.boolean().optional(),
+      "reason": z.string().nullable().optional(),
+      "untilEpochMs": z.number().int().nullable().optional(),
+    }).optional(),
     "inspectorWidth": z.number().int().nullable().optional(),
+    "invalidExcludePatterns": z.array(z.string()).nullable().optional(),
     "mode": z.string().nullable().optional(),
-    "pauseIndexingDuringAi": z.boolean().nullable().optional(),
     "theme": z.string().nullable().optional(),
     "vimMode": z.boolean().nullable().optional(),
   }).nullable().optional(),

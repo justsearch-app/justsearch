@@ -80,6 +80,11 @@ public final class EngineRoot implements WorkerHost {
    */
   private final io.justsearch.core.scheduling.BulkWorkGate bulkWork =
       new io.justsearch.core.scheduling.BulkWorkGate();
+  private final io.justsearch.core.scheduling.IndexingHold indexingHold =
+      new io.justsearch.core.scheduling.IndexingHold();
+
+  @Override public io.justsearch.core.scheduling.IndexingHold indexingHold() { return indexingHold; }
+
   private final Object generationActivityLock = new Object();
   private io.justsearch.app.api.chat.GenerationActivity generationActivity; // Guarded by the lock.
   private AutoCloseable generationEdges; // Guarded by generationActivityLock.
@@ -1027,6 +1032,7 @@ public final class EngineRoot implements WorkerHost {
     try {
       started.installProjectionSeedSources(projectionSeedSources);
       started.bindBootRootBindings(authority.roots().snapshotBindings());
+      started.bindExclusionRoots(authority.roots()::watchedPaths);
       if (startContext != null) started.bindIndexStartContext(startContext);
       else started.bindBootQueryRoleSelection(exactBootQuery);
       started.start();
@@ -1055,6 +1061,7 @@ public final class EngineRoot implements WorkerHost {
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
             () -> requestRestart(started), admission, authority.roots(),
             started::captureServingView);
+    built.bindIndexingHold(gpuScheduling.indexingHold());
     built.bindProjectionSourceIds(projectionSeedSources.stream()
         .map(io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId)
         .sorted().toList());
@@ -1108,6 +1115,19 @@ public final class EngineRoot implements WorkerHost {
     KnowledgeServer current = server;
     if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
     return servingLease(current.captureStartupHealthView());
+  }
+
+  @Override
+  public java.util.Optional<WorkerHost.ServingLease> tryCaptureHealthView() {
+    KnowledgeServer current = server;
+    if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
+    return current.tryCaptureHealthView().map(EngineRoot::servingLease);
+  }
+
+  @Override
+  public boolean runtimeReloadInProgress() {
+    KnowledgeServer current = server;
+    return current != null && current.runtimeReloadInProgress();
   }
 
   private static WorkerHost.ServingLease servingLease(KnowledgeServer.ServingLease lease) {

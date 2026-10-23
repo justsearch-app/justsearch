@@ -1,0 +1,38 @@
+{
+  "root": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale",
+  "revision": "8eb70d443d1a0823b874147be40b60b40706f122",
+  "command": [
+    "prlimit",
+    "--core=0",
+    "java",
+    "-Xmx2g",
+    "-XX:+UseG1GC",
+    "-XX:-UsePerfData",
+    "-XX:MetaspaceSize=128m",
+    "-XX:MaxDirectMemorySize=256m",
+    "-XX:+UseCompactObjectHeaders",
+    "-Dfile.encoding=UTF-8",
+    "--sun-misc-unsafe-memory-access=warn",
+    "--enable-native-access=ALL-UNNAMED",
+    "-Djustsearch.data.dir=/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/terminal-continuity/tmp/engine-enqueue-control/data",
+    "-Djustsearch.home=/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/terminal-continuity/tmp/engine-enqueue-control/home",
+    "-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/terminal-continuity/tmp/engine-enqueue-control",
+    "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:56277",
+    "-cp",
+    "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/modules/ui/build/install/ui/lib/*",
+    "io.justsearch.ui.HeadlessApp"
+  ],
+  "pidRecord": "engine-process.json",
+  "environment": {
+    "JUSTSEARCH_HOME": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/terminal-continuity/tmp/engine-enqueue-control/home",
+    "JUSTSEARCH_DATA_DIR": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/terminal-continuity/tmp/engine-enqueue-control/data",
+    "JUSTSEARCH_API_PORT": "59947",
+    "JUSTSEARCH_PROD": "true"
+  },
+  "jars": {
+    "app-services-0.3.0.jar": "dc772350719af98f4e4ecd6bf37c8dbe771e262f9baa5cdf4dfab88e048cf60d",
+    "app-engine-0.3.0.jar": "d969cfc22ba1a6900e7e400bd7b520b86507b798e4a0c24f27aa08b44f19dd1b",
+    "indexer-worker-0.3.0.jar": "c197dccdcbf6d4c0164f37500c000178f799d5ceeaf3e4cdec1662ce656f09e4",
+    "ui-0.3.0.jar": "9b175f5ddcbd3908eed4d6284992575e29c859431bbd3a96e861de7df1e61b56"
+  }
+}

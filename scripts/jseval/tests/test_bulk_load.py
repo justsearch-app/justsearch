@@ -177,5 +177,42 @@ class BulkLoadTest(unittest.TestCase):
             bulk_load.snapshot(client, 5183)
 
 
+class RetryQueueActivityTest(unittest.TestCase):
+    def test_waiting_or_incomplete_population_is_not_active_work(self):
+        for state in ['WAITING', 'IDLE', 'FAILED']:
+            with self.subTest(state=state):
+                self.assertFalse(self.observe(state)['active'])
+
+    def test_ready_and_processing_work_use_the_worker_verdict(self):
+        self.assertTrue(self.observe('INDEXING')['active'])
+
+    def test_waiting_queue_allows_reachable_enrichment_but_fatal_loop_does_not(self):
+        self.assertTrue(self.observe('WAITING', embeddingPendingCount=2)['active'])
+        self.assertFalse(self.observe('FAILED', embeddingPendingCount=2)['active'])
+
+    def test_unavailable_enrichment_does_not_make_a_waiting_queue_active(self):
+        self.assertFalse(self.observe('WAITING', embeddingPendingCount=2, embeddingAvailable=False)['active'])
+
+    def test_stale_worker_observations_are_not_active_load(self):
+        for flags in [{'meta': {'workerRpcStale': True}}, {'stale_sources': ['indexing']}]:
+            with self.subTest(flags=flags), self.assertRaisesRegex(ValueError, 'stale'):
+                self.observe('INDEXING', **flags)
+
+    @staticmethod
+    def observe(state, *, meta=None, stale_sources=None, **overrides):
+        body = {'worker': {'core': {'indexState': state, 'indexedDocuments': 3,
+            'pendingJobs': 2 if state in ['INDEXING', 'WAITING', 'FAILED'] else 0},
+            'enrichment': {'chunkEmbeddingCompletedCount': 0, 'chunkEmbeddingPendingCount': 0,
+                'embeddingPendingCount': 0, 'spladePendingCount': 0, 'pendingNerCount': 0,
+                **overrides}}}
+        if meta is not None:
+            body['meta'] = meta
+        if stale_sources is not None:
+            body['operating'] = {'freshness': {'staleSources': stale_sources}}
+        with httpx.Client(base_url='http://127.0.0.1:12345', transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json=body))) as client:
+            return bulk_load.snapshot(client, 41)
+
+
 if __name__ == '__main__':
     unittest.main()

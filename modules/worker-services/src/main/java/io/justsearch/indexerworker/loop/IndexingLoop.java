@@ -378,7 +378,11 @@ public class IndexingLoop implements Closeable {
         ingestionOutcomeCatalog == null
             ? IngestionOutcomeMetricCatalog.noop().outcomeWriteFailuresTotal
             : ingestionOutcomeCatalog.outcomeWriteFailuresTotal;
-    this.staleSourceHandler = new StaleSourceHandler(indexingCoordinator, this.documentIdentityStore);
+    this.staleSourceHandler = new StaleSourceHandler(indexingCoordinator, this.documentIdentityStore,
+        () -> {
+          RunningRuntime source = activeLexicalSource.get();
+          return source == null ? null : source.indexingCoordinator();
+        });
     this.journal =
         new IngestionOutcomeJournal(
             jobQueue, metrics, outcomeWriteFailureCounter, () -> detailedTracing);
@@ -438,6 +442,7 @@ public class IndexingLoop implements Closeable {
             this::chunkSpladeEnabled,
             activeLexicalSource::get,
             fileMutationFence);
+    this.writer.useFileExclusions(ingestionAuthority::excludes);
     // Tempdoc 516 Slice 4a.3 (W5.2): construct the extractor. Holds its own per-batch
     // indexEmptyForBatch cache, the forcedPaths set (shared with the markForced public API),
     // and the running/signalBus pair so it can self-decide when to stop the per-job loop.
@@ -632,12 +637,8 @@ public class IndexingLoop implements Closeable {
    * WorkerSignalBus.hasPendingIngest()} (tempdoc 798), memoized for {@link
    * #PENDING_INGEST_PROBE_TTL_MS}.
    *
-   * <p>Two tiers, cheapest first. {@link JobQueue#queueDepth()} is a {@code COUNT(*) WHERE state
-   * IN ('PENDING','PROCESSING')} served by {@code idx_jobs_state}, so the steady state — an empty
-   * ingest lane while backfill drains — costs one indexed count. Only when that is non-zero is
-   * {@link JobQueue#jobStateCounts()} consulted, which is the precise answer (PENDING-ready only:
-   * a job still in retry backoff cannot be claimed, so yielding backfill for it would buy
-   * nothing) but a full scan of {@code jobs} including DONE/FAILED rows.
+   * <p>The queue answers with indexed existence reads. Only runnable PENDING work yields
+   * backfill; retry-waiting rows do not, and the answer is refreshed after the short probe TTL.
    */
   private boolean hasPendingIngestWork() {
     long now = System.currentTimeMillis();
@@ -645,7 +646,7 @@ public class IndexingLoop implements Closeable {
       return pendingIngestCached;
     }
     boolean pending =
-        jobQueue.queueDepth() > 0 && jobQueue.jobStateCounts().pendingReadyCount() > 0;
+        jobQueue.hasPendingIngestWork();
     pendingIngestCached = pending;
     pendingIngestProbedAtMs = now;
     return pending;
@@ -680,14 +681,33 @@ public class IndexingLoop implements Closeable {
     }
     log.info("Indexing loop running");
 
+    var hold = signalBus.indexingHold();
+    io.justsearch.core.scheduling.IndexingHold.Lease lease = null;
+    try {
     while (running.get() && !Thread.currentThread().isInterrupted()) {
       try {
-        awaitCutoverResume();
+        if (lease != null && hold.held()) {
+          // Retain ownership across batches: buffered writes must be published before quiet.
+          if (!finishIdleCommit()) {
+            Thread.sleep(50L);
+            continue;
+          }
+          commitOps.maybeRefreshBlocking();
+          lease.close();
+          lease = null;
+        }
+        if (awaitCutoverResume(lease)) lease = null;
         if (!running.get()) break;
 
-        // CRITICAL: Handle GPU state transitions for Hybrid Inference
-        // Must unload embedding model when Main claims GPU, reload when released
+        // Resource handoff for foreground search/Ask remains live while processing is held.
         embeddingLifecycle.handleGpuStateTransition();
+
+        if (hold != null && lease == null) lease = hold.tryAcquire();
+        if (hold != null && lease == null) {
+          // Keep cycling through cutover/upgrade coordination while processing admission is closed.
+          Thread.sleep(50L);
+          continue;
+        }
 
         if (!journal.retryBatchReturns()) {
           if (!sleepBrieflyAfterError()) break;
@@ -698,6 +718,7 @@ public class IndexingLoop implements Closeable {
         List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
 
         if (jobs.isEmpty()) {
+          if (jobQueue.pollPendingBudgetExhausted()) continue;
           // No work to do - log batch summary if we just finished one
           if (currentState == LoopState.RUNNING && batchStats.hasWork()) {
             long elapsed = batchStats.elapsedMillis(System.currentTimeMillis());
@@ -821,13 +842,15 @@ public class IndexingLoop implements Closeable {
       }
     }
 
-    finalizeShutdownCommit();
-
+    } finally {
+      try { finalizeShutdownCommit(); }
+      finally { if (lease != null) lease.close(); }
+    }
     log.info("Indexing loop stopped");
   }
 
   /** Commit buffered effects before outcomes; retry already committed outcomes on every idle cycle. */
-  private void finishIdleCommit() {
+  private boolean finishIdleCommit() {
     try {
       if (indexedSinceCommit > 0) {
         commitActiveLexicalSource(CommitReason.INDEXING_LOOP_IDLE);
@@ -840,8 +863,10 @@ public class IndexingLoop implements Closeable {
       // A failed SQL outcome write can outlive its successful index commit. With no new index
       // work there is nothing to commit, but the exact committed transition still needs retry.
       journal.drainPending();
+      return true;
     } catch (RuntimeException e) {
       log.error("Failed to commit index or record outcomes on idle", e);
+      return false;
     }
   }
 
@@ -1054,6 +1079,11 @@ public class IndexingLoop implements Closeable {
    * Task t-20261013-ef3c41, round 4: every deletion decision this loop makes (admission, freshness,
    * re-hash, pre-write) asks {@code check} whether the source's root still vouches for absence.
    */
+  /** Bind watched-root policy scope for already queued work. */
+  public void useFileExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
+    ingestionAuthority.useFileExclusions(exclusions);
+  }
+
   public void useRootCheck(SourcePresence.RootCheck check) {
     ingestionAuthority.useRootCheck(check);
   }
@@ -1167,9 +1197,13 @@ public class IndexingLoop implements Closeable {
     }
   }
 
-  private void awaitCutoverResume() throws InterruptedException {
+  private boolean awaitCutoverResume(io.justsearch.core.scheduling.IndexingHold.Lease lease)
+      throws InterruptedException {
     synchronized (cutoverPauseMonitor) {
-      if (!cutoverPauseRequested) return;
+      if (!cutoverPauseRequested) return false;
+      if (!finishIdleCommit()) throw new IllegalStateException("Cutover publication failed");
+      commitOps.maybeRefreshBlocking();
+      if (lease != null) lease.close();
       cutoverPaused = true;
       transitionToPaused();
       cutoverPauseMonitor.notifyAll();
@@ -1182,6 +1216,7 @@ public class IndexingLoop implements Closeable {
         if (running.get()) transitionToIdle();
         cutoverPauseMonitor.notifyAll();
       }
+      return true;
     }
   }
 

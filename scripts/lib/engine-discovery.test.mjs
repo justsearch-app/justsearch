@@ -185,7 +185,7 @@ function manifestFor(engine, overrides = {}) {
     instanceId: engine.instanceId,
     pid: engine.pid,
     lifecycle: 'LIFECYCLE_STATE_READY',
-    head: { apiPort: engine.port, apiBaseUrl: `http://127.0.0.1:${engine.port}` },
+    head: { apiPort: engine.port, apiBaseUrl: `http://127.0.0.1:${engine.port}`, sessionToken: engine.token },
     ...overrides,
   };
 }
@@ -230,7 +230,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       if (req.url === '/api/status') return json(200, { status: 'ok' });
       if (kind === 'foreign') return json(404, { error: 'not found' });
       if (req.url === '/api/runtime/live') return json(200, { alive: true, pid, instanceId: id });
-      if (req.url === '/api/mcp/token') return json(200, { token });
+      if (req.url === '/api/mcp/token') return json(req.headers['x-justsearch-session'] === token ? 404 : 401, {});
       if (req.url === '/mcp' && req.method === 'POST') {
         const msg = JSON.parse(body);
         if (msg.id === undefined) return res.writeHead(202).end();
@@ -528,7 +528,7 @@ async function bridgeInteractive(m, entry, between) {
       `${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`,
   );
   await reply(1);
-  await between();
+  await between({ send: message => child.stdin.write(`${JSON.stringify(message)}\n`), reply });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'justsearch_ingest', arguments: { paths: ['/x'] } } })}\n`);
   await reply(2);
   child.stdin.end();
@@ -702,12 +702,12 @@ async function desktopAndPinned(t, root) {
 test('D5: --port, JUSTSEARCH_API_PORT and JUSTSEARCH_DATA_DIR win over the desktop Engine (production MCP), JUSTSEARCH_API_PORT (bundle)', async (t) => {
   const root = tempRoot(t);
   const { m, pinned, pinnedDir } = await desktopAndPinned(t, root);
-  assert.equal((await prodDiscover(m, { port: pinned.port })).result?.port, pinned.port, '--port');
-  const byEnvPort = await prodDiscover(m, { envExtra: { JUSTSEARCH_API_PORT: String(pinned.port) } });
+  assert.equal((await prodDiscover(m, { port: pinned.port, envExtra: { JUSTSEARCH_SESSION_TOKEN: pinned.token } })).result?.port, pinned.port, '--port');
+  const byEnvPort = await prodDiscover(m, { envExtra: { JUSTSEARCH_API_PORT: String(pinned.port), JUSTSEARCH_SESSION_TOKEN: pinned.token } });
   assert.equal(byEnvPort.result?.port, pinned.port, 'JUSTSEARCH_API_PORT');
   const byDataDir = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: pinnedDir } });
   assert.equal(byDataDir.result?.port, pinned.port, 'JUSTSEARCH_DATA_DIR');
-  assertConnectedTo(await bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(pinned.port) }), pinned);
+  assertConnectedTo(await bridgeSession(m, bundle(root), { JUSTSEARCH_API_PORT: String(pinned.port), JUSTSEARCH_SESSION_TOKEN: pinned.token }), pinned);
 });
 
 test('D5: JUSTSEARCH_DATA_DIR wins over the desktop Engine in the bundle too', async (t) => {
@@ -809,7 +809,8 @@ test('D4: a proven Engine still starting (/api/health 503) is waited for and adm
     }
     assert.ok(engine.requests.some((r) => r.url === '/api/health' && r.health === 503), `${client}: it was seen starting`);
     const credentialed = engine.requests.filter((r) => r.url === '/api/mcp/token' || r.url === '/mcp');
-    assert.ok(credentialed.length > 0, client);
+    if (client === 'bundle') assert.ok(credentialed.length > 0, client);
+    assert.ok(!engine.requests.some(r => r.url === '/api/mcp/token'), 'no HTTP credential bootstrap');
     assert.ok(credentialed.every((r) => r.health === 200), `${client}: nothing past the probes before health 200`);
   }
 });
@@ -1051,12 +1052,13 @@ test('D9: the port is taken while /api/health is pending — neither client send
     const seen = await impostor.settled();
     reached[client] = { requests: seen.requests, answersFromIt: /impostor/.test(JSON.stringify(res.result ?? res.messages)) };
     // The observed refusal, never a timeout or a crash: it tried the port, wrote nothing, and ...
-    assert.ok(seen.connections > 0, `${client}: it tried the replacement's port\n${res.stderr}`);
+    if (client === 'bundle') assert.ok(seen.connections > 0, `${client}: it tried the replacement's port\n${res.stderr}`);
+    else assert.equal(seen.connections, 0, 'manifest discovery sends no request after its public probes');
     if (client === 'production MCP') {
       // ... discovery returns the proven Engine with no token.
       assert.equal(res.code, 0, res.stderr);
       assert.equal(res.result.instanceId, engine.instanceId, res.stderr);
-      assert.equal(res.result.token, null, 'the token bootstrap to the replacement is refused');
+      assert.equal(res.result.token, engine.token, 'the credential comes from the original proven manifest');
     } else {
       // ... the bridge exits naming the refusal.
       assert.equal(res.code, 1, res.stderr);
@@ -1090,8 +1092,8 @@ async function bridgeReconnectSwap(t, holdUrl, answer) {
   assert.match(call.error.message, /owner-mismatch/, session.stderr);
 }
 
-test('D9: bridge reconnect — the restarted Engine\'s port is taken while its token response is pending', async (t) => {
-  await bridgeReconnectSwap(t, '/api/mcp/token', { token: 'token-second' });
+test('D9: bridge reconnect — the restarted Engine\'s port is taken while its public health response is pending', async (t) => {
+  await bridgeReconnectSwap(t, '/api/health', { ok: true });
 });
 
 test('D9: bridge reconnect — the restarted Engine\'s port is taken while the re-initialize response is pending', async (t) => {
@@ -1142,4 +1144,73 @@ test('D1: Windows reports the Roaming known folder even to a process started wit
   const asks = (e) => standardCandidates({ env: e, userHome: 'C:\\Users\\x' }).some((c) => typeof c.resolveDataDir === 'function');
   assert.ok(asks({}), 'without APPDATA the OS is asked');
   assert.ok(!asks({ APPDATA: 'C:\\Users\\x\\AppData\\Roaming' }), 'with APPDATA it is not');
+});
+
+test('T11/T14: discovery takes the credential from the validated manifest, without a token HTTP request', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { token: 'legacy-endpoint-decoy' });
+  const manifest = manifestFor(engine);
+  manifest.head.sessionToken = 'credential-from-owner-file';
+  writeManifest(m.desktop, manifest);
+  const result = await prodDiscover(m);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.result.token, 'credential-from-owner-file');
+  assert.ok(!engine.requests.some((request) => request.url === '/api/mcp/token'));
+});
+
+test('T13: explicit ports require JUSTSEARCH_SESSION_TOKEN instead of bootstrapping over HTTP', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  const result = await prodDiscover(m, { port: engine.port });
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /JUSTSEARCH_SESSION_TOKEN/);
+  assert.ok(!engine.requests.some((request) => request.url === '/api/mcp/token'));
+});
+
+
+test('T11: production MCP next call discovers a restarted Engine on a changed port', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { token: 'before-restart' });
+  writeManifest(m.desktop, manifestFor(first));
+  const prod = await startProdMcp(t, m);
+  const ingest = { paths: [path.join(root, 'doc.txt')] };
+  first.lastAnswers();
+  assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${first.instanceId}`));
+  await first.close();
+  const second = await startService(t, { token: 'after-restart' });
+  writeManifest(m.desktop, manifestFor(second));
+  assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${second.instanceId}`));
+  assert.ok(second.requests.some(r => r.headers['x-justsearch-session'] === second.token));
+  assert.ok(!second.requests.some(r => r.headers['x-justsearch-session'] === first.token));
+});
+
+
+test('T12: a concurrent call during reconnect retains the last proven target', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t);
+  writeManifest(m.desktop, manifestFor(first));
+  let seen;
+  const session = await bridgeInteractive(m, bundle(root), async ({ send, reply }) => {
+    // The initialize reply can precede the notification/GET socket proofs (netstat on Windows).
+    // Finish that handshake before restarting, so this test races only the two tool calls.
+    await handshakeDone(first, { stream: true });
+    await first.close();
+    const impostor = await startImpostor(t, { port: first.port, pid: first.pid, instanceId: first.instanceId });
+    const second = await startService(t, { holdUrl: '/api/health' });
+    writeManifest(m.desktop, manifestFor(second));
+    const call = id => ({ jsonrpc: '2.0', id, method: 'tools/call',
+      params: { name: 'justsearch_ingest', arguments: { paths: ['/must-remain-on-proven-engine'] } } });
+    send(call(3));
+    await within(second.arrived, 10000, 'reconnect waiting for the new Engine health proof');
+    send(call(4));
+    await reply(4);
+    seen = await impostor.settled();
+    second.release({ ok: true });
+  });
+  assert.ok(session.messages.some(message => message.id === 4), session.stderr);
+  assert.deepEqual(seen.requests, [], 'a concurrent request sends neither credentials nor tool arguments to the unproven old port');
 });

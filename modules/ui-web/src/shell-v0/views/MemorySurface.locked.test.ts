@@ -70,6 +70,56 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows unavailable on first open and revisit, then reloads after recovery", async () => {
+    const fact = {
+      id: "m1",
+      kind: "fact",
+      content: "all memories recovered",
+      actor: "chat",
+      createdAt: "2026-01-01T00:00:00Z",
+    };
+    scriptFetch([
+      { status: 503, body: { errorCode: "MEMORIES_UNAVAILABLE" } },
+      { status: 503, body: { errorCode: "MEMORIES_UNAVAILABLE" } },
+      { status: 200, body: { memories: [fact], locked: false } },
+    ]);
+    const el = await mount();
+    expect(text(el)).toContain("Memories are unavailable");
+    expect(text(el)).not.toContain(EMPTY_STATE);
+    expect(
+      (el.shadowRoot?.querySelector("input.draft") as HTMLInputElement)
+        .disabled,
+    ).toBe(true);
+    el.remove();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(text(el)).toContain("Memories are unavailable");
+    expect(text(el)).not.toContain(EMPTY_STATE);
+    el.remove();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(text(el)).toContain(fact.content);
+    expect(text(el)).not.toContain("Memories are unavailable");
+  });
+
+  it("hides a stale list when a revisit fails to load", async () => {
+    scriptFetch([
+      {
+        status: 200,
+        body: { memories: [{ id: "old", content: "stale fact" }] },
+      },
+      { status: 503, body: {} },
+    ]);
+    const el = await mount();
+    expect(text(el)).toContain("stale fact");
+    el.remove();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(text(el)).toContain("Memories are unavailable");
+    expect(text(el)).not.toContain("stale fact");
+    expect(text(el)).not.toContain(EMPTY_STATE);
+  });
+
   it('renders the LOCKED state and never the empty state when the read reports locked', async () => {
     scriptFetch([{ status: 200, body: { memories: [], locked: true } }]);
     const el = await mount();

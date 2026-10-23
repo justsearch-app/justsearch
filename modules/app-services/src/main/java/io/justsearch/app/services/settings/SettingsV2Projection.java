@@ -5,6 +5,7 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.LlmSettingsV2;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.api.settings.UiSettingsV2;
+import io.justsearch.configuration.excludes.ExclusionPatterns;
 import java.util.List;
 import java.util.Locale;
 
@@ -18,12 +19,14 @@ public final class SettingsV2Projection {
 
   public static SettingsV2 toSettingsV2(UiSettings settings, UiSettingsStore.PersistenceMode persistenceMode,
       io.justsearch.app.api.settings.SettingsWitness witness) {
+    var invalidPatterns = ExclusionPatterns.fromPatterns(settings.getExcludePatterns()).invalidPatterns();
     var ui = new UiSettingsV2(
         settings.getTheme(), settings.isHighContrast(), settings.getDensity(),
         settings.isVimMode(), settings.getDefaultAction(),
         settings.getInspectorWidth() > 0 ? settings.getInspectorWidth() : null,
-        settings.isPauseIndexingDuringAi(), settings.getMode(), settings.isTrustLoopNudgeSeen(),
-        List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled());
+        settings.getMode(), settings.isTrustLoopNudgeSeen(),
+        List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled(),
+        invalidPatterns.isEmpty() ? null : invalidPatterns, settings.getIndexingPause());
     var llm = new LlmSettingsV2(
         blankToNull(settings.getServerExecutablePath()), settings.getContextLength(),
         settings.getMaxTokens(), settings.configuredGpuLayers(),

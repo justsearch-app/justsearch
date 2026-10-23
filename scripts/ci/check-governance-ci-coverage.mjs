@@ -23,7 +23,7 @@ export function workflowJobs(text) {
     const field = /^    (name|runs-on|continue-on-error|if|timeout-minutes|needs):\s*(.*)$/.exec(line);
     if (field) job[field[1]] = field[2];
     if (/^      - /.test(line)) step = {};
-    const stepField = /^        (if|continue-on-error):\s*(.*)$/.exec(line);
+    const stepField = /^        (id|if|continue-on-error):\s*(.*)$/.exec(line);
     if (step && stepField) step[stepField[1]] = stepField[2];
     const command = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(line);
     if (command) {
@@ -37,10 +37,17 @@ export function workflowJobs(text) {
   return jobs;
 }
 
-// Recognize only a fail-closed aggregate: every dependency is tested for exactly
-// success, with an unconditional job and no other commands or tolerated failures.
+// Production credit requires both PR and push execution. Dispatch-only and
+// arbitrary conditions cannot substitute for those events.
+export function runsOnPrAndPush(condition) {
+  return !condition || condition === 'always()' || /^needs\.changes\.outputs\.[a-z]+ != 'false'$/.test(condition);
+}
+
+// Recognize only a fail-closed aggregate on PRs and pushes: every dependency
+// must be exactly success, with no other commands or tolerated failures.
 export function aggregateDependencies(job) {
-  if (job.if !== 'always()' || job['continue-on-error'] || job.runs.length !== 1) return [];
+  if (job.if !== 'always()'
+      || job['continue-on-error'] || job.runs.length !== 1) return [];
   const match = /^\[([\w, -]+)\]$/.exec(job.needs ?? '');
   if (!match) return [];
   const dependencies = match[1].split(',').map((s) => s.trim());
@@ -49,7 +56,8 @@ export function aggregateDependencies(job) {
   if (checks.length !== dependencies.length || job.runs[0].step?.if || job.runs[0].step?.['continue-on-error']) return [];
   const checked = [];
   for (const check of checks) {
-    const test = /^test "\$([A-Z_]+)" = success$/.exec(check);
+    const test = /^test "\$([A-Z_]+)" = success$/.exec(check)
+      ?? /^\[\[ "\$([A-Z_]+)" = success \|\| "\$\1" = skipped \]\]$/.exec(check);
     if (!test) return [];
     const binding = new RegExp(`^          ${test[1]}: \\$\\{\\{ needs\\.([\\w-]+)\\.result \\}\\}\\s*$`, 'm').exec(job.text);
     if (!binding) return [];
@@ -130,12 +138,12 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
   const jobs = workflowJobs(workflowText);
   const requiredIds = requiredHostedJobIds(jobs, requiredChecks);
   for (const job of jobs) {
-    if (!requiredIds.has(job.id) || job['continue-on-error'] || job.if
+    if (!requiredIds.has(job.id) || job['continue-on-error'] || !runsOnPrAndPush(job.if)
         || !/^(ubuntu|windows|macos)-|\$\{\{ matrix\.os \}\}/.test(job['runs-on'] ?? '')) continue;
     const enforcedRuns = job.runs.filter((r) => {
       if (r.step?.['continue-on-error']) return false;
       const condition = r.step?.if;
-      if (!condition || condition === 'always()') return true;
+      if (runsOnPrAndPush(condition)) return true;
       const matrix = /^matrix\.(\w+) == ['"]([\w-]+)['"]$/.exec(condition);
       return matrix && new RegExp(`${matrix[1]}: ['"]?${matrix[2]}['"]?\\s*$`, 'm').test(job.text);
     });

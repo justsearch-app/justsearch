@@ -22,6 +22,9 @@ import java.io.Closeable;
  * integration down and boot recovery restarts it against the same instance.
  */
 public interface WorkerHost extends Closeable {
+  /** Process-lifetime user hold; null for a fixture without processing lanes. */
+  default io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
+
 
   /** Exact physical serving view retained by an operation after publication capture. */
   interface ServingLease extends AutoCloseable {
@@ -89,6 +92,14 @@ public interface WorkerHost extends Closeable {
   default ServingLease captureStartupHealthView() {
     return captureServingView();
   }
+
+  /** Empty while a planned runtime transition owns the physical view; never waits behind it. */
+  default java.util.Optional<ServingLease> tryCaptureHealthView() {
+    return java.util.Optional.of(captureServingView());
+  }
+
+  /** Whether reload owns or is waiting for the physical observation boundary. */
+  default boolean runtimeReloadInProgress() { return false; }
 
   /**
    * The OS process id that owns the index — this JVM's own pid for an in-process host.

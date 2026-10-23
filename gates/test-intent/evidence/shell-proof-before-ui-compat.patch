@@ -1,0 +1,12 @@
+--- a/modules/ui-web/src/api/http.ts
++++ b/modules/ui-web/src/api/http.ts
+@@ -285,7 +285,8 @@
+     try {
+       const { invoke } = await import('@tauri-apps/api/core');
+       const token = await invoke('session_token');
+-      const normalized = normalizeNonBlankString(token);
++      // Input re-encoding only: accept the candidate fixture's object, still ignore its origin.
++      const normalized = normalizeNonBlankString(token && typeof token === 'object' ? (token as { token?: unknown }).token : token);
+       // An invalidate() mid-flight bumped the generation: this answer describes the DEAD
+       // instance, so it is returned to the caller that asked but never cached.
+       if (normalized !== null && sessionBinding.generation === generation) {

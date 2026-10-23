@@ -23,7 +23,6 @@ class SettingsV2ProjectionTest {
     settings.setVimMode(true);
     settings.setDefaultAction("reveal");
     settings.setInspectorWidth(420);
-    settings.setPauseIndexingDuringAi(true);
     settings.setMode("advanced");
     settings.setTrustLoopNudgeSeen(true);
     settings.setExcludePatterns(List.of("*.tmp"));
@@ -39,7 +38,7 @@ class SettingsV2ProjectionTest {
 
     var expected = new SettingsV2(
         new UiSettingsV2("dark", true, "compact", true, "reveal", 420,
-            true, "advanced", true, List.of("*.tmp"), true),
+            "advanced", true, List.of("*.tmp"), true),
         new LlmSettingsV2(" server.exe ", 8192, 2048, 35, " model.gguf ", " native-dir "),
         List.of("index-dir"), "read_write", null, null, null, 0);
     assertEquals(expected, SettingsV2Projection.toSettingsV2(settings, UiSettingsStore.PersistenceMode.READ_WRITE));
@@ -59,6 +58,8 @@ class SettingsV2ProjectionTest {
     settings.setIndexBasePath("  ");
 
     var projected = SettingsV2Projection.toSettingsV2(settings, UiSettingsStore.PersistenceMode.READ_WRITE);
+    assertNull(projected.ui().invalidExcludePatterns(),
+        "D3: omit diagnostics when no saved pattern is invalid");
     assertNull(projected.ui().inspectorWidth());
     assertNull(projected.ui().chatEnabled());
     assertNull(projected.llm().serverExecutable());

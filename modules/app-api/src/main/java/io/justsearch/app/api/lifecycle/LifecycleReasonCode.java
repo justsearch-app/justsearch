@@ -49,6 +49,7 @@ public enum LifecycleReasonCode {
   INDEX_BLOCKED_LEGACY("index.blocked_legacy"),
   INDEX_SCHEMA_MISMATCH("index.schema_mismatch"),
   INDEX_SCHEMA_OPEN_REFUSED("index.schema_open_refused"),
+  INDEX_MIGRATION_JOURNAL_UNAVAILABLE("index.migration_journal_unavailable"),
   MIGRATION_AWAITING_GAP_ACCEPTANCE("migration.awaiting_gap_acceptance"),
   // Tempdoc 915 §C: the Worker gave up on automatic rebuilds for this index shape after
   // MAX_AUTO_REBUILD_ATTEMPTS. Search still serves the existing index read-only; ingestion does
@@ -178,6 +179,9 @@ public enum LifecycleReasonCode {
   // operating-state assembler from the bulk-work gate, whose game input the Engine's GPU residency
   // sampler sets from game detection; never held in a reason slot.
   INDEXING_PAUSED_GAME_MODE("indexing.paused_game_mode"),
+  INDEXING_PAUSING_USER("indexing.pausing_user"),
+  INDEXING_PAUSED_USER("indexing.paused_user"),
+  INDEXING_PAUSED_SETTINGS_RECOVERY("indexing.paused_settings_recovery_check_exclusions"),
 
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
@@ -254,7 +258,7 @@ public enum LifecycleReasonCode {
   public RetentionClass retentionClass() {
     return switch (this) {
       // Fatal marker evidence is consumed once; exhausted recovery is terminal until READY.
-      case INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED,
+      case INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED, INDEX_MIGRATION_JOURNAL_UNAVAILABLE,
           COMPONENT_RECOVERY_EXHAUSTED -> RetentionClass.STICKY;
 
       // Tempdoc 882 item 24: observed exactly once, at load, and never re-derived. The file that
@@ -336,6 +340,9 @@ public enum LifecycleReasonCode {
           INDEXING_SLOWED_CHAT_GENERATING,
           INDEXING_PAUSED_GPU_BUSY,
           INDEXING_PAUSED_GAME_MODE,
+          INDEXING_PAUSING_USER,
+          INDEXING_PAUSED_USER,
+          INDEXING_PAUSED_SETTINGS_RECOVERY,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

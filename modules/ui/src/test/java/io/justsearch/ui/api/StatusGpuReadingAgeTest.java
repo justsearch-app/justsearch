@@ -121,7 +121,7 @@ final class StatusGpuReadingAgeTest {
 
   private static WorkerOperationalView indexing() {
     var serving = WorkerOperationalViewBuilder.from(WorkerOperationalView.fallback("SERVING"))
-        .withCore(new CoreIndexView(true, 10, 1, "SERVING", 0, 0));
+        .withCore(new CoreIndexView(true, 10, 1, "INDEXING", 0, 0));
     var indexing = MigrationGenerationViewBuilder.from(MigrationGenerationView.empty())
         .withProcessingJobsCount(1L);
     return WorkerOperationalViewBuilder.from(serving).withMigration(indexing);

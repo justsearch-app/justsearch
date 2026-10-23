@@ -6,7 +6,7 @@ description: "Manual-only workflow policy for the former self-hosted/local-runne
 date: 2026-04-22
 probes:
   - adr-0026-workflow-triggers-checked
-last_reviewed: 2026-09-05
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0026: Manual-Only CI Triggering
@@ -207,8 +207,8 @@ as §22.2 follow-up 5.
 
 **Decision.** `.github/workflows/ci.yml` gains a `measured-axe` job
 (`Measured axe (advisory)`, `ubuntu-latest`) running `jseval ui-a11y-gate` on
-`pull_request`, `push` to `main`, `merge_group` and `workflow_dispatch` — the
-triggers ADR-0044 already grants that workflow. This adds no trigger and
+`pull_request` for affected frontend inputs, `push` to `main` and
+`workflow_dispatch` (current scheduling: ADR-0053). This adds no trigger and
 touches no self-hosted runner, so the manual-only policy for self-hosted and
 specialty workflows is unchanged.
 
@@ -233,3 +233,23 @@ it stays that way, which only a series of runs can answer.
 `ui-proportion-gate` keeps its local-only status and its ADR-0026 citation for
 now: its baseline is pixel geometry, which is far more runner-dependent than
 an axe rule id. That is a separate judgement, not an oversight.
+
+## Amendment 2026-10-20: later exceptions to the all-workflow rule
+
+The 2026-05-08 amendment's requirement that every workflow expose manual
+dispatch is historical. [ADR-0044](0044-public-hosted-ci-fact-lanes.md) permits
+event-driven public hosted checks; `.github/workflows/cla.yml` handles
+`issue_comment` and `pull_request_target` without
+`workflow_dispatch`.
+
+[ADR-0052](0052-weekly-codeql-on-hosted-runners.md) also narrows item 4 of that
+amendment: `.github/workflows/codeql.yml` declares `schedule: '17 4 * * 1'` as
+well as `workflow_dispatch`, on hosted runners. Self-hosted workstation workflows
+remain manual. Use `scripts/ci/workflow-signal-policy.v1.json` and its trigger
+check for the per-workflow posture rather than reinstating the historical
+repository-wide ban.
+
+## Amendment 2026-10-21: one PR run
+
+[ADR-0053](0053-one-pr-ci-run-and-squash-auto-merge.md) supersedes the hosted CI event-selection
+and publication rules. Main and dispatch run all slow suites; PRs run their input closure.

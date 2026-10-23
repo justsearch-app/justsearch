@@ -41,6 +41,7 @@ const UNIT_ARTIFACTS = new Map([
 ]);
 const WINDOWS_ARTIFACTS = new Map([
   ['Windows-native tests (contracts)', 'windows-native-contracts'],
+  ['Windows-native tests (contracts-2)', 'windows-native-contracts-2'],
 ]);
 const BUILD_ATTRIBUTION_ARTIFACT = 'build-attribution';
 const BUILD_ATTRIBUTION_KIND = 'justsearch-build-attribution.v1';
@@ -245,7 +246,7 @@ function normalizeStep(step) {
   };
 }
 
-function normalizeJob(job, policyEntry, artifacts, splitRun) {
+function normalizeJob(job, policyEntry, artifacts, jobNames) {
   const steps = (job.steps || []).map(normalizeStep);
   const failedSteps = steps.filter((step) => {
     const conclusion = String(step.conclusion || '').toLowerCase();
@@ -253,12 +254,19 @@ function normalizeJob(job, policyEntry, artifacts, splitRun) {
     return conclusion === 'failure' || conclusion === 'cancelled' || status === 'failure';
   });
   const name = job.name || 'unknown job';
+  const skipped = job.conclusion === 'skipped' || (steps.length > 0 && steps.every((step) =>
+    step.conclusion === 'skipped' || /^(Set up job|Complete job)$/.test(step.name)));
   const expected = new Set(policyEntry?.requiredStatusChecks || []);
-  const baseArtifact = name === 'Unit tests (app-ui)' && (splitRun || steps.some((s) => /Require every app-ui part/.test(s.name)))
+  const shard = SHARD_POLICY.lanes.find(lane => lane.jobName === name);
+  const aggregate = SHARD_POLICY.aggregates.find(entry => entry.requiredCheck === name);
+  const splitAggregate = aggregate && (aggregate.parts.some(part => jobNames.has(
+    SHARD_POLICY.lanes.find(lane => lane.jobId === part)?.jobName))
+    || steps.some(step => /Require every (?:app-ui|selected) part/.test(step.name)));
+  const baseArtifact = skipped || splitAggregate
     ? null : UNIT_ARTIFACTS.get(name) || null;
-  const localCommand = SHARD_POLICY.lanes.find((lane) => lane.jobName === name)?.localCommand;
-  const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
-  const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
+  const localCommand = shard?.localCommand;
+  const part = Boolean(shard) || name === 'Windows-native tests (node)' || WINDOWS_ARTIFACTS.has(name);
+  const partBase = skipped ? null : baseArtifact || WINDOWS_ARTIFACTS.get(name);
   const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
   const partArtifact = part && partBase ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;
   const artifactName = baseArtifact && part ? partArtifact : baseArtifact;
@@ -275,7 +283,7 @@ function normalizeJob(job, policyEntry, artifacts, splitRun) {
     labels: Array.isArray(job.labels) ? job.labels.map(String) : [],
     runnerName: job.runner_name || job.runnerName || null,
     runnerGroupName: job.runner_group_name || job.runnerGroupName || null,
-    factLane: (expected.has(name) || (part && expected.has(name.startsWith('Unit tests') ? 'Unit tests (app-ui)' : 'Windows-native tests'))) ? {
+    factLane: (expected.has(name) || (part && expected.has(shard?.requiredCheck ?? 'Windows-native tests'))) ? {
       workflow: policyEntry.name,
       class: policyEntry.class,
       owner: policyEntry.owner,
@@ -504,8 +512,8 @@ export function buildDigest({
 }) {
   const ciPolicy = (policy.workflows || []).find((workflow) => workflow.name === 'CI') || null;
   const artifacts = artifactList(artifactsDoc);
-  const splitRun = (jobsDoc?.jobs || []).some((job) => job.name === 'Unit tests (app-ui-ui)' || job.name === 'Unit tests (app-ui-services)');
-  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy, artifacts, splitRun));
+  const jobNames = new Set((jobsDoc?.jobs || []).map(job => job.name));
+  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy, artifacts, jobNames));
   const unitAttribution = summarizeUnitAttribution(jobs, artifacts, unitPayloads);
   const buildEvidence = summarizeBuildEvidence(jobs, artifacts, buildPayloads);
   const partEvidence = jobs.filter((job) => job.partArtifact).map((job) => ({

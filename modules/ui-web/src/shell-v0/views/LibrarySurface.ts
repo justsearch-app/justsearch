@@ -19,7 +19,10 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
+import { OperationError } from '../operations/OperationClient.js';
+import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/Button.js';
+import type { JfButton } from '../components/Button.js';
 import '../components/IngestionSummary.js';
 // Tempdoc 571 §11 / 578 — Library ⊇ Browse: Library hosts the Browse file-tree as a tab.
 import '../components/SurfaceTabs.js';
@@ -32,6 +35,7 @@ import { icon } from '../components/Icon.js';
 // 569 §14 — render the indexed-folder cards through the projection engine (the 2nd real surface).
 import { activeBodyFor, subscribePresentation } from '../state/presentationRuntime.js';
 import { subscribeAiState } from '../state/aiStateStore.js';
+import '../components/IndexingControls.js';
 import { LIBRARY_CARDS_REGION } from '../themes/builtinPresentations.js';
 import '../components/DeclaredSurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -57,7 +61,6 @@ import {
   selectIndexingProgress,
   type EnrichmentApplicability,
 } from '../state/indexingProgress.js';
-import { enrichmentProgress } from '../state/enrichmentCoverage.js';
 // Tempdoc 811 C-2a — the non-root (ad-hoc / MCP) sources the folder rows cannot describe.
 import {
   deriveOtherSources,
@@ -89,6 +92,16 @@ interface FolderPreview {
   /** Tempdoc 599 Fix 3 — the count walk hit its cap; fileCount is a lower bound ("N+"). */
   readonly capped: boolean;
   readonly alreadyWatched: boolean;
+  /** Optional for older Engines; exact membership still uses alreadyWatched. */
+  readonly overlap?: { readonly path: string; readonly relationship: 'inside' | 'containing' };
+}
+
+function overlapExplanation(preview: FolderPreview): string | null {
+  const overlap = preview.overlap;
+  if (!overlap) return null;
+  return overlap.relationship === 'inside'
+    ? `This folder is inside the watched folder “${overlap.path}” and is already covered by it. Choose a separate folder.`
+    : `This folder contains the watched folder “${overlap.path}”. Choose a separate folder.`;
 }
 
 // The substrate list response: a thin {items, count} envelope around the generated IndexedRootView.
@@ -98,6 +111,27 @@ const listResponseSchema = z
     count: z.number().optional(),
   })
   .loose();
+
+const excludesPolicySchema = z.object({
+  source: z.string(), sourceDetail: z.string().nullable(), patterns: z.array(z.string()),
+});
+type ExcludesPolicy = z.infer<typeof excludesPolicySchema>;
+function isOverride(policy: ExcludesPolicy | null): boolean {
+  return policy?.source === 'env_var' || policy?.source === 'jvm_arg';
+}
+function policySource(policy: ExcludesPolicy): string {
+  return `${policy.source === 'jvm_arg' ? 'system property' : 'environment variable'} ${policy.sourceDetail ?? policy.source}`;
+}
+
+// Operation results are untrusted wire data; absent partial-scope fields cannot mean success.
+const excludesResultSchema = z.object({
+  effectivePolicy: excludesPolicySchema.optional(),
+  dryRun: z.boolean(), matchedFiles: z.number().int().nonnegative(),
+  confirmedRemovals: z.number().int().nonnegative(), capped: z.boolean(),
+  perPattern: z.array(z.object({ pattern: z.string(), matches: z.number().int().nonnegative() })),
+  uncheckedScopes: z.array(z.object({ path: z.string(), status: z.enum(['not_checked', 'not_removed']), reason: z.string() })),
+});
+type ExcludesResult = z.infer<typeof excludesResultSchema>;
 
 type GapDecisionView = { reindexKey: string; gapListHash: string;
   gaps: readonly { unitId: string; reason: string }[] };
@@ -141,6 +175,7 @@ const OP_APPLY = 'core.apply-excludes';
 const LIVE_REFRESH_MIN_MS = 4000;
 
 export class LibrarySurface extends JfElement {
+  private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
@@ -149,8 +184,20 @@ export class LibrarySurface extends JfElement {
     loading: { state: true },
     error: { state: true },
     excludesText: { state: true },
+    excludesInvalidPatterns: { state: true },
     excludesLoaded: { state: true },
     excludesBusy: { state: true },
+    excludesError: { state: true },
+    excludesNotice: { state: true },
+    excludesResult: { state: true },
+    excludesPolicy: { state: true },
+    excludesConflict: { state: true },
+    addBusy: { state: true },
+    removingHashes: { state: true },
+    actionMessage: { state: true },
+    reindexOutcome: { state: true },
+    reindexOutcomeError: { state: true },
+    reindexOutcomeBusy: { state: true },
     pendingPath: { state: true },
     pendingCollection: { state: true },
     pendingPreview: { state: true },
@@ -158,16 +205,21 @@ export class LibrarySurface extends JfElement {
     isTauri: { state: true },
     activeTab: { state: true },
     provisional: { state: true },
+    indexingActivity: { state: true },
+    retryWaiting: { state: true },
     enrichmentStages: { state: true },
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
     otherSources: { state: true },
+    bulkOutcome: { state: true },
     gapDecision: { state: true },
     gapDecisionBusy: { state: true },
     gapDecisionError: { state: true },
+    gapDecisionErrorCode: { state: true },
     reindexCancelKey: { state: true },
     reindexCancelBusy: { state: true },
     reindexCancelError: { state: true },
+    reindexCancelErrorCode: { state: true },
     reindexCancelRecorded: { state: true },
   };
 
@@ -178,11 +230,33 @@ export class LibrarySurface extends JfElement {
   declare loading: boolean;
   declare error: string | null;
   declare excludesText: string;
+  declare excludesInvalidPatterns: string[];
   declare excludesLoaded: boolean;
   declare excludesBusy: boolean;
+  declare private excludesError: string | null;
+  declare private excludesNotice: string;
+  declare private excludesResult: ExcludesResult | null;
+  declare private excludesConflict: boolean;
+  declare private excludesPolicy: ExcludesPolicy | null;
   private excludesWitness: SettingsWitness | null = null;
+  private excludesSavedText: string | null = null;
   private excludesAttempt: SettingsAttempt | null = null;
   private excludesLoadStarted = false;
+  declare addBusy: boolean;
+  declare removingHashes: ReadonlySet<string>;
+  declare actionMessage: string | null;
+  declare reindexOutcome: string | null;
+  declare reindexOutcomeError: boolean;
+  declare reindexOutcomeBusy: boolean;
+  private bulkOutcomeKey: string | null = null;
+  declare bulkOutcome: OperationOutcomeView | null;
+  private reindexOutcomeKey: string | null = null;
+  private reindexReadSerial = 0;
+  private lastReindexReadAtMs = 0;
+  private surfaceSerial = 0;
+  private confirmingHashes = new Set<string>();
+  private refreshSerial = 0;
+  private rootsObserved = false;
   declare pendingPath: string;
   /**
    * Tempdoc 914 D4 — the optional collection the new watched root's documents are tagged with.
@@ -211,6 +285,8 @@ export class LibrarySurface extends JfElement {
    * → "fully searchable") is computed from applicable stages only. `null` until the first poll
    * snapshot arrives, which the seam reads as "coverage unknown" (no percent).
    */
+  declare indexingActivity: ReturnType<typeof selectIndexingProgress>['activity'];
+  declare retryWaiting: boolean;
   declare enrichmentStages: EnrichmentApplicability | null;
   /**
    * 809 finding 1 — the enrichment backfill still owes work, so a drained folder is keyword-searchable
@@ -234,9 +310,11 @@ export class LibrarySurface extends JfElement {
   declare gapDecision: GapDecisionView | null;
   declare gapDecisionBusy: boolean;
   declare gapDecisionError: string | null;
+  declare gapDecisionErrorCode: string | null;
   declare reindexCancelKey: string | null;
   declare reindexCancelBusy: boolean;
   declare reindexCancelError: string | null;
+  declare reindexCancelErrorCode: string | null;
   declare reindexCancelRecorded: boolean;
   private observedGapKey: string | null = null;
   private gapRequestSerial = 0;
@@ -272,8 +350,21 @@ export class LibrarySurface extends JfElement {
     this.loading = false;
     this.error = null;
     this.excludesText = '';
+    this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
     this.excludesBusy = false;
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
+    this.excludesPolicy = null;
+    this.excludesConflict = false;
+    this.addBusy = false;
+    this.removingHashes = new Set();
+    this.actionMessage = null;
+    this.bulkOutcome = null;
+    this.reindexOutcome = null;
+    this.reindexOutcomeError = false;
+    this.reindexOutcomeBusy = false;
     this.pendingPath = '';
     this.pendingCollection = '';
     this.pendingPreview = null;
@@ -281,6 +372,8 @@ export class LibrarySurface extends JfElement {
     this.isTauri = false;
     this.activeTab = 'folders';
     this.provisional = false;
+    this.indexingActivity = selectIndexingProgress(null, false, 0, []).activity;
+    this.retryWaiting = false;
     this.enrichmentStages = null;
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
@@ -288,9 +381,11 @@ export class LibrarySurface extends JfElement {
     this.gapDecision = null;
     this.gapDecisionBusy = false;
     this.gapDecisionError = null;
+    this.gapDecisionErrorCode = null;
     this.reindexCancelKey = null;
     this.reindexCancelBusy = false;
     this.reindexCancelError = null;
+    this.reindexCancelErrorCode = null;
     this.reindexCancelRecorded = false;
   }
 
@@ -329,7 +424,11 @@ export class LibrarySurface extends JfElement {
     .actions {
       display: flex;
       gap: 0.5rem;
-      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 640px) {
+      .header, .excludes-header { flex-wrap: wrap; }
+      .add-row input { min-inline-size: 0; }
     }
     /* 574 B1 — the button look is the jf-button atom's single authority; the per-surface
        base + primary/danger variant fork (§14 V2) is deleted. */
@@ -421,7 +520,9 @@ export class LibrarySurface extends JfElement {
       text-align: center;
       color: var(--text-secondary);
     }
+    .action-message { margin-bottom: 1rem; overflow-wrap: anywhere; }
     .error-banner {
+      overflow-wrap: anywhere;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -451,6 +552,7 @@ export class LibrarySurface extends JfElement {
       gap: 0.35rem;
       margin-bottom: 1rem;
       font-size: var(--font-size-sm);
+      overflow-wrap: anywhere;
     }
     .add-preview.ok {
       color: var(--text-success);
@@ -503,6 +605,9 @@ export class LibrarySurface extends JfElement {
       gap: 1rem;
       margin-bottom: 0.5rem;
     }
+    .excludes-section pre { white-space: pre-wrap; }
+    .excludes-section pre, .excludes-section li { overflow-wrap: anywhere; }
+    .excludes-header > div { min-width: 0; }
     .excludes-header h3 {
       margin: 0;
       font-size: var(--font-size-md);
@@ -569,6 +674,7 @@ export class LibrarySurface extends JfElement {
       this.isTauri = this.host_.platform.capabilities.has('folder-picker');
     }
     void this.refresh();
+    if (this.reindexOutcomeKey) void this.checkReindexOutcome();
     if (!this.excludesLoadStarted) void this.loadExcludes();
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
     // 595 §4.3 — observe the one Stability axis so an empty roots list during a
@@ -580,17 +686,20 @@ export class LibrarySurface extends JfElement {
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
         s.status,
-        s.snapshotLive,
+        s.indexingStatusLive,
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );
+      this.indexingActivity = progress.activity;
+      this.indexProgress = progress;
+      this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
       // row cannot render an unqualified "✓ … Verified just now" over an index with no vectors.
-      this.enrichmentBlocked = progress.phase === 'blocked';
+      this.enrichmentBlocked = progress.blockedPending > 0;
       // 809 finding 1 — same tick, same store: whether the enrichment backfill is still running, so a
       // row cannot claim the terminal "✓ indexed" while semantic search is still being built.
-      this.enrichmentPending = enrichmentProgress(s.status).pending;
+      this.enrichmentPending = progress.enrichingPending > 0;
       // Tempdoc 811 C-2a — the facet probe runs under the DEFAULT search scope, so the
       // default-scope population is its exact bound; fall back to the whole-index count on a
       // backend that predates `searchableDocuments` (C-4).
@@ -606,6 +715,9 @@ export class LibrarySurface extends JfElement {
       // Tempdoc 599 §9.3 — ride the existing status tick to live-refresh the rows (counts-free, no
       // new poller), so a folder's "Indexing · N remaining → ✓ indexed" updates without re-nav.
       void this.refresh({ live: true });
+      if (this.reindexOutcomeKey && Date.now() - this.lastReindexReadAtMs >= LIVE_REFRESH_MIN_MS) {
+        void this.checkReindexOutcome();
+      }
     });
   }
 
@@ -613,9 +725,24 @@ export class LibrarySurface extends JfElement {
    *  spinner / error would otherwise survive navigation). Folder/excludes drafts, the active tab, and the
    *  fetched roots are recoverable and KEPT. */
   protected override settleTransients(): void {
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
     this.loading = false;
     this.error = null;
+    this.surfaceSerial++;
+    this.refreshSerial++;
+    this.refreshing = false;
+    this.addBusy = false;
+    this.removingHashes = new Set();
+    this.confirmingHashes.clear();
+    this.actionMessage = null;
+    this.reindexOutcome = null;
+    this.reindexOutcomeError = false;
+    this.reindexReadSerial++;
+    this.reindexOutcomeBusy = false;
     this.gapDecisionError = null;
+    this.gapDecisionErrorCode = null;
     this.gapRequestSerial++;
     this.gapDecisionAttemptSerial++;
     this.gapLoading = false;
@@ -623,6 +750,7 @@ export class LibrarySurface extends JfElement {
     this.reindexCancelAttemptSerial++;
     this.reindexCancelBusy = false;
     this.reindexCancelError = null;
+    this.reindexCancelErrorCode = null;
   }
 
   override disconnectedCallback(): void {
@@ -667,6 +795,9 @@ export class LibrarySurface extends JfElement {
         enrichmentStages: this.enrichmentStages,
         enrichmentPending: this.enrichmentPending,
         enrichmentBlocked: this.enrichmentBlocked,
+        retryWaiting: this.retryWaiting,
+        indexingPaused: this.indexProgress.pause?.state === 'paused',
+        indexingPauseReason: this.indexProgress.pause?.reason,
         // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
         // re-queue window, when the wire row reports the failures as in-flight instead.
         lastKnownFailed: this.lastKnownFailed[pathHash],
@@ -675,8 +806,9 @@ export class LibrarySurface extends JfElement {
         pathHash,
         // Tempdoc 804 §B9 (F8) — never the raw hash as the row's name (see folderRowLabel).
         displayPath: folderRowLabel(pathHash, this.resolvedPaths[pathHash]).label,
-        status: fs.glyph,
-        metaText: fs.metaText,
+        status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
+        metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
+        removalBusy: this.removingHashes.has(pathHash),
         walkError: undefined,
         // Tempdoc 599 §16/B1 — the clickable "N failed" chip's count (the declared renderer emits an
         // intent the surface handles by opening the failed-files drawer). Named `failed` (the seam's
@@ -709,14 +841,15 @@ export class LibrarySurface extends JfElement {
    * full refresh by pathHash, so it does not flicker to "count pending". Live refreshes are
    * throttled and never toggle the loading spinner or clobber the error banner.
    */
-  private async refresh(opts: { live?: boolean } = {}): Promise<void> {
+  private async refresh(opts: { live?: boolean; force?: boolean } = {}): Promise<boolean> {
     const live = opts.live === true;
-    if (live) {
-      if (this.refreshing) return;
+    if (live && !opts.force) {
+      if (this.refreshing) return false;
       const sinceLast = Date.now() - this.lastLiveRefreshAtMs;
-      if (sinceLast < LIVE_REFRESH_MIN_MS) return;
+      if (sinceLast < LIVE_REFRESH_MIN_MS) return false;
       this.lastLiveRefreshAtMs = Date.now();
     }
+    const serial = ++this.refreshSerial;
     this.refreshing = true;
     if (!live) {
       this.loading = true;
@@ -728,6 +861,7 @@ export class LibrarySurface extends JfElement {
         throw new Error(`HTTP ${res.status}`);
       }
       const body = parseWireContract(listResponseSchema, await res.json(), ENDPOINT);
+      if (serial !== this.refreshSerial) return false;
       let items = body.items ?? [];
       if (live) {
         // Counts-free rows carry fileCount=-1; keep the last-known filesystem count per folder.
@@ -746,6 +880,7 @@ export class LibrarySurface extends JfElement {
         provisional: this.provisional,
       });
       this.roots = items;
+      this.rootsObserved = true;
       // Lazy-resolve hashes via core.resolve-path-hash (slice 450 §1.1).
       for (const r of this.roots) {
         const hash = r.pathHash;
@@ -762,16 +897,19 @@ export class LibrarySurface extends JfElement {
       if (!live) {
         void this.loadOtherSources();
       }
+      return true;
     } catch (err) {
+      if (serial !== this.refreshSerial) return false;
       // Live (background) failures stay silent — don't clobber the surface with a tick error.
       if (!live) {
         this.error = err instanceof Error ? err.message : String(err);
       }
+      return false;
     } finally {
-      if (!live) {
+      if (serial === this.refreshSerial) {
         this.loading = false;
+        this.refreshing = false;
       }
-      this.refreshing = false;
     }
   }
 
@@ -846,10 +984,18 @@ export class LibrarySurface extends JfElement {
     const key = ['MIGRATING', 'SWITCHING', 'AWAITING_ACCEPTANCE'].includes(migration?.migrationState ?? '')
       && /^g-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(building)
       ? building.slice(2) : null;
+    if (key && key !== this.bulkOutcomeKey) {
+      this.bulkOutcomeKey = key;
+      this.bulkOutcome = null;
+      this.gapRequestSerial++;
+      this.gapLoading = false;
+      this.lastGapReadAtMs = 0;
+    }
     if (key !== this.reindexCancelKey) {
       this.reindexCancelKey = key;
       this.reindexCancelBusy = false;
       this.reindexCancelError = null;
+      this.reindexCancelErrorCode = null;
       this.reindexCancelRecorded = false;
       this.reindexCancelAttemptSerial++;
     }
@@ -858,12 +1004,15 @@ export class LibrarySurface extends JfElement {
       this.observedGapKey = gapKey;
       this.gapDecision = null;
       this.gapDecisionError = null;
+      this.gapDecisionErrorCode = null;
       this.gapRequestSerial++;
       this.gapLoading = false;
       this.lastGapReadAtMs = 0;
     }
-    if (gapKey && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
-      void this.loadGapDecision(gapKey);
+    if (this.bulkOutcomeKey && !this.gapLoading
+        && !['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')
+        && Date.now() - this.lastGapReadAtMs >= 4_000) {
+      void this.loadGapDecision(this.bulkOutcomeKey);
     }
   }
 
@@ -876,8 +1025,9 @@ export class LibrarySurface extends JfElement {
       if (!response.ok) throw new Error(`Could not read migration gaps (HTTP ${response.status})`);
       const outcome: OperationOutcomeView = parseWireContract(operationOutcomeViewSchema,
         await response.json(), '/api/operation-history/{operationKey}');
-      if (serial !== this.gapRequestSerial || key !== this.observedGapKey) return;
-      if (outcome.phase !== 'awaiting_acceptance') {
+      if (serial !== this.gapRequestSerial || key !== this.bulkOutcomeKey) return;
+      this.bulkOutcome = outcome;
+      if (key !== this.observedGapKey || outcome.phase !== 'awaiting_acceptance') {
         this.gapDecision = null;
         return;
       }
@@ -889,9 +1039,11 @@ export class LibrarySurface extends JfElement {
       this.gapDecision = { reindexKey: key, gapListHash: result.gapListHash,
         gaps: result.gaps.map((gap) => ({ unitId: gap.unitId!, reason: gap.reason! })) };
       this.gapDecisionError = null;
+      this.gapDecisionErrorCode = null;
     } catch (failure) {
       if (serial === this.gapRequestSerial && key === this.observedGapKey) {
         this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+        this.gapDecisionErrorCode = failure instanceof OperationError ? failure.errorCode ?? null : null;
       }
     } finally {
       if (serial === this.gapRequestSerial) this.gapLoading = false;
@@ -904,11 +1056,13 @@ export class LibrarySurface extends JfElement {
     const attemptSerial = ++this.gapDecisionAttemptSerial;
     this.gapDecisionBusy = true;
     this.gapDecisionError = null;
+    this.gapDecisionErrorCode = null;
     try {
       const result = await this.host_.data.invokeOperation('core.accept-gaps', {
         reindexKey: decision.reindexKey, gapListHash: decision.gapListHash,
       }, { consented: true });
-      if (!result.success) throw new Error(result.message ?? 'Migration gap acceptance failed');
+      if (!result.success) throw new OperationError(result.message ?? 'Migration gap acceptance failed',
+        'HANDLER_FAILURE', undefined, result.errorCode);
       if (attemptSerial === this.gapDecisionAttemptSerial && this.isConnected
           && decision.reindexKey === this.observedGapKey) {
         await this.loadGapDecision(decision.reindexKey);
@@ -921,6 +1075,7 @@ export class LibrarySurface extends JfElement {
       if (refreshSerial === this.gapRequestSerial && this.isConnected
           && attemptSerial === this.gapDecisionAttemptSerial) {
         this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+        this.gapDecisionErrorCode = failure instanceof OperationError ? failure.errorCode ?? null : null;
       }
     } finally {
       if (attemptSerial === this.gapDecisionAttemptSerial) this.gapDecisionBusy = false;
@@ -939,33 +1094,55 @@ export class LibrarySurface extends JfElement {
         || attemptSerial !== this.reindexCancelAttemptSerial) return;
     this.reindexCancelBusy = true;
     this.reindexCancelError = null;
+    this.reindexCancelErrorCode = null;
     try {
       const result = await this.host_.data.invokeOperation('core.cancel-reindex',
         { reindexKey: key }, { consented: true });
-      if (!result.success) throw new Error(result.message ?? 'Rebuild cancellation failed');
+      if (!result.success) throw new OperationError(result.message ?? 'Rebuild cancellation failed',
+        'HANDLER_FAILURE', undefined, result.errorCode);
       if (this.isConnected && key === this.reindexCancelKey
           && attemptSerial === this.reindexCancelAttemptSerial) {
         this.reindexCancelRecorded = true;
+        await this.loadGapDecision(key);
       }
     } catch (failure) {
       if (this.isConnected && key === this.reindexCancelKey
           && attemptSerial === this.reindexCancelAttemptSerial) {
         this.reindexCancelError = failure instanceof Error ? failure.message : String(failure);
+        this.reindexCancelErrorCode = failure instanceof OperationError ? failure.errorCode ?? null : null;
       }
     } finally {
       if (attemptSerial === this.reindexCancelAttemptSerial) this.reindexCancelBusy = false;
     }
   }
 
-  private async loadExcludes(): Promise<void> {
+  private async loadExcludesPolicy(): Promise<void> {
+    this.excludesPolicy = null;
+    try {
+      const response = await this.doFetch('/api/indexing/excludes', { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      this.excludesPolicy = excludesPolicySchema.parse(await response.json());
+    } catch {
+      // Keep effects unavailable until a later observation succeeds.
+    }
+  }
+
+  private async loadExcludes(keepDraft = false): Promise<void> {
     if (this.excludesBusy || this.excludesAttempt) return;
     this.excludesLoadStarted = true;
     this.excludesBusy = true;
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      this.excludesText = (body.ui?.excludePatterns ?? []).join('\n');
+      this.excludesSavedText = (body.ui?.excludePatterns ?? []).join('\n');
+      if (!keepDraft) this.excludesText = this.excludesSavedText;
+      this.excludesConflict = false;
+      this.excludesError = null;
+      this.excludesResult = null;
+      this.excludesNotice = keepDraft ? 'Latest saved patterns loaded below. Review them before saving your retained draft.' : '';
+      this.excludesInvalidPatterns = body.ui?.invalidExcludePatterns ?? [];
       this.excludesWitness = body.witness;
       this.excludesLoaded = true;
+      await this.loadExcludesPolicy();
       this.error = null;
     } catch (err) {
       this.excludesLoaded = false;
@@ -978,6 +1155,7 @@ export class LibrarySurface extends JfElement {
 
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
+    if (!this.excludesAttempt && this.excludesText === this.excludesSavedText) return true;
     try {
       if (!this.excludesAttempt) {
         const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
@@ -986,34 +1164,31 @@ export class LibrarySurface extends JfElement {
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
       this.excludesWitness = result.witness;
       this.excludesAttempt = null;
+      this.excludesSavedText = this.excludesText;
+      this.excludesInvalidPatterns = [];
+      await this.loadExcludesPolicy();
+      this.excludesNotice = isOverride(this.excludesPolicy)
+        ? 'Patterns saved. The saved list has no effect while the override is set; it takes effect after the override is removed. Existing search results have not been removed.'
+        : this.excludesPolicy ? 'Patterns saved. Future indexing skips these matches. Existing search results have not been removed.'
+          : 'Patterns saved. Effective policy is unavailable; reload before Preview or Apply.';
       return true;
     } catch (err) {
-      // An uncertain save remains the same attempt on the next Preview/Apply click.
-      // Do not let an edited draft acquire a newer witness while that row is unresolved.
+      // An uncertain save retains its exact key and bytes until Save checks the receipt.
       const state = err instanceof SettingsAttemptError ? err.response?.['state'] : undefined;
+      const invalid = err instanceof SettingsAttemptError && ['INVALID_REQUEST', 'INVALID_PATH'].includes(err.code);
       const terminal = state === 'FAILED' || state === 'CANCELLED'
         || (err instanceof SettingsAttemptError && ['VERSION_CONFLICT', 'SETTINGS_READ_ONLY', 'INVALID_REQUEST', 'INVALID_PATH',
           'OPERATION_KEY_INVALID', 'OPERATION_KEY_REUSED', 'OPERATION_KEY_EXPIRED'].includes(err.code));
       if (terminal) {
         this.excludesAttempt = null;
-        this.excludesLoaded = false;
-        this.excludesWitness = null;
+        if (!invalid) {
+          this.excludesLoaded = false;
+          this.excludesWitness = null;
+        }
       }
-      this.error = err instanceof Error ? err.message : String(err);
+      this.excludesConflict = err instanceof SettingsAttemptError && err.code === 'VERSION_CONFLICT';
+      this.excludesError = err instanceof Error ? err.message : String(err);
       return false;
-    }
-  }
-
-  private async invoke(
-    operationId: string,
-    args: Record<string, unknown> = {},
-  ): Promise<void> {
-    this.error = null;
-    try {
-      await this.host_.data.invokeOperation(operationId, args);
-      await this.refresh();
-    } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
     }
   }
 
@@ -1024,13 +1199,13 @@ export class LibrarySurface extends JfElement {
    *
    * The native picker answers WHICH folder, not which collection, so it now fills the same add form
    * the browser flow uses (path pre-filled, preview fetched) and the user confirms with Add — that is
-   * where the collection field lives, in both modes. A cancelled picker still just opens the form.
+   * where the collection field lives, in both modes. Cancelling the picker leaves the form unchanged.
    */
   private async handleAddFolderClick(): Promise<void> {
     if (this.host_.platform.capabilities.has('folder-picker')) {
       const picked = await this.host_.platform.pickFolder();
-      this.showManualInput = true;
       if (picked) {
+        this.showManualInput = true;
         this.pendingPath = picked;
         this.pendingPreview = null;
         void this.fetchPreview(picked);
@@ -1046,11 +1221,37 @@ export class LibrarySurface extends JfElement {
     if (!path) return;
     // Tempdoc 599 §9.4 — don't create the job if the preview already says it can't be added.
     if (this.addAvailability().kind !== 'available') return;
-    await this.invoke(OP_ADD, this.addRootArgs(path));
-    this.pendingPath = '';
-    this.pendingCollection = '';
-    this.pendingPreview = null;
-    this.showManualInput = false;
+    const serial = this.surfaceSerial;
+    this.addBusy = true;
+    this.error = null;
+    this.actionMessage = 'Adding folder…';
+    try {
+      const result = await this.host_.data.invokeOperation(OP_ADD, this.addRootArgs(path));
+      if (serial !== this.surfaceSerial) return;
+      if (!result.success) throw new Error(result.message || 'Add refused');
+      this.pendingPath = '';
+      this.pendingCollection = '';
+      this.pendingPreview = null;
+      this.showManualInput = false;
+      this.actionMessage = 'Folder added. Indexing activity is shown below.';
+      await this.refresh({ live: true, force: true });
+      if (serial === this.surfaceSerial) {
+        this.addBusy = false;
+        await this.updateComplete;
+        const addButton = this.renderRoot.querySelector<JfButton>('[data-add-folder]');
+        await addButton?.updateComplete;
+        if (serial === this.surfaceSerial) addButton?.focus();
+      }
+    } catch (err) {
+      if (serial !== this.surfaceSerial) return;
+      this.actionMessage = null;
+      this.addBusy = false;
+      this.error = `Folder was not added. ${err instanceof Error ? err.message : String(err)} Correct the path or retry Add.`;
+      await this.updateComplete;
+      this.renderRoot.querySelector<HTMLInputElement>('[aria-label="Folder path"]')?.focus();
+    } finally {
+      if (serial === this.surfaceSerial) this.addBusy = false;
+    }
   }
 
   /**
@@ -1100,6 +1301,9 @@ export class LibrarySurface extends JfElement {
         fileCount: typeof body?.fileCount === 'number' ? body.fileCount : -1,
         capped: Boolean(body?.capped),
         alreadyWatched: Boolean(body?.alreadyWatched),
+        ...(typeof body?.overlap?.path === 'string' && body.overlap.path.trim()
+          && (body.overlap.relationship === 'inside' || body.overlap.relationship === 'containing')
+          ? { overlap: { path: body.overlap.path, relationship: body.overlap.relationship } } : {}),
       };
     } catch {
       // Silent: preview is advisory; the Add path still validates server-side.
@@ -1112,6 +1316,7 @@ export class LibrarySurface extends JfElement {
    * settled preview that can't be added yields a soft `unavailable` with a reachable reason.
    */
   private addAvailability() {
+    if (this.addBusy) return unavailableBecause('Adding folder…', true);
     const path = this.pendingPath.trim();
     if (!path) return unavailableBecause('Enter a folder path', true);
     // Tempdoc 914 D4 — a supplied collection must not name an app-internal corpus. The AUTHORITY is
@@ -1129,51 +1334,223 @@ export class LibrarySurface extends JfElement {
     if (!p.exists) return unavailableBecause('Path not found');
     if (!p.isDir) return unavailableBecause('Not a folder');
     if (p.alreadyWatched) return unavailableBecause('Already watched');
+    const overlap = overlapExplanation(p);
+    if (overlap) return unavailableBecause(overlap);
     return AVAILABLE;
   }
 
   private async handleRemoveRoot(pathHash: string): Promise<void> {
+    if (this.removingHashes.has(pathHash) || this.confirmingHashes.has(pathHash)) return;
     const resolved = this.resolvedPaths[pathHash];
     if (!resolved) {
       this.error = 'Path resolution pending; retry in a moment.';
       return;
     }
-    const ok = await this.host_.ui.showConfirmDialog(
-      // 813 §19 (W3) — the confirm states the ENRICHMENT consequence too: removal also discards
-      // whatever semantic work was still in flight for this folder. Deliberately no numeric latency:
-      // the stop-to-quiet bound is mode-dependent (combined mode checkpoints at 1-8 document
-      // granularity; individual mode retains whole-batch atomicity), so "within seconds" would
-      // overclaim exactly where the old copy underclaimed.
-      `Remove ${resolved}? Files indexed from this folder will be removed from search results, and any enrichment still running for it is stopped and discarded.`,
-      { confirmLabel: 'Remove', destructive: true },
-    );
-    if (!ok) return;
-    await this.invoke(OP_REMOVE, { path: resolved });
+    const serial = this.surfaceSerial;
+    this.confirmingHashes.add(pathHash);
+    let affected = [pathHash];
+    let acquired = false;
+    try {
+      // Confirm every legacy registration affected by subtree removal. The wire remains hash-only.
+      await Promise.all(this.roots.map(async (root) => {
+        const hash = root.pathHash;
+        if (!hash || this.resolvedPaths[hash]) return;
+        const path = await resolvePathLazy(RESOURCE_ID, hash, { apiBase: this.apiBase });
+        if (path && serial === this.surfaceSerial) this.resolvedPaths = { ...this.resolvedPaths, [hash]: path };
+      }));
+      if (serial !== this.surfaceSerial) return;
+      if (this.roots.some(root => root.pathHash && !this.resolvedPaths[root.pathHash])) {
+        this.error = 'Could not check which watched folders this removal affects. Retry when their paths are available.';
+        return;
+      }
+      const paths = this.roots.map(root => ({ hash: root.pathHash ?? '', path: this.resolvedPaths[root.pathHash ?? ''] ?? '' }));
+      const enclosing = paths.find(other => other.hash !== pathHash && this.pathInside(resolved, other.path));
+      const nested = paths.filter(other => other.hash !== pathHash && this.pathInside(other.path, resolved));
+      const nestedHashes = nested.map(other => other.hash);
+      if (nestedHashes.some(hash => this.removingHashes.has(hash))) {
+        this.error = 'A folder inside this one is being removed. Wait for its outcome, then retry.';
+        return;
+      }
+      const consequence = enclosing
+        ? `Its files stay searchable because the enclosing watched folder ${enclosing.path} covers them. Only the selected registrations and their own watchers are removed.`
+        : 'Files indexed from this folder will be removed from search results, and any enrichment still running for it is stopped and discarded.';
+      const inner = nested.length ? ` This also removes these watched folders: ${nested.map(other => other.path).join(', ')}.` : '';
+      const ok = await this.host_.ui.showConfirmDialog(`Remove ${resolved}? ${consequence}${inner}`,
+        { confirmLabel: 'Remove', destructive: true });
+      if (!ok || serial !== this.surfaceSerial) return;
+      if ([pathHash, ...nestedHashes].some(hash => this.removingHashes.has(hash))) return;
+      affected = [pathHash, ...nestedHashes];
+      this.removingHashes = new Set([...this.removingHashes, ...affected]);
+      acquired = true;
+      this.error = null;
+      this.actionMessage = `Removing folder ${resolved}…`;
+      let removed = false;
+      try {
+        const result = await this.host_.data.invokeOperation(OP_REMOVE, { path: resolved });
+        if (serial !== this.surfaceSerial) return;
+        if (!result.success) throw new Error(result.message || 'Remove refused');
+        removed = true;
+      } catch (err) {
+        if (serial !== this.surfaceSerial) return;
+        const errorClass = (err as { errorClass?: string } | null)?.errorClass;
+        // Any response can be lost after effects completed, including a server-side error.
+        // Reconcile membership before labelling the removal a failure.
+        const observed = await this.refresh({ live: true, force: true });
+        if (serial !== this.surfaceSerial) return;
+        removed = observed && !this.roots.some(root => root.pathHash === pathHash);
+        if (!removed) {
+          this.error = errorClass === 'NETWORK_ERROR' || errorClass === 'SERIALIZATION_ERROR'
+            ? 'Removal outcome is unconfirmed. Return to Library to check current folders, or retry Remove.'
+            : `Removal did not complete. ${err instanceof Error ? err.message : String(err)} You can retry Remove. Live watching is unconfirmed.`;
+        }
+      }
+      if (serial !== this.surfaceSerial) return;
+      if (removed) {
+        // The synchronous result proves removal; invalidate older list reads before publishing it.
+        this.refreshSerial++;
+        this.roots = this.roots.filter(root => !affected.includes(root.pathHash ?? ''));
+        this.actionMessage = enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
+        await this.refresh({ live: true, force: true });
+        if (serial === this.surfaceSerial) {
+          await this.updateComplete;
+          this.renderRoot.querySelector<HTMLElement>('[data-add-folder]')?.focus();
+        }
+      } else {
+        this.actionMessage = null;
+      }
+    } catch (err) {
+      if (serial === this.surfaceSerial) {
+        this.actionMessage = null;
+        this.error = `Removal did not complete. ${err instanceof Error ? err.message : String(err)} You can retry Remove.`;
+      }
+    } finally {
+      if (serial === this.surfaceSerial) {
+        this.confirmingHashes.delete(pathHash);
+        if (acquired) this.removingHashes = new Set([...this.removingHashes].filter(hash => !affected.includes(hash)));
+        if (this.error) {
+          await this.updateComplete;
+          this.renderRoot.querySelector<HTMLElement>('.error-banner')?.focus();
+        }
+      }
+    }
+  }
+
+  private pathInside(child: string, parent: string): boolean {
+    // These are Engine-resolved paths; Windows paths compare case-insensitively, on segment edges.
+    const normalize = (path: string) => {
+      const slash = path.replaceAll('\\', '/');
+      return (/^[a-z]:/i.test(slash) || slash.startsWith('//') ? slash.toLowerCase() : slash).replace(/\/+$/, '');
+    };
+    return !!parent && normalize(child).startsWith(normalize(parent) + '/');
+  }
+
+  private async reindexAccepted(detail: { structuredData?: unknown }): Promise<void> {
+    if (!this.isConnected) return;
+    this.error = null;
+    const data = detail.structuredData;
+    const key = data && typeof data === 'object' && 'operationKey' in data ? data.operationKey : undefined;
+    this.reindexReadSerial++;
+    this.reindexOutcomeBusy = false;
+    this.reindexOutcomeKey = typeof key === 'string' && /^[0-9a-f-]{36}$/.test(key) ? key : null;
+    this.reindexOutcomeError = false;
+    this.reindexOutcome = 'Reindex accepted. Completion has not yet been confirmed.';
+    if (this.reindexOutcomeKey) await this.checkReindexOutcome();
+  }
+
+  private async checkReindexOutcome(): Promise<void> {
+    const key = this.reindexOutcomeKey;
+    if (!key || this.reindexOutcomeBusy) return;
+    const serial = ++this.reindexReadSerial;
+    this.reindexOutcomeBusy = true;
+    this.lastReindexReadAtMs = Date.now();
+    try {
+      const response = await this.doFetch(`/api/operation-history/${encodeURIComponent(key)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'reindex outcome');
+      if (serial !== this.reindexReadSerial) return;
+      this.reindexOutcomeError = outcome.state === 'failed';
+      if (outcome.state === 'complete') {
+        this.reindexOutcome = 'Reindex completed for the recorded request. Current indexing activity is shown below.';
+        this.reindexOutcomeKey = null;
+      } else if (outcome.state === 'failed') {
+        this.reindexOutcome = `Reindex did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Reindex; failed files can also be retried below.`;
+        this.reindexOutcomeKey = null;
+      } else {
+        this.reindexOutcome = `Reindex accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
+      }
+    } catch {
+      if (serial === this.reindexReadSerial) this.reindexOutcome = 'Reindex accepted. Its outcome could not be read; check again before retrying.';
+    } finally {
+      if (serial === this.reindexReadSerial) this.reindexOutcomeBusy = false;
+    }
   }
 
   /**
    * Tempdoc 626 §Axis-C — the one-click recovery for an "unverified" folder (its reconcile couldn't
    * verify deletions). {@code core.reindex} is incremental-all-roots; {@code force:true} bypasses the
    * unchanged fast-path so deletions are re-checked and the per-root unverified state clears once the
-   * reconcile verifies it. {@link #invoke} surfaces errors and refreshes the rows on completion.
+   * reconcile verifies it. The accepted operation receipt separately reports its completion.
    */
   private async handleReindexToVerify(): Promise<void> {
-    await this.invoke('core.reindex', { force: true });
+    const serial = this.surfaceSerial;
+    try {
+      this.error = null;
+      const result = await this.host_.data.invokeOperation('core.reindex', { force: true });
+      if (serial !== this.surfaceSerial) return;
+      if (!result.success) throw new Error(result.message || 'Reindex refused');
+      await this.reindexAccepted(result);
+    } catch (err) {
+      if (serial !== this.surfaceSerial) return;
+      this.error = `Reindex was not confirmed. ${err instanceof Error ? err.message : String(err)} You can retry Reindex.`;
+    }
+  }
+
+  private async handleSaveExcludes(): Promise<void> {
+    if (this.excludesBusy || !this.excludesLoaded) return;
+    this.excludesBusy = true;
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
+    try { await this.persistExcludes(); }
+    finally { this.excludesBusy = false; }
   }
 
   private async handlePreviewExcludes(): Promise<void> {
-    await this.saveAndInvokeExcludes(OP_PREVIEW);
+    await this.invokeExcludes(false);
   }
 
   private async handleApplyExcludes(): Promise<void> {
-    await this.saveAndInvokeExcludes(OP_APPLY);
+    await this.invokeExcludes(true);
   }
 
-  private async saveAndInvokeExcludes(operation: string): Promise<void> {
-    if (this.excludesBusy || !this.excludesLoaded) return;
+  private async invokeExcludes(apply: boolean): Promise<void> {
+    if (this.excludesBusy || !this.excludesLoaded || !this.excludesPolicy || this.excludesAttempt
+        || this.excludesText !== this.excludesSavedText) return;
     this.excludesBusy = true;
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
     try {
-      if (await this.persistExcludes()) await this.invoke(operation, {});
+      if (apply && !await this.host_.ui.showConfirmDialog(
+        `${isOverride(this.excludesPolicy) ? `Apply the effective patterns from ${policySource(this.excludesPolicy)}:\n${this.excludesPolicy.patterns.join('\n') || '(none)'}\n` : 'Apply saved patterns '}to the watched folders on disk? Matching files and folders will be removed from search. Offline, missing or unreadable scope may remain searchable and will be listed in the result.`,
+        { confirmLabel: 'Apply', destructive: true, typedConfirmWord: OP_APPLY })) {
+        this.excludesNotice = 'Apply cancelled. Nothing was removed.';
+        return;
+      }
+      const result = apply
+        ? await this.host_.data.invokeOperation(OP_APPLY, {}, { consented: true })
+        : await this.host_.data.invokeOperation(OP_PREVIEW, {});
+      if (!result.success) throw new Error(result.message ?? 'Exclusion operation failed');
+      const parsed = excludesResultSchema.safeParse(result.structuredData);
+      if (!parsed.success || parsed.data.dryRun === apply
+          || (isOverride(this.excludesPolicy) && !parsed.data.effectivePolicy)) {
+        this.excludesNotice = `${apply ? 'Apply' : 'Preview'} outcome is unconfirmed. Check again before relying on this result.`;
+      } else {
+        this.excludesResult = parsed.data;
+      }
+      if (apply) await this.refresh();
+    } catch (err) {
+      this.excludesError = `${apply ? 'Apply outcome is unconfirmed. Some matches may already have been removed. Retry to reconcile. ' : ''}${err instanceof Error ? err.message : String(err)}`;
     } finally {
       this.excludesBusy = false;
     }
@@ -1225,7 +1602,8 @@ export class LibrarySurface extends JfElement {
       size="sm"
       label=${copy.label}
       title=${copy.title || nothing}
-      .onActivate=${() => openFailedJobs(pathHash)}
+      .disabled=${this.removingHashes.has(pathHash)}
+      .onActivate=${() => { if (!this.removingHashes.has(pathHash)) openFailedJobs(pathHash); }}
       >${icon({ name: 'alert-circle', size: 12 })} ${copy.text}</jf-button
     >`;
   }
@@ -1250,15 +1628,18 @@ export class LibrarySurface extends JfElement {
       enrichmentStages: this.enrichmentStages,
       enrichmentPending: this.enrichmentPending,
       enrichmentBlocked: this.enrichmentBlocked,
+        retryWaiting: this.retryWaiting,
+        indexingPaused: this.indexProgress.pause?.state === 'paused',
+        indexingPauseReason: this.indexProgress.pause?.reason,
       // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });
     return html`
-      <div class="card">
+      <div class="card" aria-busy=${this.removingHashes.has(pathHash) ? 'true' : 'false'}>
         <span class="card-icon">${icon({ name: 'folder', size: 24 })}</span>
         <div class="card-info">
           <div class="card-path">
-            ${this.renderStatusIcon(status.glyph)}<span
+            ${this.renderStatusIcon(!this.indexingActivity.confirmed && status.glyph === 'indexed' ? 'pending' : status.glyph)}<span
               class="folder-name"
               title=${displayTitle}
               data-testid="library-folder-name"
@@ -1266,7 +1647,7 @@ export class LibrarySurface extends JfElement {
             >
           </div>
           <div class="card-meta">
-            ${status.metaText}${status.failed > 0
+            ${this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(status.metaText)}${status.failed > 0
               ? this.renderFailedChip(pathHash, status)
               : nothing}${status.state === 'unverified'
               ? html`<jf-button
@@ -1274,6 +1655,7 @@ export class LibrarySurface extends JfElement {
                   variant="ghost"
                   size="sm"
                   label="Reindex to verify"
+                  .disabled=${this.removingHashes.has(pathHash)}
                   .onActivate=${() => this.handleReindexToVerify()}
                   >${icon({ name: 'refresh-cw', size: 12 })} Reindex</jf-button
                 >`
@@ -1282,10 +1664,11 @@ export class LibrarySurface extends JfElement {
         </div>
         <jf-button
           variant="danger"
-          label="Remove"
+          label=${this.removingHashes.has(pathHash) ? 'Removing…' : 'Remove'}
+          .disabled=${this.removingHashes.has(pathHash)}
           .onActivate=${() => this.handleRemoveRoot(pathHash)}
         >
-          ${icon({ name: 'trash-2', size: 14 })} Remove
+          ${icon({ name: 'trash-2', size: 14 })} ${this.removingHashes.has(pathHash) ? 'Removing…' : 'Remove'}
         </jf-button>
       </div>
     `;
@@ -1300,6 +1683,17 @@ export class LibrarySurface extends JfElement {
    * renders: the scan omits collections rather than undercounting them (see `otherSources.ts`), so
    * silence there would be the same invisibility this section exists to end.
    */
+  private folderActivityText(folderText: string): string {
+    const activity = this.indexingActivity;
+    if (!activity.confirmed || activity.detail) {
+      // The global reason is explicitly scoped to the index; per-folder failures and verification
+      // caveats remain owned by folderStatus, even when its observation is only last known.
+      const scope = activity.confirmed ? 'Index: ' : 'Index (folder observation last known): ';
+      return `${folderText} · ${scope}${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}`;
+    }
+    return folderText;
+  }
+
   private renderOtherSources(): TemplateResult | typeof nothing {
     const { sources, truncated } = this.otherSources;
     if (sources.length === 0 && !truncated) return nothing;
@@ -1366,7 +1760,12 @@ export class LibrarySurface extends JfElement {
                supersedes the slice 509 <jf-op-button>. LibrarySurface
                is user-tier; core.reindex's wire audience=USER passes
                the gate. -->
-          <jf-operation context="button" operation-id="core.reindex" api-base=${this.apiBase} @op-success=${() => this.refresh()}></jf-operation>
+          ${this.rootsObserved && this.roots.length === 0 && !this.provisional
+            ? html`<span>No watched folders to reindex.</span>`
+            : html`<jf-operation context="button" operation-id="core.reindex" api-base=${this.apiBase}
+                @op-success=${(e: CustomEvent<OpSuccessEventDetail>) => void this.reindexAccepted(e.detail)}
+                @op-error=${(e: CustomEvent<OpErrorEventDetail>) => { this.error = `Reindex was not confirmed. ${e.detail.message} You can retry Reindex.`; }}
+              ></jf-operation>`}
           <!-- Tempdoc 813 §6: the manual "Process pending enrichment" trigger — drains the pending
                VDU + embedding work for already-indexed documents, same catalog-driven pattern as
                core.reindex above. Its LABEL comes from the operation catalog (one string, both
@@ -1378,7 +1777,9 @@ export class LibrarySurface extends JfElement {
           ></jf-operation>
           <jf-button
             variant="primary"
+            data-add-folder
             label="Add Folder"
+            .disabled=${this.addBusy}
             .onActivate=${() => this.handleAddFolderClick()}
           >
             ${icon({ name: 'folder-plus', size: 14 })} Add Folder
@@ -1433,6 +1834,10 @@ export class LibrarySurface extends JfElement {
     if (p.alreadyWatched) {
       return html`<div class="add-preview warn">${icon({ name: 'alert-circle', size: 14 })} Already watched</div>`;
     }
+    const overlap = overlapExplanation(p);
+    if (overlap) {
+      return html`<div class="add-preview warn" role="status">${icon({ name: 'alert-circle', size: 14 })} ${overlap}</div>`;
+    }
     const files =
       p.fileCount >= 0
         ? ` · ${p.fileCount.toLocaleString()}${p.capped ? '+' : ''} ${p.fileCount === 1 && !p.capped ? 'file' : 'files'}`
@@ -1443,7 +1848,22 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
+      <div data-testid="library-indexing-pause">
+        ${this.indexProgress.pause || !this.indexProgress.activity.confirmed ? html`<p>${this.indexingActivity.summary} — ${this.indexingActivity.detail}</p>` : nothing}
+        <jf-indexing-controls .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
+      </div>
       ${this.renderReindexDecision()}
+      ${this.bulkOutcome?.state === 'failed' && this.bulkOutcome.message ? html`
+        <div class="action-message" role="alert">${this.bulkOutcome.message}</div>` : nothing}
+      <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
+      ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
+        ${this.reindexOutcome}
+        ${this.reindexOutcomeKey ? html`<jf-button label="Check reindex outcome" .disabled=${this.reindexOutcomeBusy}
+          .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
+        <p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>
+      </div>` : nothing}
+      ${this.roots.some(root => root.status === 'unavailable')
+        ? html`<p>Some watched folders were last observed offline. Reindex cannot cover their files until they are available.</p>` : nothing}
       ${!this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
@@ -1455,7 +1875,7 @@ export class LibrarySurface extends JfElement {
         : nothing}
 
       ${this.error
-        ? html`<div class="error-banner">
+        ? html`<div class="error-banner" role="alert" tabindex="-1">
             ${icon({ name: 'alert-circle', size: 14 })}
             <span>${this.error}</span>
             <jf-button
@@ -1474,6 +1894,7 @@ export class LibrarySurface extends JfElement {
               <input
                 type="text"
                 aria-label="Folder path"
+                ?disabled=${this.addBusy}
                 placeholder="C:\\path\\to\\folder"
                 .value=${this.pendingPath}
                 @keydown=${(e: KeyboardEvent) => {
@@ -1488,6 +1909,7 @@ export class LibrarySurface extends JfElement {
                 class="add-collection"
                 type="text"
                 aria-label="Collection (optional)"
+                ?disabled=${this.addBusy}
                 data-testid="library-add-collection"
                 placeholder="Collection (optional)"
                 .value=${this.pendingCollection}
@@ -1504,7 +1926,7 @@ export class LibrarySurface extends JfElement {
                 .onActivate=${() => this.handleAddRoot()}
                 >Add</jf-button
               >
-              <jf-button label="Cancel" .onActivate=${() => (this.showManualInput = false)}
+              <jf-button label="Cancel" .disabled=${this.addBusy} .onActivate=${() => (this.showManualInput = false)}
                 >Cancel</jf-button
               >
             </div>
@@ -1515,7 +1937,9 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? this.provisional
+          ? !this.indexingActivity.confirmed
+            ? html`<div class="empty">${this.indexingActivity.summary}</div>`
+            : this.provisional
             ? html`<div class="empty">
                 Rebuilding index… your watched folders will reappear when it finishes.
               </div>`
@@ -1530,53 +1954,101 @@ export class LibrarySurface extends JfElement {
         ? html`<jf-ingestion-summary .host_=${this.host_}></jf-ingestion-summary>`
         : nothing}
 
-      <div class="excludes-section">
+      <section class="excludes-section" aria-label="Exclude patterns">
         <div class="excludes-header">
           <div>
             <h3>Exclude patterns</h3>
             <p>
               One glob per line. Bare names like <code>node_modules</code> or
               <code>dist/</code> match at any depth.
+              <code>[ab]</code> matches one listed character; <code>[a-z]</code> matches a range;
+              <code>[!ab]</code> matches a character not listed.
+              <code>{draft,final}</code> matches either alternative.
+              These meanings also apply to patterns saved by earlier versions.
             </p>
+            ${isOverride(this.excludesPolicy) && this.excludesPolicy ? html`<div id="excludes-override" data-testid="excludes-override" role="note" tabindex="0"
+              aria-label=${`Exclusion override: ${policySource(this.excludesPolicy)}. Effective patterns: ${this.excludesPolicy.patterns.join(', ') || '(none)'}. Save edits the saved list; it has no effect until the override is removed.`}>
+              <p>Exclusion override: ${policySource(this.excludesPolicy)} controls future indexing, Preview and Apply.
+                Save edits the saved list, which has no effect until the override is removed.</p>
+              <p>Effective patterns:</p><pre>${this.excludesPolicy.patterns.join('\n') || '(none)'}</pre>
+            </div>` : nothing}
+            ${this.excludesLoaded && !this.excludesBusy && !this.excludesPolicy ? html`<p role="alert">Effective exclusion policy is unavailable. Reload saved patterns before Preview or Apply.</p>` : nothing}
+            <p id="excludes-help">${isOverride(this.excludesPolicy) ? html`Preview counts matches on disk using the effective patterns above and removes nothing.
+              Apply uses those patterns to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
+              Missing or offline files cannot be checked.` : html`Save changes what future indexing skips; it does not remove existing search results.
+              Preview counts matches on disk using the saved list and removes nothing.
+              Apply uses the saved list to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
+              Missing or offline files cannot be checked.`}</p>
           </div>
           <div class="actions">
+            <jf-button label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && this.excludesText === this.excludesSavedText)}
+              .onActivate=${() => void this.handleSaveExcludes()}>Save patterns</jf-button>
             <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
               .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
-            <jf-button label="Preview" .disabled=${!this.excludesLoaded || this.excludesBusy}
+            <jf-button label="Preview" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
               .onActivate=${() => void this.handlePreviewExcludes()}
               >Preview</jf-button
             >
-            <jf-button label="Apply" .disabled=${!this.excludesLoaded || this.excludesBusy}
+            <jf-button label="Apply" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
               .onActivate=${() => void this.handleApplyExcludes()}
               >Apply</jf-button
             >
           </div>
         </div>
         ${this.excludesAttempt && !this.excludesBusy
-          ? html`<p>Save completion is unknown. Retry Preview or Apply to check the same save.</p>` : nothing}
+          ? html`<p>Save completion is unknown. Retry Save patterns to check the same save. Your draft is retained.</p>` : nothing}
+        ${this.excludesConflict ? html`<jf-button label="Review latest settings, keep draft" .disabled=${this.excludesBusy}
+          .onActivate=${() => void this.loadExcludes(true)}>Review latest settings, keep draft</jf-button>` : nothing}
+        ${this.excludesLoaded && this.excludesText !== this.excludesSavedText ? html`<p>Unsaved draft. Save before Preview or Apply.</p>
+          <details><summary>Current saved patterns</summary><pre>${this.excludesSavedText || '(none)'}</pre></details>` : nothing}
+        ${this.excludesInvalidPatterns.length > 0
+          ? html`<div role="status"><ul>${this.excludesInvalidPatterns.map((pattern) => html`<li>“${pattern}” has invalid pattern syntax and is matched as a literal name. Correct or remove it.</li>`)}</ul></div>`
+          : nothing}
         <textarea
           aria-label="Exclude patterns"
+          aria-busy=${this.excludesBusy}
+          aria-describedby=${`excludes-help${isOverride(this.excludesPolicy) ? ' excludes-override' : ''}${this.excludesError ? ' excludes-error' : ''}`}
+          aria-invalid=${this.excludesError ? 'true' : 'false'}
           ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
           .value=${this.excludesText}
           @input=${(e: Event) =>
             (this.excludesText = (e.target as HTMLTextAreaElement).value)}
           placeholder="**/node_modules/**"
         ></textarea>
-      </div>
+        ${this.excludesError ? html`<p id="excludes-error" role="alert">${this.excludesError}</p>` : nothing}
+        <div role="status" aria-live="polite" aria-atomic="true" data-testid="excludes-result">
+          ${this.excludesBusy ? 'Working on exclusions…' : this.excludesResult ? this.renderExcludesResult(this.excludesResult) : this.excludesNotice}
+        </div>
+      </section>
     `;
   }
 
+  private renderExcludesResult(result: ExcludesResult): TemplateResult {
+    const partial = result.capped || result.uncheckedScopes.length > 0;
+    return html`<p>${result.dryRun ? (partial ? 'Partial Preview' : 'Preview complete') : (partial ? 'Partial Apply' : 'Apply complete')}.
+      ${result.dryRun ? `${result.matchedFiles} matching files found on disk. Files may not have been indexed. Nothing was removed.`
+        : `${result.confirmedRemovals} matching files or folders confirmed no longer searchable. This counts confirmed deletion requests, including matches that were never indexed.`}</p>
+      ${isOverride(result.effectivePolicy ?? null) && result.effectivePolicy ? html`<p>Effective patterns from ${policySource(result.effectivePolicy)}:</p><pre>${result.effectivePolicy.patterns.join('\n') || '(none)'}</pre>` : nothing}
+      ${result.capped ? html`<p>Entry cap reached. Remaining disk scope was not checked.</p>` : nothing}
+      ${result.uncheckedScopes.length ? html`<ul>${result.uncheckedScopes.map((scope) => html`<li>${scope.status === 'not_checked' ? 'Not checked' : 'Not removed'}: ${scope.path} — ${scope.reason}</li>`)}</ul>
+        <p>Some matches may remain searchable. Retry Apply after resolving the listed scope.</p>` : nothing}
+      ${result.dryRun ? html`<ul>${result.perPattern.map((match) => html`<li>${match.pattern}: ${match.matches} files</li>`)}</ul>` : nothing}`;
+  }
+
   private renderReindexDecision(): TemplateResult | typeof nothing {
-    if (!this.reindexCancelKey) return nothing;
+    if (!this.reindexCancelKey || ['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')) return nothing;
     const decision = this.gapDecision;
     const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
+    const confirmed = this.indexingActivity.confirmed;
     return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
-      <h3>${waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      <h3>${!confirmed ? this.indexingActivity.summary
+        : waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      ${!confirmed ? html`<p>Rebuild details are last observed; current progress and index availability are unconfirmed.</p>` : nothing}
       ${waitingForGaps && decision ? html`
         <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
-          included in the new index. Your current index stays available until you accept this list.</p>
+          included in the new index.${confirmed ? ' Your current index stays available until you accept this list.' : nothing}</p>
         <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
-      ` : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
+      ` : !confirmed ? nothing : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
         : html`<p>Your current index stays available during the rebuild.</p>`}
       <div class="actions">
         ${waitingForGaps && decision ? html`
@@ -1588,9 +2060,11 @@ export class LibrarySurface extends JfElement {
           .disabled=${this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy}
           .onActivate=${() => void this.cancelCurrentReindex()}>Cancel rebuild</jf-button>
       </div>
-      ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}</p>` : nothing}
-      ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}</p>` : nothing}
-      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded. Your current index stays available.</p>` : nothing}
+      ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}
+        ${this.gapDecisionErrorCode && !this.gapDecisionError.endsWith(` (Code: ${this.gapDecisionErrorCode})`) ? html`<small style="display: block">Code: ${this.gapDecisionErrorCode}</small>` : nothing}</p>` : nothing}
+      ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}
+        ${this.reindexCancelErrorCode && !this.reindexCancelError.endsWith(` (Code: ${this.reindexCancelErrorCode})`) ? html`<small style="display: block">Code: ${this.reindexCancelErrorCode}</small>` : nothing}</p>` : nothing}
+      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded.</p>` : nothing}
     </section>`;
   }
 }

@@ -63,7 +63,7 @@ final class IndexStatusOpsLoopFailureTest {
     when(queue.queueDepth()).thenReturn(queueDepth);
     when(queue.failureSummary())
         .thenReturn(new JobQueue.FailureSummary(failedDocuments, null, null, null, null));
-    when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+    when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(queueDepth, queueDepth, 0, 0, failedDocuments));
     IndexStatusOps ops =
         new IndexStatusOps(
             queue, indexDirectory, null, null, null, null, null, null, null, null, null,

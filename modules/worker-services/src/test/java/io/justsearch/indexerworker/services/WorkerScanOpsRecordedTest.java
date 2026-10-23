@@ -297,16 +297,32 @@ final class WorkerScanOpsRecordedTest {
   }
 
   @Test
-  void malformedRecordedGlobRefusesBeforeAnyQueueOrLedgerEffect() throws Exception {
+  void AX1MalformedRecordedGlobMatchesLiteralNameAndKeepsOtherEntriesWorking() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("malformed"));
-    Files.writeString(root.resolve("entry.txt"), "entry");
+    Path keep = Files.writeString(root.resolve("entry.txt"), "entry");
+    Files.writeString(root.resolve("[legacy"), "literal");
+    Files.createDirectories(root.resolve("nested"));
+    Files.writeString(root.resolve("nested/[legacy"), "nested literal");
+    Files.writeString(root.resolve("nested/private.txt"), "valid pattern");
     JobQueue queue = org.mockito.Mockito.mock(JobQueue.class);
+    List<Path> admitted = new ArrayList<>();
+    when(queue.enqueueRecordedEntries(eq(KEY), eq(EPOCH), anyList(), eq(COLLECTION)))
+        .thenAnswer(call -> {
+          List<JobQueue.EnqueueEntry> entries = call.getArgument(2);
+          admitted.addAll(entries.stream().map(JobQueue.EnqueueEntry::path).toList());
+          return entries.size();
+        });
 
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> guardedScan(queue).scan(recordedRequest(root, List.of("[")), ignored -> {}));
+    ScanRootProgress terminal = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> guardedScan(queue).scan(
+            recordedRequest(root, List.of("[legacy", "**/private.txt")), ignored -> {}),
+        "AX1: replay must match invalid saved entries literally without stopping indexing");
 
-    org.mockito.Mockito.verifyNoInteractions(queue);
+    assertEquals(List.of(keep), admitted,
+        "AX1: root and nested literal matches and the valid pattern remain excluded");
+    assertEquals(1, terminal.getFilesAdmitted());
+    verify(queue).enqueueRecordedEntries(eq(KEY), eq(EPOCH), anyList(), eq(COLLECTION));
+    verify(queue, never()).enqueueEntries(anyList(), any());
   }
 
   @Test

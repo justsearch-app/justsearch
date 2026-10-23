@@ -60,6 +60,8 @@ final class EngineTestHarness implements AutoCloseable {
   private static final long DEADLINE_MS = 30_000L;
 
   private static final int BATCH_SIZE = 5_000;
+  private static final java.util.concurrent.atomic.AtomicBoolean ACTIVE =
+      new java.util.concurrent.atomic.AtomicBoolean();
 
   private final Path dataDir;
   private final Path indexBase;
@@ -69,6 +71,9 @@ final class EngineTestHarness implements AutoCloseable {
   private EngineRoot root;
   private KnowledgeClient client;
   private GpuSchedulingGauge gauge;
+  private String previousDataDirectory;
+  private String previousUserHome;
+  private boolean ownsProperties;
 
   private EngineTestHarness(
       Path dataDir,
@@ -143,6 +148,26 @@ final class EngineTestHarness implements AutoCloseable {
   }
 
   private void open() throws Exception {
+    // JUnit runs these fixtures serially. Embedded Engine constructors also use PlatformPaths,
+    // so resolved config alone cannot isolate roots, operations or legacy profile migration.
+    if (!ACTIVE.compareAndSet(false, true)) {
+      throw new IllegalStateException("Engine harnesses own process properties and must run serially");
+    }
+    previousDataDirectory = System.getProperty("justsearch.data.dir");
+    previousUserHome = System.getProperty("user.home");
+    ownsProperties = true;
+    try {
+      System.setProperty("justsearch.data.dir", dataDir.toAbsolutePath().toString());
+      System.setProperty("user.home", dataDir.resolve("home").toAbsolutePath().toString());
+      openEngine();
+    } catch (Exception | Error failure) {
+      try { close(); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
+  private void openEngine() throws Exception {
     publishConfig(dataDir, indexBase, extraConfig);
     gauge = new GpuSchedulingGauge();
     if (migrationHook == MigrationTransitionBarrier.NO_HOOK) {
@@ -456,11 +481,20 @@ final class EngineTestHarness implements AutoCloseable {
 
   @Override
   public void close() {
-    if (root != null) {
-      root.close();
+    try {
+      if (root != null) root.close();
+    } finally {
+      root = null;
+      client = null;
+      gauge = null;
+      if (ownsProperties) {
+        if (previousDataDirectory == null) System.clearProperty("justsearch.data.dir");
+        else System.setProperty("justsearch.data.dir", previousDataDirectory);
+        if (previousUserHome == null) System.clearProperty("user.home");
+        else System.setProperty("user.home", previousUserHome);
+        ownsProperties = false;
+        ACTIVE.set(false);
+      }
     }
-    root = null;
-    client = null;
-    gauge = null;
   }
 }

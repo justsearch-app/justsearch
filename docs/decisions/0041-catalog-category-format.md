@@ -4,8 +4,8 @@ type: decision
 status: superseded by tempdoc 564
 description: "Superseded catalog-format proposal. No catalog Category is registered; the severity.proto spike is unregistered and outside the Java projection source set. Current frontend wire types derive from Java records via JSON Schema (tempdoc 564)."
 date: 2026-06-09
-probes: none - format superseded in part by tempdoc 564; the surviving half is owned by ADR-0039 probes.
-last_reviewed: 2026-09-02
+probes: none - superseded catalog-format proposal; the one registered contract Category is guarded by ADR-0039.
+last_reviewed: 2026-10-20
 ---
 
 
@@ -21,7 +21,10 @@ last_reviewed: 2026-09-02
 ## Status
 
 Superseded by tempdoc 564. No catalog Category is registered, and the `contracts/catalog/severity/`
-spike is outside the Java projection source set. See ADR-0039 for the substrate that remains.
+spike is outside the Java projection source set. See
+[ADR-0039](0039-contract-substrate.md) and its 2026-10-20 amendment for the substrate
+that remains. The Decision and recipes below are historical, not instructions
+for adding a catalog to the current build.
 
 **Where the surviving mechanism lives (added 2026-09-02):** the record-as-IDL projection register [`governance/contract-surfaces.v1.json`](../../governance/contract-surfaces.v1.json) and its emitter [`scripts/codegen/gen-wire-schema-types.mjs`](../../scripts/codegen/gen-wire-schema-types.mjs) are what actually projects contract types today; the decisions that still hold are [ADR-0038](0038-wire-contract-source-of-truth.md) (wire contract as a first-class artifact) and [ADR-0039](0039-contract-substrate.md) (the substrate, narrowed 2026-09-02 to the one registered `wire` Category — no catalog Category is registered).
 

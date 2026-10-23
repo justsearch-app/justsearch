@@ -248,13 +248,14 @@ abstract class LocalApiIntegrationTestBase {
   protected record HttpJsonResponse(int statusCode, JsonNode json, String body) {}
 
   protected HttpJsonResponse getJson(String path) throws Exception {
-    HttpResponse<String> resp =
-        client.send(
-            HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
+    return getJson(path, Map.of());
+  }
+
+  protected HttpJsonResponse getJson(String path, Map<String, String> headers) throws Exception {
+    HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(baseUrl + path))
+        .timeout(Duration.ofSeconds(10)).GET();
+    headers.forEach(request::header);
+    HttpResponse<String> resp = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     return new HttpJsonResponse(resp.statusCode(), parseJsonBestEffort(resp.body()), resp.body());
   }
 

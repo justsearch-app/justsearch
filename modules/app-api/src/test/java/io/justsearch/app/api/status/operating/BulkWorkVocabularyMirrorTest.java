@@ -17,10 +17,12 @@ import org.junit.jupiter.api.Test;
 @DisplayName("BulkWorkGate vocabularies mirror IndexingReason and Profile")
 final class BulkWorkVocabularyMirrorTest {
 
-  // reasons: same names, same precedence order
+  // Automatic reasons retain their names and precedence; user/recovery holds have their own owner.
   @Test
   void reasons() {
-    assertEquals(names(IndexingReason.values()), names(BulkWorkGate.Reason.values()));
+    assertEquals(names(IndexingReason.values()).stream()
+        .filter(reason -> !reason.equals("USER_PAUSED") && !reason.equals("SETTINGS_RECOVERY")).toList(),
+        names(BulkWorkGate.Reason.values()));
   }
 
   // profiles: same names, same order

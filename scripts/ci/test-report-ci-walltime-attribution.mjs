@@ -247,3 +247,20 @@ console.log('test-report-ci-walltime-attribution: PASS');
     assert.equal(walltime.readSuiteTimes(root, [missing])['app-ui-ui'], undefined);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
+
+// Successful matrix legs whose work was skipped are not missing test evidence.
+{
+  const start = '2026-07-01T00:00:00Z';
+  const end = '2026-07-01T00:00:01Z';
+  const skipped = job('Unit tests (search-worker)', start, end, [
+    step('Set up job', start, end),
+    { ...step('Checkout', start, end), conclusion: 'skipped' },
+    { ...step('Tests', start, end), conclusion: 'skipped' },
+    step('Complete job', start, end),
+  ]);
+  const check = (jobs) => buildWalltimeReport({ jobs, requiredChecks: ['Unit tests (search-worker)'] });
+  assert.deepEqual(check([skipped]).warnings, []);
+  assert.deepEqual(check([{ ...skipped, conclusion: 'skipped', steps: [] }]).warnings, []);
+  const worked = { ...skipped, steps: [step('Tests', start, end)] };
+  assert.ok(check([worked]).warnings.some((warning) => /unit attribution missing/.test(warning)));
+}

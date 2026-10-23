@@ -114,7 +114,12 @@ public final class RuntimeInstancesController {
 
   public void handleGetOne(Context ctx) {
     String id = ctx.pathParam("id");
-    if (id == null || !INSTANCE_ID_PATTERN.matcher(id).matches()) {
+    try {
+      io.justsearch.configuration.persistence.StoreIds.requireValid(id);
+      if (!INSTANCE_ID_PATTERN.matcher(id).matches()) {
+        throw new IllegalArgumentException("Invalid instance id");
+      }
+    } catch (IllegalArgumentException invalid) {
       ctx.status(400)
           .json(
               Map.of(

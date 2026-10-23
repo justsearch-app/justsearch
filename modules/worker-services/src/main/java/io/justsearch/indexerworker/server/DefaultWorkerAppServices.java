@@ -293,7 +293,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     private void delete(String path) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
-        if (selected.runtime() == null) return;
         deleteAt(selected, path);
       }
     }
@@ -303,14 +302,15 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         String path) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
-        if (selected.runtime() == null) return;
         deleteAt(selected, witness, path);
       }
     }
 
     private static void deleteAt(Target selected, String path) {
       selected.ingest().acceptWatcherDelete(path, () -> {
-        if (!selected.runtime().isAcceptingWrites()) return;
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
+          throw new IllegalStateException("Watcher deletion lost its writable runtime");
+        }
         selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
         selected.deletionMarker().markIfAbsent(path);
       });
@@ -321,10 +321,32 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
         String path) {
       selected.ingest().acceptWatcherDelete(witness, path, () -> {
-        if (!selected.runtime().isAcceptingWrites()) return;
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
+          throw new IllegalStateException("Watcher deletion lost its writable runtime");
+        }
         selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
         selected.deletionMarker().markIfAbsent(path);
       });
+    }
+
+    private void applyPendingReceipts() {
+      try (RoutedTarget routed = acquireTarget()) {
+        routed.target().ingest().reconcilePendingWatcherRoots();
+      }
+    }
+
+    private java.util.Set<Path> recoveryRoots() {
+      return target.ingest().watcherRecoveryRoots();
+    }
+
+    private void recoverRoot(Path root) {
+      try (RoutedTarget routed = acquireTarget()) {
+        try {
+          routed.target().ingest().recoverWatcherRoot(root);
+        } catch (IOException unavailable) {
+          throw new IllegalStateException("Watcher root recovery is incomplete", unavailable);
+        }
+      }
     }
 
     private void reconcile(Path root, boolean force) {
@@ -513,6 +535,24 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
         embeddingTelemetryEvents, indexingPacing, childControl, configuration, null,
         deferredSource);
+  }
+
+  /** Replaces a stopped loop on the same generation without interrupting physical watches. */
+  public static DefaultWorkerAppServices prepareRuntimeReload(
+      WorkerExecutorRegistrations executors, InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration, DefaultWorkerAppServices source) {
+    if (source.indexingLoop == null || source.producerOwnership.ownsLoop()
+        || !source.producerOwnership.ownsWatcher()) {
+      throw new IllegalStateException("Runtime reload source has not stopped its native loop");
+    }
+    var successor = new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
+        embeddingTelemetryEvents, indexingPacing, childControl, configuration, null, source);
+    successor.forcedPaths.addAll(source.forcedPaths);
+    return successor;
   }
 
   private DefaultWorkerAppServices(
@@ -757,6 +797,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
           ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
           watcherCallbacks::delete);
+      workerWatcher.usePendingReceipts(watcherCallbacks::applyPendingReceipts);
       this.rootWatcherRegistry =
           new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
     } else {
@@ -764,10 +805,17 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.rootWatcherRegistry = nativeSource.rootWatcherRegistry;
     }
     this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
+    if (nativeSource == null) {
+      workerWatcher.startRootRecovery(executors.watcherReturnPoll(), executors.watcherReturn(),
+          watcherCallbacks::recoveryRoots, watcherCallbacks::recoverRoot);
+    }
     // Task t-20261013-ef3c41, round 4: the indexing loop's admission, freshness, re-hash and
     // pre-write decisions and the watcher's DELETE confirmation all ask the service's one
     // root-identity check, the same question the prune asks.
-    if (indexingLoop != null) indexingLoop.useRootCheck(ingestService.rootCheck());
+    if (indexingLoop != null) {
+      indexingLoop.useRootCheck(ingestService.rootCheck());
+      indexingLoop.useFileExclusions(ingestService::isUserExcluded);
+    }
     this.workerWatcher.useRootCheck(ingestService.rootCheck());
     this.embeddingProviderTarget = new EmbeddingProviderTarget(this);
     if (nativeSource != null) copySourceQueryBindings(nativeSource);
@@ -919,7 +967,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
     searchService.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
     // Task t-20261013-ef3c41, round 4: the shared loop and watcher ask this service's root check.
-    if (indexingLoop != null) indexingLoop.useRootCheck(ingestService.rootCheck());
+    if (indexingLoop != null) {
+      indexingLoop.useRootCheck(ingestService.rootCheck());
+      indexingLoop.useFileExclusions(ingestService::isUserExcluded);
+    }
     workerWatcher.useRootCheck(ingestService.rootCheck());
 
     this.healthService =
@@ -1136,8 +1187,26 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         || successor.mutationAdmission != mutationAdmission) {
       throw new IllegalArgumentException("Native watcher successor changed");
     }
+    // Before A can close: every settled DELETE waiting on the fence becomes A's durable root
+    // receipt, through the same call a failed handoff's released callback makes on drained A. The
+    // fence's write lease admits it; the successor's reconciliation settles the receipt.
+    workerWatcher.forEachSettlingDelete((witness, path) -> {
+      try {
+        WatcherCallbacks.deleteAt(preparedWatcherTarget, witness, path);
+      } catch (RuntimeException unrecorded) {
+        // The waiting callback still holds this DELETE and applies or reports it once admitted.
+        log.warn("A waiting watcher DELETE was not recorded before the handoff: {}",
+            unrecorded.getMessage());
+      }
+    });
     producerOwnership.transferWatcherTo(successor.producerOwnership);
     watcherCallbacks.target = successor.preparedWatcherTarget;
+  }
+
+  /** A failed handoff routes the retained watcher back to this drained owner, inside the fence. */
+  public void withdrawNativeWatcherHandoff(WorkerMutationAdmission.FinalFence fence) {
+    watcherCallbacks.target = preparedWatcherTarget;
+    fence.restorePriorOwner();
   }
 
   public WorkerMutationAdmission mutationAdmission() { return mutationAdmission; }
@@ -1153,6 +1222,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   }
 
   public boolean producerClosed() { return producerOwnership.closed(); }
+
+  /** A runtime-bound loop is still owned here, including while stopped for a close retry. */
+  public boolean ownsNativeProducer() {
+    return indexingLoop != null && producerOwnership.ownsLoop();
+  }
 
   /** Physical producer identity shared by wrappers of this exact service view. */
   public Object mutationOwnerToken() { return mutationOwnerToken; }
@@ -1267,6 +1341,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void startIndexingLoop() {
+    ingestService.reconcilePendingWatcherRoots();
     if (indexingLoop != null) {
       indexingLoop.start();
     }
@@ -1666,6 +1741,26 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public void close() throws IOException {
     producerOwnership.close(workerWatcher, indexingLoop);
+  }
+
+  /**
+   * Stops native work and retains the watcher behind its mutation fence until replacement. If the
+   * replacement fails, the fence closes on this owner: callbacks waiting on it reach this drained
+   * service, which records each watcher delete as a durable root obligation.
+   */
+  public WorkerMutationAdmission.FinalFence closeForRuntimeReload()
+      throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
+    var fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 5_000);
+    if (fence == null) {
+      throw new java.util.concurrent.TimeoutException("Old producer mutations are still running");
+    }
+    try {
+      closeNativeLoopRetainingModels();
+      return fence;
+    } catch (IOException | RuntimeException | Error failure) {
+      fence.close();
+      throw failure;
+    }
   }
 
   // ==================== Sandbox seam (tempdoc 410) ====================

@@ -137,6 +137,252 @@ final class SubstrateDrivenEngineTest {
     assertEquals("SEMANTIC_BUDGET_EXCEEDED", history.get(1).get("retrievalModeReason"));
   }
 
+  /** An injector that records a rewrite the way {@code QueryRewriteInjector} does, then retrieves. */
+  private static ContextInjector rewritingInjector(String standalone, boolean terminal) {
+    return new ContextInjector() {
+      @Override public String id() { return "core.test-rewrite-then-retrieve"; }
+      @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {
+        if (standalone != null) {
+          ctx.attributes().put(
+              io.justsearch.app.services.conversation.spi.QueryRewriteInjector.ATTR_STANDALONE_QUESTION,
+              standalone);
+        }
+        List<SseEvent> events = List.of(new SseEvent("rag.meta", Map.of("retrieval_mode", "BM25")));
+        return terminal
+            ? new io.justsearch.agent.api.conversation.InjectorResult(List.of(), events,
+                Optional.of(new SseEvent("error", Map.of("error", "No matching documents found",
+                    "errorCode", "NO_CONTENT"))))
+            : new io.justsearch.agent.api.conversation.InjectorResult(
+                List.of(Map.of("role", "user", "content", "and the second one?")), events, Optional.empty());
+      }
+    };
+  }
+
+  @Test
+  void rewrittenFollowUpPersistsTheStandaloneQuestion() {
+    var injector = rewritingInjector("What does the second report say?", false);
+    var store = new RecordingStore();
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(), new ScriptedAi(List.of("answer")), store);
+    var live = new ArrayList<SseEvent>();
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "and the second one?"),
+        Audience.USER, live::add, io.justsearch.app.services.TestEngineContexts.internal());
+    var answer = assistantRecords(store, "conv-1").get(0);
+    assertEquals("What does the second report say?", answer.get("standaloneQuestion"));
+    SseEvent done = live.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
+    assertTrue(!done.payload().containsKey("standaloneQuestion"),
+        "persisted-only: the live note already arrived on rag.rewrite");
+  }
+
+  @Test
+  void unrevisedTurnCarriesNoStandaloneQuestion() {
+    var injector = rewritingInjector(null, false);
+    var store = new RecordingStore();
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(), new ScriptedAi(List.of("answer")), store);
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "first question"),
+        Audience.USER, event -> {}, io.justsearch.app.services.TestEngineContexts.internal());
+    assertTrue(!assistantRecords(store, "conv-1").get(0).containsKey("standaloneQuestion"));
+  }
+
+  @Test
+  void rewriteThenRetrievalFailureKeepsTheNote() {
+    var injector = rewritingInjector("What does the second report say?", true);
+    var store = new FileConversationStore(retrievalStoreDir);
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(), new ScriptedAi(List.of("unused")), store);
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "and the second one?"),
+        Audience.USER, event -> {}, io.justsearch.app.services.TestEngineContexts.internal());
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("conv-1");
+    assertEquals(true, history.get(1).get("terminalError"));
+    assertEquals("What does the second report say?", history.get(1).get("standaloneQuestion"));
+    assertTrue(!history.get(0).containsKey("standaloneQuestion"), "the note sits on the turn's outcome");
+  }
+
+  @Test
+  void rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote() {
+    // The production retriever, whose search fails outright: it ends the turn with RETRIEVAL_FAILED
+    // and reports no retrieval metadata, so nothing but the rewrite says what the turn was.
+    var docs = org.mockito.Mockito.mock(io.justsearch.app.api.DocumentService.class);
+    org.mockito.Mockito.when(docs.retrieveContext(
+            org.mockito.ArgumentMatchers.any(io.justsearch.app.api.RetrieveContextParams.class),
+            org.mockito.ArgumentMatchers.any()))
+        .thenReturn(CompletableFuture.failedFuture(
+            new IllegalStateException("worker retrieval unavailable")));
+    var rag = new io.justsearch.app.services.conversation.spi.RAGContext(docs, Duration.ofMillis(500));
+    var rewrite = new ContextInjector() {
+      @Override public String id() { return "core.test-rewrite"; }
+      @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {
+        ctx.attributes().put(
+            io.justsearch.app.services.conversation.spi.QueryRewriteInjector.ATTR_STANDALONE_QUESTION,
+            "What does the second report say?");
+        return new io.justsearch.agent.api.conversation.InjectorResult(List.of(),
+            List.of(new SseEvent("rag.rewrite", Map.of("standalone", "What does the second report say?"))),
+            Optional.empty());
+      }
+    };
+    var store = new FileConversationStore(retrievalStoreDir);
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(rewrite.id(), rag.id()), List.of()),
+        List.of(), List.of(rewrite, rag), List.of(), List.of(), new ScriptedAi(List.of("unused")), store);
+    var live = new ArrayList<SseEvent>();
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "and the second one?"),
+        Audience.USER, live::add, io.justsearch.app.services.TestEngineContexts.internal());
+    assertTrue(live.stream().anyMatch(e -> "error".equals(e.name())
+        && "RETRIEVAL_FAILED".equals(e.payload().get("errorCode"))), live.toString());
+    assertTrue(live.stream().noneMatch(e -> "rag.meta".equals(e.name())), live.toString());
+
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("conv-1");
+    assertEquals(2, history.size(), "the question and its outcome survive a reload");
+    assertEquals("and the second one?", history.get(0).get("content"));
+    assertEquals(true, history.get(1).get("terminalError"));
+    assertEquals("RETRIEVAL_FAILED", history.get(1).get("errorCode"));
+    assertEquals("What does the second report say?", history.get(1).get("standaloneQuestion"));
+  }
+
+  @Test
+  void rewriteThenGenerationFailureKeepsTheNote() {
+    var injector = rewritingInjector("What does the second report say?", false);
+    var store = new FileConversationStore(retrievalStoreDir);
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(),
+        new FailingAi(new IllegalStateException("Answer generation unavailable")), store);
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "and the second one?"),
+        Audience.USER, event -> {}, io.justsearch.app.services.TestEngineContexts.internal());
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("conv-1");
+    assertEquals(true, history.get(1).get("terminalError"));
+    assertEquals("What does the second report say?", history.get(1).get("standaloneQuestion"));
+  }
+
+  @Test
+  void forwardedContextCountsAsConversationInTheBreakdown() {
+    var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
+    var store = new RecordingStore();
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(external.id()), List.of()),
+        List.of(), List.of(external), List.of(), List.of(), new ScriptedAi(List.of("answer")), store);
+    var live = new ArrayList<SseEvent>();
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("conversationId", "conv-1");
+    body.put("question", "and the second one?");
+    body.put("context", List.of(
+        Map.of("role", "user", "content", "What do the quarterly reports say about churn?"),
+        Map.of("role", "assistant", "content", "The first report says churn fell by two points.")));
+    engine.run(SHAPE_ID, body, Audience.USER, live::add,
+        io.justsearch.app.services.TestEngineContexts.internal());
+    SseEvent done = live.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
+    @SuppressWarnings("unchecked")
+    var breakdown = (Map<String, Object>) done.payload().get("contextBreakdown");
+    assertTrue((Integer) breakdown.get("conversation") > 0, "the forwarded turns are conversation");
+    assertEquals(0, breakdown.get("retrieved"), "nothing was retrieved");
+  }
+
+  // The served chat template (Qwen3.5, run with --jinja) raises "System message must be at the
+  // beginning." for any system message after message[0], so the list the model receives may hold
+  // one system message, first.
+
+  @Test
+  void compactionSummaryFoldsIntoTheLeadingSystemMessage() {
+    var store = new FileConversationStore(retrievalStoreDir);
+    store.createSession("conv-1", SHAPE_ID.value());
+    store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "user", "content", "old question"));
+    store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "assistant", "content", "old answer"));
+    store.appendMessage("conv-1", SHAPE_ID.value(), Map.of("role", "user", "content", "new question"));
+    String floorId = (String) store.loadHistory("conv-1").get(2).get("id");
+    store.compactContext("conv-1", floorId, "The user asked about renewals.");
+    var contributor = new RecordingContributor("core.test-contrib", "SYS", 10);
+    var llm = new ScriptedAi(List.of("answer"));
+    var engine = newEngineWithStore(
+        persistentShape(IterationMode.ONE_SHOT, SingleHopController.ID, List.of(contributor.id()),
+            List.of(), List.of()),
+        List.of(contributor), List.of(), List.of(), List.of(SingleHopController.INSTANCE), llm, store);
+    engine.run(SHAPE_ID, Map.of("sessionId", "conv-1"), Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal());
+
+    assertEquals(
+        List.of(
+            Map.of("role", "system",
+                "content", "SYS\n\nSummary of earlier conversation:\nThe user asked about renewals."),
+            Map.of("role", "user", "content", "new question")),
+        llm.calls.get(0));
+  }
+
+  @Test
+  void forwardedSummaryFoldsIntoTheLeadingSystemMessage() {
+    var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
+    var contributor = new RecordingContributor("core.test-contrib", "SYS", 10);
+    var llm = new ScriptedAi(List.of("answer"));
+    var engine = newEngineWithStore(
+        oneShotShape(List.of(contributor.id()), List.of(external.id()), List.of()),
+        List.of(contributor), List.of(external), List.of(), List.of(), llm, new RecordingStore());
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("conversationId", "conv-1");
+    body.put("question", "and the second one?");
+    body.put("context", List.of(
+        Map.of("role", "system", "content", "Summary of earlier conversation:\nChurn was discussed."),
+        Map.of("role", "user", "content", "What does the first report say?"),
+        Map.of("role", "assistant", "content", "Churn fell by two points.")));
+    engine.run(SHAPE_ID, body, Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal());
+
+    var sent = llm.calls.get(0);
+    assertEquals(
+        Map.of("role", "system",
+            "content", "SYS\n\nSummary of earlier conversation:\nChurn was discussed."),
+        sent.get(0));
+    assertEquals(1, sent.stream().filter(m -> "system".equals(m.get("role"))).count());
+    assertEquals(
+        List.of(
+            Map.of("role", "user", "content", "What does the first report say?"),
+            Map.of("role", "assistant", "content", "Churn fell by two points.")),
+        sent.subList(1, sent.size()));
+  }
+
+  @Test
+  void contextWithoutSystemMessagesIsUnchanged() {
+    var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
+    var contributor = new RecordingContributor("core.test-contrib", "SYS", 10);
+    var llm = new ScriptedAi(List.of("answer"));
+    var engine = newEngineWithStore(
+        oneShotShape(List.of(contributor.id()), List.of(external.id()), List.of()),
+        List.of(contributor), List.of(external), List.of(), List.of(), llm, new RecordingStore());
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("conversationId", "conv-1");
+    body.put("question", "and the second one?");
+    body.put("context", List.of(
+        Map.of("role", "user", "content", "What does the first report say?"),
+        Map.of("role", "assistant", "content", "Churn fell by two points.")));
+    engine.run(SHAPE_ID, body, Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal());
+
+    assertEquals(
+        List.of(
+            Map.of("role", "system", "content", "SYS"),
+            Map.of("role", "user", "content", "What does the first report say?"),
+            Map.of("role", "assistant", "content", "Churn fell by two points.")),
+        llm.calls.get(0));
+  }
+
+  @Test
+  void summaryWithoutSystemPromptLeadsTheList() {
+    var external = new io.justsearch.app.services.conversation.spi.ExternalContextInjector(() -> null);
+    var llm = new ScriptedAi(List.of("answer"));
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(external.id()), List.of()),
+        List.of(), List.of(external), List.of(), List.of(), llm, new RecordingStore());
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("conversationId", "conv-1");
+    body.put("question", "and the second one?");
+    body.put("context", List.of(
+        Map.of("role", "user", "content", "What does the first report say?"),
+        Map.of("role", "system", "content", "Summary of earlier conversation:\nChurn was discussed.")));
+    engine.run(SHAPE_ID, body, Audience.USER, event -> {},
+        io.justsearch.app.services.TestEngineContexts.internal());
+
+    assertEquals(
+        List.of(
+            Map.of("role", "system", "content", "Summary of earlier conversation:\nChurn was discussed."),
+            Map.of("role", "user", "content", "What does the first report say?")),
+        llm.calls.get(0));
+  }
+
   private static final ConversationShapeRef SHAPE_ID = new ConversationShapeRef("core.test-shape");
 
   @Test
@@ -1820,6 +2066,15 @@ final class SubstrateDrivenEngineTest {
 
   private static ConversationShape persistentShape(
       IterationMode mode, String controllerId, List<String> injIds, List<String> consumerIds) {
+    return persistentShape(mode, controllerId, List.of(), injIds, consumerIds);
+  }
+
+  private static ConversationShape persistentShape(
+      IterationMode mode,
+      String controllerId,
+      List<String> contribIds,
+      List<String> injIds,
+      List<String> consumerIds) {
     return new ConversationShape(
         SHAPE_ID,
         new Presentation(
@@ -1829,7 +2084,7 @@ final class SubstrateDrivenEngineTest {
         ExecutionMode.SUBSTRATE_DRIVEN,
         mode,
         PersistenceMode.PERSISTENT,
-        List.of(),
+        contribIds,
         injIds,
         consumerIds,
         controllerId,

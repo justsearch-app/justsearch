@@ -4,6 +4,8 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
+import { exerciseMigrationJournalLoss } from './migration-journal-loss-scenario.mjs';
+import { exercisePointerPublication, preparePointerRecovery } from './pointer-publication-scenario.mjs';
 import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 import { exerciseOperationResume } from './operation-resume-scenario.mjs';
@@ -36,13 +38,15 @@ import {
 
 const repo = process.cwd();
 const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
+const pointerPublication = /^pointer-(first|replacement|recovery)-(before-backup|after-backup|after-publication)$/.exec(scenario ?? '');
 const queryCrashPoint = scenario === 'query-reconfigure-in-place-precommit-crash'
   ? 'settings-after-prepare-before-file-replace'
   : scenario === 'query-reconfigure-in-place-postcommit-crash'
     ? 'settings-after-file-replace-before-publication' : null;
 const queryReconfigureMode = scenario === 'query-reconfigure-beside' ? 'BESIDE'
   : scenario === 'query-reconfigure-in-place' || queryCrashPoint ? 'IN_PLACE' : null;
-const nativeMixedAfterPointer = scenario === NATIVE_MIXED_AFTER_POINTER;
+const journalLoss = /^journal-loss-(corrupt|missing|empty|stale)$/.exec(scenario ?? '');
+const nativeMixedAfterPointer = scenario === NATIVE_MIXED_AFTER_POINTER || journalLoss !== null;
 const operationFault = new Set(['ingest-before-accept', 'settings-before-accept',
   'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
   'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
@@ -203,6 +207,32 @@ const env = {
   AI_OFFLINE: 'true',
   CI: '',
 };
+if (pointerPublication) {
+  env.JUSTSEARCH_POINTER_PUBLICATION_CUT = pointerPublication[2];
+  env.JUSTSEARCH_POINTER_CUT_PHASE = pointerPublication[1] === 'replacement' ? 'MIGRATING' : 'IDLE';
+  // Pin the hosted-CI model condition: the tracked model manifests without any weights. A
+  // discovered embedding model changes how a replacement ends (an empty candidate cannot earn
+  // the embedding stamp and is refused), so a host's real models must never decide the outcome.
+  const manifestOnlyModels = path.join(work, 'models-manifest-only');
+  const tracked = spawnSync('git', ['ls-files', '-z', '--', 'models'], { cwd: repo, encoding: 'utf8' });
+  if (tracked.status !== 0) throw new Error(`cannot list tracked model manifests: ${tracked.stderr}`);
+  // A checkout that tracks weights (through LFS) must still yield manifests only.
+  const weights = /\.(onnx|gguf)$|onnx_data$/i;
+  for (const file of tracked.stdout.split('\0').filter(name => name && !weights.test(name))) {
+    const target = path.join(manifestOnlyModels, path.relative('models', file));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(repo, file), target);
+  }
+  env.JUSTSEARCH_MODELS_DIR = manifestOnlyModels;
+  const corpus = path.join(work, 'pointer-corpus');
+  fs.mkdirSync(corpus, { recursive: true });
+  fs.writeFileSync(path.join(corpus, 'probe.txt'), 'pointerdurabilitymarker quokka', { flag: 'wx' });
+  // The probe lives in a watched root, as a user's files do: a rebuild recaptures watched roots.
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
+    schemaVersion: 1, roots: [{ path: corpus }],
+  }), { flag: 'wx' });
+  if (pointerPublication[1] === 'recovery') preparePointerRecovery(indexBase);
+}
 if (queryReconfigureMode) {
   // Keep A on model discovery; an operator model-path override masks settings reconfigure.
   env.JUSTSEARCH_MODELS_DIR = findRetainedModelsRoot();
@@ -458,6 +488,15 @@ if (nativeMixedAfterPointer) {
   env.JUSTSEARCH_MIGRATION_BARRIER_POINT = NATIVE_MIGRATION_POINT;
   env.JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT = '1';
 }
+if (journalLoss) {
+  env.JUSTSEARCH_REAL_RECOVERY_SCENARIO = NATIVE_MIXED_AFTER_POINTER;
+  env.JUSTSEARCH_NATIVE_JOURNAL_LOSS = '1';
+  env.JUSTSEARCH_AI_EMBED_ENABLED = 'false';
+  env.AI_OFFLINE = 'true';
+  env.JUSTSEARCH_INDEX_START_BARRIERS = 'index-start-initial';
+  fs.writeFileSync(path.join(data, 'runtime', 'index-start-initial-reached.json'),
+    JSON.stringify({ fixtureSentinel: true }), { flag: 'wx' });
+}
 if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
   const sources = path.join(work, 'migration-sources');
   fs.mkdirSync(sources, { recursive: true });
@@ -588,15 +627,21 @@ const engineLogWindow = modelLiveAB ? (() => {
     rolledFiles,
   };
 })() : null;
-const child = spawn(process.execPath, [
+const launchArgs = [
   runner, 'start', '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
   '--ui-port', String(port), '--data-dir', data, '--session-id', 'writer-recovery-live',
   '--lease-duration-sec', nativeMixedAfterPointer || queryReconfigureMode ? '900' : '600',
-], { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
+];
 let output = '';
 let ownedRunId = null;
-child.stdout.on('data', (b) => { output += b; process.stdout.write(b); });
-child.stderr.on('data', (b) => { output += b; process.stderr.write(b); });
+function launchFixture() {
+  const launched = spawn(process.execPath, launchArgs, { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  launched.stdout.on('data', (b) => { output += b; process.stdout.write(b); });
+  launched.stderr.on('data', (b) => { output += b; process.stderr.write(b); });
+  return launched;
+}
+let child = launchFixture();
+let initialPointerExit = null;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
@@ -614,8 +659,11 @@ async function waitUntil(label, deadline, probe) {
   return waitFor(label, Math.max(1, deadline - Date.now()), probe);
 }
 async function request(apiPort, endpoint, options = {}, timeoutMs = 5000) {
+  const manifest = readJson(path.join(data, 'runtime', 'manifest.json'));
+  const headers = { ...(options.headers ?? {}) };
+  if (manifest?.head?.sessionToken) headers['X-JustSearch-Session'] = manifest.head.sessionToken;
   const response = await fetch(`http://127.0.0.1:${apiPort}${endpoint}`, {
-    ...options,
+    ...options, headers,
     signal: AbortSignal.timeout(timeoutMs),
   });
   const text = await response.text();
@@ -692,10 +740,25 @@ try {
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
   const initial = await waitFor('first running incarnation with matching manifest', 90000, async () => {
     if (child.exitCode !== null || child.signalCode !== null) {
+      const discoveryExit = output.split(/\r?\n/).filter(line => line.startsWith('{'))
+        .map(line => { try { return JSON.parse(line); } catch { return null; } })
+        .find(value => value?.error?.code === 'ENGINE_EXITED_DURING_DISCOVERY')?.error?.details;
+      const cut = pointerPublication && readJson(path.join(indexBase, 'pointer-publication-cut'));
+      if (pointerPublication?.[1] !== 'replacement' && cut && !initialPointerExit
+          && discoveryExit?.exitCode === 73 && discoveryExit.initialDiscovery === true
+          && discoveryExit.childReplaced === false) {
+        initialPointerExit = discoveryExit;
+        child = launchFixture();
+        return null;
+      }
       throw new Error(`startup runner exited before initial discovery: exit=${child.exitCode} signal=${child.signalCode}; ${output}`);
     }
     const s = readJson(supervisorFile);
     const m = readJson(path.join(data, 'runtime', 'manifest.json'));
+    if (pointerPublication && pointerPublication[1] !== 'replacement') {
+      const cut = readJson(path.join(indexBase, 'pointer-publication-cut'));
+      if (!cut || m?.pid === cut.pid) return null;
+    }
     return s?.state === 'running' && m?.pid === s.pid && m?.instanceId === s.instanceId
       && m?.head?.apiPort === s.apiPort ? { supervisor: s, manifest: m } : null;
   });
@@ -718,7 +781,15 @@ try {
         return response.status === 200 ? response : null;
       } catch { return null; }
     });
-  if (nativeMixedAfterPointer) {
+  if (pointerPublication) {
+    await exercisePointerPublication({ work, data, indexBase, mode: pointerPublication[1],
+      point: pointerPublication[2], first, apiPort, readJson, waitFor, request, post, requireThat,
+      createOperationKey, initialExit: initialPointerExit });
+  } else if (journalLoss) {
+    await exerciseMigrationJournalLoss({ work, data, indexBase, first, apiPort,
+      fixture: nativeMixedFixture, damage: journalLoss[1], readJson, waitFor, request, post,
+      requireThat });
+  } else if (nativeMixedAfterPointer) {
     const result = await exerciseNativeMixedAfterPointer({
       work, data, indexBase, jobsPath: path.join(data, 'jobs.db'),
       sourceInputPath: nativeMixedFixture.sourceInputPath,

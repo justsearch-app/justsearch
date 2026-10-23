@@ -608,6 +608,23 @@ export class Sv3Composer extends JfElement {
       .editor {
         position: relative;
       }
+      .schema-field {
+        padding: 0 var(--space-4);
+        min-width: 0;
+      }
+      :host .schema-field [id='sv3-schema'] {
+        width: 100%;
+        box-sizing: border-box;
+        min-block-size: 4.5rem;
+        max-block-size: 8rem;
+        overflow: auto;
+        font-family: var(--font-mono);
+        border: 1px solid var(--border);
+      }
+      .schema-field p {
+        margin: var(--space-1) 0;
+        overflow-wrap: anywhere;
+      }
       textarea {
         display: block;
         width: 100%;
@@ -651,6 +668,10 @@ export class Sv3Composer extends JfElement {
         pointer-events: none;
         position: absolute;
         inset: 0;
+        /* Like a native input placeholder, keep the hint inside the field when text is enlarged. */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
         color: var(--placeholder);
         font-size: var(--font-size-sv3-sm);
         line-height: 1.625;
@@ -1084,6 +1105,9 @@ export class Sv3Composer extends JfElement {
     draft: { state: true },
     effortMenuOpen: { state: true },
     tierMenuOpen: { state: true },
+    schemaDraft: { type: String, attribute: false },
+    schemaError: { state: true },
+    structuredError: { type: String, attribute: false },
     degradationOpen: { state: true },
   };
 
@@ -1103,6 +1127,9 @@ export class Sv3Composer extends JfElement {
    * the verdict; it never asks itself whether a run is running.
    */
   declare haltReason: string;
+  declare schemaDraft: string;
+  declare private schemaError: string;
+  declare structuredError: string;
   /**
    * The live run accepts a mid-run submit as a STEER that joins it (an agent run does; an ask stream
    * has no such channel). It is what decides whether a submit while the slot is Stop is a refusal or
@@ -1177,6 +1204,8 @@ export class Sv3Composer extends JfElement {
    */
   declare modelLabel: string;
   declare draft: string;
+  /** Every input, including IME edits: a delayed send may clear only its original draft. */
+  draftRevision = 0;
   /**
    * Public because the window's Escape ladder has to see it: an open menu is the MOST LOCAL
    * transient in the composer, so the window declines the key the way it declines to an open rename
@@ -1214,6 +1243,9 @@ export class Sv3Composer extends JfElement {
     this.corpus = SV3_CORPUS_UNKNOWN;
     this.effort = SV3_EFFORT_DEFAULT;
     this.tier = SV3_TIER_DEFAULT;
+    this.schemaDraft = '';
+    this.schemaError = '';
+    this.structuredError = '';
     this.scopeLabel = '';
     this.modelLabel = '';
     this.draft = '';
@@ -1243,6 +1275,7 @@ export class Sv3Composer extends JfElement {
 
   private setDraft(text: string, composing: boolean): void {
     const previous = this.draft;
+    this.draftRevision += 1;
     this.draft = text;
     if (composing) return;
     this.dispatchEvent(
@@ -1366,12 +1399,23 @@ export class Sv3Composer extends JfElement {
       );
       return;
     }
+    if (tier === 'structured') {
+      try {
+        const parsed: unknown = JSON.parse(this.schemaDraft);
+        if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error('object');
+        this.schemaError = '';
+      } catch {
+        this.schemaError = 'Enter a JSON schema object.';
+        this.shadowRoot?.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-schema]')?.focus();
+        return;
+      }
+    }
     if (this.slotKind === 'answer') return;
     if (this.slotKind === 'stop' && !this.steerable) return;
     // A STEER is not a new commitment against the tier's gate — it joins a run that is already
     // running, so it is refused only by the slot rule above.
     if (this.slotKind !== 'stop') {
-      const reason = tier === 'delegate' ? this.delegateUnavailableReason : this.unavailableReason;
+      const reason = this.tierReason(tier);
       if (reason !== '') return;
     }
     this.dispatchEvent(
@@ -1406,13 +1450,15 @@ export class Sv3Composer extends JfElement {
     // The ONE banner slot, shared. The affordance-scoped reason yields whenever the degradation
     // banner already words its code, so the same fact never stands in the slot twice.
     const reason = sv3ComposerReason(this.degradation, activeReason);
+    // Like the degradation banner, this is a reachable description of the refusal. The shell's
+    // always-mounted status deck announces observed health/indexing changes once for all surfaces.
     return html`
       <div class="band" data-testid="sv3-composer-band">
         ${this.state === 'hero' ? this.landing() : nothing}
         ${this.degradationBanner()}
         ${reason === ''
           ? nothing
-          : html`<p class="notice" id="sv3-composer-notice" role="status" data-testid="sv3-composer-notice">
+          : html`<p class="notice" id="sv3-composer-notice" data-testid="sv3-composer-notice">
               ${reason}
             </p>`}
         ${this.scopeNote()}
@@ -1443,6 +1489,23 @@ export class Sv3Composer extends JfElement {
                 : nothing}
             </div>
           </div>
+          ${this.tier === 'structured' ? html`<div class="schema-field">
+            <label for="sv3-schema">JSON schema</label>
+            <textarea id="sv3-schema" rows="3" data-testid="sv3-composer-schema"
+              .value=${this.schemaDraft} aria-invalid=${this.schemaError !== '' ? 'true' : 'false'}
+              aria-describedby="sv3-schema-error"
+              @keydown=${(event: KeyboardEvent) => event.stopPropagation()}
+              @input=${(event: Event) => {
+                this.schemaError = '';
+                this.dispatchEvent(new CustomEvent('sv3-schema-change', {
+                  detail: { text: (event.target as HTMLTextAreaElement).value }, bubbles: true, composed: true,
+                }));
+              }}></textarea>
+            <p id="sv3-schema-error" role="alert" data-testid="sv3-composer-schema-error">${this.schemaError}</p>
+            <p class="notice" data-testid="sv3-composer-structured-inputs">${this.scopeLabel === ''
+              ? 'Extracts from your typed text and this conversation.' : `Extracts from ${this.scopeLabel} and this conversation.`}</p>
+            ${this.structuredError === '' ? nothing : html`<p role="alert">${this.structuredError}</p>`}
+          </div>` : nothing}
           <div class="footer">
             <div class="controls" @focusout=${this.onControlsFocusOut}>
               ${this.tierControl()}${this.effortControl()}${this.modelLabelFact()}
@@ -1654,6 +1717,7 @@ export class Sv3Composer extends JfElement {
   private tierReason(tier: Sv3ComposerTier): string {
     if (tier === 'delegate') return this.delegateUnavailableReason;
     if (tier === 'ask') return this.unavailableReason;
+    if (tier === 'structured') return this.delegateUnavailableReason;
     return '';
   }
 

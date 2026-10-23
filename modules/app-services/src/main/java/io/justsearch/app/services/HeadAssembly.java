@@ -780,19 +780,23 @@ public final class HeadAssembly implements AutoCloseable {
                 }
                 var events =
                     run.get("events") instanceof List<?> list ? list : List.of();
-                if (!meta.isEmpty()) {
-                  agentRunStore.runEvents().writeRunMeta(sid.toString(), meta);
-                }
-                if (!events.isEmpty()) {
-                  agentRunStore.runEvents().appendRawEvents(sid.toString(), events);
-                  // 629 (#E): make the restored run SEARCHABLE — replay its terminal event into the
-                  // agent-history index (import doesn't fire the live listener). Fail-soft, off-hot-path.
-                  if (agentHistoryIndexer != null) {
-                    agentHistoryIndexer.reindexRestoredRun(sid.toString(), events);
+                Object parent = meta.get("conversationId");
+                try (var ignoredWriting = agentRunStore.conversationWork().restore(
+                    parent instanceof String id && !id.isBlank() ? id : null)) {
+                  if (!meta.isEmpty()) {
+                    agentRunStore.runEvents().writeRunMeta(sid.toString(), meta);
                   }
-                }
-                if (!meta.isEmpty() || !events.isEmpty()) {
-                  restored++;
+                  if (!events.isEmpty()) {
+                    agentRunStore.runEvents().appendRawEvents(sid.toString(), events);
+                    // 629 (#E): make the restored run SEARCHABLE — replay its terminal event into the
+                    // agent-history index (import doesn't fire the live listener). Fail-soft, off-hot-path.
+                    if (agentHistoryIndexer != null) {
+                      agentHistoryIndexer.reindexRestoredRun(sid.toString(), events);
+                    }
+                  }
+                  if (!meta.isEmpty() || !events.isEmpty()) {
+                    restored++;
+                  }
                 }
               }
               return restored;
@@ -1270,7 +1274,7 @@ public final class HeadAssembly implements AutoCloseable {
     var agentToolsCatalog = io.justsearch.agent.api.registry.OperationCatalog.of("core", List.of());
     var resourceOut =
         io.justsearch.app.services.bootstrap.phases.ResourceSubstrateInit.run(
-            io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext());
+            io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext(), executors);
     var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(executors, telemetry);
     var operationOut =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(operations, attempts, engineAdmission,
@@ -1428,6 +1432,11 @@ public final class HeadAssembly implements AutoCloseable {
    */
   public io.justsearch.agent.api.memory.MemoryStore memoryStore() {
     return memoryStore;
+  }
+
+  /** Shared history writer used by the conversation deletion coordinator. */
+  public io.justsearch.app.services.agenthistory.AgentHistoryIndexer agentHistoryIndexer() {
+    return agentHistoryIndexer;
   }
 
   /**
@@ -1993,7 +2002,19 @@ public final class HeadAssembly implements AutoCloseable {
             if (perSourceSearch != null) perSourceSearch.close();
           }
         } finally {
-          try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
+          try { foregroundDocumentOwner.close(); }
+          finally {
+            try { backgroundDocumentOwner.close(); }
+            finally {
+              try {
+                if (substrateOut != null && substrateOut.resourceOut() != null)
+                  substrateOut.resourceOut().indexingJobsChangeRegistry().channel().close();
+              } finally {
+                if (substrateOut != null && substrateOut.operationOut() != null)
+                  substrateOut.operationOut().actionLedgerChangeRegistry().channel().close();
+              }
+            }
+          }
         }
       }
     }

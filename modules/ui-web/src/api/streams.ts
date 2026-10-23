@@ -6,10 +6,9 @@
  * Defines a typed StreamEventV1 discriminated union for consistent stream handling.
  */
 
-import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
+import { authorizedFetch } from '../shell-v0/api/authorizedFetch.js';
 import { parseSseBuffer, parseSseBufferJson, type SseEvent } from './sse';
 import { observeStatusEvent } from './statusInvalidation.js';
-import { fetchWithAdmissionWait } from './admissionFetch.js';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
 import { parseChatRefusal, type ChatRefusalDetail } from '../shell-v0/state/chatResidency.js';
 // Tempdoc 941 — what the app DOES when one of our per-event handlers throws (reader notice +
@@ -448,21 +447,9 @@ export async function streamRequest<TDone = Record<string, unknown>>(
   const mergedSignal = controller.signal;
 
   try {
-    // Ensure session token is resolved before proceeding (A2: token hardening).
-    // This blocks the stream POST until we know whether a token exists,
-    // preventing race conditions where the request fires before token resolution completes.
-    await resolveSessionTokenFromTauri();
-
-    // Build headers with Content-Type and optional session token
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const sessionToken = getSessionToken();
-    if (sessionToken) {
-      headers[SESSION_TOKEN_HEADER] = sessionToken;
-    }
-
-    const response = await fetchWithAdmissionWait(fetch, url, {
+    const response = await authorizedFetch(url, {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       signal: mergedSignal,
     });
@@ -640,25 +627,14 @@ export async function consumeShapeStream(
   signal?: AbortSignal,
   options?: ShapeStreamOptions,
 ): Promise<void> {
-  let token = getSessionToken();
-  if (!token) {
-    try {
-      token = await resolveSessionTokenFromTauri();
-    } catch {
-      // best-effort — non-Tauri contexts get null token (allowed in dev)
-    }
-  }
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (token) headers[SESSION_TOKEN_HEADER] = token;
-
   const target =
     options?.sinceSeq && options.sinceSeq > 0
       ? `${url}${url.includes('?') ? '&' : '?'}sinceSeq=${encodeURIComponent(String(options.sinceSeq))}`
       : url;
 
-  const response = await fetchWithAdmissionWait(fetch, target, {
+  const response = await authorizedFetch(target, {
     method: 'POST',
-    headers,
+    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify(body ?? {}),
     signal,
   });

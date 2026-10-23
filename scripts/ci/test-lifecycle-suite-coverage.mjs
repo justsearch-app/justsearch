@@ -15,7 +15,7 @@ test('model-free lifecycle task has a required hosted job and a matching explici
     /(?:^|\s):modules:system-tests:lifecycleIntegrationTest(?:\s|$)/.test(r.text)));
   assert.ok(job, 'lifecycleIntegrationTest must be scheduled in hosted CI');
   assert.equal(job['runs-on'], 'windows-latest');
-  assert.equal(job.if, undefined, 'lifecycle coverage must run on every CI trigger');
+  assert.equal(job.if, "needs.changes.outputs.lifecycle != 'false'", 'lifecycle coverage uses fail-safe input selection');
   assert.notEqual(job['continue-on-error'], 'true');
   assert.ok(signal.workflows.find((w) => w.name === 'CI').requiredStatusChecks.includes(job.name));
   const command = job.runs.find((r) => r.text.includes(':modules:system-tests:lifecycleIntegrationTest'));
@@ -62,4 +62,25 @@ test('both installed Engine tiers always collect and upload additional child log
     assert.match(job.text, /path: build\/ci\/e2e-child-logs\/\*\*/);
     assert.match(job.text, /retention-days: 3/);
   }
+});
+
+test('PRs scope fixed jobs and main runs every slow tier', () => {
+  const jobs = load(workflow).jobs;
+  const mainOnly = "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')";
+  for (const id of ['jseval-suite', 'license-and-notices', 'build', 'app-ui-ui', 'app-ui-ui-2', 'app-ui-services', 'app-ui-services-2', 'app-ui-services-3',
+    'unit-tests-search-worker-1', 'unit-tests-search-worker-2', 'unit-tests-platform-contracts-1', 'unit-tests-platform-contracts-2', 'shell-rust-tests', 'shell-rust-tests-linux',
+    'windows-native-node', 'windows-native-contracts', 'windows-native-contracts-2', 'lifecycle-integration-tests']) {
+    assert.equal(jobs[id].needs, 'changes', id);
+    assert.match(jobs[id].if, /^needs\.changes\.outputs\.[a-z]+ != 'false'$/, id);
+    assert.ok(!jobs[id].strategy, `${id}: literal check names must report even when skipped`);
+  }
+  for (const id of ['app-ui', 'unit-tests-search-worker', 'unit-tests-platform-contracts', 'windows-native-tests', 'secret-scan', 'public-claims']) assert.equal(jobs[id].if, 'always()', id);
+  for (const id of ['integration-tests', 'module-integration-tests']) assert.equal(jobs[id].if, mainOnly, id);
+  assert.equal(jobs['measured-axe'].needs, 'changes');
+  assert.equal(jobs['measured-axe'].if, "needs.changes.outputs.frontend != 'false'");
+  assert.equal(jobs['measured-axe'].name, 'Measured axe (advisory)');
+  assert.notEqual(jobs['integration-tests']['continue-on-error'], true);
+  assert.equal(jobs['ci-walltime'].if, `always() && (${mainOnly})`);
+  assert.ok(jobs['ci-walltime'].needs.includes('integration-tests'));
+  assert.ok(jobs['ci-walltime'].needs.includes('module-integration-tests'));
 });

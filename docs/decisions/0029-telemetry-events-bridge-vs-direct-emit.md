@@ -7,7 +7,7 @@ date: 2026-04-27
 probes:
   - adr-0029-bridge-idiom-present
   - adr-0029-direct-emit-idiom-present
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0029: TelemetryEvents Bridge vs Direct-Emit Façade for MetricCatalog Adoption
@@ -21,6 +21,8 @@ tempdoc 412 (InferenceLifecycleManager — designed), tempdoc 413
 (AgentSession). The criteria below were applied implicitly during each
 shipment; this ADR makes them explicit so the next adopter doesn't
 re-derive.
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Context
 
@@ -242,3 +244,16 @@ changes idiom — which is the only event that bears on whether the criteria sti
 ADR-0027 or retired.** A one-idiom codebase does not need a criteria ADR telling adopters which
 of two idioms to pick; at that point the surviving idiom is simply how `MetricCatalog` is adopted,
 and that sentence belongs in ADR-0027.
+
+## Amendment 2026-10-20: the inference bridge is shipped
+
+The Status and References entries calling tempdoc 412's inference bridge
+"designed" are historical. The interface is now
+`modules/app-inference/src/main/java/io/justsearch/app/inference/telemetry/InferenceTelemetryEvents.java`;
+`modules/app-services/src/main/java/io/justsearch/app/services/inference/InferenceTelemetryAdapter.java`
+implements it over `InferenceMetricCatalog`. `BootstrapInferenceFactory.buildEvents`
+constructs the adapter for `LocalTelemetry` and supplies a no-op otherwise.
+`OnlineModeOps`, `LlamaServerOps` and `TransitionRunner` consume the interface.
+The direct-emit example remains `IpcTelemetry` in
+`modules/app-services/src/main/java/io/justsearch/app/services/worker/IpcTelemetry.java`
+(the declaration is at line 26 in this revision). Both adoption idioms remain.

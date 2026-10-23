@@ -12,14 +12,14 @@ JustSearch implements a **Hybrid Inference Architecture** to provide advanced AI
 ## The Problem: VRAM Contention
 Modern local AI requires two distinct types of models:
 1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Engine's index half.
-2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server.exe`). Models that emit `reasoning_content` support chain-of-thought reasoning (see §Reasoning Pipeline below).
+2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server` (`.exe` on Windows)). Models that emit `reasoning_content` support chain-of-thought reasoning (see §Reasoning Pipeline below).
 
 Co-residency can exhaust VRAM on small GPUs. On a measured 12 GB card, `llama-server` used 7.5 GB and co-resident ONNX encoders used 3.3 GB p95 / 5.5 GB peak, reaching 11.9 GB of 12.28 GB and leaving about 0.4 GB headroom. OOM risk therefore depends on device and workload.
 
 ## GPU co-residence and VRAM risk
 
 Shipped builds allow ONNX Runtime encoders to remain GPU-resident while
-`llama-server.exe` is Online. The proposed single-tenant exclusion was never
+`llama-server` (`.exe` on Windows) is Online. The proposed single-tenant exclusion was never
 active in shipped split builds: `HeadlessApp` supplied a null index bootstrap,
 so `InferenceWiring` returned without registering the Head's GPU-status
 listener. The merged Engine also does not apply the exclusion. The in-process
@@ -77,22 +77,24 @@ When the user escalates to an Ask/agent turn in the unified "Search" window (tem
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
 2.  **Main:** Does not claim the GPU from ONNX encoders as part of the Online transition.
 3.  **Index half:** ONNX encoders may remain GPU-resident and continue query and background work while Chat is Online; VRAM capacity is shared.
-4.  **Main:** Starts `llama-server.exe` (or **adopts** an already-running instance on the configured port).
+4.  **Main:** Starts `llama-server` (`.exe` on Windows) (or **adopts** an already-running instance on the configured port).
 5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait — tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
 6.  **Main:** Completes the transition to ONLINE via `ModeStateMachine`. On failure at any step, rolls back to the previous mode.
 
 When the user closes Chat or minimizes the app:
-1.  **Main:** Kills `llama-server.exe`.
+1.  **Main:** Kills `llama-server` (`.exe` on Windows).
 2.  **Index half:** Continues its ordinary encoder lifecycle; Chat closing does not trigger a GPU-yield/resume transition.
 
 ## Components
 
 ### 1. `llama-server` (The Engine)
-We use the compiled binary from `llama.cpp` as a separate process (`llama-server.exe`) for maximum performance and isolation.
+We use the compiled binary from `llama.cpp` as a separate process (`llama-server` (`.exe` on Windows)) for maximum performance and isolation.
 
-**Current shipping posture: chat requires a supported NVIDIA GPU.** The bundled baseline `llama-server` binary is a CPU-capable build, but no install path ever offers a chat/GGUF model download without a CUDA-functional NVIDIA GPU — `DownloadProfile`/`InstallPlanner` skip every GGUF package on a CPU-only or non-NVIDIA machine with the reason "CPU chat is not supported in this build" (`Necessity.java`, `InstallPlanner.java`), and `AiInstallService.applyCudaServerExe()` is what points chat at the `cuda12` `llama-server.exe` in the first place. So without a supported NVIDIA GPU, JustSearch has no chat/RAG capability at all — the product is **search-only** (search and its embedding/reranking pipeline run on CPU by design and are unaffected). JustSearch stages and installs the NVIDIA CUDA 12.4 runtime as a versioned `cuda12` variant through the offline GPU Booster Pack path; the existing control plane supplies flags such as `-ngl` once that variant is installed and active.
+**Current shipping posture: chat requires a supported NVIDIA GPU.** The bundled baseline `llama-server` binary is a CPU-capable build, but no install path ever offers a chat/GGUF model download without a CUDA-functional NVIDIA GPU — `DownloadProfile`/`InstallPlanner` skip every GGUF package on a CPU-only or non-NVIDIA machine with the reason "CPU chat is not supported in this build" (`Necessity.java`, `InstallPlanner.java`), and `AiInstallService.applyCudaServerExe()` is what points chat at the `cuda12` `llama-server` (`.exe` on Windows) in the first place. So without a supported NVIDIA GPU, JustSearch has no chat/RAG capability at all — the product is **search-only** (search and its embedding/reranking pipeline run on CPU by default and can use ORT CUDA when available and permitted). JustSearch stages and installs the NVIDIA CUDA 12.4 runtime as a versioned `cuda12` variant through pinned, hash-verified Install AI downloads or allowlisted offline runtime packs; the existing control plane supplies flags such as `-ngl` once that variant is installed and active.
 *   **Protocol:** OpenAI-compatible API (`/v1/chat/completions`).
 *   **Diagnostics:** `GET /health` and `GET /props` (includes `n_ctx` + `model_alias`).
+*   **Downloaded runtime archives:** Install AI keeps the five Windows CUDA ZIPs in `<home>/native-bin/llama-server/variants/cuda12`. A ZIP alone is incomplete: each archive needs complete outputs and a matching SHA-256 extraction receipt in `.archive-receipts/`. Healthy legacy installs without receipts count as installed in status by ZIP entry sizes; the next install run hashes each such ZIP once, records its receipt when it matches the registry, and downloads and applies the registry archive when it does not. Missing or truncated outputs schedule extraction-only repair with zero planned download bytes; the install run hashes the kept ZIP first and re-downloads corrupt bytes. Status reads metadata without hashing ZIPs. Apply compares output sizes and CRC-32, leaves identical files untouched, and replaces changed files with a complete staged copy from `.archive-staging/`, moving the old file into `.archive-old/`. Both folders sit inside the destination, so a loaded DLL is moved aside on its own volume, and the extractor empties only these two folders, at the start and end of each apply; a file still held open waits for the next apply. An entry named like these folders or a receipt, or one at or below an archive the registry lists for the folder or that archive's download temporaries (`.partial`, `.partial.resume`), fails its archive without writing; directory entries are skipped. Pending state survives interrupted applies; receipts publish atomically after every output, and version markers publish after the payload. ORT's `ort-native-version.txt` waits in `.archive-receipts/` while any archive changes and becomes visible only when every archive the registry lists for the folder has a receipt for its registry SHA-256, so ORT never sees the pack as ready while one of its archives failed or was interrupted. An archive that would overwrite a file another listed archive's receipt records with a different CRC-32 fails, naming both, and records no receipt. Receipts of archives the registry no longer lists for the folder, such as a pack a registry update renamed, take no part and are deleted at the next apply; their outputs stay until the new archive replaces them. Registry folders that differ only in spelling, such as `cuda12` and `./cuda12`, are one folder. The destination is resolved once: links at or above it (a variant folder moved to another disk, a symlinked home, a junction or an 8.3 short name) are followed; links and junctions below it are refused. Files outside the archive inventories remain untouched, including names that look like temporaries. An entry name the filesystem cannot represent fails its archive, not the install run. Shell-bundled and offline runtime content can coexist with these outputs.
+
 *   **Binary discovery:** `InferenceConfig.findServerExecutable()` searches canonical paths and `variants/` subdirectories. When GPU is configured (`gpuLayers > 0`), prefers `variants/cuda12/` for CUDA-optimized binary. Falls back to baseline binary. **Dev-layout path** (active only when `justsearch.repo.root` system property is set): searches `{repoRoot}/modules/shell/src-tauri/resources/headless/` (Tauri resource bundle). Added in tempdoc 369 for eval backend LLM support. (The former `{repoRoot}/third_party/llama.cpp/build/` local source-build path was removed with the vendored llama.cpp tree — tempdoc 632; the runtime is the pinned upstream prebuilt download.)
 *   **Crash diagnostics:** `waitForServerHealth()` parses llama-server stderr for known failure patterns (e.g., `unknown model architecture`) and surfaces user-facing error messages instead of opaque "failed to load model" errors.
 *   **Arguments:**
@@ -168,7 +170,7 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
 
 *   **Responsibilities:**
     *   Spawning/Killing `llama-server`.
-    *   **Zombie Protection:** Uses `taskkill /F /PID` on Windows to ensure VRAM is released.
+    *   **Owned-process termination:** Uses `ProcessTerminator`, including FFM `TerminateProcess` on Windows and platform-specific termination on Linux.
     *   **Health Checks:** Waits for `/health` during startup; runs periodic health checks for hung detection.
     *   **External Instance Adoption:** If the configured port is already serving a healthy `llama-server`, it can adopt it instead of starting a duplicate process (prevents restart loops after a forced kill).
         * By default, adoption is verified via `GET /props` (not just `GET /health`) to avoid accidentally adopting an unrelated HTTP service.
@@ -191,7 +193,7 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
 *   **Class:** `io.justsearch.indexerworker.embed.EmbeddingService`
 *   **Backend:** ONNX Runtime; sessions built via the index-half composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` - see the composition subsection below and register entry D-007.
 *   **Default:** CPU-only (GPU offload is opt-in via `JUSTSEARCH_EMBED_GPU_ENABLED`).
-*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on the in-process `WorkerSignalBus.isMainGpuActive()` flag.
+*   **GPU Coordination:** `EmbeddingProviderLifecycle` retains a GPU-session handoff path that keeps CPU query embedding available. Current `InferenceWiring` supplies `false` for `mainGpuActive`, so Online chat does not trigger that handoff.
 *   **Model File Selection:** `ModelManifest.loadOrDefault()` reads `model_manifest.json` from the model directory to determine which `.onnx` file to use for CPU vs GPU. External directories without a manifest fall back to convention (`model.onnx` CPU, `model_fp16.onnx` GPU).
 *   **Long-document memory:** Parent batch embedding uses pooled-only ONNX results, retaining a running sum per document instead of unused chunk vectors. Token windows are copied only for the current inference batch (at most eight); window counting is arithmetic. Parent backfill admits at most 512,000 characters per batch, or one whole oversized document bounded by extraction policy. Original token arrays and explicitly requested chunk-vector outputs still scale with input; this is not a constant-memory tokenizer.
 
@@ -297,8 +299,8 @@ On the conversation path, `ConversationEngine` forwards each reasoning chunk to 
 
 | Preset | Temperature | Top-P | Used by |
 |--------|-------------|-------|---------|
-| `THINKING` | 0.6 | 0.95 | Reserved preset for explicit reasoning-heavy calls (not currently wired in production paths) |
-| `AGENT` | 0.2 | 0.9 | Agent chat (`AgentLoopService`) |
+| `THINKING` | 0.7 | 0.8 | Reserved preset for explicit reasoning-heavy calls (not currently wired in production paths) |
+| `AGENT` | 0.7 | 0.8 | Agent chat (`AgentLoopService`) |
 | `DETERMINISTIC` | 0.1 | 0.9 | Summarization, Q&A |
 | `VDU` | 0.0 | 0.9 | Vision document understanding (deterministic OCR output) |
 
@@ -355,7 +357,7 @@ These findings were validated through controlled experiments (12-16 scenario bat
 
 3. **Budget-aware prompts are counterproductive for 8B models.** Injecting remaining token budget ("Budget: X/8192 tokens used") into the system prompt caused a V4 regression (66.7% → 58.3%). The suffix "Be concise. Avoid redundant tool calls." made the agent too conservative — it stopped exploring after a single negative result instead of following up. 8B models follow concrete instructions ("use absolute paths") better than abstract meta-cognitive ones ("be concise").
 
-4. **AGENT sampling preset (temp=0.2) is within consensus range but not A/B validated.** Industry consensus is temp 0.0-0.5 for tool-calling agents. The current temp=0.2 has not been tested against temp=0.0 or temp=0.1 for this model.
+4. **AGENT sampling preset uses temp=0.7 and top_p=0.8.** `SamplingParams.AGENT` uses the Qwen3.5 sampling preset; grammar constraints also apply on tool-call turns.
 
 ### Rollback
 
@@ -505,7 +507,7 @@ Q&A uses the index half's retrieval path (`DocumentService.retrieveContextWithMe
 Important correctness/UX detail (current):
 
 - RAG retrieval can legitimately return an **empty** context (no chunks indexed + BM25 finds no matches).
-- In that case, `SummaryController.handleAskStream` falls back to `documents().fetchBatch(...)` (full docs) instead of hard-failing with `NO_CONTENT`.
+- In that case, `RAGContext.fetchBatchFallback` falls back to `documents().fetchBatch(...)` (full docs) instead of hard-failing with `NO_CONTENT`.
 
 ### Context size guardrails (strict char budgeting)
 Token-aware budgeting is preferred when available (`max_context_tokens > 0`). Character budgeting remains a fallback safety net.
@@ -515,13 +517,13 @@ Implementation:
 
 - **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the application half provides `max_context_tokens > 0`.
 - **Budgeter:** `ContextBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/ContextBudgeter.java`) counts **all** overhead (section headers + separators), not just raw document content.
-- **Index-half retrieval:** `WorkerSearchService` uses `ContextBudgeter` when building the context returned by `retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`).
+- **Index-half retrieval:** `WorkerSearchService` uses `ContextBudgeter` when building the context returned by `retrieveContext` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`).
 - **Fallback retrieval:** when RAG returns empty/insufficient context, the fallback full-doc path is also budgeted via `ContextBudgeter` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`).
 
 Regression coverage:
 
 - `modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterTest.java`
-- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRetrieveContextTest.java`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRetrieveContextTest.java`
 - `modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceContextBudgetTest.java`
 
 ### Stable Intermediate Format: `SECTION_SUMMARY_V1`
@@ -656,7 +658,7 @@ AI features instead.
 
 Verification lanes:
 
-- Hermetic eligibility fixtures (no llama-server): `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VduEligibilityPdfFixturesTest.java`
+- Hermetic eligibility fixtures (no llama-server): `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/VduEligibilityPdfFixturesTest.java`
 - Tier-2 OCR (requires llama-server): `modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java` (`processesScannedPdfWithRealLlm`, fixture `modules/system-tests/src/systemTest/resources/fixtures/pdf/scanned-alpha.pdf`)
 
 ### Enrichment operation lifetime

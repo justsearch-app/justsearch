@@ -2,16 +2,18 @@
 title: "ADR-0027: MetricCatalog as the Telemetry Contract"
 type: decision
 status: stable
-description: "Every metric the JustSearch processes emit flows through a typed `MetricCatalog`. Callsites build `MetricDefinition`s at module load, register them with `LocalTelemetry` at boot, and emit through compile-checked `Counter/Histogram/Gauge/ObservableCounter` instruments. The legacy `Telemetry.counter/timer/histogram/gauge/meter` surface is retired."
+description: "MetricCatalog is the typed telemetry contract; the legacy Telemetry emission surface is retired. Two KnowledgeSearchEngine skip counters still bypass the catalog through GlobalOpenTelemetry, as recorded in the 2026-10-20 amendment."
 date: 2026-04-25
 probes: none - the retired Telemetry.counter/timer/gauge surface survives only in javadoc that documents its retirement, so a grep-absent probe false-fails on three comment sites (tempdoc 884 §B.3).
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0027: MetricCatalog as the Telemetry Contract
 
 ## Status
 Accepted
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## The contract (canonical API surface)
 
@@ -94,3 +96,16 @@ This is the same design philosophy tempdoc 406 shipped for runtime lifecycle (se
 - Implementation tempdoc: tempdoc 417 (tier4/tier5 followups from 406).
 - Tempdoc 419 C3 V1 (2026-04-26) — first non-trivial consumer extending the substrate: 2 new `StatusEndpoint` enum values (`GPU_STATUS_VIEW`, `TELEMETRY_HEALTH_VIEW`), 3 new `surfacedAt(...)` declarations across `WorkerOpsMetricCatalog` (worker side) and `HeadGpuMetricCatalog` (head side), and a parallel `HeadMetricSurfaceContractTest` in `app-services` mirroring the worker-side drift detection. See tempdoc 419 (C3 entry).
 - Tempdoc 419 C3 V2 (2026-04-28) — three named-question HealthEvents consuming the V1 substrate: `telemetry-degraded` (extracted `TelemetryHealthClassifier` shared with `/api/telemetry/health`), `recentDocsPerSec` rate trend (new `worker.documents.indexed.rate_per_sec` gauge with `surfacedAt(CORE_INDEX_VIEW, "recentDocsPerSec")`), and `gpu-saturated` (new head-side `GpuSaturationMonitor` mirroring `OperationalMetrics.ThroughputMonitor` discipline + daemon-thread `GpuSaturationSampler`). Two new `ReadinessDimension` enum constants (`TELEMETRY`, `GPU`) and one new `LifecycleReasonCode` (`GPU_SATURATED`).
+
+## Amendment 2026-10-20: catalog authority has two direct-counter exceptions
+
+The catalog remains the intended emission contract. The original statements
+that every metric uses it and that bypass is structurally impossible overstate
+current enforcement: `KnowledgeSearchEngine.rerankerSkippedCounter` and
+`lambdamartSkippedCounter` build `search.reranker_skipped.total` and
+`search.lambdamart_skipped.total` directly through `GlobalOpenTelemetry`.
+They do not use a typed `MetricCatalog` instrument. This amendment records the
+exception, not permission to add another. Their presence alone does not prove
+that those instruments export at runtime.
+Evidence: `modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java`.
+Moving them into a catalog is a separate implementation task.

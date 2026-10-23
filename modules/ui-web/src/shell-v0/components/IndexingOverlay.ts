@@ -26,6 +26,7 @@ import {
 } from '../state/aiStateStore.js';
 import { orElse } from '../state/known.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
+import './IndexingControls.js';
 
 const NUM = new Intl.NumberFormat();
 
@@ -33,12 +34,20 @@ export class IndexingOverlay extends JfElement {
   static properties = {
     embeddingQueueSize: { type: Number, attribute: 'embedding-queue-size' },
     vduQueueSize: { type: Number, attribute: 'vdu-queue-size' },
+    activity: { attribute: false },
+    progress: { attribute: false },
+    apiBase: { type: String, attribute: 'api-base' },
+    textIndexing: { type: Boolean },
     switching: { type: Boolean },
     dismissible: { type: Boolean },
   };
 
   declare embeddingQueueSize: number;
   declare vduQueueSize: number;
+  declare activity: ReturnType<typeof selectIndexingProgress>['activity'];
+  declare progress: ReturnType<typeof selectIndexingProgress>;
+  declare apiBase: string;
+  declare textIndexing: boolean;
   declare switching: boolean;
   declare dismissible: boolean;
 
@@ -66,6 +75,10 @@ export class IndexingOverlay extends JfElement {
 
   constructor() {
     super();
+    this.activity = selectIndexingProgress(null, false, 0, []).activity;
+    this.progress = selectIndexingProgress(null, false, 0, []);
+    this.apiBase = '';
+    this.textIndexing = false;
     this.embeddingQueueSize = 0;
     this.vduQueueSize = 0;
     this.switching = false;
@@ -115,6 +128,8 @@ export class IndexingOverlay extends JfElement {
       background: var(--accent-chat-16);
       border-radius: 0.5rem;
       color: var(--text-chat);
+    }
+    .icon-box.active {
       animation: spin 3s linear infinite;
     }
     h3 {
@@ -222,14 +237,16 @@ export class IndexingOverlay extends JfElement {
   override render(): TemplateResult {
     const total = this.embeddingQueueSize + this.vduQueueSize;
     const hasWork = total > 0;
+    const active = this.activity.confirmed &&
+      (this.textIndexing || (hasWork && !this.activity.enrichmentDeferred));
     return html`
       <div class="backdrop">
         <div class="card" role="dialog" aria-modal="true">
           <div class="head">
             <div class="head-left">
-              <div class="icon-box">${icon({ name: 'cpu', size: 22 })}</div>
+              <div class=${active ? 'icon-box active' : 'icon-box'}>${icon({ name: 'cpu', size: 22 })}</div>
               <div>
-                <h3>Batch Processing Active</h3>
+                <h3>${this.activity.summary}</h3>
                 <p class="sub">Chat &amp; Q&amp;A paused — search still works</p>
               </div>
             </div>
@@ -240,13 +257,12 @@ export class IndexingOverlay extends JfElement {
               : nothing}
           </div>
           <p class="explain">
-            The system is generating embeddings for your indexed files. Chat, Q&amp;A, and
-            summarization are paused to prevent GPU memory conflicts — search still works.
+            ${this.activity.detail ?? (this.activity.confirmed ? 'Search still works while enrichment improves your results.' : 'Waiting for a fresh status observation.')}
           </p>
           ${hasWork
             ? html`
                 <div class="queue">
-                  <div class="queue-label">Processing queue</div>
+                  <div class="queue-label">${this.activity.confirmed ? 'Remaining work' : 'Last observed queue'}</div>
                   ${this.vduQueueSize > 0
                     ? html`
                         <div class="queue-row vdu">
@@ -275,6 +291,7 @@ export class IndexingOverlay extends JfElement {
               ? html`${icon({ name: 'loader-2', size: 14, spin: true })} Going online…`
               : html`${icon({ name: 'check-circle-2', size: 14 })} Go online (interrupt)`}
           </button>
+          <jf-indexing-controls allow-pause .progress=${this.progress} api-base=${this.apiBase}></jf-indexing-controls>
         </div>
       </div>
     `;
@@ -374,7 +391,7 @@ export class IndexingOverlayHost extends JfElement {
     // silently withdraw a live overlay).
     const progress = selectIndexingProgress(
       ai.status,
-      ai.snapshotLive,
+      ai.indexingStatusLive,
       ai.episodeMaxPendingJobs,
       ai.enrichSettleSamples,
     );
@@ -384,11 +401,11 @@ export class IndexingOverlayHost extends JfElement {
     // Round-15 F1 — same rule for the unreachable case: with the embedding stage absent, its pending
     // count is a standing backlog no batch will ever process, so an overlay claiming live embedding
     // work off it is the 727 F-2 class again (the Brain surface's install CTA is the real remedy).
-    if (progress.phase === 'blocked') return nothing;
+    if (progress.phase === 'blocked' || progress.phase === 'waiting' || progress.phase === 'error') return nothing;
     const speaks = progress.phase !== 'unknown';
     const embeddingQueue = speaks ? progress.embeddingPending : orElse(ai.index.embeddingQueueSize, 0);
     const vduQueue = speaks ? progress.vduPending : orElse(ai.index.vduQueueSize, 0);
-    if (embeddingQueue + vduQueue === 0) return nothing;
+    if (embeddingQueue + vduQueue === 0 && !progress.pause) return nothing;
     if (this.userDismissed) return nothing;
     return html`
       <jf-indexing-overlay
@@ -397,6 +414,10 @@ export class IndexingOverlayHost extends JfElement {
         ?switching=${this.switching}
         @go-online=${() => void this.handleGoOnline()}
         @dismiss=${() => (this.userDismissed = true)}
+        .activity=${progress.activity}
+        .progress=${progress}
+        api-base=${this.apiBase}
+        .textIndexing=${progress.phase === 'indexing'}
       ></jf-indexing-overlay>
     `;
   }

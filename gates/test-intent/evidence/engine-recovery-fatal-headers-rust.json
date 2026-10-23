@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T12:05:38.636Z",
+  "revision": "ad2b22ae5feb8e7835b0e098b552cbf6f41a7bc7",
+  "tree": "18badb1f4099020e2bab339cf48bfdb29f4fef1d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2152
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1654
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1676
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:ae8fa541c2f13bc0388dd7be0379e7ce7214b49a53debbbd7832aad71eae2dd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:ae8fa541c2f13bc0388dd7be0379e7ce7214b49a53debbbd7832aad71eae2dd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:ae8fa541c2f13bc0388dd7be0379e7ce7214b49a53debbbd7832aad71eae2dd0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ad2b22ae5feb8e7835b0e098b552cbf6f41a7bc7",
+    "revision": "ad2b22ae5feb8e7835b0e098b552cbf6f41a7bc7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 9089,
+        "output": "\nrunning 1 test\ntest recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers ... FAILED\n\nfailures:\n\n---- recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers stdout ----\n\nthread 'recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers' (2225559) panicked at src/recovery.rs:289:13:\nassertion `left == right` failed: native-oom.txt\n  left: Null\n right: \"hs_err_pid-real.log\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/test-intent-before-1VCXgj/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:216:4\n    |\n216 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1022:15\n     |\n1022 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:523:19\n    |\n135 | impl EngineHost {\n    | --------------- method in this implementation\n...\n523 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1640:10\n     |\n1640 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2014:4\n     |\n2014 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.03s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/modules/shell/src-tauri/target/debug/deps/shell_lib-4b545b7ad422528c)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1593,
+        "output": "\nrunning 1 test\ntest recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal ... FAILED\n\nfailures:\n\n---- recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal stdout ----\n\nthread 'recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal' (2226230) panicked at src/recovery.rs:331:9:\nassertion `left == right` failed\n  left: String(\"hs_err_pid-older.log\")\n right: \"hs_err_pid-newest.log\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/test-intent-before-1VCXgj/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:216:4\n    |\n216 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1022:15\n     |\n1022 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:523:19\n    |\n135 | impl EngineHost {\n    | --------------- method in this implementation\n...\n523 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1640:10\n     |\n1640 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2014:4\n     |\n2014 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.54s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/modules/shell/src-tauri/target/debug/deps/shell_lib-4b545b7ad422528c)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1650,
+        "output": "\nrunning 1 test\ntest recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound ... FAILED\n\nfailures:\n\n---- recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound stdout ----\n\nthread 'recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound' (2227008) panicked at src/recovery.rs:349:9:\nassertion `left == right` failed\n  left: Null\n right: \"Out of Memory Error [path]\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/fatal-summary-readers/test-intent-before-1VCXgj/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:216:4\n    |\n216 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1022:15\n     |\n1022 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:523:19\n    |\n135 | impl EngineHost {\n    | --------------- method in this implementation\n...\n523 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1640:10\n     |\n1640 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2014:4\n     |\n2014 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.60s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/modules/shell/src-tauri/target/debug/deps/shell_lib-4b545b7ad422528c)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers",
+        "classification": "assertion",
+        "detail": "recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers:  ---- recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers stdout ----\n\nthread 'recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers' (2225559) panicked at src/recovery.rs:289:13:\nassertion `left == right` failed: native-oom.txt\n  left: Null\n right: \"hs_err_pid-real.log\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    recovery::tests::fatal_summar"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal",
+        "classification": "assertion",
+        "detail": "recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal:  ---- recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal stdout ----\n\nthread 'recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal' (2226230) panicked at src/recovery.rs:331:9:\nassertion `left == right` failed\n  left: String(\"hs_err_pid-older.log\")\n right: \"hs_err_pid-newest.log\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    rec"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound",
+        "classification": "assertion",
+        "detail": "recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound:  ---- recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound stdout ----\n\nthread 'recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound' (2227008) panicked at src/recovery.rs:349:9:\nassertion `left == right` failed\n  left: Null\n right: \"Out of Memory Error [path]\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    rec"
+      }
+    ]
+  },
+  "digest": "sha256:bbc28a73afbea2ebc7ecb73dc8883f5adc021f1d8b751abc1f2e8ee5200f0671"
+}

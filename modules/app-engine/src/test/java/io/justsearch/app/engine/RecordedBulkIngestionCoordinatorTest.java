@@ -497,6 +497,100 @@ final class RecordedBulkIngestionCoordinatorTest {
     }
   }
 
+  @ParameterizedTest(name = "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance({0})")
+  @ValueSource(strings = {"WATCHER", "EXPLICIT", "LEGACY"})
+  void bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(String format)
+      throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("delete-journal-" + format))) {
+      harness.replacePhysical(buildingRuntime(harness.key));
+      harness.coordinator.maintain();
+      var claim = harness.queue.pollPending(1).getFirst();
+      Files.delete(harness.member);
+      assertTrue(harness.queue.markClaimDone(claim, IngestionOutcome.of(
+          IngestionOutcomeClass.STALE_SOURCE, "DELETED_OR_MISSING", IngestionRetryPolicy.NONE), null));
+
+      var witness = candidateDeleteWitness(harness, format, false);
+      assertTrue(witness.gaps().isEmpty());
+      assertEquals(RecordedIngestionLifecycle.GapDecision.NONE,
+          harness.coordinator.recordedGapDecision(harness.key, witness),
+          "the decoded DELETE path must cover its captured DELETED_OR_MISSING unit without acceptance");
+      assertEquals(Set.of(io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(
+          harness.member.toString())), witness.coveredUnitIds());
+      assertTrue(harness.coordinator.beforeRecordedPromotion(harness.key, harness.queue));
+
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.coordinator.maintain();
+      var completed = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.COMPLETE, completed.state());
+      assertEquals("SUCCESS", completed.receipt().code(),
+          "a confirmed watcher deletion is not a gap requiring the person's acceptance");
+    }
+  }
+
+  @ParameterizedTest(name = "versionedDeleteStillIndexedCannotCertifyCandidateCoverage({0})")
+  @ValueSource(strings = {"WATCHER", "EXPLICIT"})
+  void versionedDeleteStillIndexedCannotCertifyCandidateCoverage(String format) throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("unapplied-delete-" + format))) {
+      var witness = candidateDeleteWitness(harness, format, true);
+      assertTrue(witness.coveredUnitIds().isEmpty(), "an unapplied DELETE is not coverage");
+      assertEquals(1, witness.gaps().size());
+      assertEquals("DELETE_NOT_APPLIED", witness.gaps().getFirst().reason());
+      assertEquals(io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(
+          harness.member.toString()), witness.gaps().getFirst().unitId());
+    }
+  }
+
+  /** Real SQLite and Lucene exercise KnowledgeServer's actual private snapshot through its caller. */
+  private RecordedIngestionLifecycle.JournalWitness candidateDeleteWitness(
+      BulkHarness harness, String format, boolean stillIndexed) throws Exception {
+    var base = harness.directory.resolve("candidate-index");
+    var manager = new IndexGenerationManager(base);
+    manager.initializeOrLoad();
+    String generation = manager.startMigration("delete-reader", List.of()).building_generation();
+    Path green = manager.resolveGenerationPathStrict(generation);
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        var runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
+                io.justsearch.configuration.FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+            .atPath(green).withExecutorRegistrations(luceneExecutors).open();
+        var journal = new SqliteJobQueue(base.resolve("jobs.db"));
+        var server = new io.justsearch.indexerworker.server.KnowledgeServer(executors,
+            new io.justsearch.indexerworker.WorkerConfig(harness.directory, 60_000L, "0.0.0-test",
+                new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource().build(),
+                "delete-reader-test", 500L), null)) {
+      journal.open();
+      String path = harness.member.toString();
+      if (stillIndexed) {
+        runtime.indexingCoordinator().indexSingle(new io.justsearch.indexing.api.IndexDocument(
+            Map.of(io.justsearch.indexing.SchemaFields.DOC_ID, path,
+                io.justsearch.indexing.SchemaFields.DOC_UID, "delete-reader-uid",
+                io.justsearch.indexing.SchemaFields.CONTENT, "not deleted yet")));
+        runtime.commitOps().commitAndTrack();
+      }
+      var captureIdentity = Class.forName("io.justsearch.indexerworker.services.RootIdentity")
+          .getDeclaredMethod("capture", Path.class);
+      captureIdentity.setAccessible(true);
+      String payload = "LEGACY".equals(format) ? path : "WATCHER".equals(format)
+          ? new io.justsearch.indexerworker.queue.SwitchBufferDelete(path,
+              io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER,
+              harness.watchedRoot.toString(),
+              captureIdentity.invoke(null, harness.watchedRoot).toString(),
+              "notes").encode()
+          : new io.justsearch.indexerworker.queue.SwitchBufferDelete(path,
+              io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode();
+      assertTrue(journal.putSwitchBufferForGeneration(generation, "path:" + path, "DELETE", payload));
+      for (var binding : Map.of("indexGenerationManager", (Object) manager, "buildingIndexPath", green,
+          "jobQueue", journal, "ingestLifecycle", runtime).entrySet()) {
+        var field = server.getClass().getDeclaredField(binding.getKey());
+        field.setAccessible(true);
+        field.set(server, binding.getValue());
+      }
+      var method = server.getClass().getDeclaredMethod("candidateJournalWitness");
+      method.setAccessible(true);
+      return (RecordedIngestionLifecycle.JournalWitness) method.invoke(server);
+    }
+  }
+
   @Test
   void candidateOnlyGapControlsPromotedReceiptAndFencedApprovalRejectsStaleHash()
       throws Exception {
@@ -895,6 +989,28 @@ final class RecordedBulkIngestionCoordinatorTest {
         return null;
       }));
       assertEquals(0, harness.promotions.get());
+    }
+  }
+
+  @Test
+  void pendingGenerationAuthorityIsAvailableWithoutOpeningTheJobJournal() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("pending-before-journal"))) {
+      assertTrue(harness.coordinator.generationPendingAtBoot());
+    }
+  }
+
+  @Test
+  void onlyExactBuildingReceiptsCanProveThePreviousSourcePointer() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("previous-pointer-receipts"))) {
+      var building = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+          harness.coordinator.bootOwnership(harness.queue));
+      assertTrue(building.previousSourcePointerProven());
+      harness.completeOneCapturedClaim();
+      assertEquals(BulkReindexProgress.Phase.SETTLED, harness.progress().phase());
+      var settled = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+          harness.coordinator.bootOwnership(harness.queue));
+      assertFalse(settled.previousSourcePointerProven(),
+          "settlement precedes promotion, so these receipts cannot prove its pointer");
     }
   }
 

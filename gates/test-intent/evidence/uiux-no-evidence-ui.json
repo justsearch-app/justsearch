@@ -1,0 +1,247 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T02:13:50.218Z",
+  "revision": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+  "tree": "b8d8c30a7b7d121b17963124362b015e94b1b027",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts\" \"src/shell-v0/views/AskTerminalReload.test.ts\" \"src/shell-v0/views/AskUnfinishedReload.test.ts\" \"src/shell-v0/views/AskSubmillisecondOrder.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/tmp/no-evidence/test-intent-vitest-4073292-1792721624908.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2161
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fd9eef78469ad8cb0fb596934c7a2ce827df978ef542e51718f127acf3fa2957",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) reloads only unscoped NO_CONTENT as no-evidence, including legacy records",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) uses the persisted scope fact even when the message changes",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) preserves scoped and other errors, and the fallback facts beside no-evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) frames free chat from the old window as a model answer and preserves ids",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) an unanswered saved model question is unfinished, never completed empty (F2)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b live action (NE1, NE2, NE5, NE9, NE11) offers one accessible action and dispatches free chat once without client history or documents",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b live action (NE1, NE2, NE5, NE9, NE11) keeps no-evidence and allows retry after model LLM_ERROR",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b live action (NE1, NE2, NE5, NE9, NE11) keeps no-evidence and allows retry after model CANCELLED",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) keeps the stored error id so a later model turn can Retry/Edit after no-evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) labels a streaming model answer and says it does not search",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a reloaded model answer retry sends free chat without client history",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a reloaded model answer edit sends free chat without client history",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a reloaded no-evidence retry remains an Ask",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a reloaded no-evidence edit remains an Ask",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) offers the action only on the latest turn after a cold load",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) explains the model gate and rechecks it on activation, without dispatching an Ask",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a model answer settling after a conversation switch lands in the original conversation",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a lock refusal after activation keeps the original outcome and can retry after unlock (NE11)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) waits for a context write before allowing a model answer to consume saved history (NE6)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) keeps the existing follow-up rewrite note beside no-evidence (HN9)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) the action answers its own question and preserves an unsent composer draft (NE2)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9d57c62c8d9b99867acca6b6fcb3699607bc124787896816f44668cb5cf5b97b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloaded Search Ask shows no-evidence and keeps its retrieval explanation",
+          "status": "passed"
+        },
+        {
+          "name": "reloaded Unified Chat keeps the terminal error and its retrieval explanation",
+          "status": "passed"
+        },
+        {
+          "name": "document fallback still explains why chunk retrieval was unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer",
+          "status": "passed"
+        },
+        {
+          "name": "the old window reads a no-matching-files outcome and its model answer together (NE10, HN8)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskUnfinishedReload.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/AskUnfinishedReload.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5661e480efcea9609d31bf4ec39120b9cc4b5a34759ddc2a3d554c9681e270ad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an unanswered saved core.rag-ask question stays unfinished after Engine loss (F2)",
+          "status": "passed"
+        },
+        {
+          "name": "an unanswered saved core.free-chat question stays unfinished after Engine loss (F2)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskSubmillisecondOrder.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/AskSubmillisecondOrder.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:829b6319a0958d4a6df5f53b92b4befcf231b56a941231dd81a6790787beb070",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps the authoritative question/error order below one millisecond: 2026-10-23T02:04:45.355494108Z (NE1)",
+          "status": "passed"
+        },
+        {
+          "name": "keeps the authoritative question/error order below one millisecond: 2026-10-23T02:04:45.000000100Z (NE1)",
+          "status": "passed"
+        },
+        {
+          "name": "keeps the authoritative question/error order below one millisecond: 2026-10-23T03:04:45.000000100+01:00 (NE1)",
+          "status": "passed"
+        },
+        {
+          "name": "a fast saved no-evidence outcome remains one complete record turn, not an orphan and an unfinished question (NE1, F2)",
+          "status": "passed"
+        },
+        {
+          "name": "the old window keeps precise record order when merging its transcript (NE10)",
+          "status": "passed"
+        },
+        {
+          "name": "preserves the existing stable id tiebreak for genuinely equal instants (HN8)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b62fc5921",
+    "revision": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts\" \"src/shell-v0/views/AskTerminalReload.test.ts\" \"src/shell-v0/views/AskUnfinishedReload.test.ts\" \"src/shell-v0/views/AskSubmillisecondOrder.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/tmp/no-evidence/test-intent-vitest-4073292-1792721628128.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1950,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/tmp/no-evidence/test-intent-vitest-4073292-1792721628128.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts",
+        "classification": "assertion",
+        "detail": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) reloads only unscoped NO_CONTENT as no-evidence, including legacy records:  AssertionError: expected 'failed' to be 'no-evidence' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/no-evidence-evidence/test-intent-before-TT8cAU/modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts:87:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-no- | WP4.2b record classification (NE1, NE3, NE4, NE8, F2) uses the pers"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+        "classification": "assertion",
+        "detail": "reloaded Search Ask shows no-evidence and keeps its retrieval explanation:  AssertionError: expected 'failed' to be 'no-evidence' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/no-evidence-evidence/test-intent-before-TT8cAU/modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts:23:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-no-eviden"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskUnfinishedReload.test.ts",
+        "classification": "assertion",
+        "detail": "an unanswered saved core.rag-ask question stays unfinished after Engine loss (F2):  AssertionError: expected 'complete' to be 'failed' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/no-evidence-evidence/test-intent-before-TT8cAU/modules/ui-web/src/shell-v0/views/AskUnfinishedReload.test.ts:10:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidenc | an unanswered saved core.free-chat question stays unfinished after Engine loss (F2):  AssertionError: expected 'c"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskSubmillisecondOrder.test.ts",
+        "classification": "assertion",
+        "detail": "keeps the authoritative question/error order below one millisecond: 2026-10-23T02:04:45.355494108Z (NE1):  AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]\n    at /home/elias/dev/justsearch/tmp/no-evidence-evidence/test-intent-before-TT8cAU/modules/ui-web/src/shell-v0/views/AskSubmillisecondOrder.test.ts:25:60\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-no-evidence/modules/u | keeps the authoritative question/error order below one millisecond: 2026-10-23T02:04:45.00"
+      }
+    ]
+  },
+  "digest": "sha256:c630ec69d482a5a839516d22aff326f63453eef76324b25ffbce0149f206b6d2"
+}

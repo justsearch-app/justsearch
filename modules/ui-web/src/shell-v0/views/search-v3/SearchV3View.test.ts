@@ -579,9 +579,13 @@ describe('the window never scrolls; one inner region does', () => {
     expect(scroller).toBeTruthy();
     expect(scroller?.classList.contains('sv3-scroller')).toBe(true);
 
-    // ...and it is the only one: no other region declares a scrolling overflow.
+    // XT9 adds a bounded native schema editor. It can scroll its own text; no second
+    // region may scroll the conversation. Keep the original rule for all remaining CSS.
+    const schemaRule = own(Sv3Composer).match(/:host \.schema-field \[id='sv3-schema'\]\s*\{[^}]*\}/)?.[0];
+    expect(schemaRule).toContain('max-block-size: 8rem');
+    expect(schemaRule).toContain('overflow: auto');
     for (const ctor of [SearchV3View, Sv3Sidebar, Sv3Topbar, Sv3Composer]) {
-      const styles = own(ctor);
+      const styles = own(ctor).replace(schemaRule ?? '', '');
       expect(styles).not.toContain('overflow-y: auto');
       expect(styles).not.toContain('overflow: auto');
       expect(styles).not.toContain('overflow: scroll');

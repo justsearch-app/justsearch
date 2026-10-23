@@ -1,0 +1,58 @@
+[
+  {
+    "file": "ResourceCatalogClient-C35gyaIS.js",
+    "sha256": "f713eda09ec937374f03c0e96ea39152837cbe9877a96a267918a83f9f87c1b5",
+    "bytes": 4941,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "authorizedFetch-3Q0-lP-M.js",
+    "sha256": "4092c81629eb048f849c98bc5efdd4352d72d13275ece357d1d5631e39a62f29",
+    "bytes": 21975,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "TaskList-Do7j9Dnr.js",
+    "sha256": "c7196aa0354a6dcc778a062e4a5e6fba25041124f21f10bdcce2cc015795dec2",
+    "bytes": 65321,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "schemas-D6Wt8vvN.js",
+    "sha256": "43c5f946050a7d9230bef9e99388badcfb9295a7fefd74d8d05b7f9ae9666a5f",
+    "bytes": 94384,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "harness.js",
+    "sha256": "3bd831b548cadfac01e5612e763bfa5803625c3821c34789fc70fd7cc25a4e0c",
+    "bytes": 2264,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "aiStateStore-vMW4v7js.js",
+    "sha256": "364130531d05fcb70f2769b5e5bf802e480ada58714902a53aec5d8c512b775f",
+    "bytes": 62787,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "core-B06xuZrJ.js",
+    "sha256": "08c6b41017d4b0a9758987693920cd1c78517b9f56b3b46b4ade8ee09bf3d2c9",
+    "bytes": 166,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  },
+  {
+    "file": "indexingJobsBridge-CX6JyXB6.js",
+    "sha256": "9c7f38494f14265ef48ab1fcdc1c48bdb3be038b45cc01c1be8fd82f1c4bb974",
+    "bytes": 24618,
+    "devWarningPresent": false,
+    "nodeEnvLiteral": false
+  }
+]

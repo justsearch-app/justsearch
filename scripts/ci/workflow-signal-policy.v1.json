@@ -10,8 +10,13 @@
       "name": "CI",
       "path": ".github/workflows/ci.yml",
       "class": "public-hosted-fact-lanes",
-      "expectedTriggers": ["workflow_dispatch", "pull_request", "push", "merge_group"],
+      "expectedTriggers": [
+        "workflow_dispatch",
+        "pull_request",
+        "push"
+      ],
       "owner": "ADR-0044 / public hosted CI fact lanes",
+      "note": "PR lanes are selected by changed inputs; required names always report. Measured axe stays advisory and runs on PRs with frontend inputs, pushes to main and dispatch. Main and dispatch run the full suite, including Integration tests (system-tests tier), Integration tests (module tier), and CI wall-clock attribution. Both integration tiers are main/dispatch-only and are not required checks. Main never cancels the running run.",
       "failureDefault": "product-regression",
       "staleDays": 14,
       "blocking": true,
@@ -34,19 +39,39 @@
       "name": "CLA Assistant",
       "path": ".github/workflows/cla.yml",
       "class": "contributor-provenance",
-      "expectedTriggers": ["issue_comment", "pull_request_target", "merge_group"],
+      "expectedTriggers": [
+        "issue_comment",
+        "pull_request_target"
+      ],
       "owner": "CLA.md / CONTRIBUTING.md",
       "failureDefault": "contributor-policy",
       "staleDays": 14,
       "blocking": true,
       "advisory": false,
-      "requiredStatusChecks": ["cla-assistant"]
+      "requiredStatusChecks": [
+        "cla-assistant"
+      ]
+    },
+    {
+      "name": "Auto-merge head guard",
+      "path": ".github/workflows/auto-merge-guard.yml",
+      "class": "contributor-provenance",
+      "expectedTriggers": [
+        "pull_request_target"
+      ],
+      "owner": "ADR-0053 / validated squash auto-merge",
+      "failureDefault": "contributor-policy",
+      "staleDays": 14,
+      "blocking": false,
+      "advisory": false
     },
     {
       "name": "Build Installer",
       "path": ".github/workflows/build-installer.yml",
       "class": "release-gate",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
       "owner": "tempdoc 374 / Production-Reality Verification",
       "failureDefault": "release-blocking-failure",
       "staleDays": 14,
@@ -57,7 +82,9 @@
       "name": "Update Preserves Models",
       "path": ".github/workflows/update-preserves-models.yml",
       "class": "release-gate",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
       "owner": "tempdoc 617 D2 section 9 items 3-5 / tempdoc 930 section 18.1 row 11",
       "failureDefault": "release-blocking-failure",
       "staleDays": 365,
@@ -68,7 +95,9 @@
       "name": "Sign Vendored Mirrors",
       "path": ".github/workflows/sign-vendored-mirrors.yml",
       "class": "release-gate",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
       "owner": "tempdoc 760/772 SS-K sign-once-per-upstream-bump",
       "failureDefault": "release-blocking-failure",
       "staleDays": 365,
@@ -79,7 +108,9 @@
       "name": "Docs lint",
       "path": ".github/workflows/docs-lint.yml",
       "class": "docs-manual-gate",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
       "owner": "documentation maintenance",
       "failureDefault": "product-regression",
       "staleDays": 7,
@@ -90,7 +121,10 @@
       "name": "CodeQL",
       "path": ".github/workflows/codeql.yml",
       "class": "security-scan",
-      "expectedTriggers": ["schedule", "workflow_dispatch"],
+      "expectedTriggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
       "owner": "security automation",
       "failureDefault": "security-signal",
       "staleDays": 30,
@@ -101,7 +135,9 @@
       "name": "CI wall-clock trend",
       "path": ".github/workflows/ci-walltime-trend.yml",
       "class": "scheduled-quality-signal",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
       "owner": "tempdoc 668 / public CI wall-clock attribution",
       "failureDefault": "workflow-assumption-drift",
       "staleDays": 30,
@@ -112,7 +148,9 @@
       "name": "Onramp Smoke",
       "path": ".github/workflows/onramp-smoke.yml",
       "class": "scheduled-quality-signal",
-      "expectedTriggers": ["workflow_dispatch"],
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
       "owner": "tempdoc 656 / onramp Tier-0 first-success proof-lane",
       "failureDefault": "product-regression",
       "staleDays": 7,
@@ -123,7 +161,9 @@
       "name": "Dependabot Updates",
       "path": "github-managed",
       "class": "dependency-automation",
-      "expectedTriggers": ["dependabot"],
+      "expectedTriggers": [
+        "dependabot"
+      ],
       "owner": "dependency maintenance",
       "failureDefault": "workflow-assumption-drift",
       "staleDays": 30,
@@ -134,7 +174,9 @@
       "name": "Dependency Graph",
       "path": "github-managed",
       "class": "dependency-automation",
-      "expectedTriggers": ["dynamic"],
+      "expectedTriggers": [
+        "dynamic"
+      ],
       "owner": "dependency maintenance",
       "failureDefault": "workflow-assumption-drift",
       "staleDays": 30,

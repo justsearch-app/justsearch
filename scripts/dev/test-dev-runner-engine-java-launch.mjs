@@ -7,6 +7,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { engineJavaLaunch, splitJvmOptions } = require('./lib/engine-java-launch.cjs');
+const trimArgs = process.platform === 'linux' && process.report.getReport().header.glibcVersionRuntime
+  ? ['-XX:TrimNativeHeapInterval=30000'] : [];
 assert.deepEqual(splitJvmOptions('-Da="a b" -Db=C:\\data\\index -Dc=\'c d\''),
   ['-Da=a b', '-Db=C:\\data\\index', '-Dc=c d']);
 assert.deepEqual(splitJvmOptions('-Dliteral=$(echo nope);`x`'), ['-Dliteral=$(echo', 'nope);`x`']);
@@ -50,7 +52,7 @@ try {
       hotReload: { enabled: true, classesDir } };
     const composed = engineJavaLaunch(options);
     const argv = platform === 'linux' ? composed.args.slice(3) : composed.args;
-    assert.deepEqual(argv, ['--enable-native-access=ALL-UNNAMED', '-Dpath=data space/file', '-Xmx2g',
+    assert.deepEqual(argv, ['--enable-native-access=ALL-UNNAMED', ...(platform === 'linux' ? trimArgs : []), '-Dpath=data space/file', '-Xmx2g',
       '-Dlast=true', '-classpath', `${classesDir}${platform === 'win32' ? ';' : ':'}${path.join(directory, 'lib', '*')}`,
       'io.justsearch.ui.HeadlessApp']);
     const refused = engineJavaLaunch({ ...options, hotReload: { enabled: false, classesDir: null,
@@ -65,7 +67,7 @@ try {
     assert.ok(linux.args[1].startsWith(setup), 'installed setup and ulimits are retained verbatim');
     const result = spawnSync(linux.command, linux.args, { env: { ...process.env, JAVA_HOME: javaHome }, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.stdout.trim().split('\n'), ['512', '--enable-native-access=ALL-UNNAMED',
+    assert.deepEqual(result.stdout.trim().split('\n'), ['512', '--enable-native-access=ALL-UNNAMED', ...trimArgs,
       '-Dliteral=$(touch forbidden);&', '-classpath', path.join(directory, 'lib', '*'), 'io.justsearch.ui.HeadlessApp']);
   }
   fs.writeFileSync(script, 'unknown launch format');

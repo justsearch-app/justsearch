@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { skipPrFlake } from '../ci/pr-flakes.mjs';
 /**
  * The supervisor conformance harness (design 7.1 "Conformance", lane F stage B item B7).
  *
@@ -20,6 +21,8 @@
  */
 
 import fs from 'node:fs';
+import { caseTimings } from './timings.mjs';
+import { removeFixtureDirectory } from './fixture-cleanup.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -504,11 +507,35 @@ async function runAdapter(name) {
 
   const repeat = Number(process.argv[process.argv.indexOf('--repeat') + 1]) || 1;
   if (process.argv.includes('--repeat') && (!only || repeat < 1 || repeat > 50)) throw new Error('--repeat requires --case and 1..50');
-  for (const testCase of cases.flatMap(c => Array.from({ length: repeat }, () => c))) {
+  const recordsRoot = path.join(repoRoot, 'tmp/supervisor-conformance/records');
+  const timingWarning = err => process.stderr.write(`[timing warning] ${err?.message ?? err}\n`);
+  // A hosted job invokes the suite and repeat probe separately: retain both for its upload.
+  // Local invocations replace the previous invocation's small records.
+  if (!process.env.CI) {
+    try { removeFixtureDirectory(recordsRoot); } catch (err) { timingWarning(err); }
+  }
+  for (const testCase of cases.filter(c => !skipPrFlake('scripts/supervisor-conformance/run.mjs', c.id)).flatMap(c => Array.from({ length: repeat }, () => c))) {
+    let timings;
+    try { timings = caseTimings({ adapter: name, testCase, policy, root: recordsRoot }); }
+    catch (err) { timingWarning(err); }
+    const cleanups = [];
+    const caseIo = { ...io, timings,
+      makeWorkDir(label) { const dir = io.makeWorkDir(label); timings?.addWorkDir(dir); return dir; },
+      deferCleanup(dir, remove) { cleanups.push({ dir, remove }); },
+      readJsonIfPresent(file) {
+        const value = io.readJsonIfPresent(file);
+        if (value && path.basename(file) === 'supervisor.v1.json') timings?.state(value, file);
+        return value;
+      },
+      async waitFor(predicate, options = {}) {
+        const end = timings?.wait(options.what ?? 'condition', options.timeoutMs ?? 10000);
+        try { return await io.waitFor(predicate, options); } finally { end?.(); }
+      },
+    };
     let problems;
     try {
       // eslint-disable-next-line no-await-in-loop
-      const outcome = await adapter.runCase({ testCase, policy, io });
+      const outcome = await adapter.runCase({ testCase, policy, io: caseIo });
       if (!outcome || !Array.isArray(outcome.problems)) {
         problems = ['adapter returned no result for this case — a skipped case fails the harness'];
       } else {
@@ -517,7 +544,24 @@ async function runAdapter(name) {
     } catch (err) {
       problems = [`adapter threw: ${err?.stack ?? err}`];
     }
+    let timingRecord;
+    try { timingRecord = timings?.finish(problems); } catch (err) { timingWarning(err); }
+    try {
+      for (const { dir, remove } of cleanups) {
+        if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1' || (problems.length && process.env.CI)) {
+          if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') process.stderr.write(`[keep] ${dir}\n`);
+        } else remove(); // The adapter's callback preserves its original deletion-error handling.
+      }
+    } catch (err) {
+      problems = [`adapter threw: ${err?.stack ?? err}`];
+      if (timingRecord) {
+        timingRecord.problems = problems;
+        try { fs.writeFileSync(timings.file, JSON.stringify(timingRecord, null, 2) + '\n'); }
+        catch (writeError) { timingWarning(writeError); }
+      }
+    }
     record(`adapter:${name}`, testCase.id, problems);
+    if (problems.length && timingRecord) process.stdout.write(`        timing record: ${timings.file}\n${JSON.stringify(timingRecord)}\n`);
   }
 }
 

@@ -116,6 +116,7 @@ public final class RunStreamController {
           .json(ApiErrorHandler.toResponse(ApiErrorCode.BAD_REQUEST, message(malformed)));
       return;
     }
+    if (StoreIdRequest.rejectBody(ctx, body)) return;
     Optional<ConversationShapeRef> shapeId = shapeIdOf(body);
     if (shapeId.isEmpty()) {
       ctx.status(400)
@@ -143,8 +144,12 @@ public final class RunStreamController {
   /** Package-private so the run mechanics are testable without a live Jetty async context. */
   void streamNewRun(SseClient client) {
     var front = RequestEngineWork.get(client.ctx());
-    try (var work = front == null ? null : front.retain()) {
+    try (var ignoredWriting = chat.conversationWork(readBody(client.ctx()));
+        var work = front == null ? null : front.retain()) {
       streamNewRunOwned(client, work);
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      client.sendEvent("error", serialize(Map.of(
+          "errorCode", refused.code(), "error", refused.getMessage(), "retryable", false)));
     }
   }
 
@@ -304,7 +309,9 @@ public final class RunStreamController {
     if (ctx == null || ctx.body() == null || ctx.body().isEmpty()) {
       return Map.of();
     }
-    return MAPPER.readValue(ctx.body(), Map.class);
+    Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
+    StoreIdRequest.normalizeOptionalIds(body);
+    return body;
   }
 
   private static Map<String, Object> errorBody(String message, ApiErrorCode code) {

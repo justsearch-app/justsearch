@@ -7,13 +7,13 @@ date: 2026-01-22
 updated: 2026-02-11
 probes:
   - adr-0007-entity-boost-retired-or-off
-last_reviewed: 2026-09-03
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0007: Entity Faceting Over Full Knowledge Graph
 
 ## Status
-Accepted
+Accepted. Current implementation paths are listed in the 2026-10-20 amendment.
 
 ## Context
 
@@ -113,3 +113,14 @@ because its continued presence protects the public wire contract.
 `any-of` was added to the probe engine for this case
 (`scripts/governance/gates/adr-coverage/probes.mjs`). It is for a premise that is true for two
 different reasons across a planned migration — never a way to give a failing probe a second chance.
+
+## Amendment 2026-10-20: current entity implementation paths
+
+The earlier Key files list predates the module split. NER inference is now
+`modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/BertNerInference.java`;
+disambiguation is `modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/DisambiguationService.java`;
+backfill is `modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java`.
+The field-9 compatibility tombstone is `entity_boost` in
+`modules/ipc-common/src/main/proto/indexing.proto`; under
+[ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) this is an
+in-process DTO vocabulary, not evidence of a surviving Worker RPC transport.

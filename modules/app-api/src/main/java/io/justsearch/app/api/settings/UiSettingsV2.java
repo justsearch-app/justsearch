@@ -13,14 +13,26 @@ public record UiSettingsV2(
     Boolean vimMode,
     String defaultAction,
     Integer inspectorWidth,
-    Boolean pauseIndexingDuringAi,
     String mode,
     Boolean hasSeenTrustLoopNudge,
     java.util.List<String> excludePatterns,
     // Tempdoc 737 Phase 1 — desired-state chat bit (RuntimeSpec). Nullable: null = never set.
-    Boolean chatEnabled
+    Boolean chatEnabled,
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    java.util.List<String> invalidExcludePatterns,
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    IndexingPausePolicy indexingPause
 ) {
+  public UiSettingsV2(String theme, Boolean highContrast, String density, Boolean vimMode,
+      String defaultAction, Integer inspectorWidth, String mode,
+      Boolean hasSeenTrustLoopNudge, java.util.List<String> excludePatterns, Boolean chatEnabled) {
+    this(theme, highContrast, density, vimMode, defaultAction, inspectorWidth,
+        mode, hasSeenTrustLoopNudge, excludePatterns, chatEnabled, null, null);
+  }
+
   public static UiSettingsV2 defaults() {
-    return new UiSettingsV2("system", false, "comfort", false, "open", null, false, "simple", false, java.util.List.of(), false);
+    return new UiSettingsV2("system", false, "comfort", false, "open", null, "simple", false, java.util.List.of(), false);
   }
 }

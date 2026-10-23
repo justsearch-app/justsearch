@@ -1,0 +1,90 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T01:37:09.736Z",
+  "revision": "d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87",
+  "tree": "3def2a8fa7f0444367bc5a9788ca9cdec91d6023",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "NOTE: Picked up JDK_JAVA_OPTIONS: -Duser.home=/home/elias/dev/justsearch/.claude/worktrees/excl-recheck/tmp/agent-tmp/fexcl-round5-aahqpo__/home",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.VduExclusionPublicationFenceTest.explicitApplyFollowsInFlightVduPublication\" --tests \"io.justsearch.indexerworker.services.VduPolicySaveDeadlockTest.vduSaveAndLoopWriterAllFinish\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16888
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineTestHarnessIsolationTest.failedStartupRestoresProperties\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9151
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduExclusionPublicationFenceTest.java#explicitApplyFollowsInFlightVduPublication",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduExclusionPublicationFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa8f619fc9ee78cff147f355291796f2e898d20aa1ee1ec28692dfbb0c0c02a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitApplyFollowsInFlightVduPublication(false)",
+          "status": "passed"
+        },
+        {
+          "name": "explicitApplyFollowsInFlightVduPublication(true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduPolicySaveDeadlockTest.java#vduSaveAndLoopWriterAllFinish",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduPolicySaveDeadlockTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6667efca06355f3b78d4eef403aa7a0db2887a7c66933ef9b4e8a2e428ea765d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduSaveAndLoopWriterAllFinish(markClaim=false)",
+          "status": "passed"
+        },
+        {
+          "name": "vduSaveAndLoopWriterAllFinish(markClaim=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarnessIsolationTest.java#failedStartupRestoresProperties",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarnessIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03676880c6e2f470b42605c2cca861702e0ab4c3a58c9c19295f64ea24ccb381",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedStartupRestoresProperties()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e24ade34bd5c301877f1b941710429b776dec53631b5de4cf404c3c77205be4a"
+}

@@ -83,6 +83,9 @@ export interface Sv3TurnEvidence {
    * fact, not two copies that can disagree about the same answer.
    */
   readonly groundingIncomplete?: boolean;
+  /** The Ask check's own counts, when reported. Zero is a fact; absence is not completion. */
+  readonly sentencesTotal?: number;
+  readonly sentencesScored?: number;
   /**
    * Tempdoc 865 PR-1 (F1) — the per-source examination facts, when the producer reported any.
    *
@@ -100,16 +103,17 @@ export interface Sv3TurnEvidence {
  * be worded as a failure, and `refused` is the session lock declining the send — neither of them is
  * an answer that went wrong (tempdoc 822 Phase F1; the terminals `sv3-ask.ts` reports).
  */
-export type Sv3TurnStatus = 'streaming' | 'complete' | 'halted' | 'refused' | 'failed';
+export type Sv3TurnStatus = 'streaming' | 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence';
 
 /**
- * Which tier produced the turn (tempdoc 822 Phase F2). An `ask` turn is a grounded answer streamed
+ * Which tier produced the turn (tempdoc 822 Phase F2). A `model` turn is free chat without retrieval.
+ * An `ask` turn is a grounded answer streamed
  * from `sv3-ask.ts`; an `agent` turn is a delegated RUN hosted by the shared `AgentSessionController`,
  * which renders as a live feed while it runs and as a receipt once it ends. One turn type with a
  * discriminator, not two lists: a conversation interleaves both and the transcript must keep their
  * order.
  */
-export type Sv3TurnKind = 'ask' | 'agent';
+export type Sv3TurnKind = 'ask' | 'agent' | 'model';
 
 /**
  * One block of the model's thinking, as the SHARED `ReasoningController` finalized it (tempdoc 822
@@ -125,6 +129,8 @@ export type Sv3TurnReasoning = ReasoningBlock;
 
 /** One exchange: what was asked, and what came back. */
 export interface Sv3Turn {
+  /** The dispatch shape, shared with the canonical record. */
+  readonly shapeId?: string;
   /**
    * The turn's STABLE handle, minted once when the turn is opened and never rewritten. Every piece
    * of UI state about a turn is keyed on it — `Sv3Main`'s `expandedSources` and `copiedTurnId`, the
@@ -163,6 +169,14 @@ export interface Sv3Turn {
   readonly question: string;
   /** Accumulated answer text. Whatever streamed before a halt is KEPT — it was really received. */
   readonly answer: string;
+  /**
+   * The answer as the RECORD saved it: each assistant message of the turn, oldest first, with its
+   * id; {@link answer} is their texts joined. The floor and the exclusions name MESSAGES, and one
+   * turn can hold several, so a follow-up's context is built from these, message by message (S2.0).
+   * Set only by the record projection (`sv3-record.ts`); absent on a live turn, whose answer is the
+   * one message the store has not numbered yet.
+   */
+  readonly answerMessages?: readonly Sv3AnswerMessage[];
   readonly status: Sv3TurnStatus;
   /**
    * The evidence the backend minted for this answer — `null` until it reports any, which is not the
@@ -240,6 +254,12 @@ export interface Sv3Turn {
   readonly evidencePaths?: readonly string[];
 }
 
+/** One saved assistant message of a turn's answer: its record id and its text. */
+export interface Sv3AnswerMessage {
+  readonly id: string;
+  readonly content: string;
+}
+
 /**
  * What `GET /api/chat/conversations/{id}/history` knows about a conversation that
  * `GET /api/thread/{id}` does not (tempdoc 852 §2.3c). The shipped window reads BOTH records at
@@ -273,6 +293,12 @@ export interface Sv3SessionHistory {
   readonly excludedMessageIds?: readonly string[];
   /** Retrieved-source ids the reader hid from retrieval (§J.3); the Worker drops those chunks. */
   readonly excludedSourceIds?: readonly string[];
+  /**
+   * Every user/assistant message id `/history` holds, in the order the store SAVED them — the order
+   * it trims the prompt by. Used only to place a floor that names a message no turn on screen names
+   * (`sv3-context.ts` placeFloor); never to resolve a message to a turn, which stays BY ID.
+   */
+  readonly messageIds?: readonly string[];
   /**
    * The conversation store answered 423 — encrypted and LOCKED (tempdoc 629). The window already
    * derives its own lock state from observed status; this is the load's own report of the same
@@ -470,12 +496,14 @@ export function submitInSession(
   kind: Sv3TurnKind,
   /** The store-minted conversation id, used only when this submit OPENS a conversation. */
   newId: string,
+  shapeId?: string,
 ): Sv3SessionList {
   const text = question.trim();
   if (text === '') return list;
   const active = list.activeId === null ? null : sessionById(list, list.activeId);
   if (active === null) {
-    const created = openSession(newId, text, now, kind, now);
+    const opened = openSession(newId, text, now, kind, now);
+    const created = { ...opened, turns: opened.turns.map(turn => ({ ...turn, shapeId })) };
     return {
       sessions: [created, ...list.sessions],
       activeId: created.id,
@@ -487,7 +515,7 @@ export function submitInSession(
       session.id === active.id
         ? {
             ...session,
-            turns: [...session.turns, openTurn(session.id, session.turns.length, text, now, kind)],
+            turns: [...session.turns, { ...openTurn(session.id, session.turns.length, text, now, kind), shapeId }],
             updatedAt: now,
             // Asking in a conversation IS visiting it, so a follow-up cannot leave the session
             // holding an unread bit against a reader who is sitting in it.
@@ -642,6 +670,24 @@ export const settleTurn = (
   }));
 
 /**
+ * A turn this window let go of mid-stream (it left the conversation) is taken off the transcript:
+ * the Engine goes on and saves it as it ends, so the partial copy here would be neither what the
+ * reader stopped nor what was saved. The record puts back whatever the Engine saved, the next time
+ * the conversation is read. Only a turn still streaming is dropped, so a settled one never is.
+ */
+export function dropTurn(list: Sv3SessionList, ref: Sv3TurnRef): Sv3SessionList {
+  const session = sessionById(list, ref.sessionId);
+  const turn = session?.turns.find((t) => t.id === ref.turnId);
+  if (session === null || turn === undefined || turn.status !== 'streaming') return list;
+  return {
+    ...list,
+    sessions: list.sessions.map((s) =>
+      s.id === ref.sessionId ? { ...s, turns: s.turns.filter((t) => t.id !== ref.turnId) } : s,
+    ),
+  };
+}
+
+/**
  * The agent run's terminal (tempdoc 822 Phase F2): the turn settles AND becomes its own receipt in
  * ONE write, because the count and the outcome describe the same ended run and must never be able to
  * arrive separately. `toolCalls` is the feed projection's own count — the same list the cards were
@@ -694,9 +740,20 @@ export function adoptRunSession(
    * rather than beside it: two rows for one conversation would be the identity fork Phase F6 closed.
    */
   conversationId: string,
+  /** A freshly read turn belonging to this live run, when the record already represents it. */
+  recordTurnId: string | null = null,
 ): Sv3Adoption {
   const existing = sessionById(list, conversationId);
   if (existing !== null) {
+    const recorded = existing.turns.find((t) => t.id === recordTurnId && t.kind === 'agent');
+    if (recorded !== undefined) {
+      return {
+        list: { ...list, sessions: list.sessions.map((s) => s.id === conversationId
+          ? { ...s, turns: s.turns.map((t) => t.id === recorded.id ? { ...t, status: 'streaming' } : t) }
+          : s) },
+        ref: { sessionId: conversationId, turnId: recorded.id },
+      };
+    }
     const turnId = turnIdFor(existing.id, existing.turns.length);
     return {
       list: {
@@ -890,6 +947,8 @@ function reconcileEvidence(
     // record field by field, so a field that is not named here is silently gone.
     sourceCoverage:
       prior.sourceCoverage !== undefined ? prior.sourceCoverage : recorded.sourceCoverage,
+    sentencesTotal: prior.sentencesTotal ?? recorded.sentencesTotal,
+    sentencesScored: prior.sentencesScored ?? recorded.sentencesScored,
   };
 }
 

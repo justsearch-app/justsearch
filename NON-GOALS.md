@@ -7,8 +7,19 @@ they're not judgments about other tools.
 ### Privacy & locality (hard invariants — these will never change)
 - **No telemetry, analytics, or phone-home.** The product does not report usage anywhere. A PR that adds outbound
   reporting will be declined.
-  Today, desktop builds with an embedded release URL check GitHub for updates on launch, including CI-built
-  branch candidates and pre-releases, with no off switch yet; these requests send no usage data. Install AI
+  Desktop builds with an embedded release URL check for updates by default about 30 seconds after the desktop chrome mounts,
+  including CI-built branch candidates and pre-releases. They fetch `release.v1.json`, `release.v1.json.sig`, and
+  `latest.json` from GitHub (following redirects to download/CDN hosts); these checks send no document
+  content, queries or usage reports. The contacted hosts see the request IP and time. Installer bytes
+  are downloaded only when you request installation. Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before
+  starting a fresh desktop process to suppress launch checks; manual checks still work. Set
+  `{"schemaVersion": 1, "appUpdatesEnabled": false}` in `policy.v1.json` to forbid all new updater checks and downloads, even
+  with the Engine down. Machine policy is Windows-only at `%PROGRAMDATA%\JustSearch\policy.v1.json`;
+  user policy is in the shell's app-data directory (passed to the Engine as `JUSTSEARCH_HOME`). User
+  policy can restrict, but cannot override a machine denial. Policy is read at each discovery or install
+  and again before the installer's artifact download; an in-flight discovery may finish its metadata
+  requests. Existing upgrade/rollback state is retained. Older releases ignore the new key; the first
+  enforcing release will be named in its release notes. These controls cover app updates only. Install AI
   downloads models and runtimes from `github.com` and `huggingface.co` with consent. Trace export is off by
   default; only if you enable tracing and set an OTLP endpoint are traces sent there. They can include paths
   and document excerpts. These network paths and external integrations are described in [Privacy](README.md#privacy).

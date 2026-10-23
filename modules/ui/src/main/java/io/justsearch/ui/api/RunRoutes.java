@@ -6,13 +6,9 @@ import io.javalin.Javalin;
 /**
  * Route registration for the run family (tempdoc 834 §1.6, §5.1).
  *
- * <p>The two streaming routes are POST managed SSE — {@code new SseHandler(consumer)} behind a
- * validating {@link io.javalin.http.Handler} — and are therefore already covered by {@code
- * ApiSecurityFilters}' session-token requirement with NO filter change (probe D1, §14.1d, confirmed
- * end-to-end in prod mode). §5's {@code GET /api/chat/runs/live} enumeration is the one that DOES
- * need a path-scoped filter change, because the filter returns early for GET — see {@link
- * ApiSecurityFilters#requiresSessionToken}, which reads {@link #PATH_PREFIX} so the guarded path and
- * the routed path cannot drift.
+ * <p>Reads and streaming writes are protected by the production default in
+ * {@link ApiSecurityFilters#requiresSessionToken}. The run journal and live enumeration are
+ * non-public routes, so future routes in this family inherit authentication too.
  *
  * <p>Under {@code /api/chat/*} like every other conversational route; the removed {@code
  * /api/agent/*} namespace is not resurrected (Hard Invariant #3).
@@ -23,8 +19,7 @@ public final class RunRoutes {
   /**
    * The run family's path prefix. Every route under it demands the session token regardless of
    * method — the journal carries prompts, answers, retrieved passage text and tool arguments, and
-   * the enumeration dispenses the very runIds needed to fetch them (§1.6). Shared with {@link
-   * ApiSecurityFilters} so the guarded prefix and the registered routes are one string.
+   * the enumeration dispenses the very runIds needed to fetch them (§1.6). Kept here as the route registration authority.
    */
   public static final String PATH_PREFIX = "/api/chat/runs";
 

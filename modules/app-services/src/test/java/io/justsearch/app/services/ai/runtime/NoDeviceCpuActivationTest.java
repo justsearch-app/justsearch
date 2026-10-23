@@ -32,7 +32,10 @@ class NoDeviceCpuActivationTest {
    var cmd=captured.get().command();
    assertEquals(Integer.toString(expected),cmd.get(cmd.indexOf("-ngl")+1));
    assertEquals("6144",cmd.get(cmd.indexOf("-c")+1));
-   if(cpu) {assertEquals("none",cmd.get(cmd.indexOf("--device")+1)); assertTrue(cmd.contains("--no-mmproj-offload")); assertEquals("passed",result.result()); assertNull(result.vramAfter()); assertNull(result.delta()); assertEquals(Map.of("CUDA_VISIBLE_DEVICES","-1"),captured.get().environment()); assertNull(result.vramBefore()); assertEquals("cpu",result.vramTier()); assertEquals("none",result.vramSource()); verifyNoInteractions(caps);}
+   if(cpu) {assertEquals("none",cmd.get(cmd.indexOf("--device")+1)); assertTrue(cmd.contains("--no-mmproj-offload")); assertEquals("passed",result.result()); assertNull(result.vramAfter()); assertNull(result.delta()); var environment = new HashMap<>(captured.get().environment());
+   String privateKey = environment.remove("LLAMA_API_KEY");
+   assertTrue(privateKey != null && privateKey.matches("[A-Za-z0-9_-]{43}"));
+   assertEquals(Map.of("CUDA_VISIBLE_DEVICES","-1"), environment); assertNull(result.vramBefore()); assertEquals("cpu",result.vramTier()); assertEquals("none",result.vramSource()); verifyNoInteractions(caps);}
   } finally { ConfigStore.restoreGlobal(store,previous); if(home==null)System.clearProperty("justsearch.home"); else System.setProperty("justsearch.home",home); }
  }
  @org.junit.jupiter.params.ParameterizedTest

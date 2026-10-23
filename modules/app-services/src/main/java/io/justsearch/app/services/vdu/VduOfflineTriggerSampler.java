@@ -134,6 +134,8 @@ public final class VduOfflineTriggerSampler {
         return;
       }
       KnowledgeServerBootstrap ks = knowledgeServerSupplier.get();
+      var scheduling = ks == null ? null : ks.gpuScheduling();
+      if (scheduling != null && scheduling.indexingHold().held()) return;
       long msSinceActivity = idleMillis(ks);
       boolean energyReduced = ks != null && ks.energyState().reduced();
       // Spec A step 6: the claim is the chat controller's own answer (!vduMayStart()), wired at
@@ -218,6 +220,8 @@ public final class VduOfflineTriggerSampler {
 
   private boolean automaticEligible(KnowledgeServerBootstrap ks) {
     if (ks == null) return false;
+    var scheduling = ks.gpuScheduling();
+    if (scheduling != null && scheduling.indexingHold().held()) return false;
     var energy = ks.energyState();
     var bulk = ks.bulkWork();
     return energy != null && energy.source() == io.justsearch.app.util.EnergyState.Source.AC

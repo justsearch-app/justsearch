@@ -96,14 +96,34 @@
         "highContrast" : {
           "type" : [ "boolean", "null" ]
         },
+        "indexingPause" : {
+          "type" : "object",
+          "properties" : {
+            "paused" : {
+              "type" : "boolean"
+            },
+            "reason" : {
+              "type" : [ "string", "null" ]
+            },
+            "untilEpochMs" : {
+              "type" : [ "integer", "null" ]
+            }
+          },
+          "readOnly" : true
+        },
         "inspectorWidth" : {
           "type" : [ "integer", "null" ]
         },
+        "invalidExcludePatterns" : {
+          "readOnly" : true,
+          "type" : [ "array", "null" ],
+          "items" : {
+            "type" : "string",
+            "readOnly" : true
+          }
+        },
         "mode" : {
           "type" : [ "string", "null" ]
-        },
-        "pauseIndexingDuringAi" : {
-          "type" : [ "boolean", "null" ]
         },
         "theme" : {
           "type" : [ "string", "null" ]

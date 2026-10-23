@@ -4,13 +4,15 @@
  * Rendered operation-history stream regression.
  *
  * This drives the real ResourceView -> pooled EnvelopeStream -> subscription
- * strategy -> jf-table path with a controllable EventSource. The rows are
+ * strategy -> jf-table path with a controlled HTTP SSE response. The rows are
  * intentionally shaped like the operation-history catalog entry, including
  * operationKey as its declared identity field.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import './ResourceView.js';
+import { FetchEventSource } from '../streaming/FetchEventSource.js';
+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';
 import '../renderers/resourceRegistryDefaults.js';
 import type { ResourceView } from './ResourceView.js';
 import type { Resource, ResourceCatalog } from '../../api/types/registry.js';
@@ -31,55 +33,15 @@ const SCHEMA_URL = 'https://ssot.justsearch/v1/schemas/operation-history-entry.v
 
 type OperationOutcome = 'SUCCESS' | 'FAILURE' | 'UNDONE';
 
-class ControlledEventSource extends EventTarget {
-  static instances: ControlledEventSource[] = [];
+let streams: ReturnType<typeof fetchSseHarness>;
+let added: Mock<FetchEventSource['addEventListener']>;
+let removed: Mock<FetchEventSource['removeEventListener']>;
 
-  readonly url: string;
-  readonly listenerTypes = new Set<string>();
-  readyState = 0;
-  readonly CONNECTING = 0;
-  readonly OPEN = 1;
-  readonly CLOSED = 2;
-  closed = false;
-  withCredentials = false;
-
-  constructor(url: string | URL) {
-    super();
-    this.url = String(url);
-    ControlledEventSource.instances.push(this);
-  }
-
-  override addEventListener(
-    type: string,
-    callback: EventListenerOrEventListenerObject | null,
-    options?: boolean | AddEventListenerOptions,
-  ): void {
-    this.listenerTypes.add(type);
-    super.addEventListener(type, callback, options);
-  }
-
-  override removeEventListener(
-    type: string,
-    callback: EventListenerOrEventListenerObject | null,
-    options?: boolean | EventListenerOptions,
-  ): void {
-    super.removeEventListener(type, callback, options);
-    this.listenerTypes.delete(type);
-  }
-
-  emitOpen(): void {
-    this.readyState = this.OPEN;
-    this.dispatchEvent(new Event('open'));
-  }
-
-  emitFrame(envelope: object): void {
-    this.dispatchEvent(new MessageEvent('frame', { data: JSON.stringify(envelope) }));
-  }
-
-  close(): void {
-    this.readyState = this.CLOSED;
-    this.closed = true;
-  }
+function listenerTypes(): Set<string> {
+  const remaining = added.mock.calls.filter(([type, listener]) =>
+    !removed.mock.calls.some(([removedType, removedListener]) =>
+      removedType === type && removedListener === listener));
+  return new Set(remaining.map(([type]) => type));
 }
 
 function operationHistoryResource(): Resource {
@@ -153,6 +115,7 @@ function envelope(seq: number, frameKind: 'LIFECYCLE' | 'UPDATE', payload: unkno
 
 async function settle(el: ResourceView): Promise<void> {
   await el.updateComplete;
+  await flushStreamWork();
   const table = el.shadowRoot?.querySelector('jf-table') as
     | (HTMLElement & { updateComplete?: Promise<unknown> })
     | null;
@@ -171,10 +134,12 @@ describe('ResourceView operation-history snapshot overlap rendering', () => {
   beforeEach(() => {
     resetResourceCatalog();
     resetSchemaFetcher();
-    ControlledEventSource.instances = [];
+    streams = fetchSseHarness();
+    vi.stubGlobal('fetch', streams.fetch);
+    added = vi.spyOn(FetchEventSource.prototype, 'addEventListener');
+    removed = vi.spyOn(FetchEventSource.prototype, 'removeEventListener');
     seedSchema(SCHEMA_URL, { type: 'object', properties: {} });
     seedResourceCatalog(catalogOf(operationHistoryResource()));
-    vi.stubGlobal('EventSource', ControlledEventSource);
   });
 
   afterEach(() => {
@@ -183,6 +148,7 @@ describe('ResourceView operation-history snapshot overlap rendering', () => {
     resetResourceCatalog();
     resetSchemaFetcher();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('renders keyed convergence and independent unkeyed observations through the real stream path', async () => {
@@ -192,14 +158,14 @@ describe('ResourceView operation-history snapshot overlap rendering', () => {
     document.body.appendChild(el);
     await settle(el);
 
-    const source = ControlledEventSource.instances[0];
+    const source = streams.connections[0];
     if (!source) throw new Error('ResourceView did not open its history stream');
     expect(source?.url).toBe('http://127.0.0.1:33221/api/operation-history/stream');
     expect(__poolSizeForTest()).toBe(1);
-    expect(source?.listenerTypes).toEqual(new Set(['frame', 'open', 'error']));
+    expect(listenerTypes()).toEqual(new Set(['frame', 'open', 'error']));
 
-    source.emitOpen();
-    source.emitFrame(
+    await source.open();
+    await source.emitFrame(
       envelope(1, 'LIFECYCLE', {
         kind: 'snapshot',
         entries: [
@@ -215,9 +181,9 @@ describe('ResourceView operation-history snapshot overlap rendering', () => {
 
     // The same operationKey converges in place, while the same operationId
     // with a distinct operationKey remains a separate visible row.
-    source.emitFrame(envelope(2, 'UPDATE', entry('019940c0-0000-7000-8000-000000000001', 'SUCCESS')));
+    await source.emitFrame(envelope(2, 'UPDATE', entry('019940c0-0000-7000-8000-000000000001', 'SUCCESS')));
     // A null declared key never aliases an earlier unkeyed observation.
-    source.emitFrame(envelope(3, 'UPDATE', entry(null, 'SUCCESS')));
+    await source.emitFrame(envelope(3, 'UPDATE', entry(null, 'SUCCESS')));
     await settle(el);
 
     expect(el.connectionState).toBe('connected');
@@ -226,6 +192,6 @@ describe('ResourceView operation-history snapshot overlap rendering', () => {
     el.remove();
     expect(__poolSizeForTest()).toBe(0);
     expect(source.closed).toBe(true);
-    expect(source.listenerTypes).toEqual(new Set());
+    expect(listenerTypes()).toEqual(new Set());
   });
 });

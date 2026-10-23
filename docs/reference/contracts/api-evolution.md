@@ -86,7 +86,7 @@ encoding of them.
 
 ### Compile-time safety
 
-Buf is configured in `modules/ipc-common/src/main/proto/buf.yaml` with `WIRE` breaking change detection. This prevents accidental binary-incompatible changes (field number reuse, type changes, message removal) at build time. The `WIRE` rule is appropriate because Head and Body are co-shipped — there is no multi-version deployment.
+Buf is configured in `modules/ipc-common/src/main/proto/buf.yaml` with `WIRE` breaking change detection. This prevents accidental binary-incompatible changes (field number reuse, type changes, message removal) at build time. The `WIRE` rule is appropriate because the protos are compiled into one co-shipped Engine — there is no multi-version deployment.
 
 Runtime compatibility currently relies on co-shipping, compile-time schema checks, contract tests, and explicit status/degradation signals. Do not document a runtime handshake client unless that client exists in the current codebase.
 

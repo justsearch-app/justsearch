@@ -7,6 +7,10 @@
 import { execSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
+import { executableName } from './lib/native-targets.cjs';
+
+const llamaServer = executableName('llama-server');
+const llamaLibrary = process.platform === 'win32' ? 'llama.dll' : 'libllama.so';
 
 const state = {
   criticalFailures: 0,
@@ -75,9 +79,9 @@ function verifyLlamaRuntime() {
 
   const existingRoots = uniqueCandidates.filter((p) => isDirectory(p));
   for (const root of existingRoots) {
-    const directExe = join(root, 'llama-server.exe');
+    const directExe = join(root, llamaServer);
     if (existsSync(directExe)) {
-      pass(`llama-server.exe found at ${directExe}`);
+      pass(`${llamaServer} found at ${directExe}`);
       return { ok: true, resolvedRoot: root };
     }
 
@@ -85,9 +89,9 @@ function verifyLlamaRuntime() {
     if (isDirectory(variantsDir)) {
       const variantDirs = readdirSync(variantsDir).sort();
       for (const variant of variantDirs) {
-        const variantExe = join(variantsDir, variant, 'llama-server.exe');
+        const variantExe = join(variantsDir, variant, llamaServer);
         if (existsSync(variantExe)) {
-          pass(`llama-server.exe found at ${variantExe}`);
+          pass(`${llamaServer} found at ${variantExe}`);
           return { ok: true, resolvedRoot: root };
         }
       }
@@ -150,7 +154,7 @@ try {
 // 3. Verify VramDetector
 console.log('\n3. VramDetector');
 try {
-  const vramFile = 'modules/ai-bridge/src/main/java/io/justsearch/aibridge/llama/VramDetector.java';
+  const vramFile = 'modules/gpu-bridge/src/main/java/io/justsearch/gpu/VramDetector.java';
   if (!existsSync(vramFile)) {
     fail(`Missing file: ${vramFile}`);
   } else {
@@ -228,18 +232,21 @@ try {
     } else {
       fail('InferenceConfig.java missing');
     }
-    if (files.includes('ModeTransitionException.java')) {
-      pass('ModeTransitionException.java exists');
+    const apiDir = 'modules/app-api/src/main/java/io/justsearch/app/api';
+    if (existsSync(join(apiDir, 'ModeTransitionException.java'))) {
+      pass('ModeTransitionException.java exists in app-api');
     } else {
-      fail('ModeTransitionException.java missing');
+      fail(`ModeTransitionException.java missing at ${apiDir}`);
+    }
+
+    const modeFile = join(apiDir, 'Mode.java');
+    if (existsSync(modeFile) && readText(modeFile).includes('enum Mode')) {
+      pass('Mode enum exists in app-api');
+    } else {
+      fail(`Mode enum missing at ${modeFile}`);
     }
 
     const content = readText(managerFile);
-    if (content.includes('enum Mode')) {
-      pass('InferenceLifecycleManager includes Mode enum');
-    } else {
-      fail('InferenceLifecycleManager missing Mode enum');
-    }
     if (content.includes('switchToOnlineMode')) {
       pass('InferenceLifecycleManager includes switchToOnlineMode()');
     } else {
@@ -358,10 +365,10 @@ if (existsSync(citationModel) && existsSync(citationTokenizer)) {
 console.log('\n9. Native llama library');
 const nativeCandidates = [];
 if (process.env.JUSTSEARCH_NATIVE_PATH) {
-  nativeCandidates.push(join(process.env.JUSTSEARCH_NATIVE_PATH, 'llama.dll'));
+  nativeCandidates.push(join(process.env.JUSTSEARCH_NATIVE_PATH, llamaLibrary));
 }
-nativeCandidates.push('llama.dll');
-nativeCandidates.push('native-bin/llama.dll');
+nativeCandidates.push(llamaLibrary);
+nativeCandidates.push(join('native-bin', llamaLibrary));
 
 const foundNative = nativeCandidates.find((candidate) => existsSync(candidate));
 if (foundNative) {

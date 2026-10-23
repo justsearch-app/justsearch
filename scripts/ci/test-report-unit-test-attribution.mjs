@@ -232,19 +232,47 @@ withTempRoot((root) => {
 // The blocking Windows check uses every parsed suite, independent of the slow-suite limit.
 withTempRoot((root) => {
   const policy = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
-  const requiredClasses = policy.windowsParts.find((part) => part.jobId === 'windows-native-contracts').requiredClasses;
+  const requiredClasses = policy.windowsParts.flatMap(part => part.requiredClasses ?? []);
   const resultPath = (name) => path.join(root, `modules/example/build/test-results/test/TEST-${name}.xml`);
-  const testcase = (name, body = '') => `<testcase classname="${requiredClasses.at(-1).name}" name="${name}">${body}</testcase>`;
+  const prune = requiredClasses.find(entry => entry.name.endsWith('.PruneMissingDifferentVolumeTest'));
+  const testcase = (name, body = '') => `<testcase classname="${prune.name}" name="${name}">${body}</testcase>`;
   for (const entry of requiredClasses) {
     write(resultPath(entry.name), suiteXml({ name: entry.name, tests: 1, skipped: 0 }));
   }
   const report = buildReport({ root, top: 1, requiredClasses });
   assert.equal(report.slowestSuites.length, 1);
-  assert.equal(report.requiredClassCoverage.length, 13);
+  assert.equal(report.requiredClassCoverage.length, 15);
   assert.ok(report.requiredClassCoverage.every((entry) => entry.executed === 1 && !entry.issues.length));
   const run = () => spawnSync(process.execPath, [scriptPath, '--results-root', root,
     '--require-windows-classes', '--json'], { encoding: 'utf8' });
   assert.equal(run().status, 0);
+  for (const name of [
+    'io.justsearch.app.services.ai.install.AiInstallServiceCudaPolicyTest',
+    'io.justsearch.ui.HeadlessAppCudaPolicyTest',
+  ]) {
+    assert.ok(requiredClasses.some((entry) => entry.name === name), `${name} must be required`);
+    fs.rmSync(resultPath(name));
+    const missingCuda = run();
+    assert.equal(missingCuda.status, 1);
+    assert.ok(missingCuda.stderr.includes(`${name}: no tests executed`));
+    write(resultPath(name), suiteXml({ name, tests: 1, skipped: 0 }));
+    assert.equal(run().status, 0);
+  }
+  for (const part of policy.windowsParts.filter(part => part.requiredClasses?.length)) {
+    const laneRun = () => spawnSync(process.execPath, [scriptPath, '--results-root', root,
+      '--lane', part.jobId, '--require-windows-classes', '--json'], { encoding: 'utf8' });
+    const entry = part.requiredClasses[0];
+    fs.rmSync(resultPath(entry.name));
+    assert.match(laneRun().stderr, new RegExp(`${entry.name}: no tests executed`));
+    for (const other of policy.windowsParts.filter(other => other.requiredClasses?.length && other !== part)) {
+      const result = spawnSync(process.execPath, [scriptPath, '--results-root', root,
+        '--lane', other.jobId, '--require-windows-classes', '--json'], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(JSON.parse(result.stdout).requiredClassCoverage.length, other.requiredClasses.length);
+    }
+    write(resultPath(entry.name), suiteXml({ name: entry.name, tests: 1, skipped: 0 }));
+    assert.equal(laneRun().status, 0);
+  }
   const atomic = requiredClasses[0];
   const atomicCases = Array.from({ length: 12 }, (_, i) =>
     `<testcase classname="${atomic.name}" name="case${i}">`
@@ -266,7 +294,6 @@ withTempRoot((root) => {
     + `<testcase classname="${contended.name}" name="portableCase()"/>`
     + `<testcase classname="${contended.name}" name="${rotation.name}"><skipped/></testcase></testsuite>`);
   assert.equal(run().status, 0, 'preserve the named @EnabledOnOs(OS.LINUX) skip');
-  const prune = requiredClasses.at(-1);
   const allowed = prune.allowedSkips[0];
   const skip = (name, message) => testcase(name, `<skipped message="${message}"/>`);
   write(resultPath(prune.name), `<testsuite name="${prune.name}" tests="2" skipped="1">`

@@ -436,13 +436,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private void refreshResumableBytesFromDisk() {
     try {
       recordResumableBytes(
-          InstallPlanner.plan(
-              getManifest(),
-              buildHardwareProfile(),
-              installIntent(),
-              declinedPackages(),
-              modelsDir,
-              homeDir));
+          plan(getManifest(), buildInstallHardware()));
     } catch (Exception e) {
       log.debug("AiInstall resumable-bytes probe skipped (best-effort): {}", e.toString());
     }
@@ -457,7 +451,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   public InstallPlanPreview previewInstallPlan() {
     InstallPlanPreview preview = new InstallPlanPreview();
     ModelRegistry registry = getManifest();
-    HardwareProfile hardware = buildHardwareProfile();
+    InstallHardware installHardware = buildInstallHardware();
+    HardwareProfile hardware = installHardware.effective();
     DownloadProfile profile = hardware.downloadProfile();
     InstallIntent intent = installIntent();
     preview.intent = intent.id();
@@ -465,7 +460,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Reuse the PURE planner (no side effects) — tempdoc 381 §F "show the plan before download".
     InstallPlan plan =
-        InstallPlanner.plan(registry, hardware, intent, declinedPackages(), modelsDir, homeDir);
+        InstallPlanner.plan(registry, hardware, intent, declinedPackages(), modelsDir, homeDir,
+            installHardware.policyExcluded());
     // What the download will actually COST: complete files are already excluded by the planner, and
     // `remainingBytes()` also drops the bytes an interrupted run left staged. Stating `totalBytes()`
     // here charged the user for bytes already on their disk (Sandbox round 8).
@@ -602,10 +598,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     try {
       ModelRegistry registry = getManifest();
-      HardwareProfile hardware = buildHardwareProfile();
+      InstallHardware installHardware = buildInstallHardware();
       InstallPlan plan =
-          InstallPlanner.plan(
-              registry, hardware, installIntent(), declinedPackages(), modelsDir, homeDir);
+          plan(registry, installHardware);
       // A successful plan is a DEFINITIVE answer (installed or not) — consume the one-shot now.
       diskRecomputeDone = true;
       // Same disk-is-the-authority reasoning, applied to the OTHER thing a restart forgets: bytes a
@@ -1262,15 +1257,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Build hardware profile
     updateState("running", "plan", "Detecting hardware and planning downloads...");
-    HardwareProfile hardware = buildHardwareProfile();
+    InstallHardware installHardware = buildInstallHardware();
+    HardwareProfile hardware = installHardware.effective();
     DownloadProfile profile = hardware.downloadProfile();
     log.info("Hardware profile: gpuDetected={}, cudaFunctional={}, vramBytes={}, profile={}",
         hardware.gpuDetected(), hardware.cudaFunctional(), hardware.vramBytes(), profile);
 
     // Compute download plan
     InstallPlan plan =
-        InstallPlanner.plan(
-            registry, hardware, installIntent(), declinedPackages(), modelsDir, homeDir);
+        planInstallRun(registry, installHardware);
     log.info(
         "Install plan: profile={}, downloads={}, skipped={}, alreadyInstalled={}, totalBytes={}",
         plan.profile(),
@@ -1308,7 +1303,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // Reclaim BITS jobs an earlier crash left in the queue (tempdoc 840). Here rather than at app
     // boot: the set of jobs a sidecar still claims is only knowable once the plan is, and a
     // PowerShell spawn on every cold start buys no timeliness.
-    sweepOrphanedBitsJobsBestEffort(plan);
+    if (installHardware.policyExcluded() == null) sweepOrphanedBitsJobsBestEffort(plan);
 
     // ---- Stages 1-3, once per acquisition stage ------------------------------------------------
     downloadExecutor = new DownloadExecutor(cancelFlag);
@@ -1779,6 +1774,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * the install.
    */
   private void sweepOrphanedBitsJobsBestEffort(InstallPlan plan) {
+    // A policy-limited plan cannot claim retained CUDA jobs. Leave the queue and its bytes alone;
+    // the ordinary sweep can run again when GPU acceleration is permitted.
+    if (!gpuAccelerationAllowed()) return;
     try {
       Set<String> claimed = new HashSet<>();
       for (InstallPlan.PlannedDownload dl : plan.downloads()) {
@@ -1808,19 +1806,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   /**
    * Re-derives completeness from DISK, or null when the probe cannot answer (no registry on the
-   * classpath, IO failure). Cheap by construction — the planner's already-installed test is
-   * existence + size, never a hash ({@code InstallPlanner.isAlreadyInstalled}).
+   * classpath, IO failure). The planner checks archive receipts and output sizes without hashing
+   * ZIPs, and verifies retained ONNX candidate identities.
    */
   private InstallCompleteness recomputeCompletenessFromDiskBestEffort() {
     try {
       InstallPlan plan =
-          InstallPlanner.plan(
-              getManifest(),
-              buildHardwareProfile(),
-              installIntent(),
-              declinedPackages(),
-              modelsDir,
-              homeDir);
+          plan(getManifest(), buildInstallHardware());
       return InstallCompleteness.compute(plan, readInstallContractBestEffort(), declinedPackages());
     } catch (Exception e) {
       log.debug("AiInstall completion disk recompute skipped (best-effort): {}", e.toString());
@@ -2053,6 +2045,29 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // ---------------------------------------------------------------------------
 
   public HardwareProfile buildHardwareProfile() {
+    return buildInstallHardware().effective();
+  }
+
+  private record InstallHardware(HardwareProfile effective, HardwareProfile policyExcluded) {}
+
+  private InstallHardware buildInstallHardware() {
+    HardwareProfile detected = detectHardwareProfile();
+    return gpuAccelerationAllowed()
+        ? new InstallHardware(detected, null)
+        : new InstallHardware(HardwareProfile.cpuOnly(), detected);
+  }
+
+  private InstallPlan plan(ModelRegistry registry, InstallHardware hardware) {
+    return InstallPlanner.plan(registry, hardware.effective(), installIntent(), declinedPackages(),
+        modelsDir, homeDir, hardware.policyExcluded());
+  }
+
+  private InstallPlan planInstallRun(ModelRegistry registry, InstallHardware hardware) {
+    return InstallPlanner.planInstallRun(registry, hardware.effective(), installIntent(),
+        declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
+  }
+
+  private HardwareProfile detectHardwareProfile() {
     // Tempdoc 587: read every GPU fact from the ONE composition seam (GpuCapabilityResolver),
     // which folds the CUDA driver-API probe into the NVML/nvidia-smi VRAM+device merge. This
     // replaces the prior split — a direct GpuDriverApiProbe call for cudaFunctional plus a
@@ -2325,7 +2340,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     override was respected
    */
   private boolean applyCudaServerExe() {
-    if (!PlatformPaths.isWindows()) return false;
+    if (!PlatformPaths.isWindows() || !gpuAccelerationAllowed()) return false;
     Path cuda12Exe =
         homeDir
             .resolve("native-bin/llama-server/variants/cuda12")
@@ -2412,6 +2427,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * next blocker.
    */
   private boolean applyOrtNativePath() {
+    if (!gpuAccelerationAllowed()) return false;
     Path cuda12Dir = homeDir.resolve("native-bin/llama-server/variants/cuda12");
     return writeOrtNativePathSysprop(cuda12Dir);
   }
@@ -2565,17 +2581,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // ---------------------------------------------------------------------------
 
   private void checkPolicy() {
-    if (policyService == null) return;
-    try {
-      EffectivePolicy p = policyService.snapshot();
-      if (p != null && !p.downloadsEnabled()) {
-        throw new AiInstallException(
-            403, ApiErrorCode.DOWNLOADS_DISABLED, "Downloads disabled by administrator policy.");
-      }
-    } catch (AiInstallException e) {
-      throw e;
-    } catch (Exception e) {
-      log.debug("Policy snapshot failed (best-effort)", e);
+    if (policyBlocksDownloads()) {
+      throw new AiInstallException(
+          403, ApiErrorCode.DOWNLOADS_DISABLED, "Downloads disabled by administrator policy.");
     }
   }
 
@@ -2583,8 +2591,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (policyService == null) return false;
     try {
       EffectivePolicy p = policyService.snapshot();
-      return p != null && !p.downloadsEnabled();
+      return p == null || !p.downloadsEnabled();
     } catch (Exception e) {
+      log.warn("Policy snapshot failed; downloads disabled", e);
+      return true;
+    }
+  }
+
+  private boolean gpuAccelerationAllowed() {
+    if (policyService == null) return true;
+    try {
+      EffectivePolicy p = policyService.snapshot();
+      return p != null && p.gpuAccelerationEnabled();
+    } catch (Exception e) {
+      log.warn("Policy snapshot failed; GPU acceleration disabled", e);
       return false;
     }
   }
@@ -2725,7 +2745,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       ps.state = "pending";
       ps.bytesTotal = plan.downloads().stream()
           .filter(d -> d.packageId().equals(dl.packageId()))
-          .mapToLong(InstallPlan.PlannedDownload::sizeBytes)
+          .mapToLong(d -> d.extractionOnly() ? 0L : d.sizeBytes())
           .sum();
       status.packages.add(ps);
     }
@@ -3001,85 +3021,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       if (packageId.equalsIgnoreCase(ps.packageId)) return ps;
     }
     return null;
-  }
-
-  /**
-   * Tempdoc 374 alpha.15 fix B: extract a zip archive into {@code targetDir},
-   * skipping entries that already exist (idempotent re-runs). Used by the
-   * cuda-runtime package to expand the supplemental CUDA DLLs (cuFFT et al.)
-   * into the cuda12 variant dir post-download.
-   *
-   * <p>Defensive against zip-slip: rejects entries whose normalized path
-   * escapes {@code targetDir} (e.g., {@code ../../etc/passwd}).
-   *
-   * @param zipFile the archive to extract
-   * @param targetDir the directory entries are extracted into (entries are
-   *     resolved relative to this dir; nested zip entries preserve their path
-   *     under it)
-   */
-  static void extractZipInPlace(Path zipFile, Path targetDir) throws IOException {
-    if (zipFile == null || !Files.isRegularFile(zipFile)) {
-      throw new IOException("Archive not found: " + zipFile);
-    }
-    Path normalizedTarget = targetDir.toAbsolutePath().normalize();
-    Files.createDirectories(normalizedTarget);
-    int extracted = 0;
-    try (var zip = new java.util.zip.ZipFile(zipFile.toFile())) {
-      var entries = zip.entries();
-      while (entries.hasMoreElements()) {
-        var entry = entries.nextElement();
-        if (entry.isDirectory()) continue;
-        Path resolved = normalizedTarget.resolve(entry.getName()).normalize();
-        if (!resolved.startsWith(normalizedTarget)) {
-          throw new IOException(
-              "Refusing zip entry that escapes target directory: " + entry.getName());
-        }
-        if (!PlatformPaths.isWindows() && Files.isSymbolicLink(resolved)) {
-          throw new IOException("Refusing symbolic-link archive target: " + entry.getName());
-        }
-        if (Files.exists(resolved)) {
-          if (!PlatformPaths.isWindows() && !resolved.toRealPath().startsWith(normalizedTarget.toRealPath())) {
-            throw new IOException("Refusing archive target outside directory: " + entry.getName());
-          }
-          applyExecutablePermission(resolved);
-          continue;
-        }
-        Files.createDirectories(resolved.getParent());
-        if (!PlatformPaths.isWindows() && !resolved.getParent().toRealPath().startsWith(normalizedTarget.toRealPath())) {
-          throw new IOException("Refusing archive parent outside directory: " + entry.getName());
-        }
-        // Extract to a sibling .partial then atomically rename, so a crash mid-copy never leaves a
-        // half-written file at the final path (which the existence-skip above would then trust
-        // forever). Mirrors the download path's partial-then-moveAtomicBestEffort discipline.
-        Path partial = resolved.resolveSibling(resolved.getFileName() + ".partial");
-        Files.deleteIfExists(partial);
-        try (var in = zip.getInputStream(entry)) {
-          Files.copy(in, partial);
-        }
-        applyExecutablePermission(partial, resolved.getFileName().toString());
-        DownloadExecutor.moveAtomicBestEffort(partial, resolved);
-        extracted++;
-      }
-    }
-    log.info(
-        "Extracted {} new entries from {} to {}",
-        extracted,
-        zipFile.getFileName(),
-        normalizedTarget);
-  }
-
-  private static void applyExecutablePermission(Path file) throws IOException {
-    applyExecutablePermission(file, file.getFileName().toString());
-  }
-
-  private static void applyExecutablePermission(Path file, String declaredName) throws IOException {
-    if (PlatformPaths.isWindows()) return;
-    // Archives do not carry trustworthy executable modes. Only a declared executable gets +x.
-    if (declaredName.equals(NativeTargets.current().executableName("llama-server"))) {
-      var permissions = Files.getPosixFilePermissions(file);
-      permissions.add(java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE);
-      Files.setPosixFilePermissions(file, permissions);
-    }
   }
 
   private long countPackagesByState(String state) {

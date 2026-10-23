@@ -5,13 +5,15 @@ status: stable
 description: "Extend entity faceting to structured metadata with meta_ prefix, typed proto fields, and two-stage chunk retrieval."
 date: 2026-03-27
 probes: none - the meta_ field convention is already owned by the SSOT catalog sync gate; a second probe over the same catalogs would be a duplicate authority.
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0020: Structured Metadata Fields as Filterable Facets
 
 ## Status
 Accepted
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Context
 
@@ -59,3 +61,15 @@ Index all metadata fields on both parent documents and their chunks, eliminating
 
 ### Reuse entity fields for metadata
 Treat metadata values as entities and use the existing `entity_` field infrastructure. Rejected because metadata and entities have different normalization semantics (metadata uses `toLowerCase(Locale.ROOT)` for exact keyword matching; entities use NER-linked normalization), different extraction pipelines (frontmatter parsing vs NER model inference), and different UI presentation needs.
+
+## Amendment 2026-10-20: current typed filter carriers
+
+The original flat-field examples are historical. In
+`modules/ipc-common/src/main/proto/indexing.proto`, `SearchRequest` carries a
+`SearchFilters` message. `SearchFilters` and `RetrieveContextRequest` declare
+`meta_source`, `meta_author`, `meta_category` and a `TimeRangeMs meta_published_at`;
+the timestamp range is not a pair of flat `published_after`/`published_before`
+fields. Under [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md),
+these protobuf messages remain the in-process index-port vocabulary, without
+a gRPC service or separate Worker process. The typed-filter and parent-before-
+chunk retrieval decisions stand.

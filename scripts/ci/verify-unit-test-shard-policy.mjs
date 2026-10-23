@@ -11,7 +11,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { workflowJobs, aggregateDependencies } from './check-governance-ci-coverage.mjs';
+import { workflowJobs, aggregateDependencies, runsOnPrAndPush } from './check-governance-ci-coverage.mjs';
 
 const KIND = 'justsearch-unit-test-shard-policy.v1';
 const ALLOWED_PLATFORM_CLASSES = new Set([
@@ -157,7 +157,7 @@ export function parseUnitTestMatrix(workflowText) {
   // Explicit jobs are used for app-ui so its aggregate waits only on its own parts.
   for (const job of workflowJobs(workflowText)) {
     const match = /^Unit tests \(([^$]+)\)$/.exec(job.name ?? '');
-    const tasks = [...job.text.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
+    const tasks = [...job.text.matchAll(/:modules:[\w-]+:(?:test|ciUnitTest\d+)\b/g)].map((m) => m[0]);
     if (!match || !tasks.length) continue;
     lanes.push({
       lane: match[1],
@@ -210,7 +210,7 @@ function validateBudget(entry, issues) {
   }
 }
 
-export function validateUnitTestShardPolicy({ policy, workflowText, workflowSignalPolicy }) {
+export function validateUnitTestShardPolicy({ policy, workflowText, workflowSignalPolicy, classShards }) {
   const issues = [];
   if (policy.kind !== KIND) issues.push(`policy kind must be ${KIND}, got ${policy.kind}`);
   if (policy.version !== 1) issues.push(`policy version must be 1, got ${policy.version}`);
@@ -218,6 +218,25 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
   if (!Array.isArray(policy.lanes)) issues.push('policy lanes must be an array');
 
   const policyLanes = Array.isArray(policy.lanes) ? policy.lanes : [];
+  const owners = new Map();
+  for (const lane of policyLanes) for (const task of lane.gradleTasks ?? []) {
+    if (owners.has(task)) issues.push(`${task}: test task must have exactly one shard owner`);
+    owners.set(task, lane.lane);
+  }
+  if (classShards && policy.unitTestModules) {
+    const expected = policy.unitTestModules.flatMap(module => {
+      const count = classShards.modules[module]?.count;
+      return count ? Array.from({ length: count }, (_, index) => `:modules:${module}:ciUnitTest${index + 1}`) : [`:modules:${module}:test`];
+    });
+    if (!sameList([...owners.keys()].sort(), expected.sort())) issues.push('unit test task inventory differs: every complete task or class partition must have exactly one owner');
+  }
+  if (policy.windowsTestModules) {
+    const tasks = (policy.windowsParts ?? []).flatMap(part => part.gradleTasks ?? []);
+    const expected = policy.windowsTestModules.map(module => `:modules:${module}:test`);
+    if (!sameList([...tasks].sort(), expected.sort())) {
+      issues.push('Windows test task inventory differs: every original task must have exactly one shard owner');
+    }
+  }
   for (const lane of policyLanes) {
     const missing = missingStringFields(lane, REQUIRED_LANE_FIELDS);
     if (missing.length > 0) issues.push(`${lane.lane || '<unknown>'}: missing fields: ${missing.join(', ')}`);
@@ -239,13 +258,27 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
     const actual = job ? aggregateDependencies(job).sort() : [];
     if (!job || job.name !== aggregate.requiredCheck
         || !sameList(actual, [...aggregate.parts].sort())) {
-      issues.push(`${aggregate.jobId}: aggregate must unconditionally require success from every expected part`);
+      issues.push(`${aggregate.jobId}: aggregate must require success from every expected part on PRs and pushes`);
     }
     for (const part of aggregate.parts) {
       const partJob = jobs.find((j) => j.id === part);
-      if (!partJob || partJob.if || partJob['continue-on-error']
+      if (!partJob || !runsOnPrAndPush(partJob.if) || partJob['continue-on-error']
           || /^        continue-on-error:/m.test(partJob.text)
-          || partJob.runs.some((run) => run.step?.if && run.step.if !== 'always()')) {
+          || partJob.runs.some((run) => {
+            if (!run.step?.if || run.step.if === 'always()') return false;
+            if ((policy.windowsParts ?? []).find((p) => p.jobId === part)?.scopedCommands?.some(entry =>
+              run.text.trim().split('\n')[0] === entry.command && run.step.if === entry.condition)) return false;
+            if ((policy.windowsParts ?? []).find((p) => p.jobId === part)?.mainOnlyCommands?.includes(run.text.trim().split('\n')[0])
+                && run.step?.if === "(github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))") return false;
+            // Coverage attribution must still run after a failed Gradle execution. Its only
+            // permitted bypass is when that execution never ran (an earlier failure/cancel).
+            const coverage = partJob.runs.find(candidate => candidate.step?.id === 'windows-coverage');
+            return !((policy.windowsParts ?? []).some(entry => entry.jobId === part && entry.requiredClasses?.length)
+              && run.text.startsWith('node scripts/ci/report-unit-test-attribution.mjs ')
+              && run.text.includes('--require-windows-classes')
+              && run.step.if === "always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')"
+              && coverage && !coverage.step.if && coverage.text.includes('-PwindowsOnly=true'));
+          })) {
         issues.push(`${part}: required part is missing, conditional or tolerates job/step failure`);
       }
     }
@@ -257,7 +290,7 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
     for (const command of part.commands) {
       if (commandLines.filter((line) => line === command).length !== 1) issues.push(`${part.jobId}: expected command exactly once: ${command}`);
     }
-    const actualTasks = [...commands.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
+    const actualTasks = [...commands.matchAll(/:modules:[\w-]+:(?:test|ciUnitTest\d+)\b/g)].map((m) => m[0]);
     if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Gradle task ownership differs`);
   }
 
@@ -313,6 +346,7 @@ function main() {
       policy: JSON.parse(fs.readFileSync(policyPath, 'utf8')),
       workflowText: fs.readFileSync(workflowPath, 'utf8'),
       workflowSignalPolicy: JSON.parse(fs.readFileSync(signalPolicyPath, 'utf8')),
+      classShards: JSON.parse(fs.readFileSync(path.join(root, 'scripts/ci/unit-test-class-shards.v1.json'), 'utf8')),
     });
     if (opts.json) console.log(JSON.stringify(result, null, 2));
     else if (result.ok) console.log(`verify-unit-test-shard-policy: OK (${result.policyLanes.length} lanes)`);

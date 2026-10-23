@@ -101,6 +101,9 @@ import org.slf4j.LoggerFactory;
  * die with it.
  */
 public abstract class KnowledgeClient implements Closeable, SearchPort, IndexingService {
+  /** Local scheduling authority; never a mutation exposed over MCP or HTTP. */
+  public io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
+
     private static final Logger log = LoggerFactory.getLogger(KnowledgeClient.class);
 
     /**
@@ -437,6 +440,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             java.util.function.Consumer<Throwable> onError,
             Runnable onCompleted, EngineContext engineContext);
 
+    /**
+     * Live terminal outcomes, independent of the recoverable row-view handoff. The initial empty
+     * snapshot is a registration barrier, never history. Acceptance runs synchronously on the
+     * commit publisher; consumers must keep it bounded and send SSE asynchronously.
+     */
+    public abstract IndexingJobsStream subscribeIndexingJobOutcomes(
+            java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> onFrame,
+            java.util.function.Consumer<Throwable> onError,
+            Runnable onCompleted, EngineContext engineContext);
+
     /** Releases whatever the transport holds. Called from {@link #close()}. */
     protected abstract void closeTransport();
 
@@ -656,6 +669,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             "submitBatch",
             RpcDeadlineCategory.STANDARD,
             stub -> stub.submitBatch(request), engineContext);
+    }
+
+    /** Conversation deletion requires an applied delete, not a buffered migration operation. */
+    public DeleteByIdResponse deleteHistoryTranscript(Path transcript, EngineContext engineContext) {
+        var request = DeleteByIdRequest.newBuilder()
+            .setDocId(transcript.toAbsolutePath().normalize().toString()).setRequireSettled(true).build();
+        return executeIngestRpc("deleteById", RpcDeadlineCategory.STANDARD,
+            stub -> stub.deleteById(request), engineContext);
     }
 
     /**
@@ -1046,8 +1067,19 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public IndexingService.PrefixDeletionOutcome deleteDocsByPathPrefixWithOutcome(
+            Path pathPrefix, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocsByPathPrefixWithOutcome(pathPrefix, engineContext);
+    }
+
+    @Override
     public boolean deleteDocById(String docId, EngineContext engineContext) {
         return rootLifecycleOps.deleteDocById(docId, engineContext);
+    }
+
+    @Override
+    public IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
+        return rootLifecycleOps.deleteDocByIdWithOutcome(docId, engineContext);
     }
 
     /**
@@ -1813,6 +1845,28 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             String enrichment,
             int pageCount, EngineContext engineContext) {
         return vduOps.updateVduResult(docId, extractedContent, outcome, enrichment, pageCount, engineContext);
+    }
+
+    public boolean updateVduResult(String docId, String content,
+            io.justsearch.ipc.VduUpdateOutcome outcome, String enrichment, int pages,
+            String attemptId, EngineContext context) {
+        return vduOps.updateVduResult(docId, content, outcome, enrichment, pages, attemptId, context);
+    }
+
+    public int markVduProcessing(String docId, int maxRetries, String attemptId, EngineContext context) {
+        return vduOps.markVduProcessing(docId, maxRetries, attemptId, context);
+    }
+
+    public boolean releaseVduProcessing(String docId, String attemptId, EngineContext context) {
+        return vduOps.releaseVduProcessing(docId, attemptId, context);
+    }
+
+    protected io.justsearch.ipc.RecoverVduProcessingRequest vduRecoveryRequest(EngineContext context) {
+        return vduOps.recoveryRequest(context);
+    }
+
+    protected void vduRecoveryCompleted(EngineContext context, io.justsearch.ipc.RecoverVduProcessingRequest request) {
+        vduOps.retireRecoveryRequest(request, context);
     }
 
     public List<String> queryPendingVduDocIds(EngineContext engineContext) {

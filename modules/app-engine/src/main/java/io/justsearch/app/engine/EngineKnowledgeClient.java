@@ -72,6 +72,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class EngineKnowledgeClient extends KnowledgeClient {
 
+  private io.justsearch.core.scheduling.IndexingHold indexingHold;
+  void bindIndexingHold(io.justsearch.core.scheduling.IndexingHold hold) { indexingHold = hold; }
+  @Override public io.justsearch.core.scheduling.IndexingHold indexingHold() { return indexingHold; }
+
   private static final Logger log = LoggerFactory.getLogger(EngineKnowledgeClient.class);
 
   /**
@@ -705,7 +709,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return new CallView(child);
     }
     var task = taskServingView.get();
-    if (task != null) {
+    // A lifecycle dispatch has no physical view to lend to an ordinary nested RPC.
+    if (task != null && !task.deferredServices) {
       return task.fork();
     }
     if (servingLeaseSupplier == null) return new CallView(services.get());
@@ -808,9 +813,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   /** Own an already-retained reference, so orderly cleanup need not reopen admission. */
   private <T> T withOwnedBudget(String operation, long budgetMs,
       io.justsearch.app.api.EngineWorkHandle work, boolean inference, Function<Budget, T> body) {
+    return withOwnedBudget(operation, budgetMs, work, inference, true, body);
+  }
+
+  private <T> T withOwnedBudget(String operation, long budgetMs,
+      io.justsearch.app.api.EngineWorkHandle work, boolean inference, boolean serving,
+      Function<Budget, T> body) {
     CallView view;
     try {
-      view = captureCallView();
+      view = serving ? captureCallView() : new CallView(null, true);
     } catch (RuntimeException | Error failure) {
       work.close();
       throw failure;
@@ -995,6 +1006,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   protected <T> T executeIngestRpc(
       String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc,
       EngineContext engineContext) {
+    if ("reloadRuntime".equals(operation)) {
+      // Reload drains serving holders itself. Keep the normal Engine task ownership and budget,
+      // but resolve its lifecycle trigger on execution without retaining a view it must drain.
+      return withOwnedBudget(operation, deadline(category), admission.attach(engineContext),
+          false, false,
+          budget -> rpc.apply(new WorkerIngestCalls(
+              requireService(WorkerAppServices::ingestService), budget.context())));
+    }
     return withBudget(
         operation,
         deadline(category),
@@ -1004,12 +1023,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   public int recoverVduProcessingForRetainedOwner(io.justsearch.app.api.EngineWorkHandle owner) {
-    var request = io.justsearch.ipc.RecoverVduProcessingRequest.newBuilder()
-        .setProcedureOwner(owner.context().workId().orElseThrow().toString()).build();
-    return withOwnedBudget("recoverVduProcessing", deadline(RpcDeadlineCategory.VDU_OPERATION),
+    var request = vduRecoveryRequest(owner.context());
+    int recovered = withOwnedBudget("recoverVduProcessing", deadline(RpcDeadlineCategory.VDU_OPERATION),
         owner.retain(), false,
         budget -> new WorkerIngestCalls(requireService(WorkerAppServices::ingestService),
             budget.context()).recoverVduProcessing(request).getRecoveredCount());
+    vduRecoveryCompleted(owner.context(),request);
+    return recovered;
   }
 
   @Override
@@ -1617,12 +1637,20 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   public IndexingJobsStream subscribeIndexingJobs(
       Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
     try (var work = admission.attach(engineContext)) {
-      return subscribeIndexingWork(onFrame, onError, work);
+      return subscribeIndexingWork(onFrame, onError, work, false);
+    }
+  }
+
+  @Override
+  public IndexingJobsStream subscribeIndexingJobOutcomes(
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return subscribeIndexingWork(onFrame, onError, work, true);
     }
   }
 
   private IndexingJobsStream subscribeIndexingWork(Consumer<IndexingJobsFrame> onFrame,
-      Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work) {
+      Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work, boolean outcomesOnly) {
     // Legacy supplier-only clients may block during service selection. Do that on the producer
     // thread, after cancellation is registered. Production serving leases are captured here.
     CallView view = servingLeaseSupplier == null
@@ -1714,9 +1742,21 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           () -> {
             try {
               WorkerIngestService ingest = requireService(WorkerAppServices::ingestService);
-              ingest.subscribeIndexingJobs(
+              if (outcomesOnly) {
+                // Terminal acceptance is lossless and independent of view overflow/resubscribe.
+                // Its consumer only appends to the bounded activity store; sockets stay async.
+                ingest.subscribeIndexingJobOutcomes(onFrame, ctx);
+              } else ingest.subscribeIndexingJobs(
                       SubscribeIndexingJobsRequest.newBuilder().build(),
                       frame -> {
+                        // A newly inserted PENDING row cannot already be in the bounded head
+                        // window. Its queue total comes from status. Do not spend handoff slots
+                        // forwarding thousands of no-op enqueues; preserve presence barriers and
+                        // all updates (a retry can remove a formerly visible failure), plus every
+                        // terminal event for the activity ledger.
+                        if (frame.hasDelta() && frame.getDelta().hasInsert()
+                            && "PENDING".equals(frame.getDelta().getInsert().getState())
+                            && !frame.hasStatePresence()) return;
                         if (!flow.publish(frame)) {
                           // Closed, or the consumer stopped draining: stop the producer. The worker
                           // reads this through ctx.cancelled() on its next delta and closes its
@@ -1765,7 +1805,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   private static String indexingJobsPath(IndexingJobsFrame frame) {
-    if (!frame.hasDelta()) return null;
+    // State-presence publications must survive path coalescing and retain commit order.
+    if (frame.hasStatePresence() || !frame.hasDelta()) return null;
     return switch (frame.getDelta().getChangeCase()) {
       case INSERT -> frame.getDelta().getInsert().getPathHash();
       case UPDATE -> frame.getDelta().getUpdate().getPathHash();

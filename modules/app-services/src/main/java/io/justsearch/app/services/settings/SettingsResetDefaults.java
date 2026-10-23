@@ -13,7 +13,7 @@ public final class SettingsResetDefaults {
     current.setHighContrast(false);
     current.setDensity("comfort");
     current.setDefaultAction("open");
-    current.setPauseIndexingDuringAi(false);
+    current.setIndexingPause(null);
     current.setMode("simple");
     current.setTrustLoopNudgeSeen(false);
     current.setExcludePatterns(new java.util.ArrayList<>());

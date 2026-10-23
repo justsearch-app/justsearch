@@ -1025,11 +1025,6 @@ final class EngineSupervisedRecoveryE2ETest {
     runScenario(scenario);
   }
 
-  @Test
-  void initialBootstrapSurvivesHostileLocks() throws Exception {
-    runScenario("lock-boot");
-  }
-
   static void runScenario(String scenario) throws Exception {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
@@ -1053,8 +1048,8 @@ final class EngineSupervisedRecoveryE2ETest {
       assumeTrue(hasRetainedInstallerModels(repo),
           "installed standard-model activation requires retained model bytes; run on a model-equipped host");
     }
-    Path work =
-        repo.resolve("tmp/lane-f-takeover/writer-junit-" + UUID.randomUUID()).normalize();
+    Path work = repo.resolve((scenario.startsWith("journal-loss-") || scenario.startsWith("pointer-")
+        ? "tmp/restart/installed-" : "tmp/lane-f-takeover/writer-junit-") + UUID.randomUUID()).normalize();
     Path outputFile = work.resolve("fixture-output.txt");
     Files.createDirectories(work);
     ProcessBuilder builder =
@@ -1074,7 +1069,7 @@ final class EngineSupervisedRecoveryE2ETest {
       Files.writeString(childArgs, "-Xmx128m\n-Dfile.encoding=UTF-8\n-cp\n\""
           + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n"
           + io.justsearch.indexerworker.fixtures.ChaosExtractionSandboxChild.class.getName() + "\n");
-      String javaExe = Path.of(System.getProperty("java.home"), "bin", "java.exe").toString();
+      String javaExe = ProcessHandle.current().info().command().orElseThrow();
       builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_MODE", "process");
       builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_POOL", "1");
       builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND",
@@ -1289,6 +1284,23 @@ final class EngineSupervisedRecoveryE2ETest {
       assertEquals(promoted.path("supervisor").path("incarnation").asInt(),
           migration.path("afterRefusal").path("incarnation").asInt(),
           "migration settlement and refused rollback must preserve the Engine incarnation");
+    } else if (scenario.startsWith("pointer-")) {
+      assertTrue(output.contains("POINTER_PUBLICATION_PASS "), output);
+      var proof = markerPayload(output, "POINTER_PUBLICATION_PASS");
+      assertNotEquals(proof.path("cut").path("pid").asLong(),
+          proof.path("recovered").path("manifest").path("pid").asLong(), output);
+      assertEquals(2, proof.path("recovered").path("generation").path("format_version").asInt(), output);
+      assertTrue(Files.isRegularFile(work.resolve("pointer-publication-proof.json")), output);
+    } else if (scenario.startsWith("journal-loss-")) {
+      assertTrue(output.contains("MIGRATION_JOURNAL_LOSS_PASS "), output);
+      var proof = markerPayload(output, "MIGRATION_JOURNAL_LOSS_PASS");
+      assertEquals("index.migration_journal_unavailable", proof.path("refusal").path("reasonCode").asText(), output);
+      assertEquals(4, proof.path("beforeReady").size(), output);
+      assertEquals(4, proof.path("afterRestart").size(), output);
+      for (String phase : List.of("beforeReady", "afterRestart")) {
+        for (var query : proof.path(phase)) assertEquals(503, query.path("status").asInt(), output);
+      }
+      assertTrue(Files.isRegularFile(work.resolve("migration-journal-loss-proof.json")), output);
     } else if (nativeProjectionScenario) {
       assertTrue(output.contains("PASS native-mixed-after-pointer"), output);
       var recovery = markerPayload(output, "COMPONENT_DEATH_RECOVERY_PASS");

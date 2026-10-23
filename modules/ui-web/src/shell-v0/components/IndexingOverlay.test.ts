@@ -22,12 +22,12 @@ describe('IndexingOverlay (slice 460)', () => {
     __resetModalityForTest();
   });
 
-  it('renders header + explain text', async () => {
+  it('S33.4 without an observation renders an unconfirmed header and explanation', async () => {
     const el = make();
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Batch Processing Active');
+    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Indexing status unconfirmed');
     expect(el.shadowRoot?.querySelector('.explain')?.textContent).toContain(
-      'embeddings',
+      'Waiting for a fresh status observation.',
     );
   });
 
@@ -152,6 +152,7 @@ describe('IndexingOverlayHost — numbers come from the one projection (813)', (
       // below would read 999/999.
       index: { embeddingQueueSize: known(999), vduQueueSize: known(999) },
       snapshotLive: true,
+      indexingStatusLive: true,
       status,
       // 813 §20 — see above: both store memories are part of the shape this fixture claims to be.
       episodeMaxPendingJobs: 0,
@@ -159,6 +160,13 @@ describe('IndexingOverlayHost — numbers come from the one projection (813)', (
     } as unknown as AiState;
     return el;
   };
+
+  it('does not present retry waiting as active work in a blocking overlay', () => {
+    expect(host({ worker: {
+      core: { indexState: 'WAITING', pendingJobs: 8, pendingVduCount: 7 },
+      enrichment: { embeddingEnabled: true, embeddingDocCount: 100, embeddingPendingCount: 12 },
+    } }).render()).toBe(nothing);
+  });
 
   it('renders the status-poll pending counts, not the inference-poll queue residue', () => {
     const out = host({

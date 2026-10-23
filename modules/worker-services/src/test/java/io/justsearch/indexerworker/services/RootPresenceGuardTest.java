@@ -122,7 +122,7 @@ final class RootPresenceGuardTest {
     assertEquals(java.util.Optional.of("windows-volume:1"), volumes.recorded(root),
         "the first volume stands");
 
-    volumes.forgetUnder(root.toString());
+    volumes.forgetUnder(root.toString(), ignored -> true);
 
     assertEquals(java.util.Optional.empty(), volumes.recorded(root));
     assertEquals(java.util.Optional.empty(), volumes.recorded(root.resolve("live")));

@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T01:35:10.696Z",
+  "revision": "c5285b8ca88a2a771536df480c1de46631ae6196",
+  "tree": "d148b51849527c3b8317fa4a3483f1706c307237",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s68pylno/tmp/test-intent-vitest-3581486-1792719297332.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6369
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#shows the base as version 1 of the fork and pages forward into the branch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the version pager shows the base as version 1 of the fork and pages forward into the branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 discovers every old version on both sides after reload without enlarging recents",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a branch discovery S16.1 discovers every old version on both sides after reload without enlarging recents",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 hides counts while pending and failed and preserves typing",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a branch discovery S16.2 hides counts while pending and failed and preserves typing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 refreshes old fork membership on creation and deletion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a branch discovery S16.2 refreshes old fork membership on creation and deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a branch discovery S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 restores the neutral immediate-parent control for an old locked branch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a branch discovery S16.3 restores the neutral immediate-parent control for an old locked branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 uses a neutral name for a hidden parent on an empty branch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a branch discovery S16.3 uses a neutral name for a hidden parent on an empty branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 pages an empty continuation at the last answer from base and branch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 pages an empty continuation at the last answer from base and branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#BN1 S16.2 Retry sends while complete fork reads are still pending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BN1 S16.2 Retry sends while complete fork reads are still pending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 S16.2 waits for branch lineage before presenting a fork count",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S16.1 S16.2 waits for branch lineage before presenting a fork count",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b1e8223b8",
+    "revision": "b1e8223b8d93426668555cdbac2f0fd3966b6fe3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s68pylno/tmp/test-intent-vitest-3581486-1792719304705.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5844,
+        "output": "JSON report written to /home/elias/.cache/am/s68pylno/tmp/test-intent-vitest-3581486-1792719304705.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#shows the base as version 1 of the fork and pages forward into the branch",
+        "classification": "assertion",
+        "detail": "the version pager shows the base as version 1 of the fork and pages forward into the branch:  AssertionError: expected undefined to be '2 / 2' // Object.is equality\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:672:102\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 discovers every old version on both sides after reload without enlarging recents",
+        "classification": "assertion",
+        "detail": "WP1.4a branch discovery S16.1 discovers every old version on both sides after reload without enlarging recents:  AssertionError: expected [] to deeply equal [ '1 / 2', '1 / 121' ]\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1637:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 hides counts while pending and failed and preserves typing",
+        "classification": "assertion",
+        "detail": "WP1.4a branch discovery S16.2 hides counts while pending and failed and preserves typing:  AssertionError: expected [ '1 / 2' ] to deeply equal []\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1699:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 refreshes old fork membership on creation and deletion",
+        "classification": "assertion",
+        "detail": "WP1.4a branch discovery S16.2 refreshes old fork membership on creation and deletion:  AssertionError: expected [] to include '1 / 121'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-br"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+        "classification": "assertion",
+        "detail": "WP1.4a branch discovery S16.3 S16.4 names the immediate parent and opens it through an accessible native control:  AssertionError: expected '' to contain 'why did the renewal fail?'\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1737:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 restores the neutral immediate-parent control for an old locked branch",
+        "classification": "assertion",
+        "detail": "WP1.4a branch discovery S16.3 restores the neutral immediate-parent control for an old locked branch:  AssertionError: expected '' to contain 'Original conversation'\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1754:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 uses a neutral name for a hidden parent on an empty branch",
+        "classification": "assertion",
+        "detail": "WP1.4a branch discovery S16.3 uses a neutral name for a hidden parent on an empty branch:  AssertionError: expected '' to contain 'Original conversation'\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1776:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 pages an empty continuation at the last answer from base and branch",
+        "classification": "assertion",
+        "detail": "WP1.4a continuation and lineage boundaries S16.1 pages an empty continuation at the last answer from base and branch:  AssertionError: expected undefined to be '2 / 2' // Object.is equality\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1789:102\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+        "classification": "assertion",
+        "detail": "WP1.4a continuation and lineage boundaries S16.1 keeps the parent fork on the first own turn and own forks on later turns:  AssertionError: expected '2 / 2' to be '2 / 3' // Object.is equality\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1814:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-discovery/mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+        "classification": "assertion",
+        "detail": "S16.2 never labels a removed open branch as the base version while absence is unconfirmed:  AssertionError: expected <span class=\"version-count\" …(1)></span> to be null\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1860:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-disc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#BN1 S16.2 Retry sends while complete fork reads are still pending",
+        "classification": "assertion",
+        "detail": "BN1 S16.2 Retry sends while complete fork reads are still pending:  AssertionError: expected <span class=\"version-count\" …(1)></span> to be null\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1878:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-disc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 S16.2 waits for branch lineage before presenting a fork count",
+        "classification": "assertion",
+        "detail": "S16.1 S16.2 waits for branch lineage before presenting a fork count:  AssertionError: expected <span class=\"version-count\" …(1)></span> to be null\n    at /home/elias/.cache/am/s68pylno/tmp/test-intent-before-DzzJfi/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1900:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-branch-disc"
+      }
+    ]
+  },
+  "digest": "sha256:548eb9f3214dcec8ceefaf5c0b9047874ff61edf43c5d5517c7185862c7d332a"
+}

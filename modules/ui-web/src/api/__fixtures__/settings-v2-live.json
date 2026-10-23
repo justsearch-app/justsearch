@@ -6,7 +6,6 @@
     "vimMode" : true,
     "defaultAction" : "reveal",
     "inspectorWidth" : 400,
-    "pauseIndexingDuringAi" : true,
     "mode" : "advanced",
     "hasSeenTrustLoopNudge" : true,
     "excludePatterns" : [ "*.tmp", "node_modules/**" ],

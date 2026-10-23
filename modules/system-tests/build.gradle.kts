@@ -183,6 +183,8 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/native-projection-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/component-recovery-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/migration-journal-loss-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/pointer-publication-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/operation-resume-scenario.mjs"))
@@ -205,31 +207,18 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     }
   }
 
-  // Time limit: 30 minutes default, 30 for agent tests, configurable for AI runs.
-  //
-  // Tempdoc 821 P4 — this task timeout, not the job budget (ci.yml:529), is the binding
-  // ceiling, and Gradle enforces it by killing the forked test JVM. That destroys the fixture's
-  // diagnostics exactly like the 30s @BeforeAll cap below did, so it has to clear the
-  // retry-amplified worst case rather than the happy-path wall.
-  //
-  // Arithmetic: Develocity sets maxRetries=2 in CI (JvmBaseConventionsPlugin.kt:135), so a class
-  // whose @BeforeAll stalls is booted 3 times. That is not hypothetical — OperationPreviewE2ETest
-  // exhausted all 3 attempts, ~100s apart, in run 31730197618 on 2026-08-13. The fixture worst
-  // case per boot is now ~400s (PORT_FILE 60s + HEALTH 240s + WORKER_READY 90s + HttpClient send
-  // overshoot), up from ~250s when HEALTH was 90s, so 3 boots cost ~20 min on top of the ~8.5 min
-  // this tier takes to run everything else (measured: the Gradle step of run 31716264505 ran
-  // 8m28s) = ~28.5 min. 22 min held the old ~250s worst case with ~1 min margin but cannot hold
-  // this one; 30 min clears it with ~1.5 min margin.
-  //
-  // Cost note: the extra budget is spent only when a boot genuinely stalls three times. The
-  // common case is unchanged (~8.5 min), and a dead backend still fails in seconds via the
-  // fixture's process.isAlive() check rather than burning any of it.
-  //
-  // The AI and agent branches are already >= this and need no change.
+  // Time limit: 50 minutes default, 30 for agent tests, configurable for AI runs.
+  // Hosted Windows JUnit class totals (27 classes, 124 tests): 20.0 min in run 39702407839
+  // (24 min Gradle step), 25.8 min in run 39772670475 (35 min job timeout, ~7 min setup).
+  // OperationResumeE2ETest alone takes 7.7–9.2 min; run 39750061965 hit the old 30 min task cap.
+  // CI maxRetries=2 means 3 boots of a stalled class, each up to ~400s (PORT_FILE 60s +
+  // HEALTH 240s + WORKER_READY 90s + HttpClient send overshoot): ~20 min + ~26 min worst
+  // observed tier = ~46 min, so 50 min clears it. Gradle kills the test JVM at this ceiling,
+  // losing fixture diagnostics; ci.yml keeps the job budget above it for setup and uploads.
   val integrationTestTimeoutMinutes = when {
     includeAiTests -> ragEvalTimeoutMinutes
     includeAgentTests -> 30
-    else -> 30
+    else -> 50
   }
   timeout.set(Duration.ofMinutes(integrationTestTimeoutMinutes.toLong()))
 

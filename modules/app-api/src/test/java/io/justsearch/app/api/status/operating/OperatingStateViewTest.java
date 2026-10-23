@@ -27,11 +27,11 @@ final class OperatingStateViewTest {
   @Test
   @DisplayName("enums have exactly the reconciled members and wire casing")
   void vocabulary() throws Exception {
-    assertEquals(List.of("IDLE", "RUNNING", "SLOWED", "PAUSED"), names(IndexingState.class));
+    assertEquals(List.of("IDLE", "RUNNING", "SLOWED", "PAUSING", "PAUSED"), names(IndexingState.class));
     assertEquals(List.of("P16_PLUS", "P12", "P8", "NO_GPU", "UNRESOLVED"), names(Profile.class));
     assertEquals(List.of("MEASURED", "USER_OVERRIDE"), names(ProfileSource.class));
     assertEquals(
-        List.of("game_mode", "gpu_busy_external", "energy_saver", "chat_generating"),
+        List.of("user_paused", "settings_recovery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"),
         Arrays.stream(IndexingReason.values()).map(r -> MAPPER.writeValueAsString(r)
             .replace("\"", "")).toList(),
         "lower_snake on the wire, in precedence order");

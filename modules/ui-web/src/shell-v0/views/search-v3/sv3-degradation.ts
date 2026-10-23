@@ -28,6 +28,7 @@
  * Pure data → data. The composer renders it and decides nothing, which is what keeps the wording
  * identical to the shipped window's.
  */
+import { selectIndexingProgress, type IndexingProgress } from '../../state/indexingProgress.js';
 import type { AiState } from '../../state/aiStateStore.js';
 import {
   OPEN_HEALTH,
@@ -130,13 +131,14 @@ export function sv3RemedyReference(remedy: NoticeRemedy): Sv3DegradationRemedy {
 export function sv3DegradationCauses(
   codes: readonly string[],
   notice: ReadinessNoticeView,
+  activity?: IndexingProgress['activity'],
 ): Sv3DegradationCause[] {
   const scoped = new Set(notice.causes);
   const out: Sv3DegradationCause[] = [];
   const seen = new Set<string>();
   for (const code of codes) {
     if (seen.has(code)) continue;
-    const wording = reasonFor(code).wording;
+    const wording = reasonFor(code, activity).wording;
     if (!scoped.has(wording)) continue;
     seen.add(code);
     out.push({ code, wording });
@@ -160,14 +162,16 @@ export function projectSv3Degradation(snapshot: AiState | null): Sv3Degradation 
   const verdict = snapshot?.verdict;
   if (verdict === undefined) return null;
   if (!warrantsSearchDegradationBanner(verdict)) return null;
-  const notice = readinessNotice(verdict);
+  const activity = snapshot ? selectIndexingProgress(snapshot.status, snapshot.indexingStatusLive,
+    snapshot.episodeMaxPendingJobs, snapshot.enrichSettleSamples).activity : undefined;
+  const notice = readinessNotice(verdict, activity);
   // Unreachable: the predicate above already returns false for a null notice. Kept as the type's
   // own narrowing rather than a non-null assertion, which would outlive the predicate's contract.
   if (notice === null) return null;
   return {
     headline: notice.headline,
     body: notice.body,
-    causes: sv3DegradationCauses(verdict.reasons, notice),
+    causes: sv3DegradationCauses(verdict.reasons, notice, activity),
     remedy: sv3RemedyReference(notice.remedy),
     severity: verdict.severity,
   };

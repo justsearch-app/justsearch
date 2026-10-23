@@ -44,6 +44,7 @@ import {
 } from '../../../api/streams.js';
 import type { CoreRagAskHandlers } from '../../../api/generated/shape-handlers/core-rag-ask.js';
 import { buildRequestBody } from '../unifiedChatRequest.js';
+import { authorizedFetch } from '../../api/authorizedFetch.js';
 // The ONE stream-error vocabulary (slice 497; inventory E9). A technical code becomes the same
 // sentence here as it does in the shipped window; an abort never reaches it (see the catch below).
 import { friendlyStreamError } from '../../utils/streamError.js';
@@ -68,6 +69,7 @@ import {
   claimsFromRecord,
   matchesFromRecord,
   readScorer,
+  coverageFactsFromRecord,
 } from '../../components/chat/recordEvidence.js';
 import type { Sv3ContextUsage, Sv3TurnEvidence } from './sv3-sessions.js';
 // Tempdoc 610 §E.4 — the ONE reading of the terminal's own occupancy report, next to the meter it
@@ -76,6 +78,9 @@ import { readSv3ContextUsage } from './sv3-context.js';
 
 /** The one shape this window's ask route dispatches. */
 export const SV3_ASK_SHAPE_ID = 'core.rag-ask';
+
+/** Model answers use the persistent store as their only source of conversation history (D6). */
+export const SV3_MODEL_SHAPE_ID = 'core.free-chat';
 
 /**
  * How much work the next question asks for (tempdoc 822 Phase F10; the §4b ADAPTATION RATIFIED —
@@ -191,18 +196,33 @@ export function sv3EffortParams(effort: Sv3Effort): Readonly<Record<string, unkn
 
 export interface Sv3AskRequest {
   readonly apiBase: string;
+  /** Present only for Structured; the existing dispatch and terminal rules are shared. */
+  readonly schema?: string;
   readonly question: string;
   /** The window's session id — stamped on every dispatch so the backend records the turn. */
   readonly conversationId: string;
   /** The composer's effort rung for THIS send; omitted is the default rung, not "no parameters". */
   readonly effort?: Sv3Effort;
+  /** Explicitly answer without retrieval; history comes only from the persistent store. */
+  readonly modelAnswer?: boolean;
   /**
    * WP1.1 — the document PATHS retrieval is limited to (what the backend's `docIds` filter
    * matches). Omitted asks the whole index; the window never sends an empty list for a choice.
    */
   readonly docIds?: readonly string[];
+  /**
+   * The conversation so far, as `{role, content}` messages, for a FOLLOW-UP (S2.0) — the window's
+   * effective context (`sv3-context.ts` sv3FollowUpContext). The ask shape is ephemeral, so this is
+   * all the model and the follow-up rewrite know of the earlier turns. Omitted or empty sends none.
+   */
+  readonly context?: readonly { readonly role: string; readonly content: string }[];
+  /** This dispatch's own id, which the reader's Stop names to the Engine ({@link sv3StopAsk}). */
+  readonly turnId?: string;
   readonly signal?: AbortSignal;
 }
+
+/** The `errorCode` the Engine ends a turn with when the reader's Stop ended it. */
+const SV3_STOPPED_CODE = 'CANCELLED';
 
 export interface Sv3AskSink {
   /** Streaming text, delta by delta. The accumulated answer lives in the caller's turn. */
@@ -239,9 +259,18 @@ export interface Sv3AskSink {
   onDone(usage: Sv3ContextUsage | null): void;
   /** The session lock refused this send (HTTP 423) — the ONLY 423 consumer in this window. */
   onRefused(): void;
-  /** The reader pressed Stop. Whatever streamed so far is kept; the turn is halted, not failed. */
+  /**
+   * The Engine ended the turn because the reader pressed Stop, and saved it as stopped. Whatever
+   * streamed so far is kept; the turn is halted, not failed.
+   */
   onHalted(): void;
-  onFailed(message: string): void;
+  /**
+   * The window let the stream go (it left the conversation, or went away) and was told nothing more:
+   * the Engine goes on and saves the turn as it ends, so what this window holds of it is not what is
+   * saved.
+   */
+  onLeft(): void;
+  onFailed(message: string, code?: string): void;
 }
 
 /**
@@ -344,23 +373,29 @@ function claimsOf(acc: Map<number, ClaimAcc>, scorer: string | null): Claim[] {
 }
 
 /**
- * Dispatch one grounded ask and drive `sink` from the stream.
- *
- * `docIds` is empty by construction: this window has no committed document set to scope an answer to
- * (the retired search-v2 window's frozen-snapshot law has no counterpart here yet), and an empty
- * array is the backend's documented open-retrieval fallback (`views/unifiedChatRequest.ts:80-84`) rather than a scope this
- * FE invented.
+ * Dispatch an Ask, or the explicit model-answer action, through the same stream lifecycle.
+ * A model answer sends sessionId and its new prompt, with no client history (D6).
+ * An Ask carries its chosen files and the effective follow-up context.
  */
 export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void> {
-  const body = buildRequestBody(SV3_ASK_SHAPE_ID, req.question, req.conversationId, '', [
+  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract', req.question, req.conversationId, req.schema ?? '', [
     ...(req.docIds ?? []),
   ]);
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
+  if (req.schema !== undefined && (req.docIds?.length ?? 0) > 0) {
+    body.selection = { kind: 'result-set', items: [...new Set(req.docIds)].map(id => ({ id, kind: 'search-hit' })) };
+  }
   // The effort rung's parameters, added AFTER the shared builder rather than inside it: the builder
   // is the shipped window's authority over the per-shape body and this window may not widen it. The
   // fields land beside `conversationId`, which arrives the same way and for the same reason.
   Object.assign(body, sv3EffortParams(req.effort ?? SV3_EFFORT_DEFAULT));
+  // The follow-up's conversation, read by `ExternalContextInjector` (into the prompt) and
+  // `QueryRewriteInjector` (to rewrite the question). Same late-add as the fields above.
+  if (!req.modelAnswer && req.context !== undefined && req.context.length > 0) {
+    body.context = req.context.map((m) => ({ role: m.role, content: m.content }));
+  }
+  if (req.turnId !== undefined) body.turnId = req.turnId;
 
   let sources: readonly RetrievalCitation[] = [];
   let matches: readonly CitationMatch[] = [];
@@ -369,6 +404,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   let retrievalModeCause = '';
   /** The producer the LAST `rag.citation_matches` envelope named; `null` until one says (847 §2.5). */
   let scorer: string | null = null;
+  let coverage: ReturnType<typeof coverageFactsFromRecord> = {};
   const claims = new Map<number, ClaimAcc>();
   /**
    * The evidence record is rebuilt WHOLE on every contributing event and handed over as one value,
@@ -383,6 +419,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       retrievalMode,
       retrievalModeReason,
       retrievalModeCause,
+      ...coverage,
     });
 
   /**
@@ -395,6 +432,10 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   const handlers: CoreRagAskHandlers = {
     onDone(payload: unknown) {
       usage = readSv3ContextUsage(payload);
+      if (req.schema !== undefined) {
+        const final = (payload as { finalResponse?: unknown } | null)?.finalResponse;
+        if (typeof final === 'string') sink.onDelta(final);
+      }
     },
     onReasoningChunk(payload: unknown) {
       sink.onReasoning(payload);
@@ -407,7 +448,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     onChunk(payload: unknown) {
       const p = payload as { text?: unknown } | string | null;
       const delta = typeof p === 'string' ? p : typeof p?.text === 'string' ? p.text : '';
-      if (delta === '') return;
+      if (delta === '' || req.schema !== undefined) return;
       sink.onDelta(delta);
     },
     onRagMeta(payload: unknown) {
@@ -451,6 +492,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       // numbers — whose supported and unsupported bands interleave at a 0.0049 margin (836 §9.7) —
       // with cross-encoder-calibrated grounding tiers.
       scorer = readScorer(p);
+      coverage = coverageFactsFromRecord(p);
       // The panel answers to the same verdict as the marks: an unadmitted producer's matches carry
       // no per-source tier, so the sources list and the answer text say the same thing (847 §2.3).
       matches = matchesFromRecord(p);
@@ -494,6 +536,11 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // test environments), so keying on the error's shape would report the reader's own Stop as a
     // backend failure on some runtimes and not others.
     if (req.signal?.aborted === true) {
+      sink.onLeft();
+      return;
+    }
+    // The Engine's own end of a turn the reader stopped: it is saved as stopped (`CANCELLED`).
+    if ((err as Error & { code?: string }).code === SV3_STOPPED_CODE) {
       sink.onHalted();
       return;
     }
@@ -507,9 +554,41 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // The shared mapping, reached only AFTER the abort and the refusal have been ruled out above —
     // which is exactly the shipped window's ordering (`views/UnifiedChatView.ts:6019-6024`) and the
     // reason a reader's own Stop is never worded as a failure (inventory E9).
-    sink.onFailed(friendlyStreamError(err));
+    sink.onFailed(friendlyStreamError(err), (err as Error & { code?: string }).code);
     return;
   }
 
   sink.onDone(usage);
+}
+
+/**
+ * The reader's Stop, told to the Engine (S2.3). Aborting the stream alone only leaves: the Engine
+ * keeps answering and saves a turn the reader never saw finish. Told, it ends the turn and saves it
+ * as stopped, with its question, its "Interpreted as" note, its thinking, its sources and what had
+ * streamed. A Stop that overtakes its dispatch stops the turn when it starts. A closed tab sends
+ * nothing, and a turn whose answer is already saved is left as it is.
+ *
+ * The stream is NOT let go here: the turn's own stream says how it ended — stopped (and saved so)
+ * or finished first — and carries every word the Engine sent before the Stop landed, which is what
+ * it saves. Resolves whether the Engine took the Stop; false when it was refused or never answered,
+ * and the answer goes on.
+ */
+export async function sv3StopAsk(
+  apiBase: string,
+  conversationId: string,
+  turnId: string,
+): Promise<boolean> {
+  try {
+    const response = await authorizedFetch(
+      `${apiBase}/api/chat/conversations/${encodeURIComponent(conversationId)}/stop`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turnId }),
+      },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

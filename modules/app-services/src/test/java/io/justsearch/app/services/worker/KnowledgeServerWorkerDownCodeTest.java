@@ -28,6 +28,19 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class KnowledgeServerWorkerDownCodeTest {
 
+  @Test
+  void migrationJournalRefusalSurvivesLaterGenericFailure(@TempDir Path tempDir) {
+    WorkerFatalReasonMarker.write(tempDir, "migration_journal_unavailable");
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "startup failed");
+      assertEquals("index.migration_journal_unavailable", bootstrap.workerCapability().pendingReason());
+      assertTrue(bootstrap.workerCapability().pendingDetail().contains("kept for repair"));
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "retry failed");
+      assertEquals("index.migration_journal_unavailable", bootstrap.workerCapability().pendingReason());
+    }
+  }
+
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
         false, dir, dir, dir,

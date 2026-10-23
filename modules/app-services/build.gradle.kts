@@ -1,6 +1,5 @@
 ﻿plugins {
   `java-library`
-  `java-test-fixtures`
   id("jvm-test-suite")
   id("conventions.jvm-base")
   // Scoped to the seams registered for this module in governance/logic-seams.v1.json (tempdoc 627:
@@ -111,29 +110,6 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
       }
-      targets {
-        all {
-          testTask.configure {
-            // Throttles ONLY this suite's internal fork parallelism. In CI the shared
-            // TestGateService already serializes cross-module Test tasks (testParallelism=1,
-            // see JvmBaseConventionsPlugin), so this does not guard against cross-module
-            // contention. app-services lives in the measured critical-path shard (app-ui,
-            // slowest in 12/15 sampled runs; tempdoc 668). This `1` is a conservative default,
-            // not a memory constraint: the hosted runner has 16 GiB (2x384 MB forks + a 1 GB
-            // daemon is trivial) and only 4 vCPUs, so the real ceiling is CPU. Raising to 2 is
-            // plausibly safe but is an optimization-band change deferred to hosted validation
-            // (tempdoc 668 scope boundary), not made here.
-            maxParallelForks = 1
-            jvmArgs("--enable-native-access=ALL-UNNAMED")
-            jvmArgs("-Dnet.bytebuddy.experimental=true")
-            // Forward the regen flag to the forked test JVM so the documented
-            // `-Dupdate.shapes.fixture=true` (read by ConversationShapeFixtureGenTest) actually works.
-            providers.systemProperty("update.shapes.fixture").orNull?.let {
-              systemProperty("update.shapes.fixture", it)
-            }
-          }
-        }
-      }
     }
     register<JvmTestSuite>("integrationTest") {
       useJUnitJupiter()
@@ -168,7 +144,24 @@ testing {
 // three separate times, every one of them under a concurrent Gradle build, and passed on every
 // isolated re-run. Excluding it here is what stops a contended machine reddening `build`; its
 // assertions and its timings are untouched, and `loadSensitiveUnitTest` below is where it runs.
-tasks.named<Test>("test") {
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  // Throttles ONLY this suite's internal fork parallelism. In CI the shared
+  // TestGateService already serializes cross-module Test tasks (testParallelism=1,
+  // see JvmBaseConventionsPlugin), so this does not guard against cross-module
+  // contention. app-services lives in the measured critical-path shard (app-ui,
+  // slowest in 12/15 sampled runs; tempdoc 668). This `1` is a conservative default,
+  // not a memory constraint: the hosted runner has 16 GiB (2x384 MB forks + a 1 GB
+  // daemon is trivial) and only 4 vCPUs, so the real ceiling is CPU. Raising to 2 is
+  // plausibly safe but is an optimization-band change deferred to hosted validation
+  // (tempdoc 668 scope boundary), not made here.
+  maxParallelForks = 1
+  jvmArgs("--enable-native-access=ALL-UNNAMED")
+  jvmArgs("-Dnet.bytebuddy.experimental=true")
+  // Forward the regen flag to the forked test JVM so the documented
+  // `-Dupdate.shapes.fixture=true` (read by ConversationShapeFixtureGenTest) actually works.
+  providers.systemProperty("update.shapes.fixture").orNull?.let {
+    systemProperty("update.shapes.fixture", it)
+  }
   useJUnitPlatform { excludeTags("load-sensitive") }
   // Lane F stage B item B7. SupervisionContractTest reads governance/supervision-contract.v1.json
   // as DATA — it is not on any classpath — so an edit to the register alone leaves this task
@@ -255,8 +248,8 @@ tasks.register<JavaExec>("runSearchDump") {
 }
 
 // Registry snapshot for the consumer-presence governance gate (tempdoc 560 §5/§6). Always-run
-// (no up-to-date caching) so the snapshot the Node gate reads is never stale; mirrors the
-// module-deps gate's tmp/*.json generation step. Run before `node scripts/governance/run.mjs
+// (no up-to-date caching) so the snapshot the Node gate reads is never stale.
+// Run before `node scripts/governance/run.mjs
 // --gate consumer-presence`.
 tasks.register<JavaExec>("exportRegistrySnapshot") {
   group = "verification"

@@ -18,6 +18,7 @@
  */
 
 import type { StatusResponse } from '../../api/generated/index.js';
+import { formatCount } from '../display/format.js';
 
 /**
  * The 813 §3a phase model, index-wide scope. `Scanning` is per-scan (the scan SSE) and is therefore
@@ -31,7 +32,7 @@ import type { StatusResponse } from '../../api/generated/index.js';
  * reachable (`unreachable-seed-green`). It is deliberately NOT folded into `enriching`: nothing is
  * running, so no percent moves and no estimate exists.
  */
-export type IndexingPhase = 'indexing' | 'enriching' | 'blocked' | 'ready' | 'unknown';
+export type IndexingPhase = 'indexing' | 'pausing' | 'paused' | 'waiting' | 'error' | 'enriching' | 'blocked' | 'ready' | 'unknown';
 
 /**
  * 813 §4 — which PARENT enrichment stages are applicable to this deployment, index-wide.
@@ -87,6 +88,15 @@ export interface EnrichSettleSample {
 }
 
 export interface IndexingProgress {
+  /** WP3.7: Engine-confirmed policy hold, distinct from automatic enrichment holds. */
+  pause?: { state: 'pausing' | 'paused'; reason: string; untilEpochMs: number | null; waiting: boolean } | null;
+  /** WP3.3: one account of current activity and automatic holds for every status surface. */
+  activity: {
+    summary: string;
+    detail: string | null;
+    confirmed: boolean;
+    enrichmentDeferred: boolean;
+  };
   /** §3a phase. `unknown` ⟹ no trustworthy progress observation; NO number below may be rendered. */
   phase: IndexingPhase;
   /** Non-terminal job rows (PENDING + PROCESSING) — `worker.core.pendingJobs` (the queueDepth projection). */
@@ -98,7 +108,7 @@ export interface IndexingProgress {
   /**
    * Settled-over-total across every APPLICABLE enrichment stage (parent embedding/SPLADE/NER + the
    * chunk tier), 0-100, rounded. `null` when there is no faithful denominator — the worker did not
-   * report, or no stage has any documents to enrich. Never NaN, never a fabricated number
+   * report, no stage has documents to enrich, or no work has settled yet. Never NaN, never a fabricated number
    * (`availability.ts:193-194`'s discipline, applied to progress).
    */
   enrichingPercent: number | null;
@@ -160,7 +170,7 @@ export interface IndexingProgress {
    */
   etaSeconds: number | null;
   /**
-   * 813 §19 (W2) — the DETERMINATE position of the `indexing` phase's drain, 0-100, measured against
+   * 813 §19 (W2) — the DETERMINATE position of the `indexing` phase's drain, 0-99, measured against
    * the largest backlog observed this drain episode (`AiState.episodeMaxPendingJobs`, the store's
    * cross-poll memory). `null` whenever there is no denominator to be honest about:
    *  - any phase other than `indexing` (the enrichment fraction is {@link enrichingPercent}'s job);
@@ -172,6 +182,8 @@ export interface IndexingProgress {
    * truthful than showing it.
    */
   indexingPercent: number | null;
+  /** Indicative generation rebuild fraction; absent when the observation is unconfirmed. */
+  rebuildPercent: number | null;
   /**
    * 813 Slice B — the byte weight of the remaining job backlog (`worker.core.pendingBytes`), or
    * `null` when it would not be faithful: nothing recorded, the worker could not compute the
@@ -181,7 +193,7 @@ export interface IndexingProgress {
   pendingBytes: number | null;
   /**
    * Is this snapshot still a LIVE observation? Threaded in from the ONE liveness authority
-   * (`AiState.snapshotLive`, 807 A.3) — this module does NOT invent a staleness signal, and in
+   * (`AiState.indexingStatusLive`) — this module does NOT invent a staleness signal, and in
    * particular never reads `chunkCoverage.observedAtMs`, which is a Head serialization stamp.
    */
   live: boolean;
@@ -200,7 +212,7 @@ export interface IndexingProgress {
  * (`WorkerStatusCache.status()` / `CoreIndexView.fallback`), so its zeros are absence, not "settled".
  * Reading them as `ready` is the "0 == done" lie this allowlist exists to prevent.
  */
-const INDEX_REPORTED_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'ERROR', 'FAILED']);
+const INDEX_REPORTED_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'WAITING', 'ERROR', 'FAILED']);
 
 /**
  * Does this snapshot carry a WORKER-REPORTED index block (as opposed to the hard-zeroed fallback
@@ -215,6 +227,8 @@ export function isWorkerReportedIndex(status: StatusResponse | null | undefined)
 }
 
 const EMPTY: IndexingProgress = {
+  pause: null,
+  activity: { summary: 'Indexing status unconfirmed', detail: null, confirmed: false, enrichmentDeferred: false },
   phase: 'unknown',
   jobsPending: 0,
   jobsRunning: 0,
@@ -228,6 +242,7 @@ const EMPTY: IndexingProgress = {
   vduPending: 0,
   etaSeconds: null,
   indexingPercent: null,
+  rebuildPercent: null,
   pendingBytes: null,
   live: false,
   // Nothing was reported ⟹ applicability is UNKNOWN ⟹ no per-root percent may be asserted. `null`,
@@ -389,10 +404,13 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
  * the semantic stage cannot run — a SPLADE-only backfill is still visible as a stage row in the
  * disclosure, so nothing is hidden by saying the truer thing in the headline.
  */
-function derivePhase(jobsPending: number, work: EnrichmentWork): IndexingPhase {
+function derivePhase(indexState: string | null | undefined, jobsPending: number, work: EnrichmentWork): IndexingPhase {
+  // Eligibility is decided by the queue in the Worker; browser time never makes a retry due.
+  if (indexState === 'WAITING') return 'waiting';
   if (jobsPending > 0) return 'indexing';
-  if (work.blockedPending > 0) return 'blocked';
-  return work.rawPending > 0 ? 'enriching' : 'ready';
+  if (work.blockedPending > 0) return indexState === 'ERROR' ? 'error' : 'blocked';
+  if (work.rawPending > 0) return 'enriching';
+  return indexState === 'ERROR' ? 'error' : 'ready';
 }
 
 /**
@@ -408,7 +426,25 @@ export function selectIndexingPhase(status: StatusResponse | null | undefined): 
   if (!isWorkerReportedIndex(status) || !core) return 'unknown';
   // The counts remain real, but no progress or completion claim survives a fatal loop death.
   if (core.indexState === 'FAILED') return 'unknown';
-  return derivePhase(count(core.pendingJobs), readEnrichmentWork(status));
+  return policyPause(status)?.state ?? derivePhase(core.indexState, count(core.pendingJobs), readEnrichmentWork(status));
+}
+
+// Automatic PAUSED is a narrower hold: text indexing can still run (WP3.3).
+const AUTOMATIC_REASONS: ReadonlySet<string> = new Set([
+  'game_mode', 'gpu_busy_external', 'energy_saver', 'chat_generating',
+]);
+const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
+  ['user_paused', 'Paused by you.'],
+  ['settings_recovery', 'Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.'],
+]);
+
+function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
+  const indexing = status?.operating?.indexing;
+  if (!indexing || (indexing.state !== 'PAUSING' && indexing.state !== 'PAUSED')) return null;
+  const reason = indexing.reasons.find(r => !AUTOMATIC_REASONS.has(r));
+  if (!reason) return null;
+  return { state: indexing.state === 'PAUSING' ? 'pausing' : 'paused', reason: reason ?? '',
+    untilEpochMs: indexing.untilEpochMs, waiting: indexing.waitingForResume };
 }
 
 /**
@@ -531,7 +567,8 @@ function derivePendingBytes(
  * Derive the index-wide progress projection from one `/api/status` snapshot.
  *
  * @param status the retained poll snapshot (`AiState.status`); `null` before the first poll.
- * @param snapshotLive the ONE liveness answer (`AiState.snapshotLive`).
+ * @param indexingStatusLive the store's indexing-observation freshness answer (`AiState.indexingStatusLive`),
+ *   bounded by worker sample/receipt age even while inference or SSE still confirms reachability.
  * @param episodeMaxPendingJobs the CROSS-POLL memory this pure function cannot have: the largest
  *   backlog observed during the current drain episode (`AiState.episodeMaxPendingJobs`, owned and
  *   stamped by the store). REQUIRED, not optional-with-a-default: a defaulted parameter would let
@@ -544,13 +581,13 @@ function derivePendingBytes(
  */
 export function selectIndexingProgress(
   status: StatusResponse | null | undefined,
-  snapshotLive: boolean,
+  indexingStatusLive: boolean,
   episodeMaxPendingJobs: number,
   enrichSettleSamples: readonly EnrichSettleSample[],
 ): IndexingProgress {
   const core = status?.worker?.core;
   if (!isWorkerReportedIndex(status) || !core || core.indexState === 'FAILED') {
-    return { ...EMPTY, live: snapshotLive };
+    return { ...EMPTY, live: indexingStatusLive };
   }
 
   const migration = status.worker?.migration;
@@ -580,12 +617,27 @@ export function selectIndexingProgress(
   // Symmetric rule (owner finding, 2026-08-06): never a fake 100% either — Math.round lets a
   // sub-half-percent tail (e.g. 2 of 600 pending) render "100%" beside "semantic search catching
   // up", a full bar contradicting its own caveat. While ANY counted work is pending the display
-  // is capped at 99; a true 100 is only reachable when pending === 0 (and the phase gate, which
-  // also sees denominator-less stages, still decides `ready` on its own evidence).
-  const enrichingPercent =
-    total > 0 ? Math.min(pending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100)) : null;
+  // is capped at 99, including denominator-less pending stages. Before any settlement is observed,
+  // withhold a starting percentage just as indexing withholds one before an observed drain.
+  const enrichingPercent = total > pending
+    ? Math.min(work.rawPending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100))
+    : null;
 
-  const phase = derivePhase(jobsPending, work);
+  const confirmed = indexingStatusLive && status.meta?.workerRpcStale !== true &&
+    !status.operating?.freshness?.staleSources?.includes('indexing');
+  const reportedPause = confirmed ? policyPause(status) : null;
+  const pause = reportedPause ? { ...reportedPause,
+    waiting: reportedPause.waiting || jobsPending > 0 || work.rawPending > 0 || count(core.pendingVduCount) > 0 } : null;
+  const phase = pause?.state ?? derivePhase(core.indexState, jobsPending, work);
+  const activity = pause ? {
+    summary: pause.state === 'pausing' ? 'Pausing — finishing current files' : 'Indexing paused',
+    detail: [PAUSE_REASON_WORDING.get(pause.reason) ?? 'Indexing is on hold; reason unavailable.',
+      pause.reason === 'user_paused' && pause.untilEpochMs != null
+        ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
+      pause.waiting && pause.reason !== 'settings_recovery' ? 'Work is waiting for Resume.' : '',
+    ].filter(Boolean).join(' '),
+    confirmed: true, enrichmentDeferred: true,
+  } : indexingActivity(status, indexingStatusLive, phase, work.rawPending);
 
   // 813 §19 (W2) — the high-water denominator. `episodeMax > jobsPending` is the whole admission
   // test: it is simultaneously "a drain was observed" and "the denominator is positive", so the
@@ -593,10 +645,12 @@ export function selectIndexingProgress(
   const episodeMax = count(episodeMaxPendingJobs);
   const indexingPercent =
     phase === 'indexing' && episodeMax > jobsPending
-      ? Math.round(((episodeMax - jobsPending) / episodeMax) * 100)
+      ? Math.min(99, Math.round(((episodeMax - jobsPending) / episodeMax) * 100))
       : null;
 
   return {
+    pause,
+    activity,
     phase,
     jobsPending,
     jobsRunning,
@@ -612,22 +666,96 @@ export function selectIndexingProgress(
     // second pass over the wire.
     enrichingStages: work.rows,
     enrichingEtaSeconds:
-      phase === 'enriching' && snapshotLive
+      phase === 'enriching' && activity.confirmed && !activity.enrichmentDeferred
         ? deriveEnrichEtaSeconds(enrichSettleSamples, pending)
         : null,
     embeddingPending: count(status.worker?.enrichment?.embeddingPendingCount),
     vduPending: count(core.pendingVduCount),
     etaSeconds:
-      phase === 'indexing' && snapshotLive
+      phase === 'indexing' && indexingStatusLive
         ? deriveEtaSeconds(core.recentDocsPerSec, core.recentJobQueueDepth, jobsPending)
         : null,
     indexingPercent,
+    rebuildPercent: !pause && activity.confirmed && count(migration?.activeIndexedDocuments) > 0
+      ? Math.min(99, Math.round(count(migration?.buildingIndexedDocuments) / count(migration?.activeIndexedDocuments) * 100))
+      : null,
     pendingBytes: derivePendingBytes(
       count(core.pendingBytes),
       count(core.pendingUnknownSizeJobs),
       jobsPending,
     ),
-    live: snapshotLive,
+    live: indexingStatusLive,
     stages: applicable,
   };
+}
+
+/** Indexing's mirrored file rows share the observation verdict; independent agent tasks do not. */
+export function indexingTaskStatus(
+  task: { id: string; status: string },
+  activity: IndexingProgress['activity'],
+  phase: IndexingPhase,
+): string {
+  return task.id.startsWith('idxjob:') && (!activity.confirmed ||
+    (phase !== 'indexing' && task.status === 'running'))
+    ? `last observed ${task.status}`
+    : task.status;
+}
+
+/** Automatic reasons describe the work they hold, never the broad wire state's name. */
+function indexingActivity(
+  status: StatusResponse,
+  snapshotLive: boolean,
+  phase: IndexingPhase,
+  enrichingPending: number,
+): IndexingProgress['activity'] {
+  if (!snapshotLive || status.meta?.workerRpcStale === true ||
+      status.operating?.freshness?.staleSources?.includes('indexing')) return EMPTY.activity;
+
+  const reasons = new Set(status.operating?.indexing?.reasons ?? []);
+  // Power is the assembler's authority for this reason; older snapshots can lack operating.
+  const energy = reasons.has('energy_saver') || status.power?.energyReduced === true;
+  const gpuCauses = [
+    ...(reasons.has('game_mode') ? ['a game is running'] : []),
+    ...(reasons.has('gpu_busy_external') ? ['another app is using the GPU'] : []),
+  ];
+  // Withhold active estimates when an idle cycle may wait; wire placement is unreported.
+  const enrichmentDeferred = enrichingPending > 0 && (energy || gpuCauses.length > 0);
+  const details: string[] = [];
+  if (energy) {
+    details.push('Idle enrichment deferred to save energy.');
+    if (phase === 'indexing' && gpuCauses.length === 0) details.push('Sparse enrichment can continue between files.');
+  }
+  if (gpuCauses.length > 0) {
+    const cause = gpuCauses.join(' and ');
+    details.push(`GPU-bound idle enrichment deferred while ${cause}.`);
+    if (!energy) details.push('CPU-only idle enrichment can continue.');
+    details.push('Sparse enrichment between files also waits, including on CPU.');
+  }
+  if (reasons.has('chat_generating') && !enrichmentDeferred) {
+    details.push('Indexing shares time with chat.');
+  }
+  if (phase === 'error') {
+    const failed = count(status.worker?.failure?.failedJobs);
+    return { summary: 'Indexing error',
+      detail: failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be indexed.`
+        : 'Some files could not be indexed.',
+      confirmed: true, enrichmentDeferred };
+  }
+  if (phase === 'waiting') {
+    const jobs = count(status.worker?.core?.pendingJobs);
+    const retry = count(status.worker?.failure?.nextRetryAtMs);
+    const deadline = retry > 0 ? new Date(retry) : null;
+    const nextRetry = deadline && Number.isFinite(deadline.getTime())
+      ? ` Next retry: ${deadline.toLocaleString()}.` : '';
+    return { summary: 'Waiting to retry',
+      detail: `${formatCount(jobs)} ${jobs === 1 ? 'file' : 'files'} waiting.${nextRetry}`,
+      confirmed: true, enrichmentDeferred };
+  }
+  const summary = phase === 'indexing'
+    ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'
+    : phase === 'enriching'
+      ? energy ? 'Enrichment deferred' : gpuCauses.length > 0 ? 'Enrichment pending' : 'Search is ready — still improving'
+      : phase === 'blocked' ? 'Semantic search waiting for AI install'
+        : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Indexing queue empty';
+  return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };
 }

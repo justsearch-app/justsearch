@@ -1,0 +1,83 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T13:20:25.283Z",
+  "revision": "2a64b161f9d2ac5a9aa1c269bedf72bd083c2ecb",
+  "tree": "4a3b6688270ddc66c3d7530907648d7ac8f8cfb5",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/boot/boot-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-3724849-1792588802904.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 10421
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/boot-lockdown.test.ts",
+      "file": "modules/ui-web/src/boot/boot-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e8223044c070f574c290c49fb442abfa2d3386663da332da9f8e8ac59a45f10",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RS4 reset Continue and Try again reload into a mounted app under real lockdown",
+          "status": "passed"
+        },
+        {
+          "name": "RN3 nonterminal Engine recovery Retry and both desktop event reloads mount under real lockdown",
+          "status": "passed"
+        },
+        {
+          "name": "E3 terminal Engine recovery restarts through native IPC and reconnects under real lockdown",
+          "status": "passed"
+        },
+        {
+          "name": "RS4 incomplete and storage-cleanup starts stay gated under real lockdown",
+          "status": "passed"
+        },
+        {
+          "name": "RN3 normal desktop and browser starts and debug routes mount after lockdown",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2a64b161f",
+    "revision": "2a64b161f9d2ac5a9aa1c269bedf72bd083c2ecb",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/boot/boot-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-3724849-1792588814421.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 10623,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-3724849-1792588814421.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/boot-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "E3 terminal Engine recovery restarts through native IPC and reconnects under real lockdown:  Error: expected { calls: +0, …(1) } to deeply equal { calls: 1, navigations: [] }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/dev/justsearch/.claude"
+      }
+    ]
+  },
+  "digest": "sha256:e8ed4b25907d78e32997b12c860a38094eb426b1e8fe4efae9230e98fb9a26ee"
+}

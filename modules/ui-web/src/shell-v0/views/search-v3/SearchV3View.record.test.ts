@@ -74,12 +74,13 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import {
   __resetConversationListForTest,
   getConversationListState,
+  loadConversations,
   setActiveConversation,
 } from '../../state/conversationListStore.js';
 import { __draftStorageKey, __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
-import { MAIN_EMPTY, RECORD_UNREACHABLE, SV3_DRAFT_KEY } from './fixtures.js';
+import { MAIN_EMPTY, RECORD_UNREACHABLE, SV3_DRAFT_KEY, TURN_HALTED } from './fixtures.js';
 // Tempdoc 852 §2.3b — the ONE turn↔message-id lookup, so the case below resolves the companion
 // record's floor the way a ported affordance will, rather than re-deciding it here.
 import { sv3TurnByMessageId } from './sv3-sessions.js';
@@ -536,6 +537,9 @@ describe('the transcript projects from the canonical record (D1)', () => {
       contextFloorSummary: 'Everything above was compacted.',
       excludedMessageIds: [storedId(4)],
       excludedSourceIds: ['docs/lease.md0'],
+      // The companion's message ORDER, as ids only — what places a floor no turn names (WP1.2 S2.8).
+      // Its content is still not read: the transcript stays the record's (asserted below).
+      messageIds: [storedId(0), storedId(1), storedId(3), storedId(4)],
       locked: undefined,
     });
     // The two records MEET: the floor names a message, and the turn it belongs to is found by id.
@@ -876,11 +880,12 @@ describe('New session detaches from everything in flight (A13, abort half)', () 
     await settle(el);
     expect(el.sessions.activeId).toBeNull();
 
-    // The ABORT is the mechanism, and it is verified as one rather than assumed: the parked turn has
-    // already reached its `halted` terminal, so the stream is torn down and the turn is closed to
-    // writes. (Dropping `abortAsk()` from `onSessionNew` fails right here, and then again below.)
+    // The ABORT is the mechanism, and it is verified as one rather than assumed: the stream is
+    // already torn down and the unsaved live turn left the parked conversation, whose record shows
+    // what the Engine saved when it is opened again. (Dropping `abortAsk()` from `onSessionNew`
+    // fails right here, and then again below.)
     const parkedNow = el.sessions.sessions.find((s) => s.id === firstId);
-    expect(parkedNow?.turns[0]?.status).toBe('halted');
+    expect(parkedNow?.turns).toEqual([]);
 
     // THE PROBE: emit anyway — a delta AND an evidence event, the two writes an ask makes. Neither
     // may reach anything: not the parked turn, and not the fresh conversation.
@@ -893,12 +898,54 @@ describe('New session detaches from everything in flight (A13, abort half)', () 
     await settle(el);
 
     const parked = el.sessions.sessions.find((s) => s.id === firstId);
-    expect(parked?.turns[0]?.answer).toBe('early text');
-    expect(parked?.turns[0]?.answer).not.toContain('LATE TEXT');
-    expect(parked?.turns[0]?.evidence).toBeNull();
+    expect(parked?.turns).toEqual([]);
     // The fresh conversation is untouched: nothing was created and the window is back at the hero.
     expect(el.sessions.sessions).toHaveLength(1);
     expect(el.getAttribute('composer-state')).toBe('hero');
+  });
+
+  it('does not call leaving mid-answer a Stop: back in the conversation, the saved answer shows', async () => {
+    const el = await mount();
+    await send(el, 'why did the renewal fail?');
+    const id = el.sessions.sessions[0]?.id ?? '';
+    stream.emit('chunk', { text: 'Half an ans' });
+    await settle(el);
+    // Leaving tells the Engine nothing, so it answers in full and saves that.
+    backend.conversations = [
+      {
+        sessionId: id,
+        createdAtMs: 1,
+        lastActiveAtMs: 2,
+        messageCount: 2,
+        firstUserMessage: 'why did the renewal fail?',
+        shapeId: 'core.rag-ask',
+      },
+    ];
+    backend.threads[id] = {
+      conversationId: id,
+      events: [
+        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?'),
+        wireEvent('r2', 'ASSISTANT_MESSAGE', 'Half an answer, and the rest of it.'),
+      ],
+    };
+
+    const sidebar = await region(el, 'jf-sv3-sidebar');
+    sidebar.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-sidebar-new"]')?.click();
+    await settle(el);
+    const row = sidebar.shadowRoot?.querySelector('jf-sv3-session-row') as Updatable;
+    await row.updateComplete;
+    row.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-session-row-button"]')?.click();
+    await settle(el);
+
+    expect(el.sessions.activeId).toBe(id);
+    const turns = el.sessions.sessions.find((s) => s.id === id)?.turns ?? [];
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.status).toBe('complete');
+    expect(turns[0]?.answer).toBe('Half an answer, and the rest of it.');
+    const main = await region(el, 'jf-sv3-main');
+    expect(main.shadowRoot?.textContent ?? '').not.toContain(TURN_HALTED);
+    stream.end();
+    await settle(el);
   });
 
   it('DETACHES from a live run without halting it', async () => {
@@ -994,4 +1041,28 @@ describe('the composer draft and the global activity indicator (A14, A15, G11)',
     // Another surface's activity is not this window's to settle on its way out.
     expect(getAiState().activity.shapeId).toBe('core.free-chat');
   });
+});
+
+it('a streamed answer counts as server content before any list or record read returns it', async () => {
+  const fetchBefore = globalThis.fetch;
+  let absent = false;
+  vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).includes('/history?existsOnly=true')) return new Response(JSON.stringify({ exists: !absent }));
+    return fetchBefore(url, init);
+  }));
+  const el = await mount();
+  await send(el, 'private question');
+  const id = el.sessions.activeId;
+  expect(id).not.toBeNull();
+  stream.emit('chunk', { text: 'private streamed answer' });
+  await settle(el);
+  expect(el.sessions.sessions.find(s => s.id === id)?.turns[0]?.answer).toBe('private streamed answer');
+  stream.emit('done', {}); stream.end();
+  await settle(el);
+  absent = true;
+  await loadConversations();
+  await settle(el);
+  expect(el.sessions.sessions.map(s => s.id)).not.toContain(id);
+  expect(el.sessions.activeId).toBeNull();
+  expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
 });

@@ -6,6 +6,7 @@ import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.EngineWorkCancelledException;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.chat.GenerationLease;
+import io.justsearch.app.inference.LlamaServerEndpoint;
 import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.telemetry.Telemetry;
 import java.io.FilterInputStream;
@@ -19,7 +20,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
-import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,7 +94,7 @@ public final class OpenAiCompatController implements AutoCloseable {
   private final HttpClient backgroundHttp;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration foregroundOwner;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundOwner;
-  private final IntSupplier llamaServerPortSupplier;
+  private final Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier;
   private final Telemetry telemetry;
   private final ExchangeAdmission admission;
 
@@ -120,17 +121,17 @@ public final class OpenAiCompatController implements AutoCloseable {
 
   public OpenAiCompatController(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
-      IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this(executors, llamaServerPortSupplier, telemetry, standaloneAdmission(
+      Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier, Telemetry telemetry) {
+    this(executors, llamaServerEndpointSupplier, telemetry, standaloneAdmission(
         io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(executors)));
   }
 
   public OpenAiCompatController(
       io.justsearch.core.execution.EngineExecutorRegistry executors,
-      IntSupplier llamaServerPortSupplier, Telemetry telemetry,
+      Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier, Telemetry telemetry,
       ExchangeAdmission admission) {
     this.admission = java.util.Objects.requireNonNull(admission, "admission");
-    this.llamaServerPortSupplier = java.util.Objects.requireNonNull(llamaServerPortSupplier);
+    this.llamaServerEndpointSupplier = java.util.Objects.requireNonNull(llamaServerEndpointSupplier);
     this.telemetry = telemetry;
     var fg = httpOwner(executors, io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND);
     io.justsearch.core.execution.EngineExecutorRegistry.Registration bg = null;
@@ -168,26 +169,26 @@ public final class OpenAiCompatController implements AutoCloseable {
 
   /** Test seam: the supplied HTTP client is borrowed, with no hidden executor allocation. */
   OpenAiCompatController(
-      HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this(httpClient, llamaServerPortSupplier, telemetry, ignored -> () -> {});
+      HttpClient httpClient, Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier, Telemetry telemetry) {
+    this(httpClient, llamaServerEndpointSupplier, telemetry, ignored -> () -> {});
   }
 
   /** Test seam: a tracker of its own entering {@code generationLifetime} for chat leases. */
   OpenAiCompatController(
-      HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry,
+      HttpClient httpClient, Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier, Telemetry telemetry,
       java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
-    this(httpClient, llamaServerPortSupplier, telemetry, standaloneAdmission(generationLifetime));
+    this(httpClient, llamaServerEndpointSupplier, telemetry, standaloneAdmission(generationLifetime));
   }
 
   OpenAiCompatController(
-      HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry,
+      HttpClient httpClient, Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier, Telemetry telemetry,
       ExchangeAdmission admission) {
     this.admission = java.util.Objects.requireNonNull(admission, "admission");
     foregroundHttp = httpClient;
     backgroundHttp = httpClient;
     foregroundOwner = null;
     backgroundOwner = null;
-    this.llamaServerPortSupplier = llamaServerPortSupplier;
+    this.llamaServerEndpointSupplier = llamaServerEndpointSupplier;
     this.telemetry = telemetry;
   }
 
@@ -219,7 +220,8 @@ public final class OpenAiCompatController implements AutoCloseable {
   }
 
   private void proxy(Context ctx, String path) {
-    int port = llamaServerPortSupplier.getAsInt();
+    LlamaServerEndpoint endpoint = llamaServerEndpointSupplier.get();
+    int port = endpoint.port();
     if (port <= 0) {
       respondOffline(ctx, "llama-server not running (port unset)");
       return;
@@ -241,7 +243,9 @@ public final class OpenAiCompatController implements AutoCloseable {
     // Forward request headers, dropping hop-by-hop and a couple Javalin
     // already manages.
     for (String name : ctx.headerMap().keySet()) {
-      if (SKIP_REQUEST_HEADERS.contains(name.toLowerCase(java.util.Locale.ROOT))) {
+      if (SKIP_REQUEST_HEADERS.contains(name.toLowerCase(java.util.Locale.ROOT))
+          || (endpoint.apiKey() != null
+              && (name.equalsIgnoreCase("Authorization") || name.equalsIgnoreCase("X-Api-Key")))) {
         continue;
       }
       String value = ctx.header(name);
@@ -252,6 +256,10 @@ public final class OpenAiCompatController implements AutoCloseable {
         // JDK HttpClient rejects some restricted headers (e.g. Host). Skip.
         log.debug("Skipped restricted upstream header {}", name);
       }
+    }
+
+    if (endpoint.apiKey() != null) {
+      rb.setHeader("Authorization", "Bearer " + endpoint.apiKey());
     }
 
     // The after-filter releases only the request reference. Javalin drains result(InputStream)

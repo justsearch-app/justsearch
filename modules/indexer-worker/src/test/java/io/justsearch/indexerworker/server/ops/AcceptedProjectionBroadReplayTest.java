@@ -477,6 +477,8 @@ final class AcceptedProjectionBroadReplayTest extends LuceneExecutorTestBase {
 
   private static SwitchBufferCapableQueue.SwitchBufferOp op(
       String key, String kind, String payload) {
+    if ("DELETE".equals(kind)) payload = new io.justsearch.indexerworker.queue.SwitchBufferDelete(
+        payload, io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode();
     return new SwitchBufferCapableQueue.SwitchBufferOp(
         GENERATION, key, kind, payload, System.currentTimeMillis(),
         Long.toString(System.nanoTime()));

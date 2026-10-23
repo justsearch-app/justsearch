@@ -12,6 +12,8 @@ import java.util.Objects;
 /** Stable executor registrations shared by every index-service generation in one server. */
 public final class WorkerExecutorRegistrations implements AutoCloseable {
   public static final String WATCHER_RECONCILE = "index.watcher-reconcile";
+  public static final String WATCHER_RETURN_POLL = "index.watcher-return-poll";
+  public static final String WATCHER_RETURN = "index.watcher-return";
   public static final String EXTRACTION_TIMEBOX = "index.extraction-timebox";
   public static final String SANDBOX_READERS = "index.extraction-sandbox-readers";
   public static final String STUCK_JOB_REAPER = "index.stuck-job-reaper";
@@ -20,6 +22,8 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   public static final String QUERY_PREWARM = "index.query-prewarm";
 
   private final EngineExecutorRegistry.Registration watcherReconcile;
+  private final EngineExecutorRegistry.Registration watcherReturnPoll;
+  private final EngineExecutorRegistry.Registration watcherReturn;
   private final EngineExecutorRegistry.Registration extractionTimebox;
   private final EngineExecutorRegistry.Registration sandboxReaders;
   private final EngineExecutorRegistry.Registration stuckJobReaper;
@@ -92,6 +96,10 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
       // Spec D §4.2: one thread runs query-encoder prewarm passes and their periodic check.
       queryPrewarm = acquire(registry, acquired, new EngineExecutorSpec(
           QUERY_PREWARM, Kind.BACKGROUND, Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+      watcherReturnPoll = acquire(registry, acquired, new EngineExecutorSpec(
+          WATCHER_RETURN_POLL, Kind.BACKGROUND, Mode.SCHEDULED, 1, limits.maxQueue(), 2));
+      watcherReturn = acquire(registry, acquired,
+          EngineExecutorSpec.virtual(WATCHER_RETURN, Kind.BACKGROUND, 2));
     } catch (RuntimeException | Error failure) {
       closeReverse(acquired, failure);
       throw failure;
@@ -101,6 +109,10 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   public EngineExecutorRegistry.Registration watcherReconcile() {
     return watcherReconcile;
   }
+
+  public EngineExecutorRegistry.Registration watcherReturnPoll() { return watcherReturnPoll; }
+
+  public EngineExecutorRegistry.Registration watcherReturn() { return watcherReturn; }
 
   public EngineExecutorRegistry.Registration extractionTimebox() {
     return extractionTimebox;
@@ -127,6 +139,8 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
     RuntimeException failure = null;
     for (EngineExecutorRegistry.Registration registration :
         List.of(
+            watcherReturn,
+            watcherReturnPoll,
             queryPrewarm,
             pdfOcr,
             deferredModelInit,

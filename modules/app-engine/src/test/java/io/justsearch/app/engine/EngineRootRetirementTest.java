@@ -344,9 +344,12 @@ final class EngineRootRetirementTest {
             "schemaVersion", 1, "roots", emptyRoots ? List.of() : List.of(Map.of("path", root.toString())))));
     var roots = WatchedRootsState.load(data);
     var layout = new IndexGenerationManager(directory.resolve("index")).initializeOrLoad();
-    var queue = spy(new SqliteJobQueue(layout.basePath().resolve("jobs.db"),
-        ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE));
-    queue.open();
+    var openedQueue = new SqliteJobQueue(layout.basePath().resolve("jobs.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE);
+    openedQueue.open();
+    // Queue helpers capture their owning instance in the constructor. Open that owner before
+    // Mockito copies its fields so journal reads and spied admissions use the same connection.
+    var queue = spy(openedQueue);
     var runtime = mock(RunningRuntime.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
     when(runtime.readPathOps()).thenReturn(null);
     when(runtime.pruneOps()).thenReturn(null);

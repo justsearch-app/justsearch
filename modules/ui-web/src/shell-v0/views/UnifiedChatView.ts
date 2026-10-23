@@ -14,6 +14,7 @@
  * shape that produced its response.
  */
 
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { retrievalFallbackPhrase } from '../aggregate-substrate/strategies/searchTraceExplain.js';
 import { html, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
@@ -35,6 +36,7 @@ import {
   subscribeShortViewport,
 } from '../primitives/compositionLayout.js';
 import { friendlyStreamError } from '../utils/streamError.js';
+import { sv3StopAsk } from './search-v3/sv3-ask.js';
 import {
   chatRefusalOf,
   requestLoadAnyway,
@@ -83,6 +85,7 @@ import { copyToClipboard } from '../utils/clipboardCopy.js';
 import { whenKnown } from '../state/known.js';
 import {
   readinessNotice,
+  isIndexingObservation,
   reasonFor,
   isReindexCause,
   warrantsSearchDegradationBanner,
@@ -101,6 +104,7 @@ import { inferRoute, type TurnRoute } from '../state/routeHeuristic.js';
 import '../components/RouteChip.js';
 import {
   projectUnifiedThread,
+  compareUnifiedTurnItems,
   projectLiveAgentActivity,
   terminalAssistantIds,
   directionNotAppliedBecause,
@@ -239,6 +243,7 @@ import {
   claimsFromRecord,
   matchesFromRecord,
   readScorer,
+  readSourceCoverage,
 } from '../components/chat/recordEvidence.js';
 import type { CitationSelectDetail, SourceCoverage } from '../components/chat/citationTypes.js';
 // Tempdoc 561 surface tier: the one window is the view for EVERY interaction shape.
@@ -293,6 +298,7 @@ import {
   createConversationId,
   getRecentSessions,
   recordRecentSession,
+  rememberServerConversation,
   branchConversation,
   fetchMessageIds,
   // Tempdoc 610 Phase B — the loaded conversation list + the pure sibling-set
@@ -430,30 +436,6 @@ function dedupDegradationCauses(
  */
 function rungLabel(base: string, active: boolean): string {
   return active ? `${base} (current mode)` : base;
-}
-
-/** Tempdoc 836 S2S3-A.1 — read the per-source examination facts off a payload or a record. */
-function readSourceCoverage(payload: unknown): SourceCoverage[] {
-  if (!payload || typeof payload !== 'object') return [];
-  const raw = (payload as { sourceCoverage?: unknown }).sourceCoverage;
-  if (!Array.isArray(raw)) return [];
-  const out: SourceCoverage[] = [];
-  for (const c of raw) {
-    if (!c || typeof c !== 'object') continue;
-    const r = c as Record<string, unknown>;
-    if (
-      typeof r.sourceIndex === 'number' &&
-      typeof r.windowsConsidered === 'number' &&
-      typeof r.windowsScored === 'number'
-    ) {
-      out.push({
-        sourceIndex: r.sourceIndex,
-        windowsConsidered: r.windowsConsidered,
-        windowsScored: r.windowsScored,
-      });
-    }
-  }
-  return out;
 }
 
 export class UnifiedChatView extends JfElement {
@@ -737,6 +719,7 @@ export class UnifiedChatView extends JfElement {
   // lock-safe backend conversation list at render time, never from a client-side plaintext cache.
   private recentSession: { sessionId: string; timestamp: number } | null = null;
   private abortController: AbortController | null = null;
+  private stopExtraction: (() => void) | null = null;
   readonly reasoning = new ReasoningController(() => this.requestUpdate());
   private sessionId: string;
   private storeUnsubscribe: (() => void) | null = null;
@@ -1011,6 +994,9 @@ export class UnifiedChatView extends JfElement {
     // Tempdoc 610 Phase B — track the loaded conversation list so the inline
     // version pager can resolve a turn's sibling set; fetch it once on connect.
     this.convListUnsub = subscribeConversationList((s) => {
+      if (s.deletedIds.includes(this.sessionId)) this.newConversation();
+      const lastViewed = readLastViewedConversation();
+      if (lastViewed !== null && s.deletedIds.includes(lastViewed)) clearLastViewedConversation();
       this.conversations = s.conversations;
     });
     void loadConversations();
@@ -2152,6 +2138,7 @@ export class UnifiedChatView extends JfElement {
     this.unifiedThreadRefreshFailed = null;
     void this.refreshUnifiedThread();
     const resumed = await resumeConversation(sessionId, shapeId);
+    if (this.sessionId !== sessionId) return;
     // Tempdoc 629 (LAYER): the conversation store is encrypted + locked. Render a locked notice with an
     // Unlock affordance instead of an empty transcript (§L4: locked must never look deleted).
     this.historyLocked = resumed.locked === true;
@@ -2366,8 +2353,9 @@ export class UnifiedChatView extends JfElement {
    * while an agent run is in flight; submitting dispatches an `interject` directive through the ONE
    * control-intent seam, which the backend drains at the run's next step boundary and folds into the
    * next LLM call. (Peers: `halt` = the seam's session stop `dispatchRunControl({kind:'halt'})` →
-   * `cancelSession`; the composer's inline cancel does a lighter `abortController.abort()` stream
-   * teardown. `set-posture` = the autonomy dial → the global 561 P-D store, a peer channel.)
+   * `cancelSession`; ordinary composer cancellation does a lighter `abortController.abort()` stream
+   * teardown, while Structured turns use the Engine's turn Stop. `set-posture` = the autonomy dial
+   * → the global 561 P-D store, a peer channel.)
    */
   private renderSteerInput(): TemplateResult | typeof nothing {
     // Tempdoc 565 §33 — show ONLY for a steerable, in-flight agent run. Gate on the CONTROLLER's
@@ -2572,7 +2560,9 @@ export class UnifiedChatView extends JfElement {
     // not get it (the same verdict's causes are still carried, calmly, by Health). The tier decision
     // lives in the notice authority, beside the wording it gates, not as a local severity test here.
     if (!warrantsSearchDegradationBanner(verdict)) return nothing;
-    const notice = readinessNotice(verdict);
+    const s = this.aiState;
+    const activity = s ? selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples).activity : undefined;
+    const notice = readinessNotice(verdict, activity);
     if (!notice) return nothing;
     // Tempdoc 738 — disclosure decides how much banner. Simple (default) is the one-line pill
     // (headline + remedy, raw causes hidden); Detailed shows the causes. A severe (`error`) verdict
@@ -2593,7 +2583,7 @@ export class UnifiedChatView extends JfElement {
     const causes = dedupDegradationCauses(notice, verdict);
     return html`<jf-system-notice
       tone=${verdictTone(verdict.severity)}
-      live="status"
+      live=${verdict.reasons.some(isIndexingObservation) ? 'off' : 'status'}
       class="degradation-banner"
       data-testid="chat-degradation"
     >
@@ -2640,7 +2630,7 @@ export class UnifiedChatView extends JfElement {
     const count = causes.length;
     return html`<jf-system-notice
       tone=${verdictTone(verdict.severity)}
-      live="status"
+      live=${verdict.reasons.some(isIndexingObservation) ? 'off' : 'status'}
       class="degradation-banner degradation-banner-collapsed"
       data-testid="chat-degradation"
     >
@@ -3056,7 +3046,7 @@ export class UnifiedChatView extends JfElement {
         }}
         @composer-submit=${() => this.handleComposerSubmit()}
         @composer-submit-alt=${() => this.handleComposerSubmitAlt()}
-        @composer-cancel=${() => this.abortController?.abort()}
+        @composer-cancel=${() => this.cancelCurrentAnswer()}
         @keydown=${(e: KeyboardEvent) => this.handleComposerKeydown(e)}
       ></jf-composer>
     `;
@@ -3658,9 +3648,11 @@ export class UnifiedChatView extends JfElement {
   private async refreshUnifiedThread(): Promise<void> {
     if (!this.sessionId) return;
     let failed: { reason: ThreadFetchFailureReason; detail?: string } | null = null;
-    const res = await fetchUnifiedThread(this.apiBase, this.sessionId, undefined, (reason, detail) => {
+    const sessionId = this.sessionId;
+    const res = await fetchUnifiedThread(this.apiBase, sessionId, undefined, (reason, detail) => {
       failed = { reason, detail };
     });
+    if (this.sessionId !== sessionId) return;
     this.unifiedThreadRefreshFailed = failed;
     this.unifiedEvents = res.events;
     this.unifiedLifecycles = res.lifecycles;
@@ -4214,9 +4206,7 @@ export class UnifiedChatView extends JfElement {
       return true; // other progress / handoff / error are ephemeral — never in the record
     });
 
-    const ordered = [...recordItems, ...liveOnly].sort(
-      (a, b) => a.ts - b.ts || a.id.localeCompare(b.id),
-    );
+    const ordered = [...recordItems, ...liveOnly].sort(compareUnifiedTurnItems);
 
     // Tempdoc 577 §2.14 Root I (#19) — the run/session boundary seam: when a thread is RESTORED
     // (the record carries prior turns) and a new run continues live, the seam marks where the
@@ -5685,6 +5675,7 @@ export class UnifiedChatView extends JfElement {
           ),
           sourceCoverage: readSourceCoverage(it.attributes.claimMatches),
           ...(standalone ? { standaloneQuestion: standalone } : {}),
+          ...(it.attributes.disposition === 'CANCELLED' ? { stopped: true } : {}),
         };
         return this.renderMessage(enriched, idx);
       }
@@ -5945,6 +5936,8 @@ export class UnifiedChatView extends JfElement {
     const coverageNoteText = m.isExtract
       ? null
       : coverageNote(groundingCoverage(marks, m.content, m.coverage ?? null));
+    // A turn the reader stopped before any text came has no answer to show or to frame.
+    const unanswered = m.stopped === true && m.content.trim() === '';
     return html`
       ${floorDivider}
       <div class="message assistant${inheritedClass}" data-item-id=${m.id ?? nothing} data-msg-idx=${idx}>
@@ -5969,8 +5962,10 @@ export class UnifiedChatView extends JfElement {
         ${/* Search Thread S7 — the transform-shaped "unmissable" warning stays PRE-content (its
             established position abutting the extracted result); every other frame's line is now the
             quiet receipt UNDER the answer. Exactly one of the two ever renders per turn. */ ''}
-        ${frame === 'transform' ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
-        ${m.isExtract
+        ${frame === 'transform' && !unanswered ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
+        ${unanswered
+          ? nothing
+          : m.isExtract
           ? // Tempdoc 565 §15.B — extract is verbatim text: the ONE renderer in `plain` format.
             html`<jf-markdown-block format="plain" .text=${m.content} frame=${frame}></jf-markdown-block>`
           : (m.claims?.length ?? 0) > 0
@@ -5986,7 +5981,10 @@ export class UnifiedChatView extends JfElement {
               ></jf-markdown-block>`
             : // Tempdoc 565 §15.B — the canonical answer block for every other mode (agent/chat).
               html`<jf-markdown-block .text=${m.content} frame=${frame}></jf-markdown-block>`}
-        ${frame !== 'transform' ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
+        ${m.stopped
+          ? html`<div class="turn-stopped" role="note" data-testid="chat-turn-stopped">Stopped by you.</div>`
+          : nothing}
+        ${frame !== 'transform' && !unanswered ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
         ${(m.sources?.length ?? 0) > 0 || (m.citations?.length ?? 0) > 0
           ? html`<jf-citations-panel
               .sources=${m.sources ?? []}
@@ -6220,6 +6218,11 @@ export class UnifiedChatView extends JfElement {
     return [...ids];
   }
 
+  private cancelCurrentAnswer(): void {
+    if (this.stopExtraction) this.stopExtraction();
+    else this.abortController?.abort();
+  }
+
   private async send(): Promise<void> {
     const text = this.inputDraft.trim();
     if (!text || this.isStreaming) return;
@@ -6309,6 +6312,24 @@ export class UnifiedChatView extends JfElement {
     setLastViewedConversation(this.sessionId);
     this.inputDraft = '';
     this.abortController = new AbortController();
+    this.stopExtraction = null;
+    const abort = this.abortController;
+    const streamSessionId = this.sessionId;
+    if (shapeId === 'core.extract') {
+      // Reuse Search v3's turn Stop. Closing the response alone lets the Engine accept unseen JSON.
+      const turnId = crypto.randomUUID();
+      body.turnId = turnId;
+      let stopping = false;
+      this.stopExtraction = () => {
+        if (stopping) return;
+        stopping = true;
+        void sv3StopAsk(this.apiBase || '', streamSessionId, turnId).then(taken => {
+          if (taken || this.abortController !== abort) return;
+          stopping = false;
+          this.errorMessage = 'Could not stop extraction. Try Stop again.';
+        });
+      };
+    }
     this.isStreaming = true;
     this.startRenderTick();
     setAiActivity({
@@ -6316,7 +6337,7 @@ export class UnifiedChatView extends JfElement {
       shapeId,
       startedAtMs: Date.now(),
       canCancel: true,
-      cancel: () => this.abortController?.abort(),
+      cancel: () => this.cancelCurrentAnswer(),
     });
     this.streamingText = '';
     this.reasoning.reset();
@@ -6346,6 +6367,7 @@ export class UnifiedChatView extends JfElement {
               ? (p.text as string)
               : '';
         if (t) {
+          rememberServerConversation(streamSessionId);
           if (!this.streamingText) setAiActivity({ state: 'streaming' });
           this.streamingText = this.streamingText + t;
         }
@@ -6402,18 +6424,17 @@ export class UnifiedChatView extends JfElement {
         // "Interpreted as: …" line persists past the live stream (mirrors citations/ragMeta).
         if (this.rewriteNote) msg.standaloneQuestion = this.rewriteNote.standalone;
         // Tempdoc 941 R19-F1 — the `done` payload carries the substrate's authoritative answer
-        // (`ConversationEngine.emitDone` -> `finalResponse`). Streamed `chunk` text is the same
-        // text arriving incrementally, so prefer it when we have it; but when no chunk text
-        // accumulated in this view (a handler throw is swallowed by `consumeShapeStream`, a
-        // reconnect drops the chunk frames, or the shape answers in one shot) the turn used to be
-        // dropped at the `streamingText.trim()` guard below: no message, no notice, no error, and
-        // the composer already cleared. Read the contract field instead of losing the answer —
-        // same house pattern as `AgentSessionController.onDone`.
-        const settledText = this.streamingText.trim()
-          ? this.streamingText
-          : (donePayload?.finalResponse ?? '');
+        // (`ConversationEngine.emitDone` -> `finalResponse`). Chunks can include rejected
+        // extraction attempts, so only the terminal answer belongs in the completed card and
+        // subsequent context. Ordinary shapes can send an empty terminal after streaming their
+        // answer. Preserve those chunks; an explicitly empty extraction must not accept attempts.
+        const finalResponse = donePayload?.finalResponse;
+        const settledText = shapeId === 'core.extract'
+          ? finalResponse ?? this.streamingText
+          : finalResponse || this.streamingText;
         msg.content = settledText;
         if (settledText.trim()) {
+          rememberServerConversation(streamSessionId);
           this.thread = [...this.thread, msg];
         } else if (!this.errorMessage) {
           // Nothing streamed and nothing in the payload: the dispatch completed with no answer.
@@ -6443,6 +6464,8 @@ export class UnifiedChatView extends JfElement {
           (p?.error as string) ??
           (p?.message as string) ??
           'An error occurred';
+        // Rejected extraction attempts are transient, never a completed answer or future context.
+        if (shapeId === 'core.extract') this.streamingText = '';
         this.isStreaming = false;
         this.stopRenderTick();
         setAiActivity({ state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null });
@@ -6661,12 +6684,24 @@ export class UnifiedChatView extends JfElement {
         this.noteRefusedWhileLocked(text);
       } else if (refusal) {
         this.noteChatRefused(text, refusal);
-      } else if (!(err instanceof Error && err.name === 'AbortError')) {
+      } else if (err instanceof Error && (err.name === 'AbortError'
+        || (shapeId === 'core.extract' && (err as Error & { code?: string }).code === 'CANCELLED'))) {
+        if (shapeId === 'core.extract') this.errorMessage = 'Extraction stopped. No completed result was added to the conversation.';
+      } else {
         this.errorMessage = friendlyStreamError(err);
       }
     } finally {
+      // Error events, transport loss, EOF, timeouts and cancellation all settle here. Extraction
+      // chunks can be rejected attempts or partial JSON; only onDone may commit an accepted result.
+      if (shapeId === 'core.extract') {
+        this.streamingText = '';
+        this.reasoning.finalize();
+        this.stopRenderTick();
+        setAiActivity({ state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null });
+      }
       this.isStreaming = false;
       this.abortController = null;
+      this.stopExtraction = null;
     }
   }
 

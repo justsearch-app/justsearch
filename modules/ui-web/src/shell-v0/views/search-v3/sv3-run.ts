@@ -93,7 +93,7 @@ export type Sv3RunSource = Pick<
   // been cut. Every CLOSED region is already an ordered `conversation` entry; this is the one item
   // the array cannot hold, and it is the only item that may wear the live affordance.
   | 'reasoning'
->;
+> & Partial<Pick<AgentSessionController, 'concludedRunId'>>;
 
 /* ── Axis 1: the session ─────────────────────────────────────────────────────────────────────── */
 
@@ -448,6 +448,9 @@ export function projectSv3RunPrompts(
  */
 export function sv3RunSessionStatus(source: Sv3RunSource | null, feed: Sv3RunFeed): Sv3RunSessionStatus {
   if (source === null) return 'absent';
+  // Explicit conclusion ends old gate/approval frames; transport failure alone does not.
+  if (source.concludedRunId != null && source.concludedRunId === source.sessionId
+    && !source.runInFlight && !source.isStreaming) return 'settled';
   // Tempdoc 834 §6.2 — `runPark` is the fourth way the same fact arrives, and the only one that
   // survives a reattach whose announcing frame the ring evicted. Without it a parked run that this
   // tab did not watch park would read as `live`, i.e. as silently idle: streaming, saying nothing.
@@ -703,7 +706,7 @@ export type Sv3SlotKind = 'answer' | 'stop' | 'follow-up' | 'send';
  * builder, `delegate` goes through the shared agent controller. What S4 adds is the AFFORDANCE — the
  * routing was reachable only by chord until then.
  */
-export type Sv3ComposerTier = 'search' | 'ask' | 'delegate';
+export type Sv3ComposerTier = 'search' | 'ask' | 'delegate' | 'structured';
 
 export interface Sv3TierOption {
   readonly id: Sv3ComposerTier;
@@ -733,6 +736,12 @@ export const SV3_TIER_OPTIONS: readonly Sv3TierOption[] = [
     id: 'ask',
     label: 'Ask',
     description: 'Answers from your documents, in this conversation.',
+    isDefault: false,
+  },
+  {
+    id: 'structured',
+    label: 'Structured',
+    description: 'Extracts fields as JSON against your schema.',
     isDefault: false,
   },
   {
@@ -868,7 +877,7 @@ export function sv3PrimaryAction(input: Sv3SlotInput): Sv3Slot {
   // The routing explanation lives on the send control and nowhere else, so it has to follow the
   // chosen tier: a send that delegates while its own label says "Enter asks" is chrome that lies.
   const hint =
-    tier === 'delegate' ? SV3_DELEGATE_SEND_HINT : scoped ? SV3_SCOPED_SEND_HINT : SV3_SEND_HINT;
+    tier === 'structured' ? 'Enter extracts JSON · Ctrl/⌘+Enter delegates' : tier === 'delegate' ? SV3_DELEGATE_SEND_HINT : scoped ? SV3_SCOPED_SEND_HINT : SV3_SEND_HINT;
   if (pendingPrompt) {
     return {
       kind: 'answer',

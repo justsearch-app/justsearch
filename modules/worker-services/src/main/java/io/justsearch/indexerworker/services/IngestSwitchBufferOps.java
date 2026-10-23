@@ -6,6 +6,7 @@ import static io.justsearch.indexerworker.services.IngestResponses.*;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.ipc.DeleteByIdResponse;
 import io.justsearch.ipc.DeleteByPathResponse;
 import io.justsearch.ipc.PruneResponse;
@@ -102,7 +103,8 @@ final class IngestSwitchBufferOps {
   void journalDeleteForGeneration(String generation, String normalizedId) {
     if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
         || !sbq.putSwitchBufferForGeneration(generation, switchBufferPathKey(normalizedId),
-            SWITCHBUF_OP_DELETE, normalizedId)) {
+            SWITCHBUF_OP_DELETE, new SwitchBufferDelete(
+                normalizedId, SwitchBufferDelete.Origin.EXPLICIT, null).encode())) {
       throw switchBufferUnavailable();
     }
   }
@@ -208,9 +210,24 @@ final class IngestSwitchBufferOps {
   DeleteByIdResponse bufferDeleteByIdDuringSwitching(
       SwitchBufferCapableQueue sbq, String normalizedId) {
     putSwitchBufferOrThrow(
-        sbq, switchBufferPathKey(normalizedId), SWITCHBUF_OP_DELETE, normalizedId, "deleteById");
+        sbq, switchBufferPathKey(normalizedId), SWITCHBUF_OP_DELETE,
+        new SwitchBufferDelete(normalizedId, SwitchBufferDelete.Origin.EXPLICIT, null).encode(),
+        "deleteById");
     log.info("Buffered deleteById during SWITCHING: {}", normalizedId);
     return bufferedDeleteByIdResponse();
+  }
+
+  void journalWatcherDelete(String normalizedPath, java.nio.file.Path root,
+      String rootIdentity, String collection) {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)) throw switchBufferUnavailable();
+    String generation = buildingGenerationForFileAdmission();
+    String payload = new SwitchBufferDelete(normalizedPath, SwitchBufferDelete.Origin.WATCHER,
+        root.toAbsolutePath().normalize().toString(), rootIdentity, collection).encode();
+    boolean accepted = generation == null
+        ? sbq.putSwitchBuffer(switchBufferPathKey(normalizedPath), SWITCHBUF_OP_DELETE, payload)
+        : sbq.putSwitchBufferForGeneration(generation, switchBufferPathKey(normalizedPath),
+            SWITCHBUF_OP_DELETE, payload);
+    if (!accepted) throw switchBufferUnavailable();
   }
 
   PruneResponse bufferPruneMissingDuringSwitching(

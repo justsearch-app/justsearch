@@ -1,0 +1,131 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T03:18:12.330Z",
+  "revision": "2d3faef2d3b51873a0f405989d5ff3f2e201e56b",
+  "tree": "ea1c10debe39899e325205166055516b3263f96b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/test-intent-vitest-2628700-1792552686253.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1542
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:187edd5e3763592e6d25547ed5e84144e653e9764e922909aaf192f918a9f1ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts",
+      "file": "modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c92ad99824cca4002c10e50056a82da1791f05be136ba09b475e4e468d22502",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exposes removal progress and blocks all actions only on the affected card",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2d3faef2d",
+    "revision": "2d3faef2d3b51873a0f405989d5ff3f2e201e56b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/test-intent-vitest-2628700-1792552689988.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2001,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/test-intent-vitest-2628700-1792552689988.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+        "classification": "assertion",
+        "detail": "keeps a refused Add draft reachable and allows correction and retry:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/916h78cg/tmp/test-intent-before-4Ih75X/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:62:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///h | submits Add once while waiting and announces its outcome:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 2 t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts",
+        "classification": "assertion",
+        "detail": "exposes removal progress and blocks all actions only on the affected card:  AssertionError: expected null to be 'true' // Object.is equality\n    at /home/elias/.cache/am/916h78cg/tmp/test-intent-before-4Ih75X/modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts:15:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)"
+      }
+    ]
+  },
+  "digest": "sha256:7b87e70802f15a3c8a7bd486eb1f6d34e21b52b48879af7a38dfa034a5e4cd77"
+}

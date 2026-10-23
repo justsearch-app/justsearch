@@ -52,12 +52,15 @@ export interface Conversation {
 
 interface ConversationListState {
   conversations: Conversation[];
+  /** Confirmed by successful DELETE or the Engine list; omission from its recent window is insufficient. */
+  deletedIds: string[];
   activeId: string | null;
   loading: boolean;
 }
 
 let state: ConversationListState = {
   conversations: [],
+  deletedIds: [],
   activeId: null,
   loading: false,
 };
@@ -300,6 +303,74 @@ function watchOtherWindowsLegacyTitles(): void {
   stopLegacyWatch = () => window.removeEventListener('storage', onStorage);
 }
 
+// Identities observed in this window's server rows or cached server content. Never enumerate the
+// Engine's full history: only these held identities can need a missing-row confirmation.
+const serverConversations = new Set<string>();
+
+// Confirmations live only in this window and this Engine run. More than 100 deletions between
+// list answers can hide a missed delete, starting a new generation even in the same run.
+let existenceGeneration: { instanceId: string; deletionCount: number } | null = null;
+const confirmedExisting = new Set<string>();
+const existenceReads = new Map<string, Promise<boolean | null>>();
+
+function observeDeletionWindow(instanceId: unknown, deletionCount: unknown): void {
+  const valid = typeof instanceId === 'string' && instanceId.trim() !== ''
+    && typeof deletionCount === 'number' && Number.isSafeInteger(deletionCount) && deletionCount >= 0;
+  if (!valid || !existenceGeneration || existenceGeneration.instanceId !== instanceId
+    || deletionCount < existenceGeneration.deletionCount
+    || deletionCount - existenceGeneration.deletionCount > 100) {
+    confirmedExisting.clear();
+    existenceReads.clear();
+    existenceGeneration = valid ? { instanceId, deletionCount } : null;
+  } else {
+    existenceGeneration.deletionCount = deletionCount;
+  }
+}
+
+/** Concurrent refreshes share one exact read; only an explicit boolean is an answer. */
+function readConversationExists(id: string, request: number): Promise<boolean | null> {
+  const pending = existenceReads.get(id);
+  // A shared positive is reusable, but an absence read before this refresh may predate a restore.
+  if (pending) return pending.then(exists => exists === false && request >= listShown
+    ? readConversationExists(id, request) : exists);
+  const read = (async () => {
+    try {
+      const answer = await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/history?existsOnly=true`);
+      if (!answer.ok) return null;
+      const exists: unknown = (await answer.json()).exists;
+      return typeof exists === 'boolean' ? exists : null;
+    } catch { return null; }
+  })();
+  existenceReads.set(id, read);
+  void read.finally(() => {
+    if (existenceReads.get(id) === read) existenceReads.delete(id);
+  });
+  return read;
+}
+
+export function rememberServerConversation(id: string): void {
+  if (serverConversations.has(id)) return;
+  if (!state.deletedIds.includes(id)) serverConversations.add(id);
+}
+
+/** Complete, lock-safe versions of one fork; never changes the recent/sidebar roster. */
+export async function loadForkConversations(
+  parentSessionId: string,
+  branchPointMessageId: string,
+  signal: AbortSignal,
+): Promise<Conversation[] | null> {
+  try {
+    const query = new URLSearchParams({ parentSessionId, branchPointMessageId });
+    const response = await authorizedFetch(`${apiBase}/api/chat/conversations?${query}`, { signal });
+    if (!response.ok) return null;
+    const data = await response.json();
+    // An older Engine ignores unknown filters. Its recent window is not a complete fork answer.
+    if (data.fork?.parentSessionId !== parentSessionId
+      || data.fork?.branchPointMessageId !== branchPointMessageId || !Array.isArray(data.sessions)) return null;
+    return data.sessions.map((row: Record<string, unknown>) => toConversation(row, listRequests, {}));
+  } catch { return null; }
+}
+
 export async function loadConversations(): Promise<void> {
   watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
@@ -318,7 +389,24 @@ export async function loadConversations(): Promise<void> {
     // written through when a person acts and erased once a list answer confirms the write.
     const legacy = loadTitles();
     const conversations = rows.map((row) => toConversation(row, request, legacy));
-    state = { ...state, conversations, loading: false };
+    const listed = new Set(conversations.map(c => c.id));
+    const markers: string[] = Array.isArray(data.deletedIds)
+      ? data.deletedIds.filter((id: unknown): id is string => typeof id === 'string')
+      : [];
+    observeDeletionWindow(data.instanceId, data.deletionCount);
+    const generation = existenceGeneration;
+    const missing = [...serverConversations].filter(id => !listed.has(id) && !markers.includes(id)
+      && !confirmedExisting.has(id));
+    const deletedIds = [...new Set([...state.deletedIds.filter(id => !listed.has(id)), ...markers])];
+    for (const id of listed) serverConversations.add(id);
+    for (const id of deletedIds) {
+      serverConversations.delete(id);
+      confirmedExisting.delete(id);
+    }
+    for (const id of deletedIds) forgetRecentSession(id);
+    state = { ...state, conversations: conversations.filter(c => !deletedIds.includes(c.id)), deletedIds,
+      activeId: state.activeId !== null && deletedIds.includes(state.activeId) ? null : state.activeId,
+      loading: false };
     emit();
     // Both write-throughs the list makes possible, fired AFTER the list has rendered so neither one
     // delays it: the names the backend refused with a 404 while the conversation was still being
@@ -330,6 +418,21 @@ export async function loadConversations(): Promise<void> {
     forgetOutgrownLegacyTitles(rows, legacy);
     if (conversations.some((c) => needsAdoption(c, legacy))) adoptLegacyTitlesWhenAPersonActs();
     resumeAutoTitles(state.conversations);
+    // Apply each exact answer independently: one unavailable read must not delay the list or
+    // another confirmed absence. A limited list, failed read or old-server reply proves nothing.
+    await Promise.all(missing.map(async id => {
+      const exists = await readConversationExists(id, request);
+      if (generation !== existenceGeneration) return;
+      if (exists === true && generation !== null && serverConversations.has(id)) confirmedExisting.add(id);
+      if (exists !== false || request < listShown) return;
+      serverConversations.delete(id);
+      confirmedExisting.delete(id);
+      forgetRecentSession(id);
+      state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
+        deletedIds: [...new Set([...state.deletedIds, id])],
+        activeId: state.activeId === id ? null : state.activeId };
+      emit();
+    }));
   } catch {
     state = { ...state, loading: false };
     emit();
@@ -498,7 +601,7 @@ async function adoptLegacyTitles(legacy: Record<string, string>): Promise<void> 
 }
 
 export function setActiveConversation(id: string | null): void {
-  state = { ...state, activeId: id };
+  state = { ...state, activeId: id !== null && state.deletedIds.includes(id) ? null : id };
   emit('claim');
 }
 
@@ -510,7 +613,7 @@ export function setActiveConversation(id: string | null): void {
  * a history entry — see {@link ConversationListChange}.
  */
 export function restoreActiveConversation(id: string | null): void {
-  state = { ...state, activeId: id };
+  state = { ...state, activeId: id !== null && state.deletedIds.includes(id) ? null : id };
   emit('restore');
 }
 
@@ -522,9 +625,8 @@ export function restoreActiveConversation(id: string | null): void {
  * branches that share `(parentSessionId === baseId, branchPointMessageId ===
  * branchKey)` follow, ordered by creation time. Returns `[baseId]` alone when
  * there are no branches (callers render the pager only when length > 1). This
- * is a pure read-side projection over the already-loaded conversation list —
- * no new endpoint (the siblings are discoverable from listSessions' parent
- * pointers).
+ * is a pure projection over the supplied rows: a complete fork read in Search v3,
+ * or the loaded recent list in the legacy window.
  */
 export function siblingSessionsAt(
   conversations: Conversation[],
@@ -621,6 +723,7 @@ async function sendTitle(
       `${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/title`,
       { method: 'POST', headers, body: JSON.stringify({ title, source }) },
     );
+    if (res.ok) rememberServerConversation(id);
     if (res.status !== 412) return { ok: res.ok, status: res.status };
     const body = await readJson(res);
     return {
@@ -890,11 +993,10 @@ export interface ResumedMessage {
    *
    * The live path pins it onto the committed turn so the "Interpreted as: …" transparency line
    * survives the stream (603 C2); carrying it here is what lets a RELOADED turn say the same
-   * thing. Honest limit: the injector writes it to the dispatch context, and no producer persists
-   * it onto the store record today — so this reads a field that is currently always absent
-   * rather than inventing one. It is read defensively (nested `attributes`, both spellings) so
-   * the transparency line appears the moment a producer does start carrying it, instead of the
-   * record and the reader having to be changed together.
+   * thing. `ConversationEngine` persists it as a top-level `standaloneQuestion` on the turn's
+   * outcome row (its answer, or its error) when the follow-up was rewritten; it is still read
+   * defensively (nested `attributes`, both spellings), and an older record without it reads as
+   * absent.
    */
   standaloneQuestion?: string;
 }
@@ -929,6 +1031,11 @@ export interface ResumedConversation {
   // encrypted + locked). The transcript must render a "locked → Unlock" notice, NOT an empty
   // thread (an empty thread reads as deleted; §L4: locked must never look deleted).
   locked?: boolean;
+  // True when the read itself FAILED (a server error or no answer) — as opposed to a 404, which is
+  // the backend saying the conversation has no record. Every other field is then "not told", and a
+  // caller that keeps state from an earlier read must not take the empty result for "nothing is
+  // hidden, no floor" (search-v3 keeps what it had).
+  failed?: boolean;
 }
 
 /**
@@ -968,7 +1075,11 @@ export async function resumeConversation(
     // locked state so the chat surface renders an unlock affordance instead of an empty (deleted-looking)
     // transcript. Other non-OK responses remain a benign empty resume.
     if (res.status === 423) return { sessionId, shapeId, messages: [], locked: true };
-    if (!res.ok) return { sessionId, shapeId, messages: [] };
+    if (!res.ok) {
+      return res.status === 404
+        ? { sessionId, shapeId, messages: [] }
+        : { sessionId, shapeId, messages: [], failed: true };
+    }
     const data = (await res.json()) as {
       // Tempdoc 941 — the endpoint returns the STORE'S OWN message maps verbatim
       // (`ChatController.handleLoadHistory` → `conversationStore.loadHistory`), so the per-message
@@ -1011,6 +1122,8 @@ export async function resumeConversation(
           ...(standaloneQuestion !== undefined ? { standaloneQuestion } : {}),
         };
       });
+    if (state.deletedIds.includes(sessionId)) return { sessionId, shapeId, messages: [] };
+    if (messages.length > 0) rememberServerConversation(sessionId);
     if (claim) setActiveConversation(sessionId);
     return {
       sessionId,
@@ -1036,7 +1149,7 @@ export async function resumeConversation(
         : undefined,
     };
   } catch {
-    return { sessionId, shapeId, messages: [] };
+    return { sessionId, shapeId, messages: [], failed: true };
   }
 }
 
@@ -1195,6 +1308,9 @@ export async function fetchMessageIds(
     const data = (await res.json()) as {
       messages?: Array<{ role?: string; content?: string; id?: string }>;
     };
+    if ((data.messages ?? []).some(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')) {
+      rememberServerConversation(sessionId);
+    }
     return (data.messages ?? []).map((m) => ({
       role: typeof m.role === 'string' ? m.role : '',
       content: typeof m.content === 'string' ? m.content : '',
@@ -1225,6 +1341,7 @@ export async function branchConversation(
     const data = (await res.json()) as { sessionId?: string };
     const newSessionId = data.sessionId;
     if (!newSessionId) return null;
+    if (typeof newSessionId === 'string') rememberServerConversation(newSessionId);
     // Record as recent so the resume prompt + history dropdown surface it
     // without waiting for the next listSessions roundtrip.
     // Tempdoc 562: record the session POINTER only (no cached content); the preview is derived from the
@@ -1243,9 +1360,13 @@ export async function deleteConversation(sessionId: string): Promise<boolean> {
     });
     if (!res.ok) return false;
     forgetRecentSession(sessionId);
+    // An older in-flight list cannot undo this successful deletion.
+    listShown = ++listRequests;
     state = {
       ...state,
       conversations: state.conversations.filter((c) => c.id !== sessionId),
+      deletedIds: [...new Set([...state.deletedIds, sessionId])],
+      loading: false,
       activeId: state.activeId === sessionId ? null : state.activeId,
     };
     emit();
@@ -1276,6 +1397,10 @@ export async function deleteConversation(sessionId: string): Promise<boolean> {
 export interface DeleteCascadeResult {
   ok: boolean;
   childIds?: string[];
+  error?: string;
+  errorCode?: string;
+  deletedIds?: string[];
+  failedId?: string;
 }
 
 export async function deleteConversationWithCascade(
@@ -1288,35 +1413,40 @@ export async function deleteConversationWithCascade(
     });
     if (res.ok) {
       forgetRecentSession(sessionId);
+      listShown = ++listRequests;
       state = {
         ...state,
         conversations: state.conversations.filter((c) => c.id !== sessionId),
+        deletedIds: [...new Set([...state.deletedIds, sessionId])],
+        loading: false,
         activeId: state.activeId === sessionId ? null : state.activeId,
       };
       emit();
       return { ok: true };
     }
-    if (res.status === 409) {
-      let childIds: string[] = [];
-      try {
-        const body = (await res.json()) as { childSessionIds?: string[] };
-        if (Array.isArray(body.childSessionIds)) childIds = body.childSessionIds;
-      } catch {
-        // best-effort body parse; if it fails we still surface the 409
-      }
-      if (!onChildsFound) return { ok: false, childIds };
+    let body: { error?: unknown; errorCode?: string; childSessionIds?: unknown } = {};
+    try { body = await res.json() as typeof body; } catch { /* A failed response may have no JSON. */ }
+    const error = typeof body.error === 'string' && body.error ? body.error : undefined;
+    if (res.status === 409 && (body.errorCode === 'BRANCHES_PREVENT_DELETION'
+      || (body.errorCode === undefined && Array.isArray(body.childSessionIds) && body.childSessionIds.length > 0))) {
+      const childIds = Array.isArray(body.childSessionIds)
+        ? body.childSessionIds.filter((id): id is string => typeof id === 'string') : [];
+      if (!onChildsFound || childIds.length === 0) return { ok: false, childIds };
       const userConfirmed = await onChildsFound(childIds);
       if (!userConfirmed) return { ok: false, childIds };
-      // Sequential cascade delete: children first, then parent. If any
-      // child delete fails, abort the cascade and leave the parent intact.
+      const deletedIds: string[] = [];
       for (const childId of childIds) {
         const childResult = await deleteConversationWithCascade(childId);
-        if (!childResult.ok) return { ok: false, childIds };
+        if (!childResult.ok) return {
+          ...childResult, childIds, deletedIds: [...deletedIds, ...(childResult.deletedIds ?? [])],
+          failedId: childResult.failedId ?? childId,
+        };
+        deletedIds.push(childId);
       }
-      // Retry parent now that branches are gone.
-      return deleteConversationWithCascade(sessionId);
+      const parentResult = await deleteConversationWithCascade(sessionId);
+      return parentResult.ok ? parentResult : { ...parentResult, deletedIds, failedId: sessionId };
     }
-    return { ok: false };
+    return error ? { ok: false, error, ...(body.errorCode ? { errorCode: body.errorCode } : {}) } : { ok: false };
   } catch {
     return { ok: false };
   }
@@ -1335,8 +1465,12 @@ export function exportConversationMarkdown(
 }
 
 export function __resetConversationListForTest(): void {
-  state = { conversations: [], activeId: null, loading: false };
+  state = { conversations: [], deletedIds: [], activeId: null, loading: false };
   listeners.clear();
+  serverConversations.clear();
+  existenceGeneration = null;
+  confirmedExisting.clear();
+  existenceReads.clear();
   apiBase = '';
   pendingTitles.clear();
   adoptBlockedIds.clear();

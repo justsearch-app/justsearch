@@ -32,11 +32,17 @@ mod binding;
 #[path = "../engine_host.rs"]
 #[allow(dead_code)]
 mod engine_host;
+#[path = "../engine_conn.rs"]
+mod engine_conn;
 #[path = "../engine_probe.rs"]
 mod engine_probe;
+#[path = "../recovery.rs"]
+mod recovery;
 #[path = "../supervisor.rs"]
 #[allow(dead_code)]
 mod supervisor;
+#[path = "../tls.rs"]
+mod tls;
 // Spec F §2.1: the fake engine starts inside its incarnation job exactly as the real Engine does,
 // so the containment cases exercise the production spawn with no Tauri link.
 #[path = "../containment.rs"]
@@ -65,6 +71,7 @@ mod updater_probe {
     include!("support/updater_probe.inc.rs");
 }
 // AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
+#[cfg_attr(test, derive(Default))]
 pub struct BackendState {
     host: Arc<engine_host::EngineHost>,
 }
@@ -106,13 +113,29 @@ fn arg(name: &str) -> Option<String> {
         .and_then(|i| args.get(i + 1).cloned())
 }
 fn main() {
+    tls::initialize();
     #[cfg(target_os = "linux")]
     linux_process::set_bundle_dir(
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/build/install/ui"),
     );
+    if let Some(profile) = arg("--jvm-options") {
+        println!(
+            "{}",
+            serde_json::to_string(
+                &recovery::jvm_options(std::path::Path::new(&profile))
+                    .expect("crash diagnostics directory")
+            )
+            .unwrap()
+        );
+        return;
+    }
     let data_dir = PathBuf::from(arg("--data-dir").expect("data dir"));
     let fake_engine = PathBuf::from(arg("--fake-engine").expect("fake engine"));
     let plan = PathBuf::from(arg("--plan").expect("plan"));
+    let fail_spawn_at = arg("--fail-spawn-at")
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(0);
+    let mut spawn_attempt = 0;
     let node = PathBuf::from(arg("--node").unwrap_or("node".into()));
     let run_ms = arg("--run-ms")
         .and_then(|v| v.parse::<u64>().ok())
@@ -120,6 +143,7 @@ fn main() {
     let stop_after = arg("--stop-after-incarnation")
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(0);
+    let stop_on_exhausted = arg("--stop-on-exhausted").as_deref() == Some("true");
     let request = arg("--request-reason").filter(|s| !s.is_empty());
     let host = Arc::new(engine_host::EngineHost::default());
     let coordinator = Arc::new(quit::QuitCoordinator::new(host.clone()));
@@ -127,9 +151,10 @@ fn main() {
         session_window::start(host.clone(), coordinator.clone()).expect("session window");
     let spawn_host = host.clone();
     let spawn_dir = data_dir.clone();
-    let checkpoint = Arc::new(Mutex::new(None::<supervisor::StateRecord>));
+    let checkpoint = Arc::new(Mutex::new(None::<(supervisor::StateRecord, bool)>));
     let saved = checkpoint.clone();
     let event_host = host.clone();
+    let event_dir = data_dir.clone();
     let actor_thread = Arc::new(Mutex::new(None::<String>));
     let event_actor = actor_thread.clone();
     let mut actuator = shell_actuator::ShellActuator::new(
@@ -137,7 +162,17 @@ fn main() {
         data_dir.clone(),
         move || {
             spawn_host.reset_for_successor()?;
-            let mut command = containment::engine_command(&node).map_err(|e| e.to_string())?;
+            spawn_attempt += 1;
+            let executable = if spawn_attempt == fail_spawn_at {
+                spawn_dir.join("missing-java")
+            } else {
+                node.clone()
+            };
+            if spawn_attempt == fail_spawn_at && !executable.is_file() {
+                return Err(format!("java runtime not found: {}", executable.display()));
+            }
+            let mut command =
+                containment::engine_command(&executable).map_err(|e| e.to_string())?;
             command
                 .arg(&fake_engine)
                 .env("JUSTSEARCH_DATA_DIR", &spawn_dir)
@@ -151,12 +186,16 @@ fn main() {
         },
         move |record| {
             *event_actor.lock().unwrap() = Some(format!("{:?}", std::thread::current().id()));
-            if stop_after > 0
-                && record.state == "running"
-                && record.incarnation >= stop_after
+            if ((stop_after > 0 && record.state == "running" && record.incarnation >= stop_after)
+                || (stop_on_exhausted && record.state == "exhausted" && record.retry_at.is_some()))
                 && saved.lock().unwrap().is_none()
             {
-                *saved.lock().unwrap() = Some(record.clone());
+                // Teardown may write this file when its HTTP quit falls back. Observe the
+                // restart before posting quit so teardown cannot change the case's answer.
+                *saved.lock().unwrap() = Some((
+                    record.clone(),
+                    event_dir.join("runtime/shutdown-request.v1.json").exists(),
+                ));
                 let _ = event_host.post_stop(
                     "quit",
                     None,
@@ -201,14 +240,12 @@ fn main() {
                     let _ = std::fs::remove_file(control_dir.join("shell-control.json"));
                     match value["action"].as_str() {
                         Some("session-query") => {
-                            trigger_coordinator.begin(quit::QuitCause::SessionEnd {
-                                close_app: false,
-                            });
+                            trigger_coordinator
+                                .begin(quit::QuitCause::SessionEnd { close_app: false });
                         }
                         Some("session-end") => {
-                            let ticket = trigger_coordinator.begin(quit::QuitCause::SessionEnd {
-                                close_app: false,
-                            });
+                            let ticket = trigger_coordinator
+                                .begin(quit::QuitCause::SessionEnd { close_app: false });
                             let _ = trigger_coordinator.wait(ticket);
                         }
                         Some("triggers") => {
@@ -243,6 +280,35 @@ fn main() {
                                     "held": control_host.replacement_held(),
                                     "actorRunning": control_host.supervisor_running()
                                 }),
+                            );
+                        }
+                        Some("restart-quit-race") => {
+                            let accepted = (0..5)
+                                .filter(|_| control_host.request_manual_restart().is_ok())
+                                .count();
+                            let _ = control_host.post_stop("quit", None, Duration::from_secs(2));
+                            let refused = control_host.request_manual_restart().is_err();
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({"ok":true,"accepted":accepted,"quitRefusedRestart":refused}),
+                            );
+                        }
+                        Some("quit") => {
+                            let result =
+                                control_host.post_stop("quit", None, Duration::from_secs(2));
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({"ok": result.is_ok(), "error": result.err()}),
+                            );
+                        }
+                        Some("restart") => {
+                            let result = control_host.request_manual_restart();
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({"ok": result.is_ok(), "error": result.err()}),
                             );
                         }
                         Some("upgrade") => {
@@ -283,8 +349,18 @@ fn main() {
                                 serde_json::json!(control_actor.lock().unwrap().clone());
                             write_control_result(&control_dir, &value, result);
                         }
-                        Some("suspend") => control_host.note_power(supervisor::PowerEvent::Suspend),
-                        Some("resume") => control_host.note_power(supervisor::PowerEvent::Resume),
+                        Some("suspend") | Some("resume") => {
+                            control_host.note_power(if value["action"] == "suspend" {
+                                supervisor::PowerEvent::Suspend
+                            } else {
+                                supervisor::PowerEvent::Resume
+                            });
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({"ok":true}),
+                            );
+                        }
                         _ => {
                             let _ = control_host.post_stop(
                                 value["reason"].as_str().unwrap_or("quit"),
@@ -318,6 +394,8 @@ fn main() {
     .unwrap()
     .records;
     let checkpoint = checkpoint.lock().unwrap().clone();
+    let shutdown_request_at_checkpoint = checkpoint.as_ref().map(|(_, exists)| *exists);
+    let checkpoint = checkpoint.map(|(record, _)| record);
     let last_exit = checkpoint
         .as_ref()
         .and_then(|r| r.last_exit.clone())
@@ -329,7 +407,7 @@ fn main() {
         Outcome::Stopped {reason,exit_code}=>serde_json::json!({"kind":"stopped","reason":reason,"exitCode":exit_code}),
         Outcome::Exhausted {reason,exit_code}=>serde_json::json!({"kind":"exhausted","reason":reason,"exitCode":exit_code}),
         Outcome::NoEngine=>serde_json::json!({"kind":"stopped","reason":"quit"}) },
-        "state":supervisor.state.name(),"checkpoint":checkpoint,"incarnation":supervisor.incarnation,
+        "state":supervisor.state.name(),"checkpoint":checkpoint,"shutdownRequestAtCheckpoint":shutdown_request_at_checkpoint,"incarnation":supervisor.incarnation,
         "restartCount":supervisor.restart_count,"lastExit":last_exit,"forcedKill":forced,
         "requestsWritten":records.iter().filter(|r|r["type"]=="engine-intent" && r["channel"]!="TERMINATE").map(|r|match r["reason"].as_str(){Some("TIMEOUT")=>"hang",Some("ENGINE_RESTART")=>"restart",Some("UPGRADE")=>"upgrade",_=>"quit"}).collect::<Vec<_>>(),
         "policyProfile":if supervisor.policy.harness_active {"harness"} else {"product"}});
@@ -347,3 +425,7 @@ fn write_control_result(
     std::fs::write(&tmp, serde_json::to_vec(&payload).unwrap()).unwrap();
     std::fs::rename(tmp, path).unwrap();
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../engine_conn_test_support.rs"]
+mod engine_conn_test_support;

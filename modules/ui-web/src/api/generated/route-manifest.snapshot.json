@@ -2,7 +2,7 @@
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
   "count": 252,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:e682cfe90289651d2cb9e2d1f96b278f1fd83de8938bdecc5e009ea06ed23176",
+  "routeDigest": "sha256:a0deb6b7865b0038433d3714fd26c08c87a69f4bd611fd87a65b9904840e6558",
   "routes": [
     {
       "method": "GET",
@@ -798,6 +798,20 @@
     {
       "method": "POST",
       "path": "/api/chat/conversations/{sessionId}/sources/exclude",
+      "cohort": "conversation",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/conversations/{sessionId}/stop",
       "cohort": "conversation",
       "owningModule": null,
       "requiredCapabilities": [],
@@ -2240,20 +2254,6 @@
       "method": "GET",
       "path": "/api/preview",
       "cohort": "knowledge",
-      "owningModule": null,
-      "requiredCapabilities": [],
-      "responseSchema": null,
-      "stability": null,
-      "sdkOperationId": null,
-      "requestSchema": null,
-      "queryParameters": null,
-      "responseSchemas": null,
-      "lifecycle": null
-    },
-    {
-      "method": "GET",
-      "path": "/api/mcp/token",
-      "cohort": "mcp",
       "owningModule": null,
       "requiredCapabilities": [],
       "responseSchema": null,

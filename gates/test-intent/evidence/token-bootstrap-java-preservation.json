@@ -1,0 +1,245 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T07:35:43.513Z",
+  "revision": "0073e38aab1b158e5e4a9f4b02c14f887095bd9b",
+  "tree": "9147f2308fff03cf9c3f621d97cc6cf91d0ccf5a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredSurvivalHttpAdmissionTest\" --tests \"io.justsearch.ui.api.OpenAiCompatControllerTest\" --tests \"io.justsearch.ui.api.McpOriginValidationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 841311
+    },
+    {
+      "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.ProdModeSettingsPersistenceIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8820
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:27bd48666cab033531a1b75e6a4b8805b79af73380d08657ad6da81cc34faa4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nonOperationStreamKeepsItsRetainedRequestOwnerForeground()",
+          "status": "passed"
+        },
+        {
+          "name": "unknownOperationPreservesItsExistingErrorWithoutDispatchOrRetainedWork()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] INGEST_ALIAS",
+          "status": "passed"
+        },
+        {
+          "name": "[2] GENERIC_INVOKE",
+          "status": "passed"
+        },
+        {
+          "name": "[3] MIGRATION_ALIAS",
+          "status": "passed"
+        },
+        {
+          "name": "[4] UNDO",
+          "status": "passed"
+        },
+        {
+          "name": "actualSecurityFiltersStillGuardDeclaredSurvivalRoutes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fcdac3b20dcbf769f8daf03eb9bb4446b1135cbc6499b91b78d981889f19f70b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "upstreamWildcardCannotOverrideProductionCorsPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "failedResponseHandoffClosesUpstreamAndRetainedAdmission()",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationClosesUpstreamButAdmissionWaitsForDownstreamClose()",
+          "status": "passed"
+        },
+        {
+          "name": "streamingBodyKeepsAggregateAdmissionAfterHeaders()",
+          "status": "passed"
+        },
+        {
+          "name": "upstream success → forwards status, headers (filtered), and body stream",
+          "status": "passed"
+        },
+        {
+          "name": "streamingBodyKeepsPerContextAdmissionAfterHeaders()",
+          "status": "passed"
+        },
+        {
+          "name": "upstream connect refused → 503 SERVICE_UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationInterruptsUpstreamBeforeResponseHeaders()",
+          "status": "passed"
+        },
+        {
+          "name": "port unset (== 0) → 503 SERVICE_UNAVAILABLE without contacting upstream",
+          "status": "passed"
+        },
+        {
+          "name": "modelMetadataDoesNotEnterGenerationLifetime()",
+          "status": "passed"
+        },
+        {
+          "name": "connectionNominatedStreamingHeadersAreNotForwarded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cdd816b9b9d0c833165d25062977490984a6c0e27e85cceb1fae5375862faa04",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Live: POST /mcp from a foreign Origin is 403 with a JSON-RPC error body",
+          "status": "passed"
+        },
+        {
+          "name": "Removed token endpoint is absent for every Origin",
+          "status": "passed"
+        },
+        {
+          "name": "Live: DELETE /mcp is validated too — the check covers all methods on the endpoint",
+          "status": "passed"
+        },
+        {
+          "name": "The opaque `null` origin is rejected — it carries no host that can be verified",
+          "status": "passed"
+        },
+        {
+          "name": "Live: a denied request still runs after-handlers (no scope/inflight leak) and keeps its body",
+          "status": "passed"
+        },
+        {
+          "name": "Live: GET /mcp with no Origin is 405 + Allow — the spec's answer for a server with no SSE stream",
+          "status": "passed"
+        },
+        {
+          "name": "Unparseable values and non-web schemes are rejected",
+          "status": "passed"
+        },
+        {
+          "name": "Live: GET /mcp from a loopback Origin is 405 + Allow — the guard admits it, the method rejects it",
+          "status": "passed"
+        },
+        {
+          "name": "Absent Origin is allowed — native MCP hosts are not browsers and send none",
+          "status": "passed"
+        },
+        {
+          "name": "Loopback origins are allowed: 127.0.0.1 / localhost / ::1, any port, http or https",
+          "status": "passed"
+        },
+        {
+          "name": "Live: POST /mcp from a loopback-lookalike Origin is 403",
+          "status": "passed"
+        },
+        {
+          "name": "Live: POST /mcp with no Origin is served (native MCP host)",
+          "status": "passed"
+        },
+        {
+          "name": "Live: POST /mcp from a loopback Origin is served",
+          "status": "passed"
+        },
+        {
+          "name": "Live: the MCP guard is endpoint-scoped — other routes keep browser-enforced CORS",
+          "status": "passed"
+        },
+        {
+          "name": "Live: GET /mcp from a foreign Origin is 403 — the guard wins over the 405",
+          "status": "passed"
+        },
+        {
+          "name": "Foreign web origins are rejected",
+          "status": "passed"
+        },
+        {
+          "name": "Loopback LOOKALIKE origins are rejected (host equality, never substring matching)",
+          "status": "passed"
+        },
+        {
+          "name": "An over-long Origin is truncated before it reaches logs and the event buffer",
+          "status": "passed"
+        },
+        {
+          "name": "Desktop-shell origins are allowed (tauri://localhost, https://tauri.localhost)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb1cbfdd4485849cd893d4e00951ce76c55d797bad24d75adfeaad064c292820",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "prod boot really enforces the session token on mutating calls",
+          "status": "passed"
+        },
+        {
+          "name": "(B7 probe) empty activate body returns a non-empty 400 JSON body in prod mode",
+          "status": "passed"
+        },
+        {
+          "name": "(b)+(c) settings are writable and survive a fresh store load",
+          "status": "passed"
+        },
+        {
+          "name": "(a) activation resolves the installed chat model instead of MODEL_PATH_REQUIRED",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ec1077359f1d15f80f75ca74610d05831de990bbd978abd3feccfe48ade556be"
+}

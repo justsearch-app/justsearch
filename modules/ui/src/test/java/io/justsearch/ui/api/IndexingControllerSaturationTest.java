@@ -39,6 +39,7 @@ import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.server.WorkerAppServices;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.stubbing.Answer;
+import tools.jackson.databind.json.JsonMapper;
 
 @Timeout(10)
 final class IndexingControllerSaturationTest {
@@ -106,6 +108,14 @@ final class IndexingControllerSaturationTest {
         }
         return observed;
       }).when(registry).register(any());
+      // S34.7 makes an unregistered removal a no-op. Seed membership before saturation so
+      // Remove still exercises the actual Worker submission refusal, like the other endpoints.
+      if (endpoint.equals("remove")) {
+        Path root = Files.createDirectory(dataDir.resolve("watched"));
+        Files.writeString(dataDir.resolve("watched_roots.json"), JsonMapper.builder().build()
+            .writeValueAsString(Map.of("schemaVersion", 1, "roots",
+                List.of(Map.of("path", root.toString(), "collection", "notes")))));
+      }
       try (var client = new EngineKnowledgeClient(registry, () -> services,
           new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop())) {
         try {
