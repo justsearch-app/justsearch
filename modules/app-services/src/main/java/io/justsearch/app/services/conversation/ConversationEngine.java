@@ -625,11 +625,13 @@ public final class ConversationEngine {
       return;
     }
     if (injectorRun.terminated) {
-      // A turn whose retrieval reported what it did, or whose question was rewritten (the reader saw
-      // "Interpreted as" live), is saved with its outcome even though it ends here: a retrieval that
-      // could not run at all reports no metadata, and the rewrite is then all that says what it was.
+      // Retrieval failures can carry no metadata at all. Keep their question and classified outcome
+      // as well as the turns whose retrieval or rewrite reported what happened.
       if (retrievalRecordId != null && conversationStore != null
-          && (!injectorRun.retrievalMetadata.isEmpty() || standalone != null || "core.extract".equals(shape.id().value()))
+          && (!injectorRun.retrievalMetadata.isEmpty() || standalone != null
+              || "core.extract".equals(shape.id().value())
+              || shape.contextInjectorIds().contains(
+                  io.justsearch.app.services.conversation.spi.RAGContext.ID))
           && injectorRun.terminalError != null) {
         conversationStore.createSession(retrievalRecordId, shape.id().value());
         conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
@@ -682,8 +684,8 @@ public final class ConversationEngine {
     // Tempdoc 834 §4.3 — open the turn marker before iteration 0, for ITERATING shapes only. The
     // assistant-turn persistence below sits INSIDE this loop, so a WITHIN_TURN_ITERATION shape
     // writes one assistant turn per iteration and a crash at iteration 3 of 8 leaves three
-    // persisted turns reading as a finished answer. A ONE_SHOT ask has no such gap: it persists
-    // once, complete, so a dropped ask loses nothing and needs no marker.
+    // persisted turns reading as a finished answer. A ONE_SHOT answer is saved once, complete;
+    // its saved question without an outcome already identifies an unfinished attempt to readers.
     String turnRecordKey = sessionId != null ? sessionId : threadId;
     if (shape.iterationMode() != IterationMode.ONE_SHOT
         && turnRecordKey != null
@@ -739,6 +741,14 @@ public final class ConversationEngine {
           persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
               e.getMessage(), e.errorCode);
           return;
+        } catch (RuntimeException failure) {
+          // Preserve synchronous failures for the API adapter's existing classification, while
+          // saving the model attempt just as we save an asynchronous stream failure.
+          if (failure instanceof io.justsearch.app.api.EngineWorkCancelledException
+              || refusalEvent(failure) != null) throw failure;
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+              failure.getMessage() == null ? failure.toString() : failure.getMessage(), "LLM_ERROR");
+          throw failure;
         }
         accumulatedFinalText = finalText;
         stoppedReasoning = reasoningRef.get();
@@ -1252,9 +1262,13 @@ public final class ConversationEngine {
         sink.accept(event);
       }
       if (result.terminalError().isPresent()) {
-        if (!stoppedByUser(work)) sink.accept(result.terminalError().get());
+        SseEvent terminal = result.terminalError().get();
+        if (terminal.payload().get("retrievalScoped") instanceof Boolean scoped) {
+          retrievalMetadata.put("retrievalScoped", scoped);
+        }
+        if (!stoppedByUser(work)) sink.accept(terminal);
         return new InjectorRunResult(out, forwarded, true, retrievalMetadata, citations,
-            result.terminalError().get());
+            terminal);
       }
       out.addAll(result.messages());
       if (io.justsearch.app.services.conversation.spi.ExternalContextInjector.ID.equals(inj.id())) {
@@ -1283,8 +1297,7 @@ public final class ConversationEngine {
   private void persistRetrievalError(String recordId, ConversationShape shape,
       Map<String, Object> retrievalMetadata, String standaloneQuestion, String message,
       Object errorCode) {
-    if (recordId == null || conversationStore == null
-        || (retrievalMetadata.isEmpty() && standaloneQuestion == null && !"core.extract".equals(shape.id().value()))) {
+    if (recordId == null || conversationStore == null) {
       return;
     }
     var error = new LinkedHashMap<String, Object>();

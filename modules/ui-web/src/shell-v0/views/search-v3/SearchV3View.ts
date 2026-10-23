@@ -46,6 +46,7 @@
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
 import { sv3Tokens } from './sv3-tokens.css.js';
@@ -104,6 +105,7 @@ import {
 } from './sv3-boundaries.js';
 import {
   activeTurns,
+  sv3TurnMessageIds,
   adoptRunSession,
   appendTurnDelta,
   applySv3History,
@@ -158,15 +160,18 @@ import {
   isSv3BranchActionId,
   projectSv3TurnLineage,
   sv3BranchMenuItems,
+  sv3FirstOwnTurnIndex,
   sv3LineageFor,
   type Sv3BranchAction,
   type Sv3TurnLineage,
   type Sv3VersionSelect,
+  type Sv3VersionSet,
 } from './sv3-branch.js';
 // The window's honesty derivations (tempdoc 822 Phase F7): the lock, the corpus, and the ONE remedy
 // channel every region's fix-it control leaves through.
 import {
   deriveSv3HistoryLocked,
+  sv3RecordItemStopsRun,
   projectSv3Corpus,
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
@@ -182,6 +187,7 @@ import {
   SV3_EFFORT_DEFAULT,
   isSv3Effort,
   sv3Ask,
+  SV3_MODEL_SHAPE_ID,
   sv3StopAsk,
   type Sv3Effort,
 } from './sv3-ask.js';
@@ -200,6 +206,8 @@ import {
   generateConversationTitle,
   getConversationListState,
   loadConversations,
+  loadForkConversations,
+  siblingSessionsAt,
   restoreActiveConversation,
   resumeConversation,
   type ResumedConversation,
@@ -248,7 +256,7 @@ import {
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
-import { discoverLiveAgentRun } from '../../controllers/liveRuns.js';
+import { discoverLiveAgentRun, type LiveRunRow } from '../../controllers/liveRuns.js';
 import {
   getAgentSessionController,
   peekAgentSessionController,
@@ -297,6 +305,8 @@ import {
   SV3_SOURCE_INDEX_ABSENT,
 } from './sv3-citation-anchor.js';
 import { setAiActivity, subscribeAiState, type AiState } from '../../state/aiStateStore.js';
+import { selectIndexingProgress } from '../../state/indexingProgress.js';
+import '../../components/IndexingControls.js';
 import { projectAvailability } from '../../state/availability.js';
 import { reasonFor } from '../../state/readinessNotice.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
@@ -349,6 +359,11 @@ import './Sv3Palette.js';
 import './Sv3Pane.js';
 
 const COMPOSER_STATE_ATTR = 'composer-state';
+
+// Stop disappears on DONE; an in-flight DELETE can still lag (DS4 observed ~1.1s).
+// Allow 5s for cross-window/network delivery. The Engine has no finished-run deadline;
+// this bounds clean-DONE reads, never our own Halt or Stop awaiting its checkpoint.
+const COMPLETED_RECORD_GRACE_MS = 5000;
 
 /** Tempdoc 867 — a stable empty-set identity for when no run controller exists yet. */
 const EMPTY_EVIDENCE_PATHS: ReadonlySet<string> = new Set();
@@ -436,6 +451,35 @@ export class SearchV3View extends JfElement {
         color: var(--foreground);
         font-family: var(--font-sans);
         font-size: var(--font-size-sv3-sm);
+      }
+      .branch-origin {
+        display: flex;
+        align-items: center;
+        padding: var(--space-2) var(--space-4);
+        border-bottom: 1px solid var(--toolbar-border);
+        color: var(--muted-foreground);
+        font-size: var(--font-size-sv3-xs);
+      }
+      .branch-origin span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .branch-origin button {
+        margin-inline-start: var(--space-3);
+        flex-shrink: 0;
+        min-height: 24px;
+        padding: var(--space-1) var(--space-2);
+        border: 1px solid var(--toolbar-border);
+        border-radius: var(--control-radius);
+        background: transparent;
+        color: var(--foreground);
+        font: inherit;
+        cursor: pointer;
+      }
+      .branch-origin button:hover { background: var(--toolbar-control-hover); }
+      .branch-origin button:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
       }
       jf-sv3-sidebar {
         flex: 0 0 var(--sidebar-width);
@@ -545,6 +589,14 @@ export class SearchV3View extends JfElement {
            the content region — and, since tempdoc 859 §B, for the DOCKED dock as well. */
         position: relative;
       }
+
+      /* The notice occupies its own row; hero and dock position within the space below it. */
+      .indexing-pause-note {
+        flex: none;
+        padding: var(--space-3) var(--floating-content-inset);
+      }
+      .indexing-pause-note p { margin: 0 0 var(--space-2); }
+      .column jf-sv3-composer[state='hero'] { inset-block-start: 0; }
 
       /* ── THE DOCK (tempdoc 859 §B) ─────────────────────────────────────────
          The context bar and the composer, in ONE positioned wrapper, floating over the transcript.
@@ -847,16 +899,7 @@ export class SearchV3View extends JfElement {
    * own guard (`views/UnifiedChatView.ts:1658-1673`).
    */
   declare compacting: boolean;
-  /**
-   * The shared conversation store's list, AS ROWS (852 S3). This window's own {@link sessions} is a
-   * projection that drops the two fields the version pager is made of — `parentSessionId` and
-   * `branchPointMessageId` — so the pager reads the store's rows directly rather than having those
-   * pointers copied onto a second shape that would then have to be kept in step.
-   *
-   * Held rather than re-fetched: `siblingSessionsAt` is a pure read and the subscription below keeps
-   * this current, which is why a branch created here calls `loadConversations` — the new row is what
-   * makes the fork visible to the pager at all.
-   */
+  /** Recent sidebar rows, retained for row actions. Complete fork reads never enlarge this list. */
   declare conversations: readonly Conversation[];
 
   /** Watches the window box so the pane's presentation follows it (Phase F8). */
@@ -869,9 +912,28 @@ export class SearchV3View extends JfElement {
   private appearanceUnsubscribe: (() => void) | null = null;
   private chatWidthUnsubscribe: (() => void) | null = null;
   private agentUnsubscribe: (() => void) | null = null;
+  private readonly forkReads = new Map<string, {
+    abort: AbortController;
+    rows: readonly Conversation[] | null;
+    versions: readonly string[] | null;
+  }>();
+  private forkListLoading = false;
+
+  private clearForkReads(): void {
+    for (const read of this.forkReads.values()) read.abort.abort();
+    this.forkReads.clear();
+  }
+
   private convListUnsubscribe: (() => void) | null = null;
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
-  private recordAbort: AbortController | null = null;
+  private readonly recordReads = new Map<string, AbortController>();
+  /** A local terminal can precede the Engine's journal and checkpoint writes. */
+  private readonly pendingRunRecords = new Map<string, {
+    local: Sv3RunLocal; runId: string; doneGraceUntil?: number;
+  }>();
+  private readonly announcedStops = new Set<string>();
+  private recordRetryTimer: number | null = null;
+  private reattachRecordTurn: { runId: string; sessionId: string; turnId: string } | null = null;
   /** Reads are ordered within each conversation without cancelling another conversation's read. */
   private historyReads = new Map<string, AbortController>();
   /** A write includes its response AND saved-history refresh; later controls queue behind it. */
@@ -1043,10 +1105,12 @@ export class SearchV3View extends JfElement {
     // subscription fires immediately with whatever is already loaded; the fetch refreshes it.
     setConversationApiBase(this.apiBase || '');
     this.convListUnsubscribe = subscribeConversationList((state, change) => {
+      if (state.loading || this.conversations !== state.conversations) this.clearForkReads();
+      this.forkListLoading = state.loading;
+      this.requestUpdate();
       this.forgetDeletedConversations(state.deletedIds);
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
-      // The ROWS as well as the projection (852 S3): the version pager is read from the store's own
-      // parent pointers, which `mergeStoreConversations` deliberately does not carry across.
+      // Retain the recent rows separately from the transcript projection for sidebar actions.
       this.conversations = state.conversations;
       // Tempdoc 864 PR C — a REHYDRATION is the ADDRESS being applied (a Back press, a deep link,
       // this tab's own reload pointer), and the address is where this window is. A `claim` is not:
@@ -1142,8 +1206,10 @@ export class SearchV3View extends JfElement {
     releaseSv3MorphSheet();
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
-    this.recordAbort?.abort();
-    this.recordAbort = null;
+    this.clearForkReads();
+    for (const read of this.recordReads.values()) read.abort();
+    this.recordReads.clear();
+    this.clearRecordRetry();
     for (const [id, read] of this.historyReads) {
       this.markContextUnconfirmed(id);
       read.abort();
@@ -1321,6 +1387,7 @@ export class SearchV3View extends JfElement {
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has('sessions')) this.upgradeOpenPaneAnchor();
+    this.syncForkReads();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
       this.reflowSidebar();
     }
@@ -1456,24 +1523,82 @@ export class SearchV3View extends JfElement {
    * caller's live state, which is right and was also completely silent. `onFailure` is the out-of-band
    * signal; the notice is raised and the merge is SKIPPED, so a failure never re-renders the thread.
    */
-  private async refreshRecord(conversationId: string): Promise<void> {
-    this.recordAbort?.abort();
+  private async refreshRecord(conversationId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+    this.recordReads.get(conversationId)?.abort();
     const abort = new AbortController();
-    this.recordAbort = abort;
+    this.recordReads.set(conversationId, abort);
     let failed = false;
     const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
       failed = true;
     });
-    // A superseded claim's response must not land on the conversation the reader moved to.
-    if (abort.signal.aborted) return;
-    if (this.recordAbort === abort) this.recordAbort = null;
-    this.recordNotice = failed;
-    if (failed) return;
-    this.sessions = applySv3Record(
-      this.sessions,
-      conversationId,
-      projectSv3RecordTurns(record.events),
-    );
+    // Reads supersede only their own conversation; a pending Stop can settle after navigation.
+    if (abort.signal.aborted) return false;
+    this.recordReads.delete(conversationId);
+    if (this.sessions.activeId === conversationId) this.recordNotice = failed;
+    if (!failed) {
+      this.sessions = applySv3Record(
+        this.sessions,
+        conversationId,
+        projectSv3RecordTurns(record.events),
+      );
+      const stopIds = new Set(record.events
+        .filter((e) => sv3RecordItemStopsRun(e.kind.toLowerCase(), e.attributes))
+        .map((e) => e.id));
+      for (const [id, pending] of this.pendingRunRecords) {
+        const { local, runId } = pending;
+        if (local.sessionId !== conversationId) continue;
+        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        if (turn === undefined) {
+          this.pendingRunRecords.delete(id);
+          continue;
+        }
+        const stop = turn.activity.find((item) => item.kind === 'note' && stopIds.has(item.id));
+        if (stop?.kind === 'note' && !this.announcedStops.has(runId)) {
+          this.announcedStops.add(runId);
+          emitEphemeralToast({ message: stop.text });
+        }
+        const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
+        if (state === 'DONE' && stop === undefined && !local.haltRequested) {
+          pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
+        } else {
+          delete pending.doneGraceUntil;
+        }
+        // A saved Stop can precede the final checkpoint; keep reading through both edges.
+        if ((state === 'DONE' || state === 'ERROR' || state === 'CANCELLED')
+          && (stop !== undefined || (!local.haltRequested && state === 'ERROR'))) {
+          this.pendingRunRecords.delete(id);
+        }
+      }
+    }
+    this.scheduleRecordRetry();
+    return !failed;
+  }
+
+  private clearRecordRetry(): void {
+    if (this.recordRetryTimer !== null) window.clearTimeout(this.recordRetryTimer);
+    this.recordRetryTimer = null;
+  }
+
+  private retireExpiredRecordReads(): void {
+    const now = Date.now();
+    for (const [id, pending] of this.pendingRunRecords) {
+      if (!pending.local.haltRequested && pending.doneGraceUntil !== undefined
+        && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
+    }
+  }
+
+  private scheduleRecordRetry(): void {
+    this.retireExpiredRecordReads();
+    if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
+    if (!this.isConnected || this.pendingRunRecords.size === 0 || this.recordRetryTimer !== null) return;
+    this.recordRetryTimer = window.setTimeout(() => {
+      this.recordRetryTimer = null;
+      this.retireExpiredRecordReads();
+      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+        void this.refreshRecord(id);
+      }
+    }, 500);
   }
 
   /**
@@ -1489,6 +1614,7 @@ export class SearchV3View extends JfElement {
     const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
     if (abort.signal.aborted) return false;
     this.historyReads.delete(conversationId);
+    if (history.locked === true && this.sessions.activeId === conversationId) this.noteRefusedWhileLocked();
     const landed = (forWrite || this.sessions.activeId === conversationId)
       && history.failed !== true && history.locked !== true;
     if (landed) {
@@ -1545,6 +1671,10 @@ export class SearchV3View extends JfElement {
   }
 
   private retryContextOnReconnect = (): void => {
+    this.clearRecordRetry();
+    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+      void this.refreshRecord(id);
+    }
     this.clearContextRetry();
     this.contextRetryDelay = 1000;
     const id = this.sessions.activeId;
@@ -1605,7 +1735,9 @@ export class SearchV3View extends JfElement {
           // files when this window limited the turn, otherwise all files (a reloaded turn included).
           label:
             item.id === 'retry'
-              ? `${item.label} · ${this.activeSession?.turns.find(t => t.id === detail.turnId)?.shapeId === 'core.extract' ? this.structuredNote(detail.turnId) : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
+              ? `${item.label} · ${session.turns.find(turn => turn.id === detail.turnId)?.kind === 'model'
+                ? 'This answer does not search your files.' : session.turns.find(turn => turn.id === detail.turnId)?.shapeId === 'core.extract'
+                  ? this.structuredNote(detail.turnId) : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
               : item.label,
           icon: 'git-branch' as const,
           category: 'ai' as const,
@@ -1775,14 +1907,100 @@ export class SearchV3View extends JfElement {
 
   /**
    * What each turn can do about branching, derived once per render from the SAME three inputs the
-   * acts below read: the turns on screen, the conversation's `/history`, and the store's own rows.
+   * acts below read: the turns on screen, the conversation's `/history`, and complete fork reads.
    * The trigger's gate and the act's target are therefore one derivation, which is what stops a menu
    * offering a fork the window would then compute differently.
    */
   private turnLineage(): readonly Sv3TurnLineage[] {
     const session = this.activeSession;
     if (session === null) return [];
-    return projectSv3TurnLineage(session.turns, session.history, session.id, this.conversations);
+    return projectSv3TurnLineage(session.turns, session.history, session.id, [],
+      (base, point) => this.forkReads.get(JSON.stringify([base, point]))?.versions ?? null);
+  }
+
+  /** A continuation with no question yet still has a fork point, including on an empty branch. */
+  private continuationFork(): { base: string; point: string } | null {
+    const session = this.activeSession;
+    if (this.historyLocked || session === null || session.history === null) return null;
+    const parent = session.history?.parentSessionId;
+    const point = session.history?.branchPointMessageId;
+    if (parent && point && sv3FirstOwnTurnIndex(session.turns, session.history) >= session.turns.length) {
+      return { base: parent, point };
+    }
+    const last = session.turns.at(-1);
+    const answer = last === undefined ? null : sv3TurnMessageIds(last).assistantMsgId;
+    return answer === null ? null : { base: session.id, point: answer };
+  }
+
+  private continuationVersions(): Sv3VersionSet | null {
+    const fork = this.continuationFork();
+    if (fork === null) return null;
+    const versions = this.forkReads.get(JSON.stringify([fork.base, fork.point]))?.versions;
+    const index = versions?.indexOf(this.activeSession?.id ?? '') ?? -1;
+    return versions && versions.length > 1 && index >= 0 ? { sessions: versions, index } : null;
+  }
+
+  /** Only fork points on the open transcript are read. Requests are parallel and never gate sends. */
+  private syncForkReads(): void {
+    const session = this.activeSession;
+    const needed = new Map<string, { base: string; point: string }>();
+    if (!this.historyLocked && session !== null && session.history !== null) {
+      for (const turn of projectSv3TurnLineage(session.turns, session.history, session.id, [])) {
+        if (turn.forkKey !== null) needed.set(JSON.stringify([turn.forkFromId, turn.forkKey]),
+          { base: turn.forkFromId, point: turn.forkKey });
+      }
+      const parent = session.history?.parentSessionId;
+      const point = session.history?.branchPointMessageId;
+      // Empty branches still need their origin, even before they have a divergent turn.
+      if (parent && point) needed.set(JSON.stringify([parent, point]), { base: parent, point });
+    }
+    // A locked history returns 423 without lineage. The base row of this same lock-safe filter
+    // supplies structural parent pointers without opening content or growing the sidebar.
+    if (this.historyLocked && session !== null && session.history === null
+      && !this.conversations.some(row => row.id === session.id)) {
+      needed.set(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]),
+        { base: session.id, point: EMPTY_PREFIX_SENTINEL });
+    }
+    const continuation = this.continuationFork();
+    if (continuation !== null) needed.set(JSON.stringify([continuation.base, continuation.point]), continuation);
+    for (const [key, read] of this.forkReads) {
+      if (!needed.has(key)) {
+        read.abort.abort();
+        this.forkReads.delete(key);
+      }
+    }
+    if (this.forkListLoading || !this.isConnected) return;
+    for (const [key, { base, point }] of needed) {
+      if (this.forkReads.has(key)) continue;
+      const read = { abort: new AbortController(), rows: null as readonly Conversation[] | null,
+        versions: null as readonly string[] | null };
+      this.forkReads.set(key, read);
+      void loadForkConversations(base, point, read.abort.signal).then(rows => {
+        if (!this.isConnected || this.forkReads.get(key) !== read) return;
+        read.rows = rows;
+        read.versions = rows === null ? null : siblingSessionsAt(rows, base, point);
+        this.requestUpdate();
+      });
+    }
+  }
+
+  private renderBranchOrigin(): TemplateResult | typeof nothing {
+    const session = this.activeSession;
+    if (session === null) return nothing;
+    const ownRead = this.forkReads.get(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]));
+    const metadata = session.history ?? this.conversations.find(row => row.id === session.id)
+      ?? ownRead?.rows?.find(row => row.id === session.id);
+    const parent = metadata?.parentSessionId;
+    const point = metadata?.branchPointMessageId;
+    if (!parent || !point) return nothing;
+    const read = this.forkReads.get(JSON.stringify([parent, point]));
+    const name = (!this.historyLocked && !this.lockedRefusal
+      ? read?.rows?.find(row => row.id === parent)?.firstUserMessage?.trim() : '') || 'Original conversation';
+    return html`<div class="branch-origin" data-testid="sv3-branch-origin">
+      <span>Branched from: ${name}</span>
+      <button type="button" aria-label=${`Open original: ${name}`}
+        @click=${() => { void this.openBranch(parent); }}>Open original</button>
+    </div>`;
   }
 
   private onBranchAction(event: Event): void {
@@ -1816,7 +2034,7 @@ export class SearchV3View extends JfElement {
     const lineage = sv3LineageFor(this.turnLineage(), detail.turnId);
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
-    const tier: Sv3ComposerTier = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : 'ask';
+    const tier: Sv3ComposerTier | 'model' = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
     if (tier === 'structured' && detail.action !== 'branch') {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
@@ -1874,14 +2092,14 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Only the
-   * delegate tier is checked here: an ask re-run keeps the path it has always had. The agent needs
-   * the model (its own availability gate — not the ask tier's, which also wants indexed documents)
+   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Model and
+   * delegate reruns check availability here; an Ask rerun keeps its existing path. Both need
+   * the model (their own availability gates, which do not require indexed documents)
    * and no other run in flight on the one shared controller.
    */
-  private canRerun(tier: Sv3ComposerTier): boolean {
-    if (tier !== 'delegate') return true;
-    const unavailable = this.delegateUnavailableReason;
+  private canRerun(tier: Sv3ComposerTier | 'model'): boolean {
+    if (tier !== 'delegate' && tier !== 'model') return true;
+    const unavailable = tier === 'model' ? this.modelAnswerUnavailableReason : this.delegateUnavailableReason;
     if (unavailable !== '') {
       emitEphemeralToast({ message: unavailable, severity: 'warning' });
       return false;
@@ -1909,7 +2127,7 @@ export class SearchV3View extends JfElement {
     sessionId: string,
     fromMsgId: string,
     resend: string | null,
-    tier: Sv3ComposerTier,
+    tier: Sv3ComposerTier | 'model',
     scope: Sv3AskScope | null = null,
   ): Promise<boolean> {
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
@@ -1936,7 +2154,11 @@ export class SearchV3View extends JfElement {
       }
       this.delegate(resend);
     } else {
-      await this.runAsk(resend, scope);
+      if (tier === 'model' && !this.canRerun(tier)) {
+        this.writeDraft(resend);
+        return true;
+      }
+      await this.runAsk(resend, scope, undefined, tier === 'model');
     }
     return true;
   }
@@ -1946,10 +2168,8 @@ export class SearchV3View extends JfElement {
    * ({@link onSessionSelect}) — project the row, focus it, claim it, load both records — plus the
    * one a row click does not need: RE-LIST.
    *
-   * The re-list is what makes the fork visible. A branch's siblings are read from the store's own
-   * `parentSessionId`/`branchPointMessageId` pointers, and the row carrying them does not exist in
-   * this window's copy of the list until `listSessions` returns it — so without this the pager would
-   * render nothing on the very fork the reader just made.
+   * Re-listing updates recents and invalidates complete fork reads, including older versions
+   * outside the sidebar window. The fork reads finish independently of opening or sending.
    */
   private async openBranch(id: string): Promise<void> {
     const prevId = this.sessions.activeId;
@@ -2027,17 +2247,33 @@ export class SearchV3View extends JfElement {
     this.reattachChecked = true;
     const existing = peekAgentSessionController();
     if (existing !== null) {
-      void existing.reattachActiveRunOnLoad();
+      void existing.reattachActiveRunOnLoad(this.prepareReattachedRecord);
       return;
     }
     if ((await discoverLiveAgentRun(this.apiBase)) === null) return;
-    void getAgentSessionController(this.apiBase).reattachActiveRunOnLoad();
+    if (!this.isConnected) return;
+    void getAgentSessionController(this.apiBase).reattachActiveRunOnLoad(this.prepareReattachedRecord);
     // The mount-time presence look already ran, synchronously, while this round-trip was still in
     // flight — and it found no controller because there was none yet to find. Take it again now
     // that there is one, so a recovered run reaches the window on this path directly rather than
     // only through whatever the controller happens to notify next.
     this.syncRunPresence();
   }
+
+  /** Bind an observer to the canonical turn before its first notification can create a placeholder. */
+  private prepareReattachedRecord = async (run: LiveRunRow): Promise<void> => {
+    const id = run.conversationId;
+    if (!this.isConnected || !id || !run.runId) return;
+    const now = Date.now();
+    this.sessions = mergeStoreConversations(this.sessions, [
+      { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
+    ]);
+    if (!await this.refreshRecord(id) || !this.isConnected) return;
+    const turn = sessionById(this.sessions, id)?.turns.at(-1);
+    if (turn?.kind === 'agent' && turn.recordId !== null) {
+      this.reattachRecordTurn = { runId: run.runId, sessionId: id, turnId: turn.id };
+    }
+  };
 
   /* ── The lock (tempdoc 822 Phase F7; inventory E4/E5) ─────────────────────────────────────── */
 
@@ -2857,6 +3093,30 @@ export class SearchV3View extends JfElement {
     void this.focusComposer();
   }
 
+  /** The model uses the shared model gate, plus the conversation's write lock. No document gate. */
+  private get modelAnswerUnavailableReason(): string {
+    const id = this.sessions.activeId;
+    if (id !== null && this.contextWrites.has(id)) return this.contextNotice(id);
+    if (this.historyLocked) return reasonFor('conversations.locked').wording;
+    return this.delegateUnavailableReason;
+  }
+
+  private onModelAnswer(event: Event): void {
+    const id = (event as CustomEvent<{ turnId?: string }>).detail?.turnId;
+    const turn = this.activeSession?.turns.at(-1);
+    if (turn === undefined || turn.shapeId === 'core.extract' || turn.id !== id || this.streaming
+      || this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true) return;
+    if (turn.status !== 'no-evidence'
+      && !(turn.kind === 'model' && ['failed', 'halted', 'refused'].includes(turn.status))) return;
+    const reason = this.modelAnswerUnavailableReason;
+    if (reason !== '') {
+      emitEphemeralToast({ message: reason, severity: 'warning' });
+      return;
+    }
+    void this.runAsk(turn.question, null, undefined, true);
+    void this.focusComposer();
+  }
+
   private refuseAsk(): void {
     emitEphemeralToast({ message: this.askUnavailableReason, severity: 'warning' });
   }
@@ -2918,12 +3178,13 @@ export class SearchV3View extends JfElement {
 
   /**
    * The ONE path a question takes. There is no second entry: the composer refuses an unavailable or
-   * busy send before it leaves, so this method is not a second gate re-deciding the same question —
-   * it opens the turn, dispatches through the window's single ask site, and settles that turn.
+   * busy send before it leaves, and the model action checks its own gate. This method
+   * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
-  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string): Promise<void> {
+  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false): Promise<void> {
     const question = rawQuestion.trim();
-    if (question === '') return;
+    if (question === '' || this.streaming) return;
+    if (modelAnswer && this.modelAnswerUnavailableReason !== '') return;
     if (schema !== undefined && (scope?.paths.length ?? 0) > 5) {
       this.structuredError = 'Choose at most 5 files for one extraction.';
       this.requestUpdate();
@@ -2935,7 +3196,7 @@ export class SearchV3View extends JfElement {
     const sessionId = this.sessions.activeId;
     if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
     let context: ReturnType<typeof sv3FollowUpContext> = [];
-    if (sessionId !== null) {
+    if (sessionId !== null && !modelAnswer) {
       this.contextAskPending.add(sessionId);
       try {
         const resolved = await this.followUpContext(sessionId);
@@ -2951,7 +3212,8 @@ export class SearchV3View extends JfElement {
       }
     }
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, question, Date.now(), 'ask', createConversationId(), schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract');
+    const shapeId = modelAnswer ? SV3_MODEL_SHAPE_ID : schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract';
+    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
@@ -2960,7 +3222,7 @@ export class SearchV3View extends JfElement {
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (schema === undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
+    if (!modelAnswer && schema === undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -2999,7 +3261,7 @@ export class SearchV3View extends JfElement {
     // to stop this turn however the reader reaches it.
     setAiActivity({
       state: 'streaming',
-      shapeId: schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract',
+      shapeId,
       startedAtMs: Date.now(),
       canCancel: true,
       cancel: stop,
@@ -3007,7 +3269,7 @@ export class SearchV3View extends JfElement {
     // Every terminal below settles the SAME ref the dispatch opened, so a reader who claims another
     // session mid-stream still gets the answer written where it was asked.
     const settle = (
-      status: 'complete' | 'halted' | 'refused' | 'failed' | 'left',
+      status: 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence' | 'left',
       detail = '',
     ): void => {
       if (status === 'left') {
@@ -3057,6 +3319,7 @@ export class SearchV3View extends JfElement {
         schema,
         question,
         conversationId: ref.sessionId,
+        modelAnswer,
         // The rung AS OF THIS SEND (tempdoc 822 Phase F10). Read here rather than inside the ask
         // client, so the one place a question is dispatched is also the one place its parameters
         // are decided — and a rung changed mid-stream cannot rewrite a request already in flight.
@@ -3115,7 +3378,12 @@ export class SearchV3View extends JfElement {
           void this.refreshRecord(ref.sessionId);
         },
         onLeft: () => settle('left'),
-        onFailed: (message) => settle('failed', message),
+        onFailed: (message, code) => {
+          const noEvidence = !modelAnswer && schema === undefined && code === 'NO_CONTENT' && scope === null;
+          settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
+          void loadConversations();
+          void this.refreshRecord(ref.sessionId);
+        },
       },
     );
   }
@@ -3395,7 +3663,11 @@ export class SearchV3View extends JfElement {
       sv3RunPresenceTitle(ctrl),
       Date.now(),
       ctrl.conversationId ?? createConversationId(),
+      this.reattachRecordTurn?.runId === ctrl.sessionId
+        && this.reattachRecordTurn.sessionId === ctrl.conversationId
+        ? this.reattachRecordTurn.turnId : null,
     );
+    this.reattachRecordTurn = null;
     this.sessions = list;
     this.run = {
       sessionId: ref.sessionId,
@@ -3585,6 +3857,9 @@ export class SearchV3View extends JfElement {
       // cut-short badge.
       terminalBelongsToThisRun && ctrl !== null ? ctrl.terminalDisposition : null,
     );
+    if (local.acknowledged && ctrl?.sessionId != null) {
+      this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
+    }
     // The live feed was ATTENTION; the record is what survives it. Refreshing at the terminal is what
     // makes the yield happen (inventory D1): the settled turn re-renders from the canonical record's
     // interleaved items instead of vanishing with the controller that produced them.
@@ -3895,6 +4170,12 @@ export class SearchV3View extends JfElement {
   /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
   private forgetDeletedConversations(ids: readonly string[]): void {
     for (const gone of ids) {
+      this.recordReads.get(gone)?.abort();
+      this.recordReads.delete(gone);
+      for (const [id, pending] of this.pendingRunRecords) {
+        if (pending.local.sessionId === gone) this.pendingRunRecords.delete(id);
+      }
+      if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
       if (this.sessions.activeId === gone) this.resetToHero();
       if (readLastViewedConversation() === gone) clearLastViewedConversation();
       if (this.renamingId === gone) this.renamingId = null;
@@ -4068,6 +4349,9 @@ export class SearchV3View extends JfElement {
   }
 
   render(): TemplateResult {
+    const ai = this.aiSnapshot;
+    const indexing = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
+      ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
     const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
@@ -4151,15 +4435,26 @@ export class SearchV3View extends JfElement {
         @sv3-citation-open=${this.onCitationOpen}
         @sv3-context-menu=${this.onContextMenu}
         @sv3-context-action=${this.onContextAction}
+        @sv3-model-answer=${this.onModelAnswer}
+        @sv3-model-focus=${this.onFocusComposerEvent}
         @sv3-branch-action=${this.onBranchAction}
         @sv3-version-select=${this.onVersionSelect}
       >
         <jf-sv3-topbar window-title=${WINDOW_TITLE} data-testid="sv3-topbar"></jf-sv3-topbar>
+        ${indexing.pause?.waiting || !indexing.activity.confirmed || this.shadowRoot?.querySelector('jf-indexing-controls:focus-within')
+          ? html`<div class="indexing-pause-note" data-testid="sv3-indexing-pause">
+          ${indexing.pause?.waiting ? html`<p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>` : nothing}
+          <jf-indexing-controls .progress=${indexing} api-base=${this.apiBase}></jf-indexing-controls>
+        </div>` : nothing}
+        ${this.renderBranchOrigin()}
+        <div class="column">
         <jf-sv3-main
           state=${this.composerState}
           .view=${results}
           .turns=${turns}
           .turnScopes=${this.search.scopesByTurn}
+          .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
+          ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}
           .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.structuredNote(t.id)]))}
           .run=${run}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
@@ -4173,6 +4468,7 @@ export class SearchV3View extends JfElement {
           ?detailed=${isAdvancedMode()}
           .turnContexts=${contexts}
           .turnLineage=${this.turnLineage()}
+          .continuationVersions=${this.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
           .stopping=${this.askStopping}
@@ -4210,6 +4506,7 @@ export class SearchV3View extends JfElement {
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"
         ></jf-sv3-composer>
+        </div>
         </div>
       </div>
       ${this.pane()}

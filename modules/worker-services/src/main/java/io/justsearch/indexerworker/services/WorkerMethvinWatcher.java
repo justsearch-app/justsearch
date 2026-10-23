@@ -111,6 +111,9 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private final BiConsumer<Path, Boolean> reconcileSink;
   private final WorkerBurstDetector burstDetector = new WorkerBurstDetector();
   private final ScheduledExecutorService reconcileExecutor;
+  private ScheduledExecutorService returnPoll;
+  private java.util.concurrent.ExecutorService returnWorkers;
+  private final java.util.Set<Path> recoveringRoots = ConcurrentHashMap.newKeySet();
   private volatile Runnable pendingReceipts = () -> {};
   private final Map<Path, PendingReconcile> pendingReconciliations = new ConcurrentHashMap<>();
   /**
@@ -239,6 +242,35 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
                   t.setDaemon(true);
                   return t;
                 });
+  }
+
+  /** Linux mount return checks must not queue behind a slow scan or a transition fence. */
+  public synchronized void startRootRecovery(
+      EngineExecutorRegistry.Registration pollRegistration,
+      EngineExecutorRegistry.Registration workerRegistration,
+      java.util.function.Supplier<java.util.Set<Path>> roots, Consumer<Path> recover) {
+    if (!io.justsearch.configuration.PlatformPaths.isLinux()) return;
+    returnWorkers = workerRegistration.openVirtual();
+    returnPoll = pollRegistration.openScheduled(Thread.ofPlatform()
+        .daemon().name("worker-watcher-return-poll").factory());
+    var ignored = returnPoll.scheduleWithFixedDelay(() -> {
+      for (Path root : roots.get()) {
+        if (!recoveringRoots.add(root)) continue;
+        try {
+          returnWorkers.execute(() -> {
+            try {
+              recover.accept(root);
+            } catch (RuntimeException unavailable) {
+              log.debug("Watcher recovery waits for {}: {}", root, unavailable.getMessage());
+            } finally {
+              recoveringRoots.remove(root);
+            }
+          });
+        } catch (java.util.concurrent.RejectedExecutionException closing) {
+          recoveringRoots.remove(root);
+        }
+      }
+    }, 1, 5, TimeUnit.SECONDS);
   }
 
   /**
@@ -846,6 +878,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
 
   @Override
   public synchronized void close() {
+    if (returnPoll != null) returnPoll.shutdownNow();
+    if (returnWorkers != null) returnWorkers.shutdownNow();
     for (Path root : List.copyOf(watchers.keySet())) {
       closeWatcherFor(root);
     }

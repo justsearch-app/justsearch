@@ -945,6 +945,11 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       when(executors.pdfOcr()).thenReturn(ocr);
       when(executors.extractionTimebox()).thenReturn(timebox);
       when(executors.watcherReconcile()).thenReturn(watcher);
+      when(executors.watcherReturnPoll()).thenReturn(engineExecutors.register(
+          new EngineExecutorSpec(
+              "producer-test-watcher-return-poll", Kind.BACKGROUND, Mode.SCHEDULED, 1, 8, 2)));
+      when(executors.watcherReturn()).thenReturn(engineExecutors.register(
+          EngineExecutorSpec.virtual("producer-test-watcher-return", Kind.BACKGROUND, 2)));
       when(runtime.resolvedConfig()).thenReturn(snapshot);
       when(runtime.latestCommitUserDataBestEffort()).thenReturn(Map.of());
       context =

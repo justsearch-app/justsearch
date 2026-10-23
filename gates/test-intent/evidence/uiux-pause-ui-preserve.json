@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T23:52:22.487Z",
+  "revision": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+  "tree": "699a8da9afb4181276dcfb0868542c032c77f410",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/indexingProgress.pause.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/tmp/pause-ui/test-intent-vitest-1819234-1792713140918.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1568
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts#N37.1 automatic holds keep their work-specific explanations and active text indexing",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d8c5341728c94c407a6980e977e3304e5492ae46690ef99fbcbcd04c0ba57c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 status-owned pause projection N37.1 automatic holds keep their work-specific explanations and active text indexing",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1713eef6f7a5df88b2f53f7b0f2222c18e27d8d8b4b656a15b2a53dfa0a06708"
+}

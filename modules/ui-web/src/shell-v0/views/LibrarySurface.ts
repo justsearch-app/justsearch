@@ -35,6 +35,7 @@ import { icon } from '../components/Icon.js';
 // 569 §14 — render the indexed-folder cards through the projection engine (the 2nd real surface).
 import { activeBodyFor, subscribePresentation } from '../state/presentationRuntime.js';
 import { subscribeAiState } from '../state/aiStateStore.js';
+import '../components/IndexingControls.js';
 import { LIBRARY_CARDS_REGION } from '../themes/builtinPresentations.js';
 import '../components/DeclaredSurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -174,6 +175,7 @@ const OP_APPLY = 'core.apply-excludes';
 const LIVE_REFRESH_MIN_MS = 4000;
 
 export class LibrarySurface extends JfElement {
+  private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
@@ -689,11 +691,12 @@ export class LibrarySurface extends JfElement {
         s.enrichSettleSamples,
       );
       this.indexingActivity = progress.activity;
+      this.indexProgress = progress;
       this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
       // row cannot render an unqualified "✓ … Verified just now" over an index with no vectors.
-      this.enrichmentBlocked = progress.phase === 'blocked';
+      this.enrichmentBlocked = progress.blockedPending > 0;
       // 809 finding 1 — same tick, same store: whether the enrichment backfill is still running, so a
       // row cannot claim the terminal "✓ indexed" while semantic search is still being built.
       this.enrichmentPending = progress.enrichingPending > 0;
@@ -793,6 +796,8 @@ export class LibrarySurface extends JfElement {
         enrichmentPending: this.enrichmentPending,
         enrichmentBlocked: this.enrichmentBlocked,
         retryWaiting: this.retryWaiting,
+        indexingPaused: this.indexProgress.pause?.state === 'paused',
+        indexingPauseReason: this.indexProgress.pause?.reason,
         // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
         // re-queue window, when the wire row reports the failures as in-flight instead.
         lastKnownFailed: this.lastKnownFailed[pathHash],
@@ -1624,6 +1629,8 @@ export class LibrarySurface extends JfElement {
       enrichmentPending: this.enrichmentPending,
       enrichmentBlocked: this.enrichmentBlocked,
         retryWaiting: this.retryWaiting,
+        indexingPaused: this.indexProgress.pause?.state === 'paused',
+        indexingPauseReason: this.indexProgress.pause?.reason,
       // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });
@@ -1841,6 +1848,10 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
+      <div data-testid="library-indexing-pause">
+        ${this.indexProgress.pause || !this.indexProgress.activity.confirmed ? html`<p>${this.indexingActivity.summary} — ${this.indexingActivity.detail}</p>` : nothing}
+        <jf-indexing-controls .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
+      </div>
       ${this.renderReindexDecision()}
       ${this.bulkOutcome?.state === 'failed' && this.bulkOutcome.message ? html`
         <div class="action-message" role="alert">${this.bulkOutcome.message}</div>` : nothing}

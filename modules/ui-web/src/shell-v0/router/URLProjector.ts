@@ -27,6 +27,8 @@
 
 import { canonicalize, parseUrl } from './parser.js';
 import { getStore } from './storeRegistry.js';
+import { getJournalState, recordNavigation } from '../state/NavigationJournal.js';
+import { present } from '../display/present.js';
 import type { ShellAddressNavigation, StateSnapshot } from './types.js';
 import {
   getSurfaceStateSchema,
@@ -258,15 +260,33 @@ function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void
     target: surfaceId,
     state,
   };
-  const url = toRelative(canonicalize(addr));
+  const address = canonicalize(addr);
+  const url = toRelative(address);
+  const conversationView = surfaceId === 'core.search-v3-surface';
   try {
     // Encode the canonical justsearch:// URL into the hash fragment so the
     // browser bar projection survives refresh under the loopback HTTP origin.
     if (push && !isCurrentUrl(url)) {
-      window.history.pushState({ surfaceId }, '', url);
+      // Conversation claims bypass IntentRouter, whose Shell subscriber journals surface
+      // navigation. Use that same journal here, before leaving the departing browser address.
+      if (conversationView) {
+        const previous = getJournalState();
+        const departing = previous.entries[previous.cursor];
+        if (departing) window.history.replaceState(
+          { ...window.history.state, navigationJournalId: departing.id }, '',
+        );
+        recordNavigation(surfaceId, address, present({ kind: 'surface', id: surfaceId }).label, 'BUTTON');
+      }
+      const journal = conversationView ? getJournalState() : null;
+      const entry = journal?.entries[journal.cursor];
+      window.history.pushState({ surfaceId, ...(entry ? { navigationJournalId: entry.id } : {}) }, '', url);
       return;
     }
-    window.history.replaceState({ surfaceId }, '', url);
+    const journal = conversationView ? getJournalState() : null;
+    const entry = journal?.entries[journal.cursor];
+    window.history.replaceState(conversationView
+      ? { ...window.history.state, surfaceId, ...(entry?.url === address ? { navigationJournalId: entry.id } : {}) }
+      : { surfaceId }, '', url);
   } catch {
     // history API failure non-fatal.
   }

@@ -11,6 +11,7 @@ type VTDoc = Document & { startViewTransition?: (cb: () => Promise<void> | void)
 
 afterEach(() => {
   delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -24,6 +25,22 @@ function stubReducedMotion(reduce: boolean): void {
 }
 
 describe('viewTransition (tempdoc 609 §R T1.1)', () => {
+  it.each([
+    ['Linux Tauri shell', 'X11; Linux x86_64', true, false],
+    ['Windows Tauri shell', 'Windows NT 10.0; Win64; x64', true, true],
+    ['macOS Tauri shell', 'Macintosh; Intel Mac OS X 10_15_7', true, true],
+    ['Linux browser', 'X11; Linux x86_64', false, true],
+  ])('gates surface switching in a %s on first use', (_label, platform, tauri, enabled) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 (${platform})`);
+    vi.stubGlobal('__TAURI_INTERNALS__', tauri ? {} : undefined);
+    const start = vi.fn();
+    (document as VTDoc).startViewTransition = start;
+    stubReducedMotion(false);
+
+    expect(startSurfaceTransition({ updateComplete: Promise.resolve(true) })).toBe(enabled);
+    expect(start).toHaveBeenCalledTimes(enabled ? 1 : 0);
+  });
+
   it('surfaceTransitionsEnabled is false when the API is absent', () => {
     stubReducedMotion(false);
     expect(surfaceTransitionsEnabled()).toBe(false);

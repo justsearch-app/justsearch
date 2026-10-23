@@ -575,7 +575,9 @@ final class SyncDirectoryOps {
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
-      return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
+      return syncDirectoryErrorResponse(
+          (io.justsearch.configuration.PlatformPaths.isLinux() ? "ROOT_NOT_DIRECTORY: " : "")
+              + "Root path does not exist or is not a directory");
     }
 
     java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission =
@@ -784,6 +786,7 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+              if (!rootOwnership.test(root, file)) return FileVisitResult.CONTINUE;
               if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
@@ -859,6 +862,7 @@ final class SyncDirectoryOps {
               || Thread.currentThread().isInterrupted(), entries -> {
             // Recheck scoped policy at admission while retaining the spool's bounded batches.
             var admitted = entries.stream()
+                .filter(entry -> rootOwnership.test(root, entry.path()))
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();

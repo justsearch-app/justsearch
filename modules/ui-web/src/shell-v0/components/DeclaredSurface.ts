@@ -179,7 +179,6 @@ export class DeclaredSurface extends JfElement {
     /* 594 §11.3 #4 — a diagnostic "<name> off" chip reads as a deliberately-disabled capability:
        muted, not asserting. (Only rendered on a DIAGNOSTIC-altitude surface; ambient surfaces omit.) */
     .adaptive-strip .item[data-presence='absent'] {
-      opacity: 0.55;
       font-style: italic;
     }
     /* 594 §11.3 #2 — a low/unknown-CONFIDENCE present fact (e.g. a GPU detected only via nvidia-smi)
