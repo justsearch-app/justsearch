@@ -26,7 +26,8 @@ What actually happened.
 - GPU (if applicable): [e.g., RTX 3060 12GB]
 
 ## Diagnostic Summary (optional)
-In Help & Support, choose **Copy diagnostic summary**. Review the local, redacted summary before
+In Help & Support, **Report a problem** copies the summary for you and opens this form.
+You can also choose **Copy diagnostic summary**. Review the local, redacted summary before
 posting it, remove anything you do not want to share, then paste it inside the fence:
 
 ```text
