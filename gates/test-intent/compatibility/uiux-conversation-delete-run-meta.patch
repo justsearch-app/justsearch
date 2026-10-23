@@ -1,0 +1,14 @@
+--- a/modules/app-agent/src/main/java/io/justsearch/agent/RunEventStore.java
++++ b/modules/app-agent/src/main/java/io/justsearch/agent/RunEventStore.java
+@@ -251,6 +251,11 @@
+     }
+   }
+ 
++  /** Before-state bridge to the unchanged metadata write. */
++  public synchronized void updateRunMeta(String sessionId, Map<String, Object> meta) {
++    writeRunMeta(sessionId, meta);
++  }
++
+   public Path runDir(String sessionId) {
+     return StoreIds.resolve(rootDir, sessionId);
+   }

@@ -364,8 +364,11 @@ export class Sv3Sidebar extends JfElement {
     row.focusRow();
   }
 
-  private toggleCollapsed(): void {
-    this.dispatchEvent(new CustomEvent(SV3_SIDEBAR_TOGGLE, { bubbles: true, composed: true }));
+  private toggleCollapsed(event: Event): void {
+    // Preserve the actual opener across the shadow boundary for sheet focus restoration.
+    (event.currentTarget as HTMLElement).dispatchEvent(
+      new CustomEvent(SV3_SIDEBAR_TOGGLE, { bubbles: true, composed: true }),
+    );
   }
 
   /** The row's rename intent, named. The panel supplies the id and decides nothing else. */

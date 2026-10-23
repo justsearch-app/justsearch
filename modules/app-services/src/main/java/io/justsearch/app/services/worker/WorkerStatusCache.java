@@ -93,6 +93,34 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     return knowledgeServer.workerCapability().health().name();
   }
 
+  private Map<String, Object> indexingExtras() {
+    Map<String, Object> extras = new HashMap<>();
+    var scheduling = knowledgeServer.gpuScheduling();
+    if (scheduling != null) {
+      var pause = scheduling.indexingHold().snapshot();
+      extras.put("indexingPauseState", pause.state().name());
+      if (pause.reason() != null) extras.put("indexingPauseReason", pause.reason().toLowerCase(Locale.ROOT));
+      if (pause.untilEpochMs() != null) extras.put("indexingPauseUntilEpochMs", pause.untilEpochMs());
+      extras.put("indexingWaitingForResume", pause.waiting() > 0);
+    }
+    var bulk = knowledgeServer.bulkWork();
+    var automatic = java.util.EnumSet.noneOf(io.justsearch.core.scheduling.BulkWorkGate.Reason.class);
+    if (bulk != null) automatic.addAll(bulk.snapshot().verdict().reasons());
+    if (scheduling != null) {
+      automatic.remove(io.justsearch.core.scheduling.BulkWorkGate.Reason.ENERGY_SAVER);
+      if (scheduling.isEnergyReduced()) automatic.add(io.justsearch.core.scheduling.BulkWorkGate.Reason.ENERGY_SAVER);
+    }
+    extras.put("indexingAutomaticReasons", automatic.stream()
+        .map(reason -> reason.name().toLowerCase(Locale.ROOT)).toList());
+    return extras;
+  }
+
+  private Map<String, Object> unavailableExtras() {
+    var extras = indexingExtras();
+    extras.put(KnowledgeStatusView.DOC_COUNT_UNKNOWN_EXTRA, Boolean.TRUE);
+    return extras;
+  }
+
   KnowledgeStatus status(EngineContext engineContext) {
     boolean ready = isWorkerReady();
 
@@ -119,7 +147,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
           false,
           workerStateName(),
           // Task t-20261013-ef3c41: no Worker answered, so the 0 above is not a document count.
-          Map.of(KnowledgeStatusView.DOC_COUNT_UNKNOWN_EXTRA, Boolean.TRUE));
+          unavailableExtras());
     }
 
     StatusResponse s;
@@ -128,7 +156,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     }
 
     // Include embedding compatibility status in extras
-    Map<String, Object> extras = new HashMap<>();
+    Map<String, Object> extras = indexingExtras();
     extras.put("embeddingCompatState", s.getCompatibility().getEmbeddingCompatState());
     extras.put("embeddingCompatReason", s.getCompatibility().getEmbeddingCompatReason());
     extras.put("embeddingFingerprintCurrent", s.getCompatibility().getEmbeddingFingerprintCurrent());

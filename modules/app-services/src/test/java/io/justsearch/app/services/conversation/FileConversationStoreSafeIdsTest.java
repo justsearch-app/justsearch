@@ -105,6 +105,7 @@ class FileConversationStoreSafeIdsTest {
       Path messages = Files.writeString(dir.resolve("messages.jsonl"), saved);
       assertEquals("legacy", store.loadHistory(id).getFirst().get("content"));
       assertEquals(saved, Files.readString(messages));
+      store.createSession(id, "free-chat");
       store.appendMessage(id, "free-chat", Map.of("id", "m", "role", "user", "content", "new"));
       assertEquals(2, store.loadHistory(id).size());
       store.branchFrom(id, "m", id + "-branch");

@@ -155,7 +155,7 @@ public final class ModelSessionPolicyResolver {
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
-            /* deferCpuSession= */ false,
+            /* deferCpuSession= */ variant.executionProvider() == ExecutionProvider.CUDA,
             /* gpuRetryEnabled= */ false, // NER-specific: disable retry (349 item 1)
             DEFAULT_GPU_RETRY_INTERVAL_MS),
         defaultRunOptions());

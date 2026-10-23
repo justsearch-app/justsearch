@@ -101,7 +101,7 @@ final class StatusFieldClassification {
       Map.entry("RuntimeReconciler",
           "runtime condition axes: status and reason"),
       Map.entry("SettingsCommitCoordinator",
-          "committed chat enablement"),
+          "committed chat enablement and authored indexing pause policy"),
       Map.entry("RemoteIndexingJobsBridge",
           "which job states are present in the Worker queue (not their counts)"),
       Map.entry("WatchedRootsState",
@@ -274,8 +274,8 @@ final class StatusFieldClassification {
         state("phase", "expectedSource"), measurement("expectedMs"),
         time("startedAt", "elapsedMs"));
     put(table, OperatingIndexingView.class,
-        state("state", "reasons", "reasonCode", "affects"), measurement("pendingJobs"),
-        time("since", "agingReleaseAt", "sampledAt"));
+        state("state", "reasons", "reasonCode", "affects", "waitingForResume"), measurement("pendingJobs"),
+        time("since", "agingReleaseAt", "sampledAt", "untilEpochMs"));
     put(table, OperatingGpuView.class,
         state("profile", "profileSource", "adapter", "spillSuspected", "source", "stale"),
         measurement("adapterTotalBytes", "adapterFreeBytes", "ourDedicatedBytes",

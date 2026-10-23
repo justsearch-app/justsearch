@@ -30,7 +30,7 @@ public final class UiSettings {
   private boolean vimMode = false;
   private String defaultAction = "open";
   private int inspectorWidth = 0;
-  private boolean pauseIndexingDuringAi = false;
+  private io.justsearch.app.api.settings.IndexingPausePolicy indexingPause;
 
   // v2 additions (UI market readiness)
   // - mode: progressive disclosure (simple/advanced)
@@ -142,12 +142,11 @@ public final class UiSettings {
     this.inspectorWidth = Math.max(0, inspectorWidth);
   }
 
-  public boolean isPauseIndexingDuringAi() {
-    return pauseIndexingDuringAi;
-  }
+  @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+  public io.justsearch.app.api.settings.IndexingPausePolicy getIndexingPause() { return indexingPause; }
 
-  public void setPauseIndexingDuringAi(boolean pauseIndexingDuringAi) {
-    this.pauseIndexingDuringAi = pauseIndexingDuringAi;
+  public void setIndexingPause(io.justsearch.app.api.settings.IndexingPausePolicy policy) {
+    this.indexingPause = policy;
   }
 
   public String getMode() {

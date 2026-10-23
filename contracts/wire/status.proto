@@ -127,9 +127,10 @@ message ChatLoadView {
 }
 
 message OperatingIndexingView {
-  // IndexingState: IDLE | RUNNING | SLOWED | PAUSED.
+  // IndexingState: IDLE | RUNNING | SLOWED | PAUSING | PAUSED.
   string state = 1 [json_name = "state"];
-  // IndexingReason tokens in precedence order: game_mode, gpu_busy_external, energy_saver,
+  // IndexingReason tokens in precedence order: user_paused, settings_recovery,
+  // game_mode, gpu_busy_external, energy_saver,
   // chat_generating.
   repeated string reasons = 2 [json_name = "reasons"];
   optional string reason_code = 3 [json_name = "reasonCode"];
@@ -139,6 +140,8 @@ message OperatingIndexingView {
   int64 pending_jobs = 6 [json_name = "pendingJobs"];
   optional string aging_release_at = 7 [json_name = "agingReleaseAt"];
   string sampled_at = 8 [json_name = "sampledAt"];
+  optional int64 until_epoch_ms = 9 [json_name = "untilEpochMs"];
+  bool waiting_for_resume = 10 [json_name = "waitingForResume"];
 }
 
 message OperatingGpuView {

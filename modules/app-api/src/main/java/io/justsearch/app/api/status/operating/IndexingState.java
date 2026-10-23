@@ -8,5 +8,7 @@ public enum IndexingState {
   RUNNING,
   /** Running at the duty floor while chat is generating. */
   SLOWED,
+  /** Admission is closed; permitted work is finishing and publishing its acknowledgment. */
+  PAUSING,
   PAUSED
 }

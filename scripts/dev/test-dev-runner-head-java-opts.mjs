@@ -59,6 +59,8 @@ const SHARED_FLAGS = [
 
 /** The packaged heap. Sized at the A13 follow-up; the stage-E gate run re-sizes it on measurement. */
 const PACKAGED_HEAP = '-Xmx2g';
+// Added by engineJavaLaunch after installed defaults, and guarded by Linux/glibc in lib.rs.
+const PLATFORM_LAUNCH_FLAGS = ['-XX:TrimNativeHeapInterval=30000'];
 
 /**
  * Flags lib.rs passes that the dev-runner correctly does NOT, each with the reason it is a
@@ -181,7 +183,7 @@ function main() {
   const libRsFlags = argCalls.filter((a) => a.startsWith('-') && !CLASSPATH_ARGS.has(a));
   assert.deepEqual(
     [...libRsFlags].sort(),
-    [...SHARED_FLAGS, ...PACKAGED_ONLY_FLAGS].sort(),
+    [...SHARED_FLAGS, ...PACKAGED_ONLY_FLAGS, ...PLATFORM_LAUNCH_FLAGS].sort(),
     'the packaged Engine flag set in lib.rs no longer matches SHARED_FLAGS + PACKAGED_ONLY_FLAGS. '
       + 'The packaged Engine is both halves of the product: a flag only the dev-runner has is a '
       + 'flag the shipped app lacks, and a flag only lib.rs has is one no dev run ever exercises. '
