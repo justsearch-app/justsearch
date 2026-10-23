@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T03:07:16.660Z",
-  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
-  "tree": "a265c1dc1576e231282fdd56cf32b06ba110fda9",
+  "createdAt": "2026-10-23T20:21:43.139Z",
+  "revision": "c9cb35c3ebdaea324d5140186a1a8e7cbbbb8c30",
+  "tree": "08bfe896771aa2948678205ea346c06d0b687cac",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/tmp/shell-vt-crash/test-intent-vitest-424466-1792465629632.json\"",
+      "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-852861-1792786896548.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2524
+      "durationMs": 2779
     }
   ],
   "checks": [
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a Linux Tauri shell",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9ee8abe7a40dab09e700a8f7f623595e42da2b3a7e1ce2c45247c5f42404608d",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,31 +57,31 @@
     }
   ],
   "failBefore": {
-    "ref": "HEAD",
-    "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "ref": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
+    "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/tmp/shell-vt-crash/test-intent-vitest-424466-1792465633281.json\"",
+        "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-852861-1792786900439.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3252,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/tmp/shell-vt-crash/test-intent-vitest-424466-1792465633281.json\n\n"
+        "durationMs": 2553,
+        "output": "JSON report written to /tmp/test-intent-vitest-852861-1792786900439.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts#gates surface switching in a Linux Tauri shell on first use",
         "classification": "assertion",
-        "detail": "viewTransition (tempdoc 609 §R T1.1) gates surface switching in a Linux Tauri shell on first use:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/shell-vt-crash.p1GJEv/test-intent-before-AkaOqY/modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts:40:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/modules/ui-web/node_modules/@vitest/ru"
+        "detail": "viewTransition (tempdoc 609 §R T1.1) gates surface switching in a Linux Tauri shell on first use:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-xz056l/modules/ui-web/src/shell-v0/chrome/viewTransition.test.ts:40:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifa"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a Linux Tauri shell",
         "classification": "assertion",
-        "detail": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux Tauri shell:  AssertionError: expected \"vi.fn()\" to be called +0 times, but got 1 times\n    at /tmp/shell-vt-crash.p1GJEv/test-intent-before-AkaOqY/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts:330:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/modules/ui-web/node_"
+        "detail": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux Tauri shell:  AssertionError: expected \"vi.fn()\" to be called +0 times, but got 1 times\n    at /tmp/test-intent-before-xz056l/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts:330:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/modules/ui-web/node_modules/@vitest/runner"
       }
     ]
   },
-  "digest": "sha256:5ed77b60502105a46e8b9664d34a74d256c6f12213cbce6e5bfd041f6e8180d7"
+  "digest": "sha256:dd219d9fed216d45c0cf216f4339ee2ce305ca2cbda66b77151918b4ca4db545"
 }

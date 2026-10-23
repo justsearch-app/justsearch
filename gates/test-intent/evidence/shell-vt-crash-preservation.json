@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T03:08:13.289Z",
-  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
-  "tree": "a265c1dc1576e231282fdd56cf32b06ba110fda9",
+  "createdAt": "2026-10-23T20:21:48.296Z",
+  "revision": "c9cb35c3ebdaea324d5140186a1a8e7cbbbb8c30",
+  "tree": "d7dc105a7c390b21d3155c994a5d8b76fc4d6914",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-vt-crash/tmp/shell-vt-crash/test-intent-vitest-439417-1792465690871.json\"",
+      "command": "npx vitest run \"src/shell-v0/chrome/viewTransition.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-854025-1792786905657.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2416
+      "durationMs": 2637
     }
   ],
   "checks": [
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a Windows Tauri shell",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9ee8abe7a40dab09e700a8f7f623595e42da2b3a7e1ce2c45247c5f42404608d",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a macOS Tauri shell",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9ee8abe7a40dab09e700a8f7f623595e42da2b3a7e1ce2c45247c5f42404608d",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a Linux browser",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9ee8abe7a40dab09e700a8f7f623595e42da2b3a7e1ce2c45247c5f42404608d",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a API absent",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9ee8abe7a40dab09e700a8f7f623595e42da2b3a7e1ce2c45247c5f42404608d",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#applies composer state once and clears morph flags in a reduced motion",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9ee8abe7a40dab09e700a8f7f623595e42da2b3a7e1ce2c45247c5f42404608d",
+      "contentDigest": "sha256:3103a9c2daf9376d22a423dfce8b392aec62b9f648d8612e24de7a669f8579bf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -147,5 +147,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:036253649574873668a1a693e221720e34e4e39006dc40b0b569788f30e2aad3"
+  "digest": "sha256:346079615951540db6d76c6c291da62a3340d378185e7e2a18b0577aa82c578a"
 }
