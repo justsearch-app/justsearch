@@ -374,3 +374,14 @@ Five-findings continuation: the four checks appended to `IndexingPause.test.ts` 
   "note": "Independent intent review: expectations follow the delegated S37/N37 and CR37/CR37a/CR37b scenarios. Scratch run-evidence executes all 17 original repair checks and 19 continuation checks: candidate passes; b62fc5921 and 30f3617ea respectively assertion-fail. Preservation check passes. Initial dependency-copy executable-link failure retained; direct package entry rerun passes. This acceptance covers test intent; the real-system product verdict is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp37-verifier-4dkko69_",
+  "verdict": "accept",
+  "digest": "sha256:f034174de49b02d59d104b951eab2343bd3295b993c7ac92c9446aaa6ac7d373",
+  "note": "Independent intent review on 62cbe2049: scratch run-evidence passes all 40 repaired checks and proves assertion failures on their original before refs (b62fc5921, 30f3617ea, d7714b374); preservation passes. Expectations follow delegated S37/N37, CR37/CR37a/b and the five-findings continuation. Selector unknown-reason coverage is defensive only under RS37. Test intent accepted separately from the live-system product verdict."
+}
+```
