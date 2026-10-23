@@ -532,11 +532,6 @@ final class SyncDirectoryOps {
    * {@code null} for "no terminal state, continue".
    */
   SyncDirectoryResponse execute(String rootPath, boolean force,
-      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled) {
-    return execute(rootPath, force, provenance, cancelled, null);
-  }
-
-  SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection) {
     return execute(rootPath, force, provenance, cancelled, collection, null);

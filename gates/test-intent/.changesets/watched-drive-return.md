@@ -131,6 +131,16 @@ The transition deadline amendment is the orchestrator's decision under the deleg
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The one-argument RootVolumeLedger.forgetUnder(prefix), which only this test still called after production moved to the owner-filtered form, was removed (the unreferenced-code rule flagged it). The test now calls forgetUnder(prefix, ignored -> true), exactly what the one-argument form did. Every input, precondition, assertion and scenario is unchanged."
     }
   ]
 }

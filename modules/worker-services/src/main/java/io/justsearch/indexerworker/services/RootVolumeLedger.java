@@ -340,13 +340,9 @@ final class RootVolumeLedger {
 
   /**
    * Drops the record, the pending seeding and the explicit-file folder record of every folder at
-   * or under {@code pathPrefix}.
+   * or under {@code pathPrefix} that {@code ownsPath} accepts. A surviving nested declaration keeps
+   * its own records when its parent is removed.
    */
-  void forgetUnder(String pathPrefix) throws IOException {
-    forgetUnder(pathPrefix, ignored -> true);
-  }
-
-  /** A surviving nested declaration keeps its own records when its parent is removed. */
   void forgetUnder(String pathPrefix, java.util.function.Predicate<Path> ownsPath) throws IOException {
     if (!enabled() || pathPrefix == null || pathPrefix.isBlank()) {
       return;
