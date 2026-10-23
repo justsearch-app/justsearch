@@ -150,3 +150,14 @@ Pending independent acceptance by the orchestrator or verifier; the builder does
   "note": "Accept unchanged candidate d6e4c1a5e under the orchestrator exclusions: R1/D7 size-only edits with restored mtime are missed by normal startup on both b62fc5921 and candidate (confirmed independently), and are out of scope as a separately tracked pre-existing gap; D7 uses the startup reconciliation rule. R2/P10 legacy nested-root index data loss during parent removal also reproduces on b62fc5921 (confirmed independently), is no worse on candidate, and is out of scope as a separately tracked pre-existing defect; candidate retains child volume proof that baseline loses. Neither excluded behavior is claimed repaired or passing. Retain original A1 migration-replay and A3 real-bind limitations. Review and confirmations: tmp/verify-evidence/verification-report.txt and tmp/verify-evidence/reassessment/. All required candidate module suites passed; generated execution evidence includes assertion fail-before and pass-after."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-remount-1",
+  "verdict": "reject",
+  "digest": "sha256:79ab37625e3052e19d7a3c0f66b0eb38f7d144397055a33b741c04c66b777435",
+  "note": "Classes match the before-state and candidate changes, and cited evidence records assertion fail-before and pass-after. Reject the required sources for entries 1, 2 and 5: delegated-choice requires the owners written delegation, but these quote orchestrator-P1-amendment or an explicitly labelled orchestrator builder assignment. An implementation assignment also does not state each new expectation. Cite the supplied owner-adopted P1 and D/P scenarios with their specific expectations, or the actual owner delegation and its scope. Optional copies of these citations in entries 3, 4 and 6 should also be corrected or omitted. No Gradle rerun; real bind mounts remain unverified under A3."
+}
+```
