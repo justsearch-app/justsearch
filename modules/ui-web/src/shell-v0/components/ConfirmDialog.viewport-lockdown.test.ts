@@ -51,7 +51,8 @@ beforeAll(async () => {
   const address = server.httpServer!.address();
   if (!address || typeof address === 'string') throw new Error('No private Vite port');
   url = `http://127.0.0.1:${address.port}/confirm-viewport`;
-  const env = { ...process.env, CUDA_VISIBLE_DEVICES: '-1', TMPDIR: output };
+  // Playwright creates its fresh --user-data-dir under the caller's short TMPDIR.
+  const env = { ...process.env, CUDA_VISIBLE_DEVICES: '-1', TMPDIR: process.env.TMPDIR ?? output };
   for (const name of ['DISPLAY', 'WAYLAND_DISPLAY']) Reflect.deleteProperty(env, name);
   browserServer = await chromium.launchServer({ headless: true, args: ['--disable-gpu'], env });
   console.info('Owned headless Chromium PID:', browserServer.process().pid);

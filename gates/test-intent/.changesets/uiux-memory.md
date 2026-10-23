@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-memory-builder-2mvykff3
+author-session: uiux-memory-builder-aza9i77t
 ---
 
 # Test-intent entries
@@ -128,7 +128,8 @@ F1–F3 continuation: confirmation inputs now include key release; confirmed For
         "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#preserves the wide dialog width (S53.7 preservation)",
         "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#keeps the page inert and returns from native browser focus with Tab and Shift+Tab (S53.7 preservation)"
       ],
-      "preservationEvidence": "gates/test-intent/evidence/uiux-memory-preservation.json"
+      "preservationEvidence": "gates/test-intent/evidence/uiux-memory-preservation.json",
+      "setupAdaptation": "The existing browser fixture inherits the caller’s short TMPDIR for Chromium. Playwright supplies its fresh --user-data-dir there. Width and native-focus assertions are unchanged."
     },
     {
       "items": [
@@ -211,6 +212,52 @@ F1–F3 continuation: confirmation inputs now include key release; confirmed For
           "continuationLocation": "task t-20261019-bd718f orchestrator continuation F1–F3, 2026-10-23"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.admission.test.ts",
+        "modules/ui-web/src/shell-v0/api/authorizedFetch.singleAttempt.test.ts",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.menu-ownership.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Memory DELETE opts out of automatic admission and stale-token replay. A retry-safe refusal is reported and refreshed, with the replacement preserved until fresh user consent and its identity check. The one-shot authenticated path retains origin-bound session credentials, redirect refusal and response observation. Shared confirmation owns its modal key events at window capture before earlier document listeners; a ContextMenu cannot reopen on confirmation Enter or consume other modal keys. Fresh Enter completes one action, and held Enter completes none.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a second rejection continuation: admission replay and shared confirmation key ownership. Agent-adopted under the existing delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "WP5.3a continuation finding 1 / S53.3",
+          "quote": "every DELETE attempt for a Forget must be preceded by the same identity check. Re-read and compare first; if X changed or vanished, send nothing and show what is there now. Choose whichever is simpler and keeps the admission behavior honest: revalidate inside the retry, or skip the automatic retry for this call and handle the refusal yourself.\nThe single read-then-delete window the API forces remains a limit; nothing wider is acceptable.",
+          "choice": "every DELETE attempt for a Forget must be preceded by the same identity check. Re-read and compare first; if X changed or vanished, send nothing and show what is there now. Choose whichever is simpler and keeps the admission behavior honest: revalidate inside the retry, or skip the automatic retry for this call and handle the refusal yourself.\nThe single read-then-delete window the API forces remains a limit; nothing wider is acceptable.",
+          "continuationLocation": "task t-20261019-bd718f orchestrator continuation against eb0dcaf91"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a second rejection continuation: admission replay and shared confirmation key ownership. Agent-adopted under the existing delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "WP5.3a continuation finding 2 / S53.7",
+          "quote": "ordinary Enter and Space confirm exactly once in every ConfirmDialog caller, including one opened from a ContextMenu. Held or repeated keys still never confirm.\nFix the ownership so the menu's listener never sees a keystroke that belongs to the open confirmation; prefer the dialog owning its keys over special-casing the menu.",
+          "choice": "ordinary Enter and Space confirm exactly once in every ConfirmDialog caller, including one opened from a ContextMenu. Held or repeated keys still never confirm.\nFix the ownership so the menu's listener never sees a keystroke that belongs to the open confirmation; prefer the dialog owning its keys over special-casing the menu.",
+          "continuationLocation": "task t-20261019-bd718f orchestrator continuation against eb0dcaf91"
+        }
+      ],
+      "conflictSearch": "The continuation permits skipping automatic replay for this call. A stale-token replay would violate the same every-attempt requirement, so the opt-out covers both transport layers. Existing automatic retry defaults for other callers remain. The window capture change is inside ConfirmDialog; ContextMenu production source and its known pointer cancellation defect are untouched. No Engine/API changes.",
+      "evidence": "gates/test-intent/evidence/uiux-memory-retry.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.admission.test.ts",
+        "modules/ui-web/src/shell-v0/api/authorizedFetch.singleAttempt.test.ts",
+        "modules/ui-web/src/shell-v0/components/ConfirmDialog.menu-ownership.test.ts"
+      ],
+      "repaired": true,
+      "retryChoice": "Return admission/stale-token refusals for manual retry. Existing failure reporting refreshes Memory; a later activation needs fresh consent and the existing pre-delete identity read. This avoids replaying a destructive request after its precondition expires, without adding a retry state machine.",
+      "liveEvidence": "tmp/memory-retry/before/live-results.json and tmp/memory-retry/after/live-results.json; production bundles with SES enabled, private Engine and real replacement.",
+      "callerPreservation": "tmp/memory-retry/after/caller-results.json: 294 pass; six known pre-existing pointer failures. Ten real caller paths, three themes, two widths, Enter/Space/click/held Enter/held Space. Synthetic conversation backend responses are fixture-only; Memory uses the real API."
     }
   ]
 }

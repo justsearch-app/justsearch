@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T21:01:10.072Z",
-  "revision": "a471ee4358077dcb856d407ebbd1a2c162546c4c",
-  "tree": "2fc4a7eeeb88e85328ad5cc1bbf9f783c09cdbb7",
+  "createdAt": "2026-10-23T23:26:47.873Z",
+  "revision": "eb0dcaf91ec5e65c882db7b6d94d05b83adc9893",
+  "tree": "c8f15a3547c8716d909c8fe12f1dd1f9736edafe",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1259865-1792789254698.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792797996097.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3645
+      "durationMs": 2645
     },
     {
-      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1259865-1792789258343.json\"",
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792797998742.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3497
+      "durationMs": 2583
     }
   ],
   "checks": [
@@ -117,7 +117,7 @@
       "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#fits narrow viewports with a side gap in every theme (S53.7)",
       "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:27c39fdd7723163c06d7b551addc29fa5d1d542911158441a705974faf65914d",
+      "contentDigest": "sha256:b2877220b5f4495903a71082930dadf0549688769bd240748383804157dd80dc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -218,35 +218,35 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1259865-1792789263152.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798002529.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3582,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1259865-1792789263152.json\n\n"
+        "durationMs": 2598,
+        "output": "JSON report written to /home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798002529.json\n\n"
       },
       {
-        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1259865-1792789266735.json\"",
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798005128.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3136,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1259865-1792789266735.json\n\n"
+        "durationMs": 2592,
+        "output": "JSON report written to /home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798005128.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts",
         "classification": "assertion",
-        "detail": "names each Forget control with its memory (S53.3, S53.7):  AssertionError: expected 'Forget' to be 'Forget: My preferred language is Germ…' // Object.is equality\n    at /home/elias/.cache/am/2mvykff3/tmp/test-intent-before-7P7v8O/modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts:58:28\n    at processTicksAndRejections (node:internal/process/task | confirms the named memory and cancellation sends no delete (S53.3):  AssertionError: expected \"vi.fn()\" to be called with arguments: [ Obj"
+        "detail": "names each Forget control with its memory (S53.3, S53.7):  AssertionError: expected 'Forget' to be 'Forget: My preferred language is Germ…' // Object.is equality\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts:58:28\n    at processTicksAndRejections (node:internal/process/task | confirms the named memory and cancellation sends no delete (S53.3):  AssertionError: expected \"vi.fn()\" to be called with arguments: [ Obj"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
         "classification": "assertion",
-        "detail": "opens the existing Memory surface from a keyboard palette command (S53.3, DM1):  AssertionError: expected '' to contain 'Memory'\n    at /home/elias/.cache/am/2mvykff3/tmp/test-intent-before-7P7v8O/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:35:40\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev/j"
+        "detail": "opens the existing Memory surface from a keyboard palette command (S53.3, DM1):  AssertionError: expected '' to contain 'Memory'\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:35:40\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev/j"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#fits narrow viewports with a side gap in every theme (S53.7)",
         "classification": "assertion",
-        "detail": "fits narrow viewports with a side gap in every theme (S53.7):  AssertionError: dialog must fit 360px with 16px each side: expected 362 to be less than or equal to 328\n    at /home/elias/.cache/am/2mvykff3/tmp/test-intent-before-7P7v8O/modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts:94:79\n    at file:///home/elias/dev/justsearch/.c"
+        "detail": "fits narrow viewports with a side gap in every theme (S53.7):  AssertionError: dialog must fit 360px with 16px each side: expected 362 to be less than or equal to 328\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts:95:79\n    at runNextTicks (node:internal/process/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
@@ -256,9 +256,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
         "classification": "assertion",
-        "detail": "F1 refuses repeated keydown activation of a Forget trigger:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/2mvykff3/tmp/test-intent-before-7P7v8O/modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts:56:37\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elia | F2 refuses consent after the memory changes its content:  AssertionError: expected [ '/api/memory/one' ] to have a length of +0 but got "
+        "detail": "F1 refuses repeated keydown activation of a Forget trigger:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts:56:37\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elia | F2 refuses consent after the memory changes its content:  AssertionError: expected [ '/api/memory/one' ] to have a length of +0 but got "
       }
     ]
   },
-  "digest": "sha256:c23a9b45b538f11a1a73bdc603ada5be0498be6600a4f1567d15dcac51dbdfd3"
+  "digest": "sha256:a405f305befb4983b0734c22d364be2786532ae9e87236a9a1d6ccc7307527bd"
 }

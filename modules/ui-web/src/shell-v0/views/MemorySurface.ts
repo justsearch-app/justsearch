@@ -282,7 +282,7 @@ export class MemorySurface extends JfElement {
     try {
       const r = await authorizedFetch(`${this.base()}/api/memory/${encodeURIComponent(id)}`, {
         method: 'DELETE',
-      });
+      }, { retry: false });
       if (visit !== this.visitVersion || !this.isConnected) return;
       failed = !r.ok;
       if (failed) this.noteMutationFailure(r.status, 'forgotten');

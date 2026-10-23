@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T21:01:43.821Z",
-  "revision": "a471ee4358077dcb856d407ebbd1a2c162546c4c",
-  "tree": "be1b437bbd1504e1789bb947ca1068d56d482031",
+  "createdAt": "2026-10-23T23:28:32.971Z",
+  "revision": "eb0dcaf91ec5e65c882db7b6d94d05b83adc9893",
+  "tree": "3623951c337cb9ed871e6de6b6a59ae929cd1b47",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789295203.json\"",
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3200477-1792798102339.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2631
+      "durationMs": 3316
     },
     {
-      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" \"src/shell-v0/views/MemorySurface.retention.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789297834.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" \"src/shell-v0/views/MemorySurface.retention.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3200477-1792798105656.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1186
+      "durationMs": 1963
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#preserves the wide dialog width (S53.7 preservation)",
       "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:27c39fdd7723163c06d7b551addc29fa5d1d542911158441a705974faf65914d",
+      "contentDigest": "sha256:b2877220b5f4495903a71082930dadf0549688769bd240748383804157dd80dc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#keeps the page inert and returns from native browser focus with Tab and Shift+Tab (S53.7 preservation)",
       "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:27c39fdd7723163c06d7b551addc29fa5d1d542911158441a705974faf65914d",
+      "contentDigest": "sha256:b2877220b5f4495903a71082930dadf0549688769bd240748383804157dd80dc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -199,18 +199,18 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789300081.json\"",
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3200477-1792798108864.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2283,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789300081.json\n\n"
+        "durationMs": 2552,
+        "output": "JSON report written to /home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3200477-1792798108864.json\n\n"
       },
       {
-        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" \"src/shell-v0/views/MemorySurface.retention.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789302364.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" \"src/shell-v0/views/MemorySurface.retention.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3200477-1792798111416.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1269,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-memory/tmp/memory-fixes/test-intent-vitest-1270001-1792789302364.json\n\n"
+        "durationMs": 1391,
+        "output": "JSON report written to /home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3200477-1792798111416.json\n\n"
       }
     ],
     "checks": [
@@ -256,5 +256,5 @@
       }
     ]
   },
-  "digest": "sha256:1fa905d6a02f742509617f30823b65a151927da7dd20f9fabe6a54f5f8821460"
+  "digest": "sha256:02ad70bbbe6c894d72ae4616c5493e9cd4144d8c03f8db129b5b95abacdd9d64"
 }

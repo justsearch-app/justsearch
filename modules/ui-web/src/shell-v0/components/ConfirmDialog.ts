@@ -166,14 +166,14 @@ export class ConfirmDialog extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    document.addEventListener('keydown', this.boundKey, true);
-    document.addEventListener('keyup', this.boundKey, true);
+    window.addEventListener('keydown', this.boundKey, true);
+    window.addEventListener('keyup', this.boundKey, true);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('keydown', this.boundKey, true);
-    document.removeEventListener('keyup', this.boundKey, true);
+    window.removeEventListener('keydown', this.boundKey, true);
+    window.removeEventListener('keyup', this.boundKey, true);
     this.keyPress = undefined;
   }
 
@@ -207,12 +207,16 @@ export class ConfirmDialog extends JfElement {
 
   private onKey(e: KeyboardEvent): void {
     if (!this.open) return;
-    const pending = this.keyPress;
-    this.keyPress = undefined;
-    if (e.key !== 'Enter' && e.key !== ' ') return;
     const dialog = this.shadowRoot?.querySelector('dialog');
     const path = e.composedPath();
     const active = deepActiveElement();
+    if (!dialog?.open || (!path.includes(this) && active !== document.body && active !== this && active !== dialog)) return;
+    // Own modal keys before earlier document capture listeners (for example an underlying menu).
+    // Native defaults still run for Cancel, Close, text editing, Tab and Escape.
+    e.stopPropagation();
+    const pending = this.keyPress;
+    this.keyPress = undefined;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
     // Cancel, Close and other controls retain their native keyboard activation. Only confirmation
     // owns this guard; the typed field still accepts spaces as text.
     const confirmation = path.includes(this.shadowRoot?.querySelector('jf-button.confirm') as Element)
@@ -220,7 +224,6 @@ export class ConfirmDialog extends JfElement {
         || !active || active === document.body || active === this || active === dialog));
     if (!confirmation) return;
     e.preventDefault();
-    e.stopPropagation();
     const target = path[0] ?? e.target;
     if (e.type === 'keydown') {
       // A destructive keyboard activation completes on release. Any repeat invalidates the press,
