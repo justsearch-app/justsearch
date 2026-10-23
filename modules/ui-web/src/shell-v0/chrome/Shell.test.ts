@@ -42,6 +42,8 @@ import {
   __resetUiModeForTest,
 } from '../state/uiModeState.js';
 import { __activeSurfaceIdForTest, deactivateProjection } from '../router/URLProjector.js';
+import { __resetJournalForTest, getJournalState } from '../state/NavigationJournal.js';
+import { __resetConversationListForTest, setActiveConversation } from '../state/conversationListStore.js';
 import { subscribeMemberTab } from '../router/memberTabIntent.js';
 import {
   restoreSearch,
@@ -381,6 +383,51 @@ describe('Shell — slice 492 substrate integration', () => {
         expect(shell.activeId).toBe('core.search-surface');
       },
     );
+
+    it('C1 C2 pending conversation claims precede a surface navigation at every debounce boundary', async () => {
+      const sv3 = 'core.search-v3-surface';
+      const parent = `justsearch://surface/${sv3}?conversationId=old-parent`;
+      const library = 'justsearch://surface/core.library-surface';
+      for (const delay of [0, 74, 75, 100]) {
+        window.history.replaceState(null, '', '/');
+        __resetJournalForTest();
+        __resetConversationListForTest();
+        seedSurfaceCatalog({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core',
+          primitive: 'Surface', entries: [makeRailSurface(sv3, 'jf-ordering-fixture'), LIBRARY] });
+        const shell = await renderShell();
+        try {
+          shell.activateSurface(sv3, { conversationId: 'old-branch' }, 'BUTTON');
+          await shell.updateComplete;
+          vi.useFakeTimers();
+          // Both Open original and sidebar selection claim through this store.
+          setActiveConversation('old-parent');
+          vi.advanceTimersByTime(delay);
+          shell.activateSurface('core.library-surface', {}, 'RAIL');
+          expect(shell.activeId).toBe('core.library-surface');
+          let journal = getJournalState();
+          expect(journal.entries[journal.cursor]?.url, `cursor at ${delay}ms`).toBe(library);
+          expect(journal.entries.slice(-2).map(e => e.url)).toEqual([parent, library]);
+          expect(journal.entries.filter(e => e.url === parent)).toHaveLength(1);
+          expect(journal.entries.filter(e => e.url === library)).toHaveLength(1);
+          // Draining the old deadline must not append the departed conversation after Library.
+          await vi.advanceTimersByTimeAsync(100);
+          journal = getJournalState();
+          expect(journal.entries[journal.cursor]?.url).toBe(library);
+          const back = shell.shadowRoot?.querySelector('jf-control[label="Go back"]');
+          (back?.shadowRoot?.querySelector('button') as HTMLButtonElement | null)?.click();
+          await vi.advanceTimersByTimeAsync(0);
+          expect(shell.activeId).toBe(sv3);
+          expect(window.location.hash).toContain('conversationId=old-parent');
+        } finally {
+          deactivateProjection();
+          vi.clearAllTimers();
+          vi.useRealTimers();
+          shell.remove();
+          __resetJournalForTest();
+          __resetConversationListForTest();
+        }
+      }
+    });
 
     it('rail click dispatches with RAIL transport', async () => {
       const shell = await renderShell();

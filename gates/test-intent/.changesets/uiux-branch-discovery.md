@@ -305,6 +305,36 @@ Scenarios are agent-adopted under the quoted design delegation (delegated-choice
         "modules/ui-web/src/shell-v0/router/sv3ConversationUrl.test.ts#S16.4 app Back returns an original-navigation claim to its branch without looping"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "C1/C2: through the real Shell router subscription, conversation claims made by Open original/sidebar selection must be journaled before the next surface. Controlled timing at 0,74,75,100ms checks the displayed Library agrees with the cursor, one parent then one Library entry, no late append after draining timers, and the first actual app Back control returns to the parent. Fake projection timers are deactivated/cleared before restoring real timers and removing Shell; no asynchronous test work retained. Durable regression check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.4 and its C1/C2 regression repair, agent-adopted by the orchestrator 2026-10-23 under the original design delegation; existing journal and URL-write paths, preserving browser/app Back and Forward.",
+          "choice": "Fix the order with the smallest change (for example flush the pending conversation address, or journal the conversation at claim time, before another navigation is journaled), reusing the existing journal and URL-write paths. No duplicate or misordered entries for any interleaving of a conversation claim and a surface navigation; S16.4 and everything the verifier passed must keep passing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4a S16.4 and its C1/C2 regression repair, agent-adopted by the orchestrator 2026-10-23 under the original design delegation; existing journal and URL-write paths, preserving browser/app Back and Forward.",
+          "choice": "Opening the original shows the parent conversation; Back returns to the branch.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-branch-discovery-rapid-leave-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#C1 C2 pending conversation claims precede a surface navigation at every debounce boundary"
+      ],
+      "repaired": true
     }
   ]
 }

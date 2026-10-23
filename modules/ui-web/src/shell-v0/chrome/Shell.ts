@@ -276,7 +276,7 @@ import { strictPolicy } from '../router/recoveryPolicy.js';
 import { createURLSource } from '../router/sources/URLSource.js';
 import { createTauriDeepLinkSource } from '../router/sources/TauriDeepLinkSource.js';
 import { createBackendStreamSource } from '../router/sources/BackendStreamSource.js';
-import { deactivateProjection, flushPendingProjection } from '../router/URLProjector.js';
+import { deactivateProjection, flushPendingNavigationWrite, flushPendingProjection } from '../router/URLProjector.js';
 import {
   fetchAndRegisterSurfaceSchemas,
   registerCoreStores,
@@ -1666,6 +1666,9 @@ export class Shell extends JfElement {
     this.intentRouter.subscribe((intent, outcome) => {
       if (intent.address.kind === 'navigate' && (outcome.status === 'dispatched' || outcome.status === 'auto-corrected')) {
         if (!isNavigatingHistoryNow()) {
+          // Settle a claimed conversation before recording the surface that follows it.
+          // A browser traversal has already moved its address and must never push here.
+          if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
           const url = canonicalize(intent.address);
           const label = deriveRichLabel(
             intent.address.target,
