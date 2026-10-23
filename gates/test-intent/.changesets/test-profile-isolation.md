@@ -165,3 +165,14 @@ clone of 1ebd070b7 and its client profile is fake in both runs. No committed tes
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-guard-1",
+  "verdict": "accept",
+  "digest": "sha256:af9940c79638dc0e82e1557c40367773a50fe832c11102e910fbbd5a43eb171f",
+  "note": "Verified e46586059: included-build worker and inherited child profile probe fails on 1ebd070b7 and passes here; committed module profile probe passes; included-build repeat is UP-TO-DATE. Prior G3-G6 evidence retained; Windows runtime remains unverified. Evidence: tmp/verify-guard-evidence/reverify-e46586059/results.json"
+}
+```
