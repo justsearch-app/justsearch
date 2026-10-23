@@ -126,8 +126,8 @@ async function discoverApiEngine(explicitPort, discovery) {
     const port = Number(override);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid API port');
     // The token goes only to the proven Engine of a runtime manifest naming the port.
-    const { selected } = await discovery.selectPinned(discovery.standardCandidates(), port);
-    if (!selected) throw new Error(`Port ${port} refused: no proven runtime manifest names it; set JUSTSEARCH_DATA_DIR to that Engine's data folder`);
+    const { selected, tried } = await discovery.selectPinned(discovery.standardCandidates(), port);
+    if (!selected) throw new Error(discovery.pinRefusals(explicitPort != null ? `--port ${port}` : `JUSTSEARCH_API_PORT=${port}`, tried).join('\n'));
     return { port, token, engine: selected };
   }
   const { selected } = await discovery.selectEngine(discovery.standardCandidates());

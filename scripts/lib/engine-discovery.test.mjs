@@ -1392,12 +1392,29 @@ for (const kind of ['--port', 'JUSTSEARCH_API_PORT', 'bundle']) {
       assert.notEqual(res.code, 0, `refused: ${why}`);
       assert.equal(res.messages.find((x) => x.id === 1)?.result, undefined, `no MCP session is set up: ${why}`);
       assert.ok(res.stderr.includes(`${pin.label}: refused, ${refusal === 'unnamed' ? 'no runtime manifest names this port' : 'the manifest naming this port is not proven'}`), why);
-      if (refusal === 'unnamed') assert.match(res.stderr, /set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found/);
+      const remedies = {
+        unnamed: /no runtime manifest names this port, [^\n]*; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found/,
+        'not proven': /the manifest naming this port is not proven \([^\n]*\); what answers the port is not the Engine that manifest describes, so restart that Engine \(it rewrites its manifest\) or check which process owns the port/,
+      };
+      assert.match(res.stderr, remedies[refusal], `the refusal gives its own next step: ${why}`);
+      if (refusal === 'not proven') assert.doesNotMatch(res.stderr, /set JUSTSEARCH_DATA_DIR/, `pointing JUSTSEARCH_DATA_DIR is not the remedy there: ${why}`);
       assert.deepEqual(pinned.requests, [], `${refusal}: nothing reaches the refused pin`);
       assert.deepEqual(desktop.requests, [], `${refusal}: discovery ends at the refusal, so the desktop Engine is not even probed`);
     }
   });
 }
+
+test('P3/S2: every client words a pin refusal with the one shared pinRefusals (production MCP, bundle, mcp-typed-confirm)', () => {
+  const { pinRefusals } = require(ENGINE_DISCOVERY);
+  assert.match(pinRefusals('--port 1', [])[0], /set JUSTSEARCH_DATA_DIR/);
+  const unproven = pinRefusals('--port 1', [{ source: 'desktop app', dataDir: '/d', ok: false, status: 'owner-mismatch', detail: 'x' }]);
+  assert.match(unproven[0], /not proven \(desktop app: \/d \(owner-mismatch: x\)\); [^;]*restart that Engine/);
+  for (const rel of ['scripts/prod/justsearch-mcp/discovery.mjs', 'packaging/mcpb/server/index.js', 'scripts/sandbox/mcp-typed-confirm.mjs']) {
+    const src = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+    assert.match(src, /pinRefusals\(/, `${rel} uses pinRefusals`);
+    assert.doesNotMatch(src, /refused, (no runtime manifest names|the manifest naming) this port/, `${rel} words no refusal of its own`);
+  }
+});
 
 test('P7: the Engine restarts on a manifest-named pinned port — the call in flight fails explicitly and is not sent again; the next call is proven on the restarted Engine (its new manifest) and succeeds, with the pin\'s token', async (t) => {
   const root = tempRoot(t);

@@ -10,7 +10,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import {devDataDirCandidates, isPidAlive, resolveDataDir as resolveUserDataDir} from '../../lib/platform-paths.mjs';
-import {describeTried, selectEngine, selectPinned, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
+import {describeTried, pinRefusals, selectEngine, selectPinned, standardCandidates} from '../../../packaging/mcpb/server/engine-discovery.cjs';
 
 /**
  * Resolve the JustSearch data directory.
@@ -84,11 +84,7 @@ export async function pinnedEngine(port, label, attempts) {
     );
     return { port, baseUrl: `http://127.0.0.1:${port}`, token, instanceId: selected.instanceId, dataDir: selected.dataDir, source: selected.source, engine: selected, pin: label };
   }
-  if (tried.length > 0) {
-    attempts.push(...describeTried(tried).map((line) => `${label}: refused, the manifest naming this port is not proven (${line})`));
-  } else {
-    attempts.push(`${label}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`);
-  }
+  attempts.push(...pinRefusals(label, tried));
   return null;
 }
 

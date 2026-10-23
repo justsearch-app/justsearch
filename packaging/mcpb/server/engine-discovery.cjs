@@ -647,6 +647,17 @@ function describeTried(tried) {
   return tried.map((t) => `${t.source}: ${t.dataDir ?? 'folder unknown'} (${t.ok ? 'selected' : `${t.status}: ${t.detail}`})`);
 }
 
+/**
+ * Why a pin (label, e.g. '--port 4242') was refused, from selectPinned's tried (the manifests
+ * naming the port, none proven; empty when none names it), one line each with the next step.
+ */
+function pinRefusals(label, tried) {
+  if (tried.length === 0) {
+    return [`${label}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`];
+  }
+  return describeTried(tried).map((line) => `${label}: refused, the manifest naming this port is not proven (${line}); what answers the port is not the Engine that manifest describes, so restart that Engine (it rewrites its manifest) or check which process owns the port`);
+}
+
 module.exports = {
   DESKTOP_APP_IDENTIFIER,
   STARTUP_WAIT_MS,
@@ -662,4 +673,5 @@ module.exports = {
   roamingAppDataFromOs,
   standardCandidates,
   describeTried,
+  pinRefusals,
 };

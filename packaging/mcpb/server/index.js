@@ -30,7 +30,7 @@
 
 'use strict';
 
-const { describeTried, engineRequest, selectEngine, selectPinned, standardCandidates } = require('./engine-discovery.cjs');
+const { describeTried, engineRequest, pinRefusals, selectEngine, selectPinned, standardCandidates } = require('./engine-discovery.cjs');
 
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
 // Session setup (initialize, notifications/initialized) is cheap; requests wait for it, so it is bounded.
@@ -86,11 +86,7 @@ async function discoverEngine(triedOut) {
       log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${envPort}, pinned by ${pin})`);
       return { port: envPort, engine: selected, token };
     }
-    if (named.length > 0) {
-      tried.push(...describeTried(named).map((line) => `${pin}: refused, the manifest naming this port is not proven (${line})`));
-    } else {
-      tried.push(`${pin}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`);
-    }
+    tried.push(...pinRefusals(pin, named));
     return null;
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
