@@ -161,6 +161,15 @@ public final class StreamingFakeLlamaServer {
     var chat = server.createContext("/v1/chat/completions", exchange -> {
       try (exchange) {
         exchange.getRequestBody().readAllBytes();
+        // Private fault for oversized-history checks; ordinary replies retain their existing stream.
+        if (Files.exists(home.resolve("reject-context"))) {
+          byte[] error = ("{\"error\":{\"message\":\"context window exceeded\","
+              + "\"type\":\"context_length_exceeded\"}}").getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().set("Content-Type", "application/json");
+          exchange.sendResponseHeaders(400, error.length);
+          exchange.getResponseBody().write(error);
+          return;
+        }
         exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
         exchange.sendResponseHeaders(200, 0);
         OutputStream output = exchange.getResponseBody();
