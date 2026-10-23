@@ -1120,3 +1120,14 @@ round-nine evidence producer. Final result: all96 targeted executions pass witho
   "note": "Native identity-store limits still charge healthy files despite a passing canary, while document-path classification, renewable poison grace and parser-child logging also violate the agreed scenarios."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16701-dd19-73e3-b8f9-27b32276fddd",
+  "verdict": "reject",
+  "digest": "sha256:f778776b211378e0507ec493d8e2db22a4a821ee55e973e5ec19d38d9e7816b0",
+  "note": "Reject: a closed shared analyzer passes the writer probe and charges healthy files, while a missing source companion is deferred uncounted during a writer outage."
+}
+```
