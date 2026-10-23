@@ -1719,15 +1719,40 @@ public final class KnowledgeServerMigrationOps {
           // The caller waits for that row and verifies Green's indexed source witness.
           continue;
         }
+        // Keep an admitted unfinished row before inspecting its target: it can finish while
+        // replay reads the index, and must not become a fresh admission in that interval.
         if ((op.generation() == null || op.generation().isBlank())
             && (context.replayGeneration() == null
                 || !IndexGenerationManager.isRecordedGenerationIdentity(context.replayGeneration()))
-            && context.jobQueue() instanceof SqliteJobQueue queue
-            && queue.hasRelease030ReplayAdmission(Path.of(upsert.path()))) continue;
+            && context.jobQueue() instanceof SqliteJobQueue original
+            && original.hasRelease030ReplayAdmission(Path.of(upsert.path()))) continue;
+        var fields = context.ingestLifecycle() == null ? null : context.ingestLifecycle().documentFieldOps();
+        if (fields != null && context.jobQueue() instanceof SwitchBufferCapableQueue receipts) {
+          String file = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(Path.of(upsert.path()));
+          String indexed = fields.getDocumentFieldOrThrow(file, SchemaFields.SOURCE_SHA256);
+          // An applied receipt (original or later admission) settles this historical effect.
+          // DONE alone is insufficient: Green must hold the same file, collection and bytes.
+          var work = receipts.sourceFileWork(file, indexed);
+          if (work == SwitchBufferCapableQueue.SourceFileWork.POLICY
+              && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(file) == 0) continue;
+          String collection = upsert.collection() == null || upsert.collection().isBlank() ? null : upsert.collection();
+          String indexedCollection = fields.getDocumentFieldOrThrow(file, SchemaFields.COLLECTION);
+          boolean sameCollection = Objects.equals(collection, indexedCollection);
+          boolean settled = work == SwitchBufferCapableQueue.SourceFileWork.COMMITTED;
+          if (context.jobQueue() instanceof SqliteJobQueue sqlite) {
+            settled = sqlite.matchesAppliedFileProjection(file, indexed,
+                fields.getDocumentFieldOrThrow(file, SchemaFields.MODIFIED_AT), indexedCollection);
+            // A raw 0.3.0 path carries no collection. Preserve the completed admission's
+            // collection, proved against Green above, rather than inventing a new one.
+            sameCollection = !op.payload().stripLeading().startsWith("{") || sameCollection;
+          }
+          if (settled && file.equals(fields.getDocumentFieldOrThrow(file, SchemaFields.DOC_ID))
+              && file.equals(fields.getDocumentFieldOrThrow(file, SchemaFields.PATH)) && sameCollection) continue;
+        }
         int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
         enqueued += accepted;
         if (accepted != 1) complete = false;
-      } catch (java.sql.SQLException | RuntimeException unavailable) {
+      } catch (IOException | java.sql.SQLException | RuntimeException unavailable) {
         complete = false;
         context.log().warn("Buffered UPSERT enqueue failed; retaining replay versions", unavailable);
       }

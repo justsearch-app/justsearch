@@ -510,6 +510,56 @@ New isolated scenario tests retain the gate's independent verification requireme
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "C4: recorded volume evidence defeats legacy exact authority after restart, both for a later watched root and an explicit-folder record. A completed original admission with a raw UPSERT stays settled through actual MIGRATING/SWITCHING promotion, including restart between DONE and replay. Routine retention preserves completed independent debt through real deadline FAILED recovery, then resumes once recovery completes. Generic unscoped receipt checks distinguish identical and lexically aliased paths, different hashes, document IDs, paths and collections, missing and unreadable Green evidence, and applied versus unapplied terminal policy effects. Twenty-six cases include preservation negatives, inherited collection labels for written and unchanged receipts, an unchanged freshness receipt, mismatched/missing/stale freshness evidence, and a real native restart after an index commit whose queue completion failed. Native retention variants keep ordinary completed original admissions and their atomic UNCHANGED ledger evidence until replay settles, prune unrelated audit rows, and release both forms of evidence after recovery completes. Intended before failures and after outcomes are recorded by the evidence producer.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U8",
+          "quote": "A queued explicitly added file outside any watched root is kept and indexed, without granting broader ingestion authority.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U12",
+          "quote": "0.3.0's failed and retry-exhausted rows, including one whose path is under no root, do not block the upgrade, and no cutover depends on them.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Keep it general: an already-applied receipt is settled, not re-admitted.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Fix the three C4 claims on b3d998095, preserve prior rounds and U19, keep native fallback until the separate obsolete-migration PR. Resume with remaining work autonomously within the delegated scope.",
+          "choice": "Known recorded root or explicit-file-folder evidence and declared root coverage outrank the original exact-path exception; missing or unreadable ledger evidence never grants an override. Retain the current admission read failure behavior. For unscoped file replay, reuse the existing committed-write or atomic UNCHANGED receipt and prove matching Green document identity, path, collection and source hash or freshness using the canonical ingestion key before treating the effect as already applied, irrespective of whether its revision is legacy or modern. An existing terminal policy receipt settles only with strict zero indexed ID/chunks, never a failed or unread admission. Missing or different target effects still need normal admission; unreadable projection evidence retains the journal without renewing the row. UNCHANGED is also an applied effect: compare the existing atomic outcome/ledger freshness receipt (path hash, matching current outcome class/reason/retry/observed time, latest matching ledger row, saved source mtime and collection) to Green, plus document identity/path/collection. Reject missing or mismatched freshness evidence and never borrow an older row on a same-millisecond re-admission. No new writes in the unchanged fast path and no extra extraction; only replay reads this proof. A raw 0.3.0 path has no collection label: preserve the completed admission label proved against Green rather than invent a new one; a JSON request with an explicit collection must still match. Read and preserve an unfinished original admission before reading Green so concurrent completion cannot become a fresh admission. Keep native buffered ordering, strong-witness verification, certification and final publication fences. Preserve every prepared release030 exact-path admission from ordinary job retention while the existing recovery sidecar cannot be confirmed absent: ordinary DONE receipts also settle native replay, alongside the exhausted-debt receipts authorizing FAILED recovery. Preserve ledger rows at current completed original exact-file outcome times, because legacy stat receipts have no ledger unit revision; coincident audit rows may be kept temporarily, granting no ingestion authority. The uncorrelated time set avoids a per-ledger-row scan of jobs. Prune unrelated times normally, and release job and ledger evidence once the checkpoint clears. Both added retention counterexamples failed on the first candidate against real native MIGRATING before this extension; final checks also run on b3d998095. Two additional native cases exercise both cleanup operations, prove promotion/search, and verify normal retention resumes. Use a private one-fork 1GB heap for launcher/UI discovery after their initial 384MB OOM; change no shared or product build setting. Store no new state and change no schema. Tests hold only the real native monitor, never write migration states; cover both native archives, replay after DONE with and without restart, the real zero-duration deadline, normal retention and its release. No recovery-walk changes or scale regeneration. Use fixed JVM folders and retained caches, sequential slotted Gradle calls; packaged HTTP first boot/restart runs last.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round5.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java"
+      ],
+      "repaired": true
     }
   ]
 }

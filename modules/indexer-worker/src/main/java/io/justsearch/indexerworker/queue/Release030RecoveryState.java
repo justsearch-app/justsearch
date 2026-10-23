@@ -160,7 +160,7 @@ public final class Release030RecoveryState {
     AtomicFileWrites.replaceStrict(file, bytes.toByteArray());
   }
 
-  private static Path path(Path database) {
+  static Path path(Path database) {
     return database.resolveSibling("upgrade-030-recovery.properties");
   }
 }

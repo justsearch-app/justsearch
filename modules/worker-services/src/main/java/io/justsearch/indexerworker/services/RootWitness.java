@@ -68,7 +68,19 @@ public final class RootWitness implements SourcePresence.RootCheck {
   }
 
   @Override
-  public boolean isRelease030ExactFile(Path file) { return release030ExactFiles.test(file); }
+  public boolean isRelease030ExactFile(Path file) {
+    if (!release030ExactFiles.test(file)) return false;
+    Path key = normalize(file);
+    Path folder = key == null ? null : key.getParent();
+    // An original exact admission fills an authority gap; it never overrides a root or an
+    // explicit-folder record, including unreadable evidence. Normal admission checks it instead.
+    if (folder == null || declaredRootCovers.test(folder)) return false;
+    try {
+      return volumes.recordedFor(folder).isEmpty() && volumes.recordedFileFolder(folder).isEmpty();
+    } catch (IOException unreadable) {
+      return false;
+    }
+  }
 
   private RootWitness(RootVolumeLedger volumes, Function<Path, RootIdentity> registered,
       java.util.function.Predicate<Path> declaredRootCovers) {

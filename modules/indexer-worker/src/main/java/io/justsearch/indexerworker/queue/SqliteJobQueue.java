@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.queue;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
@@ -1850,6 +1851,42 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  /** Match a completed write or the existing atomic UNCHANGED freshness receipt to its target. */
+  public boolean matchesAppliedFileProjection(String path, String indexedSourceSha256,
+      String modifiedAt, String collection) {
+    if (path == null) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement("""
+          SELECT j.content_hash, j.last_outcome_class, j.last_reason_code, j.last_retry_policy,
+            l.source_modified_at, l.collection FROM jobs j LEFT JOIN ingestion_ledger l
+            ON l.path_hash=? AND l.observed_at=j.last_outcome_at
+              AND l.outcome_class=j.last_outcome_class AND l.reason_code=j.last_reason_code
+              AND l.retry_policy=j.last_retry_policy
+          WHERE j.path=? AND j.state='DONE' AND j.collection IS ?
+          ORDER BY l.id DESC LIMIT 1
+          """)) {
+        query.setString(1, sha256(path)); query.setString(2, path); query.setString(3, collection);
+        try (var row = query.executeQuery()) {
+          if (!row.next() || endedByPolicy(STATE_DONE, row.getString(2), row.getString(3), row.getString(4))) return false;
+          String committed = row.getString(1);
+          if (JobQueue.IngestionLedgerTransition.isSha256(committed) && committed.equals(indexedSourceSha256)) return true;
+          if (modifiedAt == null || !"SKIPPED_POLICY".equals(row.getString(2))
+              || !"UNCHANGED".equals(row.getString(3)) || !"NONE".equals(row.getString(4))) return false;
+          final long modified;
+          try { modified = Long.parseLong(modifiedAt); }
+          catch (NumberFormatException invalid) { throw new IllegalStateException("Indexed freshness evidence is unreadable", invalid); }
+          long observedModified = row.getLong(5);
+          return !row.wasNull() && observedModified == modified && Objects.equals(collection, row.getString(6));
+        }
+      }
+    } catch (SQLException unreadable) {
+      recordDbError();
+      throw new IllegalStateException("Applied file completion evidence is unreadable", unreadable);
+    } finally { lock.unlock(); }
+  }
+
   @Override
   public boolean matchesAcceptedCapturedFileDeletion(
       String path, String unitRevision, String plannedSourceSha256) {
@@ -3539,11 +3576,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       long cutoff = System.currentTimeMillis() - (retentionDays * 24L * 60L * 60L * 1000L);
 
+      // Original exact receipts still settle native replay or authorize FAILED recovery.
+      // Release them only after the recovery checkpoint is conclusively gone.
       String jobsWhere = """
           state IN ('DONE', 'FAILED', 'RETRY_EXHAUSTED') AND last_updated < ?
             AND (walk_seen_epoch IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p
               WHERE p.operation_key = jobs.scan_id AND p.sealed_at IS NOT NULL AND p.acknowledged_revision = p.revision))
-          """;
+          """ + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
+              ? "" : " AND (unit_revision NOT LIKE 'release030/%' OR ingestion_root IS NOT path)");
 
       int deleted;
       try (PreparedStatement stmt = connection.prepareStatement("DELETE FROM jobs WHERE " + jobsWhere)) {
@@ -3578,7 +3618,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String ledgerWhere = "observed_at < ? AND "
           + "(operation_key IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p "
           + "WHERE p.operation_key = ingestion_ledger.operation_key AND p.sealed_at IS NOT NULL "
-          + "AND p.acknowledged_revision = p.revision))";
+          + "AND p.acknowledged_revision = p.revision))"
+          // Legacy stat receipts have no ledger unit revision. Keep current exact outcome
+          // times (and any coincident audit rows) until their recovery is settled.
+          + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
+              ? "" : " AND observed_at NOT IN (SELECT last_outcome_at FROM jobs"
+                  + " WHERE unit_revision LIKE 'release030/%' AND ingestion_root=path"
+                  + " AND state='DONE' AND last_outcome_at IS NOT NULL)");
       try (PreparedStatement stmt =
           connection.prepareStatement("DELETE FROM ingestion_ledger WHERE " + ledgerWhere)) {
         stmt.setLong(1, cutoff);
