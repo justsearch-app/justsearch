@@ -146,6 +146,81 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     expect(turn.status).toBe('halted');
   });
 
+  it('DS4 DS5 an observer reconciles Stop saved after its completed record read', async () => {
+    const observer = await mount(); await start(observer);
+    runState = 'DONE';
+    events = [prompt(), wire('2', 'ASSISTANT_MESSAGE', 'Finished answer', { disposition: 'COMPLETED', shapeId: 'core.agent-run' })];
+    const readsBeforeCompletion = threadReads;
+    emit('done', { finalResponse: 'Finished answer', disposition: 'COMPLETED' }); close();
+    await settle();
+    expect(threadReads).toBeGreaterThan(readsBeforeCompletion);
+    const turn = () => observer.sessions.sessions.flatMap((s) => s.turns)[0]!;
+    expect(turn().status).toBe('complete'); expect(noteCount(observer)).toBe(0);
+    // Another window's DELETE can reach the Engine after this observer's DONE read.
+    // This observer never requests Halt; the durable record is its only Stop authority.
+    await saveStop(true);
+    await expect.poll(() => noteCount(observer), { timeout: 1800 }).toBe(1);
+    expect(turn().answer).toBe('Finished answer'); expect(turn().disposition).toBe('COMPLETED');
+    expect(turn().status).toBe('halted'); expect(text(observer)).toContain('stopped by you');
+    expect(announcements.filter((m) => m === STOP)).toHaveLength(1);
+    // Once Stop is confirmed, this refresh retires rather than polling or announcing forever.
+    const confirmedReads = threadReads;
+    await new Promise<void>((resolve) => setTimeout(resolve, 650));
+    expect(threadReads).toBe(confirmedReads);
+    expect(announcements.filter((m) => m === STOP)).toHaveLength(1);
+  });
+
+  it('DN1 clean DONE stops record reads after the five-second grace, also after navigation', async () => {
+    const owner = await mount(); await start(owner);
+    const observer = await mount();
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      runState = 'DONE';
+      events = [prompt(), wire('2', 'ASSISTANT_MESSAGE', 'Finished answer', { disposition: 'COMPLETED', shapeId: 'core.agent-run' })];
+      emit('done', { finalResponse: 'Finished answer', disposition: 'COMPLETED' }); close();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(owner.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('complete');
+      expect(observer.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('complete');
+      const initialReads = threadReads;
+      owner.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-new', { bubbles: true, composed: true }));
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(owner.sessions.activeId).toBeNull();
+      expect(threadReads).toBeGreaterThan(initialReads);
+      await vi.advanceTimersByTimeAsync(100);
+      const readsAtGraceEnd = threadReads;
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(threadReads).toBe(readsAtGraceEnd);
+      expect(noteCount(observer)).toBe(0);
+      expect(announcements.filter((m) => m === STOP)).toHaveLength(0);
+    } finally {
+      owner.remove(); observer.remove();
+      await vi.advanceTimersByTimeAsync(0);
+      vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
+  it('DS3 DS4 this window own Halt still waits beyond the clean-DONE grace', async () => {
+    const owner = await mount(); await start(owner);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      runState = 'DONE';
+      events = [prompt(), wire('2', 'ASSISTANT_MESSAGE', 'Finished answer', { disposition: 'COMPLETED', shapeId: 'core.agent-run' })];
+      clickStop(owner); await vi.advanceTimersByTimeAsync(0);
+      const initialReads = threadReads;
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(threadReads).toBeGreaterThan(initialReads);
+      expect(noteCount(owner)).toBe(0);
+      await saveStop(true); finishDelete();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(noteCount(owner)).toBe(1);
+      expect(owner.sessions.sessions.flatMap((s) => s.turns)[0]!.disposition).toBe('COMPLETED');
+    } finally {
+      owner.remove();
+      await vi.advanceTimersByTimeAsync(0);
+      vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
   it('DS5 DS7 remote cancellation with an early record read recovers once without generic failure', async () => {
     const el = await mount(); await start(el);
     emit('error', { error: 'Session cancelled', errorCode: 'CANCELLED' }); close(); await settle();

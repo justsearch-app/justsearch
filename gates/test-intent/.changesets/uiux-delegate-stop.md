@@ -7,18 +7,17 @@ author-session: s2xi2v_y
 
 # Test-intent entries
 
-The repair cases fail by assertion before the change; the preservation cases pass before and after. The evidence runs the complete file and retains those outcomes. All tests are durable.
+The observer repair originally failed on b06ad571f. The bounded-grace repair fails on the reviewed uncommitted predecessor: b06ad571f plus gates/test-intent/evidence/uiux-delegate-stop-unbounded.patch, the exact captured prior SearchV3View.ts diff. The refreshed view evidence runs the complete file: the new grace check fails by assertion there; the other view cases, including DS4, pass. The original SSE negotiation and concurrent-cancel evidence retain their earlier before-states. All tests are durable. Scenarios and the grace choice are agent-adopted under the quoted delegation, never owner-agreed.
 
 ```json
 {
   "entries": [
     {
       "items": [
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
-        "modules/ui-web/src/api/streams.observeAccept.test.ts"
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts"
       ],
       "class": "New",
-      "behaviour": "The live addressed Delegate turn converges on its durable Stop note, once, through delayed cancellation and record reads, remote Stop, held decisions and record fallback. Saved output, completed disposition and genuine failures keep their existing interpretations; focus stays where the reader put it. These are agent-adopted scenarios (delegated-choice), not owner-adopted scenarios. A cold observer negotiates the managed event stream and binds its first update to the discovered conversation and its freshly read canonical turn, so the same run is not presented under a placeholder conversation or a second turn.",
+      "behaviour": "The live addressed Delegate turn converges on its durable Stop note, once, through delayed cancellation and record reads, remote Stop, held decisions and record fallback. Saved output, completed disposition and genuine failures keep their existing interpretations; focus stays where the reader put it. These are agent-adopted scenarios (delegated-choice), not owner-adopted scenarios. A cold observer negotiates the managed event stream and binds its first update to the discovered conversation and its freshly read canonical turn, so the same run is not presented under a placeholder conversation or a second turn. An observer that has already read DONE continues reconciling the record when another window saves a late Stop. It preserves the completed answer and disposition, shows the existing stopped interpretation once, announces once, and retires the refresh once Stop is confirmed. Clean DONE without a local Halt keeps reconciling for five seconds from the first saved DONE read, then retires even after navigation; repeated reads do not extend the grace. This window’s own Halt still waits past the grace for its durable Stop.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -99,11 +98,48 @@ The repair cases fail by assertion before the change; the preservation cases pas
           "delegationScope": "Search v3 designs; the orchestrator adopted DS1–DS8 and DN1–DN2 in wp1.2c under this delegation, after a challenger pass. Agent-adopted, never owner-adopted.",
           "choice": "DN2 Preservation: the old chat window's agent Halt still cancels, keeps partial output, allows later sends and refreshes its record, also while Search v3 observes the run (identical layout not required).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Search v3 design under the owner’s delegation; agent-adopted scenarios and five-second grace choice, never owner-agreed scenarios.",
+          "choice": "Change it so that after a clean DONE the window keeps reconciling only for a bounded grace period, then retires the refresh.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-delegate-stop-observer.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/api/streams.observeAccept.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A cold observer requests the managed run event stream as SSE, so it can observe remote Stop and recover its durable record. Agent-adopted (delegated-choice), never owner-adopted.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Search v3 designs; the orchestrator adopted DS1–DS8 and DN1–DN2 in wp1.2c under this delegation, after a challenger pass. Agent-adopted, never owner-adopted.",
+          "choice": "DS5 With two windows observing the same run, Stop in either window gives one stopped presentation in both, with no interim generic failure that stays; a different conversation's run is untouched.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Search v3 designs; the orchestrator adopted DS1–DS8 and DN1–DN2 in wp1.2c under this delegation, after a challenger pass. Agent-adopted, never owner-adopted.",
+          "choice": "DS7 Dropping the event stream around a confirmed Stop: reconnect or record fallback restores the same single stopped presentation. Engine restart before the cancellation is saved does not invent a Stop; after it is saved, the Stop is kept. (No new restart-recovery feature.)",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-delegate-stop.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
         "modules/ui-web/src/api/streams.observeAccept.test.ts"
       ],
       "repaired": true

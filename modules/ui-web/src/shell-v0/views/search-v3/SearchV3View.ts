@@ -357,6 +357,11 @@ import './Sv3Pane.js';
 
 const COMPOSER_STATE_ATTR = 'composer-state';
 
+// Stop disappears on DONE; an in-flight DELETE can still lag (DS4 observed ~1.1s).
+// Allow 5s for cross-window/network delivery. The Engine has no finished-run deadline;
+// this bounds clean-DONE reads, never our own Halt or Stop awaiting its checkpoint.
+const COMPLETED_RECORD_GRACE_MS = 5000;
+
 /** Tempdoc 867 — a stable empty-set identity for when no run controller exists yet. */
 const EMPTY_EVIDENCE_PATHS: ReadonlySet<string> = new Set();
 
@@ -912,7 +917,9 @@ export class SearchV3View extends JfElement {
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
   private readonly recordReads = new Map<string, AbortController>();
   /** A local terminal can precede the Engine's journal and checkpoint writes. */
-  private readonly pendingRunRecords = new Map<string, { local: Sv3RunLocal; runId: string }>();
+  private readonly pendingRunRecords = new Map<string, {
+    local: Sv3RunLocal; runId: string; doneGraceUntil?: number;
+  }>();
   private readonly announcedStops = new Set<string>();
   private recordRetryTimer: number | null = null;
   private reattachRecordTurn: { runId: string; sessionId: string; turnId: string } | null = null;
@@ -1541,10 +1548,14 @@ export class SearchV3View extends JfElement {
           emitEphemeralToast({ message: stop.text });
         }
         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
-        // A completed run can still acquire its late Stop note. Conversely, a saved Stop can
-        // precede the final output/checkpoint: read through both edges before retiring the refresh.
+        if (state === 'DONE' && stop === undefined && !local.haltRequested) {
+          pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
+        } else {
+          delete pending.doneGraceUntil;
+        }
+        // A saved Stop can precede the final checkpoint; keep reading through both edges.
         if ((state === 'DONE' || state === 'ERROR' || state === 'CANCELLED')
-          && (stop !== undefined || (!local.haltRequested && state !== 'CANCELLED'))) {
+          && (stop !== undefined || (!local.haltRequested && state === 'ERROR'))) {
           this.pendingRunRecords.delete(id);
         }
       }
@@ -1558,11 +1569,21 @@ export class SearchV3View extends JfElement {
     this.recordRetryTimer = null;
   }
 
+  private retireExpiredRecordReads(): void {
+    const now = Date.now();
+    for (const [id, pending] of this.pendingRunRecords) {
+      if (!pending.local.haltRequested && pending.doneGraceUntil !== undefined
+        && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
+    }
+  }
+
   private scheduleRecordRetry(): void {
+    this.retireExpiredRecordReads();
     if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
     if (!this.isConnected || this.pendingRunRecords.size === 0 || this.recordRetryTimer !== null) return;
     this.recordRetryTimer = window.setTimeout(() => {
       this.recordRetryTimer = null;
+      this.retireExpiredRecordReads();
       for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
         void this.refreshRecord(id);
       }
