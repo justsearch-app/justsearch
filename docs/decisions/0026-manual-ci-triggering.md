@@ -253,3 +253,22 @@ repository-wide ban.
 
 [ADR-0053](0053-one-pr-ci-run-and-squash-auto-merge.md) supersedes the hosted CI event-selection
 and publication rules. Main and dispatch run all slow suites; PRs run their input closure.
+
+## Amendment 2026-10-24: Measured axe becomes required
+
+The advisory decision is superseded: `measured-axe` reports as **Measured axe** and is
+included in the CI signal policy's required checks. Since 2026-10-21 it passed all 59
+selected PR runs in the promotion record, with zero failures. This satisfies the stable
+advisory record required by ADR-0026 and ADR-0044. Serious and critical accessibility
+violations block merges.
+
+Selection is unchanged: affected frontend inputs on PRs, always on main pushes and manual
+dispatch. An unselected PR reports the literal job as skipped, matching `jseval Python suite`.
+No merge-group trigger is added. The gate still fails on every new rule regardless of impact,
+on serious/critical violations even in baselined rules, and on missing, null or errored scans;
+its job and gate step do not continue on error.
+
+Required-lane bookkeeping includes the local reproduction entry, a measured wall-clock policy
+row and `ci-walltime.needs` dependency. The dated advisory history above remains historical.
+Branch protection is updated by the maintainer after this change merges; repository settings
+are outside this change.

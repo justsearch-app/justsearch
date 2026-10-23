@@ -78,7 +78,7 @@ test('PRs scope fixed jobs and main runs every slow tier', () => {
   for (const id of ['integration-tests', 'module-integration-tests']) assert.equal(jobs[id].if, mainOnly, id);
   assert.equal(jobs['measured-axe'].needs, 'changes');
   assert.equal(jobs['measured-axe'].if, "needs.changes.outputs.frontend != 'false'");
-  assert.equal(jobs['measured-axe'].name, 'Measured axe (advisory)');
+  assert.equal(jobs['measured-axe'].name, 'Measured axe');
   assert.notEqual(jobs['integration-tests']['continue-on-error'], true);
   assert.equal(jobs['ci-walltime'].if, `always() && (${mainOnly})`);
   assert.ok(jobs['ci-walltime'].needs.includes('integration-tests'));
