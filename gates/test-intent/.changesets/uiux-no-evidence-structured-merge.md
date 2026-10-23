@@ -66,3 +66,14 @@ quotes the merge continuation brief verbatim. Existing test expectations remain 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "uvce0kse-verifier-3",
+  "verdict": "accept",
+  "digest": "sha256:d37e0b47043ee5bd1d53619a9a3c757aff18168ed4693b5fef6e0b43aac7fc44",
+  "note": "New expectations follow the agent-adopted delegated-choice scenarios reviewed before the diff. Independent evidence: 7 frontend cases and 1 Java case pass with zero skips; both fail before by assertions for the intended repair. The recorded dependency-copy adapter preserves internal links. Product verification is reported separately."
+}
+```

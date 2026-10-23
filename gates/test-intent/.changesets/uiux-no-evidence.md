@@ -568,3 +568,14 @@ scenario id is carried in agreedScenario. No independent acceptance is authored 
   "note": "Accepted New classifications and delegated-choice sources after baseline/source-first review. Independent run-evidence: 14 Java cases pass, zero skipped; baseline has 12 assertion failures plus 2 preservation passes. Frontend confirmation 34/34. Scope-disclosure finding and pre-existing esbuild suite failure remain separate verification findings; this accepts test intent, not product sign-off."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "uvce0kse-verifier-3",
+  "verdict": "accept",
+  "digest": "sha256:7ce824ce3d74dda78f4eb986c31a40af2909c3ca57dab13a5fb8ff53cb335072",
+  "note": "Reaffirmed original test-intent acceptance: current digest exactly matches the prior accepted sha256:7ce824ce3d74dda78f4eb986c31a40af2909c3ca57dab13a5fb8ff53cb335072. The merge leaves the covered tests, entries and producer evidence unchanged; the original agent-adopted delegated-choice intent still applies. Product verification is reported separately."
+}
+```
