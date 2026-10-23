@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T06:37:07.199Z",
+  "revision": "7f27e6a50a45c7eff0b615253d242ae4f0f95a1c",
+  "tree": "b3840b14b7ee79f24fba6f8eba640292f2374979",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3689943-1792737416858.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4550
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#C1 C2 pending conversation claims precede a surface navigation at every debounce boundary",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1146fd5d53df42d1ff10811e15b1946da6570c983837920f5fd67e86627fbdd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration connectedCallback bootstrap C1 C2 pending conversation claims precede a surface navigation at every debounce boundary",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1730a66d2",
+    "revision": "1730a66d2d7dfc9c727122ba34fae4c24af36416",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3689943-1792737422445.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4617,
+        "output": "JSON report written to /tmp/test-intent-vitest-3689943-1792737422445.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#C1 C2 pending conversation claims precede a surface navigation at every debounce boundary",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration connectedCallback bootstrap C1 C2 pending conversation claims precede a surface navigation at every debounce boundary:  AssertionError: cursor at 0ms: expected 'justsearch://surface/core.search-v3-s…' to be 'justsearch://surface/core.library-sur…' // Object.is equality\n    at /tmp/test-intent-before-Ogaz8F/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:448:80\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      }
+    ]
+  },
+  "digest": "sha256:b96b827af8b37a472d8be79ffa3596b14efbb412507f14ad07f49e6486c36347"
+}

@@ -335,6 +335,20 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       }
     }
 
+    private java.util.Set<Path> recoveryRoots() {
+      return target.ingest().watcherRecoveryRoots();
+    }
+
+    private void recoverRoot(Path root) {
+      try (RoutedTarget routed = acquireTarget()) {
+        try {
+          routed.target().ingest().recoverWatcherRoot(root);
+        } catch (IOException unavailable) {
+          throw new IllegalStateException("Watcher root recovery is incomplete", unavailable);
+        }
+      }
+    }
+
     private void reconcile(Path root, boolean force) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
@@ -791,6 +805,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.rootWatcherRegistry = nativeSource.rootWatcherRegistry;
     }
     this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
+    if (nativeSource == null) {
+      workerWatcher.startRootRecovery(executors.watcherReturnPoll(), executors.watcherReturn(),
+          watcherCallbacks::recoveryRoots, watcherCallbacks::recoverRoot);
+    }
     // Task t-20261013-ef3c41, round 4: the indexing loop's admission, freshness, re-hash and
     // pre-write decisions and the watcher's DELETE confirmation all ask the service's one
     // root-identity check, the same question the prune asks.

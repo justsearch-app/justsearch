@@ -81,6 +81,8 @@ final class WorkerExecutorRegistrationsTest {
     assertTrue(registry.registrations.stream().allMatch(RecordingRegistration::closed));
     assertEquals(
         List.of(
+            WorkerExecutorRegistrations.WATCHER_RETURN,
+            WorkerExecutorRegistrations.WATCHER_RETURN_POLL,
             WorkerExecutorRegistrations.QUERY_PREWARM,
             WorkerExecutorRegistrations.PDF_OCR,
             WorkerExecutorRegistrations.DEFERRED_MODEL_INIT,
