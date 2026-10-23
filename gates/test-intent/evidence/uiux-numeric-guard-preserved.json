@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T08:36:57.680Z",
-  "revision": "76efc1c1013cf78851b610884ae26b3d4d25b2fb",
-  "tree": "a4cf685e58a0d3bbee642aec361818e02909d339",
+  "createdAt": "2026-10-23T11:43:37.312Z",
+  "revision": "943665fac7a81b0590ba0f836a4aced11920bac7",
+  "tree": "fff053ac5b2cda35145d6fec891de3bc99320e4a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,31 +21,31 @@
       "command": "./gradlew :modules:reranker:test --tests \"io.justsearch.reranker.CitationScorerNumericTest.preservesLiteralCompatiblePairs\" --tests \"io.justsearch.reranker.CitationScorerNumericTest.preservesNumberFreeCorpusAndThreshold\" --tests \"io.justsearch.reranker.NumericCitationScorerIntegrationTest.reportsFiveRunScorerSuiteMeasurement\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7964
+      "durationMs": 9084
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.CitationMatchOpsNumericTest.preservesReferencesOrdinalsAndNumberFreeCorpus\" --tests \"io.justsearch.indexerworker.services.CitationMatchOpsNumericTest.preservesCompatibleNumbersAndOriginalThreshold\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1942
+      "durationMs": 2008
     },
     {
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest.rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload\" --tests \"io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest.legacyNumericVerdictLoadsWithoutRejudging\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2206
+      "durationMs": 2242
     },
     {
       "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.AgentNumericCitationRejectionTest.rejectedSentenceKeepsProducerAndEmptyCitesThroughDelegateEventsAndHistory\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1217
+      "durationMs": 1190
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RetrieveContextNumericRejectionTest.rawApiReportsRejectionAsScoredWithZeroMatches\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2426
+      "durationMs": 3527
     }
   ],
   "checks": [
@@ -53,7 +53,7 @@
       "id": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesLiteralCompatiblePairs",
       "file": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9bb23c3e4ac5e08ed31ead1dc6b5e563004a65f6ae21e6d3d7dd35b001dad707",
+      "contentDigest": "sha256:d3185d9b9f494bc10012061436737533bc4f6c7e8fb54b49efdac43adc985f40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -68,7 +68,7 @@
       "id": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold",
       "file": "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9bb23c3e4ac5e08ed31ead1dc6b5e563004a65f6ae21e6d3d7dd35b001dad707",
+      "contentDigest": "sha256:d3185d9b9f494bc10012061436737533bc4f6c7e8fb54b49efdac43adc985f40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -98,7 +98,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesReferencesOrdinalsAndNumberFreeCorpus",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:70e769bf76aedf5066e0a33f354d322dfbc73dc98f72975a24d4089205140e2f",
+      "contentDigest": "sha256:42bf97d6dfaaaed63d71ed15941b665b81dc301e4917a48a676a7a122b0b2704",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -113,7 +113,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:70e769bf76aedf5066e0a33f354d322dfbc73dc98f72975a24d4089205140e2f",
+      "contentDigest": "sha256:42bf97d6dfaaaed63d71ed15941b665b81dc301e4917a48a676a7a122b0b2704",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -128,7 +128,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/NumericCitationHistoryTest.java#rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/NumericCitationHistoryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c546486661b74dec3e3f62a18cdf7b3a95dea77003d9f5d589b7a49c0af4f74d",
+      "contentDigest": "sha256:0c4da058eb68a3614fda53b986bb02f75d2ea938fe8da63b438bfa52ce96086b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -143,7 +143,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/NumericCitationHistoryTest.java#legacyNumericVerdictLoadsWithoutRejudging",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/NumericCitationHistoryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c546486661b74dec3e3f62a18cdf7b3a95dea77003d9f5d589b7a49c0af4f74d",
+      "contentDigest": "sha256:0c4da058eb68a3614fda53b986bb02f75d2ea938fe8da63b438bfa52ce96086b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -186,5 +186,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ae854dd6c55c58162ab0c615d4f553adcf19385b04f9532081d510813c199c5c"
+  "digest": "sha256:fdb3ef1272e90e5082e8266de2c9f9976c1edeb5afffcf35176d5a159e1a94ef"
 }
