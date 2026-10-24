@@ -122,15 +122,22 @@ public final class DocAccess implements ContextInjector {
     Resolved resolved = resolveContent(docId, providedContent, engineContext);
     String fullContent = resolved.content();
     if (fullContent == null || fullContent.isBlank()) {
-      return InjectorResult.empty();
+      return InjectorResult.terminalError(new SseEvent("error", Map.of(
+          "errorCode", "DOC_UNAVAILABLE",
+          "error", docId == null || docId.isBlank()
+              ? "Summary input is empty. Choose a document or provide text."
+              : "Document content unavailable: " + docId,
+          "retryable", false)));
     }
 
     SseEvent rejection = inputLimit.rejection(fullContent, engineContext);
     if (rejection != null) return InjectorResult.terminalError(rejection);
 
-    String truncated = fullContent.length() > MAX_CONTENT_CHARS
-        ? fullContent.substring(0, MAX_CONTENT_CHARS)
-        : fullContent;
+    if (fullContent.length() > MAX_CONTENT_CHARS) {
+      return InjectorResult.terminalError(new SseEvent("error", Map.of(
+          "errorCode", "INPUT_TOO_LARGE", "error", "Document exceeds the summary character limit; choose a smaller passage.")));
+    }
+    String truncated = fullContent;
 
     Map<String, Object> message = new LinkedHashMap<>();
     message.put("role", "user");

@@ -43,7 +43,8 @@ import {
   type RagMetaPayload,
 } from '../../../api/streams.js';
 import type { CoreRagAskHandlers } from '../../../api/generated/shape-handlers/core-rag-ask.js';
-import { buildRequestBody } from '../unifiedChatRequest.js';
+import type { SelectionPayload } from '../../../api/types/selection.js';
+import { buildRequestBody, type ShapeId } from '../unifiedChatRequest.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 // The ONE stream-error vocabulary (slice 497; inventory E9). A technical code becomes the same
 // sentence here as it does in the shipped window; an abort never reaches it (see the catch below).
@@ -198,6 +199,8 @@ export interface Sv3AskRequest {
   readonly apiBase: string;
   /** Present only for Structured; the existing dispatch and terminal rules are shared. */
   readonly schema?: string;
+  readonly shapeId?: ShapeId | 'core.summarize';
+  readonly selection?: SelectionPayload | null;
   readonly question: string;
   /** The window's session id — stamped on every dispatch so the backend records the turn. */
   readonly conversationId: string;
@@ -380,12 +383,12 @@ function claimsOf(acc: Map<number, ClaimAcc>, scorer: string | null): Claim[] {
  * An Ask carries its chosen files and the effective follow-up context.
  */
 export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void> {
-  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract', req.question, req.conversationId, req.schema ?? '', [
-    ...(req.docIds ?? []),
-  ]);
+  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : req.shapeId ?? (req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract'), req.question, req.conversationId, req.schema ?? '', [
+    ...(req.modelAnswer ? [] : req.docIds ?? []),
+  ], req.modelAnswer ? undefined : req.selection);
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
-  if (req.schema !== undefined && (req.docIds?.length ?? 0) > 0) {
+  if (!req.modelAnswer && req.schema !== undefined && req.selection == null && (req.docIds?.length ?? 0) > 0) {
     body.selection = { kind: 'result-set', items: [...new Set(req.docIds)].map(id => ({ id, kind: 'search-hit' })) };
   }
   // The effort rung's parameters, added AFTER the shared builder rather than inside it: the builder

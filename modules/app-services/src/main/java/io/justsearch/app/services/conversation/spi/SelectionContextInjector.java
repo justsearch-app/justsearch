@@ -180,6 +180,23 @@ public final class SelectionContextInjector implements ContextInjector {
       return InjectorResult.terminalError(errorEvent("Invalid selection payload", "BAD_SELECTION"));
     }
 
+    if ("core.rag-ask".equals(ctx.shapeId())) {
+      List<String> docIds = switch (payload) {
+        case SelectionPayload.Item item -> List.of(item.itemId());
+        case SelectionPayload.ResultSet rs -> rs.items().stream().map(SelectionPayload.ResultRef::id).distinct().toList();
+        default -> null;
+      };
+      if (docIds != null) {
+        if (docIds.isEmpty()) return InjectorResult.terminalError(errorEvent("No files selected", "DOC_UNAVAILABLE"));
+        for (String docId : docIds) {
+          if (!readableDocument(ctx, docId)) {
+            return InjectorResult.terminalError(errorEvent("Cannot read selected file: " + docId, "DOC_UNAVAILABLE"));
+          }
+        }
+        ctx.attributes().put(RAGContext.ATTR_DOC_IDS, docIds);
+        return InjectorResult.empty();
+      }
+    }
     return switch (payload) {
       case SelectionPayload.TextRange tr -> injectTextRange(ctx, tr);
       case SelectionPayload.Item item -> injectItem(ctx, item);
@@ -188,6 +205,22 @@ public final class SelectionContextInjector implements ContextInjector {
       case SelectionPayload.HealthCondition hc -> injectHealthCondition(ctx, hc);
       case SelectionPayload.SearchTrace st -> injectSearchTrace(ctx, st);
     };
+  }
+
+  private boolean readableDocument(ConversationContext ctx, String docId) {
+    if (localFileUnavailable(docId)) return false;
+    try {
+      var slice = documents.fetchSlice(docId, 0, 1, ctx.engineContext())
+          .toCompletableFuture().get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
+      return slice != null && slice.found() && slice.error() == null
+          && (slice.totalChars() > 0 || !slice.content().isBlank());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
+      LOG.warn("SelectionContextInjector: cannot read selected file {}", docId, e);
+    }
+    return false;
   }
 
   /**
@@ -211,7 +244,16 @@ public final class SelectionContextInjector implements ContextInjector {
     InjectorResult rejection = summaryLimitRejection(ctx, source);
     if (rejection != null) return rejection;
     Map<String, Object> message = userMessage("", source);
-    return InjectorResult.messagesOnly(List.of(message));
+    if (!"hit".equals(st.scope()) || st.docId() == null || st.docId().isBlank()) {
+      return InjectorResult.messagesOnly(List.of(message));
+    }
+    // This source identifies the result being explained, not a passage read by the model.
+    // Announce it through the existing live/record path, without adding document text to the
+    // verification inputs or inventing a chunk, span or quotation for the ranking trace.
+    ContextCitation citation = new ContextCitation(
+        st.docId(), ContextCitation.CHUNK_INDEX_ABSENT, 1, 0, 0, 1.0f, "", 0, 0, "", 0,
+        DocumentService.ContextInclusion.ABSENT);
+    return InjectorResult.of(List.of(message), List.of(citationsEvent(citation, 0, 0)));
   }
 
   /**
@@ -390,18 +432,18 @@ public final class SelectionContextInjector implements ContextInjector {
   private InjectorResult injectResultSet(ConversationContext ctx, SelectionPayload.ResultSet rs) {
     var engineContext = ctx.engineContext();
     List<SelectionPayload.ResultRef> refs = rs.items();
-    if (refs.isEmpty()) return InjectorResult.empty();
+    if (refs.isEmpty()) return InjectorResult.terminalError(errorEvent("No files selected", "DOC_UNAVAILABLE"));
     List<ResultContent> selected = new ArrayList<>();
-    boolean extracting = "core.extract".equals(ctx.shapeId());
-    if (extracting && refs.stream().map(SelectionPayload.ResultRef::id).distinct().count() > MAX_RESULT_SET_DOCS) {
-      return InjectorResult.terminalError(errorEvent("Choose at most " + MAX_RESULT_SET_DOCS + " files for extraction", "TOO_MANY_FILES"));
+    boolean strictInput = "core.extract".equals(ctx.shapeId()) || SUMMARIZE_SHAPE_ID.equals(ctx.shapeId());
+    if (strictInput && refs.stream().map(SelectionPayload.ResultRef::id).distinct().count() > MAX_RESULT_SET_DOCS) {
+      return InjectorResult.terminalError(errorEvent("Choose at most " + MAX_RESULT_SET_DOCS + " files for this task", "TOO_MANY_FILES"));
     }
     java.util.Set<String> seen = new java.util.HashSet<>();
     for (SelectionPayload.ResultRef ref : refs) {
-      if (extracting && !seen.add(ref.id())) continue;
+      if (strictInput && !seen.add(ref.id())) continue;
       if (selected.size() >= MAX_RESULT_SET_DOCS) break;
       String content = fetchDocContent(ref.id(), engineContext);
-      if (extracting && (content == null || content.isBlank())) {
+      if (strictInput && (content == null || content.isBlank())) {
         return InjectorResult.terminalError(errorEvent("Cannot read selected file: " + ref.id(), "DOC_UNAVAILABLE"));
       }
       if (content != null && !content.isBlank()) selected.add(new ResultContent(ref.id(), content));
@@ -424,8 +466,8 @@ public final class SelectionContextInjector implements ContextInjector {
     // hold). MAX_RESULT_SET_DOCS stays a document COUNT: it is not a window quantity.
     int perDocChars = Math.max(1, selectionCapChars(ctx) / MAX_RESULT_SET_DOCS);
     for (ResultContent result : selected) {
-      if (extracting && result.content().length() > perDocChars) {
-        return InjectorResult.terminalError(errorEvent("Selected file exceeds the extraction per-document budget: " + result.id(), "INPUT_TOO_LARGE"));
+      if (strictInput && result.content().length() > perDocChars) {
+        return InjectorResult.terminalError(errorEvent("Selected file exceeds the per-document input budget: " + result.id(), "INPUT_TOO_LARGE"));
       }
       String truncated =
           truncateToBudget(result.content(), "result-set document", result.id(), perDocChars);
@@ -537,6 +579,9 @@ public final class SelectionContextInjector implements ContextInjector {
       return InjectorResult.terminalError(errorEvent("Selected input exceeds the extraction context budget", "INPUT_TOO_LARGE"));
     }
     if (!SUMMARIZE_SHAPE_ID.equals(ctx.shapeId())) return null;
+    if (source.length() > selectionCapChars(ctx)) {
+      return InjectorResult.terminalError(errorEvent("Selected input exceeds the summary context budget", "INPUT_TOO_LARGE"));
+    }
     SseEvent rejection = summaryInputLimit.rejection(source, ctx.engineContext());
     return rejection == null ? null : InjectorResult.terminalError(rejection);
   }
@@ -615,7 +660,7 @@ public final class SelectionContextInjector implements ContextInjector {
   private static SseEvent citationsEvent(ContextCitation citation, int startChar, int endChar) {
     Map<String, Object> citationMap = new LinkedHashMap<>();
     citationMap.put("parentDocId", citation.parentDocId());
-    citationMap.put("chunkIndex", 0);
+    citationMap.put("chunkIndex", citation.chunkIndex());
     citationMap.put("startChar", startChar);
     citationMap.put("endChar", endChar);
     citationMap.put("score", 1.0f);
@@ -623,8 +668,21 @@ public final class SelectionContextInjector implements ContextInjector {
     return new SseEvent("rag.citations", Map.of("citations", List.of(citationMap)));
   }
 
+  /** File hand-offs must not read retained index text after their local file disappears.
+   * Relative/opaque document identities still belong to DocumentService; real file IDs are absolute.
+   */
+  private static boolean localFileUnavailable(String docId) {
+    if (docId == null || docId.isBlank()) return true;
+    try {
+      var path = java.nio.file.Path.of(docId);
+      return path.isAbsolute() && (!java.nio.file.Files.isRegularFile(path) || !java.nio.file.Files.isReadable(path));
+    } catch (java.nio.file.InvalidPathException | SecurityException e) {
+      return true;
+    }
+  }
+
   private String fetchDocContent(String docId, EngineContext engineContext) {
-    if (docId == null || docId.isBlank()) return null;
+    if (localFileUnavailable(docId)) return null;
     try {
       DocumentRecord record =
           documents
