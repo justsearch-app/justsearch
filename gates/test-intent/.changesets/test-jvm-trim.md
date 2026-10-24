@@ -37,3 +37,13 @@ Author: the orchestrator's Claude session, which wrote this ten-line build chang
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16bdf-9828-7ad3-b184-7830085d0677",
+  "verdict": "accept",
+  "digest": "sha256:b1ee97b43348c44edf8ebfaa15fc856e161becfb1a497175db8fa93f4ce58b84"
+}
+```
