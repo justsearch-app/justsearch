@@ -1064,18 +1064,21 @@ public class IndexingLoop implements Closeable {
       // A stopped/failed batch may not visit every polled claim. Written claims retain their
       // existing commit owner; the remainder return only after synchronous batch execution exits.
       if (!fatal) {
-        boolean peerSucceeded = writer.pipelineSucceeded();
-        if (peerSucceeded) extractor.pipelineSucceeded();
-        BooleanSupplier healthy = () -> peerSucceeded || canary.getAsBoolean();
-        long delayMs = Math.max(writer.prepareRetry(healthy), extractor.prepareRetry(healthy));
-        retryAtMs = System.currentTimeMillis() + delayMs;
         try {
-          writer.finishBatch(retryAtMs);
+          boolean peerSucceeded = writer.pipelineSucceeded();
+          if (peerSucceeded) extractor.pipelineSucceeded();
+          BooleanSupplier healthy = () -> peerSucceeded || canary.getAsBoolean();
+          long delayMs = Math.max(writer.prepareRetry(healthy), extractor.prepareRetry(healthy));
+          retryAtMs = System.currentTimeMillis() + delayMs;
         } finally {
           try {
-            extractor.finishBatch(retryAtMs);
+            writer.finishBatch(retryAtMs);
           } finally {
-            journal.returnBatchClaims(jobs);
+            try {
+              extractor.finishBatch(retryAtMs);
+            } finally {
+              journal.returnBatchClaims(jobs);
+            }
           }
         }
       }

@@ -1557,6 +1557,48 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "An unexpected non-VM throwable escaping the full health check cannot strand claimed rows: ambiguous writes use legacy per-file handling, become PENDING with one attempt and backoff, public status is WAITING, and the same rows complete after the dependency is repaired and their original deadline elapses. Finalization and claim return enclose classification even if a VM error propagates. Known outage/false-canary, typed unavailable, source classification and fatal VM propagation behavior stay unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator round-twenty claim-finalization repair; do not change source-failure classification or any other behavior.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "The round-twenty orchestrator explicitly requires: \"Any throwable from the health check, other than VirtualMachineError, means the pipeline is not proven healthy, so fall back to the existing per-file handling (charge as main does).\" A throwable escaping the BooleanSupplier is handled in BatchServiceFailures: VM errors are immediately rethrown; other failures retain legacy per-file handling for ambiguous files. Existing PipelineCanary known-failure false results and typed service-unavailable fast paths remain unchanged. Classification, including peer checks and prepareRetry, moves into a try whose nested finally persists writer and extractor outcomes and returns claims even when classification throws. The existing fatal-body exclusion remains. Source classification is byte-for-byte unchanged. The supplied real mapper linkage fault is retained, including warmup, real Tika/SQLite/Lucene/full canary and public status. The orchestrator replaces its older zero-attempt oracle with legacy PENDING/attempts1/RETRY_WITH_BACKOFF; recovery waits for the existing minute-scale per-file deadline rather than modifying it, re-enqueueing or restarting. The diagnostic repair proof is included by calling the real runtime probe after repairing only the mapper dependency. A simulated VM probe failure pins propagation plus unconditional claim cleanup. Direct policy variants cover linkage, assertion, ThreadDeath and runtime throwables; fatal VM propagation is a preservation check. These are delegated choices under the orchestrator decision, not owner-words."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-canary-claims.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -1822,6 +1864,14 @@ Entry33 implements the orchestrator's outcome rule in the existing shared classi
 The three native stream scenarios must fail on exacte46593561 for attempts0/DEFER and pass after with source1/backoff and healthy peer0. Existing NIO alias, U19 ladder/revive, typed availability matrix, all-poison/poison and readable-source shared-outage scenarios remain preservation checks. Existing acceptance records and the accepted unrefreshed-schema residual are unchanged.
 
 Round19 exact e46593561 before: three real java.io source cases fail at attempts0; after source1/backoff and healthy peer0, including readable retarget. All 146 unique named executions/37 matrix states pass; supplied product84 pass plus1 accepted schema residual, environment1 pass. Compile and 6 PMD pass. Full suites retain1 known launcher-NOTE failures and50 conditional skips. Product+3/-1net2. [Report](../../../tmp/builder/round19/report.md), [before](../../../tmp/builder/round19/before.txt), [after](../../../tmp/builder/round19/after.txt), [counts](../../../tmp/builder/round19/verification-summary.json), [evidence](../evidence/systemic-batch-deferral-source-readability.json). Existing acceptance records are unchanged.
+
+## Round twenty: classification cannot bypass claim finalization
+
+The orchestrator requires an escaping non-VM health-check throwable to fall back to legacy per-file handling, rather than leaving claims PROCESSING. This is distinct from an ordinary `false` canary result, whose outage deferral remains unchanged. `BatchServiceFailures` applies that fallback to ambiguous failures and propagates VM errors; `IndexingLoop` protects classification with the existing nested writer/extractor finalizers and claim return. Source-failure classification, including a transient java.io denial that clears before classification, is unchanged by explicit decision.
+
+[Shared mapper linkage and VM finalization](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java) retains the independent verifier's real mapped writer/canary fault. The old zero-attempt oracle is replaced by the round-twenty decision: PENDING, one attempt, RETRY_WITH_BACKOFF, WAITING, then completion on the original deadline after repairing only the mapping dependency. It also includes the diagnostic repaired probe. [Probe throwable policy](../../../modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java) covers escaping non-VM errors/runtime failures and preserves VM propagation. The second integration check proves claim finalization even when a simulated VM error escapes classification.
+
+Round-20 verification: exact HEAD b1d1a8a624 fails both new check files with the intended stranded-claim assertions; 40 preservation executions pass. Candidate: all seven new cases and 156 unique targeted executions pass, including real mapper recovery at the original deadline and VM propagation/claim cleanup. Full suites report 4431 entries, 50 conditional skips and 1 known launcher-NOTE environment failure(s); main/test compilation and six PMD checks pass. Product +21/−9, net 12. [Before](../../../tmp/builder/round20/before.txt), [after](../../../tmp/builder/round20/after.txt), [report](../../../tmp/builder/round20/report.md), [counts](../../../tmp/builder/round20/verification-summary.json), [evidence](../evidence/systemic-batch-deferral-canary-claims.json). Existing acceptance records remain unchanged.
 
 ## Acceptance records
 

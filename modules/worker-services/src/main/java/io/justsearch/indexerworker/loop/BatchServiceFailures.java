@@ -118,7 +118,16 @@ final class BatchServiceFailures {
 
   private long prepareRetry(long minimumDelayMs, BooleanSupplier canary) {
     active = false;
-    if (pending.stream().anyMatch(f -> !f.unavailable())) healthy = canary.getAsBoolean();
+    if (pending.stream().anyMatch(f -> !f.unavailable())) {
+      try {
+        healthy = canary.getAsBoolean();
+      } catch (VirtualMachineError fatal) {
+        throw fatal;
+      } catch (Throwable failure) {
+        // An escaping probe failure retains legacy per-file handling, not a health verdict.
+        healthy = true;
+      }
+    }
     if (healthy) success();
     if (pending.stream().anyMatch(this::systemic)) {
       delayMs = Math.max(nextDelayMs, Math.min(MAX_DELAY_MS, minimumDelayMs));
