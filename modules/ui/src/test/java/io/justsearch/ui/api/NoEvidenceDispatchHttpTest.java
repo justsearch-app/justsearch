@@ -31,6 +31,7 @@ import io.justsearch.app.services.conversation.spi.QueryRewriteInjector;
 import io.justsearch.app.services.conversation.spi.RAGContext;
 import io.justsearch.app.services.conversation.spi.RAGDoneEnricher;
 import io.justsearch.app.services.conversation.spi.RAGQAStyle;
+import io.justsearch.app.services.conversation.spi.SelectionContextInjector;
 import io.justsearch.app.services.conversation.spi.StreamingCitationMatcher;
 import io.justsearch.app.services.conversation.spi.UserPromptInjector;
 import io.justsearch.agent.api.registry.ConversationShapeCatalog;
@@ -143,7 +144,8 @@ final class NoEvidenceDispatchHttpTest {
         ConversationShapeCatalog.of("core", List.of(RAGAskShape.definition(), FreeChatShape.definition())),
         List.of(), PromptContributorRegistry.of(List.of(RAGQAStyle.INSTANCE, AnswerShapeGrammar.INSTANCE)),
         ContextInjectorRegistry.of(List.of(new ExternalContextInjector(() -> ai),
-            new QueryRewriteInjector(() -> ai), new RAGContext(documents, 5, () -> ai), UserPromptInjector.INSTANCE)),
+            new SelectionContextInjector(documents, () -> ai), new QueryRewriteInjector(() -> ai),
+            new RAGContext(documents, 5, () -> ai), UserPromptInjector.INSTANCE)),
         StreamConsumerRegistry.of(List.of(new StreamingCitationMatcher(documents),
             RAGDoneEnricher.INSTANCE, new MemoryExtractionConsumer(MemoryStore.noop()))),
         IterationControllerRegistry.of(List.of()), () -> ai, conversationStore, admission);

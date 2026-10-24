@@ -141,6 +141,65 @@ class LegacyIngestionBoundaryTest {
     }
   }
 
+  @Test
+  void replacementCheckpointQuarantinesOnlyUpgradeDebtAndStopsRetryingAfterSevenDays() throws Exception {
+    Path file = Files.writeString(directory.resolve("unowned.txt"), "not authorized");
+    Path db = directory.resolve("replacement.db");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)));
+    }
+    Path checkpoint = directory.resolve("upgrade-030-recovery.properties");
+    Files.writeString(checkpoint, "format=1\nprepared=true\ndatabase=another-database\n");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      assertTrue(queue.pollPending(1).isEmpty(), "unprepared upgrade work is held");
+      String identity = queue.prepareRelease030Recovery(List.of());
+      var recovery = io.justsearch.indexerworker.queue.Release030RecoveryState.load(db);
+      recovery.prepared(List.of(), identity);
+      assertTrue(recovery.finish(), "ordinary checkpoint cleanup cannot lose quarantine");
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+          var query = connection.createStatement(); var row = query.executeQuery("SELECT ingestion_root FROM jobs")) {
+        assertTrue(row.next());
+        assertNull(row.getString(1), "upgrade quarantine grants no ingestion boundary");
+      }
+      var claims = queue.pollPending(1);
+      assertEquals(1, claims.size(), "prepared quarantine remains claimable after checkpoint cleanup");
+      var claim = claims.getFirst();
+      assertNull(claim.ingestionRoot(), "quarantine grants no ingestion boundary");
+      assertTrue(claim.unitRevision().startsWith("release030-unscoped/"));
+      var admission = new WorkerIngestionAuthority().admit(claim);
+      assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
+      assertTrue(queue.markClaimFailed(claim, admission.outcome(), null));
+      assertEquals(1, queue.jobStateCounts().pendingCount());
+      assertEquals(0, queue.jobStateCounts().doneCount());
+    }
+    // Advance the persisted retry origin, without a wall-clock wait or a migration-state edit.
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var update = connection.prepareStatement("UPDATE jobs SET retry_after=0,first_failed_at=?")) {
+      update.setLong(1, System.currentTimeMillis()
+          - io.justsearch.indexerworker.ingest.IngestionRetryLadder.MAX_RETRY_WINDOW_MS - 1_000);
+      update.executeUpdate();
+    }
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      var claim = queue.pollPending(1).getFirst();
+      var admission = new WorkerIngestionAuthority().admit(claim);
+      assertTrue(queue.markClaimFailed(claim, admission.outcome(), null));
+      assertEquals(0, queue.jobStateCounts().pendingCount(), "upgrade debt cannot wait forever");
+      assertEquals(0, queue.jobStateCounts().doneCount(), "unread debt is never reported done");
+      assertEquals(1, queue.failureSummary().failedCount());
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+          var query = connection.createStatement(); var row = query.executeQuery("SELECT state FROM jobs")) {
+        assertTrue(row.next());
+        assertEquals("RETRY_EXHAUSTED", row.getString(1));
+      }
+      assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(file))));
+      assertEquals(SourceAdmissionAction.ADMIT,
+          new WorkerIngestionAuthority().admit(queue.pollPending(1).getFirst()).action());
+    }
+  }
+
   private static List<String> historicalPayloads(Path file) {
     return List.of(file.toString(), new SwitchBufferUpsert(file.toString(), null,
         new JobQueue.EnqueueProvenance("system", "watcher")).encode());

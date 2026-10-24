@@ -219,7 +219,7 @@ final class WorkerScanOps {
     // extractor bypasses its unchanged-check and actually re-runs extraction + enrichment.
     // Same sink WorkerIngestService#submitBatch already uses for ForceReindex on the batch API —
     // no new mechanism, just the arm that never consulted request.mode().
-    boolean forceReindex = request.mode() == ScanMode.FORCE_REINDEX;
+    ScanMode mode = request.mode();
     // Tempdoc 812 D2: every job this walk admits remembers the scan that admitted it, so the Head
     // can roll the per-document terminal outcomes up into ONE durable scan-completion audit row.
     String enqueueScanId = scanId;
@@ -302,7 +302,7 @@ final class WorkerScanOps {
                 cancelled[0] = true;
                 return FileVisitResult.TERMINATE;
               }
-              flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), forceReindex, counters, bytes);
+              flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), mode, counters, bytes);
               if (isCancelled.getAsBoolean()) {
                 cancelled[0] = true;
                 return FileVisitResult.TERMINATE;
@@ -333,7 +333,7 @@ final class WorkerScanOps {
       if (!awaitAdmissionCapacity(request) || isCancelled.getAsBoolean()) {
         cancelled[0] = true;
       } else {
-        flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), forceReindex, counters, bytes);
+        flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), mode, counters, bytes);
         if (isCancelled.getAsBoolean()) cancelled[0] = true;
       }
     }
@@ -346,17 +346,22 @@ final class WorkerScanOps {
   }
 
   private void flushBatch(
-      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, Long recordedEpoch, boolean forceReindex,
+      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, Long recordedEpoch, ScanMode mode,
       long[] counters, long[] bytes) {
     String coll = collection == null || collection.isBlank() ? null : collection;
     if (recordedEpoch != null) beforeRecordedAdmission.run();
     String candidateGeneration = migratingGeneration.get();
     int accepted;
     if (candidateGeneration == null) {
-      accepted = recordedEpoch == null
-          ? jobQueue.enqueueEntries(List.copyOf(batch), coll,
-              scanId == null || scanId.isBlank() ? null : scanId)
-          : jobQueue.enqueueRecordedEntries(scanId, recordedEpoch, List.copyOf(batch), coll);
+      boolean maintenance = mode == ScanMode.INITIAL && batch.stream().allMatch(entry ->
+          entry.provenance() != null && "system".equals(entry.provenance().originator())
+              && "SYSTEM_INTERNAL".equals(entry.provenance().transport()));
+      String normalizedScan = scanId == null || scanId.isBlank() ? null : scanId;
+      accepted = recordedEpoch != null
+          ? jobQueue.enqueueRecordedEntries(scanId, recordedEpoch, List.copyOf(batch), coll)
+          : maintenance
+              ? jobQueue.enqueueMaintenanceScanEntries(List.copyOf(batch), coll, normalizedScan)
+              : jobQueue.enqueueEntries(List.copyOf(batch), coll, normalizedScan);
     } else if (jobQueue instanceof SwitchBufferCapableQueue scoped) {
       accepted = recordedEpoch == null
           ? scoped.enqueueAndBufferFilesForGeneration(candidateGeneration, List.copyOf(batch), coll,
@@ -371,7 +376,7 @@ final class WorkerScanOps {
     }
     counters[1] += accepted;
     for (JobQueue.EnqueueEntry entry : batch) bytes[0] += entry.sizeBytes();
-    if (forceReindex && recordedEpoch == null && !batch.isEmpty()) {
+    if (mode == ScanMode.FORCE_REINDEX && recordedEpoch == null && !batch.isEmpty()) {
       // Mark per batch rather than once at the end: a long walk's early batches are already
       // being extracted while later directories are still being visited, so a deferred mark
       // would arrive after the extractor had skipped them as UNCHANGED.

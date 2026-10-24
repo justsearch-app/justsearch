@@ -24,7 +24,8 @@ import java.util.Map;
  *
  * <p>Missing or empty {@code prompt} field: emits a {@link InjectorResult#terminalError}
  * with {@code MISSING_PROMPT} so the engine aborts before the LLM call rather than
- * sending an empty user message.
+ * sending an empty user message. Summarize accepts an absent instruction because its document
+ * injector supplies the default summary task.
  */
 public final class UserPromptInjector implements ContextInjector {
 
@@ -46,6 +47,8 @@ public final class UserPromptInjector implements ContextInjector {
     Object raw = ctx.requestBody().get("prompt");
     String prompt = raw instanceof String s ? s.trim() : "";
     if (prompt.isEmpty()) {
+      // Summarize already supplies its default task with the document or selection.
+      if ("core.summarize".equals(ctx.shapeId())) return InjectorResult.empty();
       Map<String, Object> errorPayload = new LinkedHashMap<>();
       errorPayload.put("errorCode", "MISSING_PROMPT");
       errorPayload.put(

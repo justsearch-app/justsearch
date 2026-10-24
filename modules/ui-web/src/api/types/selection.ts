@@ -130,6 +130,8 @@ export interface SelectionPayloadSearchTrace {
   readonly kind: 'search-trace';
   readonly scope: 'query' | 'hit';
   readonly summary: string;
+  /** The result being explained, for source navigation; no document text is injected. */
+  readonly docId?: string;
 }
 
 export type SelectionPayload =

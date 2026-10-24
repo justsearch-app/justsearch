@@ -28,9 +28,9 @@ public final class ParityDiagnostics {
    * <p>{@code index_fingerprint_inputs} is deliberately NOT a member. It is the canonical rendering
    * the digest hashes — the same statement, not a second one — so comparing it as a key of its own
    * would report a single shape change twice, once as a digest mismatch and once as a text
-   * mismatch. It is read on exactly one path: {@link #diff} falls back to it when the EXPECTED
-   * digest is uncomputable, and then compares only the inputs the unresolved model does not touch
-   * (tempdoc 931 §C.5).
+   * mismatch. The inputs also prove a narrow compatibility exception: a digest change consisting
+   * solely of explicitly compatible stored-keyword additions. Otherwise {@link #diff} falls back
+   * to them when a digest is uncomputable, comparing the inputs the unresolved model does not touch.
    */
   public static final Set<String> PARITY_KEYS =
       Set.of(io.justsearch.adapters.lucene.commit.IndexFingerprint.COMMIT_META_KEY, "boosts_fp");
@@ -198,6 +198,10 @@ public final class ParityDiagnostics {
         if (REBUILD_REQUIRING_KEYS.contains(key) && storedShapeUnreadable(stored, expected)) {
           continue;
         }
+        if (REBUILD_REQUIRING_KEYS.contains(key)
+            && compatibleAdditionsOnly(stored, expected)) {
+          continue;
+        }
         diffs.add(
             new Diff(
                 key,
@@ -210,6 +214,22 @@ public final class ParityDiagnostics {
     return List.copyOf(diffs);
   }
 
+  private static boolean compatibleAdditionsOnly(
+      Map<String, String> stored, Map<String, Object> expected) {
+    String before = storedInputsJson(stored);
+    String after = expectedInputsJson(expected);
+    if (!io.justsearch.adapters.lucene.commit.CompatibleFieldAdditions.certifies(
+            storedFingerprint(stored), before)
+        || !io.justsearch.adapters.lucene.commit.CompatibleFieldAdditions.certifies(
+            expectedFingerprint(expected), after)) return false;
+    var differences = io.justsearch.adapters.lucene.commit.IndexFingerprint.differingInputs(
+        before, after, Set.of());
+    // Equal renderings with different digests are inconsistent metadata, not an addition.
+    return !differences.isEmpty()
+        && io.justsearch.adapters.lucene.commit.CompatibleFieldAdditions.remaining(
+            differences, after).isEmpty();
+  }
+
   /**
    * True when the digest comparison cannot answer but the fallback one can: <em>either</em> side is
    * missing its {@code index_fingerprint}, and BOTH recorded the canonical inputs.
@@ -220,9 +240,9 @@ public final class ParityDiagnostics {
    * index opened by a runtime that CAN read every model had a full set of comparable inputs on both
    * sides and was still not compared. Same bug-class as the one §C.5 fixed, pointing the other way.
    *
-   * <p>When both digests are present the digest IS the answer and this returns false: it is the
-   * stronger comparison (it covers the model inputs the fallback has to drop) and running both
-   * would report one shape change twice.
+   * <p>When both digests are present this returns false: that comparison covers the model inputs
+   * the fallback has to drop. A differing pair can only be excused by certified input renderings
+   * proving compatible additions; running both as independent findings would double-report it.
    *
    * <p>Exposed so the guard's once-per-boot WARN can say which case it is in. "Parity is not being
    * checked" and "parity is being checked on everything except the model digests" are different
@@ -301,8 +321,9 @@ public final class ParityDiagnostics {
           io.justsearch.adapters.lucene.commit.IndexFingerprint.nullModelInputs(storedInputs));
     }
     List<io.justsearch.adapters.lucene.commit.IndexFingerprint.InputDifference> differences =
-        io.justsearch.adapters.lucene.commit.IndexFingerprint.differingInputs(
-            storedInputs, expectedInputsJson(expected), ignored);
+        io.justsearch.adapters.lucene.commit.CompatibleFieldAdditions.remaining(
+            io.justsearch.adapters.lucene.commit.IndexFingerprint.differingInputs(
+                storedInputs, expectedInputsJson(expected), ignored), expectedInputsJson(expected));
     if (differences.isEmpty()) {
       return List.of();
     }

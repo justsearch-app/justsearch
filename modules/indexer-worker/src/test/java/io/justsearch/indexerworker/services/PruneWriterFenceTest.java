@@ -393,6 +393,8 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
     Path file = Files.writeString(root.resolve("before.txt"), "before");
     String oldPath = key(file);
     String newPath = key(root.resolve("after.txt"));
+    // The filesystem move precedes its notification; test the rename's writer fence.
+    Files.move(file, root.resolve("after.txt"));
     writeParent(oldPath, "before parent");
     runtime.commitOps().commitAndTrack();
     var service = service(loopWithFence(), runtime);

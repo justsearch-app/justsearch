@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T00:14:38.837Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "996c93bb837939b3cf2411fe95cd90ab280d7c42",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.SummarizeHandoffTest.presentIndexedFileStillResolves\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3208
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java#presentIndexedFileStillResolves",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ba4fc8380b5bc8eccec54244ed86fc70a1c6ddc7e164f687951c7a124ec8d67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presentIndexedFileStillResolves(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:105f9fba5ea439961b2a5ddc957eb248f320e115d4e5ee4f24abc885416d39d3"
+}

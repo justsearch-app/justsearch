@@ -103,13 +103,15 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   }
 
   @Test
+  @org.junit.jupiter.api.extension.ExtendWith(
+      io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
   void deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan(@TempDir Path tempDir)
       throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
       Path root = Files.createDirectory(tempDir.resolve("scanned"));
       Files.writeString(root.resolve("document.txt"), "queued document",
           java.nio.charset.StandardCharsets.UTF_8);
-      when(fixture.jobQueue.enqueueEntries(any(), eq("docs"), any())).thenAnswer(
+      when(fixture.jobQueue.enqueueMaintenanceScanEntries(any(), eq("docs"), any())).thenAnswer(
           invocation -> invocation.<List<?>>getArgument(0).size());
       DefaultWorkerAppServices deferred = fixture.newDeferredIncumbent();
       DefaultWorkerAppServices successor = DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
@@ -126,8 +128,10 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       Thread scan = Thread.ofPlatform().start(() -> {
         try {
           deferred.ingestService().scanRoot(io.justsearch.ipc.ScanRootRequest.newBuilder()
-              .setRootPath(root.toString()).setCollection("docs").build(), progress -> {
+              .setRootPath(root.toString()).setRootAdded(true).setCollection("docs").build(), progress -> {
                 if (!progress.getComplete()) return;
+                assertEquals("", progress.getTerminalReasonCode(), "the scan must be admitted before handoff");
+                assertEquals(1, progress.getFilesAdmitted(), "the real queue accepted the scanned file");
                 scanAccepted.countDown();
                 try {
                   if (!finishScan.await(5, TimeUnit.SECONDS)) {
@@ -142,7 +146,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       });
       Thread handoff = null;
       try {
-        assertTrue(scanAccepted.await(2, TimeUnit.SECONDS), "Real queue scan did not start");
+        assertTrue(scanAccepted.await(2, TimeUnit.SECONDS), "Real queue scan did not start: " + scanFailure.get());
         handoff = Thread.ofPlatform().start(() -> {
           try (var prepared = deferred.prepareDeferredWatcherHandoffTo(successor)) {
             handoffPrepared.countDown();

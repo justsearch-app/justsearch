@@ -309,6 +309,7 @@ interface Building {
    * `''` when the record carries none (not rewritten, or a record written before it was persisted).
    */
   standaloneQuestion: string;
+  selectionKind?: string;
   noEvidence: boolean;
 }
 
@@ -379,6 +380,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     if (item.kind === 'user') {
       current = open(item.id, item.content, item.ts, true);
       current.declaredShapeId = declaredShapeOf(item);
+      if (typeof item.attributes.selectionKind === 'string') current.selectionKind = item.attributes.selectionKind;
       built.push(current);
       continue;
     }
@@ -557,6 +559,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       recordOpenedByUser: turn.openedByUser,
       kind: agent ? 'agent' : model ? 'model' : 'ask',
       shapeId: turn.declaredShapeId ?? undefined,
+      ...(turn.selectionKind === undefined ? {} : { selectionKind: turn.selectionKind }),
       question: turn.question,
       answer: turn.answers.join('\n\n'),
       // The same messages, kept apart: what a follow-up's context is built from (S2.0).
