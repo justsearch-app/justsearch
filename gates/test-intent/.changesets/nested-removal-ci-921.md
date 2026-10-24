@@ -78,3 +78,15 @@ author-session: codex-nested-removal-ci-921
 ```
 
 New check (kind: New, repaired contract): `EngineUndeclaredParentRemovalTest.undeclaredParentPreservesDeclaredChildAndRecordedJobs`. The owner decision above requires undeclared-parent removal to return zero and preserve the child declaration in memory and on disk, watcher registration, recorded queue state, and index contents. The check uses real Engine calls, SQLite admissions and a watcher registry, and asserts that no worker or index mutation is issued. This is an isolated new test file (exempt from the changed-existing-check gate), rather than an alteration of an existing oracle. On main 9c533e8e8 the identical new check fails with an assertion: undeclared-parent removal returns 3 instead of 0. It passes on the candidate (14 focused engine checks, zero failures and skips). Logs and JUnit XML are retained in the delivery evidence.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-nested-1",
+  "verdict": "accept",
+  "digest": "sha256:f5b793741d7330eeddec355b7d75d1bf5bcbd413eb8fe0eb2dfafa8ad296a3b0"
+}
+```
