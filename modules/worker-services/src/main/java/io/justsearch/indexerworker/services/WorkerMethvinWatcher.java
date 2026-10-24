@@ -462,7 +462,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
             currentEpoch.set(true);
             firstFailure.set(failedEpochs.put(normalized, watcherEpoch) != watcherEpoch);
             if (current.registration().rootIdentity().volume() != null
-                && java.nio.file.Files.notExists(normalized)) {
+                && rootUnavailable(normalized)) {
               unavailable.set(current.registration());
             }
           }
@@ -482,6 +482,15 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
                   "Worker watcher failed unexpectedly for " + normalized, failure));
     }
     return true;
+  }
+
+  private static boolean rootUnavailable(Path root) {
+    try {
+      var _ = RootIdentity.capture(root);
+      return false;
+    } catch (IOException unavailable) {
+      return true;
+    }
   }
 
   /**

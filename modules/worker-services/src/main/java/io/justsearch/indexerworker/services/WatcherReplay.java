@@ -106,6 +106,7 @@ public final class WatcherReplay implements AutoCloseable {
     // freshly matched registration while processing this attempt's captured source hashes.
     if (publisher != null) publisher.resumeReconciledWatcherRoot(debt);
     requireIdentity();
+    target.commitOps().maybeRefreshBlocking();
     for (var outcome : outcomes.entrySet()) {
       String path = outcome.getKey();
       String source = observe(path); // A reappearing source is admitted, never deleted.
@@ -148,7 +149,6 @@ public final class WatcherReplay implements AutoCloseable {
         throw new IOException("Watcher reconciliation lacks a committed path outcome: " + outcome.getKey());
       }
     }
-    requireIdentity();
     requireIdentity();
     committed = true;
     if (publisher != null) {

@@ -37,6 +37,25 @@ final class WatcherUnavailabilityScopeTest {
   }
 
   @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void inaccessibleRootWhoseAbsenceIsUnknownIsStillRootScoped() throws Exception {
+    try (var f = new Fixture()) {
+      var permissions = Files.getPosixFilePermissions(temporary);
+      Files.setPosixFilePermissions(temporary, java.util.Set.of());
+      try {
+        assertFalse(Files.notExists(f.root), "an inaccessible path does not prove absence");
+        assertTrue(f.watcher.handleWatcherException(f.root, f.witness.watcherEpoch(),
+            new IllegalStateException("native watch ended")));
+        assertTrue(f.runtimeCertain(), "an unreadable root must retain root-scoped uncertainty");
+        assertFalse(f.admission.replayCertain());
+        assertEquals(1, f.roots().size());
+      } finally {
+        Files.setPosixFilePermissions(temporary, permissions);
+      }
+    }
+  }
+
+  @Test
   void aNewerUnavailableIncarnationCannotBeClearedByAnOlderReconciliation() throws Exception {
     try (var f = new Fixture()) {
       Files.move(f.root, temporary.resolve("away"));

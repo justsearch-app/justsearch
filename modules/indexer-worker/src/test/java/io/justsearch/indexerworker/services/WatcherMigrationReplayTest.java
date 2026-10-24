@@ -181,6 +181,44 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"prefix-before", "collection-before", "prefix-after", "collection-after"})
+  void broadDeletesAndRootOutcomesKeepTheirAcceptedOrder(String order) throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.file("ordered.txt", "current bytes");
+      f.admit(file, "notes");
+      f.index(file, "notes");
+      boolean prefix = order.startsWith("prefix");
+      String payload = prefix ? io.justsearch.adapters.lucene.runtime.QueryFilterBuilder
+          .normalizePathPrefix(f.root.toString()) : "notes";
+      if (order.endsWith("after")) f.debt();
+      assertTrue(f.queue.putSwitchBufferForGeneration(f.generation,
+          (prefix ? "prefix:" : "collection:") + payload,
+          prefix ? "DELETE_PREFIX" : "DELETE_COLLECTION", payload));
+      if (order.endsWith("before")) f.debt();
+      var replay = f.prepare();
+      assertTrue(replay.isPresent(), "each root outcome must respect the broad receipt's position");
+      assertEquals(order.endsWith("before") ? "current bytes" : null, f.content(file));
+      assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay.orElseThrow()));
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
+    }
+  }
+
+  @Test
+  void committedPointerCannotBlindlyAcknowledgeRetainedRootDebt() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.file("returned.txt", "current bytes");
+      f.index(file, "notes");
+      f.debt();
+      var retained = f.queue.listSwitchBufferOpsStrict();
+      assertFalse(KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(f.queue, f.generation));
+      assertEquals(retained, f.queue.listSwitchBufferOpsStrict());
+      assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(f.context()));
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
+      assertEquals("current bytes", f.content(file));
+    }
+  }
+
   @Test
   void aRetryReprobesAReappearedSourceBeforeDestructiveReplay() throws Exception {
     try (var f = new Fixture()) {
@@ -205,6 +243,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     var manager = new IndexGenerationManager(base);
     String blue = manager.initializeOrLoad().state().active_generation();
     String green = manager.startMigration("watcher-crash").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
     Path target = manager.resolveGenerationPathStrict(green);
     Path database = temporary.resolve("crash.db");
     Path source = root.resolve("crash.txt");
@@ -236,7 +275,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     } finally {
       if (child.isAlive()) { child.destroyForcibly(); assertTrue(child.waitFor(10, TimeUnit.SECONDS)); }
     }
-    if (!cut.equals("after-pointer")) Files.writeString(source, "returned after process death");
+    Files.writeString(source, "returned after process death");
     try (var f = new Fixture(root, database, target, green)) {
       assertFalse(f.queue.listSwitchBufferOpsStrict().isEmpty(), "every cut precedes exact acknowledgement");
       if (cut.equals("after-pointer")) {
@@ -244,6 +283,8 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
         assertNull(f.content(source));
         assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(f.context()),
             "committed native boot must freshly reconcile retained root debt");
+        assertEquals("returned after process death", f.content(source));
+        assertEquals("notes", f.collection(source));
       } else {
         assertEquals(blue, manager.readStateBestEffort().active_generation());
         var prepared = f.prepare();
@@ -251,6 +292,9 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
         var replay = prepared.orElseThrow();
         assertEquals("returned after process death", f.content(source));
         assertEquals("notes", f.collection(source));
+        f.runtime.commitOps().commitWithBuildState(
+            io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BuildState.COMPLETE,
+            io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
         try (var promotion = manager.beginNativePromotion(blue, green)) { promotion.promote(); }
         assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay));
       }
@@ -339,7 +383,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
               index(job.path(), "notes");
               runtime.commitOps().commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.DRAIN);
               assertTrue(queue.markClaimDone(job, io.justsearch.indexerworker.ingest.IngestionOutcome.of(
-                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.INDEXED, "INDEXED",
+                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "INDEXED",
                   io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE), null));
             } catch (Exception failure) { throw new IllegalStateException(failure); }
           }
