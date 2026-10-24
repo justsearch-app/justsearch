@@ -22,5 +22,10 @@ final class NoOpMemoryStore implements MemoryStore {
   public void forget(String id) {}
 
   @Override
+  public ForgetResult forgetIf(String id, String revision) {
+    return new ForgetResult(false, null);
+  }
+
+  @Override
   public void clear() {}
 }

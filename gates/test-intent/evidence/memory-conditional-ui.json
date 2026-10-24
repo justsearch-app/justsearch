@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T12:22:08.322Z",
+  "revision": "95d3012f4e289bc795bdb08044bb4d9da2273077",
+  "tree": "354efb73d7fbfe789099bc5b00861efc1880d51c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.safety.test.ts\" \"src/shell-v0/views/MemorySurface.conditional.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/memory-forget/tmp/agent-tmp/test-intent-vitest-2335505-1792844521884.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2036
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f660db4bd1ed102b9afa6cec69f6529c23264827cf972c9094fcab19905310ba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 refuses repeated keydown activation of a Forget trigger",
+          "status": "passed"
+        },
+        {
+          "name": "F2 keeps a replacement after the memory changes its content",
+          "status": "passed"
+        },
+        {
+          "name": "F2 keeps a replacement after the memory changes its createdAt",
+          "status": "passed"
+        },
+        {
+          "name": "F2 does not delete an item that vanished during confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "F3 manual reconciliation announces and focuses its resolved outcome (present=false)",
+          "status": "passed"
+        },
+        {
+          "name": "F3 manual reconciliation announces and focuses its resolved outcome (present=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.conditional.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.conditional.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bcaeaa5dd98658141b6f7255806d319617714e76c8444bb0f42f24695aa54c82",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejects a row with invalid revision undefined without deleting",
+          "status": "passed"
+        },
+        {
+          "name": "rejects a row with invalid revision  without deleting",
+          "status": "passed"
+        },
+        {
+          "name": "rejects a row with invalid revision * without deleting",
+          "status": "passed"
+        },
+        {
+          "name": "rejects a row with invalid revision abc without deleting",
+          "status": "passed"
+        },
+        {
+          "name": "rejects a row with invalid revision W/\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\" without deleting",
+          "status": "passed"
+        },
+        {
+          "name": "sends the listed revision once and announces the actual removal result (true)",
+          "status": "passed"
+        },
+        {
+          "name": "sends the listed revision once and announces the actual removal result (false)",
+          "status": "passed"
+        },
+        {
+          "name": "keeps the 412 message with a readable re-read",
+          "status": "passed"
+        },
+        {
+          "name": "keeps the 412 message with a failed re-read",
+          "status": "passed"
+        },
+        {
+          "name": "keeps the 412 message with a locked re-read",
+          "status": "passed"
+        },
+        {
+          "name": "keeps the 412 message with a second replacement re-read",
+          "status": "passed"
+        },
+        {
+          "name": "does not announce a delayed 412 after navigation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "95d3012f4e",
+    "revision": "95d3012f4e289bc795bdb08044bb4d9da2273077",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.safety.test.ts\" \"src/shell-v0/views/MemorySurface.conditional.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/memory-forget/tmp/agent-tmp/test-intent-vitest-2335505-1792844527663.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 235,
+        "output": "\nnode:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/elias/dev/justsearch/.claude/worktrees/memory-forget/tmp/agent-tmp/test-intent-before-NS7HKN/modules/ui-web/node_modules/.bin/dist/cli.js' imported from /home/elias/dev/justsearch/.claude/worktrees/memory-forget/tmp/agent-tmp/test-intent-before-NS7HKN/modules/ui-web/node_modules/.bin/vitest\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)\n    at #resolve (node:internal/modules/esm/loader:687:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:607:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:276:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:381:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///home/elias/dev/justsearch/.claude/worktrees/memory-forget/tmp/agent-tmp/test-intent-before-NS7HKN/modules/ui-web/node_modules/.bin/dist/cli.js'\n}\n\nNode.js v24.22.0\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+        "classification": "environment",
+        "detail": "the check produced no result on the before-state"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.conditional.test.ts",
+        "classification": "environment",
+        "detail": "the check produced no result on the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:0a751b247b6d663beeaf08f8af07de985c1d30d36dd0f63e0619e2c34af389c5"
+}

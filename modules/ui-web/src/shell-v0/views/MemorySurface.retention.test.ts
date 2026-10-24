@@ -63,7 +63,7 @@ describe('MemorySurface retained navigation', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise));
     const surface = mount();
     await leaveAndReturn(surface);
-    fresh.resolve(response(200, { locked: false, memories: [{ id: 'fresh', kind: 'fact', content: 'current memory' }] }));
+    fresh.resolve(response(200, { locked: false, memories: [{ id: 'fresh', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'current memory' }] }));
     await settle(surface);
     expect(surface.shadowRoot?.textContent).toContain('current memory');
 
@@ -92,7 +92,7 @@ describe('MemorySurface retained navigation', () => {
     expect(control.querySelector('button')?.getAttribute('aria-disabled')).toBe('true');
     expect(control.querySelector('[role="tooltip"]')?.textContent).toContain('Loading memories');
 
-    fresh.resolve(response(200, { locked: false, memories: [{ id: 'fresh', kind: 'fact', content: 'fresh result' }] }));
+    fresh.resolve(response(200, { locked: false, memories: [{ id: 'fresh', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'fresh result' }] }));
     await settle(surface);
     expect(surface.shadowRoot?.textContent).toContain('fresh result');
     expect(surface.shadowRoot?.textContent).not.toContain('Loading memories');
@@ -112,7 +112,7 @@ describe('MemorySurface retained navigation', () => {
     await settle(surface);
     expect(surface.shadowRoot?.textContent).toContain('Memories are unavailable');
 
-    body.resolve({ memories: [{ id: 'stale', kind: 'fact', content: 'outdated memory' }], locked: false });
+    body.resolve({ memories: [{ id: 'stale', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'outdated memory' }], locked: false });
     await settle(surface);
     expect(surface.shadowRoot?.textContent).toContain('Memories are unavailable');
     expect(surface.shadowRoot?.textContent).not.toContain('outdated memory');
@@ -148,7 +148,7 @@ describe('MemorySurface retained navigation', () => {
     expect(surface.shadowRoot?.textContent).toContain('Loading memories');
     expect(surface.loadError).toBe('');
     expect(surface.shadowRoot?.textContent).not.toContain('Memories are unavailable');
-    finishReload(response(200, { locked: false, memories: [{ id: 'm1', kind: 'fact', content: 'recovered memory' }] }));
+    finishReload(response(200, { locked: false, memories: [{ id: 'm1', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'recovered memory' }] }));
     await settle(surface);
     expect(surface.loading).toBe(false);
     expect(surface.shadowRoot?.textContent).toContain('recovered memory');
@@ -173,7 +173,7 @@ describe('MemorySurface retained navigation', () => {
     await settle(surface);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(surface.loading).toBe(true);
-    finishReload(response(200, { locked: false, memories: [{ id: 'm2', kind: 'fact', content: 'fresh result' }] }));
+    finishReload(response(200, { locked: false, memories: [{ id: 'm2', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'fresh result' }] }));
     await settle(surface);
     expect(surface.loading).toBe(false);
     expect(surface.shadowRoot?.textContent).toContain('fresh result');
