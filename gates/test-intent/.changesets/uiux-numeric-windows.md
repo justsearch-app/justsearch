@@ -247,3 +247,14 @@ files. No frontend dependency tree was written.
   "note": "Expectations follow the plain-number decision and delegated NX4 sources. Fresh default-link evidence: all fourteen candidate checks pass; seven repairs assertion-fail on main, two normalization repairs assertion-fail on 631837df7 and pass on main. Independent Worker probes preserve 440 derived pairs and repair boundary/Unicode cases. This accepts test intent, not the final product verdict; exact identity of the aggregate-only 424-row artifact is unverified. Independence is a separate session within the available model family."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a16b94-ad03-7f12-a968-2f243f15b2a3",
+  "verdict": "accept",
+  "digest": "sha256:338719eb524f4240855859d57e226383162d0351cba8a769d5c0b0fdafb28a71",
+  "note": "Reviewed all three New entries against before-state tests and NX3/NX4 sources before the flagged diff. Expectations are warranted and existing oracles are not weakened. Fresh default-link evidence: fourteen candidate methods pass; seven boundary repairs assertion-fail on f1f173020; two normalization repairs assertion-fail on 631837df7. All five preservation methods and both normalization methods pass on known-good f1f173020 and candidate. Twenty-four additional unchanged Worker methods pass on supplied baseline and candidate, including multi-source reselection and mixed plain/nonplain claims. Independence is a separate session within the available Codex family. This accepts test intent; live Ask/Delegate and timing were not rerun. Explicit origin/main gate comparison independently exposes nine unrelated uncovered items."
+}
+```
