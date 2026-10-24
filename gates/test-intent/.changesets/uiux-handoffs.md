@@ -888,6 +888,134 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge an unscoped Summarize input failure is not a no-matching-files result"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Durable selection-owned Explain identity live, recorded and without a document; text cannot forge or remove provenance.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and selection-trust continuation",
+          "delegationScope": "WP1.3b hand-off framing and HO13/P2-4a repair, agent-adopted requirements under the design delegation.",
+          "choice": "Requirement: whether an answer is framed as a ranking explanation follows the request's selection (kind search-trace), never the composer wording. The Explain frame, the subject card and the caption must survive any edit of the text and a reload. Nothing may claim document grounding for a trace-only request.\nRequirement: a file hand-off whose file no longer exists on disk at send time refuses visibly, keeps the prepared text, and dispatches nothing that reads the file's indexed content. Do the least that holds: check existence where the hand-off's file selection is resolved, if that is one place. Do not change index retention or search results; say if the only fix would.\nRe-run all HO and HN checks for preservation, plus Explain edited in other ways: emptied, shortened, a different question.\nChecks use their own temporary resources: never use another session's running service or write into a dependency tree other checkouts use.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-selection-frontend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'inline trace'",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'shortened'",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'different question'",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'empty record question'",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 a document summary cannot acquire Explain framing by editing its question",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 legacy trace subject remains Explain without consulting editable words",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 a trace with no document identity remains trace-only after reload",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'inline trace'",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'shortened'",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'different question'"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Durable preservation: emptying a prepared Explain never dispatches and retains its selection. Untyped, source-free legacy turns do not acquire a document-search claim when removing text-derived identity.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and selection-trust continuation",
+          "delegationScope": "WP1.3b hand-off framing and HO13/P2-4a repair, agent-adopted requirements under the design delegation.",
+          "choice": "Requirement: whether an answer is framed as a ranking explanation follows the request's selection (kind search-trace), never the composer wording. The Explain frame, the subject card and the caption must survive any edit of the text and a reload. Nothing may claim document grounding for a trace-only request.\nRequirement: a file hand-off whose file no longer exists on disk at send time refuses visibly, keeps the prepared text, and dispatches nothing that reads the file's indexed content. Do the least that holds: check existence where the hand-off's file selection is resolved, if that is one place. Do not change index retention or search results; say if the only fix would.\nRe-run all HO and HN checks for preservation, plus Explain edited in other ways: emptied, shortened, a different question.\nChecks use their own temporary resources: never use another session's running service or write into a dependency tree other checkouts use.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-selection-frontend-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'emptied'",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 untyped legacy traces without a subject never acquire a document-search claim"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Durable request identity persistence and read-time projection, and refusal before any index-content read for deleted selected files.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and selection-trust continuation",
+          "delegationScope": "WP1.3b hand-off framing and HO13/P2-4a repair, agent-adopted requirements under the design delegation.",
+          "choice": "Requirement: whether an answer is framed as a ranking explanation follows the request's selection (kind search-trace), never the composer wording. The Explain frame, the subject card and the caption must survive any edit of the text and a reload. Nothing may claim document grounding for a trace-only request.\nRequirement: a file hand-off whose file no longer exists on disk at send time refuses visibly, keeps the prepared text, and dispatches nothing that reads the file's indexed content. Do the least that holds: check existence where the hand-off's file selection is resolved, if that is one place. Do not change index retention or search results; say if the only fix would.\nRe-run all HO and HN checks for preservation, plus Explain edited in other ways: emptied, shortened, a different question.\nChecks use their own temporary resources: never use another session's running service or write into a dependency tree other checkouts use.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-selection-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#explainTraceSourceAndPreparedTextSurviveStoreReopen",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java#deletedIndexedFileIsRefusedBeforeFetching",
+        "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedSelectionIdentityReachesTheThreadResponse"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Durable preservation: existing local files still resolve for Ask and Summarize.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and selection-trust continuation",
+          "delegationScope": "WP1.3b hand-off framing and HO13/P2-4a repair, agent-adopted requirements under the design delegation.",
+          "choice": "Requirement: whether an answer is framed as a ranking explanation follows the request's selection (kind search-trace), never the composer wording. The Explain frame, the subject card and the caption must survive any edit of the text and a reload. Nothing may claim document grounding for a trace-only request.\nRequirement: a file hand-off whose file no longer exists on disk at send time refuses visibly, keeps the prepared text, and dispatches nothing that reads the file's indexed content. Do the least that holds: check existence where the hand-off's file selection is resolved, if that is one place. Do not change index retention or search results; say if the only fix would.\nRe-run all HO and HN checks for preservation, plus Explain edited in other ways: emptied, shortened, a different question.\nChecks use their own temporary resources: never use another session's running service or write into a dependency tree other checkouts use.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-selection-java-preservation.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SummarizeHandoffTest.java#presentIndexedFileStillResolves"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorLiteralTextTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: replace fictional absolute file paths with real per-test @TempDir files, preserving the content, literal verification, budget and citation oracles. The missing-file fixture remains absent.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement and selection-trust continuation",
+          "delegationScope": "WP1.3b hand-off framing and HO13/P2-4a repair, agent-adopted requirements under the design delegation.",
+          "choice": "Requirement: whether an answer is framed as a ranking explanation follows the request's selection (kind search-trace), never the composer wording. The Explain frame, the subject card and the caption must survive any edit of the text and a reload. Nothing may claim document grounding for a trace-only request.\nRequirement: a file hand-off whose file no longer exists on disk at send time refuses visibly, keeps the prepared text, and dispatches nothing that reads the file's indexed content. Do the least that holds: check existence where the hand-off's file selection is resolved, if that is one place. Do not change index retention or search results; say if the only fix would.\nRe-run all HO and HN checks for preservation, plus Explain edited in other ways: emptied, shortened, a different question.\nChecks use their own temporary resources: never use another session's running service or write into a dependency tree other checkouts use.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-handoffs-selection-fixture-preservation.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorLiteralTextTest.java"
+      ],
+      "repaired": false
     }
   ]
 }

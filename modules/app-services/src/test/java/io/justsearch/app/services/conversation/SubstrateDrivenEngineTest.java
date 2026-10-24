@@ -78,6 +78,7 @@ final class SubstrateDrivenEngineTest {
     assertTrue(source.isPresent(), "Explain must list its hit document as a source live");
     var history = new FileConversationStore(retrievalStoreDir).loadHistory("trace-record");
     assertEquals(prompt, history.getFirst().get("content"), "the exact trace stays inspectable in the user turn");
+    assertEquals("search-trace", history.getFirst().get("selectionKind"), "selection identity must survive independently of editable words");
     assertEquals("The sparse rank is two.", history.getLast().get("content"));
     var citations = (List<?>) history.getLast().get("citations");
     assertNotNull(citations, "Explain sources must survive reopening the store");

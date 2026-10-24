@@ -396,11 +396,14 @@ export function sv3AnswerFrame(turn: Sv3Turn): AnswerFrame | null {
   );
 }
 
-/** The existing prepared-text context label is saved with the user turn, including after edits.
- * It describes a ranking trace, not document content; no additional record field is needed.
+/** The request selection owns Explain's identity. Older records can identify their subject
+ * citation (which deliberately contains no document passage), but never their editable wording.
  */
 export function sv3ExplainsRankingTrace(turn: Sv3Turn | null): boolean {
-  return turn?.shapeId === 'core.summarize' && turn.question.includes('\n\nRanking trace:\n');
+  if (turn?.shapeId !== 'core.summarize') return false;
+  if (turn.selectionKind !== undefined) return turn.selectionKind === 'search-trace';
+  return turn.evidence?.sources.some(source => source.chunkIndex === -1
+    && source.startChar === 0 && source.endChar === 0 && source.excerpt === '') ?? false;
 }
 
 export function projectSv3AnswerFrame(
@@ -423,6 +426,12 @@ export function projectSv3AnswerFrame(
         : 'Explains the ranking trace',
       elaboration: '', tail,
     };
+  }
+  // Older source-free summaries did not record their input kind. Do not turn that missing
+  // provenance into a claim that documents were searched, or infer it from editable prose.
+  if (turn.shapeId === 'core.summarize' && turn.selectionKind === undefined
+      && turn.evidence !== null && turn.evidence.sources.length === 0) {
+    return tail === '' ? null : { verdict: null, elaboration: '', tail };
   }
   const frame = sv3AnswerFrame(turn);
   if (frame === null) {

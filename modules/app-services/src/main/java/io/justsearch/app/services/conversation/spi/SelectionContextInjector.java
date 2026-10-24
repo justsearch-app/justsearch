@@ -208,6 +208,7 @@ public final class SelectionContextInjector implements ContextInjector {
   }
 
   private boolean readableDocument(ConversationContext ctx, String docId) {
+    if (localFileUnavailable(docId)) return false;
     try {
       var slice = documents.fetchSlice(docId, 0, 1, ctx.engineContext())
           .toCompletableFuture().get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -667,8 +668,21 @@ public final class SelectionContextInjector implements ContextInjector {
     return new SseEvent("rag.citations", Map.of("citations", List.of(citationMap)));
   }
 
+  /** File hand-offs must not read retained index text after their local file disappears.
+   * Relative/opaque document identities still belong to DocumentService; real file IDs are absolute.
+   */
+  private static boolean localFileUnavailable(String docId) {
+    if (docId == null || docId.isBlank()) return true;
+    try {
+      var path = java.nio.file.Path.of(docId);
+      return path.isAbsolute() && (!java.nio.file.Files.isRegularFile(path) || !java.nio.file.Files.isReadable(path));
+    } catch (java.nio.file.InvalidPathException | SecurityException e) {
+      return true;
+    }
+  }
+
   private String fetchDocContent(String docId, EngineContext engineContext) {
-    if (docId == null || docId.isBlank()) return null;
+    if (localFileUnavailable(docId)) return null;
     try {
       DocumentRecord record =
           documents

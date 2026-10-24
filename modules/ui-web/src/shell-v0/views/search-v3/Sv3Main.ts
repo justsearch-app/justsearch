@@ -2115,7 +2115,7 @@ export class Sv3Main extends JfElement {
    * rather than a pencil that would fork the wrong conversation or 404.
    */
   private question(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.question === '') return nothing;
+    if (turn.question === '') return sv3ExplainsRankingTrace(turn) ? this.scopeLine(turn) : nothing;
     if (this.editingTurnId === turn.id) return this.questionEditor(turn);
     const canEdit = sv3LineageFor(this.turnLineage, turn.id)?.canEdit === true;
     return html`<div class="ask">

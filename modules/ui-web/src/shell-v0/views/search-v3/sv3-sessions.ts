@@ -131,6 +131,8 @@ export type Sv3TurnReasoning = ReasoningBlock;
 export interface Sv3Turn {
   /** The dispatch shape, shared with the canonical record. */
   readonly shapeId?: string;
+  /** Selection identity from the request, independent of editable instructions. */
+  readonly selectionKind?: string;
   /**
    * The turn's STABLE handle, minted once when the turn is opened and never rewritten. Every piece
    * of UI state about a turn is keyed on it — `Sv3Main`'s `expandedSources` and `copiedTurnId`, the
@@ -497,13 +499,14 @@ export function submitInSession(
   /** The store-minted conversation id, used only when this submit OPENS a conversation. */
   newId: string,
   shapeId?: string,
+  selectionKind?: string,
 ): Sv3SessionList {
   const text = question.trim();
   if (text === '') return list;
   const active = list.activeId === null ? null : sessionById(list, list.activeId);
   if (active === null) {
     const opened = openSession(newId, text, now, kind, now);
-    const created = { ...opened, turns: opened.turns.map(turn => ({ ...turn, shapeId })) };
+    const created = { ...opened, turns: opened.turns.map(turn => ({ ...turn, shapeId, ...(selectionKind === undefined ? {} : { selectionKind }) })) };
     return {
       sessions: [created, ...list.sessions],
       activeId: created.id,
@@ -515,7 +518,7 @@ export function submitInSession(
       session.id === active.id
         ? {
             ...session,
-            turns: [...session.turns, { ...openTurn(session.id, session.turns.length, text, now, kind), shapeId }],
+            turns: [...session.turns, { ...openTurn(session.id, session.turns.length, text, now, kind), shapeId, ...(selectionKind === undefined ? {} : { selectionKind }) }],
             updatedAt: now,
             // Asking in a conversation IS visiting it, so a follow-up cannot leave the session
             // holding an unread bit against a reader who is sitting in it.
@@ -1056,6 +1059,7 @@ export function applySv3Record(
       // opens such a turn — keeps the reader's own prompt, and a record turn a user item DID open is
       // authoritative even when the two strings differ (an edited or re-asked prompt).
       question: recorded.recordOpenedByUser ? recorded.question : prior.question,
+      selectionKind: recorded.selectionKind ?? prior.selectionKind,
       evidence: reconcileEvidence(prior.evidence, recorded.evidence),
       status: prior.status === 'halted' ? 'halted' : recorded.status,
       detail: prior.status === 'halted' ? prior.detail : recorded.detail,

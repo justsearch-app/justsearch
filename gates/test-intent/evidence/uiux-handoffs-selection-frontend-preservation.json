@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T00:13:56.084Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "f6a086db432e54b22d903b454e37ba0a7690749a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3766478-1792800829853.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6229
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'emptied'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'emptied'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 untyped legacy traces without a subject never acquire a document-search claim",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 untyped legacy traces without a subject never acquire a document-search claim",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4c7d2e3ccab07178667451bda5a035639366a245141161e2a2ff04d80d66e734"
+}

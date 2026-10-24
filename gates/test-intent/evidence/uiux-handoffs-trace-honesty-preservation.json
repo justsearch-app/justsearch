@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:06:03.776Z",
-  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
-  "tree": "362494d30d27c0b0f9b1113406a7ded723bbab78",
+  "createdAt": "2026-10-23T23:32:53.936Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "e3ee6d2b555a5410e8c4eecd6db2a554593cb9e1",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/racowdwl/tmp/test-intent-vitest-716393-1792785961849.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3257516-1792798370182.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1927
+      "durationMs": 3753
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts#HO5 document summaries and ordinary citations keep their existing presentation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.explainHonesty.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8e4b473338fe6eb404ac9f8b107d3eb1d28154548d49b66c150803cec5213fcf",
+      "contentDigest": "sha256:3e89ceab69c7efea98154889015b5e86700a559710e12f36dd2e1093f32954b0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:b5ecfbbeb99b080faf980b23d833342570eaee69bf5a832232de5af4857b184d"
+  "digest": "sha256:f3a2d283d3d37d45b8dd2eceda8bd8c24dfa5c9126b469a38c0d99f53292a74c"
 }

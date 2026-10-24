@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:26:30.700Z",
-  "revision": "1573b367b21a217facca0517d5153a1b325e7865",
-  "tree": "5ed4d993513221a262c501736ea7b4ae97ddcd45",
+  "createdAt": "2026-10-23T23:41:34.295Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "5299d2f639e3297bc41201404741e64c15eebb14",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-905817-1792787186844.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3385233-1792798890018.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3855
+      "durationMs": 4276
     }
   ],
   "checks": [
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10b5990fd6fce9541ee8002ebe439b8ef37d4d9db35866d7ab8c89148364aa5f",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge an unscoped Summarize input failure is not a no-matching-files result",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10b5990fd6fce9541ee8002ebe439b8ef37d4d9db35866d7ab8c89148364aa5f",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -72,5 +72,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:f2f4067ecd83c5bdd031a758611aa6179f12e3afbe24a748a76c6e1a0c3bc1a2"
+  "digest": "sha256:250e282dc3fe4c3d9e860a2d87dd90c2e5f88d3a4c04cca452835deae68e544c"
 }

@@ -28,6 +28,36 @@ import org.junit.jupiter.api.Test;
 
 final class SummarizeHandoffTest {
   @Test
+  void presentIndexedFileStillResolves(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    var path = java.nio.file.Files.writeString(dir.resolve("present.md"), "current file");
+    for (String shape : List.of("core.rag-ask", "core.summarize")) {
+      var docs = new StubDocs(Map.of(path.toString(), new DocumentRecord(path.toString(), "current file", Map.of())));
+      var result = new SelectionContextInjector(docs).inject(ctx(shape, Map.of("prompt", "Read this file", "selection",
+          Map.of("kind", "result-set", "items", List.of(Map.of("id", path.toString(), "kind", "doc"))))));
+      assertTrue(result.terminalError().isEmpty(), "an existing selected file must keep working");
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "deletedIndexedFileIsRefusedBeforeFetching({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"core.rag-ask", "core.summarize"})
+  void deletedIndexedFileIsRefusedBeforeFetching(String shape, @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    var path = java.nio.file.Files.writeString(dir.resolve("chosen.md"), "DELETED-PRIVATE-RELIC-917");
+    var reads = new AtomicInteger();
+    DocumentService cached = new DocumentService() {
+      @Override
+      public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
+        reads.incrementAndGet();
+        return CompletableFuture.completedFuture(new DocumentRecord(docId, "DELETED-PRIVATE-RELIC-917", Map.of()));
+      }
+    };
+    java.nio.file.Files.delete(path);
+    var result = new SelectionContextInjector(cached).inject(ctx(shape, Map.of("prompt", "Read this file", "selection",
+        Map.of("kind", "result-set", "items", List.of(Map.of("id", path.toString(), "kind", "doc"))))));
+    assertTrue(result.terminalError().isPresent(), "a deleted selected file must refuse even when its index still has content");
+    assertEquals(0, reads.get(), "a deleted file must not read cached index content");
+  }
+
+  @Test
   void unreadableAskSelectionIsRefused() {
     var result = new SelectionContextInjector(new StubDocs(Map.of())).inject(ctx("core.rag-ask", Map.of(
         "question", "What is in this file?", "selection", Map.of("kind", "result-set", "items", List.of(Map.of("id", "deleted.md", "kind", "doc"))))));

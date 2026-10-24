@@ -11,7 +11,7 @@ import type { Sv3Turn } from './sv3-sessions.js';
 
 const explain = (): Sv3Turn => ({
   id: 'explain', recordId: null, assistantRecordId: null, recordOpenedByUser: true,
-  kind: 'ask', shapeId: 'core.summarize', status: 'complete',
+  kind: 'ask', shapeId: 'core.summarize', selectionKind: 'search-trace', status: 'complete',
   question: 'Explain why this result ("chosen-orchard.md") ranked where it did.\n\nRanking trace:\nsparse:4.09 → fusion:1',
   answer: 'The trace reports sparse retrieval followed by fusion.', evidence: {
     sources: [{parentDocId: '/docs/chosen-orchard.md', chunkIndex: -1, startLine: 1, endLine: 1,
@@ -62,7 +62,7 @@ it('HO5 Explain subject pane makes no cited or retrieved claim', () => {
 
 it('HO5 document summaries and ordinary citations keep their existing presentation', async () => {
   await loadHighlighter();
-  const summary = {...explain(), question: 'Summarize chosen-orchard.md'};
+  const summary = {...explain(), selectionKind: 'item', question: 'Summarize chosen-orchard.md'};
   expect(projectSv3AnswerFrame(summary, null, false)?.verdict).toBe('Based on your documents');
   expect(sv3CitationHeader(summary, 0, null)?.turnLabel).toBe('Summarize chosen-orchard.md');
   const main = document.createElement('jf-sv3-main') as Sv3Main;

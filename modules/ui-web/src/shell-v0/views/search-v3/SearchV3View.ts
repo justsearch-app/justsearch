@@ -3377,7 +3377,7 @@ export class SearchV3View extends JfElement {
       this.handoffNotice = ''; this.handoffBlocked = false;
     }
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId);
+    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId, handoff?.selection?.kind);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });

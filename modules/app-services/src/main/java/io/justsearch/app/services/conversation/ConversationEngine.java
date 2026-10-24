@@ -1502,6 +1502,11 @@ public final class ConversationEngine {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("role", "user");
     m.put("content", text == null ? "" : text);
+    // Preserve the request's input identity without making editable prose a provenance flag.
+    if (body.get("selection") instanceof Map<?, ?> selection
+        && selection.get("kind") instanceof String kind && !kind.isBlank()) {
+      m.put("selectionKind", kind);
+    }
     return m;
   }
 

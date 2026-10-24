@@ -235,7 +235,7 @@ function savedBackend(historyOverrides: Record<string, unknown> = {}, question =
     if (href.includes('/api/thread/')) return reply({ conversationId: 'saved', events: href.endsWith('/saved')
       ? messages.map((m, i) => ({ id: m.id, occurredAt: `2026-08-19T10:00:0${i}Z`,
           kind: i === 0 ? 'USER_MESSAGE' : 'ASSISTANT_MESSAGE', originator: m.role,
-          content: m.content, attributes: { shapeId: m.shapeId } })) : [] });
+          content: m.content, attributes: { shapeId: m.shapeId, ...(question === savedExplainQuestion ? {selectionKind:'search-trace'} : {}) } })) : [] });
     if (href.endsWith('/api/chat/conversations') || href.includes('/api/chat/conversations?')) return reply({ sessions: [{ sessionId: 'saved',
       createdAtMs: 1, lastActiveAtMs: 2, messageCount: 2, firstUserMessage: question, shapeId: 'core.summarize' }] });
     return previous(url, init);
@@ -507,4 +507,20 @@ it('merge an unscoped Summarize input failure is not a no-matching-files result'
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
   expect(q(main, 'sv3-no-evidence')).toBeNull();expect(q(main, 'sv3-answer-without-files')).toBeNull();
   expect(q(main, 'sv3-turn')?.getAttribute('data-status')).toBe('failed');
+});
+
+it.each([{label:'inline trace',instruction:'Explain in one sentence. Trace: sparse #2 12.40'},{label:'shortened',instruction:'Briefly.'},{label:'different question',instruction:'Why did this rank first?'},{label:'emptied',instruction:''}])('HO5 edited Explain keeps selection identity before send: $label', async ({instruction}) => {
+  const selection = {kind: 'search-trace' as const, scope: 'hit' as const, summary: 'sparse #2 12.40', docId: 'docs/a.md'};
+  setPendingSelection(selection);setPendingForceShape('core.summarize');
+  await navigate({query:'Explain this result.\n\nRanking trace:\nsparse #2 12.40',forceShapeId:'core.summarize',docIds:[]});
+  const view=await mount();const c=await composer(view);const input=q<HTMLTextAreaElement>(c,'sv3-composer-input')!;
+  input.value=instruction;input.dispatchEvent(new Event('input',{bubbles:true,composed:true}));await drain(view);
+  if(instruction==='') {
+    q<HTMLButtonElement>(c,'sv3-composer-send')!.click();await drain(view);
+    expect(dispatches()).toHaveLength(0);expect((view as unknown as {preparedHandoff:{selection:unknown}}).preparedHandoff.selection).toEqual(selection);
+  } else {
+    const body=await send(view);expect(body).toMatchObject({shapeId:'core.summarize',selection});
+    const main=view.shadowRoot!.querySelector('jf-sv3-main') as HTMLElement & {turns: readonly {selectionKind?:string}[]};
+    expect(main.turns[0]?.selectionKind).toBe('search-trace');
+  }
 });
