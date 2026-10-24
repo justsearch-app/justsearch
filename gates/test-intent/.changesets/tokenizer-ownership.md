@@ -297,3 +297,13 @@ their own server, executors, temporary indexes and profiles. Shared resources to
 and GPU 0 for real-model device initialization; no running application or dev stack is used.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16c4a-9299-71e0-95c2-83cef8157c1d",
+  "verdict": "accept",
+  "digest": "sha256:3958e2de710918570021f9b4e77ca82c744af93e61db730a0fdef1a6db0516f8"
+}
+```
