@@ -48,3 +48,14 @@ capture its own WARN. The independent verifier supplies acceptance after checkin
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-analyzer-1",
+  "verdict": "accept",
+  "digest": "sha256:0d7b09fec40eb1be7a64f4d03e5039f2e260ec31b1923bf0a3b95c419beaefe3",
+  "note": "L1-L4 independently verified at 15bf78b5c8 against 2461a585f0; tmp/verify-analyzer-evidence contains scripts, fail-before assertions, full-suite XML, output comparison and timing."
+}
+```
