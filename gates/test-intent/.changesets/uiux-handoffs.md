@@ -1045,3 +1045,14 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
   "note": "Reviewed agreed delegated-choice scenarios and before-state tests before production diff. Default-link scratch evidence independently executed: 64 frontend and 22 JVM expectations pass; 10 frontend and 3 JVM repair checks assertion-fail on f25592889 and pass this candidate. Real CPU-model/Shell/Chromium checks reproduce edited-trace misframing and deleted-file disclosure before and verify repaired behavior after. Temporary readable-file fixtures preserve prior literal-content, citation and budget oracles. Latest selection-kind requirement supersedes historical text-derived/no-new-field wording. Acceptance concerns test intent; pre-existing runtime and exact-main rendering differences are reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "52nqoepx",
+  "verdict": "accept",
+  "digest": "sha256:fe00fa2ccf3e9b01303327a706fb96c6d378ca6418c38f72d7a009329a33cd0a",
+  "note": "Accept the post-merge Adaptation only, under the package's prior accepted intent. The three fixture registrations change no assertions, expectations, inputs or injected faults. NoEvidenceDispatchHttpTest fails before on unregistered core.selection and all five cases pass after; both persistence fixtures already pass before and after (ten tests). Production assembly is unchanged and real CPU Engine Ask, no-match Ask and BAD_SELECTION checks pass on both revisions. No hand-off scenarios were re-judged."
+}
+```
