@@ -1679,3 +1679,14 @@ Round15 adds native live-lock identity to the same O10 health proof. The only ne
   "note": "I10 fails because the writer canary passes after the live native write lock disappears, despite real writes failing on that infrastructure state."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16b95-8c52-7451-8033-a16d0814c6b3",
+  "verdict": "reject",
+  "digest": "sha256:1d50c03c95cfb58e9a912bddbf9f39e58faec2c7fe466aaceffbd5559b6951fc",
+  "note": "Reject entry 15 and I10/U17 because shared stored text-field schema passes the canary yet charges healthy files and gives minute-scale retries."
+}
+```
