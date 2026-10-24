@@ -1022,3 +1022,14 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-5-4scz2v7l",
+  "verdict": "accept",
+  "digest": "sha256:f14f5c8c424885c85726685ee43f0ca972daacdbe9269a51d2b438971b9c9227",
+  "note": "Reviewed agreed delegated-choice scenarios and before-state tests before production diff. Default-link scratch evidence independently executed: 64 frontend and 22 JVM expectations pass; 10 frontend and 3 JVM repair checks assertion-fail on f25592889 and pass this candidate. Real CPU-model/Shell/Chromium checks reproduce edited-trace misframing and deleted-file disclosure before and verify repaired behavior after. Temporary readable-file fixtures preserve prior literal-content, citation and budget oracles. Latest selection-kind requirement supersedes historical text-derived/no-new-field wording. Acceptance concerns test intent; pre-existing runtime and exact-main rendering differences are reported separately."
+}
+```
