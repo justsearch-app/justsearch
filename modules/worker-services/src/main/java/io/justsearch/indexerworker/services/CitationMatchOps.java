@@ -223,11 +223,6 @@ final class CitationMatchOps {
 
     CrossEncoderProducer crossEncoder = availableCrossEncoder();
     CitationScorer scorer = getCitationScorer();
-    if (crossEncoder != null && scorer != null) {
-      // Carry code-vs-reference metadata to the real scorer; model input / stored keys stay plain.
-      crossEncoder = (_, passages, ids, cutoff, budget, request) ->
-          scorer.scoreClaims(claims, passages, ids, cutoff, budget, request);
-    }
     if (crossEncoder == null && !switch (embeddingProvider.availability().state()) {
       case READY -> true;
       case STARTING, ABSENT, FAILED -> false;
@@ -259,6 +254,12 @@ final class CitationMatchOps {
           prepared.windowsConsidered(),
           sentenceList.size(),
           deadlineMs);
+    }
+
+    if (crossEncoder != null && scorer != null) {
+      // Both producers consume numeric spans from the same admitted window preparation.
+      crossEncoder = (_, passages, ids, cutoff, budget, request) ->
+          scorer.scoreClaims(claims, passages, ids, cutoff, budget, request, prepared.numericWindows());
     }
 
     if (crossEncoder != null) {
@@ -327,7 +328,7 @@ final class CitationMatchOps {
         windowVectors.add(embeddingProvider.embedDocument(window, acquisition));
       }
 
-      NumericConsistency numeric = new NumericConsistency(claims, windows);
+      NumericConsistency numeric = NumericConsistency.forWindows(claims, prepared.numericWindows());
       List<CitationMatchEntry> matches = new ArrayList<>();
       int sentencesMatched = 0;
       int sentencesScored = 0;
