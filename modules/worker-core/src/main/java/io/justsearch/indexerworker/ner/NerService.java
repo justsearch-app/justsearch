@@ -249,8 +249,12 @@ public final class NerService implements Closeable {
   public synchronized void close() {
     if (cleanupComplete) return;
     closed.set(true);
-    if (ownedAssembly != null) ownedAssembly.close();
-    if (inference != null) inference.close();
-    cleanupComplete = true;
+    try {
+      if (ownedAssembly != null && !ownedAssembly.tryClose()) return;
+      if (inference != null) inference.close();
+      cleanupComplete = true;
+    } catch (Exception e) {
+      log.debug("NER inference close failed (non-fatal)", e);
+    }
   }
 }

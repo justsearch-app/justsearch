@@ -455,8 +455,9 @@ public final class CitationScorer implements Closeable {
   @Override
   public void close() {
     closed = true;
-    if (ownedAssembly != null) ownedAssembly.close();
-    else sessions.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
     log.info("CitationScorer closed.");
   }
 

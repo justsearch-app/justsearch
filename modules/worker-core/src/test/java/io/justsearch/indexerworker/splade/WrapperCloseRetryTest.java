@@ -60,9 +60,9 @@ class WrapperCloseRetryTest {
           tokenizer, null, null), NerConfig.DISABLED);
       default -> throw new AssertionError(role);
     }
-    // NER used to swallow the failure and mark itself closed; the retry still must release.
+    // NER keeps its non-fatal close contract and retains the owner for a retry.
     if (role.equals("ner")) {
-      try { wrapper.close(); } catch (IllegalStateException expected) { /* retained for retry */ }
+      assertDoesNotThrow(wrapper::close);
     } else {
       assertThrows(IllegalStateException.class, wrapper::close);
     }
@@ -78,7 +78,7 @@ class WrapperCloseRetryTest {
     org.mockito.Mockito.doThrow(new io.justsearch.aibackend.backend.BackendException("close refused"))
         .doAnswer(ignored -> { tokenizer.close(); return null; }).when(backend).close();
     var service = EmbeddingService.createWithBackend(backend, embeddingConfig());
-    assertThrows(IllegalStateException.class, service::close);
+    assertDoesNotThrow(service::close);
     assertFalse(service.isAvailable());
     assertDoesNotThrow(service::close);
     assertDoesNotThrow(service::close);

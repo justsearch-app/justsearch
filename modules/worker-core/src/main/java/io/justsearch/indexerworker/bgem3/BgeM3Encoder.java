@@ -461,8 +461,9 @@ public class BgeM3Encoder implements AutoCloseable {
 
   @Override
   public void close() {
-    if (ownedAssembly != null) ownedAssembly.close();
-    else sessions.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
   }
 
   // ==================== Utility methods ====================

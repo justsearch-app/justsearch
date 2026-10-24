@@ -525,7 +525,8 @@ public final class BertNerInference implements Closeable {
 
   @Override
   public void close() {
-    if (ownedAssembly != null) ownedAssembly.close();
-    else sessions.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
   }
 }

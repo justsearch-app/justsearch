@@ -763,17 +763,22 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
     if (!cleanupComplete) {
       closed.set(true);
       log.info("Closing EmbeddingService...");
+      boolean backendClosed = true;
       if (backend != null) {
         try {
           backend.close();
         } catch (BackendException e) {
-          throw new IllegalStateException("Error closing embedding backend", e);
+          log.warn("Error closing embedding backend: {}", e.getMessage());
+          backendClosed = false;
         }
-        backend = null;
+        if (backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+            && !onnx.encoder().isCloseComplete()) backendClosed = false;
       }
-      // Clear embedding cache to release memory
+      // Clear after downstream cleanup so admitted work cannot refill the completed cache.
       embeddingCache.clear();
       available = false;
+      if (!backendClosed) return;
+      backend = null;
       cleanupComplete = true;
       log.info("EmbeddingService closed.");
     }

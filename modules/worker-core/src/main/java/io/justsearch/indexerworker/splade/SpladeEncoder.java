@@ -1350,8 +1350,9 @@ public final class SpladeEncoder implements Closeable {
       }
     }
     closePinnedOutput();
-    if (ownedAssembly != null) ownedAssembly.close();
-    else sessions.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
     cleanupComplete = true;
     log.info("SpladeEncoder closed");
   }

@@ -1260,10 +1260,17 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     return LongBuffer.wrap(flat);
   }
 
+  /** Whether close has finished, so a containing service can retain an incomplete owner. */
+  public boolean isCloseComplete() {
+    return ownedAssembly != null ? ownedAssembly.tokenizerClosed()
+        : sessions == null || sessions.retirementStatus() == SessionHandle.RetirementStatus.RETIRED;
+  }
+
   @Override
   public void close() {
-    if (ownedAssembly != null) ownedAssembly.close();
-    else sessions.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
     log.info("OnnxEmbeddingEncoder closed");
   }
 
