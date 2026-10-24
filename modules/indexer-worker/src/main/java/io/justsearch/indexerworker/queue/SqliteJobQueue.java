@@ -1319,7 +1319,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         int accepted = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false, null);
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null);
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
@@ -1376,8 +1376,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String generation, String path, String sourceSha256, String sourceCollection)
       throws SQLException {
     List<String> deletedCollections = new ArrayList<>();
-    String collection = sourceCollection;
-    boolean collectionKnown = sourceCollection != null;
     try (PreparedStatement query = connection.prepareStatement(
         "SELECT key, op, payload FROM switch_buffer WHERE generation = ? "
             + "AND (key = ? OR op IN ('DELETE_PREFIX', 'DELETE_COLLECTION'))")) {
@@ -1400,33 +1398,28 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
             if (!"UPSERT".equals(op)) return true;
             var prior = SwitchBufferUpsert.decode(payload);
+            if (prior.sourceSha256() != null && !prior.sourceSha256().equals(sourceSha256)) {
+              // Hashing the batch precedes the admission lock. A foreground writer may have
+              // accepted newer bytes in that interval. Only replace a stale receipt when the
+              // enumerator still witnesses the current source; otherwise retain the accepted work.
+              try {
+                if (!sourceSha256.equals(
+                    io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path)))) return true;
+              } catch (IOException unreadable) {
+                throw new SQLException("Cannot establish current enumeration source", unreadable);
+              }
+            }
             if ((prior.provenance() == null
                 || !"MIGRATION_ENUMERATOR".equals(prior.provenance().transport()))
                 && (prior.sourceSha256() == null
-                    || prior.sourceSha256().equals(sourceSha256))) return true;
-            collection = prior.collection();
-            collectionKnown = true;
+                    || (prior.sourceSha256().equals(sourceSha256)
+                        && Objects.equals(prior.collection(), sourceCollection)))) return true;
           }
         }
       }
     }
-    if (deletedCollections.isEmpty()) return false;
-    if (!collectionKnown) {
-      try (PreparedStatement query = connection.prepareStatement(
-          "SELECT collection FROM jobs WHERE path = ?")) {
-        query.setString(1, path);
-        try (ResultSet row = query.executeQuery()) {
-          if (row.next()) {
-            collection = row.getString(1);
-            collectionKnown = true;
-          }
-        }
-      }
-    }
-    if (!collectionKnown) {
-      throw new SQLException("Cannot prove collection identity during candidate enumeration");
-    }
-    return deletedCollections.contains(collection);
+    // Enumeration knows the owning root's exact binding, including the default (null).
+    return deletedCollections.contains(sourceCollection);
   }
 
   @Override

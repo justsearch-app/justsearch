@@ -171,6 +171,7 @@ export function readSourceCoverage(payload: unknown): SourceCoverage[] {
 
 /** Coverage facts shared by the live Ask envelope and its saved claimMatches. Absence stays absent. */
 export function coverageFactsFromRecord(payload: unknown): {
+  readonly groundingIncomplete?: boolean;
   readonly sentencesTotal?: number;
   readonly sentencesScored?: number;
   readonly sourceCoverage?: readonly SourceCoverage[];
@@ -178,6 +179,7 @@ export function coverageFactsFromRecord(payload: unknown): {
   if (!payload || typeof payload !== 'object') return {};
   const p = payload as Record<string, unknown>;
   return {
+    ...(p.groundingIncomplete === true ? { groundingIncomplete: true } : {}),
     ...(typeof p.sentencesTotal === 'number' ? { sentencesTotal: p.sentencesTotal } : {}),
     ...(typeof p.sentencesScored === 'number' ? { sentencesScored: p.sentencesScored } : {}),
     ...(Array.isArray(p.sourceCoverage) ? { sourceCoverage: readSourceCoverage(p) } : {}),

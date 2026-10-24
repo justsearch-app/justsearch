@@ -176,7 +176,10 @@ final class StreamingCitationMatcherTest {
       var matcher = new StreamingCitationMatcher(failingDocs());
       var ctx = ctxWithCitations(List.of(citation("doc-1", 0, "excerpt")));
       var r = matcher.onDone("text", ctx);
-      assertTrue(r.events().isEmpty());
+      assertEquals(1, r.events().size());
+      assertEquals("rag.citation_matches", r.events().get(0).name());
+      assertEquals(true, r.events().get(0).payload().get("groundingIncomplete"));
+      assertEquals(r.events().get(0).payload(), r.donePayloadEntries().get("claimMatches"));
     }
   }
 
