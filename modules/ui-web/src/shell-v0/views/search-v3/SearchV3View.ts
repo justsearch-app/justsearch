@@ -769,6 +769,7 @@ export class SearchV3View extends JfElement {
     aiSnapshot: { state: true },
     streaming: { state: true },
     askStopping: { state: true },
+    askCheckingTurnId: { state: true },
     sidebarWidthPx: { state: true },
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
     sidebarNarrow: { type: Boolean, reflect: true, attribute: 'sidebar-narrow' },
@@ -816,6 +817,8 @@ export class SearchV3View extends JfElement {
   declare streaming: boolean;
   /** Where the reader's Stop on the streaming answer stands, until the Engine ends the turn. */
   declare askStopping: Sv3StopState | null;
+  /** The signal belongs to this turn alone and is never saved with a conversation. */
+  declare askCheckingTurnId: string | null;
   /**
    * The sidebar's chosen width (tempdoc 822 Phase F5). Kept EXPANDED-only: collapsing renders the
    * icon rail without touching this number, which is what makes "expand restores the width I chose"
@@ -967,7 +970,7 @@ export class SearchV3View extends JfElement {
   private askStop: (() => void) | null = null;
   private readonly liveAsks = new Map<string, {
     abort: AbortController; stop: () => void; reasoning: ReasoningController;
-    turnId: string; stopping: Sv3StopState | null;
+    turnId: string; stopping: Sv3StopState | null; checkingTurnId: string | null;
   }>();
 
   /** The slot belongs to the place on screen; streams keep their own handles until they settle. */
@@ -977,6 +980,7 @@ export class SearchV3View extends JfElement {
     this.askAbort = ask?.abort ?? null;
     this.askStop = ask?.stop ?? null;
     this.askStopping = ask?.stopping ?? null;
+    this.askCheckingTurnId = ask?.checkingTurnId ?? null;
     this.askReasoningTurnId = ask?.turnId ?? null;
     if (ask !== undefined) this.askReasoning = ask.reasoning;
   }
@@ -1052,6 +1056,7 @@ export class SearchV3View extends JfElement {
     this.aiSnapshot = null;
     this.streaming = false;
     this.askStopping = null;
+    this.askCheckingTurnId = null;
     this.sidebarWidthPx = SV3_SIDEBAR_DEFAULT_PX;
     this.sidebarCollapsed = false;
     this.sidebarNarrow = false;
@@ -3420,7 +3425,7 @@ export class SearchV3View extends JfElement {
         this.syncActiveAsk();
       });
     };
-    this.liveAsks.set(ref.sessionId, { abort, stop, reasoning, turnId: ref.turnId, stopping: null });
+    this.liveAsks.set(ref.sessionId, { abort, stop, reasoning, turnId: ref.turnId, stopping: null, checkingTurnId: null });
     this.syncActiveAsk();
     // The controller is per-ASK, not per-turn: it accumulates and times one stream's thinking, and
     // the blocks it finalizes are written onto the turn below. Resetting here is what stops the
@@ -3504,6 +3509,12 @@ export class SearchV3View extends JfElement {
         onDelta: (text) => {
           if (text) rememberServerConversation(ref.sessionId);
           this.sessions = appendTurnDelta(this.sessions, ref, text);
+        },
+        onChecking: (checking) => {
+          const ask = this.liveAsks.get(ref.sessionId);
+          if (ask?.abort !== abort) return;
+          ask.checkingTurnId = checking ? ref.turnId : null;
+          this.syncActiveAsk();
         },
         onEvidence: (evidence) => {
           this.sessions = setTurnEvidence(this.sessions, ref, evidence);
@@ -4118,6 +4129,7 @@ export class SearchV3View extends JfElement {
       return;
     }
     if (id === SV3_COMMAND_EXPORT_MARKDOWN) this.exportActiveConversation();
+    if (id === 'cmd-memory') requestSurfaceNavigation('core.memory-surface');
   }
 
   private get composer(): Sv3Composer | null {
@@ -4656,6 +4668,7 @@ export class SearchV3View extends JfElement {
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
           .stopping=${this.askStopping}
+          .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"
         ></jf-sv3-main>
         <!-- 859 §B — ONE positioned wrapper for the whole dock, so its height is one observable

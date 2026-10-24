@@ -228,6 +228,8 @@ export interface Sv3AskRequest {
 const SV3_STOPPED_CODE = 'CANCELLED';
 
 export interface Sv3AskSink {
+  /** Ephemeral citation-check state; never inferred from text or restored from history. */
+  onChecking?(checking: boolean): void;
   /** Streaming text, delta by delta. The accumulated answer lives in the caller's turn. */
   onDelta(text: string): void;
   /**
@@ -432,8 +434,18 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
    */
   let usage: Sv3ContextUsage | null = null;
 
+  let checking = false;
+  const setChecking = (next: boolean): void => {
+    if (checking === next) return;
+    checking = next;
+    sink.onChecking?.(next);
+  };
   const handlers: CoreRagAskHandlers = {
+    onRagCitationChecking() {
+      if (!req.modelAnswer && req.schema === undefined) setChecking(true);
+    },
     onDone(payload: unknown) {
+      setChecking(false);
       usage = readSv3ContextUsage(payload);
       if (req.schema !== undefined) {
         const final = (payload as { finalResponse?: unknown } | null)?.finalResponse;
@@ -488,6 +500,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       publish();
     },
     onRagCitationMatches(payload: unknown) {
+      setChecking(false);
       const p = payload as { matches?: CitationMatch[] } | null;
       if (!p || !Array.isArray(p.matches)) return;
       // Tempdoc 847 §2.5 — the PRODUCER gate, read off the envelope through the shared authority
@@ -559,6 +572,8 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // reason a reader's own Stop is never worded as a failure (inventory E9).
     sink.onFailed(friendlyStreamError(err), (err as Error & { code?: string }).code);
     return;
+  } finally {
+    setChecking(false);
   }
 
   sink.onDone(usage);

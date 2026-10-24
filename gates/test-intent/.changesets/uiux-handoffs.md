@@ -1028,6 +1028,16 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
         "instrumentation"
       ],
       "whatMoved": "Register the real SelectionContextInjector (core.selection) in the three private fixture registries that dispatch core.rag-ask or core.extract, using each fixture's DocumentService and AI supplier. NoEvidenceDispatchHttpTest uses the production RAGAskShape injector list, which now requires this registration. The two persistence fixtures retain their deliberate synthetic shape injector lists and terminal fault paths. All request inputs, preconditions, fault injection, observations, assertions, expected outcomes, tags and conditions remain unchanged. No production behavior or expectation changes."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.backgroundChecking.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Merge #938 checking-status coverage with WP1.3b per-conversation live Ask ownership. The new integration case uses the existing SSE, navigation and sidebar interfaces: checking starts while its conversation is in the background, appears and is announced once on return, never leaks to the separate prepared hand-off, is not reannounced after another round trip, and clears when the citation result arrives in the background. Existing checking outcome, announcement and hand-off expectations are unchanged. Before the per-conversation merge repair, this case assertion-fails because the checking status is absent on return; after it passes."
     }
   ]
 }

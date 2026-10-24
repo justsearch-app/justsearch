@@ -20,7 +20,9 @@ import java.util.concurrent.TimeUnit;
  * {@code events.txt}, answers {@code /health} and a llama-shaped {@code /props}, and answers
  * {@code /v1/chat/completions} with a first event at once and the rest only after the file
  * {@code release} appears, appending {@code done <pid>} once the reply is complete. It exits when the
- * process that launched it ends.
+ * process that launched it ends. Private browser probes may supply a complete SSE data line in
+ * {@code response-event.txt}; without it the existing {@link #FINAL_EVENT} reply is unchanged.
+ * A {@code keep-alive} file lets a probe retain its owned fake beyond the default two minutes.
  */
 public final class StreamingFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
@@ -181,7 +183,9 @@ public final class StreamingFakeLlamaServer {
         while (!Files.exists(home.resolve(RELEASE)) && System.nanoTime() < deadline) {
           Thread.sleep(20);
         }
-        output.write((FINAL_EVENT + "\n\ndata: [DONE]\n\n").getBytes(StandardCharsets.UTF_8));
+        Path responseEvent = home.resolve("response-event.txt");
+        String reply = Files.exists(responseEvent) ? Files.readString(responseEvent) : FINAL_EVENT;
+        output.write((reply + "\n\ndata: [DONE]\n\n").getBytes(StandardCharsets.UTF_8));
         output.flush();
         record(home, "done " + pid);
       } catch (InterruptedException interrupted) {
@@ -207,7 +211,8 @@ public final class StreamingFakeLlamaServer {
     }
     server.start();
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
-    while (launcher != null && launcher.isAlive() && System.nanoTime() < deadline) {
+    while (launcher != null && launcher.isAlive()
+        && (System.nanoTime() < deadline || Files.exists(home.resolve("keep-alive")))) {
       Thread.sleep(100);
     }
     server.stop(0);

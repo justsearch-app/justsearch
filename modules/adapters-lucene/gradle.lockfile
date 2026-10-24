@@ -3,6 +3,8 @@
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :modules:adapters-lucene:dependencies --write-locks
 antlr:antlr:2.7.7=pitest
+ch.qos.logback:logback-classic:1.5.32=testCompileClasspath,testRuntimeClasspath
+ch.qos.logback:logback-core:1.5.32=testCompileClasspath,testRuntimeClasspath
 com.ethlo.time:itu:1.14.0=compileClasspath,integrationTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testFixturesRuntimeClasspath,testRuntimeClasspath
 com.fasterxml.jackson.core:jackson-annotations:2.21=compileClasspath,integrationTestCompileClasspath,integrationTestRuntimeClasspath,runtimeClasspath,testCompileClasspath,testFixturesCompileClasspath,testFixturesRuntimeClasspath,testRuntimeClasspath
 com.github.ben-manes.caffeine:caffeine:3.0.5=annotationProcessor,integrationTestAnnotationProcessor,testAnnotationProcessor,testFixturesAnnotationProcessor

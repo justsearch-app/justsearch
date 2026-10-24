@@ -68,7 +68,7 @@ final class WatchedRootsStateTest {
     assertEquals(now, state.getLastVerifiedAt(root), "clearing unverified stamps lastVerifiedAt");
 
     // Cleanup removes the heartbeat with the root.
-    state.removeRootAndNested(root);
+    state.removeRootAndPersist(root);
     assertEquals(null, state.getLastVerifiedAt(root), "removed root drops its lastVerifiedAt");
   }
 
@@ -123,8 +123,8 @@ final class WatchedRootsStateTest {
   }
 
   @Test
-  @DisplayName("removeRootAndNested removes root and child entries but keeps siblings")
-  void removeRootAndNestedRemovesOnlyTargetBranch() throws Exception {
+  @DisplayName("removing both declared roots keeps siblings")
+  void removingBothDeclaredRootsKeepsSiblings() throws Exception {
     Path root = tempDir.resolve("root");
     Path child = root.resolve("child");
     Path sibling = tempDir.resolve("sibling");
@@ -143,7 +143,9 @@ final class WatchedRootsStateTest {
     watchedRoots.put(normalizedChild, Instant.now());
     watchedRoots.put(normalizedSibling, Instant.now());
 
-    state.removeRootAndNested(normalizedRoot);
+    state.removeRootAndPersist(normalizedRoot);
+    assertTrue(watchedRoots.containsKey(normalizedChild), "a separate child declaration survives parent removal");
+    state.removeRootAndPersist(normalizedChild);
 
     assertFalse(watchedRoots.containsKey(normalizedRoot));
     assertFalse(watchedRoots.containsKey(normalizedChild));
@@ -232,7 +234,7 @@ final class WatchedRootsStateTest {
     assertEquals(List.of(root), paths);
     assertThrows(UnsupportedOperationException.class, () -> paths.add(dataDirectory));
 
-    state.removeRootAndNested(root);
+    state.removeRootAndPersist(root);
     assertTrue(state.watchedPaths().isEmpty());
   }
 
@@ -278,7 +280,7 @@ final class WatchedRootsStateTest {
 
     List<IngestCollectionPolicy.RootBinding> snapshot = state.snapshotBindings();
     assertThrows(UnsupportedOperationException.class, snapshot::clear);
-    state.removeRootAndNested(root);
+    state.removeRootAndPersist(root);
 
     assertEquals(1, snapshot.size(), "later state changes must not rewrite the accepted snapshot");
     assertEquals(new IngestCollectionPolicy.RootBinding(root, null), snapshot.getFirst());

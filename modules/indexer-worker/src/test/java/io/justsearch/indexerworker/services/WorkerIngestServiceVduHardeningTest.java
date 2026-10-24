@@ -574,7 +574,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
       WorkerIngestService switchingService = createSwitchingServiceWithQueue(jobQueue, "sqlite-delete-path");
       String pathPrefix = tempDir.toAbsolutePath().toString();
       String normalizedPrefix =
-          io.justsearch.indexerworker.util.PathNormalizer.normalizePath(pathPrefix);
+          io.justsearch.indexerworker.util.PathNormalizer.normalizePathPrefix(pathPrefix);
 
       DeleteByPathResponse response =
           switchingService.deleteByPath(
@@ -585,7 +585,9 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
 
       SqliteJobQueue.SwitchBufferOp op = requireSwitchOp("prefix:" + normalizedPrefix);
       assertEquals("DELETE_PREFIX", op.op());
-      assertEquals(normalizedPrefix, op.payload());
+      var scope = io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(op.payload());
+      assertEquals(normalizedPrefix, scope.prefix());
+      assertEquals(List.of(), scope.excludedSubtrees());
     }
 
     @Test

@@ -1,0 +1,68 @@
+{
+  "baseline": "fc34d2d198",
+  "fixture": "Owned headless Chromium; real Sv3Main component/native storage; held streaming Ask turn; no Engine or dispatch",
+  "before": [
+    {
+      "mode": "ordinary",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    },
+    {
+      "mode": "getItem",
+      "first": "Checking the answer against your sources…",
+      "revisit": "Checking the answer against your sources…",
+      "pass": false
+    },
+    {
+      "mode": "setItem",
+      "first": "Checking the answer against your sources…",
+      "revisit": "Checking the answer against your sources…",
+      "pass": false
+    },
+    {
+      "mode": "unavailable-start",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    },
+    {
+      "mode": "reload",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    }
+  ],
+  "after": [
+    {
+      "mode": "ordinary",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    },
+    {
+      "mode": "getItem",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    },
+    {
+      "mode": "setItem",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    },
+    {
+      "mode": "unavailable-start",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    },
+    {
+      "mode": "reload",
+      "first": "Checking the answer against your sources…",
+      "revisit": "",
+      "pass": true
+    }
+  ]
+}

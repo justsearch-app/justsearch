@@ -36,7 +36,7 @@ import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.BulkReindexHandler;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
-import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.context.EngineContext;
@@ -240,7 +240,9 @@ final class EngineNativePointerBootMutationTest {
       var suffix = beforeRelease.subList(baseline.size(), beforeRelease.size());
       assertEquals(List.of("DELETE_PREFIX", "DELETE_COLLECTION", "PROJECTION"),
           suffix.stream().map(SwitchBufferCapableQueue.SwitchBufferOp::op).toList());
-      assertEquals(QueryFilterBuilder.normalizePathPrefix(prefix.toString()), suffix.get(0).payload());
+      assertFalse(PathPrefixScope.isLegacy(suffix.get(0).payload()));
+      assertEquals(new PathPrefixScope(prefix.toString(), List.of()),
+          PathPrefixScope.decode(suffix.get(0).payload()));
       assertEquals("deleted-files", suffix.get(1).payload());
       assertTrue(late.sameEffect(AcceptedProjection.decode(suffix.get(2).payload())));
       assertTrue(suffix.stream().allMatch(EngineNativePointerBootMutationTest::hasDurableRevision));
