@@ -109,7 +109,7 @@ class WholeProgramDeadCodeTest extends ImportedProgram {
   void no_new_whole_program_dead_classes() {
     // Shared with SystemAccessFunnelTest so the whole-program import happens once per JVM
     // rather than once per analysis (tempdoc 883: this module gained a second whole-program rule).
-    JavaClasses classes = ImportedProgram.classes();
+    JavaClasses classes = classes();
 
     assertWholeProgramCoverage(classes);
 

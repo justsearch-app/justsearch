@@ -77,7 +77,7 @@ class ProcessLaunchFunnelTest extends ImportedProgram {
 
   @Test
   void only_allowlisted_classes_start_os_processes() {
-    Map<String, Set<String>> observed = launchers(ImportedProgram.classes());
+    Map<String, Set<String>> observed = launchers(classes());
 
     List<String> unlisted = new ArrayList<>();
     observed.forEach((owner, sites) -> {

@@ -79,7 +79,7 @@ class SystemAccessFunnelTest extends ImportedProgram {
 
   @Test
   void every_system_access_outside_the_configuration_funnel_is_on_the_allowlist() {
-    Set<String> observed = observedSites(ImportedProgram.classes());
+    Set<String> observed = observedSites(classes());
     Set<String> allowed = readAllowlist();
 
     List<String> newSites = new ArrayList<>(observed);

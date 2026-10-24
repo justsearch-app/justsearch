@@ -30,7 +30,7 @@ abstract class ImportedProgram {
   @BeforeAll
   @Timeout(120)
   static void importProgram() {
-    assertTimeoutPreemptively(Duration.ofSeconds(120), ImportedProgram::classes);
+    assertTimeoutPreemptively(Duration.ofMinutes(2), ImportedProgram::classes);
   }
 
   static synchronized JavaClasses classes() {
