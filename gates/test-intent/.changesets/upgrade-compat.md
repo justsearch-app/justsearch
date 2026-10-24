@@ -808,3 +808,14 @@ The Round 8 producer batches the requested candidate compile/PMD and both UUID p
   "note": "Reject: a stale recovery checkpoint grants authority to a modern unowned replacement-queue job and replaces old searchable content over packaged HTTP; the required handoff preservation check also regresses."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16b3c-afd6-7230-b6f7-88d209469cb6",
+  "verdict": "reject",
+  "digest": "sha256:050851d2509c404fe15874edb4cb06887c74e629e8473ef13cef4187c1bc4c54",
+  "note": "Configured roots miss files and removed roots regain jobs across restart."
+}
+```
