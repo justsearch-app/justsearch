@@ -48,6 +48,7 @@ public final class WatchedRootsState {
   // Shared across client instances; do not hold the state monitor while calling the Engine.
   private final Object lifecycleLock = new Object();
   private static final String INITIALIZATION_PENDING = "ROOT_INITIALIZATION_PENDING";
+  // Persisted retry identity in walkError; keep the text stable for existing saved roots.
   static final String REMOVAL_INCOMPLETE = "Removal incomplete. Live watching is not confirmed; retry Remove.";
 
   Object lifecycleLock() {

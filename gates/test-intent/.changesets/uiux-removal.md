@@ -17,7 +17,7 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootRemovalIncompleteTest.java"
       ],
       "class": "New",
-      "behaviour": "An interrupted or failed removal retains a durable retry entry, does not claim live watching, fences stale and later root producers, and does not let an overlapping duplicate Add recreate a removed root; a deliberate later Add remains possible.",
+      "behaviour": "Failed or interrupted removal retains a durable retry entry, does not claim live watching, fences root producers and overlapping duplicate Add, and preserves a plain explanation of unavailable or buffered deletion for the caller.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -58,10 +58,7 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
       ],
       "evidence": "gates/test-intent/evidence/uiux-removal-repaired.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootRemovalIncompleteTest.java#eachFailureKeepsAnIncompleteEntryAndRetry",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootRemovalIncompleteTest.java#crashAfterStoppingWatcherRestartsAsIncompleteAndCanBeRetried",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootRemovalIncompleteTest.java#concurrentDuplicateAddCannotRecreateTheRootItWasRemoving",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootRemovalIncompleteTest.java#incompleteRemovalFencesOldAndNewRootProducersAndKeepsItsReason"
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootRemovalIncompleteTest.java"
       ],
       "repaired": true
     },
@@ -87,8 +84,7 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
       ],
       "evidence": "gates/test-intent/evidence/uiux-removal-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootRemovalVisibilityTest.java#completedDeletionIsAbsentFromFreshServingReads",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootRemovalVisibilityTest.java#readOnlyServingViewCannotConfirmRemovalAfterFailedMigration"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/RootRemovalVisibilityTest.java"
       ],
       "repaired": true
     },
@@ -123,7 +119,7 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/SwitchingRootRemovalVisibilityTest.java"
       ],
       "class": "New",
-      "behaviour": "An ordinary single-runtime switch returns an explicitly buffered durable receipt; deferred switching without a writer refuses completion and adds no receipt.",
+      "behaviour": "An ordinary single-runtime switch returns an explicitly buffered durable receipt; deferred switching without a writer returns a plain typed unavailable refusal, confirms no completion and adds no receipt.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -138,10 +134,11 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-removal-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-removal-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/SwitchingRootRemovalVisibilityTest.java#switchingWithoutWritableServingTargetNeverConfirmsCompletion"
-      ]
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/SwitchingRootRemovalVisibilityTest.java"
+      ],
+      "repaired": true
     },
     {
       "items": [
@@ -165,7 +162,7 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
       ],
       "evidence": "gates/test-intent/evidence/uiux-removal-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RetainedRootRemovalVisibilityTest.java#retainedGenerationCannotResurrectRemovedSearchResults"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RetainedRootRemovalVisibilityTest.java"
       ],
       "repaired": true
     },
@@ -173,8 +170,8 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java"
       ],
-      "class": "New",
-      "behaviour": "A prefix removal commits and refreshes the serving reader after the existing exactly-once journal and delete effects. All existing ordered and no-extra-interactions assertions remain; the refresh is now explicitly required by S35.2.",
+      "class": "Adaptation",
+      "behaviour": "Preserve the existing journal-before-mutation and exactly-once serving-effect oracle while permitting at most one read refresh.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -189,11 +186,49 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-removal-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-removal-adaptations-preserved.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java#sameRuntimePreGreenJournalsBeforeExactlyOneServingEffectForEachDelete"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java"
       ],
-      "repaired": true
+      "repaired": false,
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The existing ordered journal and exactly-once mutation assertions, plus verifyNoMoreInteractions, remain. A bounded optional reader-refresh observation is now explicitly verified; it is not another mutation effect. Required fresh-reader visibility is checked separately by RootRemovalVisibilityTest.",
+      "preservationBeforeEvidence": "gates/test-intent/evidence/uiux-removal-adaptations-before.json",
+      "preservationBase": "8292c62e381684eb506c96f50990b212ea1fb879"
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java"
+      ],
+      "class": "Adaptation",
+      "behaviour": "Preserve all existing real-producer retirement, stale watcher, queue and declaration assertions with an explicitly writable mocked running index.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "S354",
+          "agreedScenario": "S35.4",
+          "quote": "A file of the folder that is mid-indexing or mid-enrichment when removal starts, a Reindex or folder check that started just before, and a concurrent Add or second removal do not bring any of its documents back.",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Remaining UI/UX work; WP3.5 removal from search only, preserving declared nested roots and uncertainty safeguards.",
+          "choice": "A file of the folder that is mid-indexing or mid-enrichment when removal starts, a Reindex or folder check that started just before, and a concurrent Add or second removal do not bring any of its documents back.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-removal-adaptations-preserved.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java"
+      ],
+      "repaired": false,
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The existing RunningRuntime mock now explicitly accepts writes. No expectation, verification, task boundary or producer gate changes. Real read-only serving refusal is required separately by RootRemovalVisibilityTest.",
+      "preservationBeforeEvidence": "gates/test-intent/evidence/uiux-removal-adaptations-before.json",
+      "preservationBase": "8292c62e381684eb506c96f50990b212ea1fb879"
     }
   ]
 }
