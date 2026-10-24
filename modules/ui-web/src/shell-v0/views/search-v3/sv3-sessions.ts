@@ -103,16 +103,17 @@ export interface Sv3TurnEvidence {
  * be worded as a failure, and `refused` is the session lock declining the send — neither of them is
  * an answer that went wrong (tempdoc 822 Phase F1; the terminals `sv3-ask.ts` reports).
  */
-export type Sv3TurnStatus = 'streaming' | 'complete' | 'halted' | 'refused' | 'failed';
+export type Sv3TurnStatus = 'streaming' | 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence';
 
 /**
- * Which tier produced the turn (tempdoc 822 Phase F2). An `ask` turn is a grounded answer streamed
+ * Which tier produced the turn (tempdoc 822 Phase F2). A `model` turn is free chat without retrieval.
+ * An `ask` turn is a grounded answer streamed
  * from `sv3-ask.ts`; an `agent` turn is a delegated RUN hosted by the shared `AgentSessionController`,
  * which renders as a live feed while it runs and as a receipt once it ends. One turn type with a
  * discriminator, not two lists: a conversation interleaves both and the transcript must keep their
  * order.
  */
-export type Sv3TurnKind = 'ask' | 'agent';
+export type Sv3TurnKind = 'ask' | 'agent' | 'model';
 
 /**
  * One block of the model's thinking, as the SHARED `ReasoningController` finalized it (tempdoc 822
@@ -739,9 +740,20 @@ export function adoptRunSession(
    * rather than beside it: two rows for one conversation would be the identity fork Phase F6 closed.
    */
   conversationId: string,
+  /** A freshly read turn belonging to this live run, when the record already represents it. */
+  recordTurnId: string | null = null,
 ): Sv3Adoption {
   const existing = sessionById(list, conversationId);
   if (existing !== null) {
+    const recorded = existing.turns.find((t) => t.id === recordTurnId && t.kind === 'agent');
+    if (recorded !== undefined) {
+      return {
+        list: { ...list, sessions: list.sessions.map((s) => s.id === conversationId
+          ? { ...s, turns: s.turns.map((t) => t.id === recorded.id ? { ...t, status: 'streaming' } : t) }
+          : s) },
+        ref: { sessionId: conversationId, turnId: recorded.id },
+      };
+    }
     const turnId = turnIdFor(existing.id, existing.turns.length);
     return {
       list: {

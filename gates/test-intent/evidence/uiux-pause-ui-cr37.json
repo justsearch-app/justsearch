@@ -1,0 +1,427 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T08:25:00.577Z",
+  "revision": "dcdae998335cbf49cfe447d14ae486a4b75e6160",
+  "tree": "0d9afcd9b99c441b9eb92afc1ee732196b97397b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-609231-1792743891182.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4439
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-task-list retains focused Resume across unconfirmed observations and accepts activation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 jf-task-list retains focused Resume across unconfirmed observations and accepts activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-task-list explains damaged settings and navigates to the existing reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a jf-task-list explains damaged settings and navigates to the existing reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-status-deck retains focused Resume across unconfirmed observations and accepts activation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 jf-status-deck retains focused Resume across unconfirmed observations and accepts activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-status-deck explains damaged settings and navigates to the existing reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a jf-status-deck explains damaged settings and navigates to the existing reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-health-surface retains focused Resume across unconfirmed observations and accepts activation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 jf-health-surface retains focused Resume across unconfirmed observations and accepts activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-health-surface explains damaged settings and navigates to the existing reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a jf-health-surface explains damaged settings and navigates to the existing reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-library-surface retains focused Resume across unconfirmed observations and accepts activation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 jf-library-surface retains focused Resume across unconfirmed observations and accepts activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-library-surface explains damaged settings and navigates to the existing reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a jf-library-surface explains damaged settings and navigates to the existing reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-settings-surface retains focused Resume across unconfirmed observations and accepts activation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 jf-settings-surface retains focused Resume across unconfirmed observations and accepts activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-settings-surface explains damaged settings and navigates to the existing reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a jf-settings-surface explains damaged settings and navigates to the existing reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-sv3-window retains focused Resume across unconfirmed observations and accepts activation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 jf-sv3-window retains focused Resume across unconfirmed observations and accepts activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-sv3-window explains damaged settings and navigates to the existing reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a jf-sv3-window explains damaged settings and navigates to the existing reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37b OPERATOR recovery opens at the existing Reset action without changing tier",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37b OPERATOR recovery opens at the existing Reset action without changing tier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37b DEVELOPER recovery opens at the existing Reset action without changing tier",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37b DEVELOPER recovery opens at the existing Reset action without changing tier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains Pause and duration focus during uncertain observations and pending requests",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 retains Pause and duration focus during uncertain observations and pending requests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 explains an impossible action in place without removing its focused control",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 explains an impossible action in place without removing its focused control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_RECOVERY_REQUIRED where pressed across status polls",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 retains the Engine refusal SETTINGS_RECOVERY_REQUIRED where pressed across status polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_READ_ONLY where pressed across status polls",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62541c9e617acda91448ce7dcf8e42db6af085e6ade884dab3d6e461fa5128ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37 retains the Engine refusal SETTINGS_READ_ONLY where pressed across status polls",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "30f3617ea",
+    "revision": "30f3617ea55a689853842c411d022e9f6ad693bf",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-609231-1792743896739.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3677,
+        "output": "JSON report written to /home/elias/.cache/am/dv97m8fc/tmp/test-intent-vitest-609231-1792743896739.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-task-list retains focused Resume across unconfirmed observations and accepts activation",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 jf-task-list retains focused Resume across unconfirmed observations and accepts activation:  AssertionError: poll must retain the control: expected null to be <jf-indexing-controls …(2)></jf-indexing-controls> // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:309:100\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-task-list explains damaged settings and navigates to the existing reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a jf-task-list explains damaged settings and navigates to the existing reset without offering Resume:  AssertionError: expected '\\n      \\n        \\n          Indexin…' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:322:20\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-status-deck retains focused Resume across unconfirmed observations and accepts activation",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 jf-status-deck retains focused Resume across unconfirmed observations and accepts activation:  AssertionError: poll must retain the control: expected null to be <jf-indexing-controls api-base></jf-indexing-controls> // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:309:100\n    at runNextTicks"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-status-deck explains damaged settings and navigates to the existing reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a jf-status-deck explains damaged settings and navigates to the existing reset without offering Resume:  AssertionError: expected '\\n      Indexing paused — Settings re…' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:322:20\n    at runNextTicks (node:internal/process/tas"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-health-surface retains focused Resume across unconfirmed observations and accepts activation",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 jf-health-surface retains focused Resume across unconfirmed observations and accepts activation:  AssertionError: poll must retain the control: expected null to be <jf-indexing-controls api-base></jf-indexing-controls> // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:309:100\n    at file:///home/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-health-surface explains damaged settings and navigates to the existing reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a jf-health-surface explains damaged settings and navigates to the existing reset without offering Resume:  AssertionError: expected '\\n      \\n      \\n        \\n         …' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:322:20\n    at runNextTicks (node:internal/process/tas"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-library-surface retains focused Resume across unconfirmed observations and accepts activation",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 jf-library-surface retains focused Resume across unconfirmed observations and accepts activation:  AssertionError: poll must retain the control: expected null to be <jf-indexing-controls api-base></jf-indexing-controls> // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:309:100\n    at file:///home/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-library-surface explains damaged settings and navigates to the existing reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a jf-library-surface explains damaged settings and navigates to the existing reset without offering Resume:  AssertionError: expected '\\n      \\n        \\n      \\n      \\n …' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:322:20\n    at runNextTicks (node:internal/process/tas"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-settings-surface retains focused Resume across unconfirmed observations and accepts activation",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 jf-settings-surface retains focused Resume across unconfirmed observations and accepts activation:  AssertionError: uncertain activity does not make Resume impossible: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:311:85\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-settings-surface explains damaged settings and navigates to the existing reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a jf-settings-surface explains damaged settings and navigates to the existing reset without offering Resume:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:322:20\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 jf-sv3-window retains focused Resume across unconfirmed observations and accepts activation",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 jf-sv3-window retains focused Resume across unconfirmed observations and accepts activation:  AssertionError: poll must retain the control: expected null to be <jf-indexing-controls api-base></jf-indexing-controls> // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:309:100\n    at file:///home/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a jf-sv3-window explains damaged settings and navigates to the existing reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a jf-sv3-window explains damaged settings and navigates to the existing reset without offering Resume:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:322:20\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'saved settings were damaged and repla…'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:351:45\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37b OPERATOR recovery opens at the existing Reset action without changing tier",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37b OPERATOR recovery opens at the existing Reset action without changing tier:  AssertionError: expected 'Resume indexing' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:370:45\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37b DEVELOPER recovery opens at the existing Reset action without changing tier",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37b DEVELOPER recovery opens at the existing Reset action without changing tier:  AssertionError: expected 'Resume indexing' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:370:45\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains Pause and duration focus during uncertain observations and pending requests",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 retains Pause and duration focus during uncertain observations and pending requests:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:393:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 explains an impossible action in place without removing its focused control",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 explains an impossible action in place without removing its focused control:  AssertionError: expected 'Pause indexing' to contain 'Resume indexing'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:416:32\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-pause-ui/modules/ui-web/node_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_RECOVERY_REQUIRED where pressed across status polls",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 retains the Engine refusal SETTINGS_RECOVERY_REQUIRED where pressed across status polls:  AssertionError: expected '\\n      \\n      Resume indexing\\n    …' to contain 'Settings history cannot be verified'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:435:47\n    at file:///home/elias/dev/justsearch/.claude/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37 retains the Engine refusal SETTINGS_READ_ONLY where pressed across status polls",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37 retains the Engine refusal SETTINGS_READ_ONLY where pressed across status polls:  AssertionError: expected '\\n      Pause duration\\n        \\n   …' to contain 'Settings persistence is disabled'\n    at /home/elias/.cache/am/dv97m8fc/tmp/test-intent-before-GHCAJw/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:435:47\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      }
+    ]
+  },
+  "digest": "sha256:8e4d88f81ea8f7c21acd9a8eae3ce4a25d50131edc59b1d749305f9783c92175"
+}

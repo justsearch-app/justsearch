@@ -26,6 +26,7 @@ import {
 } from '../state/aiStateStore.js';
 import { orElse } from '../state/known.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
+import './IndexingControls.js';
 
 const NUM = new Intl.NumberFormat();
 
@@ -34,6 +35,8 @@ export class IndexingOverlay extends JfElement {
     embeddingQueueSize: { type: Number, attribute: 'embedding-queue-size' },
     vduQueueSize: { type: Number, attribute: 'vdu-queue-size' },
     activity: { attribute: false },
+    progress: { attribute: false },
+    apiBase: { type: String, attribute: 'api-base' },
     textIndexing: { type: Boolean },
     switching: { type: Boolean },
     dismissible: { type: Boolean },
@@ -42,6 +45,8 @@ export class IndexingOverlay extends JfElement {
   declare embeddingQueueSize: number;
   declare vduQueueSize: number;
   declare activity: ReturnType<typeof selectIndexingProgress>['activity'];
+  declare progress: ReturnType<typeof selectIndexingProgress>;
+  declare apiBase: string;
   declare textIndexing: boolean;
   declare switching: boolean;
   declare dismissible: boolean;
@@ -71,6 +76,8 @@ export class IndexingOverlay extends JfElement {
   constructor() {
     super();
     this.activity = selectIndexingProgress(null, false, 0, []).activity;
+    this.progress = selectIndexingProgress(null, false, 0, []);
+    this.apiBase = '';
     this.textIndexing = false;
     this.embeddingQueueSize = 0;
     this.vduQueueSize = 0;
@@ -284,6 +291,7 @@ export class IndexingOverlay extends JfElement {
               ? html`${icon({ name: 'loader-2', size: 14, spin: true })} Going online…`
               : html`${icon({ name: 'check-circle-2', size: 14 })} Go online (interrupt)`}
           </button>
+          <jf-indexing-controls allow-pause .progress=${this.progress} api-base=${this.apiBase}></jf-indexing-controls>
         </div>
       </div>
     `;
@@ -397,7 +405,7 @@ export class IndexingOverlayHost extends JfElement {
     const speaks = progress.phase !== 'unknown';
     const embeddingQueue = speaks ? progress.embeddingPending : orElse(ai.index.embeddingQueueSize, 0);
     const vduQueue = speaks ? progress.vduPending : orElse(ai.index.vduQueueSize, 0);
-    if (embeddingQueue + vduQueue === 0) return nothing;
+    if (embeddingQueue + vduQueue === 0 && !progress.pause) return nothing;
     if (this.userDismissed) return nothing;
     return html`
       <jf-indexing-overlay
@@ -407,6 +415,8 @@ export class IndexingOverlayHost extends JfElement {
         @go-online=${() => void this.handleGoOnline()}
         @dismiss=${() => (this.userDismissed = true)}
         .activity=${progress.activity}
+        .progress=${progress}
+        api-base=${this.apiBase}
         .textIndexing=${progress.phase === 'indexing'}
       ></jf-indexing-overlay>
     `;

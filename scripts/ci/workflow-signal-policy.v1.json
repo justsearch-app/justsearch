@@ -1,6 +1,6 @@
 {
   "kind": "justsearch-workflow-signal-policy.v1",
-  "version": 6,
+  "version": 7,
   "defaultStaleDays": 14,
   "branchProtection": {
     "requireBranchesUpToDateBeforeMerging": false
@@ -16,7 +16,7 @@
         "push"
       ],
       "owner": "ADR-0044 / public hosted CI fact lanes",
-      "note": "PR lanes are selected by changed inputs; required names always report. Measured axe stays advisory and runs on PRs with frontend inputs, pushes to main and dispatch. Main and dispatch run the full suite, including Integration tests (system-tests tier), Integration tests (module tier), and CI wall-clock attribution. Both integration tiers are main/dispatch-only and are not required checks. Main never cancels the running run.",
+      "note": "PR lanes are selected by changed inputs; required names always report. Measured axe is required and runs on PRs with frontend inputs, pushes to main and dispatch; unselected PR jobs report skipped. Main and dispatch run the full suite, including Integration tests (system-tests tier), Integration tests (module tier), and CI wall-clock attribution. Both integration tiers are main/dispatch-only and are not required checks. Main never cancels the running run.",
       "failureDefault": "product-regression",
       "staleDays": 14,
       "blocking": true,
@@ -32,7 +32,8 @@
         "Engine lifecycle tests (model-free)",
         "Shell crate tests (Rust)",
         "Secret scan",
-        "jseval Python suite"
+        "jseval Python suite",
+        "Measured axe"
       ]
     },
     {

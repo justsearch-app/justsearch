@@ -7,18 +7,21 @@
  * Shell listens for and routes through `activateSurface`. One seam, both producers — no component reaches
  * into routing directly. Mirrors the rail's existing event-to-shell navigation pattern.
  */
+import type { StateSnapshot } from '../router/types.js';
+
 export const NAVIGATE_TO_SURFACE_EVENT = 'jf-navigate-to-surface';
 
 export interface NavigateToSurfaceDetail {
   readonly surfaceId: string;
+  readonly state?: StateSnapshot;
 }
 
 /** Ask the shell to navigate to a surface (the "return to running job" action). */
-export function requestSurfaceNavigation(surfaceId: string): void {
+export function requestSurfaceNavigation(surfaceId: string, state?: StateSnapshot): void {
   if (typeof document === 'undefined') return;
   document.dispatchEvent(
     new CustomEvent<NavigateToSurfaceDetail>(NAVIGATE_TO_SURFACE_EVENT, {
-      detail: { surfaceId },
+      detail: { surfaceId, ...(state ? { state } : {}) },
     }),
   );
 }
