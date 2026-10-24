@@ -24,6 +24,7 @@ public record SandboxExtractionResponse(
     String visualExtractionEvidenceJson,
     String errorMessage,
     String reasonCode) {
+  static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
   public static final int CURRENT_SCHEMA_VERSION = SandboxExtractionRequest.CURRENT_SCHEMA_VERSION;
   static final int MAX_IDENTIFIER_CHARS = 96;
   static final int MAX_ERROR_MESSAGE_CHARS = 512;

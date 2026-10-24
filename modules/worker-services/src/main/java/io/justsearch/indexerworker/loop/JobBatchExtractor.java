@@ -3,10 +3,12 @@ package io.justsearch.indexerworker.loop;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.indexerworker.extract.ContentExtractor;
 import io.justsearch.indexerworker.extract.ContentExtractor.BudgetExceededException;
 import io.justsearch.indexerworker.extract.ExtractionArtifact;
 import io.justsearch.indexerworker.extract.SandboxExtractionException;
+import io.justsearch.indexerworker.extract.SandboxServiceUnavailableException;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor.ExtractionTimeoutException;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
@@ -15,6 +17,7 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.indexerworker.loop.ops.BatchStats;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
@@ -32,6 +35,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -79,6 +83,8 @@ public final class JobBatchExtractor {
   private final LongConsumer indexedDelta;
 
   private boolean indexEmptyForBatch;
+  private final BatchServiceFailures identityFailures = new BatchServiceFailures();
+  private final BatchServiceFailures extractionFailures = new BatchServiceFailures();
 
   public JobBatchExtractor(
       WorkerIngestionAuthority ingestionAuthority,
@@ -127,22 +133,54 @@ public final class JobBatchExtractor {
    * empty index (312 item 10).
    */
   public List<ExtractedJob> extractAll(List<JobQueue.IndexJob> jobs) {
-    indexEmptyForBatch = indexKnownEmpty();
+    try {
+      return extractForBatch(jobs);
+    } finally {
+      long delay = prepareRetry();
+      finishBatch(System.currentTimeMillis() + delay);
+    }
+  }
 
+  /** The running loop completes both services together after the write phase. */
+  List<ExtractedJob> extractForBatch(List<JobQueue.IndexJob> jobs) {
+    identityFailures.begin();
+    extractionFailures.begin();
+    indexEmptyForBatch = indexKnownEmpty();
     List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
     for (JobQueue.IndexJob job : jobs) {
       if (!running.get()) break;
-
       ExtractedJob ex = extractJob(job);
-      if (ex != null) {
-        extracted.add(ex);
-      }
-      // Tempdoc 885 item 3: extraction is the CPU-heaviest step in the batch, so it paces per
-      // file. The predecessor abandoned the rest of the batch on user activity; the duty cycle
-      // slows it instead, which is why arm (c) can still make progress under continuous search.
+      if (ex != null) extracted.add(ex);
+      // Pace extraction per file while keeping the remaining claims owned by this batch.
       indexingPacing.pace();
     }
     return extracted;
+  }
+
+  void pipelineSucceeded() {
+    identityFailures.success();
+    extractionFailures.success();
+  }
+
+  long prepareRetry(BooleanSupplier canary) {
+    return Math.max(identityFailures.prepareRetry(canary), extractionFailures.prepareRetry(canary));
+  }
+
+  long prepareRetry() {
+    return Math.max(identityFailures.prepareRetry(), extractionFailures.prepareRetry());
+  }
+
+  void finishBatch(long retryAtMs) {
+    identityFailures.finish(retryAtMs);
+    extractionFailures.finish(retryAtMs);
+  }
+
+  long retryDelayMs() {
+    return Math.max(identityFailures.retryDelayMs(), extractionFailures.retryDelayMs());
+  }
+
+  boolean deferredBatch() {
+    return identityFailures.deferredBatch() || extractionFailures.deferredBatch();
   }
 
   /**
@@ -175,6 +213,7 @@ public final class JobBatchExtractor {
 
     long startTime = System.currentTimeMillis();
     FileEnvelope envelope = null;
+    Path sourceRealPath = null;
 
     try {
       SourceAdmission admission = ingestionAuthority.admit(claim);
@@ -213,31 +252,37 @@ public final class JobBatchExtractor {
         return null;
       }
       envelope = admission.envelope();
-      // Tempdoc 419 / T5.2 (ADR-0028): record (pathHash, normalizedPath) into the scoped
-      // reverse-lookup store so the activity panel can later answer "which file is this hash?".
-      pathResolutionStoreSupplier.get().record(
-          envelope.pathHash(), envelope.normalizedPath(), envelope.observedAtMs());
+      sourceRealPath = filePath.toRealPath();
       String docUid;
+      DocumentIdentityStore identityStore = null;
       try {
-        docUid =
-            documentIdentityStoreSupplier
-                .get()
-                .resolve(envelope.pathHash(), envelope.observedAtMs())
-                .docUid();
+        // Tempdoc 419 / T5.2 (ADR-0028): record (pathHash, normalizedPath) into the scoped
+        // reverse-lookup store so the activity panel can later answer "which file is this hash?".
+        pathResolutionStoreSupplier.get().record(
+            envelope.pathHash(), envelope.normalizedPath(), envelope.observedAtMs());
+        identityStore = documentIdentityStoreSupplier.get();
+        docUid = identityStore.resolve(envelope.pathHash(), envelope.observedAtMs()).docUid();
       } catch (RuntimeException identityError) {
-        log.error("Document identity persistence failed for: {}", filePath, identityError);
         FileEnvelope admittedEnvelope = envelope;
-        journal.recordOutcomeSafely(
-            filePath,
-            "WRITE_FAILED(document_identity)",
-            () ->
-                jobQueue.markClaimFailed(claim,
-                    journal.outcome(
-                        IngestionOutcomeClass.WRITE_FAILED,
-                        IngestionReasonCodes.WRITE_FAILED,
-                        IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                        failureDetail(identityError)),
-                    ledgerEntry(filePath, admittedEnvelope, collection, null, provenance)));
+        Consumer<Boolean> recordFailure = systemic -> {
+          IngestionOutcome outcome = journal.outcome(
+              IngestionOutcomeClass.WRITE_FAILED,
+              IngestionReasonCodes.WRITE_FAILED,
+              systemic ? IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT
+                  : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+              failureDetail(identityError));
+          journal.recordOutcomeSafely(filePath, "WRITE_FAILED(document_identity)", () -> {
+            var entry = ledgerEntry(filePath, admittedEnvelope, collection, null, provenance);
+            if (systemic) jobQueue.deferClaim(claim, outcome, entry, identityFailures.retryAtMs());
+            else jobQueue.markClaimFailed(claim, outcome, entry);
+          });
+        };
+        if (identityStore == DocumentIdentityStore.UNAVAILABLE) {
+          // This receiver rejects every document independently of its content.
+          identityFailures.unavailable(identityError, recordFailure);
+        } else {
+          identityFailures.failure(identityError, filePath, sourceRealPath, recordFailure);
+        }
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
         return null;
@@ -329,120 +374,70 @@ public final class JobBatchExtractor {
       }
 
       return new ExtractedJob(
-          claim, artifact, startTime, envelope, sourceSha256, docUid);
+          claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath);
 
-    } catch (BudgetExceededException e) {
-      log.warn("Extraction budget exceeded for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "BUDGET_EXCEEDED",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.BUDGET_EXCEEDED,
-                      e.reasonCode(),
-                      IngestionRetryPolicy.NONE,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
+    } catch (IngestionServiceUnavailableException
+        | EngineExecutorRejectedException
+        | SandboxServiceUnavailableException unavailable) {
+      FileEnvelope admittedEnvelope = envelope;
+      extractionFailures.unavailable(unavailable, systemic -> journal.recordOutcomeSafely(
+          filePath, "WRITE_FAILED(shared_service)", () -> jobQueue.deferClaim(claim,
+              journal.outcome(IngestionOutcomeClass.WRITE_FAILED, IngestionReasonCodes.WRITE_FAILED,
+                  IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, failureDetail(unavailable)),
+              ledgerEntry(filePath, admittedEnvelope, collection, null, provenance),
+              extractionFailures.retryAtMs())));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
-    } catch (ExtractionTimeoutException e) {
-      log.warn("Extraction timeout for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "PARSER_TIMEOUT",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.PARSER_TIMEOUT,
-                      IngestionReasonCodes.PARSER_TIMEOUT,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (SandboxExtractionException e) {
-      log.warn("Extraction sandbox failed for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "SANDBOX_FAILED",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.SANDBOX_FAILED,
-                      IngestionReasonCodes.SANDBOX_FAILED,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (ContentExtractor.ExtractionException e) {
-      log.warn("Content extraction failed for: {} - {}", filePath, e.getMessage());
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "PARSER_FAILED(terminal)",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.PARSER_FAILED,
-                      IngestionReasonCodes.PARSER_FAILED,
-                      IngestionRetryPolicy.NONE,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (IOException e) {
-      log.error("IO error processing: {}", filePath, e);
-      FileEnvelope envelopeForLedger = envelope;
-      // Task t-20261013-ef3c41: an I/O failure on a source that exists but cannot be opened for
-      // reading (locked by another program, access denied), or whose folder is gone, is not a
-      // fault in the file: retry with growing back-off and no exhaustion, keeping its content.
-      IngestionOutcome ioOutcome = sourceAccessOutcome(claim, e);
-      journal.recordOutcomeSafely(
-          filePath,
-          "IO_FAILED",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  ioOutcome != null
-                      ? ioOutcome
-                      : journal.outcome(
-                          IngestionOutcomeClass.IO_FAILED,
-                          IngestionReasonCodes.IO_ERROR,
-                          IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                          failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-      journal.recordFailedMetric(filePath, null);
-      batchStats.recordFailed();
-      return null;
-    } catch (RuntimeException | Error e) {
+    } catch (IOException | ContentExtractor.ExtractionException | RuntimeException | Error e) {
       if (e instanceof VirtualMachineError fatal) throw fatal;
-      // The loop already recovers non-VM Errors. Attribute them to this unit so its bounded
-      // retry policy applies and an early bad document cannot starve the rest of the batch.
-      log.error("Failed to process: {}", filePath, e);
-      FileEnvelope envelopeForLedger = envelope;
-      journal.recordOutcomeSafely(
-          filePath,
-          "PARSER_FAILED(retryable)",
-          () ->
-              jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.PARSER_FAILED,
-                      IngestionReasonCodes.PARSER_FAILED,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
-                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
+      FileEnvelope admittedEnvelope = envelope;
+      IngestionOutcomeClass outcomeClass = extractionFailureClass(e);
+      IngestionOutcome original = extractionOutcome(claim, e, outcomeClass);
+      Consumer<Boolean> record = systemic -> journal.recordOutcomeSafely(filePath,
+          systemic ? "WRITE_FAILED(shared_service)" : outcomeClass.name(), () -> {
+            var entry = ledgerEntry(filePath, admittedEnvelope, collection, null, provenance);
+            if (systemic) jobQueue.deferClaim(claim,
+                journal.outcome(IngestionOutcomeClass.WRITE_FAILED, IngestionReasonCodes.WRITE_FAILED,
+                    IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, failureDetail(e)),
+                entry, extractionFailures.retryAtMs());
+            else jobQueue.markClaimFailed(claim, original, entry);
+          });
+      var presence = ingestionAuthority.presence(filePath, claim.ingestionRoot());
+      if (presence != SourcePresence.Verdict.ABSENT
+          && presence != SourcePresence.Verdict.SOURCE_UNREADABLE
+          && !BatchServiceFailures.sourceFailure(e, filePath, sourceRealPath)
+          && !(e instanceof IOException io && sourceAccessOutcome(claim, io) != null)) {
+        extractionFailures.failure(e, record);
+      } else record.accept(false);
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
     }
+  }
+
+  private static IngestionOutcomeClass extractionFailureClass(Throwable failure) {
+    if (failure instanceof BudgetExceededException) return IngestionOutcomeClass.BUDGET_EXCEEDED;
+    if (failure instanceof IOException) return IngestionOutcomeClass.IO_FAILED;
+    if (failure instanceof ExtractionTimeoutException) return IngestionOutcomeClass.PARSER_TIMEOUT;
+    if (failure instanceof SandboxExtractionException) return IngestionOutcomeClass.SANDBOX_FAILED;
+    return IngestionOutcomeClass.PARSER_FAILED;
+  }
+
+  private IngestionOutcome extractionOutcome(JobQueue.IndexJob claim, Throwable failure,
+      IngestionOutcomeClass outcomeClass) {
+    if (failure instanceof BudgetExceededException budget) {
+      return journal.outcome(outcomeClass, budget.reasonCode(), IngestionRetryPolicy.NONE, failureDetail(failure));
+    }
+    if (failure instanceof IOException io) {
+      IngestionOutcome source = sourceAccessOutcome(claim, io);
+      if (source != null) return source;
+    }
+    return journal.outcome(outcomeClass,
+        outcomeClass == IngestionOutcomeClass.IO_FAILED ? IngestionReasonCodes.IO_ERROR : outcomeClass.name(),
+        outcomeClass == IngestionOutcomeClass.PARSER_FAILED && failure instanceof ContentExtractor.ExtractionException
+            ? IngestionRetryPolicy.NONE : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+        failureDetail(failure));
   }
 
   /**

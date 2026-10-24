@@ -2,7 +2,6 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import static io.justsearch.adapters.lucene.runtime.LuceneRuntimeUtils.asString;
-import static io.justsearch.adapters.lucene.runtime.LuceneRuntimeUtils.classifyIOException;
 
 import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.io.IOException;
@@ -111,7 +110,7 @@ public final class CommitOps {
         try {
           LifecycleSnapshot snap = session.snapshot;
           IndexWriter w = snap != null ? snap.writer() : null;
-          if (w == null) throw new IllegalStateException("IndexWriter not available");
+          if (w == null || !w.isOpen()) throw new IndexWriterUnavailableException("IndexWriter not available");
           long pendingAtCommit = session.pendingDocs.get();
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
@@ -126,8 +125,10 @@ public final class CommitOps {
             session.commitCount.increment(trackedReason);
           }
           return new CommitResult(elapsedMs, pendingAtCommit);
+        } catch (org.apache.lucene.store.AlreadyClosedException closed) {
+          throw new IndexWriterUnavailableException("Index storage closed during commit", closed);
         } catch (IOException e) {
-          throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
+          throw IndexRuntimeIOException.fromIndexOperation(e, "Commit failed");
         }
       }
     } finally {
@@ -165,7 +166,7 @@ public final class CommitOps {
   private void refreshAdmissionReader() throws IOException {
     if (admissionManager == null) {
       var snapshot = session.snapshot;
-      if (snapshot == null) throw new IllegalStateException("Runtime closed during admission publication");
+      if (snapshot == null) throw new IndexWriterUnavailableException("Runtime closed during admission publication");
       var reader = new SoftDeletesDirectoryReaderWrapper(
           DirectoryReader.open(snapshot.writer(), true, true), session.softDeleteField);
       try {

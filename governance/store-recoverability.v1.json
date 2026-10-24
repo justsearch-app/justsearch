@@ -2156,6 +2156,10 @@
       "reason": "JVM/OS temp scratch: allocates and reaps files under java.io.tmpdir for in-flight work."
     },
     {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/PipelineCanary.java",
+      "reason": "JVM/OS temp scratch: one tiny built-in RTF marker for bounded extraction health probes, reused by a loop and deleted at loop close. It contains no user content or durable state. A missing file is recreated on demand; an incomplete write is retried before parsing, so losing it costs only another probe. Crash leftovers are disposable temp files."
+    },
+    {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactory.java",
       "reason": "Writes one JVM temp file for the extraction child's startup probe and deletes it in the same method (tempdoc 885 item 14)."
     },
