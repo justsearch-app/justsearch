@@ -23,6 +23,7 @@ import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.app.services.conversation.spi.RAGContext;
+import io.justsearch.app.services.conversation.spi.SelectionContextInjector;
 import io.justsearch.app.services.conversation.spi.UserPromptInjector;
 import io.justsearch.core.context.EngineContext;
 import java.nio.file.Files;
@@ -145,7 +146,7 @@ final class NoEvidencePersistenceTest {
 
   private ConversationEngine engine(Documents docs, Model model) {
     var rag = new RAGContext(docs);
-    List<ContextInjector> injectors = List.of(rag, UserPromptInjector.INSTANCE);
+    List<ContextInjector> injectors = List.of(rag, new SelectionContextInjector(docs, () -> model), UserPromptInjector.INSTANCE);
     return new ConversationEngine(ConversationShapeCatalog.of("core", List.of(
         shape(ASK, PersistenceMode.EPHEMERAL, rag.id()),
         shape(MODEL, PersistenceMode.PERSISTENT, UserPromptInjector.ID))), List.of(),

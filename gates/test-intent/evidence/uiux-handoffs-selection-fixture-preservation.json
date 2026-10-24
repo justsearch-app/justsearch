@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T00:14:44.479Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "86f08b80e15a24a5c096eb7a921d4e1cb7206ecd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.SelectionContextInjectorTest\" --tests \"io.justsearch.app.services.conversation.spi.SelectionContextInjectorLiteralTextTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3388
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f271165f09e90fd24fb84ae31af7b0254b6bb608e5e6997dab87914d7e6abc9e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ExtractShape declares the selection injector, before the user prompt",
+          "status": "passed"
+        },
+        {
+          "name": "non-summary selection variants never consult the summary input limit",
+          "status": "passed"
+        },
+        {
+          "name": "The text-range prefix follows the requesting shape, not a hardcoded summarize verb",
+          "status": "passed"
+        },
+        {
+          "name": "An item selection injects the real document content the extraction runs on",
+          "status": "passed"
+        },
+        {
+          "name": "ExtractShape declares the rag.citations event its selection injector emits",
+          "status": "passed"
+        },
+        {
+          "name": "every summarize selection source is checked before dispatch or truncation",
+          "status": "passed"
+        },
+        {
+          "name": "extractRefusesOmittedConversationContext()",
+          "status": "passed"
+        },
+        {
+          "name": "The injector's summarize-shape literal still matches SummarizeShape.ID",
+          "status": "passed"
+        },
+        {
+          "name": "extractRefusesUnreadableOrExcessMembersAndDeduplicatesDocuments()",
+          "status": "passed"
+        },
+        {
+          "name": "Every injector ExtractShape declares is a real, registered id",
+          "status": "passed"
+        },
+        {
+          "name": "extractRefusesEverySelectionTruncationThreshold()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorLiteralTextTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorLiteralTextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:10f1b54f3b1f8fceef06256a88947f433f94365d809998115ce46ee9255e310e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "item: the fetched document text is the verification text",
+          "status": "passed"
+        },
+        {
+          "name": "result-set: the arm stashes at all, with one source per injected document",
+          "status": "passed"
+        },
+        {
+          "name": "the citations attribute is derived from the same list, so the two cannot drift",
+          "status": "passed"
+        },
+        {
+          "name": "text-range: the selected slice is the verification text, not the preview",
+          "status": "passed"
+        },
+        {
+          "name": "inline excerpt: the excerpt IS the injected text when the doc cannot be fetched",
+          "status": "passed"
+        },
+        {
+          "name": "citation: the cited passage's slice is the verification text",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d8a048898a8ba3213f349e5f17f882b19340abbe60d4817051aed7a361cd30c5"
+}

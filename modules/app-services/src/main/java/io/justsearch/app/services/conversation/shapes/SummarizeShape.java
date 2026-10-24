@@ -13,6 +13,7 @@ import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.app.services.conversation.spi.DocAccess;
+import io.justsearch.app.services.conversation.spi.UserPromptInjector;
 import io.justsearch.app.services.conversation.spi.SelectionContextInjector;
 import io.justsearch.app.services.conversation.spi.StreamingCitationMatcher;
 import io.justsearch.app.services.conversation.spi.SummarizationStyle;
@@ -78,7 +79,7 @@ public final class SummarizeShape {
         IterationMode.ONE_SHOT,
         PersistenceMode.EPHEMERAL,
         List.of(SummarizationStyle.ID),
-        List.of(SelectionContextInjector.ID, DocAccess.ID),
+        List.of(SelectionContextInjector.ID, DocAccess.ID, UserPromptInjector.ID),
         List.of(StreamingCitationMatcher.ID, SummaryDoneEnricher.ID),
         SingleHopController.ID,
         EventDescriptor.namesOnly(EVENT_SCHEMA),

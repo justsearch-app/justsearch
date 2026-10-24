@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T20:26:24.655Z",
+  "revision": "1573b367b21a217facca0517d5153a1b325e7865",
+  "tree": "42d2b113af66e6d5bfeef072ba0a03fb90af2eeb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-904750-1792787180988.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 976
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts#merge model action overrides forced hand-off shape and omits its inputs",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf186ab775975b05c2990dd20aaa9c170b948b73b614e09944452451e4fcf00e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "merge model action overrides forced hand-off shape and omits its inputs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1573b367b",
+    "revision": "1573b367b21a217facca0517d5153a1b325e7865",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-904750-1792787183289.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1164,
+        "output": "JSON report written to /home/elias/.cache/am/kqzf3_ey/tmp/test-intent-vitest-904750-1792787183289.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts#merge model action overrides forced hand-off shape and omits its inputs",
+        "classification": "assertion",
+        "detail": "merge model action overrides forced hand-off shape and omits its inputs:  AssertionError: expected 'core.summarize' to be 'core.free-chat' // Object.is equality\n    at /home/elias/.cache/am/kqzf3_ey/tmp/test-intent-before-MQICur/modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts:20:26\n    at processTicksAndRejections (node:internal/process/task_queue"
+      }
+    ]
+  },
+  "digest": "sha256:62866cceff698da3838f1550b69675c1525c2654bbe74d81df957d5d759fc5b2"
+}
