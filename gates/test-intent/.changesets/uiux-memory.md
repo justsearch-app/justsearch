@@ -315,3 +315,16 @@ F1–F3 continuation: confirmation inputs now include key release; confirmed For
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "d1ok8pr2-verifier-5",
+  "verdict": "accept",
+  "digest": "sha256:e90feab51b71735777b11a9a7e18adfa0dc21d29f76fc28f56412a503acf535f",
+  "note": "Delegated choices match the brief; adaptations retain existing oracles; all cited evidence re-executed with assertion failures before and preservation passes on both. Test intent accepted. Product verdict remains FAIL: native HTTP replay deletes a replacement without consent (F4)."
+}
+```
