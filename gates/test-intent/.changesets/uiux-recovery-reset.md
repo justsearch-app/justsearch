@@ -701,3 +701,16 @@ Existing acceptance/rejection records are retained; this builder authors no acce
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-6-617qbg4b",
+  "verdict": "accept",
+  "digest": "sha256:1b22061960ef5553dc5b972e7dd7d271e1ba9229678ab03c954e8059fd75cebe",
+  "note": "42 checks rerun; intent and fail-before evidence valid. R2 startup failure is reported separately."
+}
+```
