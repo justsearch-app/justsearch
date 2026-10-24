@@ -53,7 +53,28 @@ author-session: codex-nested-removal-ci-921
           "location": "task t-20261024-ci-921 request"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineNativePointerBootMutationTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding",
+        "instrumentation"
+      ],
+      "whatMoved": "Decode the versioned prefix receipt and assert its exact scope with no exclusions instead of comparing its encoded payload to an obsolete bare string. Drain/remove the declared root in both parameterized variants. All operation ordering, mutation, durable revision, cancellation, reopen, producer-drain and removal assertions remain. Share the existing fixture with the new undeclared-parent regression check by giving its four-argument factory and record package visibility; remove the redundant removalRoot component.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "removal targets exactly the declared folder. Removing a folder nobody declared is a no-op, even when declared folders lie inside it, because a repeated or retried removal must never retire a folder the first one kept.",
+          "location": "task t-20261024-ci-921 user turn 2"
+        }
+      ]
     }
   ]
 }
 ```
+
+New check (kind: New, repaired contract): `EngineUndeclaredParentRemovalTest.undeclaredParentPreservesDeclaredChildAndRecordedJobs`. The owner decision above requires undeclared-parent removal to return zero and preserve the child declaration in memory and on disk, watcher registration, recorded queue state, and index contents. The check uses real Engine calls, SQLite admissions and a watcher registry, and asserts that no worker or index mutation is issued. This is an isolated new test file (exempt from the changed-existing-check gate), rather than an alteration of an existing oracle. On main 9c533e8e8 the identical new check fails with an assertion: undeclared-parent removal returns 3 instead of 0. It passes on the candidate (14 focused engine checks, zero failures and skips). Logs and JUnit XML are retained in the delivery evidence.
