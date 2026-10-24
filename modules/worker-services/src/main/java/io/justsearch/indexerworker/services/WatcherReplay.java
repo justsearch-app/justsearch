@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.services;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexerworker.loop.SourceContentHash;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -47,9 +48,18 @@ public final class WatcherReplay implements AutoCloseable {
     Path root = Path.of(debt.root());
     if (declarations == null || declarations.stream().noneMatch(binding ->
         root.equals(binding.path().toAbsolutePath().normalize())
-            && Objects.equals(normalizeCollection(binding.collection()),
-                normalizeCollection(debt.collection())))) {
+            && Objects.equals(rootOwnerCollection(binding.collection()),
+                rootOwnerCollection(debt.collection())))) {
       throw new IOException("Watcher reconciliation root is outside frozen migration declarations");
+    }
+    if (publisher != null) {
+      var returned = RootIdentity.capture(root);
+      if (returned.volume() == null || !returned.matchesReceipt(debt.rootIdentity())) {
+        throw new IOException("Watcher reconciliation root identity or volume is unproven: " + root);
+      }
+      // Observe before walking, and before waiting on claims deferred while the old watch was dead.
+      // Root uncertainty remains pending until all current path outcomes have committed.
+      publisher.resumeReconciledWatcherRoot(debt);
     }
     var scope = new PathPrefixScope(debt.root(), declarations.stream()
         .map(binding -> binding.path().toAbsolutePath().normalize())
@@ -80,7 +90,7 @@ public final class WatcherReplay implements AutoCloseable {
 
   public boolean covers(String path, String collection) {
     return outcomes.containsKey(path)
-        && Objects.equals(normalizeCollection(collection), normalizeCollection(debt.collection()));
+        && Objects.equals(rootOwnerCollection(collection), rootOwnerCollection(debt.collection()));
   }
 
   /** Candidate survivor names only; callers must verify each selected path before using it. */
@@ -101,10 +111,6 @@ public final class WatcherReplay implements AutoCloseable {
 
   /** Apply at the receipt's accepted position, after preceding writers have drained. */
   public void apply() throws IOException {
-    requireIdentity();
-    // Returned loop devices can have a new device number. The live writer must use the
-    // freshly matched registration while processing this attempt's captured source hashes.
-    if (publisher != null) publisher.resumeReconciledWatcherRoot(debt);
     requireIdentity();
     target.commitOps().maybeRefreshBlocking();
     for (var outcome : outcomes.entrySet()) {
@@ -154,8 +160,8 @@ public final class WatcherReplay implements AutoCloseable {
     if (publisher != null) {
       for (var exact : uncertainties) {
         if (debt.root().equals(exact.debt().root())
-            && Objects.equals(normalizeCollection(debt.collection()),
-                normalizeCollection(exact.debt().collection()))
+            && Objects.equals(rootOwnerCollection(debt.collection()),
+                rootOwnerCollection(exact.debt().collection()))
             && difference.rootIdentity().matchesReceipt(exact.debt().rootIdentity())) {
           publisher.watcherRootReconciled(exact.debt(), List.of(exact));
         }
@@ -205,6 +211,12 @@ public final class WatcherReplay implements AutoCloseable {
 
   private static String normalizeCollection(String collection) {
     return collection == null || collection.isBlank() ? null : collection;
+  }
+
+  /** Authored roots omit the index-default bucket; live watchers name it explicitly. */
+  static String rootOwnerCollection(String collection) {
+    return IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection)
+        ? null : normalizeCollection(collection);
   }
 
   @Override public void close() throws IOException { difference.close(); }

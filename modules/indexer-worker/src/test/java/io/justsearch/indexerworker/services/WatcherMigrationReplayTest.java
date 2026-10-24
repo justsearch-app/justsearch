@@ -92,7 +92,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"offline", "unreadable", "incomplete", "volume", "identity", "generation", "foreign-generation", "key", "membership"})
+  @ValueSource(strings = {"offline", "unreadable", "incomplete", "volume", "identity", "generation", "foreign-generation", "key", "membership", "collection"})
   void uncertainEvidenceKeepsEveryReceiptAndCannotDelete(String invalid) throws Exception {
     try (var f = new Fixture()) {
       Path gone = f.file("gone.txt", "retained");
@@ -104,6 +104,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
           ? f.queue.putSwitchBufferForGeneration(invalid.equals("generation") ? "green" : "another", key,
               WatcherRootReconciliation.OPERATION, debt.encode())
           : f.queue.putSwitchBuffer(key, WatcherRootReconciliation.OPERATION, debt.encode()));
+      var before = f.queue.listSwitchBufferOpsStrict();
       Files.delete(gone);
       Path displaced = temporary.resolve("displaced");
       if (invalid.equals("offline")) Files.move(f.root, displaced);
@@ -111,7 +112,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       if (invalid.equals("unreadable")) Files.setPosixFilePermissions(f.root, java.util.Set.of());
       if (invalid.equals("volume")) RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(true);
       if (invalid.equals("membership")) f.roots = List.of();
-      var before = f.queue.listSwitchBufferOpsStrict();
+      if (invalid.equals("collection")) f.roots = List.of(new ResolvedConfig.FileSource(f.root, "another-owner"));
       try {
         assertTrue(f.prepare().isEmpty());
         assertEquals(before, f.queue.listSwitchBufferOpsStrict());
@@ -121,6 +122,53 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
         if (invalid.equals("unreadable")) Files.setPosixFilePermissions(f.root,
             java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"unchanged", "same-stamp"})
+  void implicitDefaultDeclarationKeepsTheLiveWatchersLabelAndCurrentContent(String change)
+      throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.file("default.txt", "old bytes");
+      f.admit(file, null);
+      f.index(file, null);
+      assertNull(f.collection(file));
+      f.roots = List.of(new ResolvedConfig.FileSource(f.root, null));
+      var registry = new RootWatcherRegistry();
+      assertTrue(registry.watch(f.root.toString(), "default").watching());
+      f.usePublisher(registry);
+      var debt = new WatcherRootReconciliation(
+          f.root.toString(), RootIdentity.capture(f.root).toString(), "default");
+      assertTrue(f.queue.putSwitchBuffer(debt.key(), WatcherRootReconciliation.OPERATION, debt.encode()));
+      if (change.equals("same-stamp")) {
+        var stamp = Files.getLastModifiedTime(file);
+        Files.writeString(file, "new bytes");
+        Files.setLastModifiedTime(file, stamp);
+      }
+      var replay = f.prepare();
+      assertTrue(replay.isPresent(), "the persisted default and live default name own the same root");
+      assertEquals(change.equals("same-stamp") ? "new bytes" : "old bytes", f.content(file));
+      assertEquals("default", f.collection(file));
+      assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay.orElseThrow()));
+    }
+  }
+
+  @Test
+  void returnedWatcherStartsBeforeItsFreshFilesystemSnapshot() throws Exception {
+    try (var f = new Fixture()) {
+      var registry = org.mockito.Mockito.spy(new RootWatcherRegistry());
+      assertTrue(registry.watch(f.root.toString(), "notes").watching());
+      Path born = f.root.resolve("born-while-restoring.txt");
+      org.mockito.Mockito.doAnswer(call -> {
+        Files.writeString(born, "created as observation resumes");
+        return call.callRealMethod();
+      }).when(registry).registeredIdentity(f.root);
+      f.usePublisher(registry);
+      f.debt();
+      assertTrue(f.prepare().isPresent());
+      assertEquals("created as observation resumes", f.content(born));
+      assertEquals("notes", f.collection(born));
     }
   }
 
@@ -136,10 +184,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       var liveRegistry = new RootWatcherRegistry();
       assertTrue(liveRegistry.watch(f.root.toString(), "notes").watching());
       assertTrue(liveRegistry.watch(child.toString(), "child").watching());
-      f.publisher = new WorkerIngestService(f.queue, null, null, IndexingPacing.unthrottled(),
-          temporary, temporary, f.runtime, f.runtime, null, 0L);
-      f.publisher.setRootWatcherRegistry(liveRegistry);
-      f.publisher.setDeclaredRootsDirectory(temporary);
+      f.usePublisher(liveRegistry);
       f.debt();
       if (change.equals("unavailable")) Files.move(child, temporary.resolve("offline-child"));
       else {
@@ -216,6 +261,48 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(f.context()));
       assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
       assertEquals("current bytes", f.content(file));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void onlyRootDebtMayRecoverAfterTheSwitchingBudgetExpires(boolean rootDebt) throws Exception {
+    Path root = Files.createDirectory(temporary.resolve("deadline-root"));
+    var manager = new IndexGenerationManager(temporary.resolve("deadline-generations"));
+    String blue = manager.initializeOrLoad().state().active_generation();
+    String green = manager.startMigration("watcher-deadline").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    try (var f = new Fixture(root, temporary.resolve("deadline.db"),
+        manager.resolveGenerationPathStrict(green), green)) {
+      if (rootDebt) f.debt();
+      var replayContext = f.context();
+      Thread.sleep(10); // Exceed this invocation's real, one-millisecond cutover budget.
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      var attempted = new AtomicBoolean();
+      KnowledgeServerMigrationOps.runMigrationCutoverLoop(
+          new KnowledgeServerMigrationOps.CutoverContext(manager, f.queue,
+              () -> System.nanoTime() < until, () -> true, () -> null, 0, 1, 0,
+              () -> f.runtime, () -> true, () -> {},
+              LoggerFactory.getLogger(WatcherMigrationReplayTest.class), ignored -> {}, () -> {
+                attempted.set(true);
+                var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(replayContext);
+                assertTrue(replay.isPresent(), "returned root evidence must settle before promotion");
+                f.runtime.commitOps().commitWithBuildState(
+                    io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BuildState.COMPLETE,
+                    io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
+                IndexGenerationManager.State promoted;
+                try (var pointer = manager.beginNativePromotion(blue, green)) {
+                  promoted = pointer.promote();
+                }
+                assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(
+                    f.queue, replay.orElseThrow()));
+                return promoted;
+              }));
+      var state = manager.readStateBestEffort();
+      assertEquals(rootDebt, attempted.get());
+      assertEquals(rootDebt ? "IDLE" : "FAILED", state.migration_state());
+      assertEquals(rootDebt ? green : blue, state.active_generation());
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
     }
   }
 
@@ -380,7 +467,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
           for (var job : queue.pollPending(8)) {
             try {
               assertTrue(Files.isRegularFile(job.path()), "the fixture writer requires a present source");
-              index(job.path(), "notes");
+              index(job.path(), job.collection());
               runtime.commitOps().commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.DRAIN);
               assertTrue(queue.markClaimDone(job, io.justsearch.indexerworker.ingest.IngestionOutcome.of(
                   io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "INDEXED",
@@ -394,6 +481,12 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     }
 
     Path file(String name, String content) throws Exception { return Files.writeString(root.resolve(name), content); }
+    void usePublisher(RootWatcherRegistry registry) {
+      publisher = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+          temporary, temporary, runtime, runtime, null, 0L);
+      publisher.setRootWatcherRegistry(registry);
+      publisher.setDeclaredRootsDirectory(temporary);
+    }
     void admit(Path path, String collection) throws Exception {
       assertTrue(queue.enqueueAndBufferFileForGeneration(generation, JobQueue.EnqueueEntry.stat(path), collection));
       long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
@@ -408,11 +501,13 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       assertTrue(queue.putSwitchBuffer(debt.key(), WatcherRootReconciliation.OPERATION, debt.encode()));
     }
     void index(Path file, String collection) throws Exception {
-      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+      var fields = new java.util.HashMap<String, Object>(Map.of(
           SchemaFields.DOC_ID, file.toString(), SchemaFields.DOC_UID, file.toString(),
           SchemaFields.PATH, file.toString(), SchemaFields.FILENAME, file.getFileName().toString(),
-          SchemaFields.CONTENT, Files.readString(file), SchemaFields.COLLECTION, collection,
-          SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file), SchemaFields.IS_CHUNK, "false")));
+          SchemaFields.CONTENT, Files.readString(file),
+          SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file), SchemaFields.IS_CHUNK, "false"));
+      if (collection != null && !collection.isBlank()) fields.put(SchemaFields.COLLECTION, collection);
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
       runtime.commitOps().maybeRefreshBlocking();
     }
     String content(Path path) { return runtime.documentFieldOps().getDocumentField(path.toString(), SchemaFields.CONTENT); }

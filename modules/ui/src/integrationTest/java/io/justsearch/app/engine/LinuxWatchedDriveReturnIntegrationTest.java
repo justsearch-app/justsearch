@@ -423,7 +423,9 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           assertTrue(release.await(120, TimeUnit.SECONDS), "release the owned migration barrier");
         }
       };
-      try (var surviving = fixture(hook)) {
+      var surviving = fixture(hook);
+      CompletableFuture<Void> closing = null;
+      try {
         try {
           assertTrue(reached.await(30, TimeUnit.SECONDS), "real migration must reach " + point);
           awaitPhysicalWatcher(surviving, root, true, 10);
@@ -453,13 +455,13 @@ final class LinuxWatchedDriveReturnIntegrationTest {
             assertTrue(surviving.client.getStatus(CONTEXT).getMigration().getPauseReason()
                 .contains("Cutover fenced:"), "status must name the root evidence blocking cutover");
             assertEquals(1, surviving.count("migrationmountkept"), "the fenced Engine remains readable");
-            Thread.sleep(65_000); // evidence can return after the per-attempt SWITCHING budget
+            Thread.sleep(65_000); // A minute of refusal must preserve serving and automatic retry.
             assertEquals("SWITCHING", surviving.client.getStatus(CONTEXT).getMigration().getMigrationState());
             assertEquals(1, surviving.count("migrationmountkept"));
           }
           assertEquals(mount, volume.attachAndMount(false));
           if (restart) {
-            var closing = CompletableFuture.runAsync(() -> {
+            closing = CompletableFuture.runAsync(() -> {
               try { surviving.close(); }
               catch (Exception failure) { throw new java.util.concurrent.CompletionException(failure); }
             });
@@ -468,12 +470,14 @@ final class LinuxWatchedDriveReturnIntegrationTest {
                 && System.nanoTime() < until) Thread.sleep(10);
             assertTrue((boolean) inherited(surviving.server, "closeStarted"));
             release.countDown();
-            closing.get(60, TimeUnit.SECONDS);
           } else {
             release.countDown();
             assertPromotedDrive(surviving, root);
           }
         } finally { release.countDown(); }
+      } finally {
+        if (closing == null) surviving.close();
+        else closing.get(60, TimeUnit.SECONDS);
       }
       if (restart) {
         try (var restarted = fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.NO_HOOK)) {
@@ -554,7 +558,16 @@ final class LinuxWatchedDriveReturnIntegrationTest {
   private static void assertPromotedDrive(Fixture f, Path root) throws Exception {
     long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
     while (!survivingWriterAccepts(f) && System.nanoTime() < until) Thread.sleep(50);
-    assertTrue(survivingWriterAccepts(f), "one writable runtime must serve search and ingest");
+    Object admission = invoke(f.server.appServices(), "mutationAdmission", new Class<?>[0]);
+    String certainty;
+    try {
+      certainty = " runtimeCertain=" + invoke(admission, "runtimeReplayCertain", new Class<?>[0])
+          + " rootScopes=" + invoke(admission, "unavailableRoots", new Class<?>[0]);
+    } catch (NoSuchMethodException baseline) {
+      certainty = " replayCertain=" + invoke(admission, "replayCertain", new Class<?>[0]);
+    }
+    assertTrue(survivingWriterAccepts(f), "one writable runtime must serve search and ingest: "
+        + f.client.getStatus(CONTEXT).getMigration() + certainty);
     assertEquals("IDLE", f.client.getStatus(CONTEXT).getMigration().getMigrationState());
     awaitPhysicalWatcher(f, root, true, 60);
     f.awaitCount("migrationmountgone", 0);

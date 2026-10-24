@@ -1735,7 +1735,7 @@ public final class KnowledgeServerMigrationOps {
     }
     if (allApplied && removeAfterReplay) {
       try {
-        java.util.function.BooleanSupplier acknowledge = () -> {
+        BooleanSupplier acknowledge = () -> {
           int cleared = sbq.removeReplayedSwitchBufferOps(ops);
           context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
           return cleared == ops.size();

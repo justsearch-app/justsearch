@@ -829,8 +829,8 @@ public final class WorkerIngestService {
     var subscription = registry.subscription(root);
     if (subscription == null || !registry.isCurrentAndActive(subscription)
         || !subscription.rootIdentity().matchesReceipt(debt.rootIdentity())
-        || !java.util.Objects.equals(normalizeRootCollection(subscription.collection()),
-            normalizeRootCollection(debt.collection()))) {
+        || !java.util.Objects.equals(WatcherReplay.rootOwnerCollection(subscription.collection()),
+            WatcherReplay.rootOwnerCollection(debt.collection()))) {
       throw new IOException("Reconciled watcher root is not observed by its declared owner");
     }
   }
