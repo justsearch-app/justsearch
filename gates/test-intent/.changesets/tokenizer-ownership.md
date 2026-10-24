@@ -490,3 +490,13 @@ the scratch runner made by applying the recorded patch; the repository runner st
   "digest": "sha256:3958e2de710918570021f9b4e77ca82c744af93e61db730a0fdef1a6db0516f8"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16dd5-b321-79d2-bcbc-d2508f07b079",
+  "verdict": "accept",
+  "digest": "sha256:e9f2fbbaf588bec2490bbed98439e801facd58362dccd45e7403edf2a2a06940"
+}
+```
