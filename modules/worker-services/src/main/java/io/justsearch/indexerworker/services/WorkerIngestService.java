@@ -2059,7 +2059,7 @@ public final class WorkerIngestService {
       PathPrefixScope scope) {
     if (scope.excludedSubtrees().isEmpty()) writer.deleteByPathPrefix(scope.prefix());
     else writer.deleteByPathPrefixExcludingAcceptedSurvivors(
-        scope.prefix(), java.util.List.of(), scope.excludedSubtrees());
+        scope.prefix(), List.of(), scope.excludedSubtrees());
   }
 
   public DeleteByPathResponse deleteByPath(DeleteByPathRequest request, CallContext ctx) {
@@ -2097,7 +2097,7 @@ public final class WorkerIngestService {
             int jobsDeleted = scope.excludedSubtrees().isEmpty()
                 ? jobQueue.deleteByPathPrefix(pathPrefix)
                 : jobQueue.deleteByPathPrefixExcludingAcceptedSurvivors(
-                    scope.prefix(), java.util.List.of(), scope.excludedSubtrees());
+                    scope.prefix(), List.of(), scope.excludedSubtrees());
             if (jobsDeleted < 0) throw new IllegalStateException("Path-prefix queue deletion failed");
             ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
             log.info("deleteByPath complete: {} jobs deleted for prefix: {}", jobsDeleted, pathPrefix);

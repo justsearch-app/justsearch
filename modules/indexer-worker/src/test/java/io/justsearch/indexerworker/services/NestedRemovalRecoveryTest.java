@@ -63,7 +63,7 @@ final class NestedRemovalRecoveryTest extends LuceneExecutorTestBase {
     Path b = manager.resolveGenerationPathStrict(green);
     boolean replayCut = cut == Cut.REPLAY_COMMIT || cut == Cut.BEFORE_ACK || cut == Cut.AFTER_ACK;
     String frozen = null;
-    try (var first = new Fixture(base, a, b, cut, false, parent, child)) {
+    try (var first = new Fixture(base, a, b, cut, false)) {
       first.declareChild(child);
       first.seed(own, nested);
       first.armed.set(true);
@@ -77,7 +77,7 @@ final class NestedRemovalRecoveryTest extends LuceneExecutorTestBase {
       } else assertTrue(first.queue.listSwitchBufferOpsStrict().isEmpty());
     }
     if (replayCut) {
-      try (var interruptedReplay = new Fixture(base, a, b, cut, true, parent, child)) {
+      try (var interruptedReplay = new Fixture(base, a, b, cut, true)) {
         interruptedReplay.armed.set(true);
         assertThrows(Interrupt.class, () -> KnowledgeServerMigrationOps.drainSwitchBufferStrict(
             interruptedReplay.context(interruptedReplay.writer, green)));
@@ -88,7 +88,7 @@ final class NestedRemovalRecoveryTest extends LuceneExecutorTestBase {
       }
     }
     // No child declaration is restored here: a versioned receipt must retain its original scope.
-    try (var recovered = new Fixture(base, a, b, Cut.NONE, false, parent, child)) {
+    try (var recovered = new Fixture(base, a, b, Cut.NONE, false)) {
       if (migration) {
         KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(recovered.context(recovered.active, green));
         assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(
@@ -118,7 +118,7 @@ final class NestedRemovalRecoveryTest extends LuceneExecutorTestBase {
     final AtomicBoolean interrupted = new AtomicBoolean();
     final Path base;
 
-    Fixture(Path base, Path a, Path b, Cut cut, boolean replay, Path parent, Path child) throws Exception {
+    Fixture(Path base, Path a, Path b, Cut cut, boolean replay) throws Exception {
       this.base = base;
       var durableQueue = new SqliteJobQueue(temp.resolve("jobs.db"));
       durableQueue.open();

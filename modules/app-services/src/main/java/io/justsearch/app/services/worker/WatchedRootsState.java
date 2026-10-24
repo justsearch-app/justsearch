@@ -364,26 +364,6 @@ public final class WatchedRootsState {
     return driftCorrected.get(root);
   }
 
-  synchronized void removeRootAndNested(Path normalizedRoot) {
-    var statusBefore = statusContent();
-    retiredRoots.put(normalizedRoot, ++retirementRevision);
-    initializations.keySet().removeIf(root -> root.startsWith(normalizedRoot));
-    walkErrors.keySet().removeIf(p -> p.startsWith(normalizedRoot));
-    watchedRoots.remove(normalizedRoot);
-    walkCompleted.remove(normalizedRoot);
-    deleteDetectionUnverified.remove(normalizedRoot);
-    driftCorrected.remove(normalizedRoot);
-    lastVerifiedAt.remove(normalizedRoot);
-    collections.remove(normalizedRoot);
-    collections.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
-    watchedRoots.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
-    walkCompleted.removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
-    deleteDetectionUnverified.removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
-    driftCorrected.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
-    lastVerifiedAt.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
-      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
-  }
-
   synchronized void removeRootAndPersist(Path root) {
     var remaining = new java.util.HashMap<>(watchedRoots);
     remaining.remove(root);
@@ -399,14 +379,6 @@ public final class WatchedRootsState {
     lastVerifiedAt.remove(root);
     collections.remove(root);
     io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
-  }
-
-  synchronized void removeRootAndNestedAndPersist(Path normalizedRoot) {
-    var remaining = new java.util.HashMap<>(watchedRoots);
-    remaining.keySet().removeIf(p -> p.startsWith(normalizedRoot));
-    // Publish durable removal first. A failed write retains the live retry obligation too.
-    rootsStore.persistRoots(remaining, walkErrors, walkCompleted, collections);
-    removeRootAndNested(normalizedRoot);
   }
 
   synchronized void persist() {
