@@ -317,3 +317,14 @@ and GPU 0 for real-model device initialization; no running application or dev st
   "digest": "sha256:e9f2fbbaf588bec2490bbed98439e801facd58362dccd45e7403edf2a2a06940"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "602f2ee3-8f6d-4615-a933-4844103a7491",
+  "verdict": "accept",
+  "digest": "sha256:4589f7df8e795fe758b8b2f361776968658a613b0f48c6ac03a13448aef0b98f",
+  "note": "Audit after correction f97a480efd. Before-state read first: the three Adaptation items only add retirement-status instrumentation to mocked handles, no assertion removed or changed. The three New items add tokenizer-release oracles (exactly once, after retirement, none while live) and an opt-in real-model floor probe; no existing assertion removed; sources limited to owner words and a reproduced defect, agent scenarios disclaimed. Cited evidence files exist."
+}
+```
