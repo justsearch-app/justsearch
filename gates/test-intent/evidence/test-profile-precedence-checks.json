@@ -1,0 +1,3414 @@
+{
+  "kind": "supplemental-profile-precedence-repair-evidence",
+  "base": "dad7077a1",
+  "observedAtUtc": "2026-10-23T15:00:33Z",
+  "cause": "Task-injected JVM data/home properties at priority 500 and environment overrides at 400 masked YAML data_dir at 200. The guard must isolate OS profiles and clear these overrides, leaving test configuration precedence intact.",
+  "sourceSha256": {
+    "build-logic/build.gradle.kts": "f44ac6c3e3e0724e16efb39e9583049e33fe316cbac543c7b85692e5471d61d7",
+    "build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt": "8bba9ec97fbf75a106760f040f1d1f3b3c205d2f7b6aac8d5f2480c0d8b6b15d",
+    "scripts/governance/gates/test-intent/run-evidence.mjs": "1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java": "56c8917372b0568644109c237cfe594931f8b1073c33005fca47b39468392b5c"
+  },
+  "preflight": "No .agents/preflight exists.",
+  "clientRunner": "#!/usr/bin/env bash\nset -eu\nlabel=$1; tree=$2; shift 2\ncd \"$tree\"\nunset DISPLAY WAYLAND_DISPLAY\nexport GRADLE_USER_HOME=/home/elias/.gradle\nexport HOME=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/client-home-$label\" USERPROFILE=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/client-home-$label\"\nexport APPDATA=\"$HOME/AppData/Roaming\" LOCALAPPDATA=\"$HOME/AppData/Local\"\nexport XDG_CONFIG_HOME=\"$HOME/.config\" XDG_DATA_HOME=\"$HOME/.local/share\" XDG_CACHE_HOME=\"$HOME/.cache\" XDG_STATE_HOME=\"$HOME/.local/state\"\nexport JUSTSEARCH_HOME=\"$HOME/.justsearch\" JUSTSEARCH_DATA_DIR=\"$HOME/.justsearch\"\nexport VERIFIER_EVIDENCE=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t\"\nmkdir -p \"$HOME/.justsearch\"\nexec \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh\" \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/$label.memory.log\" -- js-gradle-slot ./gradlew \"$@\" -PskipWebBuild=true --console=plain\n",
+  "audit": {
+    "scope": "All JVM module test/integrationTest/systemTest/testFixtures source and resource trees; full default :test task selected per module, no product/system services borrowed.",
+    "patterns": "justsearch\\.data\\.dir|justsearch\\.home|JUSTSEARCH_(?:DATA_DIR|HOME)|data_dir|\\bDATA_DIR\\b|\\bHOME\\.(?:sysProp|envVar)|\\.dataDir\\(|EnvRegistry\\.(?:HOME|DATA_DIR)",
+    "modules": [
+      "adapters-lucene",
+      "configuration",
+      "app-engine",
+      "app-inference",
+      "app-launcher",
+      "app-observability",
+      "app-services",
+      "indexer-worker",
+      "ort-common",
+      "reranker",
+      "system-tests",
+      "telemetry",
+      "ui",
+      "worker-core",
+      "worker-services",
+      "app-api"
+    ],
+    "files": {
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java": {
+        "sha256": "7626830c12cf2dc0762676bf5249650687b614f1b6128339c80b33ab4c124b12",
+        "matchLines": [
+          671
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkReadRevisionGuardIntegrationTest.java": {
+        "sha256": "6910b02fb41f5995d0691097f3471323611c6b99ba02d68b4412be008dc4bc6b",
+        "matchLines": [
+          51
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkSearchIntegrationTest.java": {
+        "sha256": "98f6852f17840cf3193ef459891ca25fffcf3fe95100ae3fa2d990b81d2fe99b",
+        "matchLines": [
+          62
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ConfigWiringTest.java": {
+        "sha256": "f8f5f7e3f392a2cecf5f9059746311b4b8a95464091a8fc61ea0e45cb50e50ac",
+        "matchLines": [
+          69,
+          97,
+          121,
+          143,
+          160,
+          184,
+          208,
+          220,
+          235,
+          247,
+          259,
+          272
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FacetingIntegrationTest.java": {
+        "sha256": "035acbd042e0b2388670ff0159e8521119f7d6b56ca8ac77919c4834959b314a",
+        "matchLines": [
+          33,
+          108,
+          161,
+          205,
+          258,
+          322,
+          385
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FuzzySearchIntegrationTest.java": {
+        "sha256": "75b92557a113fb85632271083890902f859f21ea844ae509be5c89fd105f310a",
+        "matchLines": [
+          24,
+          68,
+          116
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/HybridSearchIntegrationTest.java": {
+        "sha256": "cbc8e650cbc61cd5c9cd2b5fed6ad07d71fe7d39b1aa0f7463ec45d4974ed9eb",
+        "matchLines": [
+          24,
+          66,
+          142,
+          274,
+          369,
+          418
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinatorDispatchTest.java": {
+        "sha256": "10d40602def8498128e04789a9c1c08aca56a6187f0c615b23d2c3238c5a25f0",
+        "matchLines": [
+          182
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IndexingIntegrationTest.java": {
+        "sha256": "0213ea53caa05364f68125791670d2cb30652b92f31b9349e0ea15c9169d133c",
+        "matchLines": [
+          140
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/LifecycleIntegrationTest.java": {
+        "sha256": "89498b83791420f88b03802e2a004ae7c72ae5d7fe4112d9d931b2475f2c78a7",
+        "matchLines": [
+          40,
+          77,
+          161,
+          222,
+          362,
+          444
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NrtGatingTest.java": {
+        "sha256": "36e753ae659ee845e29b489909331229bd97fabd4f1c6cdf11301445af15712e",
+        "matchLines": [
+          17
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NrtGatingTriggerTest.java": {
+        "sha256": "f03a39ba7c4cd7558f8c50992d6ee515c232ab8c71bcf8f6ab027313628270ba",
+        "matchLines": [
+          18
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NrtOnDemandRefreshTest.java": {
+        "sha256": "05c9967d3a39ec0456b17875cf35c9622e060fb04f37f03fb31d06fe185714c2",
+        "matchLines": [
+          34
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PathUpdateIntegrationTest.java": {
+        "sha256": "04d15cbbc0fc4e773c83e7041a1abd663535fb09076c0e8572e6d2491ef06a31",
+        "matchLines": [
+          25,
+          150,
+          199,
+          232,
+          285,
+          351,
+          424,
+          487
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java": {
+        "sha256": "c06a14d30ad8ed5d7e3981ff74efe579279d5646d74fab42e1f2a3207519dec5",
+        "matchLines": [
+          907
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RootCoverageCountsTest.java": {
+        "sha256": "5b4c771a350aedf8a29f38e37969b8d3798d51955b4c895def9f06e140493aea",
+        "matchLines": [
+          54
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SoftDeletesIntegrationTest.java": {
+        "sha256": "a0903ded41cdd54f196a966a4abe40ff5e320dfae397e99185cdac28fc5d71fc",
+        "matchLines": [
+          33,
+          75,
+          115
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SoftDeletesMetricsTest.java": {
+        "sha256": "7213a0820ab33d88c0dbb592a5d4de4cebf51445c8380b5cde842139a0c31094",
+        "matchLines": [
+          21,
+          56
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java": {
+        "sha256": "3ab734c48dc55e7d6d424a9a6112aca5d05e1a3c68a9cc32917912d059deb429",
+        "matchLines": [
+          49
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/StageCompletenessCountsTest.java": {
+        "sha256": "c7ad41a71bc539fc65d226704aa6ed548a3db40794056edae3bcf67be79613b8",
+        "matchLines": [
+          60
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/StatusArtifactContractTest.java": {
+        "sha256": "89aa92b46a1df089f71e5e8c88f11f4578a4687f1e5274f7a6960f874b339cce",
+        "matchLines": [
+          516
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/StatusCountsIntegrationTest.java": {
+        "sha256": "1dbb5ec9b123219c1026189328fe0f31b39e8c59724e7b9a64bf175753a2e256",
+        "matchLines": [
+          28
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextSearchIntegrationTest.java": {
+        "sha256": "08aa41d17cd6411f5bf39271eb3ca3e85ca9aa20189956eed9238d890dee8189",
+        "matchLines": [
+          35,
+          60,
+          111,
+          166,
+          199,
+          249,
+          284,
+          328,
+          370,
+          442,
+          515,
+          594,
+          635,
+          679,
+          773
+        ]
+      },
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/VectorSearchIntegrationTest.java": {
+        "sha256": "f591b722fe1b9b43757f7a91889310f269a873bf182331b79bbb1aef7374c0d0",
+        "matchLines": [
+          23,
+          87,
+          208,
+          240
+        ]
+      },
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/RuntimeManifestIncarnationTest.java": {
+        "sha256": "9242cae17def2a5fd82548d4e8fae7c1094c04cc62a099ea3fa280a4e3212fb8",
+        "matchLines": [
+          54
+        ]
+      },
+      "modules/app-api/src/test/java/io/justsearch/app/api/runtime/RuntimeManifestSchemaCompatibilityTest.java": {
+        "sha256": "c9fd5f271b23a66f863f1283a78807f89b14026898189d04161965b9de05e0df",
+        "matchLines": [
+          373,
+          387
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/AppliedConfigurationRevisionTest.java": {
+        "sha256": "e0393279e46d2c58d8c9c534d5b9353255ac8fe2c115547cdc492b67c8292095",
+        "matchLines": [
+          480
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java": {
+        "sha256": "1d4d980768f34c4fccfb5fb2a2a69fef69c3d1314741f6215fa378f15f6d55bb",
+        "matchLines": [
+          145
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/CpuChatPacesIndexingTest.java": {
+        "sha256": "aa3db93ccbf433df26fb8d4df682d64cd3f70dc78334cdc912566ac539a71839",
+        "matchLines": [
+          86
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDeviceLossWitnessTest.java": {
+        "sha256": "3bf95e6fda1ecd6f03945b453f821f730b97b3f4476e199ba3cb44c3144e86f8",
+        "matchLines": [
+          85
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExitTest.java": {
+        "sha256": "2ff435123c43de2e8885d13ba9a6e4923b491d3d6aabcb2b4e787fdfa45af2f3",
+        "matchLines": [
+          66
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGameDetectionWitnessTest.java": {
+        "sha256": "6fc3ed136fea5d61b720e6df88d8242f4a8c4e50ea05d4a132aa1202d12a850a",
+        "matchLines": [
+          151
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java": {
+        "sha256": "351cfd9c0828968f8b826de81ba41bf4a3b2854ae3ceecd72eeda02f7ece1d19",
+        "matchLines": [
+          153
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineLinuxRootVolumeLiveTest.java": {
+        "sha256": "9c52d1ad70e3861a42da7c6080edcc2e06d7b19897e1600df0db56739b21b81d",
+        "matchLines": [
+          35,
+          36,
+          116,
+          144,
+          145
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineQueuedRootOwnershipTest.java": {
+        "sha256": "a52b60e0028edd8090069d172d5068dfa0924f5b7d66d5dc3795e1ac38b1665d",
+        "matchLines": [
+          30,
+          31,
+          98,
+          99,
+          183,
+          192,
+          229,
+          230
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootConfigAuthorityTest.java": {
+        "sha256": "d2ea343cca16907b1e48207ed360bb3802ce7f52d483d231ab4c2609a7827d7d",
+        "matchLines": [
+          107,
+          132,
+          134,
+          144,
+          145,
+          156
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java": {
+        "sha256": "8da0029428a677cea045f48139e33377b5c4569b0cb8758a13e909242b204b5c",
+        "matchLines": [
+          161
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootIndexRecoveryTest.java": {
+        "sha256": "c2daf8899f52dc854c49039bfd2eb49ef60a10cd5a7ac0d216cb8dd55a67afa2",
+        "matchLines": [
+          608,
+          619,
+          730
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java": {
+        "sha256": "1a584b0f71b0c683f848337d48b6fef4c978d633644b606303791f43944b7f30",
+        "matchLines": [
+          83,
+          84,
+          95,
+          96
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java": {
+        "sha256": "b8642af54c451c4374cfc80b7fad0be216f88a49143460d08370c7d54eb3a354",
+        "matchLines": [
+          142,
+          157,
+          161,
+          492,
+          493
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarnessIsolationTest.java": {
+        "sha256": "03676880c6e2f470b42605c2cca861702e0ab4c3a58c9c19295f64ea24ccb381",
+        "matchLines": [
+          24,
+          32,
+          49,
+          53,
+          55,
+          58,
+          63,
+          64,
+          72,
+          76
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/QueryAssistDoesNotSlowIndexingTest.java": {
+        "sha256": "aa6db14fb3183a8201c4fb2ccc3d422d3b7583ac27c3cc93b1aa0e9fd4503abe",
+        "matchLines": [
+          145
+        ]
+      },
+      "modules/app-engine/src/test/java/io/justsearch/app/engine/VduGenerationDoesNotSlowIndexingTest.java": {
+        "sha256": "f2f0824c173460b00529c24c152e9636573a920f98998f3d0a06903ba9a093f6",
+        "matchLines": [
+          179
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLatchOrderTest.java": {
+        "sha256": "8bee5ebf5cd10da2bea63185cf961ec6af2db49ff518f3b6dbf5b47af4603c2d",
+        "matchLines": [
+          77
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLeftoverTest.java": {
+        "sha256": "e6dfdb876dbcd3b8af7f6e9b55c5312aa3e69dae2c236c95131e0f3d69e0469b",
+        "matchLines": [
+          84
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java": {
+        "sha256": "8a71ac75d9fb1c76724f9d5b65405ce040e2d4ab7cfaaf3dc318ffa52fa2796a",
+        "matchLines": [
+          130
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatDeviceLostStopFailureTest.java": {
+        "sha256": "3e0da7da2f4a2d103952168da81c843444a88fad005fcebc3df60e655618ac74",
+        "matchLines": [
+          35
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatFailureScopeTest.java": {
+        "sha256": "e82954ecdd1379aab49ba10e498dcb4902d5ec79c3fa9c4873dc6a4c032c5473",
+        "matchLines": [
+          85
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java": {
+        "sha256": "1171ed232f1034959c03081b06c8445cb6f680f710a6d2f9f57891d24e1d938b",
+        "matchLines": [
+          131
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java": {
+        "sha256": "a93dcb024e79068aceea9515ff900153c19692ee37a5f5efe9ececcbb0e688aa",
+        "matchLines": [
+          330
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProgressTest.java": {
+        "sha256": "bbcebbd35b8988236aacde6759eed4b9379002427da4d00bf6c942a4c1a9ecfe",
+        "matchLines": [
+          26
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/CpuCrashClassificationTest.java": {
+        "sha256": "3ecc64651394c22e7003de0ca7a57dcf190e32430bd7c8d7d240f0ed20744d7c",
+        "matchLines": [
+          19
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java": {
+        "sha256": "f894a1c8dfc5de04fcbf81d041b23e67387b3afe12c249c792bef4e1d68bde49",
+        "matchLines": [
+          115
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigArtifactIdentityTest.java": {
+        "sha256": "42ff649311f0352633a8782f013b80aa47c45ddcdf2827acc75aacfadceaf268",
+        "matchLines": [
+          62
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigFromEnvironmentTest.java": {
+        "sha256": "25ec81fdec24af33fb9267c9a2233c5fab782f82341812fc565cc8546d0fe4f4",
+        "matchLines": [
+          60,
+          62,
+          64,
+          66
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java": {
+        "sha256": "60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+        "matchLines": [
+          1725
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerPreservedChildTest.java": {
+        "sha256": "5a928de3411890e43167d9c8ad0eaf462c181a900b0781c758039512930f72b7",
+        "matchLines": [
+          40,
+          45
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java": {
+        "sha256": "f92b9f4f176b2430e90e1c82e29187dd387ea8cc9793b6a4915f930f4b36a83c",
+        "matchLines": [
+          440,
+          450
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java": {
+        "sha256": "5e4ff6ee7e4d1afd5a0196bda9ec9761fd93c411ce8b485a6e7ac0bb51bc5c06",
+        "matchLines": [
+          147
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java": {
+        "sha256": "545f1e633b05fc19cb7ae781aaf9179231bf106940bc1d0b55551923ac2347a9",
+        "matchLines": [
+          90
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java": {
+        "sha256": "f969b0623db9748f0c6df6882d3d694b579b3822fd8d61747483bb1774e35c4d",
+        "matchLines": [
+          192
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java": {
+        "sha256": "5b24d1f0c7bc36a1f39a62895f06c4a05234b521174424be7ca0a31c0c67db9f",
+        "matchLines": [
+          461
+        ]
+      },
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java": {
+        "sha256": "5c6f3735870ad2d238e84d724797fa75cafb1f982b625d656b668c128d29e286",
+        "matchLines": [
+          216,
+          411,
+          457
+        ]
+      },
+      "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherDataVersionMarkerTest.java": {
+        "sha256": "903f642bbe60a391aae58b1508fda28ef2731420203ea0c87a5f4cd81340e3ca",
+        "matchLines": [
+          29,
+          38,
+          47
+        ]
+      },
+      "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherEnvironmentCloseTest.java": {
+        "sha256": "201210067ee5754ea46e73b895fb040dbb71127844108e93ad99cbe24247c324",
+        "matchLines": [
+          38,
+          46,
+          51,
+          102,
+          179,
+          231,
+          326,
+          447,
+          448,
+          474,
+          497,
+          498,
+          507,
+          513
+        ]
+      },
+      "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherInternalsTest.java": {
+        "sha256": "77f6cf9ee292066e3664b64440ed50a3a09770e637162e2aeadbc58496833651",
+        "matchLines": [
+          31,
+          37,
+          39,
+          48,
+          59,
+          71,
+          76,
+          86,
+          91
+        ]
+      },
+      "modules/app-launcher/src/test/java/io/justsearch/applauncher/SmokeDriverTest.java": {
+        "sha256": "c3847d606e8514035ffd04b1e0cd71ff12f80970b3e6b63e6d3bca88ba1633ba",
+        "matchLines": [
+          108,
+          116,
+          333
+        ]
+      },
+      "modules/app-observability/src/test/java/io/justsearch/app/observability/LoggingRedactionGoldenTest.java": {
+        "sha256": "51437563a3309f058a109389eff5955b59ced7ec30976cc3798d0fcb416eed6f",
+        "matchLines": [
+          32
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java": {
+        "sha256": "dc57ff96a57452be8416d6dafc23197aee468b074e2f1015b5bbe8e985016a62",
+        "matchLines": [
+          63,
+          64,
+          68,
+          69,
+          86,
+          87,
+          88,
+          89,
+          387,
+          388,
+          438,
+          439,
+          729,
+          732,
+          733,
+          772,
+          774
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/AiPackImportServiceTest.java": {
+        "sha256": "03707222a9b6a8be6aae4a2238df0d906a990480fc86b0600ef0f1d2e77868e6",
+        "matchLines": [
+          71,
+          72,
+          718,
+          719,
+          721
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/AiPackOperationCompletionTest.java": {
+        "sha256": "63efb29677f539dc203b5cabd11019c0fe95e228689ea52554e3688a59227861",
+        "matchLines": [
+          41,
+          42,
+          43,
+          44,
+          48,
+          49
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/NoDeviceCpuActivationTest.java": {
+        "sha256": "a92642cfa1700b24c1defcf4f774e7ac811a13f4d8139d432b29e9858593b813",
+        "matchLines": [
+          19,
+          20,
+          39
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationAuthenticationTest.java": {
+        "sha256": "3fcf1ac6cabcdabe91266e7b88816782f1fd0202b3c57a58736936a7cebc05d4",
+        "matchLines": [
+          36,
+          40,
+          89,
+          90,
+          101,
+          105,
+          134,
+          135
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationAutomaticCpuTest.java": {
+        "sha256": "1e005ba66ab822a3ba82fb503c43bf4f06b13580a09a2b0c5f4ebd724d06a8ba",
+        "matchLines": [
+          37,
+          38,
+          49,
+          53,
+          54,
+          66
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java": {
+        "sha256": "4035b37b8bd57bec938dba623f06f87377eb473a3d4cd46316edc7f096ba399a",
+        "matchLines": [
+          144,
+          145
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCompletionTest.java": {
+        "sha256": "4f4b0f52813058b004157acc5bd30b319266e5e1a73a4635c507d32df799fe62",
+        "matchLines": [
+          58,
+          59,
+          98,
+          99,
+          105,
+          106,
+          121,
+          122,
+          168,
+          169,
+          190,
+          191
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuCommitTest.java": {
+        "sha256": "ad75cc6a1bcb913a2c2bbca0d977dd1c98abf12e2f1262c6629d6b1c7e600677",
+        "matchLines": [
+          41,
+          46,
+          47
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java": {
+        "sha256": "23310eac6e68d8ecc4a2b93c32cfffd68605515e0376c8e9a38c1c385ddcbf46",
+        "matchLines": [
+          74,
+          76,
+          109,
+          110
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestPromptCacheTest.java": {
+        "sha256": "09dfdc6100c7477070fc9473f489ab5f06b1bf20ecbf852025ee9137049a9119",
+        "matchLines": [
+          87,
+          88
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java": {
+        "sha256": "6ad0b64434fbf37557adc542d4794063b82f04f8d7ea92d4c8620ce2b23037bb",
+        "matchLines": [
+          89,
+          90
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestStopFailureTest.java": {
+        "sha256": "5cf574798efe10c102985b77993fa81897b720f591b881049087f4c6fb822c80",
+        "matchLines": [
+          114,
+          115
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java": {
+        "sha256": "7271a7a02ff255c8e9a045f6cbc16dddcce215f5ff9ceb344402ab693a21f7ee",
+        "matchLines": [
+          774,
+          775
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceExecutorTest.java": {
+        "sha256": "eee77b1744204824f5c8233387b38bac81ffa31f4ee2bb86e5e067cfce7e15f0",
+        "matchLines": [
+          47,
+          48,
+          54,
+          56
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java": {
+        "sha256": "10332ef04a6d1315b040288edc9b801a5624d16b952c0215c316b69bcfc00b65",
+        "matchLines": [
+          92,
+          93,
+          1156,
+          1157,
+          1158
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceVariantsRootTest.java": {
+        "sha256": "3eb830d6842027652549a5ebcf01010a55d26b60a3360a67f90c72b203533fed",
+        "matchLines": [
+          28,
+          82,
+          84,
+          195,
+          206,
+          208,
+          236,
+          247,
+          249
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeLinuxDeactivationTest.java": {
+        "sha256": "5c0b59c841915f2b104470a29d40671a0e33893069093e941514bf703ae5502c",
+        "matchLines": [
+          27,
+          32,
+          57
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/BootstrapInferenceFactoryCapturedConfigTest.java": {
+        "sha256": "4e4d03522b301db73ee7923c067227a925e52e91d00b8370531e68b7c8380a91",
+        "matchLines": [
+          77
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java": {
+        "sha256": "8bb4628996a1740a1dd47474d9a2203ebdb5f70267d667adc538c67a0ac026c2",
+        "matchLines": [
+          138,
+          139
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java": {
+        "sha256": "4d9811e7cbc874a02cd57d18ef1f3af1db625aa0c97335e9ba9617cf2d37d5c6",
+        "matchLines": [
+          217,
+          218
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java": {
+        "sha256": "f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+        "matchLines": [
+          130
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerBudgetTest.java": {
+        "sha256": "427c2f82e10ef49386d48075e7df4c7862468bef2e0fc3706a6a9195fe83327f",
+        "matchLines": [
+          16,
+          17,
+          39
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerTornLineTest.java": {
+        "sha256": "c3a923df40d1554441d1be584d1b2dffd0cf80eadbbbb907226f5754612fceae",
+        "matchLines": [
+          15,
+          16,
+          40
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplFeTelemetryTest.java": {
+        "sha256": "3195b5917ac898c53334197ef2d9dd50995dc5009ba0c8b0e288e68a4851e9e3",
+        "matchLines": [
+          32,
+          33,
+          39,
+          41
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsServiceImplRedactionTest.java": {
+        "sha256": "b647945683692d6074dd508f8a2d4707f9d60f8bebe6bf5ff936f91c98ad7d56",
+        "matchLines": [
+          39,
+          40,
+          42,
+          43,
+          49,
+          50,
+          154,
+          183
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/JvmCrashEvidenceTest.java": {
+        "sha256": "7f30a1a3cc5bfa0b97e5f474673a02c00d80eda0e3551555c27208334b1b2e14",
+        "matchLines": [
+          126,
+          127,
+          129,
+          130,
+          153,
+          154
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java": {
+        "sha256": "c6d3df3f6e26c9800d6dc066aa5e501455b5d34050eb39eb07f4c88725f1e760",
+        "matchLines": [
+          71,
+          72,
+          75,
+          76,
+          79,
+          80,
+          81,
+          82,
+          157
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/observability/runtime/RuntimeContextConfigBridgeTest.java": {
+        "sha256": "1359331e6a8ce2e18f0c73bfe4b5a0e5178488b41ec221174f4e962e3dfc0e5f",
+        "matchLines": [
+          85
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java": {
+        "sha256": "a4ed52dc445b812234b8402f4bc4247b0e0039abb7c683901014b453853d7532",
+        "matchLines": [
+          771,
+          772
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeServerConfigTest.java": {
+        "sha256": "088656531dd254b0dbb81ab82410a56883cf6b06f0fbb6097402e4178bb9c2ce",
+        "matchLines": [
+          16
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceCollectionScopeTest.java": {
+        "sha256": "ecf11c196f34d5179298f0cd1e528baf43759f38146fbc84083abcfd780f6043",
+        "matchLines": [
+          55,
+          57,
+          71,
+          73
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceContextBudgetTest.java": {
+        "sha256": "6b0aa38df28084d59ac853c0c874e4dde8493ed2c1e7c4af6ce308c5e656e611",
+        "matchLines": [
+          47,
+          49,
+          67,
+          69
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchPipelineTest.java": {
+        "sha256": "bf6ea7586f16f929d2a7ab0fb0abef643a3fc18f8215330fe662aa4b0088921d",
+        "matchLines": [
+          62,
+          64,
+          78,
+          80
+        ]
+      },
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootScanCollectionTest.java": {
+        "sha256": "e8c38ee0de415f76274c5ff1900f8db65146efdf07f5e833e3a85ec7574211b4",
+        "matchLines": [
+          272,
+          274,
+          294,
+          296
+        ]
+      },
+      "modules/configuration/src/test/java/io/justsearch/configuration/ConfigApplyRegisterTest.java": {
+        "sha256": "5580b2d94cd67976618861ae5fbbddee82d3a07da1e4f895d878c752368c189a",
+        "matchLines": [
+          71,
+          72
+        ]
+      },
+      "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java": {
+        "sha256": "ff7e1c593146e12cab3d2e21f2b73912729f4471d2266e7f59845b658e2e8594",
+        "matchLines": [
+          21,
+          30
+        ]
+      },
+      "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsContractTest.java": {
+        "sha256": "e3a9736f0180f081e00e8c0f1d1cbb7370deaca652587ab9ec9431603020d74d",
+        "matchLines": [
+          78,
+          101
+        ]
+      },
+      "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsTest.java": {
+        "sha256": "eee6ff070f45c87330ed777ba97703738d092447ceae32e1e566ce740ec09b90",
+        "matchLines": [
+          80,
+          82,
+          87,
+          89
+        ]
+      },
+      "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java": {
+        "sha256": "56c8917372b0568644109c237cfe594931f8b1073c33005fca47b39468392b5c",
+        "matchLines": [
+          22,
+          39,
+          40
+        ]
+      },
+      "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java": {
+        "sha256": "ab86ad21882ed142bf77a62691038d8d78b69b67b502f37387cd823203e97043",
+        "matchLines": [
+          223,
+          245,
+          675,
+          688,
+          705,
+          724,
+          729,
+          731,
+          860,
+          1195,
+          1196,
+          1198,
+          1301,
+          1304,
+          1312,
+          1314,
+          1569,
+          1573,
+          1576,
+          1585,
+          1586
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java": {
+        "sha256": "010c03f54bdfe94f39a1af5a02043845aab7d57cdcd937ba6b5abd838587cd0c",
+        "matchLines": [
+          230,
+          231
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/AutomaticRebuildPathsConsultTheBrakeTest.java": {
+        "sha256": "4aac2376e0ddfddb35377445ecb52dc2fcafbdd30a8fc0234462ab637024fa8f",
+        "matchLines": [
+          156,
+          159
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/BrakeExhaustedWorkerServesReadOnlyTest.java": {
+        "sha256": "be55645f38dc7ad6eea0a1e330c058e93551a330227f5d2b78834c58c4d0ab7c",
+        "matchLines": [
+          89,
+          90,
+          221,
+          222,
+          274,
+          276,
+          294
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CandidateJournalSnapshotTest.java": {
+        "sha256": "a0508672c30fd1c9cf8d5763de792f086a239c61aa8b0a9fc4343e215656819f",
+        "matchLines": [
+          87,
+          94
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootDeferredRootTest.java": {
+        "sha256": "de5c88ea2e98ab9a10b660043a794f57b4b802ad0e7f5b8d4947dcfa53adcf96",
+        "matchLines": [
+          197,
+          200,
+          225
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRemovedDeferredRootTest.java": {
+        "sha256": "f13d0b9c23181a3c7931e2c9402d74b34acc9fef30e37d2216fedaa128bcee30",
+        "matchLines": [
+          239,
+          242,
+          270,
+          278
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/CommittedBootRootReconciliationTest.java": {
+        "sha256": "b3b7d503db3b4c6e9470789926b736abc62ab8991339400819a9c8ebf2022dc8",
+        "matchLines": [
+          66,
+          69,
+          124,
+          134,
+          144,
+          147
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ConfiguredCollectionVolumeTest.java": {
+        "sha256": "bd6292aa7a20a21b23e476e764814b2d5beb12f3d7a677c37a702b0cd787b5c7",
+        "matchLines": [
+          171,
+          195,
+          207,
+          253
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ContextReplanIngestTest.java": {
+        "sha256": "a8dcbf32337fcd74cb3907dc6db1700324d62b8559aae54ca75aa8f716ec16ff",
+        "matchLines": [
+          35,
+          45,
+          53
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DeferredForcedIngestTest.java": {
+        "sha256": "f1bc555f491f2ab215241cd07c56298524e6d96144016252e65b268513ef4b13",
+        "matchLines": [
+          48,
+          58,
+          78
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportTest.java": {
+        "sha256": "940c1c607af7a7c8827e610ee1713bdd4aeabc5eeb234ea284a9ea4997c9a270",
+        "matchLines": [
+          62,
+          64,
+          68,
+          85,
+          86,
+          90,
+          102,
+          138,
+          149,
+          151,
+          182,
+          185,
+          187,
+          195,
+          217,
+          243,
+          245,
+          258,
+          320,
+          458,
+          460,
+          469,
+          471,
+          479
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/HeldBootPersonsRebuildTest.java": {
+        "sha256": "1e60b1ba0fbc4fc596ea3b7047e44141bcb589b616b034ff3062badb46906a16",
+        "matchLines": [
+          58,
+          115
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/IndexConfigurationProjectionTest.java": {
+        "sha256": "847748e0c72386567e71321e62e21b581d2bb045305df890bc37225f385cb7fc",
+        "matchLines": [
+          144
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerAvailabilityTest.java": {
+        "sha256": "cfa2cbcebed301731640953fd57746f2523269878587087d35361b46c060cd36",
+        "matchLines": [
+          80
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerCloseCompletionTest.java": {
+        "sha256": "c145895ef517769533a1c2b475e376ee5cdc173bedfbf177827c882ca88410dd",
+        "matchLines": [
+          67,
+          70
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerComponentObservationTest.java": {
+        "sha256": "b8f81aa0d5b4e1b146ae0ff04dccc44e3089cfb0c8fb87fef6052fb4fdd0b61e",
+        "matchLines": [
+          33,
+          106,
+          162,
+          215,
+          280,
+          334
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java": {
+        "sha256": "881798ed5a1cf1ebff2e99ea06e4eaa82f4b5d42a4c835f15642d20aed877b56",
+        "matchLines": [
+          156
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveMigrationTest.java": {
+        "sha256": "f75f69f3c7845bd5ab1b12c853e7eea1b6819040384d234a804102798fced903",
+        "matchLines": [
+          163,
+          165,
+          201,
+          203,
+          268,
+          270
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerPathRetentionTest.java": {
+        "sha256": "500459b896d349262a3313e5b33116746533bf560b6093cc1dc16ddf902ce277",
+        "matchLines": [
+          130
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationTransactionTest.java": {
+        "sha256": "87537d4a96fc714b761736a1ba1e245736f3e589c35f9c52abf7d2d906074cfb",
+        "matchLines": [
+          60,
+          304
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java": {
+        "sha256": "1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0",
+        "matchLines": [
+          35,
+          512,
+          529,
+          567
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java": {
+        "sha256": "5e0ba7a2134c44680b1dbfb4ca058fe5ba59394e60c50af86fc424ac34e4fc00",
+        "matchLines": [
+          63,
+          135,
+          174,
+          230,
+          234,
+          275,
+          278,
+          296,
+          306,
+          319,
+          684,
+          753,
+          836,
+          904,
+          976,
+          1047,
+          1148,
+          1232,
+          1327,
+          1412,
+          1438,
+          1463,
+          1464,
+          1465,
+          1466,
+          1468,
+          1469,
+          1473,
+          1480,
+          1481,
+          1489,
+          1490,
+          1491,
+          1504,
+          1510,
+          1516,
+          1519,
+          1527,
+          1528,
+          1529,
+          1532,
+          1535,
+          1541,
+          1559,
+          1560,
+          1561,
+          1570,
+          1571,
+          1572,
+          1583,
+          1588,
+          1603,
+          1612,
+          1632,
+          1638,
+          1686,
+          1703
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java": {
+        "sha256": "30267a63d63589403f21390306cda7b18723cd978bd050a00fba2f02ecacab96",
+        "matchLines": [
+          64,
+          88,
+          147,
+          310,
+          406,
+          491,
+          1145
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerStartupConfigurationTest.java": {
+        "sha256": "2ff1e2e7029a07e35bce236c655ef71c450b04daf21eea40e3229cecd8fe61ea",
+        "matchLines": [
+          236,
+          501
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostBrakeStateBootTest.java": {
+        "sha256": "a489d5ab60d919baddfe0de1910351467afb1c86db409c5067c6c25d6516844d",
+        "matchLines": [
+          72,
+          75,
+          114,
+          117,
+          152,
+          155
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java": {
+        "sha256": "5dc10b1fbc86ca26bfc3fd56e6ccccec576ba7137332c3f6eb01f50fd361f429",
+        "matchLines": [
+          168,
+          204,
+          211,
+          253
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/MigrationJournalDurabilityBootTest.java": {
+        "sha256": "8c84953e9e099ed2c7a94090cc3adbfa9fec83bfae347ed76a1328254c761d8d",
+        "matchLines": [
+          37,
+          39,
+          40,
+          69,
+          71,
+          79,
+          81,
+          88,
+          90,
+          92,
+          99,
+          106,
+          118,
+          124,
+          130,
+          137,
+          149,
+          156,
+          180,
+          186
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java": {
+        "sha256": "b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783",
+        "matchLines": [
+          210
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java": {
+        "sha256": "e8cbbfa1228109424aa5cb849173e842c34f067c4588e0c10428b4b7eac06ca6",
+        "matchLines": [
+          65,
+          67,
+          86,
+          99,
+          123,
+          145,
+          147,
+          174,
+          189,
+          196,
+          203,
+          329,
+          333,
+          353,
+          355,
+          375,
+          390,
+          417,
+          484,
+          496,
+          521,
+          523,
+          540,
+          542
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryPrewarmFixture.java": {
+        "sha256": "03e1752ce152ab793426f018fc9a83ab6a61b6e85732a4bdcd41e2bb7a450d61",
+        "matchLines": [
+          347
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java": {
+        "sha256": "f5d60dcafe12804f42bcb9aac4b90d6f7b95dccfd8e658240059ee6a00435da6",
+        "matchLines": [
+          451,
+          500,
+          650,
+          781
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ResumedMigrationMismatchBootTest.java": {
+        "sha256": "5403c10f1e23c1d59380566144c0af599fd32bf07eed3f6b1a1556c67b34f737",
+        "matchLines": [
+          69,
+          70
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/UpgradeRootVolumeSeedingTest.java": {
+        "sha256": "628ed5930ad22b5de07b19620c06482d5353e4e292990a7cb106722f22a4590d",
+        "matchLines": [
+          223,
+          226,
+          255,
+          266,
+          302
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WatcherReloadRetryTest.java": {
+        "sha256": "7f672325a4b2e3c5b9193cbaa0e1290a7a23ebf5dfe6445901481480c8ea886d",
+        "matchLines": [
+          31,
+          35,
+          50
+        ]
+      },
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WorkerBootFixture.java": {
+        "sha256": "a43f5b12f71351b4bcdce68495810888ca1409330954ee34d0e71d23d8f08947",
+        "matchLines": [
+          152,
+          174
+        ]
+      },
+      "modules/indexer-worker/src/test/resources/upgrade-030/README.md": {
+        "sha256": "24308a48599ef302e12de925bfb4f8c1f7d472e605a34f4d02a893c04ad837c1",
+        "matchLines": [
+          54,
+          55
+        ]
+      },
+      "modules/ort-common/src/test/java/io/justsearch/ort/OrtOptimizedModelStoreTest.java": {
+        "sha256": "e83ab794a4f1d9f764ef23bfd2841004bd27603ffeb56bad9ccceb64b4735fe1",
+        "matchLines": [
+          591
+        ]
+      },
+      "modules/reranker/src/test/java/io/justsearch/reranker/OnnxModelDiscoveryTest.java": {
+        "sha256": "509ea4ffe17323b78126be8dd0c9ace6c19a082071d32efd03068f0901131426",
+        "matchLines": [
+          195,
+          203,
+          208,
+          219,
+          220,
+          298,
+          303,
+          318,
+          319
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/GoldenCorpusIntegrationTest.java": {
+        "sha256": "9b2cc5a30e73161baa869e76d8df9d58cd13c42cf9960eddbbdf6427318f791f",
+        "matchLines": [
+          116,
+          118,
+          119
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/PassageRetrievalIntegrationTest.java": {
+        "sha256": "95be8b0725770d8383744124d8b72557d924dfe964bfbf58ac983c519bcd04b3",
+        "matchLines": [
+          84
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/ProductionRouteTokenWalkTest.java": {
+        "sha256": "d212248d19e9954482dc88d1eed345d49241068d2d042d8e2edc123a0e3d107d",
+        "matchLines": [
+          26
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/ai/RagQualityEvalTest.java": {
+        "sha256": "6af8851485ff54944cf29ca4b2910562b42f270e9c936cfc837daede5e3f89cf",
+        "matchLines": [
+          994,
+          995
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/api/HttpAiQualityTest.java": {
+        "sha256": "3425a67e60b2aa11a2b9650ed880309bf941204b0635afcb433c69d716409f11",
+        "matchLines": [
+          28,
+          34,
+          494
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/api/IngestStarvationE2ETest.java": {
+        "sha256": "6b2bc5f7db42f4922d2f63a2e1089f35682f359f495c80975e1877584496ab29",
+        "matchLines": [
+          253
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/api/IngestionDiagnosticsContractTest.java": {
+        "sha256": "55e23bbf06b323a46981ce193fef5b20adc41659fcda8474a3a22adc1af92d53",
+        "matchLines": [
+          80,
+          132,
+          181,
+          220
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/api/WorkerBootRecoveryE2ETest.java": {
+        "sha256": "63f90795d379d8e1bb9091b8d5bfe6e4d16a79e89b1f8342221a7f399ae914c6",
+        "matchLines": [
+          130
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/chaos/ExtractionSandboxOrphanE2ETest.java": {
+        "sha256": "a1ea1447eb39db8734b4df436e9fc9541301634d17237d5dcdf3996b27b40d19",
+        "matchLines": [
+          314
+        ]
+      },
+      "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/harness/IsolatedBackendFixture.java": {
+        "sha256": "073b624b59d3e505862f04b665b3aaf724fdaf9760dc286603982de4d9ee8619",
+        "matchLines": [
+          27,
+          169,
+          223,
+          305,
+          309
+        ]
+      },
+      "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java": {
+        "sha256": "915cb5f886c4d669d8f1ec98799a64be36c638e556053a6513775258e42eb813",
+        "matchLines": [
+          652,
+          660
+        ]
+      },
+      "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/provisioning/TestEnvironmentProvisioner.java": {
+        "sha256": "84d5a19df5d8c92588708464004da759a311af7ce76e5b0eca50a82405b5759e",
+        "matchLines": [
+          180
+        ]
+      },
+      "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java": {
+        "sha256": "ab9ddcd5a4163a213a2fd702f8f27c102d452f77c6ad431fc4e50f442a3b8136",
+        "matchLines": [
+          381,
+          389
+        ]
+      },
+      "modules/telemetry/src/test/java/io/justsearch/telemetry/CollectorSmokeIT.java": {
+        "sha256": "1067a86956a127f7c5e90ec5d5dbcef11b0881a1a817dc64f1e4e0ff729fc9cc",
+        "matchLines": [
+          33
+        ]
+      },
+      "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java": {
+        "sha256": "f47e4746efd659004f1cae48ab33f2b2da925187ac6e626d7b4253162ac3f556",
+        "matchLines": [
+          583,
+          602,
+          604,
+          844,
+          845
+        ]
+      },
+      "modules/ui/src/integrationTest/java/io/justsearch/indexerworker/server/PlannedSettingsQueryOwner.java": {
+        "sha256": "16d4330dd2baf9476bf9e04f20b9f39de4c98c6b461577484d2f6e28a5f1f301",
+        "matchLines": [
+          30
+        ]
+      },
+      "modules/ui/src/integrationTest/java/io/justsearch/ui/api/LocalApiIntegrationTestBase.java": {
+        "sha256": "f1eb70ab31f0d5a71930c203b828a8f41498075541dcafac2cf4616fd78f32e5",
+        "matchLines": [
+          53,
+          54,
+          62,
+          63,
+          188,
+          189
+        ]
+      },
+      "modules/ui/src/integrationTest/java/io/justsearch/ui/api/SchemaMismatchStatusContractTest.java": {
+        "sha256": "217b3f9d9eb18454753b629dd588cd0bcc5fe1d0780fbe4d79dbb29f6c146e09",
+        "matchLines": [
+          66,
+          73,
+          100,
+          176
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentRegistryCoverageTest.java": {
+        "sha256": "aa181e5ec6ed036cb908fcf9d55f80f534793ff76e21e49e748c02a763aeed4a",
+        "matchLines": [
+          48,
+          49,
+          68
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppConfigRebuildOrderingTest.java": {
+        "sha256": "389048c554e926f0870ba8de8a3403dde5d19839ec058552d7ea7b5c682ad258",
+        "matchLines": [
+          115,
+          120,
+          142
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppEngineDeviceLossChainTest.java": {
+        "sha256": "36ea46c83b2c6bdc8fbf173587124281fa29c9e8ad63a1079364062c8cf1d5f0",
+        "matchLines": [
+          143
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureProbe.java": {
+        "sha256": "f76e1d18f212e018d4460fba428e69e1d9e207f88974519ea1b4d168f2dc73c3",
+        "matchLines": [
+          17
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerSaturationTest.java": {
+        "sha256": "e5be10cfce662cbc70de42481ed81476c5fd630f540bece4aa2257d3e7f8e8c0",
+        "matchLines": [
+          80,
+          81,
+          171,
+          172
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java": {
+        "sha256": "f5649542d592b825f8575a49c213ad3943cfc9862f7b39d93015ef4a3c03179d",
+        "matchLines": [
+          238,
+          239
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java": {
+        "sha256": "f811a70268b94e09c5b527fbabc2fc3a31ff611c2826de520129ed14f6f03662",
+        "matchLines": [
+          45,
+          46,
+          76,
+          77
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/PolicyControllerTest.java": {
+        "sha256": "1d5b88d964e6a530619b15656235884c54e68ff893fa386cc8b6aea52f7f8665",
+        "matchLines": [
+          75
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/ProxyStreamAcrossReconfigureTest.java": {
+        "sha256": "16cde207bc5e036d5ca616a3552a51f1200950e3a60f6534d47e4709aecded28",
+        "matchLines": [
+          294,
+          295
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/SlowRequestStreamExemptionTest.java": {
+        "sha256": "8a535b92129ec0db41bec2b02d21fd268ed827fad3682c3775df80f69e6a0b85",
+        "matchLines": [
+          59,
+          61,
+          165,
+          166
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAnswerModelsLoadingInProcessTest.java": {
+        "sha256": "67f5465c8ae0b9e787102636d4a907704b43183278f86ddad1591ca94eb8dd96",
+        "matchLines": [
+          207
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java": {
+        "sha256": "e3973f7f18d0e7fb17dc1a0a005ff6a910cda77389a29e9a4fb2deb8e2640e41",
+        "matchLines": [
+          77
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/runtime/RuntimeClientHttpContractTest.java": {
+        "sha256": "d94f51df82492058a79eeca77eb55232f1f95e1f17038c30a766839432d7d2bb",
+        "matchLines": [
+          129
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/runtime/RuntimeManifestControllerRedactionTest.java": {
+        "sha256": "b4bad0dda3aa8a8fbe099d008a493eaed641675385978e5c5f394bb479ed310f",
+        "matchLines": [
+          42,
+          92,
+          118,
+          161,
+          205,
+          230
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/api/runtime/RuntimeProbeControllerTest.java": {
+        "sha256": "6b8747f593f6f3dfee0b9ef61d3f54763c8e16a2a6e6983f93874fb10e94113e",
+        "matchLines": [
+          166
+        ]
+      },
+      "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java": {
+        "sha256": "f0b2e79e1462267695f94b6f2c274f0036c50ef4d51a211e568207fb20db8688",
+        "matchLines": [
+          68
+        ]
+      },
+      "modules/worker-core/src/test/java/io/justsearch/indexerworker/WorkerConfigLoadTest.java": {
+        "sha256": "f39ac68b26c80bcaa85c5976188c29f64daa86b28f5f697b1974d7d38f43302d",
+        "matchLines": [
+          26,
+          78,
+          127
+        ]
+      },
+      "modules/worker-core/src/test/java/io/justsearch/indexerworker/ner/NerModelDiscoveryTest.java": {
+        "sha256": "dc7fe4937bc852738540170de5fc48a10d4232761428274d6202826b581593c3",
+        "matchLines": [
+          80,
+          85,
+          99,
+          100
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OfficeMarkerSearchabilityTest.java": {
+        "sha256": "98f21f2468dc2bbe25479e41e9daffb4bdcd7e641b12823b7ff454efe13368b5",
+        "matchLines": [
+          65
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java": {
+        "sha256": "f10cc6fc457cbc22d70c678fa512cae5eee2ff75e273b980d1ca7bd057c6858b",
+        "matchLines": [
+          58,
+          59
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaOcrRuntimeTest.java": {
+        "sha256": "8fded14b2f7797be09a0e819bea37576b605990db0cc3268b0a22923e4745335",
+        "matchLines": [
+          20,
+          39,
+          55,
+          68,
+          80,
+          93,
+          135
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/EnrichmentCompletenessProjectionTest.java": {
+        "sha256": "8cacad908cd98fb5b1b2912328a4bc494d34336b70d10a0a088882083b1d970a",
+        "matchLines": [
+          65
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java": {
+        "sha256": "869afa478d2a05e4ea9364843c7e079f2ac6e21b0bbec27c446cb00388b6138b",
+        "matchLines": [
+          352
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetRegressionMatrixTest.java": {
+        "sha256": "e05944df2a4e03e4a1fc0eb01c653c94d64a2379c44d6cef7148388cc5a51b8c",
+        "matchLines": [
+          314
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchCancellationSeamTest.java": {
+        "sha256": "cd6235100ae5d64596651e00f42d670afcf19396e4cc29203c47910b37e66448",
+        "matchLines": [
+          209
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchExecutionSpanAttrsContractTest.java": {
+        "sha256": "76065612d6af24ae0eea0b52c2141de9dfb5e642b91fee268e9248cc30a16d11",
+        "matchLines": [
+          314
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchExecutorLegSetMatrixTest.java": {
+        "sha256": "20f83c095ecb7bd745f8739ae61cb7e54741f2fb9599ce6bec818855d9317afd",
+        "matchLines": [
+          199
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchExecutorOtelTopologyTest.java": {
+        "sha256": "b36e7a25d0f3cd49f297e45fdf3ddad35d57b30c9938ac95f32ec0edf7b1607f",
+        "matchLines": [
+          331
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java": {
+        "sha256": "29ac4d1bc8efcf787df111b2a312c6375c3862a015af3d5c20e749210a3a693b",
+        "matchLines": [
+          72
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchOrchestratorComposablePathTest.java": {
+        "sha256": "e8278e74ac953ca7e54693f706344a96104ed7ca1e789bfa4271cc288be74e59",
+        "matchLines": [
+          287
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceBreakerTest.java": {
+        "sha256": "ffa9891c425350ee38f5150308203c1d3990fba6859ec5f45db49c999b4bd07c",
+        "matchLines": [
+          182
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseTest.java": {
+        "sha256": "25836e0f27265bd310fab387b58996a89ed4bf6d8274a397c8a6cf941a08f6b8",
+        "matchLines": [
+          237
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java": {
+        "sha256": "7188a658c79af0f3abb7ef78163dbb9be0daa9794972c1f6e6cdec9e51f1dad6",
+        "matchLines": [
+          219
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceDegradationSignalingTest.java": {
+        "sha256": "220bbf55b2f2355f3750bbbb9df3d00e7ca8bc8cf3b2dc0f24e9fa4345914c71",
+        "matchLines": [
+          158
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceMatchReasonsTest.java": {
+        "sha256": "6ac3dc17bb54ae884b8430d1a09a2ff78e1e21df0351b559d62b2f272b1c7c32",
+        "matchLines": [
+          30
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServicePathPrefixCountTest.java": {
+        "sha256": "f90294908d4dc16213c2fa7d87a51e763c70c42cb5ba39f246f7285eedd17a29",
+        "matchLines": [
+          55
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java": {
+        "sha256": "8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
+        "matchLines": [
+          165
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedStartTest.java": {
+        "sha256": "ac30f197a42bd0080d28a0ea1eabdfee971d8332c0a713c5fb25ecee73f92bbb",
+        "matchLines": [
+          228
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java": {
+        "sha256": "2f08210322b2e893d5600f05efb484674eb56c744b8d4aedf210568b90d48c43",
+        "matchLines": [
+          382
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java": {
+        "sha256": "812d09f41ca757f4bde10efd438d8d1bfd6ef465fc4e52378092a0785052fcd7",
+        "matchLines": [
+          304
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java": {
+        "sha256": "31df94434a61fc592afd8750307e170dd2f2cd0e03b4508ec5bd45690176ae3a",
+        "matchLines": [
+          658
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSearchPayloadTest.java": {
+        "sha256": "dc9adc7ba1104c0a309c700e692bb3280654bc8e5f5015ea2ef9b0fac4e183c7",
+        "matchLines": [
+          33
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java": {
+        "sha256": "74e8e29a787c7102b103ad9d10f11c3bf94e2df3c0acef702d894204ba5fb92e",
+        "matchLines": [
+          574
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java": {
+        "sha256": "09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+        "matchLines": [
+          53
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java": {
+        "sha256": "2fd212b449550320c588ce62deceb1ad91bf51f72f3820cedc335c529670ec6a",
+        "matchLines": [
+          147
+        ]
+      },
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/execute/SearchExecutorFanoutLifetimeTest.java": {
+        "sha256": "b2c794c4c099f00eb1da2ad9c5065708f57263d3c2fb1b5f9e4d671adfbf9678",
+        "matchLines": [
+          52
+        ]
+      }
+    },
+    "excludedDirectPathModules": {
+      "app-agent": "FileOperationLog receives a temporary Path directly; no configuration, property or environment data-folder source.",
+      "app-util": "AppInstanceLock receives a temporary Path directly.",
+      "ipc-common": "WorkerFatalReasonMarker receives a temporary Path directly."
+    },
+    "nonJvmScope": "ui-web and shell are outside the Gradle Test isolation change.",
+    "extraRecordConstructorSearch": {
+      "pattern": "new (ResolvedConfig\\.)?Paths\\(|withPaths\\(|\\.paths\\(new|\\.dataDirectory\\(|\\.dataFolder\\(",
+      "matches": 0
+    }
+  },
+  "modules": [
+    {
+      "module": "adapters-lucene",
+      "exit": 0,
+      "tests": 795,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "passed": 793,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-adapters-lucene.memory.log -- js-gradle-slot ./gradlew :modules:adapters-lucene:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest",
+          "test": "anUnmappedDriveLetterLosesNoDocuments()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+          "test": "aSharingViolationOnTheIndexAtStartupNeverDiscardsTheIndex()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+        }
+      ],
+      "logTail": [
+        "",
+        "> Task :modules:adapters-lucene:classes",
+        "> Task :modules:adapters-lucene:jar UP-TO-DATE",
+        "> Task :modules:adapters-lucene:compileTestFixturesJava",
+        "> Task :modules:adapters-lucene:testFixturesClasses",
+        "> Task :modules:adapters-lucene:testFixturesJar UP-TO-DATE",
+        "",
+        "> Task :modules:adapters-lucene:compileTestJava",
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:adapters-lucene:testClasses",
+        "> Task :modules:adapters-lucene:test",
+        "> Task :modules:adapters-lucene:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 1m 33s",
+        "24 actionable tasks: 7 executed, 2 from cache, 15 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "configuration",
+      "exit": 0,
+      "tests": 347,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 347,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-configuration.memory.log -- js-gradle-slot ./gradlew :modules:configuration:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [],
+      "logTail": [
+        "> Task :modules:configuration:jar UP-TO-DATE",
+        "> Task :modules:configuration:compileTestFixturesJava FROM-CACHE",
+        "> Task :modules:configuration:testFixturesClasses UP-TO-DATE",
+        "> Task :modules:configuration:testFixturesJar UP-TO-DATE",
+        "> Task :modules:configuration:compileTestJava FROM-CACHE",
+        "> Task :modules:configuration:testClasses UP-TO-DATE",
+        "SLF4J(W): No SLF4J providers were found.",
+        "SLF4J(W): Defaulting to no-operation (NOP) logger implementation",
+        "SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.",
+        "SLF4J(W): No SLF4J providers were found.",
+        "SLF4J(W): Defaulting to no-operation (NOP) logger implementation",
+        "SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.",
+        "> Task :modules:configuration:test",
+        "> Task :modules:configuration:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 6s",
+        "13 actionable tasks: 1 executed, 2 from cache, 10 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "app-engine",
+      "exit": 0,
+      "tests": 762,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 9,
+      "passed": 753,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-app-engine.memory.log -- js-gradle-slot ./gradlew :modules:app-engine:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.app.engine.EngineLinuxRootVolumeLiveTest",
+          "test": "absentDifferentUnknownAndReturningFilesystemsPreserveTheOriginalIndex()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "watchingResumesWithoutARestartWhenTheOriginalVolumeReturnsAfterABoot()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "aRestartOntoAnotherVolumeKeepsTheOriginalText()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "watcherEventsOnAnotherVolumeIndexNothing()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "aRestartWhileUnavailableKeepsTheLastIndexedTime()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+          "test": "theOriginalVolumeReturningIsIndexedAndPrunedAsBefore()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement",
+          "test": "primaryRateWithAndWithoutProbeChurn(Path)",
+          "reason": ""
+        }
+      ],
+      "logTail": [
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "Note: /home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/app-engine/src/test/java/io/justsearch/app/engine/DevicePlanTestSupport.java uses unchecked or unsafe operations.",
+        "Note: Recompile with -Xlint:unchecked for details.",
+        "5 warnings",
+        "",
+        "> Task :modules:app-engine:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend",
+        "WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release",
+        "> Task :modules:app-engine:test",
+        "> Task :modules:app-engine:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 11m 39s",
+        "84 actionable tasks: 42 executed, 42 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "app-inference",
+      "exit": 0,
+      "tests": 560,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "passed": 559,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-app-inference.memory.log -- js-gradle-slot ./gradlew :modules:app-inference:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.app.inference.ChatCrashLeftoverTest",
+          "test": "aCrashRestartEndsWhatTheCrashedServerLeftInItsJob()",
+          "reason": ""
+        }
+      ],
+      "logTail": [
+        "> Task :modules:gpu-bridge:classes UP-TO-DATE",
+        "> Task :modules:gpu-bridge:jar UP-TO-DATE",
+        "> Task :modules:app-inference:compileJava UP-TO-DATE",
+        "> Task :modules:app-inference:classes UP-TO-DATE",
+        "> Task :modules:app-inference:jar UP-TO-DATE",
+        "",
+        "> Task :modules:app-inference:compileTestJava",
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:app-inference:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "> Task :modules:app-inference:test",
+        "> Task :modules:app-inference:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 2m 6s",
+        "39 actionable tasks: 2 executed, 37 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "app-launcher",
+      "exit": 0,
+      "tests": 108,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 108,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-app-launcher.memory.log -- js-gradle-slot ./gradlew :modules:app-launcher:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [],
+      "logTail": [
+        "The project memory settings are likely not configured or are configured to an insufficient value.",
+        "The daemon will restart for the next build, which may increase subsequent build times.",
+        "These settings can be adjusted by setting 'org.gradle.jvmargs' in 'gradle.properties'.",
+        "The currently configured max heap space is '4 GiB' and the configured max metaspace is '512 MiB'.",
+        "For more information on how to set these values, please refer to https://docs.gradle.org/9.8.0/userguide/build_environment.html#sec:configuring_jvm_memory in the Gradle documentation.",
+        "To disable this warning, set 'org.gradle.daemon.performance.disable-logging=true'.",
+        "Daemon will be stopped at the end of the build after running out of JVM Metaspace",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend",
+        "WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release",
+        "> Task :modules:app-launcher:test",
+        "> Task :modules:app-launcher:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 39s",
+        "90 actionable tasks: 7 executed, 83 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "app-observability",
+      "exit": 0,
+      "tests": 678,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 678,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-app-observability.memory.log -- js-gradle-slot ./gradlew :modules:app-observability:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [],
+      "logTail": [
+        "> Task :modules:ipc-common:classes UP-TO-DATE",
+        "> Task :modules:ipc-common:jar UP-TO-DATE",
+        "> Task :modules:app-observability:compileJava UP-TO-DATE",
+        "> Task :modules:app-observability:classes UP-TO-DATE",
+        "> Task :modules:app-observability:jar UP-TO-DATE",
+        "",
+        "> Task :modules:app-observability:compileTestJava",
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:app-observability:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "> Task :modules:app-observability:test",
+        "> Task :modules:app-observability:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 56s",
+        "50 actionable tasks: 2 executed, 48 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "app-services",
+      "exit": 0,
+      "tests": 4234,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 11,
+      "passed": 4223,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-app-services.memory.log -- js-gradle-slot ./gradlew :modules:app-services:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+          "test": "immediateWrapperExitRetainsTheActualSurvivorEveryTime()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+          "test": "membershipSettlesWhileTheJobCountLagsAnExit()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.child.ChatJobEndFailureTest",
+          "test": "aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest",
+          "test": "aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest",
+          "test": "aFailureJoiningTheJobLeavesNoProcessBehind()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest",
+          "test": "strictModeLaunchesAndRefusesAsTheJdkDoes()",
+          "reason": ""
+        },
+        {
+          "suite": "Tempdoc 541 \u00a74.3 \u2014 composition-root discipline gate",
+          "test": "4f \u2014 No Supplier<T> field escape outside late-binding holders (deferred)",
+          "reason": ""
+        },
+        {
+          "suite": "Tempdoc 541 \u00a74.3 \u2014 composition-root discipline gate",
+          "test": "4e \u2014 LAZY phases return Memoized<T> / Supplier<T> (deferred)",
+          "reason": ""
+        },
+        {
+          "suite": "Tempdoc 541 \u00a74.3 \u2014 composition-root discipline gate",
+          "test": "4d \u2014 Phase Output records have no mutable-collection components (deferred)",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.services.gpu.DeviceFactsMachineTest",
+          "test": "thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.services.worker.UnreadableRootAvailabilityTest",
+          "test": "aRootThatCannotBeListedShowsTheRootLevelUnavailableState()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACE is set through the Windows ACL view"
+        }
+      ],
+      "logTail": [
+        "Note: Recompile with -Xlint:unchecked for details.",
+        "",
+        "> Task :modules:app-services:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "> Task :modules:app-services:test",
+        "",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend",
+        "WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release",
+        "[LightGBM] [Warning] There are no meaningful features which satisfy the provided configuration. Decreasing Dataset parameters min_data_in_bin or min_data_in_leaf and re-constructing Dataset might resolve this warning.",
+        "[LightGBM] [Warning] There are no meaningful features which satisfy the provided configuration. Decreasing Dataset parameters min_data_in_bin or min_data_in_leaf and re-constructing Dataset might resolve this warning.",
+        "",
+        "> Task :modules:app-services:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 11m 41s",
+        "81 actionable tasks: 3 executed, 78 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "indexer-worker",
+      "exit": 0,
+      "tests": 1437,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 1409,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-indexer-worker.memory.log -- js-gradle-slot ./gradlew :modules:indexer-worker:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "embedBatchWithChunking",
+          "test": "long text in batch is chunked, not truncated",
+          "reason": ""
+        },
+        {
+          "suite": "embedBatchWithChunking",
+          "test": "single-item batch delegates correctly",
+          "reason": ""
+        },
+        {
+          "suite": "embedBatchWithChunking",
+          "test": "empty batch returns empty list",
+          "reason": ""
+        },
+        {
+          "suite": "embedBatchWithChunking",
+          "test": "short texts in batch match single-embed results",
+          "reason": ""
+        },
+        {
+          "suite": "embedBatchWithChunking",
+          "test": "mixed short and long texts in batch all produce correct results",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "different texts produce different embeddings",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "similar texts produce similar embeddings",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "empty text produces valid embedding",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "embedding is deterministic",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "embedding is L2-normalized (unit length)",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "produces 768-dimensional embedding",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder (integration)",
+          "test": "short text produces single chunk",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest",
+          "test": "aLockedSourceIsStillRetriedPastTheSevenDayWindow()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest",
+          "test": "aLockedSourceIsNotRequeuedWithinSeconds()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest",
+          "test": "aFileReplacedByADanglingJunctionLeavesTheIndex()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: junctions are a Windows reparse point"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.server.CommittedBootDeferredRootTest",
+          "test": "theOriginalVolumeReturningReconcilesTheRootAndRemovesThePreviousGeneration()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.server.CommittedBootDeferredRootTest",
+          "test": "aBootWithThePreviousGenerationServesTheOtherRootsWhileARootIsOnAnotherVolume()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.server.CommittedBootRemovedDeferredRootTest",
+          "test": "aDeferredRootRemovedWhileAnotherVolumeIsMappedIsNeverIndexedWatchedOrRecorded()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.server.CommittedBootRemovedDeferredRootTest",
+          "test": "theRemovedRootAddedAgainWithTheOriginalVolumeIndexesItAndNothingOfTheOther()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.server.ConfiguredCollectionVolumeTest",
+          "test": "aConfiguredCollectionWhoseLetterHoldsAnotherVolumeRecordsNothingAndKeepsItsIndex()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.server.UpgradeRootVolumeSeedingTest",
+          "test": "anUpgradeWhereTheLetterHoldsAnotherVolumeRecordsNothingUntilTheDriveReturns()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.CommittedBootRootVolumeTest",
+          "test": "theCommittedBootReconcileDefersARootOnAnotherVolumeUntilItReturns()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.DifferentVolumeRootStateTest",
+          "test": "aRootWhoseLetterNowHoldsAnotherVolumeShowsTheRootLevelState()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.DifferentVolumeRootStateTest",
+          "test": "aRootOnTheSameVolumeStillWalksNormally()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.PruneDeniedSubfolderTest",
+          "test": "aDeniedSubfolderDoesNotStopTheDeletionsBesideIt()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACL is set through icacls"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.RootVolumeCheckTest",
+          "test": "theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.WatcherDeleteDifferentVolumeTest",
+          "test": "aWatcherDeleteOnAnotherVolumeAtTheSameLetterRemovesNothing()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.WatcherDeleteDifferentVolumeTest",
+          "test": "aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        }
+      ],
+      "logTail": [
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release",
+        "> Task :modules:indexer-worker:test",
+        "",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release",
+        "",
+        "> Task :modules:indexer-worker:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 5m 16s",
+        "86 actionable tasks: 3 executed, 83 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "ort-common",
+      "exit": 0,
+      "tests": 378,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 6,
+      "passed": 372,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-ort-common.memory.log -- js-gradle-slot ./gradlew :modules:ort-common:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "GpuAutoDetection",
+          "test": "probe detects CUDA DLLs in conventional path",
+          "reason": ""
+        },
+        {
+          "suite": "GpuAutoDetection",
+          "test": "probe returns empty / driver-only when sentinel exists but core DLLs missing",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.ort.NativeGpuLinuxLiveTest",
+          "test": "driverReportsDeviceIdentityAndMemoryWithoutSubprocesses()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.ort.OnnxMetadataProbeTest",
+          "test": "everyLocallyAvailableShippedModelMatchesRuntime()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: No shipped model binaries locally available"
+        },
+        {
+          "suite": "io.justsearch.ort.OnnxMetadataProbeTest",
+          "test": "everyLocallyAvailableShippedModelUsesZeroNameOrMetadataSessions()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: No shipped model binaries locally available"
+        },
+        {
+          "suite": "io.justsearch.ort.OnnxResolvedShapeProbeTest",
+          "test": "shippedCapabilitiesStillNeedNoProbeSessions()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: No shipped model binaries locally available"
+        }
+      ],
+      "logTail": [
+        "\u001b[0;93m2026-10-23 15:55:24.847201809 [W:onnxruntime:, graph.cc:1370 Graph] Initializer weight appears in graph inputs and will not be treated as constant value/weight. This may prevent some of the graph optimizations, like const folding. Move it out of graph inputs if there is no need to override it, by either re-generating the model with latest exporter/converter or with the tool onnxruntime/tools/python/remove_initializer_from_input.py.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.847341398 [W:onnxruntime:, graph.cc:1370 Graph] Initializer weight appears in graph inputs and will not be treated as constant value/weight. This may prevent some of the graph optimizations, like const folding. Move it out of graph inputs if there is no need to override it, by either re-generating the model with latest exporter/converter or with the tool onnxruntime/tools/python/remove_initializer_from_input.py.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.850929870 [W:onnxruntime:, graph.cc:1370 Graph] Initializer weight appears in graph inputs and will not be treated as constant value/weight. This may prevent some of the graph optimizations, like const folding. Move it out of graph inputs if there is no need to override it, by either re-generating the model with latest exporter/converter or with the tool onnxruntime/tools/python/remove_initializer_from_input.py.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.851215656 [W:onnxruntime:, graph.cc:1370 Graph] Initializer weight appears in graph inputs and will not be treated as constant value/weight. This may prevent some of the graph optimizations, like const folding. Move it out of graph inputs if there is no need to override it, by either re-generating the model with latest exporter/converter or with the tool onnxruntime/tools/python/remove_initializer_from_input.py.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.937956924 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{2,3} target:{2,4}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.938694062 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{2,3} target:{2,4}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.940577502 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{2,3} target:{2,4}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.940852490 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{2,3} target:{2,4}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.942322588 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{3,2} target:{2,3}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.942616914 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{3,2} target:{2,3}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.944034190 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{2,3} target:{2,4}. Falling back to lenient merge.\u001b[m",
+        "\u001b[0;93m2026-10-23 15:55:24.944723205 [W:onnxruntime:, graph.cc:122 MergeShapeInfo] Error merging shape info for output. 'output' source:{2,3} target:{2,4}. Falling back to lenient merge.\u001b[m",
+        "",
+        "> Task :modules:ort-common:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 45s",
+        "20 actionable tasks: 2 executed, 18 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "reranker",
+      "exit": 0,
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 71,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-reranker.memory.log -- js-gradle-slot ./gradlew :modules:reranker:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [],
+      "logTail": [
+        "> Task :modules:ort-common:classes UP-TO-DATE",
+        "> Task :modules:configuration:testFixturesJar UP-TO-DATE",
+        "> Task :modules:ort-common:jar UP-TO-DATE",
+        "> Task :modules:telemetry:compileJava UP-TO-DATE",
+        "> Task :modules:telemetry:classes UP-TO-DATE",
+        "> Task :modules:telemetry:jar UP-TO-DATE",
+        "> Task :modules:reranker:compileJava UP-TO-DATE",
+        "> Task :modules:reranker:classes UP-TO-DATE",
+        "> Task :modules:reranker:jar UP-TO-DATE",
+        "> Task :modules:reranker:compileTestJava",
+        "> Task :modules:reranker:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "> Task :modules:reranker:test",
+        "> Task :modules:reranker:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 4s",
+        "21 actionable tasks: 2 executed, 19 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "system-tests",
+      "exit": 0,
+      "tests": 96,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 96,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-system-tests.memory.log -- js-gradle-slot ./gradlew :modules:system-tests:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [],
+      "logTail": [
+        "> Task :modules:indexer-worker:jar UP-TO-DATE",
+        "> Task :modules:app-services:compileJava UP-TO-DATE",
+        "> Task :modules:app-services:classes UP-TO-DATE",
+        "> Task :modules:app-services:jar UP-TO-DATE",
+        "",
+        "> Task :modules:system-tests:compileJava",
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:system-tests:classes",
+        "> Task :modules:system-tests:compileTestJava",
+        "> Task :modules:system-tests:testClasses",
+        "> Task :modules:system-tests:test",
+        "> Task :modules:system-tests:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 6s",
+        "79 actionable tasks: 4 executed, 75 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "telemetry",
+      "exit": 0,
+      "tests": 96,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "passed": 95,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-telemetry.memory.log -- js-gradle-slot ./gradlew :modules:telemetry:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.telemetry.CollectorSmokeIT",
+          "test": "emitsSignalsWhenCollectorPresent()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: OTELCOL_BIN not provided; skipping CollectorSmokeIT"
+        }
+      ],
+      "logTail": [
+        "> Task :modules:telemetry:testFixturesClasses UP-TO-DATE",
+        "> Task :modules:telemetry:testFixturesJar UP-TO-DATE",
+        "",
+        "> Task :modules:telemetry:compileTestJava",
+        "Note: /home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/telemetry/src/test/java/io/justsearch/telemetry/TracingLocalExportTest.java uses or overrides a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:telemetry:testClasses",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend",
+        "WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release",
+        "> Task :modules:telemetry:test",
+        "> Task :modules:telemetry:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 10s",
+        "14 actionable tasks: 2 executed, 12 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "ui",
+      "exit": 0,
+      "tests": 2163,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "passed": 2162,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-ui.memory.log -- js-gradle-slot ./gradlew :modules:ui:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "MCP entity carriage: carriage metric OFF vs ON (tempdoc 771 item (b))",
+          "test": "real 781-v2 cell: carriage measured on real document geometries",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: run scripts/analysis/771-entity-carriage/extract-bridge-cases.py and pass -Djustsearch.entityCarriage.casesTsv=<tsv> to measure a real cell"
+        }
+      ],
+      "logTail": [
+        "Note: Some input files use unchecked or unsafe operations.",
+        "Note: Recompile with -Xlint:unchecked for details.",
+        "4 warnings",
+        "",
+        "> Task :modules:ui:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "> Task :modules:ui:test",
+        "",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend",
+        "WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release",
+        "",
+        "> Task :modules:ui:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 8m 23s",
+        "89 actionable tasks: 2 executed, 87 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "worker-core",
+      "exit": 0,
+      "tests": 476,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 8,
+      "passed": 468,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-worker-core.memory.log -- js-gradle-slot ./gradlew :modules:worker-core:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+          "test": "loadRealVocabulary()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: models/bge-m3/BAAI-bge-m3 (requires tokenizer.json) not found walking 8 parent directories up from /home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/worker-core; JUSTSEARCH_BGE_M3_MODEL_PATH env override also unset or invalid"
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+          "test": "doc vector from embedWithSpans is bit-identical to embed()",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+          "test": "embed() sanity: produces a unit-length vector",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+          "test": "single span covering the whole doc matches an isolated embed() within epsilon",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+          "test": "multi-span: each chunk vector is unit-length and chunks differ",
+          "reason": ""
+        },
+        {
+          "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+          "test": "long doc (> maxSeqLen tokens) returns null",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.index.GenerationPointerWindowsSharingTest",
+          "test": "windowsSharingDenialRetriesUntilTheReaderReleasesTheCurrentPointer()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.tokenizer.NoDeviceTokenizerCacheTest",
+          "test": "cpuTokenizerStartsAfterAGpuArchitectureCacheWasCreated(Path)",
+          "reason": ""
+        }
+      ],
+      "logTail": [
+        "> Task :modules:worker-core:compileJava UP-TO-DATE",
+        "> Task :modules:worker-core:classes UP-TO-DATE",
+        "> Task :modules:worker-core:jar UP-TO-DATE",
+        "",
+        "> Task :modules:worker-core:compileTestJava",
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:worker-core:testClasses",
+        "> Task :modules:worker-core:test",
+        "",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "",
+        "> Task :modules:worker-core:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 1m 14s",
+        "48 actionable tasks: 2 executed, 46 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "worker-services",
+      "exit": 0,
+      "tests": 1991,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 18,
+      "passed": 1973,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-worker-services.memory.log -- js-gradle-slot ./gradlew :modules:worker-services:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.indexerworker.extract.PreparedExtractionInputTest",
+          "test": "optionalLocalPreparationTiming()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: assumption is not true"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+          "test": "commandOnPathIsNeverLaunched()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+          "test": "scoopPathLaunchesRealExecutable()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+          "test": "transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest",
+          "test": "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest",
+          "test": "everyProductionTesseractProbeHasExactOwnerAndClosedWindow(String)",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.IndexedSourceUnreadableTest",
+          "test": "aLockedSourceWithIndexedContentIsReportedAsIndexedSourceUnreadable()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+          "test": "theFreshnessCheckKeepsTheDocumentWhenItsDriveLetterNowHoldsAnotherVolume()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+          "test": "admissionStillRetiresASourceDeletedFromTheSameVolume()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+          "test": "admissionKeepsTheSourceWhenItsDriveLetterNowHoldsAnotherVolume()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+          "test": "admissionKeepsTheSourceWhenItsDriveLetterIsUnmapped()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+          "test": "aFileReplacedByADanglingJunctionIsRetired()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: junctions are a Windows reparse point"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+          "test": "anAccessDeniedSourceIsRetriedWithoutATimeLimit()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACL is set through the Windows ACL view"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+          "test": "aLockedSourceIsRetriedWithoutATimeLimit()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.RootPresenceGuardTest",
+          "test": "anUnreadableVolumeRecordVouchesForNothing()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: volume identity and NOSHARE locks are Windows features"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.RootPresenceGuardTest",
+          "test": "aDifferentFolderMappedAtTheSameLetterDoesNotVouch()",
+          "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+        },
+        {
+          "suite": "io.justsearch.indexerworker.services.SyncDirectoryOpsCandidateDiscoveryTest",
+          "test": "windowsNativeFileIdSmokeAlsoCoversRefsWhenTempDirectoryIsOnRefs()",
+          "reason": ""
+        },
+        {
+          "suite": "686: SPLADE tokenizer crash harness over real index contents",
+          "test": "batch-encode every parent and reconstructed chunk text from the crashed index",
+          "reason": ""
+        }
+      ],
+      "logTail": [
+        "",
+        "> Task :modules:worker-services:testClasses",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.rrd4j.core.RrdNioBackend (file:/home/elias/.gradle/caches/modules-2/files-2.1/org.rrd4j/rrd4j/3.10/85d1d8bd4a385ec6fc25105011a0aa991c3595c/rrd4j-3.10.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class org.rrd4j.core.RrdNioBackend",
+        "WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release",
+        "> Task :modules:worker-services:test",
+        "> Task :modules:worker-services:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 3m 32s",
+        "64 actionable tasks: 2 executed, 62 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    },
+    {
+      "module": "app-api",
+      "exit": 0,
+      "tests": 468,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 5,
+      "passed": 463,
+      "failuresDetail": [],
+      "command": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh /home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/module-app-api.memory.log -- js-gradle-slot ./gradlew :modules:app-api:test --rerun -PskipWebBuild=true --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/data-folder",
+      "skippedCases": [
+        {
+          "suite": "io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest",
+          "test": "awaitedCrashStatusRemainsUnexpected()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest",
+          "test": "realCrashAfterIntentBeforeTerminateStaysUnexpected()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.containment.ChildHelperReceiptWitnessTest",
+          "test": "childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest",
+          "test": "unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds()",
+          "reason": ""
+        },
+        {
+          "suite": "io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest",
+          "test": "rotationWithAlreadyGrownReplacementStillFindsChildWindow()",
+          "reason": ""
+        }
+      ],
+      "logTail": [
+        "> Task :modules:app-api:classes UP-TO-DATE",
+        "> Task :modules:app-api:jar UP-TO-DATE",
+        "",
+        "> Task :modules:app-api:compileTestJava",
+        "Note: Some input files use or override a deprecated API.",
+        "Note: Recompile with -Xlint:deprecation for details.",
+        "",
+        "> Task :modules:app-api:testClasses",
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/home/elias/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.33.5/ec5069e07936941fa67ab8f78242fb91262c3dd9/protobuf-java-4.33.5.jar)",
+        "WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor",
+        "WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release",
+        "> Task :modules:app-api:test",
+        "> Task :modules:app-api:jacocoTestReport SKIPPED",
+        "",
+        "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+        "",
+        "BUILD SUCCESSFUL in 56s",
+        "30 actionable tasks: 3 executed, 27 up-to-date",
+        "Configuration cache entry stored."
+      ]
+    }
+  ],
+  "unchangedRegressionClasses": {
+    "ConfigWiringTest": {
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ConfigWiringTest.java",
+      "sha256": "f8f5f7e3f392a2cecf5f9059746311b4b8a95464091a8fc61ea0e45cb50e50ac",
+      "before": {
+        "name": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+        "tests": "12",
+        "skipped": "0",
+        "failures": "3",
+        "errors": "0",
+        "timestamp": "2026-10-23T11:33:57.918Z",
+        "hostname": "elias-systemproductname",
+        "time": "1.022",
+        "cases": [
+          {
+            "name": "vectorDimensionMismatchValidated()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.444",
+            "failures": []
+          },
+          {
+            "name": "simplefsMapsToNiofs()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.09",
+            "failures": []
+          },
+          {
+            "name": "unknownDirTypeFallsBackToDefault()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.028",
+            "failures": []
+          },
+          {
+            "name": "indexSortAppliedAndValidated()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.032",
+            "failures": []
+          },
+          {
+            "name": "vectorDefaultsAppliedWhenNotConfigured()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.026",
+            "failures": []
+          },
+          {
+            "name": "directoryTypeMmapDefault()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.022",
+            "failures": []
+          },
+          {
+            "name": "writerMemoryKnobsApplied()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.25",
+            "failures": []
+          },
+          {
+            "name": "vectorExhaustiveSearchReachesTheRuntimeSessionWhenSet()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.022",
+            "failures": []
+          },
+          {
+            "name": "collectionNameDerivedFromYaml()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.026",
+            "failures": [
+              {
+                "message": "org.opentest4j.AssertionFailedError: expected: </home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-17963559361825040653/data/index/envcol> but was: </home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/test-profile/test/home/.justsearch/index/envcol>",
+                "type": "org.opentest4j.AssertionFailedError"
+              }
+            ]
+          },
+          {
+            "name": "vectorConfigOverridesApplied()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.022",
+            "failures": []
+          },
+          {
+            "name": "literalDataDirResolves()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.022",
+            "failures": [
+              {
+                "message": "org.opentest4j.AssertionFailedError: expected: </home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-7507140416704207527/data/index/homecol> but was: </home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/test-profile/test/home/.justsearch/index/homecol>",
+                "type": "org.opentest4j.AssertionFailedError"
+              }
+            ]
+          },
+          {
+            "name": "directoryAndMergeKnobsApplied()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.023",
+            "failures": [
+              {
+                "message": "org.opentest4j.AssertionFailedError: expected: </home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-7966116250278597493/data/index/testcol> but was: </home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/test-profile/test/home/.justsearch/index/testcol>",
+                "type": "org.opentest4j.AssertionFailedError"
+              }
+            ]
+          }
+        ],
+        "stdout": ""
+      },
+      "after": {
+        "name": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+        "tests": "12",
+        "skipped": "0",
+        "failures": "0",
+        "errors": "0",
+        "timestamp": "2026-10-23T11:36:49.666Z",
+        "hostname": "elias-systemproductname",
+        "time": "1.226",
+        "cases": [
+          {
+            "name": "vectorDimensionMismatchValidated()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.505",
+            "failures": []
+          },
+          {
+            "name": "simplefsMapsToNiofs()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.101",
+            "failures": []
+          },
+          {
+            "name": "unknownDirTypeFallsBackToDefault()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.028",
+            "failures": []
+          },
+          {
+            "name": "indexSortAppliedAndValidated()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.028",
+            "failures": []
+          },
+          {
+            "name": "vectorDefaultsAppliedWhenNotConfigured()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.022",
+            "failures": []
+          },
+          {
+            "name": "directoryTypeMmapDefault()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.023",
+            "failures": []
+          },
+          {
+            "name": "writerMemoryKnobsApplied()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.33",
+            "failures": []
+          },
+          {
+            "name": "vectorExhaustiveSearchReachesTheRuntimeSessionWhenSet()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.034",
+            "failures": []
+          },
+          {
+            "name": "collectionNameDerivedFromYaml()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.037",
+            "failures": []
+          },
+          {
+            "name": "vectorConfigOverridesApplied()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.034",
+            "failures": []
+          },
+          {
+            "name": "literalDataDirResolves()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.031",
+            "failures": []
+          },
+          {
+            "name": "directoryAndMergeKnobsApplied()",
+            "classname": "io.justsearch.adapters.lucene.runtime.ConfigWiringTest",
+            "time": "0.035",
+            "failures": []
+          }
+        ],
+        "stdout": ""
+      }
+    },
+    "RecoveryIntegrationTest": {
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RecoveryIntegrationTest.java",
+      "sha256": "4c9af4ae200220f0b15f4cf2c9a43c3bdf32e00cdf70f171308d4e8d5d42ade8",
+      "before": {
+        "name": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+        "tests": "12",
+        "skipped": "1",
+        "failures": "4",
+        "errors": "0",
+        "timestamp": "2026-10-23T11:33:58.941Z",
+        "hostname": "elias-systemproductname",
+        "time": "0.857",
+        "cases": [
+          {
+            "name": "deferredReadOnlyOpenOfCorruptIndexRecovers()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.087",
+            "failures": [
+              {
+                "message": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: Index recovery failed after corruption. Manual fix: Stop the app and remove/rename the index directory at \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-6719358195480696799/data/deferred-corrupt-idx\" (prefer backup/rename over delete).",
+                "type": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException"
+              }
+            ]
+          },
+          {
+            "name": "schemaMismatchWithoutRebuildPolicyFailsFast()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.078",
+            "failures": []
+          },
+          {
+            "name": "[1] READ_ONLY",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.078",
+            "failures": []
+          },
+          {
+            "name": "[2] WRITABLE",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.061",
+            "failures": []
+          },
+          {
+            "name": "aSharingViolationOnTheIndexAtStartupNeverDiscardsTheIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.002",
+            "failures": []
+          },
+          {
+            "name": "withoutRecoveryPreservesWritableSchemaMismatchWithBackupFirstConfig()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.09",
+            "failures": []
+          },
+          {
+            "name": "schemaMismatchRebuildBackupFirstProducesBackupAndFreshIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.063",
+            "failures": [
+              {
+                "message": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: Index schema mismatch recovery failed at \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-5656223135379826513/data/schema-idx\". Manual fix: Stop the app and rebuild the index (backup/rename the old directory).",
+                "type": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException"
+              }
+            ]
+          },
+          {
+            "name": "corruptIndexAutoRecoveryProducesBackupAndFreshIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.061",
+            "failures": [
+              {
+                "message": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: Index recovery failed after corruption. Manual fix: Stop the app and remove/rename the index directory at \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-10256211308055240980/data/idx\" (prefer backup/rename over delete).",
+                "type": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException"
+              }
+            ]
+          },
+          {
+            "name": "withoutRecoveryAllowsReadOnlySchemaMismatchWithoutChangingOriginalIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.067",
+            "failures": []
+          },
+          {
+            "name": "corruptIndexWithoutAutoRecoveryFailsFast()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.064",
+            "failures": []
+          },
+          {
+            "name": "bodyCorruptionRecoversAndDropsRebuildMarker()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.088",
+            "failures": [
+              {
+                "message": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: Index recovery failed after corruption. Manual fix: Stop the app and remove/rename the index directory at \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/tmp/test-jvm/test/junit-9992085063654476123/data/body-corrupt-idx\" (prefer backup/rename over delete).",
+                "type": "io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException"
+              }
+            ]
+          },
+          {
+            "name": "cleanCloseWritesMarkerAndTheWriterOpenConsumesIt()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.093",
+            "failures": []
+          }
+        ],
+        "stdout": ""
+      },
+      "after": {
+        "name": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+        "tests": "12",
+        "skipped": "1",
+        "failures": "0",
+        "errors": "0",
+        "timestamp": "2026-10-23T11:36:50.893Z",
+        "hostname": "elias-systemproductname",
+        "time": "1.342",
+        "cases": [
+          {
+            "name": "deferredReadOnlyOpenOfCorruptIndexRecovers()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.146",
+            "failures": []
+          },
+          {
+            "name": "schemaMismatchWithoutRebuildPolicyFailsFast()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.077",
+            "failures": []
+          },
+          {
+            "name": "[1] READ_ONLY",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.072",
+            "failures": []
+          },
+          {
+            "name": "[2] WRITABLE",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.065",
+            "failures": []
+          },
+          {
+            "name": "aSharingViolationOnTheIndexAtStartupNeverDiscardsTheIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.005",
+            "failures": []
+          },
+          {
+            "name": "withoutRecoveryPreservesWritableSchemaMismatchWithBackupFirstConfig()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.098",
+            "failures": []
+          },
+          {
+            "name": "schemaMismatchRebuildBackupFirstProducesBackupAndFreshIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.185",
+            "failures": []
+          },
+          {
+            "name": "corruptIndexAutoRecoveryProducesBackupAndFreshIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.193",
+            "failures": []
+          },
+          {
+            "name": "withoutRecoveryAllowsReadOnlySchemaMismatchWithoutChangingOriginalIndex()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.106",
+            "failures": []
+          },
+          {
+            "name": "corruptIndexWithoutAutoRecoveryFailsFast()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.096",
+            "failures": []
+          },
+          {
+            "name": "bodyCorruptionRecoversAndDropsRebuildMarker()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.159",
+            "failures": []
+          },
+          {
+            "name": "cleanCloseWritesMarkerAndTheWriterOpenConsumesIt()",
+            "classname": "io.justsearch.adapters.lucene.runtime.RecoveryIntegrationTest",
+            "time": "0.11",
+            "failures": []
+          }
+        ],
+        "stdout": ""
+      }
+    }
+  },
+  "includedBuild": {
+    "command": "tmp/mem-guard.sh <own-log> -- js-gradle-slot ./gradlew :build-logic:test --tests VerifierProfileProbe --rerun :build-logic:check --init-script <own-init> -PskipWebBuild=true --console=plain",
+    "exit": 0,
+    "suite": {
+      "name": "VerifierProfileProbe",
+      "tests": "1",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-23T11:34:12.303Z",
+      "hostname": "elias-systemproductname",
+      "time": "0.07",
+      "cases": [
+        {
+          "name": "workerAndChild()",
+          "classname": "VerifierProfileProbe",
+          "time": "0.064",
+          "failures": []
+        }
+      ],
+      "stdout": "USER_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home EXPECTED=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test\nHOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home\nUSERPROFILE=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home\nAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Roaming\nLOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Local\nXDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.config\nXDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/share\nXDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.cache\nXDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/state\njustsearch.data.dir=null\njustsearch.home=null\nACCEPTED_JAVA_CHILD_USER_HOME_GAP=/home/elias\n"
+    },
+    "probeSource": "import org.junit.jupiter.api.Test;\nimport java.nio.file.*;\nimport java.util.*;\nimport java.util.concurrent.TimeUnit;\npublic class VerifierProfileProbe {\n static final String[] KEYS={\"HOME\",\"USERPROFILE\",\"APPDATA\",\"LOCALAPPDATA\",\"XDG_CONFIG_HOME\",\"XDG_DATA_HOME\",\"XDG_CACHE_HOME\",\"XDG_STATE_HOME\"};\n static void require(boolean ok,String message){if(!ok)throw new AssertionError(message);}\n @Test void workerAndChild() throws Exception {\n   Path profile=Path.of(System.getProperty(\"verifier.expected\"));\n   List<String> errors=new ArrayList<>();\n   String home=System.getProperty(\"user.home\");\n   System.out.println(\"USER_HOME=\"+home+\" EXPECTED=\"+profile);\n   if(!Path.of(home).startsWith(profile))errors.add(\"worker user.home=\"+home);\n   for(String k:KEYS){String v=System.getenv(k);System.out.println(k+\"=\"+v);if(v==null||!Path.of(v).startsWith(profile))errors.add(\"worker \"+k+\"=\"+v);}\n   for(String k:List.of(\"justsearch.data.dir\",\"justsearch.home\")){String v=System.getProperty(k);System.out.println(k+\"=\"+v);if(v!=null)errors.add(k+\" must be unset: \"+v);}\n   for(String k:List.of(\"JUSTSEARCH_HOME\",\"JUSTSEARCH_DATA_DIR\"))if(System.getenv(k)!=null)errors.add(\"worker \"+k+\" must be unset\");\n   Path out=Files.createTempFile(\"verifier-child-\", \".properties\");\n   Process p=new ProcessBuilder(Path.of(System.getProperty(\"java.home\"),\"bin\",\"java\").toString(),\"-cp\",System.getProperty(\"java.class.path\"),\"VerifierProfileProbe$Child\").redirectOutput(out.toFile()).redirectError(ProcessBuilder.Redirect.INHERIT).start();\n   try{require(p.waitFor(30,TimeUnit.SECONDS),\"child timed out\");require(p.exitValue()==0,\"child failed\");Properties props=new Properties();try(var in=Files.newInputStream(out)){props.load(in);}for(String k:KEYS){String v=props.getProperty(k);if(v==null||!Path.of(v).startsWith(profile)||!Objects.equals(v,System.getenv(k)))errors.add(\"child \"+k+\"=\"+v);}for(String k:List.of(\"JUSTSEARCH_HOME\",\"JUSTSEARCH_DATA_DIR\"))if(!props.getProperty(k,\"\").isEmpty())errors.add(\"child \"+k+\" must be unset\");System.out.println(\"ACCEPTED_JAVA_CHILD_USER_HOME_GAP=\"+props.getProperty(\"java.user.home\"));}finally{p.destroyForcibly();p.waitFor();Files.deleteIfExists(out);}\n   require(errors.isEmpty(),String.join(\"; \",errors));\n }\n public static class Child {public static void main(String[] args)throws Exception{Properties p=new Properties();for(String k:List.of(\"JUSTSEARCH_HOME\",\"JUSTSEARCH_DATA_DIR\"))p.setProperty(k,Objects.toString(System.getenv(k),\"\"));for(String k:KEYS)p.setProperty(k,Objects.toString(System.getenv(k),\"\"));p.setProperty(\"java.user.home\",System.getProperty(\"user.home\"));p.store(System.out,null);}}\n}\n",
+    "initScript": "gradle.projectsEvaluated {\n def p=gradle.rootProject\n if(p.name!='build-logic')return\n def jars=p.files(\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-api/5.14.4/478c1ec9780d6214c04db63caa520a18a7a0c697/junit-jupiter-api-5.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-engine/5.14.4/dd198558041b67d6a86f801908020ee21cdadf3e/junit-jupiter-engine-5.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-launcher/1.14.4/d68ebf573daf08bc82c452027686eaaa5a2be1c6/junit-platform-launcher-1.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-engine/1.14.4/efa8516a9ba0d1efa7f9f64d7a046f05c6b39cfd/junit-platform-engine-1.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-commons/1.14.4/8fc5afb31243ac7141e48e5aa571955340c83795/junit-platform-commons-1.14.4.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.opentest4j/opentest4j/1.3.0/152ea56b3a72f655d4fd677fc0ef2596c3dd5e6e/opentest4j-1.3.0.jar\",\"/home/elias/.gradle/caches/modules-2/files-2.1/org.apiguardian/apiguardian-api/1.1.2/a231e0d844d2721b0fa1b238006d15c6ded6842a/apiguardian-api-1.1.2.jar\")\n def compile=p.tasks.register('verifierCompileProfile',org.gradle.api.tasks.compile.JavaCompile) {\n   source new File(System.getenv('VERIFIER_EVIDENCE'),'probe')\n   classpath=jars\n   destinationDirectory=p.layout.buildDirectory.dir('verifierProbeClasses')\n   javaCompiler=p.javaToolchains.compilerFor {languageVersion=JavaLanguageVersion.of(21)}\n }\n p.tasks.named('test',org.gradle.api.tasks.testing.Test) {\n   testClassesDirs=p.files(compile.flatMap {it.destinationDirectory})\n   classpath=testClassesDirs+jars\n   useJUnitPlatform()\n   systemProperty 'verifier.expected',new File(p.layout.buildDirectory.get().asFile,'test-profile/test').absolutePath\n   systemProperty 'user.home',System.getenv('HOME')\n   systemProperty 'justsearch.data.dir',System.getenv('JUSTSEARCH_DATA_DIR')\n   systemProperty 'justsearch.home',System.getenv('JUSTSEARCH_HOME')\n   testLogging.showStandardStreams=true\n }\n}\n",
+    "logTail": [
+      "\tat Build_gradle$5$1.execute(build.gradle.kts:127)",
+      "\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)",
+      "",
+      "> Configure project :modules:worker-services",
+      "The 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties",
+      "\tat Build_gradle$4$1.execute(build.gradle.kts:191)",
+      "\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)",
+      "",
+      "> Task :build-logic:pluginUnderTestMetadata",
+      "> Task :build-logic:verifierCompileProfile",
+      "> Task :build-logic:validatePlugins",
+      "",
+      "> Task :build-logic:test",
+      "",
+      "VerifierProfileProbe > workerAndChild() STANDARD_OUT",
+      "    USER_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home EXPECTED=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test",
+      "    HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home",
+      "    USERPROFILE=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home",
+      "    APPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Roaming",
+      "    LOCALAPPDATA=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/AppData/Local",
+      "    XDG_CONFIG_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.config",
+      "    XDG_DATA_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/share",
+      "    XDG_CACHE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.cache",
+      "    XDG_STATE_HOME=/home/elias/dev/justsearch/.claude/worktrees/data-folder/build-logic/build/test-profile/test/home/.local/state",
+      "    justsearch.data.dir=null",
+      "    justsearch.home=null",
+      "    ACCEPTED_JAVA_CHILD_USER_HOME_GAP=/home/elias",
+      "",
+      "> Task :build-logic:check",
+      "",
+      "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/build/reports/problems/problems-report.html",
+      "",
+      "BUILD SUCCESSFUL in 12s",
+      "8 actionable tasks: 6 executed, 2 up-to-date",
+      "Configuration cache entry stored."
+    ]
+  },
+  "failBefore": {
+    "tree": "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before",
+    "setupCommands": [
+      [
+        "git",
+        "clone",
+        "--quiet",
+        "--shared",
+        "--no-checkout",
+        ".",
+        "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before"
+      ],
+      [
+        "git",
+        "-C",
+        "/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before",
+        "checkout",
+        "--quiet",
+        "--detach",
+        "dad7077a1"
+      ]
+    ],
+    "command": "tmp/mem-guard.sh <own-log> -- js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *ConfigWiringTest --tests *RecoveryIntegrationTest --rerun -PskipWebBuild=true --console=plain",
+    "exit": 1,
+    "logTail": [
+      "ConfigWiringTest > directoryAndMergeKnobsApplied() FAILED",
+      "    org.opentest4j.AssertionFailedError at ConfigWiringTest.java:87",
+      "",
+      "RecoveryIntegrationTest > deferredReadOnlyOpenOfCorruptIndexRecovers() FAILED",
+      "    io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException at RecoveryIntegrationTest.java:586",
+      "        Caused by: java.lang.IllegalArgumentException at RecoveryIntegrationTest.java:586",
+      "",
+      "RecoveryIntegrationTest > schemaMismatchRebuildBackupFirstProducesBackupAndFreshIndex() FAILED",
+      "    io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException at RecoveryIntegrationTest.java:322",
+      "        Caused by: java.lang.IllegalArgumentException at RecoveryIntegrationTest.java:322",
+      "",
+      "RecoveryIntegrationTest > corruptIndexAutoRecoveryProducesBackupAndFreshIndex() FAILED",
+      "    io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException at RecoveryIntegrationTest.java:116",
+      "        Caused by: java.lang.IllegalArgumentException at RecoveryIntegrationTest.java:116",
+      "",
+      "RecoveryIntegrationTest > bodyCorruptionRecoversAndDropsRebuildMarker() FAILED",
+      "    io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException at RecoveryIntegrationTest.java:543",
+      "        Caused by: java.lang.IllegalArgumentException at RecoveryIntegrationTest.java:543",
+      "",
+      "24 tests completed, 7 failed, 1 skipped",
+      "",
+      "> Task :modules:adapters-lucene:test FAILED",
+      "> Task :modules:adapters-lucene:jacocoTestReport SKIPPED",
+      "",
+      "[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/build/reports/problems/problems-report.html",
+      "",
+      "FAILURE: Build failed with an exception.",
+      "",
+      "* What went wrong:",
+      "Execution failed for task ':modules:adapters-lucene:test'.",
+      "> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/before/modules/adapters-lucene/build/reports/tests/test/index.html",
+      "",
+      "BUILD FAILED in 7s",
+      "24 actionable tasks: 15 executed, 9 from cache",
+      "Configuration cache entry stored."
+    ]
+  },
+  "probeRepair": {
+    "evidence": "gates/test-intent/evidence/test-profile-precedence.json",
+    "producerExit": 0,
+    "producerSource": "Unmodified standard evidence producer from b62fc592175fd8fb47dc296586770b7e0e571d16, in an own shared clone, so the producer does not mask the broken before-state with its own guard.",
+    "guardedProducerCommand": "#!/usr/bin/env bash\nset -eu\nlabel=$1; tree=$2; shift 2\ncd \"$tree\"\nunset DISPLAY WAYLAND_DISPLAY\nexport GRADLE_USER_HOME=/home/elias/.gradle\nexport HOME=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/client-home-$label\" USERPROFILE=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/client-home-$label\"\nexport APPDATA=\"$HOME/AppData/Roaming\" LOCALAPPDATA=\"$HOME/AppData/Local\"\nexport XDG_CONFIG_HOME=\"$HOME/.config\" XDG_DATA_HOME=\"$HOME/.local/share\" XDG_CACHE_HOME=\"$HOME/.cache\" XDG_STATE_HOME=\"$HOME/.local/state\"\nexport JUSTSEARCH_HOME=\"$HOME/.justsearch\" JUSTSEARCH_DATA_DIR=\"$HOME/.justsearch\"\nexport VERIFIER_EVIDENCE=\"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t\"\nmkdir -p \"$HOME/.justsearch\"\nexec \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/mem-guard.sh\" \"/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-precedence-yqpl7v1t/$label.memory.log\" -- js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \"$@\"\n",
+    "candidateSourceOverlays": [
+      "build-logic/build.gradle.kts",
+      "build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt",
+      "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java"
+    ]
+  },
+  "runnerPreservation": {
+    "evidence": [
+      "gates/test-intent/evidence/test-profile-precedence-runner-candidate.json",
+      "gates/test-intent/evidence/test-profile-precedence-runner-historical.json"
+    ],
+    "producerExits": {
+      "candidate": 0,
+      "historical": 0
+    },
+    "result": "Both probes pass on candidate and historical checkouts with the updated evidence runner; both positive-check producer invocations exit 0.",
+    "logs": {
+      "candidate": "gradle-slot: slot 1 after 665s\nmodules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#testJvmUsesTaskLocalProfile: passed\nmodules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#plainChildInheritsTaskLocalProfile: passed\nevidence written: ../runner-candidate.json\n",
+      "historical": "gradle-slot: slot 1 after 670s\nmodules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#testJvmUsesTaskLocalProfile: passed\nmodules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#plainChildInheritsTaskLocalProfile: passed\nevidence written: ../runner-historical.json\n"
+    },
+    "discardedRepairMode": {
+      "exit": 1,
+      "reason": "Wrong invocation mode: --before requires assertion failures; the historical preservation checks correctly passed. Replaced by positive-check invocations above.",
+      "log": "gradle-slot: slot 2 after 682s\nmodules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#testJvmUsesTaskLocalProfile: passed\nmodules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#plainChildInheritsTaskLocalProfile: passed\nfail-before modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#testJvmUsesTaskLocalProfile: passed \u2014 the check passes on the before-state, so it does not show a repair\nfail-before modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#plainChildInheritsTaskLocalProfile: passed \u2014 the check passes on the before-state, so it does not show a repair\nevidence written: ../runner-proof.json\n"
+    }
+  },
+  "resources": [
+    "Own fake client profiles, JUnit temp directories, shared clones and separate build folders",
+    "Existing /home/elias/.gradle caches and Gradle daemon pool",
+    "Shared js-gradle-slot scheduler in /tmp/js-linux-port",
+    "No running user app or browser borrowed; host GPU devices exposed, access not traced"
+  ],
+  "limitations": [
+    "Windows CI not run locally.",
+    "Java child JVM user.home gap remains accepted; G2 tests environment-based resolution only.",
+    "No system/integration tiers or ui-web suite run; the requested full default test task ran for each audited JVM module."
+  ]
+}
