@@ -30,6 +30,12 @@ import org.junit.jupiter.api.Test;
 final class SpladeCpuPackingTest {
   @Test void one512TokenTextReturnsCpuOutputUnderAnInfeasibleGpuCap() throws Exception {
     var sessions = mock(SessionHandle.class);
+    var retirement = new java.util.concurrent.atomic.AtomicReference<>(SessionHandle.RetirementStatus.ACTIVE);
+    when(sessions.retirementStatus()).thenAnswer(ignored -> retirement.get());
+    doAnswer(ignored -> {
+      retirement.set(SessionHandle.RetirementStatus.RETIRED);
+      return null;
+    }).when(sessions).close();
     var lease = mock(SessionHandle.Lease.class);
     when(lease.isCpu()).thenReturn(true);
     when(sessions.acquire(any())).thenReturn(lease);

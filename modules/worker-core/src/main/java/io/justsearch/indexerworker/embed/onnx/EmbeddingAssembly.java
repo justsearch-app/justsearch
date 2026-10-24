@@ -11,16 +11,48 @@ import io.justsearch.ort.SessionHandle;
  * Centralises all embedding metadata I/O (tokenizer, pooling config, input-name detection) at
  * boot time; encoder constructor does no filesystem I/O.
  *
- * @param sessions ORT session handle
- * @param shape model-intrinsic facts (input-name detection + max sequence length + pooling)
- * @param tokenizer pre-loaded DJL HuggingFace tokenizer (caller owns lifecycle)
- * @param capabilities the full resolved model-capability contract (tempdoc 710 Wave 2 Move 1) —
- *     {@code shape.poolingStrategy()} is already projected from {@code
- *     capabilities.poolingMode()}; this field carries the rest (prefixes, dimension, precision)
- *     for consumers downstream of the composition root (e.g. {@code EmbeddingService}'s prefixes)
  */
-public record EmbeddingAssembly(
-    SessionHandle sessions,
-    EmbeddingShape shape,
-    HuggingFaceTokenizer tokenizer,
-    ModelCapabilities capabilities) {}
+public final class EmbeddingAssembly implements AutoCloseable {
+  private final SessionHandle sessions;
+  private final EmbeddingShape shape;
+  private final HuggingFaceTokenizer tokenizer;
+  private final ModelCapabilities capabilities;
+  private boolean tokenizerClosed;
+
+  /**
+   * @param sessions ORT session handle
+   * @param shape model-intrinsic facts (input-name detection + max sequence length + pooling)
+   * @param tokenizer pre-loaded DJL HuggingFace tokenizer (owned by this assembly)
+   * @param capabilities the full resolved model-capability contract (tempdoc 710 Wave 2 Move 1) —
+   *     {@code shape.poolingStrategy()} is already projected from {@code
+   *     capabilities.poolingMode()}; this field carries the rest (prefixes, dimension, precision)
+   *     for consumers downstream of the composition root (e.g. {@code EmbeddingService}'s prefixes)
+   */
+  public EmbeddingAssembly(SessionHandle sessions, EmbeddingShape shape, HuggingFaceTokenizer tokenizer, ModelCapabilities capabilities) {
+    this.sessions = sessions;
+    this.shape = shape;
+    this.tokenizer = tokenizer;
+    this.capabilities = capabilities;
+  }
+
+  public SessionHandle sessions() { return sessions; }
+  public EmbeddingShape shape() { return shape; }
+  public HuggingFaceTokenizer tokenizer() { return tokenizer; }
+  public ModelCapabilities capabilities() { return capabilities; }
+
+  public synchronized boolean tokenizerClosed() { return tokenizerClosed; }
+
+  /** Retires sessions before the tokenizer; a refused or failed close retains retry ownership. */
+  @Override
+  public synchronized void close() {
+    if (tokenizerClosed) return;
+    if (sessions != null && sessions.retirementStatus() != SessionHandle.RetirementStatus.RETIRED) {
+      sessions.close();
+    }
+    if (sessions != null && sessions.retirementStatus() != SessionHandle.RetirementStatus.RETIRED) {
+      throw new IllegalStateException("Assembly sessions have not retired: " + sessions.retirementStatus());
+    }
+    if (tokenizer != null) tokenizer.close();
+    tokenizerClosed = true;
+  }
+}

@@ -13,9 +13,41 @@ import io.justsearch.ort.SessionHandle;
  * construction inputs (cross-encoder model, tokenizer, input-schema facts). The caller
  * determines which concrete encoder to build.
  *
- * @param sessions ORT session handle
- * @param shape model-intrinsic facts (input-name detection + max sequence length)
- * @param tokenizer pre-loaded reranker tokenizer
  */
-public record RerankerAssembly(
-    SessionHandle sessions, RerankerShape shape, RerankerTokenizer tokenizer) {}
+public final class RerankerAssembly implements AutoCloseable {
+  private final SessionHandle sessions;
+  private final RerankerShape shape;
+  private final RerankerTokenizer tokenizer;
+  private boolean tokenizerClosed;
+
+  /**
+   * @param sessions ORT session handle
+   * @param shape model-intrinsic facts (input-name detection + max sequence length)
+   * @param tokenizer pre-loaded reranker tokenizer
+   */
+  public RerankerAssembly(SessionHandle sessions, RerankerShape shape, RerankerTokenizer tokenizer) {
+    this.sessions = sessions;
+    this.shape = shape;
+    this.tokenizer = tokenizer;
+  }
+
+  public SessionHandle sessions() { return sessions; }
+  public RerankerShape shape() { return shape; }
+  public RerankerTokenizer tokenizer() { return tokenizer; }
+
+  public synchronized boolean tokenizerClosed() { return tokenizerClosed; }
+
+  /** Retires sessions before the tokenizer; a refused or failed close retains retry ownership. */
+  @Override
+  public synchronized void close() {
+    if (tokenizerClosed) return;
+    if (sessions != null && sessions.retirementStatus() != SessionHandle.RetirementStatus.RETIRED) {
+      sessions.close();
+    }
+    if (sessions != null && sessions.retirementStatus() != SessionHandle.RetirementStatus.RETIRED) {
+      throw new IllegalStateException("Assembly sessions have not retired: " + sessions.retirementStatus());
+    }
+    if (tokenizer != null) tokenizer.close();
+    tokenizerClosed = true;
+  }
+}

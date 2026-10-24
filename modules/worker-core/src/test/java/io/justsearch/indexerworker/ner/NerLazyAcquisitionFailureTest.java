@@ -106,6 +106,12 @@ final class NerLazyAcquisitionFailureTest {
 
   private static SessionHandle failingSessions() {
     SessionHandle sessions = mock(SessionHandle.class);
+    var retirement = new java.util.concurrent.atomic.AtomicReference<>(SessionHandle.RetirementStatus.ACTIVE);
+    when(sessions.retirementStatus()).thenAnswer(ignored -> retirement.get());
+    doAnswer(ignored -> {
+      retirement.set(SessionHandle.RetirementStatus.RETIRED);
+      return null;
+    }).when(sessions).close();
     when(sessions.acquire(any())).thenThrow(
         new SessionTemporarilyUnavailableException("ner: CPU session creation failed"));
     return sessions;

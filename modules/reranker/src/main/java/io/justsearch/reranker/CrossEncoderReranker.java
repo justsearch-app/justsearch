@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * created per-request.
  *
  * <p>Session lifecycle (CPU session, GPU session, GPU retry, VRAM release) is delegated to {@link
- * SessionHandle}. This class owns only the tokenizer and inference logic.
+ * SessionHandle}. The assembly owns the tokenizer; this class performs inference using it.
  *
  * <p>Usage (tempdoc 397 §14.24 FC / §14.28 U1): the composition root
  * {@code InferenceCompositionRoot.compose(...)} produces a {@code RerankerAssembly} whose
@@ -62,6 +62,7 @@ public final class CrossEncoderReranker implements Closeable {
 
   // Session management (delegated to SessionHandle — tempdoc 397 §14.5 PR 2).
   private final SessionHandle sessions;
+  private final RerankerAssembly ownedAssembly;
   private final RerankerTokenizer tokenizer;
   private final boolean needsTokenTypeIds;
   private final int maxSequenceLength;
@@ -75,10 +76,22 @@ public final class CrossEncoderReranker implements Closeable {
    *
    * @param sessions pre-configured session handle
    * @param shape model-intrinsic facts ({@code maxSeqLen} + {@code needsTokenTypeIds})
-   * @param tokenizer pre-loaded reranker tokenizer
+   * @param tokenizer pre-loaded reranker tokenizer, transferred to this standalone encoder
    */
-  public CrossEncoderReranker(
-      SessionHandle sessions, RerankerShape shape, RerankerTokenizer tokenizer) {
+  public CrossEncoderReranker(SessionHandle sessions, RerankerShape shape, RerankerTokenizer tokenizer) {
+    this(new RerankerAssembly(sessions, shape, tokenizer), true);
+  }
+
+  /** Borrows the assembly; its surface retains tokenizer ownership. */
+  public CrossEncoderReranker(RerankerAssembly assembly) {
+    this(assembly, false);
+  }
+
+  private CrossEncoderReranker(RerankerAssembly assembly, boolean ownsAssembly) {
+    SessionHandle sessions = assembly.sessions();
+    var shape = assembly.shape();
+    var tokenizer = assembly.tokenizer();
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.sessions = sessions;
     this.tokenizer = tokenizer;
     this.needsTokenTypeIds = shape.needsTokenTypeIds();
@@ -114,11 +127,22 @@ public final class CrossEncoderReranker implements Closeable {
       SessionHandle sessions, Path tokenizerPath, Path modelPath, int maxSequenceLength)
       throws OrtException {
     RerankerTokenizer tokenizer = new RerankerTokenizer(tokenizerPath, maxSequenceLength);
-    io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
-        io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), modelPath);
-    boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");
-    return new RerankerAssembly(
-        sessions, new RerankerShape(maxSequenceLength, needsTokenTypeIds), tokenizer);
+    try {
+      io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
+          io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), modelPath);
+      boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");
+      return new RerankerAssembly(
+          sessions, new RerankerShape(maxSequenceLength, needsTokenTypeIds), tokenizer);
+    } catch (OrtException | RuntimeException | Error failure) {
+      var partial = new RerankerAssembly(sessions, null, tokenizer);
+      if (sessions != null) throw new AssemblyBuildFailure(failure, partial);
+      try { partial.close(); }
+      catch (RuntimeException | Error cleanup) {
+        if (failure != cleanup) failure.addSuppressed(cleanup);
+        throw new AssemblyBuildFailure(failure, partial);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -742,8 +766,8 @@ public final class CrossEncoderReranker implements Closeable {
 
   @Override
   public void close() {
-    sessions.close();
-    tokenizer.close();
+    if (ownedAssembly != null) ownedAssembly.close();
+    else sessions.close();
     log.info("CrossEncoderReranker closed");
   }
 

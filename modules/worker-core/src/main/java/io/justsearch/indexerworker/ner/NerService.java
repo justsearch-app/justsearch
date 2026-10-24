@@ -32,6 +32,8 @@ public final class NerService implements Closeable {
 
   private static final int NER_OVERLAP_TOKENS = 50;
 
+  private final NerAssembly ownedAssembly;
+  private boolean cleanupComplete;
   private final NerConfig config;
   private final BertNerInference inference; // null when config is DISABLED / no assembly
   private final BioTagDecoder.LabelMapping labelMapping; // null when inference == null
@@ -43,9 +45,19 @@ public final class NerService implements Closeable {
    * {@link BertNerInference#buildAssembly} for dev-mode fallback paths.
    */
   public NerService(NerAssembly assembly, NerConfig config) {
+    this(assembly, config, true);
+  }
+
+  /** Borrows an assembly retained by the server surface. */
+  public static NerService borrowing(NerAssembly assembly, NerConfig config) {
+    return new NerService(assembly, config, false);
+  }
+
+  private NerService(NerAssembly assembly, NerConfig config, boolean ownsAssembly) {
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.config = config;
     this.inference =
-        new BertNerInference(assembly.sessions(), assembly.shape(), assembly.tokenizer());
+        new BertNerInference(assembly);
     this.labelMapping = assembly.labelMapping();
   }
 
@@ -56,6 +68,7 @@ public final class NerService implements Closeable {
    * path without needing a real model on disk.
    */
   public NerService(NerConfig config) {
+    this.ownedAssembly = null;
     this.config = config;
     this.inference = null;
     this.labelMapping = null;
@@ -233,13 +246,11 @@ public final class NerService implements Closeable {
   }
 
   @Override
-  public void close() {
-    if (closed.compareAndSet(false, true) && inference != null) {
-      try {
-        inference.close();
-      } catch (Exception e) {
-        log.debug("NER inference close failed (non-fatal)", e);
-      }
-    }
+  public synchronized void close() {
+    if (cleanupComplete) return;
+    closed.set(true);
+    if (ownedAssembly != null) ownedAssembly.close();
+    if (inference != null) inference.close();
+    cleanupComplete = true;
   }
 }

@@ -399,6 +399,8 @@ public final class KnowledgeServer implements Closeable {
   // Only the not-yet-attached boot surface lives here; once attached EncoderSet owns it.
   private volatile InferenceSurface pendingInitialSurface;
   private volatile InferenceSurface pendingInitialQuerySurface;
+  private volatile CandidateModels pendingInitialModels;
+  private final List<InferenceSurface> failedCompositionSurfaces = new ArrayList<>();
   private volatile EncoderSet initialEncoderSet;
   private volatile QueryRoleSet initialQueryRoleSet;
   private volatile GenerationModelSelection initialModelSelection;
@@ -773,6 +775,7 @@ public final class KnowledgeServer implements Closeable {
         addRetainedModels(recovery.composed, index, query);
         addRetainedQuery(recovery.querySettings, index, query);
       }
+      addRetainedModels(pendingInitialModels, index, query);
       addRetainedModels(candidateModels, index, query);
       addRetainedModels(unpublishedModels, index, query);
       addRetainedQuery(preparedQueryRoles, index, query);
@@ -3850,13 +3853,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** Assign the deferred A surface to every still-issued A view before model wiring is released. */
-  private void attachInitialEncoderSet(InferenceSurface indexSurface,
-      InferenceSurface querySurface) {
-    EncoderSet.ModelIdentity identity = initialModelIdentity;
-    if (identity == null) throw new IllegalStateException(
-        "Initial model identity was not captured before native assembly");
-    var owner = new EncoderSet(indexSurface, identity);
-    var queryOwner = new QueryRoleSet(querySurface);
+  private void attachInitialEncoderSet(EncoderSet owner, QueryRoleSet queryOwner) {
     boolean published = false;
     runtimeSwapLock.lock();
     publicationLock.writeLock().lock();
@@ -4414,9 +4411,9 @@ public final class KnowledgeServer implements Closeable {
         : exactQueryObservation.querySelection().orElseThrow(
             () -> new IOException("Active A query selection is unknown"));
     AtomicReference<IndexCompositionPlan> capturedPlan = new AtomicReference<>();
-    InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
+    InferenceSurface surface = composeRetainingFailures(() -> InferenceCompositionRoot.compose(encoderConfiguration, hardware,
         contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection,
-        exactQuery, ignored -> {}, captured -> capturedPlan.set(captured.indexPlan()));
+        exactQuery, ignored -> {}, captured -> capturedPlan.set(captured.indexPlan())));
     if (exactQueryObservation != null) {
       surface = surface.withUnavailableQueryRoles(
           unresolvedQueryRoles(exactQueryObservation, exactQuery));
@@ -4441,20 +4438,75 @@ public final class KnowledgeServer implements Closeable {
       EncoderConfigurationProjection queryProjection,
       InferenceSurface.ComponentObservation exactQueryObservation,
       EncoderSet.ModelIdentity identity) throws IOException {
-    InferenceSurface surface = InferenceCompositionRoot.composeCaptured(plan, queryProjection,
-        exactQueryObservation, () -> !signalBus.isMainGpuActive(), ortSessionEvents);
-    return buildCandidateModels(surface, identity,
-        plan.projection().withQueryFrom(queryProjection), plan);
+    var combinedProjection = plan.projection().withQueryFrom(queryProjection);
+    InferenceSurface surface = composeRetainingFailures(() -> InferenceCompositionRoot.composeCaptured(plan, queryProjection,
+        exactQueryObservation, () -> !signalBus.isMainGpuActive(), ortSessionEvents));
+    return buildCandidateModels(surface, identity, combinedProjection, plan);
+  }
+
+  private InferenceSurface composeRetainingFailures(java.util.function.Supplier<InferenceSurface> compose) {
+    closeFailedCompositions();
+    retireUnpublishedInitialModels();
+    try { return compose.get(); }
+    catch (InferenceCompositionRoot.FailedComposition failure) {
+      synchronized (failedCompositionSurfaces) {
+        failedCompositionSurfaces.add(failure.surface());
+      }
+      throw failure;
+    }
+  }
+
+  /** Failed boot owners retire before recovery can allocate their replacements. */
+  private void retireUnpublishedInitialModels() {
+    if (initialEncoderSet != null || initialQueryRoleSet != null) return;
+    try { closeInitialModelOwners(); }
+    catch (IOException incomplete) {
+      throw new IllegalStateException("Unpublished boot model retirement incomplete", incomplete);
+    }
+    pendingInitialSurface = null;
+    pendingInitialQuerySurface = null;
+  }
+
+  private void retireFailedSurface(InferenceSurface surface, Throwable failure) {
+    try { surface.close(); }
+    catch (RuntimeException | Error cleanup) {
+      if (failure != cleanup) failure.addSuppressed(cleanup);
+      synchronized (failedCompositionSurfaces) { failedCompositionSurfaces.add(surface); }
+    }
+  }
+
+  private void closeFailedCompositions() {
+    synchronized (failedCompositionSurfaces) {
+      IllegalStateException aggregate = null;
+      var owners = failedCompositionSurfaces.iterator();
+      while (owners.hasNext()) {
+        try {
+          owners.next().close();
+          owners.remove();
+        } catch (RuntimeException | Error failure) {
+          if (aggregate == null) aggregate = new IllegalStateException("Aborted composition retirement incomplete");
+          aggregate.addSuppressed(failure);
+        }
+      }
+      if (aggregate != null) throw aggregate;
+    }
   }
 
   private CandidateModels buildCandidateModels(InferenceSurface surface,
       EncoderSet.ModelIdentity identity,
       EncoderConfigurationProjection encoderConfiguration,
       IndexCompositionPlan exactPlan) throws IOException {
-    var partition = surface.partitionQueryRoles(encoderConfiguration);
-    var owner = new EncoderSet(partition.index(), identity);
-    var queryOwner = new QueryRoleSet(partition.query());
-    unpublishedModels = new CandidateModels(owner, queryOwner, null, exactPlan);
+    EncoderSet owner;
+    QueryRoleSet queryOwner;
+    try {
+      var partition = surface.partitionQueryRoles(encoderConfiguration);
+      owner = new EncoderSet(partition.index(), identity);
+      queryOwner = new QueryRoleSet(partition.query());
+      unpublishedModels = new CandidateModels(owner, queryOwner, null, exactPlan);
+    } catch (RuntimeException | Error failure) {
+      retireFailedSurface(surface, failure);
+      throw failure;
+    }
     EmbeddingService embedding = null;
     io.justsearch.indexerworker.ner.NerService ner;
     io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
@@ -4466,7 +4518,7 @@ public final class KnowledgeServer implements Closeable {
         var assembly = surface.embedding().orElseThrow();
         var config = encoderConfiguration.embedding();
         var encoder = new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder(
-            assembly.sessions(), assembly.shape(), assembly.tokenizer());
+            assembly);
         var backend = new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend(
             encoder, config.gpuEnabled() ? 1 : 0, config.contextLength());
         embedding = owner.own(EmbeddingService.createWithBackend(backend, config,
@@ -4478,13 +4530,13 @@ public final class KnowledgeServer implements Closeable {
         owner.bindEmbedding(embedding);
       }
       ner = surface.ner().isPresent()
-          ? owner.own(new io.justsearch.indexerworker.ner.NerService(
+          ? owner.own(io.justsearch.indexerworker.ner.NerService.borrowing(
               surface.ner().orElseThrow(), encoderConfiguration.ner())) : null;
       if (ner != null) owner.bindNer(ner);
       if (surface.bgeM3().isPresent()) {
         var assembly = surface.bgeM3().orElseThrow();
         bge = owner.own(new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
-            assembly.sessions(), assembly.shape(), assembly.tokenizer(),
+            assembly,
             encoderConfiguration.bgeM3()));
         owner.bindBgeM3(bge);
       }
@@ -4492,8 +4544,7 @@ public final class KnowledgeServer implements Closeable {
         var assembly = surface.splade().orElseThrow();
         var config = encoderConfiguration.splade();
         splade = owner.own(new io.justsearch.indexerworker.splade.SpladeEncoder(
-            assembly.sessions(), assembly.shape(), assembly.tokenizer(), assembly.vocabulary(),
-            assembly.truncationEvidencePath(), config));
+            assembly, config));
         owner.bindSplade(splade);
         if (config.isIdfQueryMode()) {
           Path table = exactPlan == null
@@ -4519,15 +4570,11 @@ public final class KnowledgeServer implements Closeable {
       }
       reranker = surface.reranker().isPresent()
           ? queryOwner.own(new io.justsearch.reranker.CrossEncoderReranker(
-              surface.reranker().orElseThrow().sessions(),
-              surface.reranker().orElseThrow().shape(),
-              surface.reranker().orElseThrow().tokenizer())) : null;
+              surface.reranker().orElseThrow())) : null;
       if (reranker != null) queryOwner.bindReranker(reranker);
       citation = surface.citation().isPresent()
           ? queryOwner.own(new io.justsearch.reranker.CitationScorer(
-              surface.citation().orElseThrow().sessions(),
-              surface.citation().orElseThrow().shape(),
-              surface.citation().orElseThrow().tokenizer())) : null;
+              surface.citation().orElseThrow())) : null;
       if (citation != null) queryOwner.bindCitation(citation);
       var diagnostics = new GpuDiagnosticSuppliers(
           splade == null ? null : splade::getOrtCudaStatus,
@@ -4571,6 +4618,7 @@ public final class KnowledgeServer implements Closeable {
   private void initDeferredModels() {
     long bgStart = System.nanoTime();
     List<ServingLease> modelWiringLeases = new ArrayList<>();
+    List<Consumer<WorkerAppServices>> modelWiring = new ArrayList<>();
     try {
       if (closeStarted) return;
       if (encoderComponent != null) {
@@ -4638,7 +4686,7 @@ public final class KnowledgeServer implements Closeable {
           : generationProjection.withQueryFrom(
               EncoderConfigurationProjection.from(compositionConfig));
       InferenceSurface surface =
-          InferenceCompositionRoot.compose(
+          composeRetainingFailures(() -> InferenceCompositionRoot.compose(
               encoderConfiguration,
               hardware,
               contract,
@@ -4676,22 +4724,23 @@ public final class KnowledgeServer implements Closeable {
                   encoderComponent.setDesiredVersion(captured.indexPlan().projection()
                       .withQueryFrom(captured.queryProjection()).digest());
                 }
-              })
-              .withUnavailableQueryRoles(bootQueryResolution.unavailableRoles().keySet());
+              }));
+      this.pendingInitialSurface = surface;
+      surface = surface.withUnavailableQueryRoles(bootQueryResolution.unavailableRoles().keySet());
       if (recoveryStartContext != null && recoveryStartContext.queryObservation() != null) {
         surface = surface.withUnavailableQueryRoles(unresolvedQueryRoles(
             recoveryStartContext.queryObservation(), effectiveQuerySelection));
       }
+      this.pendingInitialSurface = surface;
       var partition = surface.partitionQueryRoles(encoderConfiguration);
       this.pendingInitialSurface = partition.index();
       this.pendingInitialQuerySurface = partition.query();
-      attachInitialEncoderSet(partition.index(), partition.query());
-      this.pendingInitialSurface = null;
-      this.pendingInitialQuerySurface = null;
-      EncoderSet initialOwner = Objects.requireNonNull(initialEncoderSet,
-          "Initial encoder owner after attachment");
-      QueryRoleSet initialQueryOwner = Objects.requireNonNull(initialQueryRoleSet,
-          "Initial query owner after attachment");
+      EncoderSet initialOwner = new EncoderSet(partition.index(),
+          Objects.requireNonNull(initialModelIdentity, "Initial model identity before wiring"));
+      QueryRoleSet initialQueryOwner = new QueryRoleSet(partition.query());
+      pendingInitialModels = new CandidateModels(initialOwner, initialQueryOwner, null,
+          initialIndexCompositionPlan);
+      if (closeStarted) throw new IllegalStateException("Server closed during initial model composition");
 
       // Embedding — skip when BGE-M3 is active (surface.embedding() is already empty in that case).
       var embeddingConfig = encoderConfiguration.embedding();
@@ -4699,7 +4748,7 @@ public final class KnowledgeServer implements Closeable {
         var embedAssembly = surface.embedding().get();
         var encoder =
             new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder(
-                embedAssembly.sessions(), embedAssembly.shape(), embedAssembly.tokenizer());
+                embedAssembly);
         var backend =
             new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend(
                 encoder, embeddingConfig.gpuEnabled() ? 1 : 0, embeddingConfig.contextLength());
@@ -4717,14 +4766,14 @@ public final class KnowledgeServer implements Closeable {
         if (es.isAvailable()) {
           initialOwner.bindEmbedding(es);
           validateEmbeddingDimension(es);
-          wireModelServices(modelWiringLeases, svc -> svc.wireEmbeddingProvider(es));
+          modelWiring.add( svc -> svc.wireEmbeddingProvider(es));
           // observations.md fix: clear the generation's embedding reference on GPU-handoff unload
           // so `GpuDiagnosticSuppliers` lambdas (rebound to re-read the field)
           // stop returning data from the closed instance. The provider becomes
           // NoOpEmbeddingProvider.INSTANCE on unload (IndexingLoop:1581);
           // `instanceof` is rename-safe in a way the prior class-name string
           // match wasn't.
-          wireModelServices(modelWiringLeases, svc -> svc.addEmbeddingProviderChangeListener(
+          modelWiring.add( svc -> svc.addEmbeddingProviderChangeListener(
               provider -> {
                 if (provider == null
                     || provider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider) {
@@ -4737,7 +4786,7 @@ public final class KnowledgeServer implements Closeable {
         var unavailable = surface.embeddingFailure() == null
             ? io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE
             : io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.failed(surface.embeddingFailure());
-        wireModelServices(modelWiringLeases, svc -> svc.wireEmbeddingProvider(unavailable));
+        modelWiring.add( svc -> svc.wireEmbeddingProvider(unavailable));
         if (surface.bgeM3().isEmpty()) {
           log.info("No embedding model found - vector search disabled");
         }
@@ -4754,15 +4803,15 @@ public final class KnowledgeServer implements Closeable {
       // NER — surface-provided assembly wraps in NerService.
       var nerConfig = encoderConfiguration.ner();
       if (surface.ner().isPresent()) {
-        var nerService = initialOwner.own(new io.justsearch.indexerworker.ner.NerService(
+        var nerService = initialOwner.own(io.justsearch.indexerworker.ner.NerService.borrowing(
             surface.ner().get(), nerConfig));
         initialOwner.bindNer(nerService);
-        wireModelServices(modelWiringLeases, svc -> svc.wireNerService(nerService));
+        modelWiring.add( svc -> svc.wireNerService(nerService));
         var nerModelPath = nerConfig.modelPath().toString();
         var nerGpuEnabled = nerConfig.gpuEnabled();
-        wireModelServices(modelWiringLeases,
+        modelWiring.add(
             svc -> svc.ingestService().setNerModelPathSupplier(() -> nerModelPath));
-        wireModelServices(modelWiringLeases,
+        modelWiring.add(
             svc -> svc.ingestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled));
       } else if (nerConfig.isReady()) {
         log.info("NER: surface returned no assembly; NER will be unavailable.");
@@ -4774,12 +4823,10 @@ public final class KnowledgeServer implements Closeable {
         var bgeConfig = encoderConfiguration.bgeM3();
         var bgeEncoder =
             initialOwner.own(new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
-                bgeAssembly.sessions(),
-                bgeAssembly.shape(),
-                bgeAssembly.tokenizer(),
+                bgeAssembly,
                 bgeConfig));
         initialOwner.bindBgeM3(bgeEncoder);
-        wireModelServices(modelWiringLeases, svc -> svc.wireBgeM3Encoder(bgeEncoder));
+        modelWiring.add( svc -> svc.wireBgeM3Encoder(bgeEncoder));
         log.info(
             "BGE-M3 encoder ready (replaces SPLADE + EmbeddingService): model={}",
             bgeConfig.modelPath());
@@ -4791,14 +4838,10 @@ public final class KnowledgeServer implements Closeable {
         var spladeAssembly = surface.splade().get();
         var spladeEncoder =
             initialOwner.own(new io.justsearch.indexerworker.splade.SpladeEncoder(
-                spladeAssembly.sessions(),
-                spladeAssembly.shape(),
-                spladeAssembly.tokenizer(),
-                spladeAssembly.vocabulary(),
-                spladeAssembly.truncationEvidencePath(),
+                spladeAssembly,
                 spladeConfig));
         initialOwner.bindSplade(spladeEncoder);
-        wireModelServices(modelWiringLeases, svc -> svc.wireSpladeEncoder(spladeEncoder));
+        modelWiring.add( svc -> svc.wireSpladeEncoder(spladeEncoder));
         log.info("SPLADE encoder ready: model={}", spladeConfig.modelPath());
 
         if (spladeConfig.isIdfQueryMode()) {
@@ -4809,7 +4852,7 @@ public final class KnowledgeServer implements Closeable {
                   new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
                       idfPath, spladeEncoder.tokenizer(), spladeEncoder.vocabulary());
               initialOwner.bindSpladeIdf(idfEncoder);
-              wireModelServices(modelWiringLeases,
+              modelWiring.add(
                   svc -> svc.wireSpladeIdfQueryEncoder(idfEncoder));
               log.info("SPLADE IDF query encoder ready: {}", idfPath);
             } catch (Exception e) {
@@ -4824,16 +4867,16 @@ public final class KnowledgeServer implements Closeable {
 
       // Disambiguation
       initializeDisambiguationService(dataDir,
-          ds -> wireModelServices(modelWiringLeases, svc -> svc.wireDisambiguationService(ds)));
+          ds -> modelWiring.add( svc -> svc.wireDisambiguationService(ds)));
 
       // 360: Search reranker (GPU-capable, in index component).
       var searchRerankConfig = encoderConfiguration.reranker();
       if (surface.reranker().isPresent()) {
         var rerankAssembly = surface.reranker().get();
         var searchReranker = initialQueryOwner.own(new io.justsearch.reranker.CrossEncoderReranker(
-            rerankAssembly.sessions(), rerankAssembly.shape(), rerankAssembly.tokenizer()));
+            rerankAssembly));
         initialQueryOwner.bindReranker(searchReranker);
-        wireModelServices(modelWiringLeases,
+        modelWiring.add(
             svc -> svc.wireSearchReranker(searchReranker));
         // F5: Warm up ORT session at startup instead of paying 5-10s on the first user query.
         try {
@@ -4848,28 +4891,6 @@ public final class KnowledgeServer implements Closeable {
         }
       }
 
-      // Tempdoc 687 R3d: warm the SEARCH path itself (ICU analyzer, Lucene query builder, QPP
-      // term-stats, IndexSearcher) so the first real user query after boot doesn't pay the
-      // Lucene/ICU JIT + class-load cold-start penalty (measured ~870ms cold vs ~12ms warm).
-      // Runs after all encoders above are wired, so the synthetic pass exercises the same
-      // production search stack a real query would. Calls WorkerSearchService.warmUpSearchPath()
-      // directly, below the port boundary — see its Javadoc + SearchOrchestrator
-      // .warmUp()'s Javadoc for why this can't leak into /api/status search telemetry or the
-      // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
-      try {
-        long searchWarmStart = System.nanoTime();
-        boolean searchWarmed = modelWiringLeases.getFirst().services().searchService()
-            .warmUpSearchPath();
-        long searchWarmMs = (System.nanoTime() - searchWarmStart) / 1_000_000;
-        if (searchWarmed) {
-          log.info("Search path ready (warm-up={}ms)", searchWarmMs);
-        } else {
-          log.info("Search path warm-up skipped (empty index)");
-        }
-      } catch (Exception searchWarmE) {
-        log.info("Search path warm-up failed: {}", searchWarmE.getMessage());
-      }
-
       // Citation scorer (CPU-only). Tempdoc 397 §14.26 T2-E1: eager-wire — construct the full
       // CitationScorer from the surface assembly and pass it to appServices. CitationMatchOps is
       // now a pure consumer with no lazy construction path.
@@ -4877,11 +4898,9 @@ public final class KnowledgeServer implements Closeable {
         var citationAssembly = surface.citation().get();
         var citationScorer =
             initialQueryOwner.own(new io.justsearch.reranker.CitationScorer(
-                citationAssembly.sessions(),
-                citationAssembly.shape(),
-                citationAssembly.tokenizer()));
+                citationAssembly));
         initialQueryOwner.bindCitation(citationScorer);
-        wireModelServices(modelWiringLeases,
+        modelWiring.add(
             svc -> svc.wireCitationScorer(citationScorer));
       }
 
@@ -4932,14 +4951,45 @@ public final class KnowledgeServer implements Closeable {
               ownedNer != null ? ownedNer::getOrtCudaStatus : null,
               ownedCitation != null ? ownedCitation::getOrtCudaStatus : null,
               ownedBgeM3 != null ? ownedBgeM3::getOrtCudaStatus : null);
-      wireModelServices(modelWiringLeases, svc -> svc.wireGpuDiagnostics(diagnostics));
+      modelWiring.add( svc -> svc.wireGpuDiagnostics(diagnostics));
 
       // Tempdoc 394 follow-up: publish per-stage enabled state on /api/status.
       // "Enabled" here means the service is usable — config-enabled AND
       // initialization succeeded. A non-null instance satisfies both.
-      wireModelServices(modelWiringLeases,
+      modelWiring.add(
           svc -> svc.wireStageEnabled(initialOwner.embedding() != null,
               initialOwner.splade() != null, initialOwner.ner() != null));
+
+      if (closeStarted) throw new IllegalStateException("Server closed during initial model wiring");
+      for (Consumer<WorkerAppServices> wiring : modelWiring) {
+        wireModelServices(modelWiringLeases, wiring);
+      }
+      attachInitialEncoderSet(initialOwner, initialQueryOwner);
+      pendingInitialModels = null;
+      pendingInitialSurface = null;
+      pendingInitialQuerySurface = null;
+
+      // Tempdoc 687 R3d: warm the SEARCH path itself (ICU analyzer, Lucene query builder, QPP
+      // term-stats, IndexSearcher) so the first real user query after boot doesn't pay the
+      // Lucene/ICU JIT + class-load cold-start penalty (measured ~870ms cold vs ~12ms warm).
+      // Runs after all encoders above are wired, so the synthetic pass exercises the same
+      // production search stack a real query would. Calls WorkerSearchService.warmUpSearchPath()
+      // directly, below the port boundary — see its Javadoc + SearchOrchestrator
+      // .warmUp()'s Javadoc for why this can't leak into /api/status search telemetry or the
+      // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
+      try {
+        long searchWarmStart = System.nanoTime();
+        boolean searchWarmed = modelWiringLeases.getFirst().services().searchService()
+            .warmUpSearchPath();
+        long searchWarmMs = (System.nanoTime() - searchWarmStart) / 1_000_000;
+        if (searchWarmed) {
+          log.info("Search path ready (warm-up={}ms)", searchWarmMs);
+        } else {
+          log.info("Search path warm-up skipped (empty index)");
+        }
+      } catch (Exception searchWarmE) {
+        log.info("Search path warm-up failed: {}", searchWarmE.getMessage());
+      }
 
       // Spec D §4.2 (S21): the query sessions are warm before the models are reported ready,
       // so the first search after activation does not create a session or fall back.
@@ -4956,6 +5006,7 @@ public final class KnowledgeServer implements Closeable {
       log.info("Background model init complete ({}ms)", bgMs);
 
     } catch (Exception e) {
+      discardUnpublishedInitialModels(e, modelWiringLeases);
       Consumer<WorkerAppServices> publishFailure = svc -> {
         if (svc.searchService().embeddingAvailability().state()
             == EmbeddingProvider.Availability.State.STARTING) {
@@ -4974,6 +5025,9 @@ public final class KnowledgeServer implements Closeable {
       logBackgroundInitFailure(e);
       long bgMs = (System.nanoTime() - bgStart) / 1_000_000;
       log.info("Background model init failed after ({}ms)", bgMs);
+    } catch (Error fatal) {
+      discardUnpublishedInitialModels(fatal, modelWiringLeases);
+      throw fatal;
     } finally {
       queryWitnessReadyLatch.countDown();
       // Ensure enumerator is unblocked even if init failed partway through.
@@ -5001,6 +5055,47 @@ public final class KnowledgeServer implements Closeable {
           log.error("Recorded Green candidate models refused; A state={}",
               encoderComponent == null ? "unobserved" : encoderComponent.snapshot().state(), failure);
         }
+      }
+    }
+  }
+
+  private void discardUnpublishedInitialModels(Throwable failure, List<ServingLease> leases) {
+    CandidateModels pending = pendingInitialModels;
+    if (pending == null) {
+      if (initialEncoderSet == null) {
+        for (InferenceSurface surface : new InferenceSurface[] {pendingInitialSurface, pendingInitialQuerySurface}) {
+          if (surface != null) {
+            try { surface.close(); }
+            catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+          }
+        }
+      }
+      return;
+    }
+    if (initialEncoderSet == pending.owner()) return;
+    boolean detached = true;
+    for (ServingLease lease : leases) {
+      try {
+        WorkerAppServices services = lease.services();
+        services.wireEmbeddingProvider(io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.failed(failure));
+        services.wireNerService(null);
+        services.wireSpladeEncoder(null);
+        services.wireSpladeIdfQueryEncoder(null);
+        services.wireBgeM3Encoder(null);
+        services.wireSearchReranker(null);
+        services.wireCitationScorer(null);
+        services.wireStageEnabled(false, false, false);
+      } catch (RuntimeException | Error cleanup) {
+        failure.addSuppressed(cleanup);
+        detached = false;
+      }
+    }
+    if (detached) {
+      try {
+        pending.close();
+        pendingInitialModels = null;
+      } catch (RuntimeException | Error cleanup) {
+        failure.addSuppressed(cleanup);
       }
     }
   }
@@ -5490,17 +5585,22 @@ public final class KnowledgeServer implements Closeable {
     private QueryRoleSet composeQueryAdmitted(EncoderConfigurationProjection projection,
         QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
         boolean requireRerankerGpu, boolean acceptIntentionalCpu) {
-      InferenceSurface surface = InferenceCompositionRoot.composeQueryRoles(projection, selected,
-          hardware, () -> !signalBus.isMainGpuActive(), ortSessionEvents);
-      QueryRoleSet result = new QueryRoleSet(surface);
+      InferenceSurface surface = composeRetainingFailures(() -> InferenceCompositionRoot.composeQueryRoles(projection, selected,
+          hardware, () -> !signalBus.isMainGpuActive(), ortSessionEvents));
+      QueryRoleSet result;
+      try { result = new QueryRoleSet(surface); }
+      catch (RuntimeException | Error failure) {
+        retireFailedSurface(surface, failure);
+        throw failure;
+      }
       composingQuery = result;
       try {
         surface.reranker().ifPresent(assembly -> result.bindReranker(result.own(
             new io.justsearch.reranker.CrossEncoderReranker(
-                assembly.sessions(), assembly.shape(), assembly.tokenizer()))));
+                assembly))));
         surface.citation().ifPresent(assembly -> result.bindCitation(result.own(
             new io.justsearch.reranker.CitationScorer(
-                assembly.sessions(), assembly.shape(), assembly.tokenizer()))));
+                assembly))));
         if (!allowedMissing.containsAll(surface.componentObservation().missingRoles())) {
           throw new IllegalStateException("Prepared query model did not become available: "
               + surface.componentObservation().missingRoles());
@@ -7966,35 +8066,12 @@ public final class KnowledgeServer implements Closeable {
               throw new IOException("Prepared query native retirement incomplete; owner retained", refusal);
             }
           }
+          try { closeFailedCompositions(); }
+          catch (RuntimeException refusal) {
+            throw new IOException("Aborted composition retirement incomplete; server retained", refusal);
+          }
+          closeInitialModelOwners();
           EncoderSet initialOwner = initialEncoderSet;
-          if (initialOwner != null) {
-            try {
-              initialOwner.close();
-            } catch (RuntimeException refusal) {
-              throw new IOException("Native inference retirement incomplete; server retained for retry",
-                  refusal);
-            }
-          } else if (pendingInitialSurface != null) {
-            try { pendingInitialSurface.close(); }
-            catch (RuntimeException refusal) {
-              throw new IOException("Native inference retirement incomplete; server retained for retry",
-                  refusal);
-            }
-          }
-          QueryRoleSet initialQuery = initialQueryRoleSet;
-          if (initialQuery != null) {
-            try { initialQuery.close(); }
-            catch (RuntimeException refusal) {
-              throw new IOException("Query inference retirement incomplete; server retained for retry",
-                  refusal);
-            }
-          } else if (pendingInitialQuerySurface != null) {
-            try { pendingInitialQuerySurface.close(); }
-            catch (RuntimeException refusal) {
-              throw new IOException("Query inference retirement incomplete; server retained for retry",
-                  refusal);
-            }
-          }
 
           // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
           // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
@@ -8176,6 +8253,13 @@ public final class KnowledgeServer implements Closeable {
 
   /** Native owner disposition used by the process exit authority after ordered close. */
   public io.justsearch.app.api.NativeQuiescence nativeQuiescence() {
+    synchronized (failedCompositionSurfaces) {
+      if (!failedCompositionSurfaces.isEmpty()) return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    CandidateModels pendingBoot = pendingInitialModels;
+    if (pendingBoot != null && (!pendingBoot.owner().isClosed() || !pendingBoot.queryOwner().isClosed())) {
+      return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
     CompletableFuture<Void> initialization = deferredModelInit;
     if (initialization != null && !initialization.isDone()) {
       return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
@@ -8226,12 +8310,35 @@ public final class KnowledgeServer implements Closeable {
           : io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
     if ((surface == null || surface.retirementStatus()
-            == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED)
+            == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED && surface.tokenizersClosed())
         && (querySurface == null || querySurface.retirementStatus()
-            == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED)) {
+            == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED && querySurface.tokenizersClosed())) {
       return io.justsearch.app.api.NativeQuiescence.QUIESCED;
     }
     return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+  }
+
+  private void closeInitialModelOwners() throws IOException {
+    Throwable failure = null;
+    if (pendingInitialModels != null) {
+      try {
+        pendingInitialModels.close();
+        pendingInitialModels = null;
+      } catch (RuntimeException | Error refused) { failure = refused; }
+    }
+    AutoCloseable indexOwner = initialEncoderSet != null ? initialEncoderSet : pendingInitialSurface;
+    AutoCloseable queryOwner = initialQueryRoleSet != null ? initialQueryRoleSet : pendingInitialQuerySurface;
+    for (AutoCloseable owner : new AutoCloseable[] {indexOwner, queryOwner}) {
+      if (owner == null) continue;
+      try { owner.close(); }
+      catch (Exception | Error refused) {
+        if (failure == null) failure = refused;
+        else if (failure != refused) failure.addSuppressed(refused);
+      }
+    }
+    if (failure instanceof Error fatal) throw fatal;
+    if (failure != null) throw new IOException(
+        "Initial inference retirement incomplete; server retained for retry", failure);
   }
 
   /**

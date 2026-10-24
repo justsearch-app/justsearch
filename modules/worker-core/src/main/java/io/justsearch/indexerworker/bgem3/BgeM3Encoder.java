@@ -81,6 +81,7 @@ public class BgeM3Encoder implements AutoCloseable {
   // ---- Immutable state ----
   // Session management (delegated to SessionHandle — tempdoc 397 §14.8 PR 3).
   private final SessionHandle sessions;
+  private final BgeM3Assembly ownedAssembly;
   private final OrtEnvironment env;
   private final BgeM3Config config;
   private final int maxSeqLen;
@@ -94,11 +95,23 @@ public class BgeM3Encoder implements AutoCloseable {
    *
    * @param sessions pre-configured session handle
    * @param shape model-intrinsic facts (max sequence length + vocabulary)
-   * @param tokenizer pre-loaded DJL HuggingFace tokenizer
+   * @param tokenizer pre-loaded DJL HuggingFace tokenizer, transferred to this standalone encoder
    * @param config BGE-M3 configuration (for model directory, dimension caps)
    */
-  public BgeM3Encoder(
-      SessionHandle sessions, BgeM3Shape shape, HuggingFaceTokenizer tokenizer, BgeM3Config config) {
+  public BgeM3Encoder(SessionHandle sessions, BgeM3Shape shape, HuggingFaceTokenizer tokenizer, BgeM3Config config) {
+    this(new BgeM3Assembly(sessions, shape, tokenizer), config, true);
+  }
+
+  /** Borrows the assembly; its surface retains tokenizer ownership. */
+  public BgeM3Encoder(BgeM3Assembly assembly, BgeM3Config config) {
+    this(assembly, config, false);
+  }
+
+  private BgeM3Encoder(BgeM3Assembly assembly, BgeM3Config config, boolean ownsAssembly) {
+    SessionHandle sessions = assembly.sessions();
+    var shape = assembly.shape();
+    var tokenizer = assembly.tokenizer();
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.sessions = sessions;
     this.env = OrtEnvironment.getEnvironment();
     this.config = config;
@@ -139,16 +152,26 @@ public class BgeM3Encoder implements AutoCloseable {
       throw new UncheckedIOException(
           "Failed to load BGE-M3 tokenizer from " + tokenizerPath, e);
     }
-    String[] vocabulary;
     try {
-      vocabulary = loadVocabularyFromTokenizerJson(tokenizerPath);
-    } catch (IOException e) {
-      tokenizer.close();
-      throw new UncheckedIOException(
-          "Failed to load BGE-M3 vocabulary from " + tokenizerPath, e);
+      String[] vocabulary;
+      try {
+        vocabulary = loadVocabularyFromTokenizerJson(tokenizerPath);
+      } catch (IOException e) {
+        throw new UncheckedIOException(
+            "Failed to load BGE-M3 vocabulary from " + tokenizerPath, e);
+      }
+      BgeM3Shape shape = new BgeM3Shape(config.maxSequenceLength(), vocabulary);
+      return new BgeM3Assembly(sessions, shape, tokenizer);
+    } catch (RuntimeException | Error failure) {
+      var partial = new BgeM3Assembly(sessions, null, tokenizer);
+      if (sessions != null) throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      try { partial.close(); }
+      catch (RuntimeException | Error cleanup) {
+        if (failure != cleanup) failure.addSuppressed(cleanup);
+        throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      }
+      throw failure;
     }
-    BgeM3Shape shape = new BgeM3Shape(config.maxSequenceLength(), vocabulary);
-    return new BgeM3Assembly(sessions, shape, tokenizer);
   }
 
   // ==================== Public API ====================
@@ -438,8 +461,8 @@ public class BgeM3Encoder implements AutoCloseable {
 
   @Override
   public void close() {
-    sessions.close();
-    tokenizer.close();
+    if (ownedAssembly != null) ownedAssembly.close();
+    else sessions.close();
   }
 
   // ==================== Utility methods ====================

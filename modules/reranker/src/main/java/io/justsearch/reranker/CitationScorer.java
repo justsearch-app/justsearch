@@ -50,6 +50,7 @@ public final class CitationScorer implements Closeable {
 
   // Session management (delegated to SessionHandle — tempdoc 397 §14.5 PR 2).
   private final SessionHandle sessions;
+  private final RerankerAssembly ownedAssembly;
   private final OrtEnvironment env;
   private final RerankerTokenizer tokenizer;
   private final boolean needsTokenTypeIds;
@@ -62,10 +63,22 @@ public final class CitationScorer implements Closeable {
    *
    * @param sessions pre-configured session handle (CPU-only)
    * @param shape model-intrinsic facts ({@code maxSeqLen} + {@code needsTokenTypeIds})
-   * @param tokenizer pre-loaded reranker tokenizer
+   * @param tokenizer pre-loaded reranker tokenizer, transferred to this standalone scorer
    */
-  public CitationScorer(
-      SessionHandle sessions, RerankerShape shape, RerankerTokenizer tokenizer) {
+  public CitationScorer(SessionHandle sessions, RerankerShape shape, RerankerTokenizer tokenizer) {
+    this(new RerankerAssembly(sessions, shape, tokenizer), true);
+  }
+
+  /** Borrows the assembly; its surface retains tokenizer ownership. */
+  public CitationScorer(RerankerAssembly assembly) {
+    this(assembly, false);
+  }
+
+  private CitationScorer(RerankerAssembly assembly, boolean ownsAssembly) {
+    SessionHandle sessions = assembly.sessions();
+    var shape = assembly.shape();
+    var tokenizer = assembly.tokenizer();
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.sessions = sessions;
     this.env = OrtEnvironment.getEnvironment();
     this.tokenizer = tokenizer;
@@ -427,8 +440,8 @@ public final class CitationScorer implements Closeable {
   @Override
   public void close() {
     closed = true;
-    sessions.close();
-    tokenizer.close();
+    if (ownedAssembly != null) ownedAssembly.close();
+    else sessions.close();
     log.info("CitationScorer closed.");
   }
 

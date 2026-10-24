@@ -52,6 +52,7 @@ public final class BertNerInference implements Closeable {
 
   // --- Session management (delegated to SessionHandle — tempdoc 397 §7.4) ---
   private final SessionHandle sessions;
+  private final NerAssembly ownedAssembly;
   private final HuggingFaceTokenizer tokenizer;
   private final int maxSequenceLength;
   private final boolean useTokenTypeIds;
@@ -75,10 +76,22 @@ public final class BertNerInference implements Closeable {
    *
    * @param sessions pre-configured session handle
    * @param shape model-intrinsic facts ({@code maxSeqLen} + {@code needsTokenTypeIds})
-   * @param tokenizer pre-loaded DJL HuggingFace tokenizer (caller owns lifecycle)
+   * @param tokenizer pre-loaded DJL HuggingFace tokenizer, transferred to this standalone encoder
    */
-  public BertNerInference(
-      SessionHandle sessions, NerShape shape, HuggingFaceTokenizer tokenizer) {
+  public BertNerInference(SessionHandle sessions, NerShape shape, HuggingFaceTokenizer tokenizer) {
+    this(new NerAssembly(sessions, shape, tokenizer, null, null), true);
+  }
+
+  /** Borrows the assembly; its surface retains tokenizer ownership. */
+  public BertNerInference(NerAssembly assembly) {
+    this(assembly, false);
+  }
+
+  private BertNerInference(NerAssembly assembly, boolean ownsAssembly) {
+    SessionHandle sessions = assembly.sessions();
+    var shape = assembly.shape();
+    var tokenizer = assembly.tokenizer();
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.sessions = sessions;
     this.tokenizer = tokenizer;
     this.maxSequenceLength = shape.maxSequenceLength();
@@ -142,38 +155,49 @@ public final class BertNerInference implements Closeable {
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to load NER tokenizer from " + tokenizerPath, e);
     }
-    // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input names via the assembler helper;
-    // SessionHandle no longer exposes inputNames().
-    // Tempdoc 374 alpha.22 Bug S: route through resolveExistingModelFile so the probe
-    // works on GPU_FULL where Install AI downloads only model_fp16.onnx (no model.onnx).
-    // Pre-alpha.22 this called resolveModelPath(_, false) which unconditionally returns
-    // manifest.cpu() = "model.onnx" — file doesn't exist on GPU_FULL → ORT_NO_SUCHFILE
-    // → composeNerRole catches → NER unavailable. Round 12 evidence: every alpha 13-21
-    // shipped this regression but rounds 7-11 used pre-staged models (which have
-    // model.onnx) so it stayed hidden. Round 12 first true-fresh-install caught it.
-    // This is the 7th encoder site to be migrated through resolveExistingModelFile —
-    // matches alpha.16 Bug C (EmbeddingFingerprint), alpha.19 Bug J-2 (OnnxModelDiscovery
-    // fp16 fallback), alpha.20 Bug L (EmbeddingFingerprint cold-restart). Migration now
-    // complete across all known encoder sites.
-    Path probePath = exactModelFile != null ? exactModelFile
-        : manifest.resolveExistingModelFile(modelDir);
-    io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
-        io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), probePath);
-    boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");
-    NerShape shape = new NerShape(maxSequenceLength, needsTokenTypeIds);
-    // Tempdoc 710 Wave 2 Move 1: capabilities resolved ONCE here (the composition choke point) —
-    // label mapping is no longer parsed independently by this encoder; ModelCapabilityResolver
-    // already read the manifest-declared label config file's id2label and WARNed if absent.
-    io.justsearch.ort.ModelCapabilities capabilities =
-        io.justsearch.ort.ModelCapabilityResolver.resolve(
-            "ner",
-            modelDir,
-            manifest,
-            io.justsearch.ort.CapabilityRequirements.NER,
-            capabilityContractStrict,
-            exactModelFile);
-    BioTagDecoder.LabelMapping labelMapping = toLabelMapping(capabilities.labelMapping());
-    return new NerAssembly(sessions, shape, tokenizer, labelMapping, capabilities);
+    try {
+      // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input names via the assembler helper;
+      // SessionHandle no longer exposes inputNames().
+      // Tempdoc 374 alpha.22 Bug S: route through resolveExistingModelFile so the probe
+      // works on GPU_FULL where Install AI downloads only model_fp16.onnx (no model.onnx).
+      // Pre-alpha.22 this called resolveModelPath(_, false) which unconditionally returns
+      // manifest.cpu() = "model.onnx" — file doesn't exist on GPU_FULL → ORT_NO_SUCHFILE
+      // → composeNerRole catches → NER unavailable. Round 12 evidence: every alpha 13-21
+      // shipped this regression but rounds 7-11 used pre-staged models (which have
+      // model.onnx) so it stayed hidden. Round 12 first true-fresh-install caught it.
+      // This is the 7th encoder site to be migrated through resolveExistingModelFile —
+      // matches alpha.16 Bug C (EmbeddingFingerprint), alpha.19 Bug J-2 (OnnxModelDiscovery
+      // fp16 fallback), alpha.20 Bug L (EmbeddingFingerprint cold-restart). Migration now
+      // complete across all known encoder sites.
+      Path probePath = exactModelFile != null ? exactModelFile
+          : manifest.resolveExistingModelFile(modelDir);
+      io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
+          io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), probePath);
+      boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");
+      NerShape shape = new NerShape(maxSequenceLength, needsTokenTypeIds);
+      // Tempdoc 710 Wave 2 Move 1: capabilities resolved ONCE here (the composition choke point) —
+      // label mapping is no longer parsed independently by this encoder; ModelCapabilityResolver
+      // already read the manifest-declared label config file's id2label and WARNed if absent.
+      io.justsearch.ort.ModelCapabilities capabilities =
+          io.justsearch.ort.ModelCapabilityResolver.resolve(
+              "ner",
+              modelDir,
+              manifest,
+              io.justsearch.ort.CapabilityRequirements.NER,
+              capabilityContractStrict,
+              exactModelFile);
+      BioTagDecoder.LabelMapping labelMapping = toLabelMapping(capabilities.labelMapping());
+      return new NerAssembly(sessions, shape, tokenizer, labelMapping, capabilities);
+    } catch (OrtException | RuntimeException | Error failure) {
+      var partial = new NerAssembly(sessions, null, tokenizer, null, null);
+      if (sessions != null) throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      try { partial.close(); }
+      catch (RuntimeException | Error cleanup) {
+        if (failure != cleanup) failure.addSuppressed(cleanup);
+        throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -501,7 +525,7 @@ public final class BertNerInference implements Closeable {
 
   @Override
   public void close() {
-    sessions.close();
-    tokenizer.close();
+    if (ownedAssembly != null) ownedAssembly.close();
+    else sessions.close();
   }
 }

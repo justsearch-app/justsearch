@@ -58,6 +58,7 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   private final String documentPrefix;
   private final String queryPrefix;
   private final AtomicBoolean initialized = new AtomicBoolean(false);
+  private boolean cleanupComplete;
   private final AtomicBoolean closed = new AtomicBoolean(false);
 
   private volatile AiBackend backend;
@@ -758,20 +759,22 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   }
 
   @Override
-  public void close() {
-    if (closed.compareAndSet(false, true)) {
+  public synchronized void close() {
+    if (!cleanupComplete) {
+      closed.set(true);
       log.info("Closing EmbeddingService...");
       if (backend != null) {
         try {
           backend.close();
         } catch (BackendException e) {
-          log.warn("Error closing embedding backend: {}", e.getMessage());
+          throw new IllegalStateException("Error closing embedding backend", e);
         }
         backend = null;
       }
       // Clear embedding cache to release memory
       embeddingCache.clear();
       available = false;
+      cleanupComplete = true;
       log.info("EmbeddingService closed.");
     }
   }
