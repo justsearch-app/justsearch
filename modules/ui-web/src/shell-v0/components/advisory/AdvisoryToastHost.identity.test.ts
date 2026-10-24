@@ -31,6 +31,8 @@ it('XD2 keeps each polite live region with its own toast when an older outcome e
     expect(failure.getAttribute('aria-live')).toBe('polite');
 
     await vi.advanceTimersByTimeAsync(4000);
+    // Happy DOM exposes getAnimations(); expiry starts an exit animation before removal.
+    success.closest('.toast')!.dispatchEvent(new Event('animationend'));
     await host.updateComplete;
     expect(host.shadowRoot!.querySelectorAll('jf-system-notice')).toHaveLength(1);
     // Reusing the success node for this text announces the same failure a second time.
@@ -38,6 +40,7 @@ it('XD2 keeps each polite live region with its own toast when an older outcome e
     expect(success.isConnected).toBe(false);
     expect(success.textContent).not.toContain('Extraction failed:');
     await vi.advanceTimersByTimeAsync(1000);
+    failure.closest('.toast')!.dispatchEvent(new Event('animationend'));
     await host.updateComplete;
     expect(host.shadowRoot!.querySelector('jf-system-notice')).toBeNull();
   } finally {

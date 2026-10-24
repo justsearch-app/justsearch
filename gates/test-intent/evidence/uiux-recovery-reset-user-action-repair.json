@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T01:02:42.437Z",
+  "revision": "f3bc416ae4f5de4f25e3536167e3c8593c9264bc",
+  "tree": "3d1e1ec66f0408acf02edb29c34509471f5d7d18",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-640513-1792803750493.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5048
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after pointerdown outside Settings",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4323556e5e19b931eefc3db01b387d7af8b92ea1eb5d741f21cede4d90c2180b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after pointerdown outside Settings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after keydown outside Settings",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4323556e5e19b931eefc3db01b387d7af8b92ea1eb5d741f21cede4d90c2180b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after keydown outside Settings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after blur outside Settings",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4323556e5e19b931eefc3db01b387d7af8b92ea1eb5d741f21cede4d90c2180b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after blur outside Settings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after keydown outside the Settings dialog",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after keydown outside the Settings dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after blur outside the Settings dialog",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after blur outside the Settings dialog",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f3bc416ae4",
+    "revision": "f3bc416ae4f5de4f25e3536167e3c8593c9264bc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-640513-1792803756641.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5617,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-640513-1792803756641.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after pointerdown outside Settings",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after pointerdown outside Settings:  AssertionError: a startup user action cancels the pending recovery request: expected \"focusSettingsRecovery\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st focusSettingsRecovery call:\n\n    Array []\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after keydown outside Settings",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after keydown outside Settings:  AssertionError: a startup user action cancels the pending recovery request: expected \"focusSettingsRecovery\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st focusSettingsRecovery call:\n\n    Array []\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after blur outside Settings",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after blur outside Settings:  AssertionError: a startup user action cancels the pending recovery request: expected \"focusSettingsRecovery\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st focusSettingsRecovery call:\n\n    Array []\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 drops pending recovery focus after pointerdown outside the Settings dialog:  AssertionError: user activity anywhere cancels the pending hand-off: expected <button class=\"invoke\" …(1)></button> to be <button class=\"close\" …(4)>…(1)</button> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after keydown outside the Settings dialog",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 drops pending recovery focus after keydown outside the Settings dialog:  AssertionError: user activity anywhere cancels the pending hand-off: expected <button class=\"invoke\" …(1)></button> to be <button class=\"close\" …(4)>…(1)</button> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after blur outside the Settings dialog",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 drops pending recovery focus after blur outside the Settings dialog:  AssertionError: user activity anywhere cancels the pending hand-off: expected <button class=\"invoke\" …(1)></button> to be <button class=\"close\" …(4)>…(1)</button> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/"
+      }
+    ]
+  },
+  "digest": "sha256:8fd9ae13015afa5dac1b352f9f3e569889d7ca5fa706f93668762003e6c5a51b"
+}

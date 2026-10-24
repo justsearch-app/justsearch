@@ -284,6 +284,8 @@ describe('AdvisoryToastHost (Group A2 + B4)', () => {
     const toast = el.shadowRoot?.querySelector('.toast') as HTMLElement;
     toast.click();
     expect(store.acknowledge).toHaveBeenCalledWith('operation.completed:core.click:SUCCESS');
+    // Happy DOM now exposes getAnimations(), so dismissal waits for the CSS exit to finish.
+    toast.dispatchEvent(new Event('animationend'));
     expect(el.visible.length).toBe(0);
   });
 
@@ -380,6 +382,7 @@ describe('AdvisoryToastHost (Group A2 + B4)', () => {
       (btn as unknown as { onActivate: () => void }).onActivate();
       btn!.dispatchEvent(new Event('click', { bubbles: true, composed: true }));
       expect(store.acknowledge).toHaveBeenCalledTimes(1);
+      btn!.closest('.toast')!.dispatchEvent(new Event('animationend'));
       expect(el.visible.length).toBe(0);
     });
   });
@@ -509,8 +512,10 @@ describe('AdvisoryToastHost (Group A2 + B4)', () => {
     store.push({ advisories: [navRec('local:1', 'Navigated to Search')] });
     await el.updateComplete;
     expect(el.visible.length).toBe(1);
+    const previousToast = el.shadowRoot!.querySelector('.toast')!;
     // The store superseded local:1: it is gone, local:2 is the replacement.
     store.push({ advisories: [navRec('local:2', 'Navigated to Library')] });
+    previousToast.dispatchEvent(new Event('animationend'));
     await el.updateComplete;
     expect(el.visible.length).toBe(1);
     const toast = el.shadowRoot?.querySelector('.toast') as HTMLElement;
