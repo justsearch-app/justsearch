@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * puts on the classpath, reflection and native calls are invisible to it, and it bounds who
  * launches, not how often.
  */
-class ProcessLaunchFunnelTest {
+class ProcessLaunchFunnelTest extends ImportedProgram {
 
   /** Owner class -> the members on it that start an OS process. */
   private static final Map<String, Set<String>> LAUNCHES =

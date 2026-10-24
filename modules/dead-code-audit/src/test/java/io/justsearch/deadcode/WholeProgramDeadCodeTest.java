@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Test;
  * encoded as the {@code isRoot*} skips below, mirroring GraalVM native-image's
  * reachability-metadata categories (reflection / JNI / serialization / proxies / entry points).
  */
-class WholeProgramDeadCodeTest {
+class WholeProgramDeadCodeTest extends ImportedProgram {
 
   /**
    * Packages whose public API is an external contract (modules published to GitHub Packages via a
