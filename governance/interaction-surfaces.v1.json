@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "Tempdoc 561 surface tier — the placement-keyed one-interaction-window invariant. At most ONE visible (USER-audience, RAIL/STAGE) surface may consume a core user-interaction shape, and that surface is the canonical one window; DEEPLINK surfaces route into it (exempt). The authority for the core interaction-shape set is CoreConversationShapeCatalog.CORE_USER_INTERACTION_SHAPES (Java); this gate projects it and forbids a second visible interaction surface or a second per-shape FE view.",
-  "canonicalSurface": "core.unified-chat-surface",
-  "canonicalMountTag": "jf-unified-chat-view",
+  "canonicalSurface": "core.search-v3-surface",
+  "canonicalMountTag": "jf-sv3-window",
   "visiblePlacements": ["RAIL", "STAGE"],
   "scan": {
     "surfaceCatalog": "modules/app-observability/src/main/java/io/justsearch/app/observability/surface/CoreSurfaceCatalog.java",

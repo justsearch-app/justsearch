@@ -1,0 +1,1388 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T13:36:42.350Z",
+  "revision": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
+  "tree": "11a46c9c9b6abb72537381a3bd33310b2b8c3459",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zf2oprbb/tmp/test-intent-vitest-3803588-1792848992450.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9896
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/windowCutover.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/windowCutover.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:427ceafdf9044d3384ef19bd543aa88ede8c531c5cef981731e153282cf57f07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP1.5a window cutover C1 promotes exactly one Search rail window and pairs it with Library",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C2 resolves core.unified-chat-surface directly to Search",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C2 resolves core.search-surface directly to Search",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C2 resolves core.agent-surface directly to Search",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C4 normalizes a promoted alias whose target has retired",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C2 A5 recognizes and reuses an alias-equivalent bookmark without merging places",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C3 normalizes saved journal identity and preserves conversation traversal",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.5a window cutover C4 A4 migrates every profile once with explicit Search preferences winning",
+          "status": "passed"
+        },
+        {
+          "name": "C6 answer and query verbs default to Search and never park an automatic send",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A5 bookmark identity ignores irrelevant fields after alias resolution",
+          "status": "passed"
+        },
+        {
+          "name": "C6 answer preparation follows the resolved target when a sender still names the retired window",
+          "status": "passed"
+        },
+        {
+          "name": "C1 an upgrade catalog cache cannot keep the retired rail window beside Search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:36bf3cc46a1b5b130812d748623122d049a4994c3caabc5b341b53d127c1d645",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C5 A8 publishes the chosen hit and chosen result set, and clears on deselect and leave",
+          "status": "passed"
+        },
+        {
+          "name": "C5 A8 leaving Search does not clear another surface selection",
+          "status": "passed"
+        },
+        {
+          "name": "C5 A8 a replacement result list and a changed query cannot leave a stale Find related hit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16e5b3c1319fb80fabcaa7be192fe6183d8ccea7033278575d886a89bcf7cce2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC4 leaves a modal and an ordinary field in charge, including a modal button",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC4 navigates from a non-modal view once with the prior view one Back away",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC5 drains a request already pending before subscription and never replays it on reconnect",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 preserves a composer override and uses it as the destination",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 falls back temporarily for an override without a composer and preserves the saved override",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 respects a changed override after a temporary core fallback",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 ignores a missing override target without changing the saved override",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 targets the real Search v3 composer with no chat model and preserves its draft",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 reuses a secondary search pane and never focuses the other composer",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC9 a pending explicit deep link keeps its destination instead of focusing Search",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC5 does not wait for the Engine schema request before consuming a ready focus request",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC11 native registration takes precedence without activating previously inert space bindings",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 Ctrl Shift A prepares Ask when chat is ready (true), otherwise Search",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 Ctrl Shift A prepares Ask when chat is ready (false), otherwise Search",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 the Ask chord works from the focused composer (true)",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 the Ask chord works from the focused composer (false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:896d7e18c3cb2f1b18760d7cd35d8a55f0cc055e2006b8fab3a6841b783d32b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C5 plugin compose captures its chosen passage before navigation clears selection",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — UNTRUSTED tier (read-only) exposes current + subscribe",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — UNTRUSTED tier (read-only) omits setSelection + clearSelection",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — UNTRUSTED tier (read-only) current() returns null when no items are selected",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — CORE tier (read+write) exposes all four methods",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — CORE tier (read+write) setSelection wraps plugin items with pluginId",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — CORE tier (read+write) clearSelection drops the current selection",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — snapshot conversion strips internal Set into a string[]",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — snapshot conversion subscribe delivers snapshots on change",
+          "status": "passed"
+        },
+        {
+          "name": "host.selection — snapshot conversion UNTRUSTED tier can read but not mutate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/intentRouter.test.ts",
+      "file": "modules/ui-web/src/shell-v0/router/intentRouter.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f175c8018906dee6adb40b7416399d582757d20dc27d07a6fef42d472ee0a2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IntentRouter — Navigation intents delegates resolved Navigation to the NavigationHandler",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Navigation intents forwards pushHistory option as the handler push flag",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Navigation intents state-bearing Navigation passes state through to handler",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Navigation intents unresolved Navigation does NOT call handler",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Navigation intents redirected Navigation dispatches with canonical target",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Invocation intents delegates resolved Invocation to InvocationHandler with transport",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Invocation intents returns the Invocation result through the dispatch promise",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Invocation intents dispatcher errors propagate to the caller",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Invocation intents unresolved Invocation does NOT call handler",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Query intents (548 S4-A) lowers a query to a search-surface navigation carrying the query in state",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Query intents (548 S4-A) merges refinement state and honors custom querySurfaceId / queryStateKey",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Query intents (548 S4-A) does NOT call the handler when the query surface is unresolved",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Query intents (548 S4-A) fires { status: 'dispatched' } for a resolved query",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Answer intents (548 §4.5) parks the answer shape without an automatic send",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Answer intents (548 §4.5) does NOT park the auto-run flag when the chat surface is unresolved",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Answer intents (548 §4.5) lowers an answer to a chat-surface activation carrying the prompt in state",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Answer intents (548 §4.5) honors custom answerSurfaceId / answerStateKey and merges state",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Answer intents (548 §4.5) C2 C6 A2 keeps answer file scope while the named shape outranks conflicting state",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — Answer intents (548 §4.5) does NOT call the handler when the chat surface is unresolved",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — observability listeners receive { status: 'dispatched' } for resolved surfaces",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — observability listeners receive { status: 'unresolved' } for unknown surfaces",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — observability subscribe fires for both Navigation and Invocation intents",
+          "status": "passed"
+        },
+        {
+          "name": "IntentRouter — observability listener errors do not block dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f6a3d8ed65fd0591e09572f796a71b1caeb7e7ebcb0f2e912d04db371191408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "UserStateDocument — defaults + persistence returns default document on first read",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — defaults + persistence mutateDocument writes to consolidated localStorage key",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — defaults + persistence mutateDocument updates in-memory snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — defaults + persistence persists surfaceMode cross-profile (top level) and reloads it from storage (567 §9.4)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — defaults + persistence drops a malformed surfaceMode on parse (567 §9.4)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — defaults + persistence mutateDocument with same reference does not fire listeners",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration migrates legacy userConfig key into consolidated doc",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration migrates legacy activeTheme key into consolidated doc",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration migrates BOTH legacy keys when present",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration legacy keys are LEFT IN PLACE after migration (revertibility)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration falls back to defaults when legacy userConfig is malformed",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration falls back to defaults when consolidated doc is malformed",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — V1.5 alpha → V1.5.1 migration rejects consolidated doc with unknown schemaVersion",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscription subscribeDocument fires once on subscribe + on every mutation",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscription subscribeProjection only fires when selected slice changes",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscription unsubscribe stops further notifications",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) default document has empty pinnedSearches array",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) round-trips pinnedSearches through localStorage",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) drops malformed pin entries while keeping valid ones",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) falls back to [] when pinnedSearches is not an array",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) falls back to [] when pinnedSearches is missing entirely",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) legacy migration seeds empty pinnedSearches array",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) defaults pin.runs to [] for pins without the field",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) round-trips pin.runs through localStorage",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) drops malformed run entries while keeping valid ones",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) round-trips pin.filterSpec through localStorage",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) drops malformed filterSpec bounds; if both drop, omits filterSpec",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) preserves filterSpec when one bound is malformed (drops only the bad bound)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) absent filterSpec field is fine (default = pin without filter)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — pinnedSearches (G36) falls back to [] when pin.runs is not an array",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices preserves acknowledgedAdvisories array",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices drops non-string entries in acknowledgedAdvisories",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices preserves pluginSettings nested object",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices drops malformed plugin settings entries but keeps the rest",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices preserves recentCommandIds",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices caps recentCommandIds at 10",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices preserves keybindingOverrides",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices normalizes keybindingOverrides source to \"user\"",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices drops malformed keybindingOverrides entries",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §12.2 validateV1 restores previously-dropped slices round-trips through mutate + reload",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 starts with built-in default profile active",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 createProfile adds a new profile based on default",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 createProfile copies basis slices when basedOn is supplied",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 createProfile throws on duplicate id",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 setActiveProfileId switches the active profile atomically",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 setActiveProfileId throws on unknown id",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 renameProfile updates the label only",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 deleteProfile removes a non-active profile",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 deleteProfile refuses to delete the default profile",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 deleteProfile refuses to delete the active profile",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 subscribeActiveProfileId fires on switch",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 cross-profile slices persist across profile switch",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 per-profile slices isolated across profiles",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 V1 legacy doc migrates forward into the default profile",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 V1 legacy savedViews + viewerAudience lift into the default profile",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — §11.3 Profiles V2 V2 round-trip preserves per-profile savedViews + viewerAudience",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscribeProfileSwitch (tempdoc 508-followup §β4) does NOT fire on subscribe (initial-fire suppressed)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscribeProfileSwitch (tempdoc 508-followup §β4) fires when the active profile changes",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscribeProfileSwitch (tempdoc 508-followup §β4) does not fire when setActiveProfileId is called with the current id (no-op)",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscribeProfileSwitch (tempdoc 508-followup §β4) does not fire on unrelated document mutations",
+          "status": "passed"
+        },
+        {
+          "name": "UserStateDocument — subscribeProfileSwitch (tempdoc 508-followup §β4) unsubscribe stops further handler calls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/compose.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/compose.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b980e27d3c55b7d77eb9816c9645b55e7c9be30e918ad4e8dd66060095f6c6d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compose() returns false when AI chat capability is offline",
+          "status": "passed"
+        },
+        {
+          "name": "compose() core.ask with user prompt dispatches navigate-with-context",
+          "status": "passed"
+        },
+        {
+          "name": "compose() core.ask with docIds defaults affordance to documents",
+          "status": "passed"
+        },
+        {
+          "name": "compose() core.summarize with docName builds templated query",
+          "status": "passed"
+        },
+        {
+          "name": "compose() core.summarize without docName falls back to \"Summarize this document\"",
+          "status": "passed"
+        },
+        {
+          "name": "compose() typed selection is parked in the pending register and drained once",
+          "status": "passed"
+        },
+        {
+          "name": "compose() selection with no docName uses \"Summarize the selection\" query template",
+          "status": "passed"
+        },
+        {
+          "name": "resolveShape — an explicit operation is not overridden by ambient selection an explicit extract affordance resolves core.extract for EVERY selection kind",
+          "status": "passed"
+        },
+        {
+          "name": "resolveShape — an explicit operation is not overridden by ambient selection an explicit documents affordance resolves core.rag-ask for EVERY selection kind",
+          "status": "passed"
+        },
+        {
+          "name": "resolveShape — an explicit operation is not overridden by ambient selection an UNSPECIFIED affordance is still resolved by the selection (the row that was right)",
+          "status": "passed"
+        },
+        {
+          "name": "resolveShape — an explicit operation is not overridden by ambient selection core.summarize is unconditional",
+          "status": "passed"
+        },
+        {
+          "name": "resolveDispatchShape / wireSelectionKind — the ONE chip-and-send computation extract mode dispatches core.extract whether or not something is selected",
+          "status": "passed"
+        },
+        {
+          "name": "resolveDispatchShape / wireSelectionKind — the ONE chip-and-send computation the agent affordance is the action plane, not an answer-plane shape",
+          "status": "passed"
+        },
+        {
+          "name": "resolveDispatchShape / wireSelectionKind — the ONE chip-and-send computation FE-only item kinds narrow to the wire `item` kind; unknown kinds read as no selection",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAutoRun one-shot (548 §4.5) defaults to false",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAutoRun one-shot (548 §4.5) returns true once after set, then resets to false (one-shot)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAutoRun one-shot (548 §4.5) compose() does NOT set the auto-run flag (askAi prefills, waits for Send)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b49e8b57062a1f225e8b5817dec9ea66d68ccb1ccca6076a6780c53d5e1a055c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO1 HO2 a cold address query arrives intact and is consumed from the address",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.extract prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 HO9 a selection is local to its prepared turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 two arrivals replace preparation without sending",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an incoming query replaces typed Search without creating a conversation place",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a cold hand-off keeps the restored draft with its previous conversation",
+          "status": "passed"
+        },
+        {
+          "name": "HO11 an answer link ignores agent affordance and conversation and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 an empty file hand-off cannot widen to the whole index",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary Retry menu names the original summary inputs",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an outgoing conversation keeps its unsent draft and files one click away",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a prepared selection cannot attach it to another mode send",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 leaving the window retires prepared context while a layout reparent keeps it",
+          "status": "passed"
+        },
+        {
+          "name": "HO10 unavailable chat still shows the prepared task and chosen files",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 an incoming task puts keyboard focus in the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 malformed selection data is refused visibly without a crash",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a held real controller keeps its decision and reopens from the sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a locked conversation is left intact by incoming preparation",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 a refused unreadable-document hand-off keeps the instruction and files",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 keyboard palette search after a hand-off returns focus to the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 a reloaded Explain Retry menu states its actual restoration limit",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit",
+          "status": "passed"
+        },
+        {
+          "name": "merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+          "status": "passed"
+        },
+        {
+          "name": "merge an unscoped Summarize input failure is not a no-matching-files result",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'inline trace'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'shortened'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'different question'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'emptied'",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a failed durable write leaves the legacy draft recoverable",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.rag-ask prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.free-chat prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.extract prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a workflow compatibility mount announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"mode\":[\"ask\",\"search\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"forceShapeId\":[]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"docIds\":[\"\",\"chosen.md\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+          "status": "passed"
+        },
+        {
+          "name": "C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 changing the address place keeps the shared reader until explicitly closed",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a661ac959e5343c14540b38e7eb87756120d84a743c7ba240e76325fd0432d6c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "StatusDeck (slice 461) renders default groups when status null (everything muted)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot turns healthy when api + index READY",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 807: the connection dot goes red when the snapshot is no longer live — READY/READY notwithstanding",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 807: the never-contacted `unreachable` verdict reddens the dot too",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for invalid api states",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for invalid index states",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for missing component data {}",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for missing component data {\"readiness\":{}}",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for missing component data {\"readiness\":{\"engineComponents\":{}}}",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot shows starting for api",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot shows starting for index",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) memory dot turns warn at >80% utilization",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) system pill tone follows the verdict-derived statusTone (tempdoc 649)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) queue group renders when pendingJobs > 0",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) S33.1 energy saver names continued text indexing and deferred enrichment",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 630: queue stays the plain active count when not energy-reduced",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 813: jobs drained but enrichment outstanding ⇒ the chip reads the enriching percent",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 813: the embed-count fallback shows the embedding number, not the multi-stage sum",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 813: a blocked embedding stage claims no enrichment progress",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) §17.2 — files/size/memory values come from the projectFact authority (one formatter)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) endpoint label shows api-base attribute",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 595 §15.1 (E1): an error verdict announces assertively",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N1: a transitioning → operational edge fires one completion toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N1: first-load (connecting → operational) and reconnect (unreachable → operational) do NOT toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N1: a transitioning → checking → operational recovery still fires exactly one toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N3: the inference-mode pill is a jf-control that navigates to Health on activate",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) E2: provisional with a retained last-settled value shows it dimmed, not \"…\"",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) E2: provisional with NO retained value falls back to \"…\"",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) E2: a retained value with a null size shows last-known Files but \"…\" for Size (honesty)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing installing → online fires exactly one \"core.ai-engine.settled\" toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing installing → install_failed fires exactly one \"core.ai-engine.failed\" toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing reaching \"online\" WITHOUT a preceding \"installing\" (e.g. first load already online) does not toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing the inference-mode pill routes to the AI Brain surface when not_installed/install_failed",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing the inference-mode pill still routes to Health for ordinary states (e.g. online)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner yields on the chat surface when the verdict warrants that surface a banner",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner does NOT yield on another surface — the chip is the global indicator there",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner does NOT yield on the chat surface when the verdict warrants NO banner (info tier)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner does NOT yield an UNREACHABLE verdict — that is a connection fact, not this register row",
+          "status": "passed"
+        },
+        {
+          "name": "announces retry waiting with its backlog and deadline",
+          "status": "passed"
+        },
+        {
+          "name": "uses a fresh serving count during migration instead of the retained count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:30ee42921920ca9a03de8bb499953ee0db9a6ed78d3d486c6c1aad475bf77297",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Action registration (§3.C) register/get round-trip",
+          "status": "passed"
+        },
+        {
+          "name": "Action registration (§3.C) throws on duplicate id",
+          "status": "passed"
+        },
+        {
+          "name": "Action registration (§3.C) unregister removes the entry",
+          "status": "passed"
+        },
+        {
+          "name": "Action registration (§3.C) subscribeActions fires on register + unregister",
+          "status": "passed"
+        },
+        {
+          "name": "Action registration (§3.C) getAllActions returns alphabetical by id",
+          "status": "passed"
+        },
+        {
+          "name": "operation projection does not project model-terms install operations into zero-argument actions",
+          "status": "passed"
+        },
+        {
+          "name": "shell actions — AI install palette reachability (727 F-1) 923 F-22 — registers one Search destination and no duplicate Go to Chat alias",
+          "status": "passed"
+        },
+        {
+          "name": "shell actions — AI install palette reachability (727 F-1) registers navigate-only palette entries for Start/Repair AI Install",
+          "status": "passed"
+        },
+        {
+          "name": "shell actions — AI install palette reachability (727 F-1) invoking the Start/Repair entries navigates to the Brain surface (not a bare op-invoke)",
+          "status": "passed"
+        },
+        {
+          "name": "shell actions — AI install palette reachability (727 F-1) round-14 F2 — a plain \"Go to Brain\" navigation entry exists (the documented palette route)",
+          "status": "passed"
+        },
+        {
+          "name": "shell actions — AI install palette reachability (727 F-1) 857 D3 (drafted as 854) — a plain \"Go to Activity\" navigation entry exists, mirroring go-to-health",
+          "status": "passed"
+        },
+        {
+          "name": "listActions filtering (§3.C) global Action (no appliesTo) appears without addressable",
+          "status": "passed"
+        },
+        {
+          "name": "listActions filtering (§3.C) addressable-scoped Action requires matching kind",
+          "status": "passed"
+        },
+        {
+          "name": "listActions filtering (§3.C) when predicate gates on scope",
+          "status": "passed"
+        },
+        {
+          "name": "listActions filtering (§3.C) enabled(addressable) predicate filters per-payload",
+          "status": "passed"
+        },
+        {
+          "name": "listActions filtering (§3.C) throwing enabled-fn → action filtered out (defensive)",
+          "status": "passed"
+        },
+        {
+          "name": "listActions filtering (§3.C) sort: priority desc, title asc within same priority",
+          "status": "passed"
+        },
+        {
+          "name": "invokeAction (§3.C) runs the handler and returns its Effect",
+          "status": "passed"
+        },
+        {
+          "name": "invokeAction (§3.C) throws on unknown id",
+          "status": "passed"
+        },
+        {
+          "name": "invokeAction (§3.C) passes args and addressable to handler",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) writes a journal entry per Effect with provided provenance",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) dispatches toast Effect as jf-advisory-ephemeral",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) dispatches navigate Effect as window.location.hash assignment",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) dispatches open-pane / close-pane Effects as events",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) 569 §14 — dispatches the presentation + search intent Effects as jf-* events",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) §32 S2 — invoke-operation carries originator in detail (trust-bridge contract)",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) §32 U2 — undo-operation Effect dispatches jf-undo-operation",
+          "status": "passed"
+        },
+        {
+          "name": "applyEffect + Effect Journal (§13.2.2 wire) §32 U2 — invoke-operation detail carries journalEntryId (executionId capture)",
+          "status": "passed"
+        },
+        {
+          "name": "invokeAndApply (§3.C end-to-end) Action → handler → Effect → applyEffect → journal",
+          "status": "passed"
+        },
+        {
+          "name": "registerCanonicalCoreActions (§20.7 A4 — survive test reset) module-load registers core.action.cite-selection (but reset clears)",
+          "status": "passed"
+        },
+        {
+          "name": "registerCanonicalCoreActions (§20.7 A4 — survive test reset) registerCanonicalCoreActions re-installs the canonical Action",
+          "status": "passed"
+        },
+        {
+          "name": "registerCanonicalCoreActions (§20.7 A4 — survive test reset) registerCanonicalCoreActions is idempotent (second call no-op)",
+          "status": "passed"
+        },
+        {
+          "name": "registerCanonicalCoreActions (§20.7 A4 — survive test reset) dispatchEffectToChrome (543-fwd #1, journal-suppressed) dispatches the chrome event without writing a journal entry",
+          "status": "passed"
+        },
+        {
+          "name": "registerCanonicalCoreActions (§20.7 A4 — survive test reset) dispatchEffectToChrome (543-fwd #1, journal-suppressed) contrast: applyEffect DOES append to the journal",
+          "status": "passed"
+        },
+        {
+          "name": "registerCanonicalCoreActions (§20.7 A4 — survive test reset) dispatchEffectToChrome (543-fwd #1, journal-suppressed) omits journalEntryId from invoke-operation when not provided",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6153ff0de8ae8eead4536b983412647bb776fca53e2a8e26bc0fe710dd16f4f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window mounts with its five regions renders sidebar, topbar, main and composer inside the window host",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions names the window in the topbar and carries ONLY controls that do something",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions opens with an empty sidebar: no sessions until this window has searched",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions claims nothing about the corpus when the window is docked without a search",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions gives the composer a field, its effort control and a send control",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them opens on the empty hero: headline up, content region empty",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them docks into the band, dropping the headline and revealing the results",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them keeps the send control disabled until the field carries something to send",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them docks on send and returns to the hero on Escape",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them compacts the effort control into a real glyph that keeps its whole name",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them routes an external write of the dev attribute through the same morph",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux Tauri shell",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Windows Tauri shell",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a macOS Tauri shell",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux browser",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a API absent",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a reduced motion",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does adopts on connect and removes on the last disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does scopes the morph attribute to the transition and clears it afterwards",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does never waits on a frame inside the transition callback, which the browser suspends",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does clears the flag on EVERY path a state change can take",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does swaps instantly under reduced motion, without reaching the API at all",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy spends a status colour on the three non-resting states and none on the resting one",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy runs the duty-cycled ping on the in-motion row only",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy puts every state on the HOST as an attribute, which is what the fills key off",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy makes the row a real button and marks an active one for assistive tech",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does clips the window host and the main column",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does clips every region host, so no region can become a second scroller",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does puts the ONE scroller inside the content surface",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does adopts the scroller mixin exactly once across the rendered window",
+          "status": "passed"
+        },
+        {
+          "name": "the surface is registered as the main Search window declares core.search-v3-surface as USER/RAIL",
+          "status": "passed"
+        },
+        {
+          "name": "the surface is registered as the main Search window loads lazily on its first activation",
+          "status": "passed"
+        },
+        {
+          "name": "the surface is registered as the main Search window is in the component vocabulary, with every region it composes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5afda3a146d32f5772200b9e070282c947a1f23c0f575dd4955b48569d1b9d4f"
+}

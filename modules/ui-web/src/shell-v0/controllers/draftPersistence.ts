@@ -93,6 +93,35 @@ export class DraftPersistence implements ReactiveController {
     }
   }
 
+  /**
+   * One-time cutover of an unscoped legacy draft. The destination and disposition are written
+   * before removing the source. On quota/security failure the source remains recoverable.
+   * Called only on a mount without an incoming task; an explicit arrival owns its composer.
+   */
+  adoptLegacy(key: string): void {
+    const marker = storageKey(`${key}.migrated-to.${this.provider.key}`);
+    try {
+      if (localStorage.getItem(marker) !== null) return;
+      const legacy = localStorage.getItem(storageKey(key));
+      if (!legacy?.trim()) {
+        localStorage.setItem(marker, 'no-legacy-draft');
+        return;
+      }
+      const current = this.provider.get() || readDraft(this.provider.key) || '';
+      if (current.trim()) {
+        localStorage.setItem(marker, 'kept-successor');
+        return;
+      }
+      localStorage.setItem(storageKey(this.provider.key), legacy);
+      localStorage.setItem(marker, 'transferred');
+      this.set(legacy);
+      void this.host.updateComplete;
+      localStorage.removeItem(storageKey(key));
+    } catch {
+      // Do not mark or remove the only durable copy when the transfer could not be saved.
+    }
+  }
+
   hostDisconnected(): void {
     // Flush on hide too (belt-and-suspenders beyond visibilitychange/pagehide), then stop contributing.
     writeDraft(this.provider.key, this.provider.get());

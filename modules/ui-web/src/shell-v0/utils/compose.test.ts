@@ -64,10 +64,10 @@ describe('compose()', () => {
     const ok = compose({ operation: 'core.ask', source: 'BUTTON', userPrompt: 'why splade?' });
     expect(ok).toBe(true);
     const d = capture();
-    expect(d?.target).toBe('core.unified-chat-surface');
+    expect(d?.target).toBe('core.search-v3-surface');
     expect(d?.state.query).toBe('why splade?');
     expect(d?.state.affordance).toBe('none');
-    expect(d?.state.docIds).toEqual([]);
+    expect(d?.state.docIds).toBeUndefined();
   });
 
   it('core.ask with docIds defaults affordance to documents', () => {

@@ -187,7 +187,7 @@ final class CoreSurfaceCatalogTest {
         "core.agent-surface must be retired (folded into the one interaction window)");
     // The agent-run shape is now consumed by the one interaction window alongside ask/chat/extract.
     Surface unified =
-        catalog.findById(CoreSurfaceCatalog.UNIFIED_CHAT_SURFACE_ID).orElseThrow();
+        catalog.findById(CoreSurfaceCatalog.SEARCH_V3_SURFACE_ID).orElseThrow();
     assertTrue(
         unified.consumes().conversationShapes().contains(new ConversationShapeRef("core.agent-run")),
         "the one interaction window must consume core.agent-run");

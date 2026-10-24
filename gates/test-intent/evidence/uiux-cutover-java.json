@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T14:09:54.767Z",
+  "revision": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
+  "tree": "c2302d65165d6ee89cd577a5ddbf2a3edf3a6a17",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.surface.SearchWindowCutoverTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2477
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/surface/SearchWindowCutoverTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/surface/SearchWindowCutoverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ccfdec095b1553c1ee8ad4a134358ea0129a8951c74878f083f741898801fea2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalSearchOwnsTheConversationBinding()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:be5fabf18ea287cc057acbfc1c048879ea527c0e349f93265bb9ab405572c985"
+}

@@ -869,7 +869,7 @@ describe('UserStateDocument — §11.3 Profiles V2', () => {
     const doc = getDocument();
     expect(doc.version).toBe(2);
     expect(doc.activeProfileId).toBe('default');
-    expect(doc.userConfig.surfaceOrder).toEqual(['core.search-surface']);
+    expect(doc.userConfig.surfaceOrder).toEqual(['core.search-v3-surface']);
     expect(doc.activeThemeId).toBe('core.nord');
     expect(doc.pinnedSearches).toHaveLength(1);
     // V2 written to v2 key.

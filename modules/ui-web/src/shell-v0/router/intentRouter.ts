@@ -25,7 +25,7 @@ export interface RouterConfig {
   /**
    * 548 S4-A: the surface a `query` intent is lowered to (the search surface). Search Thread S5b —
    * the standalone Search rail surface is retired; the retrieve tier folded into the one window.
-   * Defaults to `core.unified-chat-surface`.
+   * Defaults to `core.search-v3-surface`.
    */
   querySurfaceId?: string;
   /**
@@ -35,7 +35,7 @@ export interface RouterConfig {
   queryStateKey?: string;
   /**
    * 548 §4.5: the surface an `answer` intent is lowered to (the shape-hosting chat surface).
-   * Defaults to `core.unified-chat-surface`.
+   * Defaults to `core.search-v3-surface`.
    */
   answerSurfaceId?: string;
   /**
@@ -54,11 +54,11 @@ export interface RouterConfig {
 
 /** Default search-surface id a `query` intent activates. Search Thread S5b — the standalone
  *  Search rail surface is retired; the retrieve tier folded into the one window. */
-const DEFAULT_QUERY_SURFACE_ID = 'core.unified-chat-surface';
+const DEFAULT_QUERY_SURFACE_ID = 'core.search-v3-surface';
 /** Default state key the search surface restores the query text from. */
 const DEFAULT_QUERY_STATE_KEY = 'query';
 /** Default chat-surface id an `answer` intent activates. */
-const DEFAULT_ANSWER_SURFACE_ID = 'core.unified-chat-surface';
+const DEFAULT_ANSWER_SURFACE_ID = 'core.search-v3-surface';
 /** Default state key the chat surface restores the answer prompt from. */
 const DEFAULT_ANSWER_STATE_KEY = 'query';
 
@@ -193,10 +193,11 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
           // intent pipeline as a navigation carrying the query text in state.
           const target = config.querySurfaceId ?? DEFAULT_QUERY_SURFACE_ID;
           const stateKey = config.queryStateKey ?? DEFAULT_QUERY_STATE_KEY;
-          const navState = target === 'core.search-v3-surface'
+          const resolution = config.resolveSurface(target);
+          const searchTarget = resolution.status !== 'unresolved' && resolution.id === 'core.search-v3-surface';
+          const navState = searchTarget
             ? { [stateKey]: intent.address.query }
             : { ...intent.address.state, [stateKey]: intent.address.query };
-          const resolution = config.resolveSurface(target);
           const action = policy(resolution);
           switch (action.kind) {
             case 'proceed':
@@ -243,24 +244,18 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
           // catalog (default core.rag-ask); V1 lowers to the chat surface that hosts the shape.
           const target = config.answerSurfaceId ?? DEFAULT_ANSWER_SURFACE_ID;
           const stateKey = config.answerStateKey ?? DEFAULT_ANSWER_STATE_KEY;
-          const navState = target === 'core.search-v3-surface'
-            ? { [stateKey]: intent.address.prompt, forceShapeId: intent.address.shape }
-            : { ...intent.address.state, [stateKey]: intent.address.prompt };
           const resolution = config.resolveSurface(target);
+          const searchTarget = resolution.status !== 'unresolved' && resolution.id === 'core.search-v3-surface';
+          const navState = searchTarget
+            ? { ...intent.address.state, [stateKey]: intent.address.prompt, forceShapeId: intent.address.shape }
+            : { ...intent.address.state, [stateKey]: intent.address.prompt };
           const action = policy(resolution);
-          // 548 §4.5: an `answer` verb is "navigate-and-run". Park the requested
-          // shape (default core.rag-ask) and an auto-run flag in the one-shot
-          // compose registers — but only once the surface resolves, so an
-          // unresolved answer never leaks a stale auto-run flag onto the next
-          // genuine chat activation. UnifiedChatView drains them on connect and
-          // fires send() once the AI is chat-capable. This gives `answer` the
-          // same run-on-arrival symmetry the `query` verb has against the search
-          // surface (restoreSearch executes the fetch). compose()/askAi paths
-          // leave these unset — they prefill and wait for the user's Send.
+          // Search answer links prepare the named mode and wait for Send. Legacy explicitly
+          // configured hosts retain their old behavior until their implementation is retired.
           const parkAnswerRun = (): void => {
-            if (target === 'core.search-v3-surface') setPendingSelection(null);
+            if (searchTarget) setPendingSelection(null);
             setPendingForceShape(intent.address.kind === 'answer' ? intent.address.shape : null);
-            setPendingAutoRun(true);
+            setPendingAutoRun(!searchTarget);
           };
           switch (action.kind) {
             case 'proceed':

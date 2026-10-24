@@ -606,18 +606,18 @@ describe('the window never scrolls; one inner region does', () => {
   });
 });
 
-describe('the surface is registered as a hidden developer route', () => {
-  it('declares core.search-v3-surface as DEVELOPER/DEEPLINK with no rail entry', () => {
+describe('the surface is registered as the main Search window', () => {
+  it('declares core.search-v3-surface as USER/RAIL', () => {
     const surfaces = createCorePluginManifest().capabilities.surfaces ?? [];
     const v3 = surfaces.find((s) => s.id === 'core.search-v3-surface');
     expect(v3).toBeDefined();
     expect(v3?.mountTag).toBe('jf-sv3-window');
-    expect(v3?.audience).toBe('DEVELOPER');
-    expect(v3?.placement).toBe('DEEPLINK');
-    expect(v3?.placement).not.toBe('RAIL');
+    expect(v3?.audience).toBe('USER');
+    expect(v3?.placement).toBe('RAIL');
+    expect(v3?.placement).not.toBe('DEEPLINK');
   });
 
-  it('loads lazily, like every other deeplink-only surface', () => {
+  it('loads lazily on its first activation', () => {
     expect(isLazySurface('jf-sv3-window')).toBe(true);
   });
 

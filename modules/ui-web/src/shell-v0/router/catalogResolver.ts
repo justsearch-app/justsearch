@@ -14,6 +14,7 @@
  * keeps resolution synchronous and does not auto-refresh.
  */
 
+import { canonicalSurfaceId } from './surfaceIdentity.js';
 import { listSurfaces } from '../../api/registry/SurfaceCatalogClient.js';
 import { listOperations } from '../../api/registry/OperationCatalogClient.js';
 import type { AliasMap, CatalogEntry, ResolutionResult, SynonymMap } from './resolution.js';
@@ -28,7 +29,8 @@ import { loadPromotedAliases } from './promotedAliases.js';
  * the same id can still override it).
  */
 const RETIRED_SURFACE_ALIASES: AliasMap = {
-  'core.agent-surface': { target: 'core.unified-chat-surface', reason: 'renamed' },
+  'core.unified-chat-surface': { target: 'core.search-v3-surface', reason: 'renamed' },
+  'core.agent-surface': { target: 'core.search-v3-surface', reason: 'renamed' },
   // Tempdoc 578 Workstream A — the standalone System Self-View ("Now") is retired; its live-strip folded
   // into Health. A deep-link redirects to the System hub, whose first member (Health) opens by default —
   // exactly where the strip now lives, so no member-tab intent is needed.
@@ -36,7 +38,7 @@ const RETIRED_SURFACE_ALIASES: AliasMap = {
   // Search Thread S5b (the great retirement) — the standalone Search rail surface is retired; its
   // retrieve tier folded into the one window. A deep-link/bookmark to core.search-surface resolves
   // into it rather than dead-ending.
-  'core.search-surface': { target: 'core.unified-chat-surface', reason: 'renamed' },
+  'core.search-surface': { target: 'core.search-v3-surface', reason: 'renamed' },
 };
 
 /**
@@ -117,7 +119,10 @@ export function resolveSurface(rawId: string): ResolutionResult {
   }));
   // Merge alias layers (lowest precedence first): static retired-surface back-compat, then promoted
   // aliases. (Member→host redirects are handled above, ahead of exact-match.)
-  const aliases: AliasMap = { ...RETIRED_SURFACE_ALIASES, ...surfaceAliases };
+  const aliases: AliasMap = Object.fromEntries(
+    Object.entries({ ...RETIRED_SURFACE_ALIASES, ...surfaceAliases })
+      .map(([id, alias]) => [id, { ...alias, target: canonicalSurfaceId(alias.target) }]),
+  );
   return resolveAgainstCatalog(rawId, entries, aliases, 'surface', defaultSynonyms);
 }
 

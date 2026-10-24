@@ -189,7 +189,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
 
       // A hand-off is read once, never URL-projected. Its verb's task outranks a conversation id.
       if (addr.target === 'core.search-v3-surface' &&
-          ['query', 'docIds', 'forceShapeId', 'mode'].some(key => Object.hasOwn(addr.state, key))) {
+          ['query', 'docIds', 'forceShapeId', 'mode', 'affordance', 'selection'].some(key => Object.hasOwn(addr.state, key))) {
         parkSearchV3Handoff(addr.state);
         addr = { ...addr, state: {} };
       } else {

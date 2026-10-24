@@ -14,6 +14,7 @@
  *   - isViewSaved(url) — true if a view with this URL exists
  *   - renameView(id, newLabel) — user-editable labels
  */
+import { canonicalSurfaceUrl } from '../router/surfaceIdentity.js';
 import {
   getDocument,
   subscribeProjection,
@@ -34,7 +35,13 @@ export function subscribeSavedViews(listener: Listener): () => void {
 }
 
 export function isViewSaved(url: string): boolean {
-  return (getDocument().savedViews ?? []).some((v) => v.url === url);
+  return findSavedView(url) !== undefined;
+}
+
+/** Alias-aware identity; keep the existing record's id, label, URL and profile. */
+export function findSavedView(url: string): SavedView | undefined {
+  const place = canonicalSurfaceUrl(url);
+  return getSavedViews().find(view => canonicalSurfaceUrl(view.url) === place);
 }
 
 export function saveView(
@@ -46,7 +53,7 @@ export function saveView(
   let result: SavedView | null = null;
   mutateDocument((doc) => {
     const views = doc.savedViews ?? [];
-    const existing = views.find((v) => v.url === url);
+    const existing = findSavedView(url);
     if (existing) {
       result = existing;
       return doc;

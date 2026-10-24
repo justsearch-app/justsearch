@@ -40,11 +40,15 @@
  *     projections and issue nothing. What is still window-local — the pin and the unread bit — and
  *     why, is stated in `sv3-sessions.ts`'s persistence-boundary note.
  *
- * Mounted as a hidden DEEPLINK surface, dev audience, no rail entry:
+ * Mounted as the main USER/RAIL Search surface, keeping its established address:
  * `#justsearch://surface/core.search-v3-surface`.
  *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
+import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
+import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
+import { subscribeInspector, setOpen as setInspectorOpen } from '../../state/inspectorState.js';
+import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
 import { takeSearchV3Handoff } from '../../utils/compose.js';
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import type { ShapeId } from '../unifiedChatRequest.js';
@@ -774,6 +778,8 @@ export class SearchV3View extends JfElement {
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
     sidebarNarrow: { type: Boolean, reflect: true, attribute: 'sidebar-narrow' },
     resizing: { type: Boolean, reflect: true },
+    shapeId: { type: String, attribute: 'shape-id' },
+    paneHighlight: { state: true },
     paneDocPath: { state: true },
     paneCitation: { state: true },
     paneCitationHeader: { state: true },
@@ -836,6 +842,11 @@ export class SearchV3View extends JfElement {
    * {@link onCitationOpen}. That is the scope guard: no search result, no browse row and no typed
    * path can reach the reading surface from this window, because nothing else assigns here.
    */
+  declare shapeId: string | undefined;
+  declare paneHighlight: DocumentLineRange | null;
+  private sharedInspectorPath: string | null = null;
+  private inspectorUnsubscribe: (() => void) | null = null;
+  private readonly draftPersistence: DraftPersistence;
   declare paneDocPath: string | null;
   /**
    * The cited passage in CHARACTER coordinates, handed to the reader as its anchor (tempdoc 849 §3).
@@ -1062,6 +1073,7 @@ export class SearchV3View extends JfElement {
     this.sidebarNarrow = false;
     this.resizing = false;
     this.paneDocPath = null;
+    this.paneHighlight = null;
     this.paneCitation = null;
     this.paneSource = null;
     this.paneCitationHeader = null;
@@ -1078,13 +1090,12 @@ export class SearchV3View extends JfElement {
     // Constructed HERE rather than on connect: a Lit controller added before connection still gets
     // its `hostConnected`, and adding it inside `connectedCallback` would add a second one on every
     // re-attach of this retained instance.
-    new DraftPersistence(
+    this.draftPersistence = new DraftPersistence(
       this,
       SV3_DRAFT_KEY,
       () => this.currentDraft(),
       (value) => {
-        this.draftSeed = value;
-        this.draftSeedPending = true;
+        this.writeDraft(value);
         this.requestUpdate();
       },
     );
@@ -1145,7 +1156,23 @@ export class SearchV3View extends JfElement {
     });
     void loadConversations();
     window.addEventListener('sv3-handoff', this.receiveHandoff);
-    if (!this.receiveHandoff()) this.restoreLastViewed();
+    if (!this.receiveHandoff()) {
+      if (this.shapeId) this.prepareCompatibilityShape();
+      else {
+        this.draftPersistence.adoptLegacy('unified-chat.composer');
+        this.restoreLastViewed();
+      }
+    }
+    this.inspectorUnsubscribe = subscribeInspector(state => {
+      if (state.isOpen && state.selected?.path) {
+        this.openPane({ docPath: state.selected.path, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT, anchor: null });
+        this.paneSource = null;
+        this.paneCitationHeader = null;
+        this.sharedInspectorPath = state.selected.path;
+        this.paneHighlight = typeof state.selected.highlightStartLine === 'number' && typeof state.selected.highlightEndLine === 'number'
+          ? { startLine: state.selected.highlightStartLine, endLine: state.selected.highlightEndLine } : null;
+      } else if (this.sharedInspectorPath !== null) this.clearPane();
+    });
     // Cold-load reattach, started here and NOT awaited: discovery is a network round-trip now
     // (tempdoc 834 §15.3) and mount must not block on it. The ordering it used to buy — the run
     // already on the controller before the first presence look — is instead carried by the
@@ -1229,6 +1256,8 @@ export class SearchV3View extends JfElement {
     if (this.streaming) this.settleAiActivity();
     super.disconnectedCallback();
     releaseSv3MorphSheet();
+    this.inspectorUnsubscribe?.();
+    this.inspectorUnsubscribe = null;
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
     this.clearForkReads();
@@ -2667,11 +2696,13 @@ export class SearchV3View extends JfElement {
   }
 
   private openPane(detail: Sv3CitationOpen): void {
+    this.sharedInspectorPath = null;
     const available = this.availableWidth();
     this.paneOverlay = !sv3PaneIsInline(available);
     this.paneWidthPx = clampSv3PaneWidth(this.paneWidthPx, available, this.sidebarOccupiedWidth());
     this.applyPaneWidth(this.paneWidthPx);
     this.paneDocPath = detail.docPath;
+    this.paneHighlight = null;
     this.paneCitation = detail.anchor ?? null;
     this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex };
     this.paneCitationHeader = this.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
@@ -2727,11 +2758,20 @@ export class SearchV3View extends JfElement {
     if (!sameCitationHeader(this.paneCitationHeader, next)) this.paneCitationHeader = next;
   }
 
-  /**
-   * The pane's exits — its own close control (`pane-close`, re-raised by the region) and Escape. The
-   * chosen width is NOT forgotten here: closing a document is not withdrawing a boundary preference.
-   */
+  /** A place change retires its own citation, while a shared inspector belongs to its caller. */
   private closePane(): void {
+    if (this.sharedInspectorPath === null) this.clearPane();
+  }
+
+  /** Explicit dismissal closes both the visible reader and the shared inspector projection. */
+  private dismissPane(): void {
+    this.clearPane();
+    setInspectorOpen(false);
+  }
+
+  private clearPane(): void {
+    this.sharedInspectorPath = null;
+    this.paneHighlight = null;
     this.paneDocPath = null;
     this.paneCitation = null;
     this.paneSource = null;
@@ -2759,7 +2799,7 @@ export class SearchV3View extends JfElement {
     if (event.key === 'Escape' && this.paneDocPath !== null) {
       event.preventDefault();
       event.stopPropagation();
-      this.closePane();
+      this.dismissPane();
       return;
     }
     if (event.key === 'Escape' && !event.isComposing && this.sidebarNarrow && !this.sidebarCollapsed) {
@@ -3238,7 +3278,25 @@ export class SearchV3View extends JfElement {
   private readonly placeTiers = new Map<string, Sv3ComposerTier>();
   private readonly summaryInputs = new Map<string, { scope: Sv3AskScope | null; selection: SelectionPayload | null }>();
 
+  /** Compatibility surfaces keep their mode preset but never run on arrival. */
+  private prepareCompatibilityShape(): void {
+    const shape = this.shapeId;
+    this.tierFollowsPlace = false;
+    if (shape === 'core.workflow-run') {
+      this.tier = 'search';
+      this.handoffNotice = 'Workflow runs are not available here';
+      emitEphemeralToast({ message: this.handoffNotice, severity: 'info' });
+    } else if (shape === 'core.agent-run') this.tier = 'delegate';
+    else {
+      this.tier = shape === 'core.extract' ? 'structured' : 'ask';
+      this.preparedHandoff = { shapeId: shape === 'core.free-chat' ? 'core.free-chat' : shape === 'core.extract' ? 'core.extract' : 'core.rag-ask', selection: null };
+    }
+  }
+
   private receiveHandoff = (): boolean => {
+    // Compatibility mounts share this class, but the parked task belongs to the main window.
+    // The outgoing shape view is still connected when navigation parks and announces the task.
+    if (this.shapeId) return false;
     const incoming = takeSearchV3Handoff();
     if (incoming === null) return false;
     const { state, selection } = incoming;
@@ -3311,12 +3369,28 @@ export class SearchV3View extends JfElement {
       this.handoffBlocked = true;
       this.handoffNotice = 'Invalid selection. Choose the files or passage again before sending.';
     }
-    if (typeof state.mode === 'string' && !['search', 'ask', 'structured'].includes(state.mode)) {
+    if (Object.hasOwn(state, 'mode') && (typeof state.mode !== 'string' || !['search', 'ask', 'structured'].includes(state.mode))) {
       this.handoffBlocked = true;
       this.handoffNotice = 'Unknown hand-off mode. Review the task before sending.';
     }
+    if (Object.hasOwn(state, 'selection')) {
+      this.handoffBlocked = true;
+      this.handoffNotice = 'Invalid selection link. Choose the files or passage again before sending.';
+    }
+    if (Object.hasOwn(state, 'forceShapeId') && typeof state.forceShapeId !== 'string' ||
+        Object.hasOwn(state, 'docIds') && !(typeof state.docIds === 'string' && state.docIds.trim() !== '' ||
+          Array.isArray(state.docIds) && (state.docIds.length > 0 || shapeId === 'core.extract') && state.docIds.every(id => typeof id === 'string' && id.trim() !== '')) && selection === null) {
+      this.handoffBlocked = true;
+      this.handoffNotice = 'Invalid task data. Choose the files or mode again before sending.';
+    }
+    if (shape === 'core.workflow-run') {
+      this.tier = 'search';
+      this.preparedHandoff = null;
+      this.search.clearScope();
+      this.handoffNotice = 'Workflow runs are not available here';
+    }
     this.writeDraft(query);
-    if (this.tier === 'search' && query.trim() !== '') { this.search.type(query); this.search.show(); }
+    if (shape !== 'core.workflow-run' && !this.handoffBlocked && this.tier === 'search' && query.trim() !== '') { this.search.type(query); this.search.show(); }
     void this.setComposerState('docked');
     this.requestUpdate();
     void this.updateComplete.then(async () => { const c = this.composer; if (c !== null) { await c.updateComplete; c.focusField(); } });
@@ -4534,11 +4608,12 @@ export class SearchV3View extends JfElement {
       <jf-sv3-pane
         data-testid="sv3-pane"
         .docPath=${this.paneDocPath}
+        .highlightRange=${this.paneHighlight}
         .citation=${this.paneCitation}
         .citationHeader=${this.paneCitationHeader}
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
-        @sv3-pane-close=${this.closePane}
+        @sv3-pane-close=${this.dismissPane}
       ></jf-sv3-pane>
     `;
   }
@@ -4723,4 +4798,14 @@ declare global {
   interface HTMLElementTagNameMap {
     'jf-sv3-window': SearchV3View;
   }
+}
+
+// WP1.5a — all compatibility shape mounts share the promoted interaction window.
+registerViewFactory('core.rag-ask', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.free-chat', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.extract', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.agent-run', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.workflow-run', ONE_WINDOW_MOUNT_TAG);
+for (const shape of CORE_INTERACTION_SHAPES) {
+  if (getViewFactory(shape) === undefined) throw new Error(`[one-window] missing view factory for ${shape}`);
 }

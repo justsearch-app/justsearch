@@ -35,6 +35,7 @@ import {
   type SearchFilterSpec,
 } from '../../state/searchFiltersState.js';
 import { FACET_LABELS } from '../../components/searchResults/facetChips.js';
+import { clearSelection, getSelection, setSelection, DEFAULT_CAPABILITIES_BY_KIND } from '../../state/selectionState.js';
 import type { Availability } from '../../state/availability.js';
 
 /** The files one Ask is limited to — document PATHS, which is what the backend's filter matches. */
@@ -247,11 +248,13 @@ export class Sv3SearchController implements ReactiveController {
         this.host.requestUpdate();
       }),
     ];
+    if (this.showing) this.publishSelection();
   }
 
   hostDisconnected(): void {
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.unsubscribers = [];
+    this.clearPublishedSelection();
   }
 
   private onSnapshot(snapshot: SearchState): void {
@@ -270,6 +273,7 @@ export class Sv3SearchController implements ReactiveController {
       this.selected = sv3PruneSelection(this.selected, snapshot.results);
     }
     this.snapshot = snapshot;
+    if (this.showing && getSelection().surfaceId === 'core.search-v3-surface') this.publishSelection();
     this.host.requestUpdate();
   }
 
@@ -282,12 +286,14 @@ export class Sv3SearchController implements ReactiveController {
 
   show(): void {
     this.showing = true;
+    this.publishSelection();
     this.hasList = true;
     this.host.requestUpdate();
   }
 
   hide(): void {
     this.showing = false;
+    this.clearPublishedSelection();
     this.host.requestUpdate();
   }
 
@@ -334,7 +340,24 @@ export class Sv3SearchController implements ReactiveController {
 
   select(ids: Iterable<string>): void {
     this.selected = sv3PruneSelection(new Set(ids), this.snapshot?.results ?? []);
+    this.publishSelection();
     this.host.requestUpdate();
+  }
+
+  private clearPublishedSelection(): void {
+    if (getSelection().surfaceId === 'core.search-v3-surface') clearSelection();
+  }
+
+  private publishSelection(): void {
+    const hits = (this.snapshot?.results ?? []).filter(hit => this.selected.has(hit.id));
+    if (!this.showing || hits.length === 0 || this.snapshot?.query !== this.answered) {
+      this.clearPublishedSelection();
+      return;
+    }
+    const items = hits.length > 1
+      ? [{ kind: 'result-set' as const, items: [...new Set(hits.map(hit => hit.path))].map(id => ({ id, kind: 'doc' as const })), query: this.query, capabilities: DEFAULT_CAPABILITIES_BY_KIND['result-set'] }]
+      : hits.map(hit => ({ kind: 'search-hit' as const, hitId: hit.id, title: hit.title, path: hit.path, capabilities: DEFAULT_CAPABILITIES_BY_KIND['search-hit'] }));
+    setSelection({ items, primaryIndex: 0, surfaceId: 'core.search-v3-surface' });
   }
 
   /** Fix the chosen rows as the next Ask's files. `null` when they name no document. */
@@ -378,6 +401,7 @@ export class Sv3SearchController implements ReactiveController {
     this.showing = false;
     this.hasList = false;
     this.selected = new Set();
+    this.clearPublishedSelection();
     this.pendingScope = null;
     this.host.requestUpdate();
   }

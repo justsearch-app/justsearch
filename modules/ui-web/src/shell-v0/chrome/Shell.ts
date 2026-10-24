@@ -1,3 +1,4 @@
+import { canonicalSurfaceId } from '../router/surfaceIdentity.js';
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Shell — Lit-side chrome root (slice 449 phase 10).
@@ -47,7 +48,7 @@ import { operationFailureMessage } from '../operations/operationFailureMessage.j
 import { originatorToTransport } from '../operations/originatorTransport.js';
 import { startDragDetect, type DragKind } from '../utils/dragDetect.js';
 import { startAiStateStore, subscribeAiState } from '../state/aiStateStore.js';
-import { unavailableBecause } from '../state/availability.js';
+import { projectAvailability, unavailableBecause } from '../state/availability.js';
 import '../components/Control.js';
 // 569 §14 — host authorities the global presentation-intent Effect listeners drive.
 import { applyAppearance } from '../state/themeState.js';
@@ -308,9 +309,9 @@ import { installSearchSummonBridge } from '../router/tauriBridge.js';
 import { SURFACE_ICONS, railAccessibleName } from '../utils/surfaceIcons.js';
 import {
   isViewSaved,
+  findSavedView,
   saveView,
   removeView,
-  getSavedViews,
   subscribeSavedViews,
 } from '../state/savedViewState.js';
 // Slice 491 §9.D Phase E (C2/C3) — side-effect imports that register typed
@@ -343,7 +344,7 @@ const SETTINGS_SURFACE_ID = 'core.settings-surface';
 
 // Tempdoc 571 §6 — the one interaction window (561). TRUST surfaces home adjacent to it in the rail,
 // derived from altitude (see Rail.render). Mirrors the Java interaction-surface gate's canonicalSurface.
-const INTERACTION_SURFACE_ID = 'core.unified-chat-surface';
+const INTERACTION_SURFACE_ID = 'core.search-v3-surface';
 
 // Tempdoc 923 / F-22 — these remain valid compatibility addresses that preselect one interaction
 // shape, but they are not independent places. Split-pane discovery must offer the canonical Search
@@ -357,7 +358,7 @@ const LEGACY_INTERACTION_MODE_SURFACE_IDS = new Set([
 function canonicalSplitSurfaceId(surfaceId: string): string {
   return LEGACY_INTERACTION_MODE_SURFACE_IDS.has(surfaceId)
     ? INTERACTION_SURFACE_ID
-    : surfaceId;
+    : canonicalSurfaceId(surfaceId);
 }
 
 function isSplitPaneCandidate(surface: SurfaceCatalogEntry, primaryId: string): boolean {
@@ -1018,7 +1019,7 @@ export class Shell extends JfElement {
     // `scripts/ci/check-printable-keybinding-policy.mjs`, retired 930 chunk H.)
     //
     // What that does and does NOT buy today, stated exactly (864 review F4, closed by PR B): on
-    // `core.unified-chat-surface` the key works — `UnifiedChatView` listens for the dispatched
+    // `core.search-v3-surface` the key works — `UnifiedChatView` listens for the dispatched
     // `jf-focus-composer` (`views/UnifiedChatView.ts` connectedCallback). `core.search-v3-surface`
     // now listens too (`views/search-v3/SearchV3View.ts` connectedCallback, tempdoc 864 Layer
     // 1(c2)), routed through the same `focusComposer()` every other entry path uses. Both named
@@ -1027,7 +1028,7 @@ export class Shell extends JfElement {
     registerKeybindingEntry({
       key: '/',
       commandId: 'shell.focus-composer',
-      when: "activeSurface == 'core.unified-chat-surface' || activeSurface == 'core.search-v3-surface'",
+      when: "activeSurface == 'core.search-v3-surface'",
       source: 'default',
       provenance: CORE_PROVENANCE,
     });
@@ -1297,7 +1298,7 @@ export class Shell extends JfElement {
           const encoded = encodeURIComponent(expanded);
           // Search Thread S5b — the standalone Search rail surface is retired; the retrieve tier
           // folded into the one window.
-          location.hash = `#justsearch://surface/core.unified-chat-surface?query=${encoded}`;
+          location.hash = `#justsearch://surface/core.search-v3-surface?query=${encoded}`;
         },
       });
       // Tempdoc 521 §16.2 deeper — in-tree consumer for the {compute:<expr>} slot, demonstrating the
@@ -1306,7 +1307,7 @@ export class Shell extends JfElement {
       // into SearchSurface's date-filter pane (Before/After inputs). Search Thread S5b — that
       // filter pane is retired with the standalone Search surface (it was outside the retrieve
       // tier's declared carry-forward scope: jf-results-card + route chip + scope chips + landing);
-      // `core.unified-chat-surface` has no `modifiedFromMs` consumer, so repointing this template's
+      // `core.search-v3-surface` has no `modifiedFromMs` consumer, so repointing this template's
       // hash target would be a silent no-op (Hard Invariant: never a silent no-op) rather than a
       // working port. Retired outright alongside the feature it demonstrated, not left dangling.
     }).catch(() => { /* swallow */ });
@@ -1350,7 +1351,7 @@ export class Shell extends JfElement {
             // Search Thread S5b — the standalone Search rail surface is retired; the retrieve tier
             // folded into the one window.
             this.activateSurface(
-              'core.unified-chat-surface',
+              'core.search-v3-surface',
               { query: q },
               'BUTTON',
             );
@@ -1647,16 +1648,16 @@ export class Shell extends JfElement {
       },
       // 548 S4-A: a `query` intent is lowered to a navigation of the search surface. Search Thread
       // S5b — the standalone Search rail surface is retired; the retrieve tier folded into the one
-      // window (core.unified-chat-surface), so a bare `query` intent now lowers to the SAME surface
+      // window (core.search-v3-surface), so a bare `query` intent now lowers to the SAME surface
       // an `answer` intent does (below) — only the shape/affordance they land in differs.
       // Wire the binding explicitly here (the router also defaults to these) so the
       // surface id + state key are visible at the construction site rather than a
-      // hidden default — matches the `core.unified-chat-surface` / `query` used elsewhere
+      // hidden default — matches the `core.search-v3-surface` / `query` used elsewhere
       // in this class and by buildSearchAdapter.
-      querySurfaceId: 'core.unified-chat-surface',
+      querySurfaceId: 'core.search-v3-surface',
       queryStateKey: 'query',
       // 548 §4.5: an `answer` intent is lowered to the shape-hosting chat surface.
-      answerSurfaceId: 'core.unified-chat-surface',
+      answerSurfaceId: 'core.search-v3-surface',
       answerStateKey: 'query',
     });
     this.intentRouter.subscribe(resolutionTelemetryListener);
@@ -2033,7 +2034,7 @@ export class Shell extends JfElement {
     // Same default-pick as refreshSurfaces' boot landing: the one interaction window, else the
     // first rail surface.
     const fallback =
-      this.surfaces.find((s) => s.id === 'core.unified-chat-surface') ?? this.surfaces[0];
+      this.surfaces.find((s) => s.id === 'core.search-v3-surface') ?? this.surfaces[0];
     const target = this.activeId ?? fallback?.id ?? null;
     if (target) this.activateSurface(target, {}, 'BUTTON');
   }
@@ -2135,8 +2136,7 @@ export class Shell extends JfElement {
     const url = this.currentCanonicalUrl();
     if (!url) return;
     if (isViewSaved(url)) {
-      const views = getSavedViews();
-      const existing = views.find((v) => v.url === url);
+      const existing = findSavedView(url);
       if (existing) removeView(existing.id);
     } else {
       const surfaceId = this.activeId ?? '';
@@ -2161,7 +2161,10 @@ export class Shell extends JfElement {
     // or `Alt+←` pressed with a `<select>` focused fired over the reader's type-ahead. The SUBJECT is
     // still "where is focus?" (a capture-phase `event.target` is retargeted to the shadow host and
     // would miss every input in a shadow tree); only the private predicate is gone.
-    if (isTypingTarget(deepActiveElement())) return;
+    // W5 is an explicit Ask command, including from the automatically focused composer.
+    // Other navigation chords still yield to editing; IME, repeat and modal guards remain below.
+    const askShortcut = e.ctrlKey && e.shiftKey && e.key === 'A';
+    if (isTypingTarget(deepActiveElement()) && !askShortcut) return;
     // Tempdoc 864 Layer 2(b) — IME composition and auto-repeat, by the app's ONE definition (a held
     // `Ctrl+D` used to flap the bookmark on and off for as long as the key was down).
     if (shouldIgnoreKeyEvent(e)) return;
@@ -2188,22 +2191,17 @@ export class Shell extends JfElement {
     } else if (e.ctrlKey && e.key === 'd') {
       e.preventDefault();
       this.handleBookmarkToggle();
-    } else if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+    } else if (askShortcut) {
       e.preventDefault();
       this.handleAskAiShortcut();
     }
   }
 
   private handleAskAiShortcut(): void {
-    const ai = this._aiState;
-    if (!ai?.capabilities?.chat) {
-      emitEphemeralToast({
-        message: 'AI offline — start AI in Brain surface',
-        severity: 'warning',
-      });
-      return;
-    }
-    this.activateSurface('core.unified-chat-surface', {}, 'BUTTON');
+    const availability = projectAvailability('extract', this._aiState);
+    const ready = availability.kind === 'available' || availability.kind === 'degraded';
+    this.activateSurface(INTERACTION_SURFACE_ID, { mode: ready ? 'ask' : 'search' }, 'BUTTON');
+    if (availability.kind === 'unavailable') emitEphemeralToast({ message: availability.reason, severity: 'warning' });
   }
 
   private async handleFolderDrop(paths: string[]): Promise<void> {
@@ -2326,10 +2324,10 @@ export class Shell extends JfElement {
     if (this.surfaces.length > 0 && !this.activeId) {
       // Tempdoc 577 Goal 3 §3.6 — Search is retired as a RAIL peer (DEEPLINK), so it is no longer in
       // `this.surfaces` (rail-only). The boot landing is the ONE interaction window
-      // (core.unified-chat-surface), whose `retrieve` affordance is the search entry tier; fall back
+      // (core.search-v3-surface), whose `retrieve` affordance is the search entry tier; fall back
       // to the first rail surface. Tempdoc 855 §11.5 — the bottom-pinned exclusion is gone with
       // `BOTTOM_RAIL_IDS`: Settings is MODAL now, so it is not in this RAIL-filtered list at all.
-      const home = this.surfaces.find((s) => s.id === 'core.unified-chat-surface');
+      const home = this.surfaces.find((s) => s.id === 'core.search-v3-surface');
       this.activeId = (home ?? this.surfaces[0])?.id ?? null;
       // Slice 489 T1/G3 — boot default path bypasses NavigationHandler
       // (URLSource only dispatches when the location actually encodes a
@@ -2348,9 +2346,9 @@ export class Shell extends JfElement {
   private narrowReadingUnsubs: Array<() => void> = [];
 
   /** 687 R5b — the OverlayHost right-drawer reading mount (narrow viewports only). */
-  private renderNarrowReadingPane() {
+  private renderNarrowReadingPane(searchVisible: boolean) {
     const st = this.inspectorForReading;
-    if (this.wideForReading || !st.isOpen || !st.selected?.path) return nothing;
+    if (searchVisible || this.wideForReading || !st.isOpen || !st.selected?.path) return nothing;
     const hl =
       typeof st.selected.highlightStartLine === 'number' &&
       typeof st.selected.highlightEndLine === 'number'
@@ -2587,7 +2585,7 @@ export class Shell extends JfElement {
           .operationClient=${this.operationClient}
         ></jf-advisory-toast-host>
         <jf-task-list slot="bottom-left" api-base=${this.apiBase}></jf-task-list>
-        ${this.renderNarrowReadingPane()}
+        ${this.renderNarrowReadingPane([active?.id, secondary?.id].some(id => id !== undefined && canonicalSplitSurfaceId(id) === INTERACTION_SURFACE_ID))}
         <jf-pending-effect-queue slot="bottom-right"></jf-pending-effect-queue>
         <!-- center slot: full-screen modals (one shows at a time). -->
         <jf-drag-overlay

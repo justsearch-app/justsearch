@@ -10,6 +10,7 @@ import { __resetConversationListForTest } from '../../state/conversationListStor
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { setLastViewedConversation } from '../../controllers/lastViewedConversation.js';
+import { getInspectorState, setSelected, setOpen as setInspectorOpen, resetInspectorState } from '../../state/inspectorState.js';
 import { resetSearchState } from '../../state/searchState.js';
 
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
@@ -53,6 +54,7 @@ async function send(view: SearchV3View): Promise<Record<string, unknown>> {
 }
 beforeEach(() => {
   registerCoreStores();
+  resetInspectorState();
   sessionStorage.clear(); localStorage.clear();
   __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest();
   __resetAiStateForTest();
@@ -133,7 +135,7 @@ it('HO3 HO5 the real Explain sender with empty docIds sends the ranking trace', 
   source.querySelector<HTMLButtonElement>('[data-testid="hit-why-explain"]')!.click();
   await navigation; await drain(view);
   const prompt = 'Explain why this result ("chosen-orchard.md") ranked where it did.\n\nNo document link is available for this result; the ranking trace is shown below.\n\nRanking trace:\nsparse-retrieval #1 12.40 · cross-encoder #1 0.98';
-  expect(state).toEqual({ query: prompt, affordance: 'none', docIds: [], forceShapeId: 'core.summarize' });
+  expect(state).toEqual({ query: prompt, affordance: 'none', forceShapeId: 'core.summarize' });
   expect(dispatches()).toHaveLength(0);
   const body = await send(view);
   expect(body.shapeId).toBe('core.summarize'); expect(body.prompt).toBe(prompt);
@@ -523,4 +525,164 @@ it.each([{label:'inline trace',instruction:'Explain in one sentence. Trace: spar
     const main=view.shadowRoot!.querySelector('jf-sv3-main') as HTMLElement & {turns: readonly {selectionKind?:string}[]};
     expect(main.turns[0]?.selectionKind).toBe('search-trace');
   }
+});
+
+it('C4 A1 transfers the legacy draft durably once and never resurrects it after Clear', async () => {
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'legacy unsent');
+  const view = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('legacy unsent');
+  expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('legacy unsent');
+  expect(localStorage.getItem('justsearch.draft.unified-chat.composer')).toBeNull();
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = ''; input.dispatchEvent(new Event('input')); await drain(view); view.remove();
+  // A stale previous-version tab cannot make a disposed draft return on restart.
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'legacy unsent');
+  const next = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('');
+});
+it('C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched', async () => {
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'legacy unsent');
+  localStorage.setItem('justsearch.draft.search-v3.composer', 'Search draft');
+  const view = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('Search draft');
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = ''; input.dispatchEvent(new Event('input')); await drain(view); view.remove();
+  const next = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('');
+  expect(localStorage.getItem('justsearch.draft.unified-chat.composer')).toBe('legacy unsent');
+});
+it('C4 A1 defers legacy transfer for an explicit arrival until a later clean mount', async () => {
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'legacy unsent');
+  await navigate({ query: 'incoming task', mode: 'ask' }); const view = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('incoming task');
+  expect(localStorage.getItem('justsearch.draft.unified-chat.composer')).toBe('legacy unsent');
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = ''; input.dispatchEvent(new Event('input')); await drain(view); view.remove();
+  const next = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('legacy unsent');
+});
+it('C4 A1 a failed durable write leaves the legacy draft recoverable', async () => {
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'legacy unsent');
+  const original = localStorage.setItem.bind(localStorage);
+  const write = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+    if (key === 'justsearch.draft.search-v3.composer') throw new Error('quota');
+    original(key, value);
+  });
+  const view = await mount();
+  expect(localStorage.getItem('justsearch.draft.unified-chat.composer')).toBe('legacy unsent');
+  write.mockRestore(); view.remove();
+  const next = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('legacy unsent');
+});
+it.each([
+  ['core.rag-ask', 'ask'], ['core.free-chat', 'ask'], ['core.extract', 'structured'],
+])('C8 a compatibility mount for %s prepares its mode without sending', async (shape, tier) => {
+  const view = document.createElement('jf-sv3-window') as SearchV3View;
+  view.setAttribute('shape-id', shape); document.body.append(view); await drain(view);
+  expect((await composer(view)).getAttribute('tier')).toBe(tier);
+  expect(dispatches()).toHaveLength(0);
+});
+it('C8 a workflow compatibility mount announces its unavailable disposition', async () => {
+  const view = document.createElement('jf-sv3-window') as SearchV3View;
+  view.setAttribute('shape-id', 'core.workflow-run'); document.body.append(view); await drain(view);
+  expect((await composer(view)).shadowRoot!.textContent).toContain('Workflow runs are not available here');
+  expect((await composer(view)).getAttribute('tier')).toBe('search');
+  expect(dispatches()).toHaveLength(0);
+});
+const invalidCutoverTasks: Record<string, string | string[]>[] = [
+  { query: 'keep text', mode: ['ask', 'search'] },
+  { query: 'keep text', forceShapeId: [] },
+  { query: 'keep text', docIds: ['', 'chosen.md'] },
+];
+it.each(invalidCutoverTasks)('C2 A2 visibly refuses invalid task data %j without losing its text or widening scope', async state => {
+  const view = await mount(); await navigate(state); await drain(view); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('keep text');
+  expect(c.shadowRoot!.textContent).toMatch(/Invalid|Unknown|No readable/);
+  q<HTMLButtonElement>(c, 'sv3-composer-send')!.click(); await drain(view);
+  expect(dispatches()).toHaveLength(0);
+});
+
+it('C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return', async () => {
+  const view = await mount();
+  setSelected({ id: 'read.md', title: 'Read', path: 'read.md', highlightStartLine: 3, highlightEndLine: 5 });
+  await drain(view);
+  const pane = q<ElementView>(view, 'sv3-pane');
+  expect(pane).not.toBeNull();
+  await pane!.updateComplete;
+  const reader = pane!.shadowRoot!.querySelector('jf-document-pane') as HTMLElement & { docPath: string; highlightRange: unknown };
+  expect(reader.docPath).toBe('read.md');
+  expect(reader.highlightRange).toEqual({ startLine: 3, endLine: 5 });
+  expect(view.shadowRoot!.querySelectorAll('jf-sv3-pane')).toHaveLength(1);
+  view.remove(); document.body.append(view); await drain(view);
+  expect(q(view, 'sv3-pane')).not.toBeNull();
+  q(view, 'sv3-pane')!.dispatchEvent(new CustomEvent('sv3-pane-close', { bubbles: true, composed: true }));
+  await drain(view);
+  expect(getInspectorState().isOpen).toBe(false);
+  expect(q(view, 'sv3-pane')).toBeNull();
+  setInspectorOpen(true); await drain(view);
+  expect(q(view, 'sv3-pane')).not.toBeNull();
+});
+
+it('C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition', async () => {
+  const view = await mount();
+  await navigate({ query: 'keep my instruction', forceShapeId: 'core.workflow-run' });
+  await drain(view); const c = await composer(view);
+  expect(c.getAttribute('tier')).toBe('search');
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('keep my instruction');
+  expect(c.shadowRoot!.textContent).toContain('Workflow runs are not available here');
+  expect(fetchMock.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search'))).toHaveLength(0);
+  expect(dispatches()).toHaveLength(0);
+});
+
+it('C7 C8 an outgoing compatibility view cannot consume the main window arrival', async () => {
+  const compatibility = document.createElement('jf-sv3-window') as SearchV3View;
+  compatibility.setAttribute('shape-id', 'core.extract');
+  document.body.append(compatibility); await drain(compatibility);
+  await navigate({ query: 'keep my incoming task', forceShapeId: 'core.workflow-run' });
+  compatibility.remove();
+  const view = await mount(); const c = await composer(view);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('keep my incoming task');
+  expect(c.shadowRoot!.textContent).toContain('Workflow runs are not available here');
+  expect(dispatches()).toHaveLength(0);
+});
+
+it('C9 A3 a shared line passage is highlighted without inventing a missing citation position', async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ content: '# Heading\nSelected passage\n' }) });
+  const view = await mount();
+  setSelected({ id: 'read.md', title: 'Read', path: 'read.md', highlightStartLine: 1, highlightEndLine: 1 });
+  await drain(view);
+  const pane = q<ElementView>(view, 'sv3-pane'); expect(pane).not.toBeNull(); await pane!.updateComplete;
+  const reader = pane!.shadowRoot!.querySelector('jf-document-pane') as ElementView; await drain(reader);
+  expect(reader.shadowRoot!.querySelector('.hl-strong, .hl-weak')?.textContent).toContain('Selected passage');
+  expect(reader.shadowRoot!.textContent).not.toContain('nothing is highlighted');
+});
+
+it('C9 A3 changing the address place keeps the shared reader until explicitly closed', async () => {
+  const view = await mount();
+  setSelected({ id: 'read.md', title: 'Read', path: 'read.md' }); await drain(view);
+  expect(q(view, 'sv3-pane')).not.toBeNull();
+  await navigate({ conversationId: 'other-conversation' }); await drain(view);
+  expect(getInspectorState().isOpen).toBe(true);
+  expect(q(view, 'sv3-pane')).not.toBeNull();
+});
+
+it('C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft', async () => {
+  const view = await mount(); view.remove();
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'late stale legacy draft');
+  const next = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('');
+  expect(localStorage.getItem('justsearch.draft.unified-chat.composer')).toBe('late stale legacy draft');
+});
+
+it('C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render', async () => {
+  localStorage.setItem('justsearch.draft.unified-chat.composer', 'recover once');
+  await navigate({ query: 'incoming task', mode: 'ask' });
+  const view = await mount();
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = ''; input.dispatchEvent(new Event('input')); await drain(view); view.remove();
+  document.body.append(view); // retained composer exists; migration must own it synchronously
+  view.remove(); // lifecycle flush before the scheduled render
+  const next = await mount();
+  expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('recover once');
+  expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('recover once');
 });

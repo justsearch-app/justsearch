@@ -218,8 +218,8 @@ export function compose(args: ComposeArgs): boolean {
   // fork (§6) by routing through the resolver instead of affordanceToShape.
   setPendingForceShape(forceShapeId);
   const detail = {
-    target: 'core.unified-chat-surface',
-    state: { query, affordance, docIds, forceShapeId },
+    target: 'core.search-v3-surface',
+    state: { query, affordance, ...(args.docIds !== undefined ? { docIds } : {}), forceShapeId },
   };
   const event = new CustomEvent('navigate-with-context', {
     bubbles: true,
