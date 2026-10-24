@@ -128,15 +128,14 @@ export class MemorySurface extends JfElement {
       }
       const j = (await r.json()) as { memories?: MemoryItem[]; locked?: boolean };
       if (version !== this.loadVersion) return false;
-      // An invalid list cannot establish that a memory is absent after an uncertain delete.
-      if (!Array.isArray(j.memories) || j.memories.some(m =>
+      // The API always emits a boolean lock state. Missing or malformed metadata cannot establish
+      // presence or absence, even when the list itself looks valid.
+      if (typeof j.locked !== 'boolean' || !Array.isArray(j.memories) || j.memories.some(m =>
         !m || typeof m.id !== 'string' || typeof m.content !== 'string')) {
         throw new Error('Invalid memory list');
       }
       this.memories = j.memories;
-      // Tempdoc 806 W1: the wire distinguishes "cannot read" from "nothing learned" — carry it, so the
-      // render can. An older backend omits the field ⇒ `false` (readable), the pre-806 behaviour.
-      this.locked = j.locked === true;
+      this.locked = j.locked;
       this.loadError = '';
       return !this.locked;
     } catch {

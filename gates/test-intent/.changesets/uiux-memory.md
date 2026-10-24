@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-memory-builder-aza9i77t
+author-session: uiux-memory-builder-1_ch_din
 ---
 
 # Test-intent entries
@@ -258,6 +258,59 @@ F1–F3 continuation: confirmation inputs now include key release; confirmed For
       "retryChoice": "Return admission/stale-token refusals for manual retry. Existing failure reporting refreshes Memory; a later activation needs fresh consent and the existing pre-delete identity read. This avoids replaying a destructive request after its precondition expires, without adding a retry state machine.",
       "liveEvidence": "tmp/memory-retry/before/live-results.json and tmp/memory-retry/after/live-results.json; production bundles with SES enabled, private Engine and real replacement.",
       "callerPreservation": "tmp/memory-retry/after/caller-results.json: 294 pass; six known pre-existing pointer failures. Ten real caller paths, three themes, two widths, Enter/Space/click/held Enter/held Space. Synthetic conversation backend responses are fixture-only; Memory uses the real API."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Every Memory read validates an array of valid items and an explicit boolean locked before establishing presence or absence. Malformed or missing lock metadata leaves reconciliation unknown, exposes Reload, preserves useful focus, hides untrusted lists, and blocks Forget consent checks. A later valid unlocked read can resolve the unknown outcome.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "S53.3 amendment / S53.4 malformed-lock continuation",
+          "quote": "reconciliation announces \"forgotten\" (confirmed absence) only from a well-formed, readable, unlocked answer:\n- the item list is an array;\n- locked is exactly the boolean false, or absent if the API documents that absence means unlocked; check the API and say which.\n\nAnything else is \"not confirmed\": the item is shown as unconfirmed with a reload offer, as you do for other uncertain outcomes. Apply the same rule wherever MemorySurface decides absence or presence from a read, not only in this path.",
+          "choice": "reconciliation announces \"forgotten\" (confirmed absence) only from a well-formed, readable, unlocked answer:\n- the item list is an array;\n- locked is exactly the boolean false, or absent if the API documents that absence means unlocked; check the API and say which.\n\nAnything else is \"not confirmed\": the item is shown as unconfirmed with a reload offer, as you do for other uncertain outcomes. Apply the same rule wherever MemorySurface decides absence or presence from a read, not only in this path.",
+          "label": "agent choice, adopted under the user's delegation",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a malformed-lock repair, orchestrator continuation against 1a1b3d2494."
+        }
+      ],
+      "conflictSearch": "MemoryController.handleList always writes locked using MemoryStore.isLocked(); MemoryControllerTest asserts true and false. No API documentation defines omission as unlocked. The previous pre-806 fallback in the UI is retired. No Engine/API change.",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts"
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-memory-lock-metadata.json",
+      "cumulativeEvidence": "gates/test-intent/evidence/uiux-memory-repair.json",
+      "liveEvidence": "tmp/memory-lock/before/live-lock.json and tmp/memory-lock/after/live-lock.json; proxy changes actual locked:true to locked:\"true\", dropped DELETE is not forwarded, unlock confirms item retained."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts",
+        "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Five success-read fixtures now explicitly carry locked:false, matching MemoryController.handleList. Every original expected outcome and assertion is unchanged. The new malformed-lock tests cover omission as invalid; none of these preservation fixtures tested omission.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "S53.3 amendment / S53.4 malformed-lock continuation",
+          "quote": "reconciliation announces \"forgotten\" (confirmed absence) only from a well-formed, readable, unlocked answer:\n- the item list is an array;\n- locked is exactly the boolean false, or absent if the API documents that absence means unlocked; check the API and say which.\n\nAnything else is \"not confirmed\": the item is shown as unconfirmed with a reload offer, as you do for other uncertain outcomes. Apply the same rule wherever MemorySurface decides absence or presence from a read, not only in this path.",
+          "choice": "reconciliation announces \"forgotten\" (confirmed absence) only from a well-formed, readable, unlocked answer:\n- the item list is an array;\n- locked is exactly the boolean false, or absent if the API documents that absence means unlocked; check the API and say which.\n\nAnything else is \"not confirmed\": the item is shown as unconfirmed with a reload offer, as you do for other uncertain outcomes. Apply the same rule wherever MemorySurface decides absence or presence from a read, not only in this path.",
+          "label": "agent choice, adopted under the user's delegation",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement 2026-10-19",
+          "delegationScope": "WP5.3a malformed-lock repair, orchestrator continuation against 1a1b3d2494."
+        }
+      ],
+      "preservationEvidence": "gates/test-intent/evidence/uiux-memory-preservation.json"
     }
   ]
 }

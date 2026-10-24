@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T23:26:47.873Z",
-  "revision": "eb0dcaf91ec5e65c882db7b6d94d05b83adc9893",
-  "tree": "c8f15a3547c8716d909c8fe12f1dd1f9736edafe",
+  "createdAt": "2026-10-24T01:50:43.338Z",
+  "revision": "1a1b3d2494b3d784a869b69479b1d04e12260914",
+  "tree": "ac585fb0c4b82a42e19e2466450e84220f0403d8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792797996097.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" \"src/shell-v0/views/MemorySurface.lock-metadata.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1_ch_din/tmp/test-intent-vitest-1096870-1792806627894.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2645
+      "durationMs": 3316
     },
     {
-      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792797998742.json\"",
+      "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1_ch_din/tmp/test-intent-vitest-1096870-1792806631212.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2583
+      "durationMs": 3137
     }
   ],
   "checks": [
@@ -209,6 +209,121 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c5a8f2e5ad03e81fe35a69f38f06dc4078dc33927ca30f99b0f7d51e7f988666",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "does not confirm lost-response absence with invalid locked='true'",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked='false'",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked=null",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked=+0",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked=1",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked=[]",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked={}",
+          "status": "passed"
+        },
+        {
+          "name": "does not confirm lost-response absence with invalid locked=undefined",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked='true'",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked='false'",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked=null",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked=+0",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked=1",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked=[]",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked={}",
+          "status": "passed"
+        },
+        {
+          "name": "does not trust initial presence with invalid locked=undefined",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked='true'",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked='false'",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked=null",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked=+0",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked=1",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked=[]",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked={}",
+          "status": "passed"
+        },
+        {
+          "name": "does not send DELETE after a consent read with invalid locked=undefined",
+          "status": "passed"
+        },
+        {
+          "name": "keeps manual reconciliation unknown for malformed lock metadata and memories=[]",
+          "status": "passed"
+        },
+        {
+          "name": "keeps manual reconciliation unknown for malformed lock metadata and memories=[ { id: 'lock-metadata', …(2) } ]",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": {
@@ -218,35 +333,35 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798002529.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/components/ConfirmDialog.activation.test.ts\" \"src/shell-v0/views/MemorySurface.safety.test.ts\" \"src/shell-v0/views/MemorySurface.lock-metadata.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1_ch_din/tmp/test-intent-vitest-1096870-1792806635848.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2598,
-        "output": "JSON report written to /home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798002529.json\n\n"
+        "durationMs": 3216,
+        "output": "JSON report written to /home/elias/.cache/am/1_ch_din/tmp/test-intent-vitest-1096870-1792806635848.json\n\n"
       },
       {
-        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798005128.json\"",
+        "command": "npx vitest run \"src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1_ch_din/tmp/test-intent-vitest-1096870-1792806639065.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2592,
-        "output": "JSON report written to /home/elias/.cache/am/aza9i77t/tmp/test-intent-vitest-3180926-1792798005128.json\n\n"
+        "durationMs": 4033,
+        "output": "JSON report written to /home/elias/.cache/am/1_ch_din/tmp/test-intent-vitest-1096870-1792806639065.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts",
         "classification": "assertion",
-        "detail": "names each Forget control with its memory (S53.3, S53.7):  AssertionError: expected 'Forget' to be 'Forget: My preferred language is Germ…' // Object.is equality\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts:58:28\n    at processTicksAndRejections (node:internal/process/task | confirms the named memory and cancellation sends no delete (S53.3):  AssertionError: expected \"vi.fn()\" to be called with arguments: [ Obj"
+        "detail": "names each Forget control with its memory (S53.3, S53.7):  AssertionError: expected 'Forget' to be 'Forget: My preferred language is Germ…' // Object.is equality\n    at /home/elias/.cache/am/1_ch_din/tmp/test-intent-before-VLion1/modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts:58:28\n    at processTicksAndRejections (node:internal/process/task | confirms the named memory and cancellation sends no delete (S53.3):  AssertionError: expected \"vi.fn()\" to be called with arguments: [ Obj"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
         "classification": "assertion",
-        "detail": "opens the existing Memory surface from a keyboard palette command (S53.3, DM1):  AssertionError: expected '' to contain 'Memory'\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:35:40\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev/j"
+        "detail": "opens the existing Memory surface from a keyboard palette command (S53.3, DM1):  AssertionError: expected '' to contain 'Memory'\n    at /home/elias/.cache/am/1_ch_din/tmp/test-intent-before-VLion1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:35:40\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev/j"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts#fits narrow viewports with a side gap in every theme (S53.7)",
         "classification": "assertion",
-        "detail": "fits narrow viewports with a side gap in every theme (S53.7):  AssertionError: dialog must fit 360px with 16px each side: expected 362 to be less than or equal to 328\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts:95:79\n    at runNextTicks (node:internal/process/"
+        "detail": "fits narrow viewports with a side gap in every theme (S53.7):  AssertionError: dialog must fit 360px with 16px each side: expected 362 to be less than or equal to 328\n    at /home/elias/.cache/am/1_ch_din/tmp/test-intent-before-VLion1/modules/ui-web/src/shell-v0/components/ConfirmDialog.viewport-lockdown.test.ts:95:79\n    at runNextTicks (node:internal/process/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.activation.test.ts",
@@ -256,9 +371,14 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
         "classification": "assertion",
-        "detail": "F1 refuses repeated keydown activation of a Forget trigger:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/aza9i77t/tmp/test-intent-before-Tb77e5/modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts:56:37\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elia | F2 refuses consent after the memory changes its content:  AssertionError: expected [ '/api/memory/one' ] to have a length of +0 but got "
+        "detail": "F1 refuses repeated keydown activation of a Forget trigger:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/1_ch_din/tmp/test-intent-before-VLion1/modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts:56:37\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elia | F2 refuses consent after the memory changes its content:  AssertionError: expected [ '/api/memory/one' ] to have a length of +0 but got "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts",
+        "classification": "assertion",
+        "detail": "does not confirm lost-response absence with invalid locked='true':  AssertionError: expected '\\n      \\n        \\n        Memory\\n\\…' to contain 'outcome is unknown'\n    at /home/elias/.cache/am/1_ch_din/tmp/test-intent-before-VLion1/modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts:34:20\n    at processTicksAndRejections (node:internal/process/ta | does not confirm lost-response absence with invalid locked='false':  AssertionError: expected '\\n      \\n        \\n        Memory"
       }
     ]
   },
-  "digest": "sha256:a405f305befb4983b0734c22d364be2786532ae9e87236a9a1d6ccc7307527bd"
+  "digest": "sha256:d2c813be0c7f70d0e61a130587c5f034de1e3e6f3b7f23cda5a1d8d70875250a"
 }
