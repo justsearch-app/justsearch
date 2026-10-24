@@ -959,3 +959,14 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
   "note": "Configured roots miss files and removed roots regain jobs across restart."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16c87-440d-7273-9ecc-fb5233765e87",
+  "verdict": "reject",
+  "digest": "sha256:1c5d5fffb88f85d9b07ec2f569580f296668a26f5b1de51181569a57bfc776f4",
+  "note": "Reject: 34 unchanged settings/query preservation checks pass on main and fail at the new configured-root wiring, despite successful upgrade and scale recovery checks."
+}
+```
