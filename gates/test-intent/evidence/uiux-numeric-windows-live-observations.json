@@ -1,0 +1,757 @@
+{
+  "raw": [
+    {
+      "scorer": "candidate-ce",
+      "phase": "live",
+      "case": "window-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 103,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 2,
+            "windows_scored": 2,
+            "source_index": 0
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "live",
+      "case": "whole-value-across-cut",
+      "claim": "The shipment contains 1200000.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 92,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 2,
+            "windows_scored": 2,
+            "source_index": 0
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-whole-value-across-cut",
+            "similarity": 0.9682212471961975,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200000.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "live",
+      "case": "standalone-control",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 28,
+      "sourceSha256": "192ba7185fd1f4f6d1a8d2a28d3e1614f566af270d6a2f6de6556a30063e7fd6",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 47,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 1,
+            "windows_scored": 1,
+            "source_index": 0
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-standalone-control",
+            "similarity": 0.9699759483337402,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "live",
+      "case": "uncut-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 32,
+      "sourceSha256": "adae2cbb093acad8b4f202be0efee2526c17cede351c6dffba8b06b029f5937b",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 42,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 1,
+            "windows_scored": 1,
+            "source_index": 0
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "live",
+      "case": "long-malformed-source",
+      "claim": "The shipment contains 5.",
+      "sourceChars": 20001,
+      "sourceSha256": "141af8f6984c4994d3add6623178a60b153a279ae63270b09fc8525fcf776ecc",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 652,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 14,
+            "windows_scored": 14,
+            "source_index": 0
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "cold",
+      "case": "window-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 108,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 2,
+            "windows_scored": 2,
+            "source_index": 0
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "cold",
+      "case": "whole-value-across-cut",
+      "claim": "The shipment contains 1200000.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 80,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 2,
+            "windows_scored": 2,
+            "source_index": 0
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-whole-value-across-cut",
+            "similarity": 0.9682212471961975,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200000.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "cold",
+      "case": "standalone-control",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 28,
+      "sourceSha256": "192ba7185fd1f4f6d1a8d2a28d3e1614f566af270d6a2f6de6556a30063e7fd6",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 40,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 1,
+            "windows_scored": 1,
+            "source_index": 0
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-standalone-control",
+            "similarity": 0.9699759483337402,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "cold",
+      "case": "uncut-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 32,
+      "sourceSha256": "adae2cbb093acad8b4f202be0efee2526c17cede351c6dffba8b06b029f5937b",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 36,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 1,
+            "windows_scored": 1,
+            "source_index": 0
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-ce",
+      "phase": "cold",
+      "case": "long-malformed-source",
+      "claim": "The shipment contains 5.",
+      "sourceChars": 20001,
+      "sourceSha256": "141af8f6984c4994d3add6623178a60b153a279ae63270b09fc8525fcf776ecc",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "CROSS_ENCODER",
+        "took_ms": 610,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "windows_considered": 14,
+            "windows_scored": 14,
+            "source_index": 0
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "live",
+      "case": "window-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 60,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 2,
+            "windows_considered": 2
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "live",
+      "case": "whole-value-across-cut",
+      "claim": "The shipment contains 1200000.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 1,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 2,
+            "windows_considered": 2
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-whole-value-across-cut",
+            "similarity": 0.7604140211062984,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200000.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "live",
+      "case": "standalone-control",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 28,
+      "sourceSha256": "192ba7185fd1f4f6d1a8d2a28d3e1614f566af270d6a2f6de6556a30063e7fd6",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 19,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 1,
+            "windows_considered": 1
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-standalone-control",
+            "similarity": 0.9337028340058505,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "live",
+      "case": "uncut-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 32,
+      "sourceSha256": "adae2cbb093acad8b4f202be0efee2526c17cede351c6dffba8b06b029f5937b",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 1,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 1,
+            "windows_considered": 1
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "live",
+      "case": "long-malformed-source",
+      "claim": "The shipment contains 5.",
+      "sourceChars": 20001,
+      "sourceSha256": "141af8f6984c4994d3add6623178a60b153a279ae63270b09fc8525fcf776ecc",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 507,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 14,
+            "windows_considered": 14
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "cold",
+      "case": "window-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 55,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 2,
+            "windows_considered": 2
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "cold",
+      "case": "whole-value-across-cut",
+      "claim": "The shipment contains 1200000.",
+      "sourceChars": 1505,
+      "sourceSha256": "8f4493c16b5e5e1c9f0eabf3e5e41f96843e8b5b310b6101118b5de81d4e70c4",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 1,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 2,
+            "windows_considered": 2
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-whole-value-across-cut",
+            "similarity": 0.7604140211062984,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200000.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "cold",
+      "case": "standalone-control",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 28,
+      "sourceSha256": "192ba7185fd1f4f6d1a8d2a28d3e1614f566af270d6a2f6de6556a30063e7fd6",
+      "expectedMatches": 1,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 21,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 1,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 1,
+            "windows_considered": 1
+          }
+        ],
+        "matches": [
+          {
+            "parent_doc_id": "nx4-final-private-standalone-control",
+            "similarity": 0.9337028340058505,
+            "text_source": "SUPPLIED",
+            "sentence_text": "The shipment contains 1200.",
+            "source_index": 0,
+            "sentence_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "cold",
+      "case": "uncut-counterexample",
+      "claim": "The shipment contains 1200.",
+      "sourceChars": 32,
+      "sourceSha256": "adae2cbb093acad8b4f202be0efee2526c17cede351c6dffba8b06b029f5937b",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 1,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 1,
+            "windows_considered": 1
+          }
+        ],
+        "matches": []
+      }
+    },
+    {
+      "scorer": "candidate-cosine",
+      "phase": "cold",
+      "case": "long-malformed-source",
+      "claim": "The shipment contains 5.",
+      "sourceChars": 20001,
+      "sourceSha256": "141af8f6984c4994d3add6623178a60b153a279ae63270b09fc8525fcf776ecc",
+      "expectedMatches": 0,
+      "response": {
+        "starved_sources": [],
+        "sentences_scored": 1,
+        "scorer": "EMBEDDING_COSINE",
+        "took_ms": 515,
+        "sentences_total": 1,
+        "text_coverage_complete": true,
+        "scoring_incomplete": false,
+        "sentences_matched": 0,
+        "ok": true,
+        "source_coverage": [
+          {
+            "source_index": 0,
+            "windows_scored": 14,
+            "windows_considered": 14
+          }
+        ],
+        "matches": []
+      }
+    }
+  ],
+  "generations": [
+    {
+      "id": "nx4-window-e2e-candidate-ce-ask",
+      "case": {
+        "id": "original-window-cut",
+        "claim": "The shipment contains 1200.",
+        "passage": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000.",
+        "expected": false,
+        "doc": "/home/elias/.cache/am/pi6_ottf/tmp/window-documents/window-cut-shipment.txt",
+        "documentText": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000."
+      },
+      "phase": "ask",
+      "expectedMatches": 0,
+      "actualMatches": 0,
+      "scorer": "CROSS_ENCODER"
+    },
+    {
+      "id": "nx4-window-e2e-candidate-ce-delegate",
+      "case": {
+        "id": "original-window-cut",
+        "claim": "The shipment contains 1200.",
+        "passage": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000.",
+        "expected": false,
+        "doc": "/home/elias/.cache/am/pi6_ottf/tmp/window-documents/window-cut-shipment.txt",
+        "documentText": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000."
+      },
+      "phase": "delegate",
+      "expectedMatches": 0,
+      "actualMatches": 0,
+      "scorer": "CROSS_ENCODER"
+    },
+    {
+      "id": "nx4-window-e2e-candidate-cosine-ask",
+      "case": {
+        "id": "original-window-cut",
+        "claim": "The shipment contains 1200.",
+        "passage": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000.",
+        "expected": false,
+        "doc": "/home/elias/.cache/am/pi6_ottf/tmp/window-documents/window-cut-shipment.txt",
+        "documentText": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000."
+      },
+      "phase": "ask",
+      "expectedMatches": 0,
+      "actualMatches": 0,
+      "scorer": "EMBEDDING_COSINE"
+    },
+    {
+      "id": "nx4-window-e2e-candidate-cosine-delegate",
+      "case": {
+        "id": "original-window-cut",
+        "claim": "The shipment contains 1200.",
+        "passage": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000.",
+        "expected": false,
+        "doc": "/home/elias/.cache/am/pi6_ottf/tmp/window-documents/window-cut-shipment.txt",
+        "documentText": "Shipment ledger.\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                The shipment contains 1 200 000."
+      },
+      "phase": "delegate",
+      "expectedMatches": 0,
+      "actualMatches": 0,
+      "scorer": "EMBEDDING_COSINE"
+    }
+  ],
+  "coldHistory": [
+    {
+      "scorer": "candidate-ce",
+      "unchanged": true,
+      "conversationIds": [
+        "nx4-window-e2e-candidate-ce-ask",
+        "nx4-window-e2e-candidate-ce-delegate"
+      ]
+    },
+    {
+      "scorer": "candidate-cosine",
+      "unchanged": true,
+      "conversationIds": [
+        "nx4-window-e2e-candidate-cosine-ask",
+        "nx4-window-e2e-candidate-cosine-delegate"
+      ]
+    }
+  ],
+  "stoppedProcesses": [
+    {
+      "record": "candidate-ce-cold-stopped.json",
+      "parent": 3143670,
+      "descendants": [
+        3143827
+      ],
+      "allAbsent": true
+    },
+    {
+      "record": "candidate-cosine-cold-stopped.json",
+      "parent": 3147920,
+      "descendants": [
+        3147993
+      ],
+      "allAbsent": true
+    },
+    {
+      "record": "candidate-cosine-stopped.json",
+      "parent": 3145428,
+      "descendants": [
+        3145559
+      ],
+      "allAbsent": true
+    },
+    {
+      "record": "candidate-ce-stopped.json",
+      "parent": 3140070,
+      "descendants": [
+        3140248
+      ],
+      "allAbsent": true
+    }
+  ],
+  "literalTable": {
+    "pairs": 424,
+    "observations": 1696,
+    "failures": 0
+  },
+  "cpu": "CUDA_VISIBLE_DEVICES=-1; CPU ONNX; private Engine data/HOME/ports and repository fake generation server; no browser or dev stack",
+  "currentNativeFatalReports": []
+}

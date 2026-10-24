@@ -47,6 +47,7 @@ export class ConfirmDialog extends JfElement {
   declare typedConfirmWord?: string;
   declare typedInput: string;
 
+  private keyPress?: { key: string; target: EventTarget | null };
   private boundKey = (e: KeyboardEvent) => this.onKey(e);
 
   constructor() {
@@ -70,8 +71,9 @@ export class ConfirmDialog extends JfElement {
       box-sizing: border-box;
       border: 1px solid var(--border-subtle);
       border-radius: 0.75rem;
-      max-width: 28rem;
-      width: 100%;
+      /* Keep the existing wide size (28rem content + borders), with a gap on narrow screens. */
+      max-width: calc(28rem + 2px);
+      width: calc(100% - 2rem);
       padding: 0;
       background: var(--surface-1);
       color: var(--text-primary);
@@ -168,12 +170,15 @@ export class ConfirmDialog extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    document.addEventListener('keydown', this.boundKey);
+    window.addEventListener('keydown', this.boundKey, true);
+    window.addEventListener('keyup', this.boundKey, true);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('keydown', this.boundKey);
+    window.removeEventListener('keydown', this.boundKey, true);
+    window.removeEventListener('keyup', this.boundKey, true);
+    this.keyPress = undefined;
   }
 
   /** The FULL modal contract (574 §22.G) — native `<dialog>` (inert + focus-trap + Top Layer) +
@@ -195,6 +200,7 @@ export class ConfirmDialog extends JfElement {
 
   override updated(changed: Map<string, unknown>): void {
     if (!changed.has('open')) return;
+    this.keyPress = undefined;
     if (this.open) {
       this.modal.open(); // 574 §22.G — enter + showModal + focus, atomically by construction
     } else {
@@ -205,15 +211,31 @@ export class ConfirmDialog extends JfElement {
 
   private onKey(e: KeyboardEvent): void {
     if (!this.open) return;
-    // Escape is handled natively by <dialog> (the @cancel handler in render); here only Enter.
-    if (e.key !== 'Enter' || this.confirmDisabled()) return;
-    // Focus can be several shadow roots deep. Focused controls own Enter (including the
-    // native Confirm button and the typed input); only the dialog itself uses this shortcut.
+    const dialog = this.shadowRoot?.querySelector('dialog');
+    const path = e.composedPath();
     const active = deepActiveElement();
-    if (active && active !== document.body && active !== this &&
-        active !== this.shadowRoot?.querySelector('dialog')) return;
+    if (!dialog?.open || (!path.includes(this) && active !== document.body && active !== this && active !== dialog)) return;
+    // Own modal keys before earlier document capture listeners (for example an underlying menu).
+    // Native defaults still run for Cancel, Close, text editing, Tab and Escape.
+    e.stopPropagation();
+    const pending = this.keyPress;
+    this.keyPress = undefined;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    // Cancel, Close and other controls retain their native keyboard activation. Only confirmation
+    // owns this guard; the typed field still accepts spaces as text.
+    const confirmation = path.includes(this.shadowRoot?.querySelector('jf-button.confirm') as Element)
+      || (e.key === 'Enter' && (path.includes(this.shadowRoot?.querySelector('input') as Element)
+        || !active || active === document.body || active === this || active === dialog));
+    if (!confirmation) return;
     e.preventDefault();
-    this.confirm();
+    const target = path[0] ?? e.target;
+    if (e.type === 'keydown') {
+      // A destructive keyboard activation completes on release. Any repeat invalidates the press,
+      // including a key held before showModal or one that starts on the confirmation itself.
+      if (!e.repeat && dialog?.open && !this.confirmDisabled()) this.keyPress = { key: e.key, target };
+    } else if (pending?.key === e.key && pending.target === target && dialog?.open && !this.confirmDisabled()) {
+      this.confirm();
+    }
   }
 
   private confirmDisabled(): boolean {
@@ -285,12 +307,6 @@ export class ConfirmDialog extends JfElement {
                     .value=${this.typedInput}
                     @input=${(e: Event) =>
                       (this.typedInput = (e.target as HTMLInputElement).value)}
-                    @keydown=${(e: KeyboardEvent) => {
-                      if (e.key === 'Enter' && !this.confirmDisabled()) {
-                        e.preventDefault();
-                        this.confirm();
-                      }
-                    }}
                   />
                 </div>
               `

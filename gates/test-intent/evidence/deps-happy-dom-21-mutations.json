@@ -1,0 +1,61 @@
+[
+  {
+    "name": "unchanged-product",
+    "exit_code": 0,
+    "mutation": {
+      "old": null,
+      "new": null
+    },
+    "failures": [],
+    "log": "/home/elias/dev/justsearch/.claude/worktrees/deps-upkeep/tmp/deps-happy-dom/counterexample-unchanged-product.log"
+  },
+  {
+    "name": "prevent-dismissal",
+    "exit_code": 1,
+    "mutation": {
+      "old": "this.visible = this.visible.filter((t) => t.record.key !== key);",
+      "new": "this.visible = [...this.visible];"
+    },
+    "failures": [
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when Extraction complete. overflows the stack",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when Extraction failed: invalid JSON overflows the stack",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when An unrelated notice overflows the stack",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts > XD2 keeps each polite live region with its own toast when an older outcome expires",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts > XD2 keeps a retained toast mounted during focusout to its retargeted host",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts > XD2 keeps a retained toast mounted during focusout to its nested native control",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > REQUIRES_ACK toast is time-bounded (round 8 \u2014 a persistent advisory was a persistent overlay) > dwells longer than a plain toast, then hides \u2014 without acknowledging or dropping the record",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > clicking a toast acknowledges + dismisses it",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > visible dismiss control (round 7 \u2014 dismissal was click-anywhere and undiscoverable) > activating it acknowledges + dismisses exactly once (the wrapper stops the toast click)",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > 602 R4 \u2014 prunes a superseded local toast that left the snapshot"
+    ],
+    "log": "/home/elias/dev/justsearch/.claude/worktrees/deps-upkeep/tmp/deps-happy-dom/counterexample-prevent-dismissal.log"
+  },
+  {
+    "name": "remove-focus-retention",
+    "exit_code": 1,
+    "mutation": {
+      "old": "if (focusedIndex >= 0) newestFirst.unshift(...newestFirst.splice(focusedIndex, 1));",
+      "new": "// Counterexample: do not retain the toast containing focus."
+    },
+    "failures": [
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when Extraction complete. overflows the stack",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when Extraction failed: invalid JSON overflows the stack",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when An unrelated notice overflows the stack",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts > XD2 keeps a retained toast mounted during focusout to its retargeted host",
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts > XD2 keeps a retained toast mounted during focusout to its nested native control"
+    ],
+    "log": "/home/elias/dev/justsearch/.claude/worktrees/deps-upkeep/tmp/deps-happy-dom/counterexample-remove-focus-retention.log"
+  },
+  {
+    "name": "reuse-live-region-by-position",
+    "exit_code": 1,
+    "mutation": {
+      "old": "repeat(this.visible, (t) => t.record.key, (t) => {",
+      "new": "repeat(this.visible, (_t, index) => index, (t) => {"
+    },
+    "failures": [
+      " FAIL  src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts > XD2 keeps each polite live region with its own toast when an older outcome expires"
+    ],
+    "log": "/home/elias/dev/justsearch/.claude/worktrees/deps-upkeep/tmp/deps-happy-dom/counterexample-reuse-live-region-by-position.log"
+  }
+]

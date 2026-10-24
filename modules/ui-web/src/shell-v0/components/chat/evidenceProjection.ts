@@ -590,7 +590,8 @@ export function groundingCoverage(
  * appears exactly when the run reported that verification did not fully happen — and it is the
  * SAME string {@link groundingCoverage} computed, never a second phrasing of the same fact.
  */
-export function coverageNote(coverage: GroundingCoverage): string | null {
+export function coverageNote(coverage: GroundingCoverage, groundingIncomplete = false): string | null {
+  if (groundingIncomplete) return 'Grounding check did not complete.';
   return coverage.budgetIncomplete ? coverage.label : null;
 }
 

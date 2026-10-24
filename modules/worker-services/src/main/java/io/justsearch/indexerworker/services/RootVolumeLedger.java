@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import io.justsearch.configuration.PlatformPaths;
 import java.io.IOException;
 import java.io.InputStream;
@@ -340,14 +342,14 @@ final class RootVolumeLedger {
 
   /**
    * Drops the record, the pending seeding and the explicit-file folder record of every folder at
-   * or under {@code pathPrefix} that {@code ownsPath} accepts. A surviving nested declaration keeps
-   * its own records when its parent is removed.
+   * or under {@code pathPrefix}, except the frozen excluded subtrees of surviving declarations.
    */
-  void forgetUnder(String pathPrefix, java.util.function.Predicate<Path> ownsPath) throws IOException {
+  void forgetUnder(String pathPrefix, java.util.List<String> excludedSubtrees) throws IOException {
     if (!enabled() || pathPrefix == null || pathPrefix.isBlank()) {
       return;
     }
     String prefix = key(Path.of(pathPrefix));
+    var scope = new PathPrefixScope(pathPrefix, excludedSubtrees);
     synchronized (lock) {
       Properties entries = load();
       boolean changed =
@@ -356,15 +358,14 @@ final class RootVolumeLedger {
             if (folder.startsWith(FILE_FOLDER_PREFIX)) {
               folder = folder.substring(FILE_FOLDER_PREFIX.length());
             }
-            return atOrUnder(folder, prefix) && ownsPath.test(Path.of(folder));
+            return atOrUnder(folder, prefix) && !scope.excludes(folder);
           });
       if (changed) {
         store(entries);
       }
       if (file != null) {
         Properties awaiting = loadPending();
-        if (awaiting.keySet().removeIf(k -> atOrUnder((String) k, prefix)
-            && ownsPath.test(Path.of((String) k)))) {
+        if (awaiting.keySet().removeIf(k -> atOrUnder((String) k, prefix) && !scope.excludes((String) k))) {
           write(pendingFile(), awaiting, PENDING_COMMENT);
         }
       }

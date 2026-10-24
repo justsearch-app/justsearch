@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T19:43:53.478Z",
+  "revision": "631837df732a2ff668ecf434f54c5791e5f17f95",
+  "tree": "81594ddb1f1c4a41edaa350f700e0aa3a57a38ba",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesWholeValuesAndWindowLocalEligibility\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.rejectsLongMalformedSourceWithoutRecursion\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesNonLatinClaimAgainstLongMalformedSource\" --tests \"io.justsearch.indexerworker.services.NumericCitationWindowTest.preservesOtherLengthChangingUnicodeAtWindowBoundaries\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5503
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesWholeValuesAndWindowLocalEligibility",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesWholeValuesAndWindowLocalEligibility()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retainsExistingWindowVerdictWhenGroupingFollowsAnUngroupedValue()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#rejectsLongMalformedSourceWithoutRecursion",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsLongMalformedSourceWithoutRecursion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesNonLatinClaimAgainstLongMalformedSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesNonLatinClaimAgainstLongMalformedSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java#preservesOtherLengthChangingUnicodeAtWindowBoundaries",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationWindowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesOtherLengthChangingUnicodeAtWindowBoundaries()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5d70d229cdd137b0c39cf55276925287f4ad580f652541c62274d2b2a5973f34"
+}

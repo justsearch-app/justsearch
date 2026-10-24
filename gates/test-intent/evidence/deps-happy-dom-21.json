@@ -1,0 +1,219 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T01:21:15.442Z",
+  "revision": "2d26d4e402c5dc14dd54a5069177d642c5b1eb2c",
+  "tree": "a5024a2c8a6cd9c2439d1441ea2fa2ed691b2de0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts\" \"src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts\" \"src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts\" \"src/shell-v0/components/advisory/AdvisoryToastHost.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/deps-upkeep/tmp/agent-tmp/test-intent-vitest-791063-1792804873673.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1766
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d765eb4d6b8c8916bc3f82a168d6b688f1112d82e9994e6b519e93ea19af6d7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XD2 keeps the focused toast action when Extraction complete. overflows the stack",
+          "status": "passed"
+        },
+        {
+          "name": "XD2 keeps the focused toast action when Extraction failed: invalid JSON overflows the stack",
+          "status": "passed"
+        },
+        {
+          "name": "XD2 keeps the focused toast action when An unrelated notice overflows the stack",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9c6c9ebab6a515ab8276755faa616bc43b46f2e9754d15a1be9151a1d375dbef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XD2 keeps each polite live region with its own toast when an older outcome expires",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd007aa429a9507c94a5cd368cec99e86987d1ac01ce93295929846f2b37de26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XD2 keeps a retained toast mounted during focusout to its retargeted host",
+          "status": "passed"
+        },
+        {
+          "name": "XD2 keeps a retained toast mounted during focusout to its nested native control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aaa4cc42ba842cd73084d581f99ee92f464415a54649aa78c99c14e37020c3b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) initial state renders nothing",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) LIFECYCLE snapshot with advisories seeds seenKeys silently — no toast",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) LIFECYCLE empty snapshot then UPDATE — toasts the new event (Group A2 fix)",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) UPDATE arriving before any snapshot — defensive baseline seeds silently",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) toasts each new advisory after the first snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) REQUIRES_ACK toast is time-bounded (round 8 — a persistent advisory was a persistent overlay) gets an auto-dismiss timer, unlike the pre-round-8 behaviour",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) REQUIRES_ACK toast is time-bounded (round 8 — a persistent advisory was a persistent overlay) dwells longer than a plain toast, then hides — without acknowledging or dropping the record",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) Substrate-completion — EPHEMERAL + PERSISTED records in same snapshot dispatch independently",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) clicking a toast acknowledges + dismisses it",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) bounded toast stack (round 7 — occlusion of the header control row) renders at most 3 toasts for a burst of 8, summarizing the rest as \"+N earlier\"",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) bounded toast stack (round 7 — occlusion of the header control row) keeps the NEWEST toasts visible — a burst never buries the just-arrived advisory",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) bounded toast stack (round 7 — occlusion of the header control row) renders no overflow summary while the stack is within the cap",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) bounded toast stack (round 7 — occlusion of the header control row) gives every burst toast — visible or capped-out — its own bounded timer",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) visible dismiss control (round 7 — dismissal was click-anywhere and undiscoverable) renders a labelled dismiss button on each toast",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) visible dismiss control (round 7 — dismissal was click-anywhere and undiscoverable) activating it acknowledges + dismisses exactly once (the wrapper stops the toast click)",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) 559 — renders a local ephemeral record with its message + severity tone, ungated",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) 613 §14 — a local ERROR toast announces assertively and is sticky (no auto-dismiss)",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) 613 §14 — a local WARNING announces assertively but is NOT sticky",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) 613 §14 — a local SUCCESS/INFO toast stays polite + auto-dismisses",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) 559 — clicking a local toast drops it (not acknowledge — never persisted)",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost (Group A2 + B4) 602 R4 — prunes a superseded local toast that left the snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 655 desktop-notification escalation a new REQUIRES_ACK record while unfocused fires a desktop notification",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 655 desktop-notification escalation a new REQUIRES_ACK record while FOCUSED does not fire a desktop notification",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 655 desktop-notification escalation a new EPHEMERAL/PERSISTED record while unfocused does NOT fire a desktop notification",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 655 desktop-notification escalation a REPLAYED (snapshot) REQUIRES_ACK record never fires a desktop notification",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 941 F5 recoverable-condition copy headlines the condition and states it — no internal id, no class-generic label",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 941 F5 recoverable-condition copy times the toast in relative words, not a wall clock",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 941 F5 recoverable-condition copy labels the recovery button from the operation, not the id segment",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 941 F5 recoverable-condition copy substitutes a parameterized body from classExtras, and declines rather than showing a brace",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryToastHost — tempdoc 941 F5 recoverable-condition copy keeps the ids — behind Detailed mode, not in the headline",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fa1ee2b753aca0980a05c3bb85588f1b0e1ee5fb07c136b31baef457f637eb54"
+}

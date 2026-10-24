@@ -69,6 +69,17 @@ public final class QueryFilterBuilder {
     return query.build();
   }
 
+  /** Literal directory boundaries; percent and underscore have no wildcard meaning. */
+  public static Query excludingSubtrees(Query scope, List<String> excludedSubtrees) {
+    if (excludedSubtrees.isEmpty()) return scope;
+    var query = new BooleanQuery.Builder().add(scope, BooleanClause.Occur.FILTER);
+    for (String subtree : excludedSubtrees) {
+      query.add(new PrefixQuery(new Term(SchemaFields.PATH, normalizePathPrefix(subtree))),
+          BooleanClause.Occur.MUST_NOT);
+    }
+    return query.build();
+  }
+
   /**
    * Normalizes a path prefix for platform-consistent path filtering.
    *

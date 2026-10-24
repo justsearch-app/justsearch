@@ -1666,10 +1666,14 @@ message WatchRootResponse {
 
 message UnwatchRootRequest {
   string root_path = 1;
+  // Clear every declared root, including worker-only and volume-held registrations.
+  bool clear_all_roots = 2;
 }
 
 message UnwatchRootResponse {
   bool unwatched = 1;
+  // Acknowledges support for the all-roots request, including when none remain.
+  bool roots_cleared = 2;
 }
 
 // --- Health Service ---

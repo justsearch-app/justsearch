@@ -167,7 +167,7 @@ export interface Sv3CommandGroup {
 }
 
 /**
- * Nine commands over two groups, so the ONE separator between them is exercised. Exactly one command
+ * Commands over two groups, so the ONE separator between them is exercised. Exactly one command
  * is `selected` — the palette's current choice — which is what makes the two-state distinction
  * visible: the highlight starts on the first row while the selection sits elsewhere.
  */
@@ -192,6 +192,7 @@ export const COMMAND_GROUPS: readonly Sv3CommandGroup[] = [
          alternative was a per-conversation overflow this window does not have. Handled in
          `SearchV3View.onPaletteRun`. */
       { id: SV3_COMMAND_EXPORT_MARKDOWN, label: 'Copy this conversation as Markdown' },
+      { id: 'cmd-memory', label: 'Open Memory' },
       { id: 'cmd-folders', label: 'Manage indexed folders' },
       { id: 'cmd-reindex', label: 'Reindex this folder' },
       { id: 'cmd-diagnostics', label: 'Open indexing diagnostics', shortcut: 'Ctrl D' },

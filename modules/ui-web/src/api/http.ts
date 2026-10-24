@@ -605,7 +605,11 @@ function withToken(headers: HeadersInit | undefined, token: string): HeadersInit
   return { ...(headers ?? {}), [SESSION_TOKEN_HEADER]: token } as Record<string, string>;
 }
 
-export async function fetchWithSessionToken(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function fetchWithSessionToken(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  retryOnTokenRejection = true,
+): Promise<Response> {
   // A Request body is single-use, so the retry needs its own copy taken BEFORE the first send.
   const retryInput =
     typeof Request !== 'undefined' && input instanceof Request ? input.clone() : input;
@@ -619,6 +623,7 @@ export async function fetchWithSessionToken(input: RequestInfo | URL, init?: Req
   // (a restart the shell's event has not delivered yet). Drop it, re-resolve, retry EXACTLY once;
   // a second rejection is the answer, not a loop.
   invalidateSessionToken();
+  if (!retryOnTokenRejection) return response;
   await resolveSessionTokenFromTauri();
   // An old port's 401 cannot ask us to send a new incarnation's token to that port.
   if (!getSessionTokenFor(input)) return response;

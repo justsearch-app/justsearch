@@ -2,10 +2,15 @@
 package io.justsearch.reranker;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Numeric containment safeguard, shared by citation producers. It can only veto a candidate;
@@ -19,8 +24,8 @@ public final class NumericConsistency {
   // Read grouped values atomically: an ending cannot make a shorter group match instead.
   // Otherwise consume adjacent digit groups and decimal points whole, never decimal pieces.
   private static final Pattern NUMBER = Pattern.compile("(?>" + GROUPED_NUMBER + ")(?![0-9]|[.,][0-9])"
-      + "|(?:[0-9]+|\\.[0-9]+)(?:[.,\\p{Zs}][0-9]+)*");
-  private static final Pattern UNGROUPED_NUMBER = Pattern.compile("[0-9]+(?:\\.[0-9]+)*");
+      + "|(?:[0-9]+|\\.[0-9]+)(?:[.,\\p{Zs}][0-9]+)*+");
+  private static final Pattern UNGROUPED_NUMBER = Pattern.compile("[0-9]+(?:\\.[0-9]+)*+");
   private static final Pattern GROUPED_PREFIX = Pattern.compile(GROUPED_NUMBER + "(?![0-9])");
   private static final Pattern PLAIN_NUMBER = Pattern.compile(
       "[0-9]+(?:\\.[0-9]+)?|" + GROUPED_NUMBER + "|\\.[0-9]+");
@@ -39,11 +44,65 @@ public final class NumericConsistency {
     }
   }
 
+  /** Original source span represented by one model window; offsets are UTF-16 indices. */
+  public record Window(String source, int start, int end) {
+    public Window {
+      Objects.checkFromToIndex(start, end, source.length());
+      // A hard UTF-16 cut may bisect a supplementary digit. Both halves represent that digit.
+      if (start > 0 && start < source.length() && Character.isLowSurrogate(source.charAt(start))
+          && Character.isHighSurrogate(source.charAt(start - 1))) start--;
+      if (end > 0 && end < source.length() && Character.isLowSurrogate(source.charAt(end))
+          && Character.isHighSurrogate(source.charAt(end - 1))) end++;
+    }
+  }
+
+  private record Value(String value, int start, int end) {}
+
   public NumericConsistency(List<Claim> claims, List<String> passages) {
+    this(claims, passages.stream().map(text -> values(normalizeDigits(text), false)));
+  }
+
+  private NumericConsistency(List<Claim> claims, Stream<Set<String>> passages) {
     this.claims = claims.stream().map(Claim::values).toList();
     // Numeric-free answers retain the existing fast path, including their winner/tie ordering.
-    this.passages = this.claims.stream().allMatch(Set::isEmpty)
-        ? List.of() : passages.stream().map(text -> values(normalizeDigits(text), false)).toList();
+    this.passages = this.claims.stream().allMatch(Set::isEmpty) ? List.of() : passages.toList();
+  }
+
+  /**
+   * A cut token contributes its complete source value to every window it intersects. Values
+   * already read by a window also survive when present as whole source values. Model inputs
+   * remain unchanged; unrelated source values cannot make an empty window eligible.
+   */
+  public static NumericConsistency forWindows(List<Claim> claims, List<Window> windows) {
+    var normalizedSources = new HashMap<String, String>();
+    var sourceValues = new HashMap<String, List<Value>>();
+    var sourceNumbers = new HashMap<String, Set<String>>();
+    return new NumericConsistency(claims, windows.stream().map(window -> {
+      String source = window.source();
+      String normalized = normalizedSources.computeIfAbsent(source, NumericConsistency::normalizePassage);
+      // NFKD has additive lengths across cuts; NFKC composition of a prefix does not.
+      int start = normalized.equals(source) ? window.start()
+          : normalizePassage(source.substring(0, window.start())).length();
+      int end = normalized.equals(source) ? window.end()
+          : normalizePassage(source.substring(0, window.end())).length();
+      if (start < 0 || start > end || end > normalized.length()) return Set.of();
+      List<Value> complete = sourceValues.computeIfAbsent(source, ignored -> readValues(normalized, false));
+      // Preserve existing window readings only when that whole value occurs in the source.
+      var supported = new HashSet<>(values(normalizeDigits(source.substring(window.start(), window.end())), false));
+      supported.retainAll(sourceNumbers.computeIfAbsent(source, ignored -> complete.stream()
+          .map(Value::value).collect(Collectors.toUnmodifiableSet())));
+      complete.stream().filter(value -> value.start() < end && value.end() > start)
+          .map(Value::value).forEach(supported::add);
+      return Set.copyOf(supported);
+    }));
+  }
+
+  /**
+   * Composition-free passage coordinates: NFKC/digit folding still defines numeric forms.
+   * Further canonical decomposition changes no numeric token and cannot reorder across a digit.
+   */
+  private static String normalizePassage(String text) {
+    return Normalizer.normalize(normalizeDigits(text), Normalizer.Form.NFKD);
   }
 
   public boolean supports(int sentenceIndex, int passageIndex) {
@@ -69,15 +128,20 @@ public final class NumericConsistency {
 
   /** NX3: claims require plain boundaries; passages admit whole values with any decoration. */
   private static Set<String> values(String text, boolean plainOnly) {
-    if (text == null || text.isEmpty()) return Set.of();
-    Set<String> values = new HashSet<>();
+    return readValues(text, plainOnly).stream().map(Value::value)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
+  private static List<Value> readValues(String text, boolean plainOnly) {
+    if (text == null || text.isEmpty()) return List.of();
+    List<Value> values = new ArrayList<>();
     var numbers = NUMBER.matcher(text);
     while (numbers.find()) {
       if (PLAIN_NUMBER.matcher(numbers.group()).matches()) {
         if (!decimalFragment(text, numbers.start(), numbers.end())
             && (!plainOnly || (numbers.group().charAt(0) != '.' && plainBoundary(text, numbers.start() - 1, true)
                 && plainBoundary(text, numbers.end(), false)))) {
-          values.add(canonical(numbers.group()));
+          values.add(new Value(canonical(numbers.group()), numbers.start(), numbers.end()));
         }
       } else if (!plainOnly && !GROUPED_PREFIX.matcher(numbers.group()).lookingAt()) {
         // Only non-grouping commas/spaces separate values; malformed grouped runs stay whole.
@@ -85,12 +149,12 @@ public final class NumericConsistency {
         while (parts.find()) {
           if (PLAIN_NUMBER.matcher(parts.group()).matches()
               && !decimalFragment(text, parts.start(), parts.end())) {
-            values.add(canonical(parts.group()));
+            values.add(new Value(canonical(parts.group()), parts.start(), parts.end()));
           }
         }
       }
     }
-    return Set.copyOf(values);
+    return List.copyOf(values);
   }
 
   private static boolean decimalFragment(String text, int start, int end) {

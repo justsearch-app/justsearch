@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -835,6 +837,38 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public void scopeLegacyPrefixReceipts(
+      java.util.function.Function<String, PathPrefixScope> scope) {
+    lock.lock();
+    try {
+      ensureOpen();
+      inTransaction(() -> {
+        for (var op : switchBufferOps.listAllStrict()) {
+          if (!"DELETE_PREFIX".equals(op.op())
+              || !PathPrefixScope.isLegacy(op.payload())) continue;
+          String payload = scope.apply(op.payload()).encode();
+          try (PreparedStatement update = connection.prepareStatement(
+              "UPDATE switch_buffer SET payload = ?, revision = ? "
+                  + "WHERE generation = ? AND key = ? AND revision = ?")) {
+            update.setString(1, payload);
+            update.setString(2, UUID.randomUUID().toString());
+            update.setString(3, op.generation());
+            update.setString(4, op.key());
+            update.setString(5, op.revision());
+            if (update.executeUpdate() != 1) throw new SQLException("Prefix receipt changed during conversion");
+          }
+        }
+        return null;
+      });
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Legacy prefix receipts could not be scoped", failure);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public boolean putSyncRoot(String key, SwitchBufferSyncRoot payload) {
     return switchBufferOps.putSyncRoot(key, payload);
   }
@@ -965,6 +999,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   /** Reads whether a non-terminal job remains under one literal normalized path prefix. */
   @Override
   public boolean hasNonterminalJobsByPathPrefixStrict(String pathPrefix) {
+    return hasNonterminalJobsByPathPrefixStrict(pathPrefix, List.of());
+  }
+
+  @Override
+  public boolean hasNonterminalJobsByPathPrefixStrict(String pathPrefix, List<String> excludedSubtrees) {
     if (pathPrefix == null || pathPrefix.isBlank()) {
       throw new IllegalArgumentException("Path-prefix scope must be non-blank");
     }
@@ -976,11 +1015,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
+      var parameters = new ArrayList<String>(List.of(lower, upper));
+      String predicate = prefixExclusions(excludedSubtrees, parameters);
       try (PreparedStatement query = connection.prepareStatement(
           "SELECT 1 FROM jobs WHERE state IN ('PENDING', 'PROCESSING') "
-              + "AND path >= ? AND path < ? LIMIT 1")) {
-        query.setString(1, lower);
-        query.setString(2, upper);
+              + "AND path >= ? AND path < ?" + predicate + " LIMIT 1")) {
+        for (int i = 0; i < parameters.size(); i++) query.setString(i + 1, parameters.get(i));
         try (ResultSet row = query.executeQuery()) {
           return row.next();
         }
@@ -997,6 +1037,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean hasJobsByPathPrefixOutsideCertifiedReplayPaths(
       String pathPrefix, List<String> certifiedReplayPaths) {
+    return hasJobsByPathPrefixOutsideCertifiedReplayPaths(pathPrefix, certifiedReplayPaths, List.of());
+  }
+
+  @Override
+  public boolean hasJobsByPathPrefixOutsideCertifiedReplayPaths(String pathPrefix, List<String> certifiedReplayPaths, List<String> excludedSubtrees) {
     if (pathPrefix == null || pathPrefix.isBlank()) {
       throw new IllegalArgumentException("Path-prefix scope must be non-blank");
     }
@@ -1006,6 +1051,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
     String upper = upperBoundExclusive(lower);
     Set<String> excluded = normalizeSurvivorPaths(certifiedReplayPaths);
+    var scope = new PathPrefixScope(pathPrefix, excludedSubtrees);
     lock.lock();
     try {
       ensureOpen();
@@ -1017,7 +1063,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try (ResultSet rows = query.executeQuery()) {
           while (rows.next()) {
             String path = rows.getString("path");
-            if (excluded.contains(path)) continue;
+            if (excluded.contains(path) || scope.excludes(path)) continue;
             return true;
           }
           return false;
@@ -1272,7 +1318,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         int accepted = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false, null);
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null);
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
@@ -1329,8 +1375,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String generation, String path, String sourceSha256, String sourceCollection)
       throws SQLException {
     List<String> deletedCollections = new ArrayList<>();
-    String collection = sourceCollection;
-    boolean collectionKnown = sourceCollection != null;
     try (PreparedStatement query = connection.prepareStatement(
         "SELECT key, op, payload FROM switch_buffer WHERE generation = ? "
             + "AND (key = ? OR op IN ('DELETE_PREFIX', 'DELETE_COLLECTION'))")) {
@@ -1340,7 +1384,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         while (row.next()) {
           String op = row.getString("op");
           String payload = row.getString("payload");
-          if ("DELETE_PREFIX".equals(op) && path.startsWith(payload)) return true;
+          if ("DELETE_PREFIX".equals(op)
+              && PathPrefixScope.decode(payload).contains(path)) return true;
           if ("DELETE_COLLECTION".equals(op)) {
             deletedCollections.add(payload);
           } else if (("path:" + path).equals(row.getString("key"))) {
@@ -1352,33 +1397,28 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
             if (!"UPSERT".equals(op)) return true;
             var prior = SwitchBufferUpsert.decode(payload);
+            if (prior.sourceSha256() != null && !prior.sourceSha256().equals(sourceSha256)) {
+              // Hashing the batch precedes the admission lock. A foreground writer may have
+              // accepted newer bytes in that interval. Only replace a stale receipt when the
+              // enumerator still witnesses the current source; otherwise retain the accepted work.
+              try {
+                if (!sourceSha256.equals(
+                    io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path)))) return true;
+              } catch (IOException unreadable) {
+                throw new SQLException("Cannot establish current enumeration source", unreadable);
+              }
+            }
             if ((prior.provenance() == null
                 || !"MIGRATION_ENUMERATOR".equals(prior.provenance().transport()))
                 && (prior.sourceSha256() == null
-                    || prior.sourceSha256().equals(sourceSha256))) return true;
-            collection = prior.collection();
-            collectionKnown = true;
+                    || (prior.sourceSha256().equals(sourceSha256)
+                        && Objects.equals(prior.collection(), sourceCollection)))) return true;
           }
         }
       }
     }
-    if (deletedCollections.isEmpty()) return false;
-    if (!collectionKnown) {
-      try (PreparedStatement query = connection.prepareStatement(
-          "SELECT collection FROM jobs WHERE path = ?")) {
-        query.setString(1, path);
-        try (ResultSet row = query.executeQuery()) {
-          if (row.next()) {
-            collection = row.getString(1);
-            collectionKnown = true;
-          }
-        }
-      }
-    }
-    if (!collectionKnown) {
-      throw new SQLException("Cannot prove collection identity during candidate enumeration");
-    }
-    return deletedCollections.contains(collection);
+    // Enumeration knows the owning root's exact binding, including the default (null).
+    return deletedCollections.contains(sourceCollection);
   }
 
   @Override
@@ -3714,6 +3754,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public int deleteByPathPrefixExcludingAcceptedSurvivors(
       String pathPrefix, List<String> survivorPaths) {
+    return deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, survivorPaths, List.of());
+  }
+
+  @Override
+  public int deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> survivorPaths, List<String> excludedSubtrees) {
     if (pathPrefix == null || pathPrefix.isBlank()) {
       throw new IllegalArgumentException("Path-prefix scope must be non-blank");
     }
@@ -3726,8 +3771,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
-      return removeJobsAdministratively(
-          "path >= ? AND path < ?", List.of(normalized, upper), true, excluded);
+      var parameters = new ArrayList<String>(List.of(normalized, upper));
+      String predicate = "path >= ? AND path < ?" + prefixExclusions(excludedSubtrees, parameters);
+      return removeJobsAdministratively(predicate, parameters, true, excluded);
     } catch (SQLException failure) {
       recordDbError();
       throw new IllegalStateException(
@@ -3735,6 +3781,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } finally {
       unlockAfterChanges();
     }
+  }
+
+  private static String prefixExclusions(List<String> subtrees, List<String> parameters) {
+    var predicate = new StringBuilder();
+    for (String subtree : subtrees) {
+      String lower = PathNormalizer.normalizePathPrefix(subtree);
+      if (lower == null || lower.isBlank()) throw new IllegalArgumentException("Empty exclusion");
+      predicate.append(" AND NOT (path >= ? AND path < ?)");
+      parameters.add(lower);
+      parameters.add(upperBoundExclusive(lower));
+    }
+    return predicate.toString();
   }
 
   /**

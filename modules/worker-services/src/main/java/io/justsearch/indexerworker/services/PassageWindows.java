@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.reranker.NumericConsistency;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -57,6 +58,7 @@ final class PassageWindows {
    * The prepared scoring inputs.
    *
    * @param windowTexts flat list of window texts, in admission order
+   * @param numericWindows original source spans, parallel to the admitted model inputs
    * @param windowToSource back-map: {@code windowToSource[w]} is the position in the REQUEST
    *     arrays of the source window {@code w} came from
    * @param windowDocIds parent doc id of each window's source, parallel to {@code windowTexts}
@@ -71,6 +73,7 @@ final class PassageWindows {
    */
   record Prepared(
       List<String> windowTexts,
+      List<NumericConsistency.Window> numericWindows,
       int[] windowToSource,
       List<String> windowDocIds,
       boolean[] suppliedBySource,
@@ -170,6 +173,7 @@ final class PassageWindows {
     }
 
     List<String> windowTexts = new ArrayList<>();
+    List<NumericConsistency.Window> numericWindows = new ArrayList<>();
     List<Integer> backMap = new ArrayList<>();
     List<String> windowDocIds = new ArrayList<>();
     int[] consideredBySource = new int[sourceCount];
@@ -180,7 +184,12 @@ final class PassageWindows {
         // window. It is reported as unverifiable (no match), never re-pointed at another source.
         continue;
       }
+      int offset = 0;
       for (String window : split(text)) {
+        // split omits blank windows; find the next retained span in the original source.
+        offset = text.indexOf(window, offset);
+        numericWindows.add(new NumericConsistency.Window(text, offset, offset + window.length()));
+        offset += window.length();
         windowTexts.add(window);
         backMap.add(i);
         windowDocIds.add(chunkDocIds.get(i));
@@ -193,14 +202,17 @@ final class PassageWindows {
     if (considered > cap) {
       int[] keep = selectWindows(windowTexts, backMap, answerText, cap);
       List<String> keptTexts = new ArrayList<>(keep.length);
+      List<NumericConsistency.Window> keptNumeric = new ArrayList<>(keep.length);
       List<Integer> keptMap = new ArrayList<>(keep.length);
       List<String> keptDocIds = new ArrayList<>(keep.length);
       for (int w : keep) {
         keptTexts.add(windowTexts.get(w));
+        keptNumeric.add(numericWindows.get(w));
         keptMap.add(backMap.get(w));
         keptDocIds.add(windowDocIds.get(w));
       }
       windowTexts = keptTexts;
+      numericWindows = keptNumeric;
       backMap = keptMap;
       windowDocIds = keptDocIds;
     }
@@ -211,6 +223,7 @@ final class PassageWindows {
     }
     return new Prepared(
         List.copyOf(windowTexts),
+        List.copyOf(numericWindows),
         backMapArray,
         List.copyOf(windowDocIds),
         supplied,

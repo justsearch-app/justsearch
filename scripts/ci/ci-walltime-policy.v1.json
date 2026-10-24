@@ -228,6 +228,16 @@
       }
     },
     {
+      "job": "Measured axe",
+      "requiredCheck": "Measured axe",
+      "owner": "fixture-backed rendered accessibility sweep on hosted Linux Chromium",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Measured 2026-10-23 via read-only Actions jobs API, latest attempt of 288 PR and main-push CI runs created since 2026-10-21 (through 2026-10-23T21:42:59Z). 104 successful jobs: 72 PR (median 177s, min 145s, max 864s), 32 main-push (median 178s, min 151s, max 927s); combined median 177s, min 145s, max 927s. Excluded 167 skipped, 10 cancelled, 1 queued, 1 in-progress and 5 absent jobs; no axe failures observed. Following the current distribution-based ceilings (including the jseval row), pad the observed maximum by 25% and round up to a minute: ceil(927 * 1.25 / 60) * 60 = 1200s. This leaves 20% headroom below the existing 1500s hard timeout. Separate evidence window from other lanes; re-measure at the next reviewBy.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 1200
+      }
+    },
+    {
       "job": "Secret scan",
       "requiredCheck": "Secret scan",
       "owner": "gitleaks public history scan",
