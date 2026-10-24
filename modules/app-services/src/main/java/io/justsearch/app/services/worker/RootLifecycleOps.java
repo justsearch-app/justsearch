@@ -137,6 +137,8 @@ final class RootLifecycleOps {
         }
 
         void unwatch(String rootPath, EngineContext engineContext);
+
+        default void clearAllRoots(EngineContext engineContext) {}
     }
 
     /**
@@ -575,19 +577,13 @@ final class RootLifecycleOps {
         // LA1: an older version could save nested registrations. A retained ancestor still
         // owns their documents; remove the selected registrations/watchers without deleting data.
         // A repeat for an absent registration is harmless, including after a lost response.
-        if (watchedRoots.keySet().stream().noneMatch(root -> root.startsWith(normalized))) return 0;
+        if (!watchedRoots.containsKey(normalized)) return 0;
         boolean coveredByAncestor = watchedRoots.keySet().stream()
                 .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root));
 
-        // Stop every watcher whose persisted root will be removed, including nested roots.
+        // Stop only this declaration; independently declared descendants retain their watchers.
         try {
-            var rootsToUnwatch = new java.util.TreeSet<Path>();
-            rootsToUnwatch.add(normalized);
-            watchedRoots.keySet().stream().filter(root -> root.startsWith(normalized))
-                    .forEach(rootsToUnwatch::add);
-            for (Path root : rootsToUnwatch) {
-                workerWatchFn.unwatch(root.toString(), engineContext);
-            }
+            workerWatchFn.unwatch(normalized.toString(), engineContext);
         } catch (io.justsearch.app.api.EngineAdmissionException
                 | io.justsearch.core.execution.EngineExecutorRejectedException e) {
             throw e;
@@ -598,7 +594,7 @@ final class RootLifecycleOps {
         }
 
         if (coveredByAncestor) {
-            watchedRootsState.removeRootAndNestedAndPersist(normalized);
+            watchedRootsState.removeRootAndPersist(normalized);
             forgetAvailabilityUnder(normalized);
             return 0;
         }
@@ -630,7 +626,7 @@ final class RootLifecycleOps {
         }
 
         // Retain persisted roots until all cleanup succeeds so incomplete removal can be retried.
-        watchedRootsState.removeRootAndNestedAndPersist(normalized);
+        watchedRootsState.removeRootAndPersist(normalized);
         // Round 8 (task t-20261013-ef3c41, S8): nothing of a removed root is kept, so the same
         // folder added again starts from its own first availability check.
         forgetAvailabilityUnder(normalized);
@@ -639,8 +635,8 @@ final class RootLifecycleOps {
     }
 
     private void forgetAvailabilityUnder(Path removed) {
-        rootAvailable.keySet().removeIf(root -> root.startsWith(removed));
-        rootAvailCheckedAtMs.keySet().removeIf(root -> root.startsWith(removed));
+        rootAvailable.keySet().removeIf(root -> root.equals(removed));
+        rootAvailCheckedAtMs.keySet().removeIf(root -> root.equals(removed));
     }
 
     void flush(EngineContext engineContext) {
@@ -654,18 +650,18 @@ final class RootLifecycleOps {
      * <p>Task t-20261013-ef3c41, round 8: a reset that removes roots removes each one exactly as
      * the person's removal does, so the Worker drops its volume record, its pending upgrade
      * seeding, its held watch and watcher state, and any deferred boot state of the root. Each
-     * outermost root is removed (which covers its nested roots); whatever is left is cleared.
+     * declaration is removed independently; the Worker then clears any worker-only roots.
      */
     void clearAllRoots(EngineContext engineContext) {
         log.info("clearAllRoots: clearing root state");
         synchronized (watchedRootsState.lifecycleLock()) {
             List<Path> roots = List.copyOf(watchedRoots.keySet());
             for (Path root : roots) {
-                boolean nested = roots.stream().anyMatch(other -> !other.equals(root) && root.startsWith(other));
-                if (!nested && removeWatchedPathOwned(root, engineContext) < 0) {
-                    log.warn("clearAllRoots: removal of {} did not complete on the Worker", root);
+                if (removeWatchedPathOwned(root, engineContext) < 0) {
+                    throw new IllegalStateException("Root removal did not complete: " + root);
                 }
             }
+            workerWatchFn.clearAllRoots(engineContext);
             watchedRootsState.clearAll();
             rootAvailable.clear();
             rootAvailCheckedAtMs.clear();

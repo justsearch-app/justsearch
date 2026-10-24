@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import java.util.List;
 
@@ -211,6 +213,15 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       String generation, String key, SwitchBufferSyncRoot payload) {
     throw new UnsupportedOperationException(
         "Generation-scoped sync-root buffering is unavailable");
+  }
+
+  /** Durably freezes legacy prefix scopes before any reader may apply them. */
+  default void scopeLegacyPrefixReceipts(
+      java.util.function.Function<String, PathPrefixScope> scope) {
+    if (listSwitchBufferOpsStrict().stream().anyMatch(op -> "DELETE_PREFIX".equals(op.op())
+        && PathPrefixScope.isLegacy(op.payload()))) {
+      throw new UnsupportedOperationException("Legacy prefix receipt conversion is unavailable");
+    }
   }
 
   /** Returns the number of buffered ops currently in the durable switch buffer. */

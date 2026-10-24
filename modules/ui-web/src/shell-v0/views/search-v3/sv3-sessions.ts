@@ -77,8 +77,8 @@ export interface Sv3TurnEvidence {
    * Tempdoc 865 §7.3 — the run reported that its grounding pass did not complete, so an empty
    * {@link matches} is a MISSING verdict rather than a negative one.
    *
-   * <p>OPTIONAL, and absent means "this producer said nothing about its pass" — the ask plane never
-   * reports it and keeps the established binary, exactly as `sourceCoverage`'s absence does. It rides
+   * <p>OPTIONAL, and absent means "this producer said nothing about its pass" — historical records
+   * keep the established binary, exactly as `sourceCoverage`'s absence does. It rides
    * on the evidence record rather than beside it because the panel and the reading pane must read one
    * fact, not two copies that can disagree about the same answer.
    */

@@ -499,6 +499,12 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Strict path-prefix scope read is unavailable");
   }
 
+  /** Scoped form retaining separately declared nested directories. */
+  default boolean hasNonterminalJobsByPathPrefixStrict(String pathPrefix, List<String> excludedSubtrees) {
+    if (!excludedSubtrees.isEmpty()) throw new UnsupportedOperationException("Scoped prefix operation is unavailable");
+    return hasNonterminalJobsByPathPrefixStrict(pathPrefix);
+  }
+
   /**
    * Reports whether a literal prefix retains any row outside exact, already certified replay
    * paths. The caller supplies paths whose replay evidence was checked independently; this read
@@ -508,6 +514,12 @@ public interface JobQueue extends Closeable {
       String pathPrefix, List<String> certifiedReplayPaths) {
     throw new UnsupportedOperationException(
         "Strict path-prefix scope read outside certified replay paths is unavailable");
+  }
+
+  /** Scoped form retaining separately declared nested directories. */
+  default boolean hasJobsByPathPrefixOutsideCertifiedReplayPaths(String pathPrefix, List<String> certifiedReplayPaths, List<String> excludedSubtrees) {
+    if (!excludedSubtrees.isEmpty()) throw new UnsupportedOperationException("Scoped prefix operation is unavailable");
+    return hasJobsByPathPrefixOutsideCertifiedReplayPaths(pathPrefix, certifiedReplayPaths);
   }
 
   /**
@@ -1093,6 +1105,12 @@ public interface JobQueue extends Closeable {
       String pathPrefix, List<String> survivorPaths) {
     throw new UnsupportedOperationException(
         "Strict path-prefix deletion with accepted survivors is unavailable");
+  }
+
+  /** Scoped form retaining separately declared nested directories. */
+  default int deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> survivorPaths, List<String> excludedSubtrees) {
+    if (!excludedSubtrees.isEmpty()) throw new UnsupportedOperationException("Scoped prefix operation is unavailable");
+    return deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, survivorPaths);
   }
 
   /**

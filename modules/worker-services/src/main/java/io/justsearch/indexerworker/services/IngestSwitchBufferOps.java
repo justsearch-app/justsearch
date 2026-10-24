@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
 import io.justsearch.indexerworker.index.IndexGenerationManager;
@@ -110,10 +112,11 @@ final class IngestSwitchBufferOps {
   }
 
   /** A path-prefix deletion uses the same ordered candidate journal as exact deletes. */
-  void journalDeletePrefixForGeneration(String generation, String normalizedPrefix) {
+  void journalDeletePrefixForGeneration(String generation,
+      PathPrefixScope scope) {
     if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
         || !sbq.putSwitchBufferForGeneration(generation,
-            switchBufferPrefixKey(normalizedPrefix), SWITCHBUF_OP_DELETE_PREFIX, normalizedPrefix)) {
+            switchBufferPrefixKey(scope.prefix()), SWITCHBUF_OP_DELETE_PREFIX, scope.encode())) {
       throw switchBufferUnavailable();
     }
   }
@@ -195,13 +198,13 @@ final class IngestSwitchBufferOps {
   }
 
   DeleteByPathResponse bufferDeleteByPathDuringSwitching(
-      SwitchBufferCapableQueue sbq, String pathPrefix) {
-    String normalizedPrefix = normalizeDeletePrefixForMutation(pathPrefix);
+      SwitchBufferCapableQueue sbq, PathPrefixScope scope) {
+    String normalizedPrefix = scope.prefix();
     putSwitchBufferOrThrow(
         sbq,
         switchBufferPrefixKey(normalizedPrefix),
         SWITCHBUF_OP_DELETE_PREFIX,
-        normalizedPrefix,
+        scope.encode(),
         "deleteByPath");
     log.info("Buffered deleteByPathPrefix during SWITCHING: {}", normalizedPrefix);
     return bufferedDeleteByPathResponse();

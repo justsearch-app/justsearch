@@ -10121,7 +10121,7 @@ public final class KnowledgeServer implements Closeable {
             () -> migrationProgressStore,
             this::migrationProgressSnapshot,
             snap -> persistedMigrationProgressSnapshot = snap,
-            log));
+            log), replayPublisher());
   }
 
   private MigrationProgressSnapshot migrationProgressSnapshot() {
