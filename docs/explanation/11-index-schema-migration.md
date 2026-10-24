@@ -489,6 +489,13 @@ retains the configuration loader's discovered SSOT path at auto-detect priority,
 configuration sources. A watched-root binding takes precedence over a configured collection
 on the same path, including a null watched label representing the default binding.
 
+Migration freezes ownership from the complete loaded root list before walking. A separately declared
+descendant owns its files, including when its collection is the default (null); undeclared descendants
+inherit their owning root's collection. Enumeration restates that exact binding in the queue and the
+candidate replay receipt, so a migration can correct old collection labels without a separate repair.
+Ordinary reindex semantics remain unchanged: reindexing a default-label child alone preserves an
+existing queue label, while a labelled child's reindex restates its label even for unchanged files.
+
 Migration enumeration requires complete declared coverage. An absent or valid empty root registry
 with no configured roots completes with zero files; directory and single-file roots are supported.
 The registry header/version uses the same format authority as the watched-roots store. Invalid
