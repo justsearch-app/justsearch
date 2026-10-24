@@ -328,3 +328,14 @@ F1–F3 continuation: confirmation inputs now include key release; confirmed For
   "note": "Delegated choices match the brief; adaptations retain existing oracles; all cited evidence re-executed with assertion failures before and preservation passes on both. Test intent accepted. Product verdict remains FAIL: native HTTP replay deletes a replacement without consent (F4)."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a16bed-fd3b-7fd0-949f-c7a8b871ce70",
+  "verdict": "accept",
+  "digest": "sha256:e90feab51b71735777b11a9a7e18adfa0dc21d29f76fc28f56412a503acf535f",
+  "note": "Reviewed all 7 entries (5 New, 2 Adaptation) in before-test/source/provisional-class/diff order. Delegated sources warrant expectations; all 100 existing expectation statements retained. run-evidence default-link reruns: 64 frontend cases pass on cf77524759, all 8 repair files assertion-fail on supplied base 2461a585 and recorded repair revisions; 44 confirmation/Memory preservation cases pass both ways. Additional 38 existing transport checks pass before/after. Browser viewport/native-focus evidence reviewed but not rerun under the no-browser/no-services brief. Supplied area5 file omits the amendment text; this assignment and changeset decisions explicitly supply it. Independent session; only Codex family available. Evidence: /home/elias/.cache/am/7k34mxtg/evidence."
+}
+```
