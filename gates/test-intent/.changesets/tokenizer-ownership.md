@@ -328,3 +328,14 @@ and GPU 0 for real-model device initialization; no running application or dev st
   "note": "Audit after correction f97a480efd. Before-state read first: the three Adaptation items only add retirement-status instrumentation to mocked handles, no assertion removed or changed. The three New items add tokenizer-release oracles (exactly once, after retirement, none while live) and an opt-in real-model floor probe; no existing assertion removed; sources limited to owner words and a reproduced defect, agent scenarios disclaimed. Cited evidence files exist."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16e9d-72db-7292-a2a8-81e42647d8d9",
+  "verdict": "accept",
+  "digest": "sha256:4589f7df8e795fe758b8b2f361776968658a613b0f48c6ac03a13448aef0b98f",
+  "note": "Reviewed all six flagged files against merge base 8292c62e381684eb506c96f50990b212ea1fb879. New lifecycle/measurement oracles and three instrumentation adaptations match their entries; supplied owner words only, cited evidence exists and validates. Historical fail-before at 9c533e8e89 is not claimed as merge-base verification. Test-intent acceptance only; no Gradle/application execution. Node subprocess stdin adapted to files for sandbox EPERM; commands, input bytes and exit failures preserved."
+}
+```
