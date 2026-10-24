@@ -319,3 +319,14 @@ browser. Private fixture servers/browsers were closed; created short profile/tem
 shared clone were removed. Changes are uncommitted.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "q7659ezy",
+  "verdict": "accept",
+  "digest": "sha256:03a2cf764d7b82404b3cd532c0452154b1f9adb0db3752edfabd2d26eb1eaa4e",
+  "note": "Agent-adopted scenarios fit the quoted design delegation. Fresh default-link UI and Java evidence reproduces the specified assertion failures; preservation passes. Private CPU Engines and owned headless Chromium reproduce the fc34 storage failures and pass on ec68, with Retry, follow-up, reload, two tabs, Stop, native restart and readers checked. Same-family independence is a separate verifier session. Original long-temp Unix fixture failures on both revisions are retained; the class passes in private short temp on both. D10 retained as instructed because the Engine diff is empty."
+}
+```
