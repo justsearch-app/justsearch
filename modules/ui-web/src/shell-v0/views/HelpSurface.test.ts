@@ -27,6 +27,13 @@ import { bootstrapAggregateSubstrate, __resetBootstrap } from '../aggregate-subs
 import { __clearAggregateRegistry } from '../aggregate-substrate/aggregateRegistry.js';
 import './HelpSurface.js';
 import type { OpSuccessEventDetail } from '../components/OpButton.js';
+import { OperationClient } from '../operations/OperationClient.js';
+import { openExternalUrl } from '../plugin-api/capabilities/platform.js';
+
+vi.mock('../plugin-api/capabilities/platform.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../plugin-api/capabilities/platform.js')>(),
+  openExternalUrl: vi.fn(),
+}));
 
 /** Concatenate text across the element's whole shadow subtree (nested shadow roots included). */
 function collectShadowText(host: Element): string {
@@ -319,5 +326,163 @@ describe('HelpSurface — redacted diagnostic summary copy', () => {
     const text = collectShadowText(el);
     expect(text).toContain('Could not copy diagnostic summary.');
     expect(text).not.toContain(hostileError);
+  });
+});
+
+describe('HelpSurface — Report a problem', () => {
+  const reportUrl = 'https://github.com/justsearch-app/justsearch/issues/new?template=bug_report.md';
+  const summary = 'PRIVATE-DIAGNOSTIC-REPORT-SENTINEL /home/private/files';
+  const copyFailure = "Couldn't copy the summary. Use Copy diagnostic summary, then paste it into the report.";
+
+  beforeEach(() => {
+    vi.mocked(openExternalUrl).mockReset().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    document.querySelectorAll('jf-help-surface').forEach((el) => el.remove());
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function mockSummary() {
+    return vi.spyOn(OperationClient.prototype, 'invokeWithConsent').mockResolvedValue({
+      success: true,
+      message: 'backend message must not be rendered',
+      structuredData: { summary },
+    });
+  }
+
+  async function report(el: HelpElement): Promise<void> {
+    const button = Array.from(el.shadowRoot!.querySelectorAll('button'))
+      .find((candidate) => candidate.textContent?.trim() === 'Report a problem');
+    expect(button, 'Report a problem must be a native keyboard-accessible button').toBeDefined();
+    expect(button!.type).toBe('button');
+    expect(button!.disabled).toBe(false);
+    expect(button!.tabIndex).toBe(0);
+    button!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+  }
+
+  it('C1-C2 invokes the summary once, copies it, and opens only the exact template URL', async () => {
+    const invoke = mockSummary();
+    const fetchImpl = vi.fn();
+    vi.stubGlobal('fetch', fetchImpl);
+    const el = await mountHelp();
+    el.copyText = vi.fn().mockResolvedValue(true);
+
+    await report(el);
+
+    expect(invoke.mock.calls).toEqual([
+      ['core.copy-diagnostic-summary', { args: {} }, { consented: false }],
+    ]);
+    expect(el.copyText).toHaveBeenCalledExactlyOnceWith(summary);
+    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(reportUrl);
+    expect(invoke.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(el.copyText).mock.invocationCallOrder[0]!);
+    expect(vi.mocked(el.copyText).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(openExternalUrl).mock.invocationCallOrder[0]!);
+    const openedUrl = vi.mocked(openExternalUrl).mock.calls[0]![0];
+    expect(Array.from(new URL(openedUrl).searchParams)).toEqual([['template', 'bug_report.md']]);
+    expect(openedUrl).not.toContain(summary);
+    expect(openedUrl).not.toContain(encodeURIComponent(summary));
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const receipt = el.shadowRoot!.querySelector('[aria-live="polite"]');
+    expect(receipt?.textContent).toBe('Summary copied. Paste it into the report, check it, then submit on GitHub.');
+    expect(collectShadowText(el)).not.toContain(summary);
+    expect(collectShadowText(el)).not.toContain('backend message must not be rendered');
+  });
+
+  it('C3 still opens the report when the summary operation fails', async () => {
+    mockSummary().mockRejectedValue(new Error(summary));
+    const el = await mountHelp();
+    el.copyText = vi.fn();
+
+    await report(el);
+
+    expect(el.copyText).not.toHaveBeenCalled();
+    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(reportUrl);
+    expect(collectShadowText(el)).toContain(copyFailure);
+    expect(collectShadowText(el)).not.toContain(summary);
+  });
+
+  it.each(['refuses', 'throws'] as const)('C3 still opens the report when the clipboard %s', async (failure) => {
+    mockSummary();
+    const el = await mountHelp();
+    el.copyText = failure === 'refuses'
+      ? vi.fn().mockResolvedValue(false)
+      : vi.fn().mockRejectedValue(new Error(summary));
+
+    await report(el);
+
+    expect(el.copyText).toHaveBeenCalledExactlyOnceWith(summary);
+    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(reportUrl);
+    expect(collectShadowText(el)).toContain(copyFailure);
+    expect(collectShadowText(el)).not.toContain(summary);
+  });
+
+  it('C3 treats a missing summary as a copy failure and opens the report', async () => {
+    mockSummary().mockResolvedValue({ success: true, message: summary });
+    const el = await mountHelp();
+    el.copyText = vi.fn();
+
+    await report(el);
+
+    expect(el.copyText).not.toHaveBeenCalled();
+    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(reportUrl);
+    expect(collectShadowText(el)).toContain(copyFailure);
+    expect(collectShadowText(el)).not.toContain(summary);
+  });
+
+  it.each([true, false])('C4 shows the URL as selectable text if opening fails (copied: %s)', async (copied) => {
+    mockSummary();
+    vi.mocked(openExternalUrl).mockRejectedValue(new Error(summary));
+    const el = await mountHelp();
+    el.copyText = vi.fn().mockResolvedValue(copied);
+
+    await report(el);
+
+    expect(openExternalUrl).toHaveBeenCalledExactlyOnceWith(reportUrl);
+    const receipt = el.shadowRoot!.querySelector<HTMLElement>('[aria-live="polite"]')!;
+    expect(receipt.textContent).toBe(`Couldn't open your browser. Open this page: ${reportUrl}`);
+    expect(getComputedStyle(receipt).userSelect).toBe('text');
+    expect(collectShadowText(el)).not.toContain(summary);
+  });
+
+  it('C4 reports a blocked popup through the shared browser opener', async () => {
+    mockSummary();
+    vi.stubGlobal('__TAURI_INTERNALS__', undefined);
+    const browserOpen = vi.fn().mockReturnValue(null);
+    vi.stubGlobal('open', browserOpen);
+    const platform = await vi.importActual<typeof import('../plugin-api/capabilities/platform.js')>(
+      '../plugin-api/capabilities/platform.js',
+    );
+    vi.mocked(openExternalUrl).mockImplementation(platform.openExternalUrl);
+    const el = await mountHelp();
+    el.copyText = vi.fn().mockResolvedValue(true);
+
+    await report(el);
+
+    expect(browserOpen).toHaveBeenCalledExactlyOnceWith(reportUrl, '_blank');
+    expect(collectShadowText(el)).toContain(`Couldn't open your browser. Open this page: ${reportUrl}`);
+  });
+
+  it('C5 preserves export arguments and success/error receipts without opening a report', async () => {
+    const el = await mountHelp();
+    const operation = el.shadowRoot!.querySelector<HTMLElement & { args: unknown }>(
+      'jf-operation[operation-id="core.export-diagnostics"]',
+    )!;
+    expect(operation.getAttribute('context')).toBe('button');
+    expect(operation.args).toEqual({ feTelemetry: { wireDrift: expect.any(Object) } });
+
+    operation.dispatchEvent(new CustomEvent('op-success', {
+      detail: { structuredData: { path: '/local/diagnostics.zip' } },
+    }));
+    await el.updateComplete;
+    expect(collectShadowText(el)).toContain('Saved to: /local/diagnostics.zip');
+
+    operation.dispatchEvent(new CustomEvent('op-error', { detail: { message: 'Disk full' } }));
+    await el.updateComplete;
+    expect(collectShadowText(el)).toContain('Disk full');
+    expect(collectShadowText(el)).not.toContain('/local/diagnostics.zip');
+    expect(openExternalUrl).not.toHaveBeenCalled();
   });
 });

@@ -106,7 +106,7 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
     scriptFetch([
       {
         status: 200,
-        body: { memories: [{ id: "old", content: "stale fact" }] },
+        body: { locked: false, memories: [{ id: "old", content: "stale fact" }] },
       },
       { status: 503, body: {} },
     ]);

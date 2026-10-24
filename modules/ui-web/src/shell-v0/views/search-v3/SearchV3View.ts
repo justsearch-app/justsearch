@@ -3947,6 +3947,7 @@ export class SearchV3View extends JfElement {
       return;
     }
     if (id === SV3_COMMAND_EXPORT_MARKDOWN) this.exportActiveConversation();
+    if (id === 'cmd-memory') requestSurfaceNavigation('core.memory-surface');
   }
 
   private get composer(): Sv3Composer | null {

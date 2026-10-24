@@ -11,6 +11,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.app.api.indexing.AcceptedProjection;
@@ -395,8 +396,10 @@ final class AcceptedProjectionBroadReplayTest extends LuceneExecutorTestBase {
   }
 
   private static boolean put(SqliteJobQueue queue, SwitchBufferCapableQueue.SwitchBufferOp op) {
+    String payload = "DELETE_PREFIX".equals(op.op())
+        ? new PathPrefixScope(op.payload(), List.of()).encode() : op.payload();
     return queue.putSwitchBufferForGeneration(
-        GENERATION, op.key(), op.op(), op.payload());
+        GENERATION, op.key(), op.op(), payload);
   }
 
   private static Optional<KnowledgeServerMigrationOps.StrictReplay> prepare(

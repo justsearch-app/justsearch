@@ -378,10 +378,10 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
   }
 
-  /** Drops cached answers and records owned by the removed root, retaining declared children. */
-  void forgetUnder(String pathPrefix, java.util.function.Predicate<Path> ownsPath) throws IOException {
+  /** Drops cached answers and records in the removed root's frozen scope, retaining declared children. */
+  void forgetUnder(String pathPrefix, java.util.List<String> excludedSubtrees) throws IOException {
     forgetAnswers();
-    volumes.forgetUnder(pathPrefix, ownsPath);
+    volumes.forgetUnder(pathPrefix, excludedSubtrees);
   }
 
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked

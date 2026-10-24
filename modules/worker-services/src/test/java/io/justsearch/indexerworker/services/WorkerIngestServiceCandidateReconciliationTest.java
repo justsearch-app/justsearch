@@ -340,9 +340,13 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     order.verify(fixture.queue).deleteByExactPath(direct);
     order.verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_ID);
+    var prefixReceipt = ArgumentCaptor.forClass(String.class);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
-        fixture.buildingGeneration, IngestResponses.switchBufferPrefixKey(normalizedPrefix),
-        "DELETE_PREFIX", normalizedPrefix);
+        eq(fixture.buildingGeneration), eq(IngestResponses.switchBufferPrefixKey(normalizedPrefix)),
+        eq("DELETE_PREFIX"), prefixReceipt.capture());
+    var scope = io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(prefixReceipt.getValue());
+    assertEquals(normalizedPrefix, scope.prefix());
+    assertEquals(List.of(), scope.excludedSubtrees());
     order.verify(fixture.candidateWriter).deleteByPathPrefix(prefix);
     order.verify(fixture.queue).deleteByPathPrefix(prefix);
     order.verify(fixture.servingCommit).commitAndTrack(

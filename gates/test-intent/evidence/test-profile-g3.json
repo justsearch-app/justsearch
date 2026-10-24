@@ -1,0 +1,33 @@
+{
+  "scenario": "G3",
+  "createdAt": "2026-10-23T04:11:08.574771+00:00",
+  "baseline": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+  "command": "HOME=<scratch>/g3-fake-home GRADLE_USER_HOME=/home/elias/.gradle ./gradlew :modules:app-engine:test --tests io.justsearch.app.engine.EngineExclusionApplyPublicationTest --rerun -PskipWebBuild=true --console=plain",
+  "scratchHarnessReversion": "--- a/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java\n+++ b/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java\n@@ -158,8 +158,6 @@\n     previousUserHome = System.getProperty(\"user.home\");\n     ownsProperties = true;\n     try {\n-      System.setProperty(\"justsearch.data.dir\", dataDir.toAbsolutePath().toString());\n-      System.setProperty(\"user.home\", dataDir.resolve(\"home\").toAbsolutePath().toString());\n       openEngine();\n     } catch (Exception | Error failure) {\n       try { close(); }\n",
+  "harnessRestored": true,
+  "result": {
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "sentinelSha256BeforeAndAfter": "47016c4da578735f59d78e7136eeff1d975201b8dab47a480147ed24b5664fd6",
+  "fakeHomeEntriesAfter": [
+    ".justsearch",
+    ".justsearch/watched_roots.json"
+  ],
+  "watchedRootsLocation": "modules/app-engine/build/test-profile/test/home/.justsearch/watched_roots.json",
+  "watchedRootsInTaskHome": true,
+  "watchedRootsContainsFixturePath": true,
+  "watchedRootsSha256": "136081b36ce3f2f3f738b5365e5e6796a4ff7701a5f27693840c0078b4950d48",
+  "evidenceReads": "Fake sentinel, scratch task profile, scratch JUnit XML and harness source only; no real ~/.justsearch access.",
+  "selectionNote": "EngineSyncDirectoryTest initially passed 10 tests but no longer persists root membership. The class above uses the actual addWatchedPath route.",
+  "guardCommand": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot bash <own-script> <primary-checkout> <scratch>",
+  "temporaryRunScript": "#!/usr/bin/env bash\nset -u\nsource_root=$1\nscratch=$2\npython3 \"$source_root/tmp/prepare-final-g3.py\" || exit\nrestore_harness() {\n  cp \"$source_root/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java\" \"$scratch/g3/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java\"\n}\ntrap restore_harness EXIT\nexport HOME=\"$scratch/g3-fake-home\" GRADLE_USER_HOME=/home/elias/.gradle\n./gradlew :modules:app-engine:test --tests io.justsearch.app.engine.EngineExclusionApplyPublicationTest --rerun -PskipWebBuild=true --console=plain\n",
+  "temporaryPreparationScript": "import difflib\nimport shutil\nfrom pathlib import Path\n\nroot = Path(__file__).resolve().parent.parent\nscratch = Path((root / 'tmp/profile-guard-scratch').read_text().strip())\nrelative = Path('modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java')\nsource = (root / relative).read_text()\nmodified = source.replace('      System.setProperty(\"justsearch.data.dir\", dataDir.toAbsolutePath().toString());\\n', '').replace('      System.setProperty(\"user.home\", dataDir.resolve(\"home\").toAbsolutePath().toString());\\n', '')\nassert source != modified and source.count('      System.setProperty(\"justsearch.data.dir\", dataDir.toAbsolutePath().toString());\\n') == 1\nassert (scratch / 'g3-fake-home/.justsearch/watched_roots.json').read_bytes() == (scratch / 'g3-sentinel-before.bin').read_bytes()\nprofile = scratch / 'g3/modules/app-engine/build/test-profile/test'\nif profile.exists():\n    shutil.rmtree(profile)\n(scratch / 'g3' / relative).write_text(modified)\n(scratch / 'g3-harness-reversion.patch').write_text(''.join(difflib.unified_diff(source.splitlines(True), modified.splitlines(True), fromfile='a/' + str(relative), tofile='b/' + str(relative))))\nprint('Final G3: task profile cleared; sentinel unchanged; only two #885 setters removed in disposable clone.')\n",
+  "finalHarnessSha256": "b8642af54c451c4374cfc80b7fad0be216f88a49143460d08370c7d54eb3a354",
+  "guardSha256": "87c623f0e00da93f761b629232edb7692bd24610b462834b9288025b43771020",
+  "resolvedFixtureDataContribution": [
+    "06:10:32.911 [Test worker] INFO io.justsearch.configuration.resolved.ResolvedConfigBuilder -- Config: justsearch.data.dir=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-guard-y7UYTd/g3/modules/app-engine/build/tmp/test-jvm/test/junit-15157093961889783931/data (test_fixture:isolated_data, ordinal=500)"
+  ]
+}

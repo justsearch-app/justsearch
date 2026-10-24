@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T01:01:42.186Z",
+  "revision": "f3bc416ae4f5de4f25e3536167e3c8593c9264bc",
+  "tree": "f8937f6bb3951f04687c119a3998909f01a1fcdc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-629038-1792803699490.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2694
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (null)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (null)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (user_paused)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (user_paused)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R3 preserves normal audience visibility outside recovery (game_mode)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (game_mode)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:aaa5940c54b269fad4df6d5e7f0372d55585aa8f72ec9a83c479a77b950c7227"
+}

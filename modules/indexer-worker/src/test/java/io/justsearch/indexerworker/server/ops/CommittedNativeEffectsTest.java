@@ -408,6 +408,8 @@ final class CommittedNativeEffectsTest {
         .thenReturn(true);
     when(counts.countPathPrefixExcludingAcceptedSurvivorsStrict(
         anyString(), anyList(), anyList())).thenCallRealMethod();
+    when(counts.countPathPrefixExcludingAcceptedSurvivorsStrict(
+        anyString(), anyList(), anyList(), anyList())).thenCallRealMethod();
     when(counts.countCollectionExcludingAcceptedSurvivorsStrict(
         anyString(), anyList(), anyList())).thenCallRealMethod();
     when(counts.countByIdAndChunksStrict(anyString())).thenCallRealMethod();

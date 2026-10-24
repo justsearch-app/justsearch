@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.SearchRequest;
 import io.justsearch.app.api.SearchResponse;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,39 +32,52 @@ final class LauncherInternalsTest {
   }
 
   @AfterEach
-  void restoreProperty() throws Exception {
+  void restoreProperty() {
     if (previousDataDir == null) {
       System.clearProperty("justsearch.data.dir");
     } else {
       System.setProperty("justsearch.data.dir", previousDataDir);
     }
-    Path defaultDir = Path.of("build", "applauncher-data");
-    if (Files.exists(defaultDir)) {
-      try (var stream = Files.walk(defaultDir)) {
-        stream.sorted(java.util.Comparator.reverseOrder())
-            .forEach(
-                p -> {
-                  try {
-                    Files.deleteIfExists(p);
-                  } catch (IOException ignored) {
-                    // best effort cleanup
-                  }
-                });
-      }
-    }
   }
 
   @Test
   void ensureDataDirCreatesDefaultDirectory() throws Exception {
-    System.clearProperty("justsearch.data.dir");
-    Launcher launcher = new Launcher();
-    Method method = Launcher.class.getDeclaredMethod("ensureDataDir");
-    method.setAccessible(true);
-    method.invoke(launcher);
-    String configured = System.getProperty("justsearch.data.dir");
-    Path configuredPath = Path.of(configured);
-    assertTrue(configuredPath.endsWith(Path.of("build", "applauncher-data")));
-    assertTrue(Files.isDirectory(configuredPath));
+    // The default branch needs an absent data environment; keep that absence local to this fixture.
+    Path home = Files.createDirectories(tempDir.resolve("home"));
+    List<String> arguments = List.of(
+        "-Duser.home=" + home, "-Djustsearch.data.dir=", "-cp",
+        System.getProperty("java.class.path"), DefaultDirectoryProbe.class.getName());
+    Path argFile = tempDir.resolve("default-directory.args");
+    Files.write(argFile, arguments.stream()
+        .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+        .toList());
+    String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
+    Path output = tempDir.resolve("default-directory.log");
+    var builder = new ProcessBuilder(
+        Path.of(System.getProperty("java.home"), "bin", executable).toString(), "@" + argFile)
+        .directory(tempDir.toFile()).redirectErrorStream(true).redirectOutput(output.toFile());
+    builder.environment().remove("JUSTSEARCH_DATA_DIR");
+    Process child = builder.start();
+    try {
+      assertTrue(child.waitFor(20, TimeUnit.SECONDS), "default-directory fixture must exit");
+      assertEquals(0, child.exitValue(), Files.readString(output));
+    } finally {
+      if (child.isAlive()) { child.destroyForcibly(); child.waitFor(); }
+    }
+  }
+
+  public static final class DefaultDirectoryProbe {
+    public static void main(String[] args) throws Exception {
+      System.clearProperty("justsearch.data.dir");
+      Launcher launcher = new Launcher();
+      Method method = Launcher.class.getDeclaredMethod("ensureDataDir");
+      method.setAccessible(true);
+      method.invoke(launcher);
+      String configured = System.getProperty("justsearch.data.dir");
+      Path configuredPath = Path.of(configured);
+      assertTrue(configuredPath.endsWith(Path.of("build", "applauncher-data")));
+      assertTrue(Files.isDirectory(configuredPath));
+    }
   }
 
   @Test
