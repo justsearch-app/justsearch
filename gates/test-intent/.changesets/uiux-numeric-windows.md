@@ -234,3 +234,16 @@ files. No frontend dependency tree was written.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "9bmd88jv",
+  "verdict": "accept",
+  "digest": "sha256:338719eb524f4240855859d57e226383162d0351cba8a769d5c0b0fdafb28a71",
+  "note": "Expectations follow the plain-number decision and delegated NX4 sources. Fresh default-link evidence: all fourteen candidate checks pass; seven repairs assertion-fail on main, two normalization repairs assertion-fail on 631837df7 and pass on main. Independent Worker probes preserve 440 derived pairs and repair boundary/Unicode cases. This accepts test intent, not the final product verdict; exact identity of the aggregate-only 424-row artifact is unverified. Independence is a separate session within the available model family."
+}
+```
