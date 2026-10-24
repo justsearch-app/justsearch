@@ -2000,3 +2000,14 @@ Round19 exact e46593561 before: three real java.io source cases fail at attempts
   "note": "U19/K2 regresses: real FileInputStream permission failures on the source are deferred with zero attempts, while baseline charges one."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16df9-0e08-7783-ae89-a35d95526018",
+  "verdict": "reject",
+  "digest": "sha256:35a1af07dc7706119b6a08fafb47ab39e8c19a19676e6476e65f3a197ccaff93",
+  "note": "Reject: transient java.io source failures defer uncounted, and a nonfatal canary error strands PROCESSING claims."
+}
+```
