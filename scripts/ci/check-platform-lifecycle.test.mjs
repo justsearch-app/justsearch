@@ -225,7 +225,7 @@ test('the real register resolves every seeded platform from its live source', ()
     result.resolutions.map(({ id, pin }) => `${id}=${pin}`),
     [
       'jdk=25',
-      'gradle=9.8.0',
+      'gradle=9.8.2',
       'lucene=10.4.0',
       'tauri=2.11.5',
       'webview2=0.38.2',
