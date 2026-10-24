@@ -2,6 +2,8 @@
 package io.justsearch.indexerworker.server.ops;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -283,7 +285,7 @@ final class MigrationEnumerationCompletenessTest {
       assertEquals(1, queue.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file, 6)), "books"));
       var counters = new Counters();
       var context = new KnowledgeServerMigrationOps.EnqueueContext(
-          List.of(new ResolvedConfig.FileSource(file, null)), queue, () -> true, () -> manager, counters.filesSeen,
+          List.of(new ResolvedConfig.FileSource(file, "books")), queue, () -> true, () -> manager, counters.filesSeen,
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
       assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
@@ -317,10 +319,23 @@ final class MigrationEnumerationCompletenessTest {
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
 
-      assertThrows(IOException.class, () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      // Public enumeration callers can omit the root authority entirely. That identity is
+      // genuinely unknown; a declared FileSource(file, null) is the known default binding.
+      var unknown = new KnowledgeServerMigrationOps.EnqueueContext(
+          null, queue, () -> true, () -> manager, counters.filesSeen,
+          counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+      assertThrows(IOException.class, () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(unknown));
       assertEquals(1, queue.listSwitchBufferOpsStrict().size(),
-          "a refused baseline admission retains the accepted delete");
+          "missing root authority retains the accepted delete and admits nothing");
       assertTrue(queue.pollPending(1).isEmpty());
+
+      assertEquals(1, assertDoesNotThrow(() -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context)),
+          "deleting books cannot suppress an authoritative default-collection root");
+      assertEquals(2, queue.listSwitchBufferOpsStrict().size());
+      assertNull(queue.pollPending(1).getFirst().collection());
+      assertTrue(queue.listSwitchBufferOpsStrict().stream()
+          .anyMatch(op -> "DELETE_COLLECTION".equals(op.op()) && "books".equals(op.payload())));
     }
   }
 

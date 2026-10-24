@@ -35,12 +35,30 @@ class WorkerIngestionAuthorityTest {
         new JobQueue.IndexJob(file, null, null, "old-scan", "old-unit"),
         new JobQueue.IndexJob(Path.of(SwitchBufferUpsert.decode(file.toString()).path()), null))) {
       var admission = authority.admit(claim);
-      assertEquals(SourceAdmissionAction.SKIP_DONE, admission.action());
+      assertEquals(SourceAdmissionAction.SKIP_DONE, admission.action(),
+          "ordinary unscoped jobs retain main retirement without reading the source");
       assertEquals(IngestionReasonCodes.MISSING_INGESTION_BOUNDARY, admission.outcome().reasonCode());
+      assertEquals(io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SKIPPED_POLICY,
+          admission.outcome().outcomeClass());
+      assertEquals(io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE,
+          admission.outcome().retryPolicy());
     }
     // Fresh discovery still observes exclusions; an intentional explicit file has its own boundary.
     assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(rooted(file, root)).action());
     assertEquals(SourceAdmissionAction.ADMIT, authority.admit(rooted(file, file)).action());
+  }
+
+  @Test
+  void onlyUpgradeUnscopedDebtUsesTheBoundedRetryLadder() throws Exception {
+    Path file = tempDir.resolve("unreadable.txt");
+    var authority = new WorkerIngestionAuthority();
+    for (String revision : java.util.List.of("release030/job/123/unit", "release030-unscoped/unit")) {
+      var admission = authority.admit(new JobQueue.IndexJob(file, null, null, null, revision));
+      assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
+      assertEquals(IngestionReasonCodes.MISSING_INGESTION_BOUNDARY, admission.outcome().reasonCode());
+      assertEquals(io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+          admission.outcome().retryPolicy(), "upgrade uncertainty has the existing seven-day bound");
+    }
   }
 
   @Test

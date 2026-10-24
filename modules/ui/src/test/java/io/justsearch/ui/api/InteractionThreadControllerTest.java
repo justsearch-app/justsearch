@@ -39,6 +39,19 @@ import tools.jackson.databind.json.JsonMapper;
 final class InteractionThreadControllerTest {
 
   @Test
+  void recordedSelectionIdentityReachesTheThreadResponse() {
+    var store = mock(ConversationStore.class);
+    when(store.loadHistory("trace")).thenReturn(List.of(Map.of(
+        "id", "question", "role", "user", "content", "Explain briefly. Trace: sparse #2 12.40",
+        "shapeId", "core.summarize", "selectionKind", "search-trace")));
+    var agent = mock(AgentService.class);
+    when(agent.threadProjection(eq("trace"), any())).thenReturn(ThreadProjection.of(List.of()));
+    var attributes = invokeGet(newController(store, agent), "trace").get("events").get(0).get("attributes");
+    assertTrue(attributes.has("selectionKind"), "the request selection kind must reach reload without inspecting editable content");
+    assertEquals("search-trace", attributes.get("selectionKind").asString());
+  }
+
+  @Test
   void recordedRetrievalExplanationReachesTheThreadResponse() {
     var store = mock(ConversationStore.class);
     when(store.loadHistory("conv-retrieval")).thenReturn(List.of(Map.of(

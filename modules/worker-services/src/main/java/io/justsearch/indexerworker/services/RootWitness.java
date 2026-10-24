@@ -57,9 +57,30 @@ public final class RootWitness implements SourcePresence.RootCheck {
   private final ConcurrentHashMap<Path, Answer> admitted = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<Path, FileFolderAnswer> fileFolders = new ConcurrentHashMap<>();
 
+  private volatile java.util.function.Predicate<Path> release030ExactFiles = ignored -> false;
+
   private record Answer(boolean yes, long expiresNanos) {}
 
   private record FileFolderAnswer(boolean vouching, Answer answer) {}
+
+  void useRelease030ExactFiles(java.util.function.Predicate<Path> exactFiles) {
+    release030ExactFiles = java.util.Objects.requireNonNull(exactFiles, "exactFiles");
+  }
+
+  @Override
+  public boolean isRelease030ExactFile(Path file) {
+    if (!release030ExactFiles.test(file)) return false;
+    Path key = normalize(file);
+    Path folder = key == null ? null : key.getParent();
+    // An original exact admission fills an authority gap; it never overrides a root or an
+    // explicit-folder record, including unreadable evidence. Normal admission checks it instead.
+    if (folder == null || declaredRootCovers.test(folder)) return false;
+    try {
+      return volumes.recordedFor(folder).isEmpty() && volumes.recordedFileFolder(folder).isEmpty();
+    } catch (IOException unreadable) {
+      return false;
+    }
+  }
 
   private RootWitness(RootVolumeLedger volumes, Function<Path, RootIdentity> registered,
       java.util.function.Predicate<Path> declaredRootCovers) {

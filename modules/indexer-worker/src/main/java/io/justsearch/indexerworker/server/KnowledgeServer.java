@@ -43,6 +43,7 @@ import io.justsearch.indexerworker.util.IndexRootLock;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.Release030RecoveryState;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
@@ -366,6 +367,8 @@ public final class KnowledgeServer implements Closeable {
   /** How often a root the committed boot deferred is checked for its recorded volume (round 7). */
   private static final long DEFERRED_BOOT_ROOT_CHECK_MS = 10_000L;
   private volatile java.util.concurrent.ScheduledFuture<?> deferredBootRootTask;
+  private Release030RecoveryState release030Recovery;
+  private java.util.concurrent.ScheduledFuture<?> release030RecoveryTask;
   private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
@@ -1769,9 +1772,7 @@ public final class KnowledgeServer implements Closeable {
         if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
           startMigrationEnumeratorBestEffort(rc);
         }
-        if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
-          startMigrationCutoverMonitorBestEffort();
-        }
+
       }
 
       // Schema validation: ensure all indexable fields exist in catalog (via ingest schema).
@@ -1842,6 +1843,20 @@ public final class KnowledgeServer implements Closeable {
       appServices = newAppServices();
       wireAppServicesPostConstruction(appServices);
       seedRootVolumesAfterUpgrade();
+      prepareRelease030Recovery();
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+        var nativeState = indexGenerationManager.readStateBestEffort();
+        if (nativeState != null && "FAILED".equals(nativeState.migration_state())
+            && buildingIndexPath != null && release030Recovery != null
+            && jobQueue instanceof SqliteJobQueue queue
+            && release030Recovery.preparedFor(queue.release030RecoveryIdentity())
+            && queue.hasRelease030IndependentDebt()) {
+          // The same retained candidate can now drain without waiting on never-indexed legacy
+          // exhausted debt. Reuse it; certification, failure limits and publication fences stay.
+          indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
+        }
+        startMigrationCutoverMonitorBestEffort();
+      }
 
       // 3.6 Embedding compatibility — MUST resolve BEFORE anything can commit (tempdoc 819 A).
       // This used to live in initDeferredModels() (async, behind multi-second ONNX composition),
@@ -1863,6 +1878,10 @@ public final class KnowledgeServer implements Closeable {
       }
       recoverStuckJobsAdmitted(jobQueue, null);
       startStuckJobReaper(jobQueue);
+      if (release030Recovery != null) {
+        release030RecoveryTask = stuckJobReaper.scheduleWithFixedDelay(
+            this::recoverRelease030RootsSafely, 1_000L, 10_000L, TimeUnit.MILLISECONDS);
+      }
 
 
       // Dev hot-reload manager (Phase 2, tempdoc 305)
@@ -3472,6 +3491,12 @@ public final class KnowledgeServer implements Closeable {
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
+    if (svc instanceof DefaultWorkerAppServices producer) {
+      // Configured roots belong to every replacement producer, including the deferred writer.
+      var configuration = producer.resolvedConfig();
+      svc.ingestService().seedConfiguredRoots(
+          configuredRoots(configuration == null ? null : configuration.collections()));
+    }
     svc.ingestService().setProjectionSemanticDeferralSupplier(() -> {
       // A FENCED source writer is open for recovery replay only. A writable Lucene runtime
       // does not grant admission to new projections before recorded authority is settled.
@@ -7254,6 +7279,92 @@ public final class KnowledgeServer implements Closeable {
         startupConfiguration == null ? null : startupConfiguration.collections()));
   }
 
+  /** No legacy job can be claimed between the lossless migration and this atomic repair. */
+  private void prepareRelease030Recovery() throws IOException, SQLException {
+    if (!bootRootBindingsBound || !(jobQueue instanceof SqliteJobQueue queue)
+        || !(appServices instanceof DefaultWorkerAppServices)) return;
+    release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
+    if (release030Recovery == null) return;
+    // Boundaries and the selective jobs repair do not depend on the index migration phase.
+    // Preparing before claims lets native cutover drain; directory recovery still waits for IDLE.
+    if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) {
+      List<Path> roots = new ArrayList<>(bootRootBindings.stream().map(RootBinding::path).toList());
+      var collections = startupConfiguration.collections();
+      for (var collection : collections.items()) roots.addAll(collection.roots());
+      // Unlike a person's unavailable root, an absent optional bundled-help directory is not
+      // outstanding user work. Some launch modes deliberately do not install that source.
+      var help = collections.bundledHelp();
+      if (help != null && Files.isDirectory(help.path())) roots.add(help.path());
+      var unreadableBlue = new AtomicBoolean();
+      String identity = queue.prepareRelease030Recovery(roots, path -> {
+        try {
+          return searchLifecycle != null && searchLifecycle.indexCountOps()
+              .countByFieldOrThrow(SchemaFields.DOC_ID,
+                  io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(path)) == 0;
+        } catch (IOException | RuntimeException unreadable) {
+          if (unreadableBlue.compareAndSet(false, true))
+            log.warn("Cannot prove legacy exhausted files absent from Blue; keeping cutover protection", unreadable);
+          return false;
+        }
+      });
+      release030Recovery.prepared(roots, identity);
+    }
+    queue.prepareRelease030ExplicitFiles();
+  }
+
+  private void recoverRelease030RootsSafely() {
+    if (closeStarted || release030Recovery == null
+        || !(jobQueue instanceof SqliteJobQueue queue)
+        || !(appServices instanceof DefaultWorkerAppServices services)) return;
+    var state = indexGenerationManager.readStateBestEffort();
+    if (state == null || !"IDLE".equals(state.migration_state())) return;
+    try {
+      if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) prepareRelease030Recovery();
+      if (!(ingestLifecycle instanceof RunningRuntime runtime) || !runtime.isAcceptingWrites()) return;
+      boolean explicitReady = queue.prepareRelease030ExplicitFiles();
+      for (Path root : release030Recovery.pendingRoots()) {
+        if (closeStarted) return;
+        try {
+          var currentRoots = new ArrayList<>(exclusionRoots.get());
+          currentRoots.addAll(configuredRoots(startupConfiguration.collections()));
+          if (currentRoots.stream().noneMatch(current -> current.toAbsolutePath().normalize()
+              .equals(root.toAbsolutePath().normalize()))) {
+            release030Recovery.completed(root); // A removed root no longer authorizes a walk.
+            continue;
+          }
+          if (!release030Recovery.ready(root, System.currentTimeMillis())) continue;
+          var result = services.ingestService().recoverRelease030Root(root, release030Collection(root),
+              () -> closeStarted || Thread.currentThread().isInterrupted());
+          if (result.getError().isBlank() && !result.getSkipped()
+              && !result.getDeleteDetectionUnverified()) release030Recovery.completed(root);
+          else if (result.getDeleteDetectionUnverified()) release030Recovery.deferred(root, System.currentTimeMillis());
+        } catch (IOException | RuntimeException unavailable) {
+          log.warn("0.3.0 recovery of {} will resume: {}", root, unavailable.toString());
+        }
+      }
+      if (explicitReady && release030Recovery.pendingRoots().isEmpty() && release030Recovery.finish()) {
+        release030Recovery = null;
+        if (release030RecoveryTask != null) release030RecoveryTask.cancel(false);
+        log.info("0.3.0 queued-work recovery complete; no index rebuild was needed");
+      }
+    } catch (IOException | SQLException | RuntimeException unavailable) {
+      log.warn("0.3.0 queued-work recovery will resume: {}", unavailable.toString());
+    }
+  }
+
+  private String release030Collection(Path root) {
+    for (var binding : bootRootBindings) {
+      if (binding.path().toAbsolutePath().normalize().equals(root)) return binding.collection();
+    }
+    for (var collection : startupConfiguration.collections().items()) {
+      if (collection.roots().stream().anyMatch(path -> path.toAbsolutePath().normalize().equals(root))) {
+        return collection.name();
+      }
+    }
+    var help = startupConfiguration.collections().bundledHelp();
+    return help != null && help.path().equals(root) ? help.collection() : null;
+  }
+
   /** The configured collection roots and the bundled help folder: configuration, not added roots. */
   private static List<Path> configuredRoots(ResolvedConfig.Collections collections) {
     List<Path> roots = new ArrayList<>();
@@ -9565,7 +9676,8 @@ public final class KnowledgeServer implements Closeable {
         // Replay can enqueue file work. The already-running Green writer drains it while new
         // producer effects wait at the fence; the pause acknowledges its final batch boundary.
         while (true) {
-          var counts = jobQueue.jobStateCountsStrict();
+          var counts = recorded == null && jobQueue instanceof SqliteJobQueue queue
+              ? queue.nativeCutoverCountsStrict() : jobQueue.jobStateCountsStrict();
           if (counts.processingCount() == 0 && counts.pendingReadyCount() == 0
               && counts.pendingBackoffCount() == 0) break;
           if (System.nanoTime() >= deadline || closeStarted) return null;
@@ -9573,11 +9685,13 @@ public final class KnowledgeServer implements Closeable {
         }
         if (!current.pauseProducerForCutover(10_000)) return null;
         paused = true;
-        var settled = jobQueue.jobStateCountsStrict();
+        var settled = recorded == null && jobQueue instanceof SqliteJobQueue queue
+            ? queue.nativeCutoverCountsStrict() : jobQueue.jobStateCountsStrict();
         if (settled.processingCount() != 0 || settled.pendingReadyCount() != 0
             || settled.pendingBackoffCount() != 0 || !current.mutationAdmission().replayCertain()
             || (recorded == null && cutoverMaxFailedJobs >= 0
-                && settled.failedCount() > cutoverMaxFailedJobs)
+                && Math.max(0L, settled.failedCount() - jobQueue.unownedFailureCount())
+                    > cutoverMaxFailedJobs)
             || !finalizeEmbeddingRebuildBeforeCutover()) return null;
         migrationTransition("migration-green-drained");
         current.commitActiveLexicalProjectionForCutover();
@@ -9627,11 +9741,13 @@ public final class KnowledgeServer implements Closeable {
                   || System.nanoTime() >= deadline) {
                 throw new IOException("Serving source changed during cutover preparation");
               }
-              var counts = jobQueue.jobStateCountsStrict();
+              var counts = recorded == null && jobQueue instanceof SqliteJobQueue queue
+                  ? queue.nativeCutoverCountsStrict() : jobQueue.jobStateCountsStrict();
               if (counts.processingCount() != 0 || counts.pendingReadyCount() != 0
                   || counts.pendingBackoffCount() != 0
                   || (recorded == null && cutoverMaxFailedJobs >= 0
-                      && counts.failedCount() > cutoverMaxFailedJobs)) {
+                      && Math.max(0L, counts.failedCount() - jobQueue.unownedFailureCount())
+                          > cutoverMaxFailedJobs)) {
                 throw new IOException("Green changed during cutover preparation");
               }
               try (var transfer = current.prepareProducerTransferTo(nextServices)) {

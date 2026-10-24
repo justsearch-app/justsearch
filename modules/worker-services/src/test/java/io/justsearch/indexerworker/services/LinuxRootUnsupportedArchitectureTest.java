@@ -26,4 +26,17 @@ class LinuxRootUnsupportedArchitectureTest {
       }
     } finally { System.setProperty("os.arch", arch); }
   }
+
+  @Test void unsupportedAbiAlsoWorksWithExplicitlyUnavailableVolume() throws Exception {
+    String arch = System.getProperty("os.arch");
+    var evidence = NoVolumeIdentityExtension.withVolumeIdentity(false);
+    try (evidence) {
+      System.setProperty("os.arch", "aarch64");
+      try (var lease = RootIdentity.hold(root)) {
+        assertInstanceOf(RootIdentity.ProviderFileIdentity.class, lease.identity().stableFileIdentity());
+        assertNull(lease.identity().volume());
+        lease.requireCurrent();
+      }
+    } finally { System.setProperty("os.arch", arch); }
+  }
 }

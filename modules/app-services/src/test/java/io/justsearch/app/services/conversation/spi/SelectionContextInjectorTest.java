@@ -31,6 +31,15 @@ import org.junit.jupiter.api.Test;
  */
 final class SelectionContextInjectorTest {
 
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
+
+  @org.junit.jupiter.api.BeforeEach
+  void createSelectedFiles() throws Exception {
+    for (String name : List.of("invoice.md", "a.md", "b.md")) java.nio.file.Files.writeString(directory.resolve(name), "indexed test document");
+  }
+
+  private String doc(String name) { return directory.resolve(name).toString(); }
+
   @Test
   @DisplayName("ExtractShape declares the selection injector, before the user prompt")
   void extractDeclaresSelectionInjector() {
@@ -65,7 +74,7 @@ final class SelectionContextInjectorTest {
     var injector =
         new SelectionContextInjector(
             new StubDocs(
-                Map.of("/docs/invoice.md", new DocumentRecord("/docs/invoice.md", "Total: 42 EUR", Map.of()))));
+                Map.of(doc("invoice.md"), new DocumentRecord(doc("invoice.md"), "Total: 42 EUR", Map.of()))));
 
     InjectorResult result =
         injector.inject(
@@ -73,7 +82,7 @@ final class SelectionContextInjectorTest {
                 ExtractShape.ID.value(),
                 Map.of(
                     "selection",
-                    Map.of("kind", "item", "itemKind", "search-hit", "itemId", "/docs/invoice.md"))));
+                    Map.of("kind", "item", "itemKind", "search-hit", "itemId", doc("invoice.md")))));
 
     assertEquals(1, result.messages().size());
     String content = (String) result.messages().get(0).get("content");
@@ -86,7 +95,7 @@ final class SelectionContextInjectorTest {
   void textRangePrefixFollowsRequestingShape() {
     var docs =
         new StubDocs(
-            Map.of("/docs/a.md", new DocumentRecord("/docs/a.md", "0123456789abcdefghij", Map.of())));
+            Map.of(doc("a.md"), new DocumentRecord(doc("a.md"), "0123456789abcdefghij", Map.of())));
     Map<String, Object> body =
         Map.of(
             "selection",
@@ -94,11 +103,11 @@ final class SelectionContextInjectorTest {
                 "kind",
                 "text-range",
                 "address",
-                Map.of("coords", "canonical", "docId", "/docs/a.md", "startChar", 0, "endChar", 10),
+                Map.of("coords", "canonical", "docId", doc("a.md"), "startChar", 0, "endChar", 10),
                 "selectionText",
                 "0123456789",
                 "hostEntity",
-                Map.of("kind", "doc", "id", "/docs/a.md")));
+                Map.of("kind", "doc", "id", doc("a.md"))));
 
     String extractContent =
         (String)
@@ -140,8 +149,8 @@ final class SelectionContextInjectorTest {
     var docs =
         new StubDocs(
             Map.of(
-                "/docs/a.md", new DocumentRecord("/docs/a.md", dense, Map.of()),
-                "/docs/b.md", new DocumentRecord("/docs/b.md", dense, Map.of())));
+                doc("a.md"), new DocumentRecord(doc("a.md"), dense, Map.of()),
+                doc("b.md"), new DocumentRecord(doc("b.md"), dense, Map.of())));
 
     for (Map<String, Object> selection : summarySelections(dense)) {
       AtomicInteger reads = new AtomicInteger();
@@ -163,9 +172,9 @@ final class SelectionContextInjectorTest {
       assertEquals(2, error.payload().get("maxTokens"));
       if ("result-set".equals(selection.get("kind"))) {
         String exact =
-            "Document: /docs/a.md\n\n" + dense
+            "Document: " + doc("a.md") + "\n\n" + dense
                 + DocumentService.SECTION_SEPARATOR
-                + "Document: /docs/b.md\n\n" + dense;
+                + "Document: " + doc("b.md") + "\n\n" + dense;
         assertEquals(
             io.justsearch.core.util.TokenEstimation.estimateTokens(exact),
             error.payload().get("estimatedTokens"),
@@ -203,8 +212,8 @@ final class SelectionContextInjectorTest {
     var docs =
         new StubDocs(
             Map.of(
-                "/docs/a.md", new DocumentRecord("/docs/a.md", dense, Map.of()),
-                "/docs/b.md", new DocumentRecord("/docs/b.md", dense, Map.of())));
+                doc("a.md"), new DocumentRecord(doc("a.md"), dense, Map.of()),
+                doc("b.md"), new DocumentRecord(doc("b.md"), dense, Map.of())));
     var selections = summarySelections(dense);
 
     for (Map<String, Object> selection : selections) {
@@ -241,27 +250,27 @@ final class SelectionContextInjectorTest {
     }
   }
 
-  private static List<Map<String, Object>> summarySelections(String dense) {
+  private List<Map<String, Object>> summarySelections(String dense) {
     return List.of(
         Map.of(
             "kind", "text-range",
             "address",
                 Map.of(
                     "coords", "canonical",
-                    "docId", "/docs/a.md",
+                    "docId", doc("a.md"),
                     "startChar", 0,
                     "endChar", dense.length()),
             "selectionText", dense,
-            "hostEntity", Map.of("kind", "doc", "id", "/docs/a.md")),
+            "hostEntity", Map.of("kind", "doc", "id", doc("a.md"))),
         Map.of(
             "kind", "item",
             "itemKind", "search-hit",
-            "itemId", "/docs/a.md"),
+            "itemId", doc("a.md")),
         Map.of(
             "kind", "citation",
             "citation",
                 Map.of(
-                    "parentDocId", "/docs/a.md",
+                    "parentDocId", doc("a.md"),
                     "startChar", 0,
                     "endChar", dense.length(),
                     "excerpt", dense)),
@@ -269,7 +278,7 @@ final class SelectionContextInjectorTest {
             "kind", "citation",
             "citation",
                 Map.of(
-                    "parentDocId", "/docs/missing.md",
+                    "parentDocId", doc("missing.md"),
                     "startChar", 0,
                     "endChar", dense.length(),
                     "excerpt", dense)),
@@ -277,8 +286,8 @@ final class SelectionContextInjectorTest {
             "kind", "result-set",
             "items",
                 List.of(
-                    Map.of("id", "/docs/a.md", "kind", "search-hit"),
-                    Map.of("id", "/docs/b.md", "kind", "search-hit")),
+                    Map.of("id", doc("a.md"), "kind", "search-hit"),
+                    Map.of("id", doc("b.md"), "kind", "search-hit")),
             "query", "dense"),
         Map.of(
             "kind", "health-condition",

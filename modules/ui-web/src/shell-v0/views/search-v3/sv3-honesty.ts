@@ -11,7 +11,8 @@
  *
  * Nothing here authors a VERDICT of its own: the frame and its wording come from the shared
  * `components/chat/evidenceProjection.ts` authority (tempdoc 559 Authority IV / 577 Move 3), the same
- * one the shipped window reads. This module supplies only the window's inputs to it.
+ * one the shipped window reads. A ranking-trace explanation instead names its subject and input;
+ * it makes no claim about grounding in document content.
  */
 import type { AiState } from '../../state/aiStateStore.js';
 // The ONE answer-frame authority. The window derives no grounding verdict and words none: it hands
@@ -19,6 +20,7 @@ import type { AiState } from '../../state/aiStateStore.js';
 // does the same through its own `frameFor`).
 import {
   answerFrame,
+  filenameOf,
   answerFrameLabel,
   groundingCoverage,
   coverageHonesty,
@@ -394,6 +396,16 @@ export function sv3AnswerFrame(turn: Sv3Turn): AnswerFrame | null {
   );
 }
 
+/** The request selection owns Explain's identity. Older records can identify their subject
+ * citation (which deliberately contains no document passage), but never their editable wording.
+ */
+export function sv3ExplainsRankingTrace(turn: Sv3Turn | null): boolean {
+  if (turn?.shapeId !== 'core.summarize') return false;
+  if (turn.selectionKind !== undefined) return turn.selectionKind === 'search-trace';
+  return turn.evidence?.sources.some(source => source.chunkIndex === -1
+    && source.startChar === 0 && source.endChar === 0 && source.excerpt === '') ?? false;
+}
+
 export function projectSv3AnswerFrame(
   turn: Sv3Turn,
   currentModelLabel: string | null,
@@ -406,6 +418,21 @@ export function projectSv3AnswerFrame(
     turn.durationMs,
     sv3TailModelLabel(turn.modelLabel, currentModelLabel, detailed),
   );
+  if (sv3ExplainsRankingTrace(turn)) {
+    const subject = turn.evidence?.sources[0];
+    return {
+      verdict: subject
+        ? `Explains the ranking of ${filenameOf(subject.parentDocId)} from its ranking trace`
+        : 'Explains the ranking trace',
+      elaboration: '', tail,
+    };
+  }
+  // Older source-free summaries did not record their input kind. Do not turn that missing
+  // provenance into a claim that documents were searched, or infer it from editable prose.
+  if (turn.shapeId === 'core.summarize' && turn.selectionKind === undefined
+      && turn.evidence !== null && turn.evidence.sources.length === 0) {
+    return tail === '' ? null : { verdict: null, elaboration: '', tail };
+  }
   const frame = sv3AnswerFrame(turn);
   if (frame === null) {
     // `evidence === null` — "never told", so there is no verdict to word; the tail still renders.

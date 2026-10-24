@@ -206,12 +206,13 @@ export function compose(args: ComposeArgs): boolean {
   const affordance: Affordance =
     args.affordance ?? (docIds.length > 0 ? 'documents' : 'none');
   const query = resolveQuery(args);
-  if (args.selection) {
-    setPendingSelection(args.selection);
-  }
+  setPendingSelection(args.selection ?? (docIds.length > 0
+    ? { kind: 'result-set', items: docIds.map(id => ({ id, kind: 'doc' as const })) }
+    : null));
+  setPendingAutoRun(false);
   const kind: SelectionPayload['kind'] | 'none' = args.selection?.kind ?? 'none';
   const forceShapeId =
-    args.targetShape ?? resolveShape(args.operation, kind, args.affordance);
+    args.targetShape ?? resolveShape(args.operation, kind, affordance);
   // Park forceShapeId in the one-shot register; UnifiedChatView.send() drains
   // it on the next /api/chat/dispatch, dissolving the askAi-vs-direct-route
   // fork (§6) by routing through the resolver instead of affordanceToShape.
@@ -240,4 +241,21 @@ function resolveQuery(args: ComposeArgs): string {
     return 'Summarize this document';
   }
   return '';
+}
+
+/** Navigation delivers transient state before mounting; the receiving window owns it thereafter. */
+let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null } | null = null;
+
+export function parkSearchV3Handoff(state: Record<string, unknown>): void {
+  const selection = takePendingSelection();
+  takePendingForceShape();
+  searchV3Handoff = { state, selection: typeof state.forceShapeId === 'string' ? selection : null };
+  takePendingAutoRun(); // Search v3 always waits for a person's send, including answer links.
+  window.dispatchEvent(new Event('sv3-handoff'));
+}
+
+export function takeSearchV3Handoff(): typeof searchV3Handoff {
+  const value = searchV3Handoff;
+  searchV3Handoff = null;
+  return value;
 }

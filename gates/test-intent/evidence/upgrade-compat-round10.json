@@ -1,0 +1,273 @@
+{
+  "kind": "executed-preservation-restoration",
+  "createdAt": "2026-10-24T09:07:53Z",
+  "baseline": "d7e0a43bc86d6c411dbc3b9721983d9241040d1c",
+  "candidateBase": "1257f68ab8acf5018fc3c5b4beb368c3e0cc656c",
+  "product": {
+    "product": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+    "digest": "c1c928397703dc1071f244a4c34991b3c09eeb075006094c4aceb1ff16d7379c",
+    "tests": [
+      {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+        "digest": "010c03f54bdfe94f39a1af5a02043845aab7d57cdcd937ba6b5abd838587cd0c"
+      },
+      {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationDeviceTest.java",
+        "digest": "1238eadc234860046582b5444d4c7255a308dfd8757cd67e4d1651c6418ecb5c"
+      },
+      {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationTransactionTest.java",
+        "digest": "87537d4a96fc714b761736a1ba1e245736f3e589c35f9c52abf7d2d906074cfb"
+      },
+      {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+        "digest": "1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0"
+      },
+      {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+        "digest": "b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783"
+      }
+    ]
+  },
+  "productDelta": {
+    "added": 3,
+    "removed": 1
+  },
+  "testsEdited": false,
+  "decision": {
+    "kind": "delegated-choice",
+    "delegationLocation": "task t-20261020-c2e24a request",
+    "delegationQuote": "Fix in production, not in the tests: a missing configuration or collection list seeds no configured roots.",
+    "choice": "Snapshot the producer configuration once. Pass null to the existing configuredRoots null guard when configuration is absent; do not borrow global configuration or edit producer doubles."
+  },
+  "testSourceIdentity": [
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "digest": "010c03f54bdfe94f39a1af5a02043845aab7d57cdcd937ba6b5abd838587cd0c"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationDeviceTest.java",
+      "digest": "1238eadc234860046582b5444d4c7255a308dfd8757cd67e4d1651c6418ecb5c"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationTransactionTest.java",
+      "digest": "87537d4a96fc714b761736a1ba1e245736f3e589c35f9c52abf7d2d906074cfb"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+      "digest": "1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "digest": "b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783"
+    }
+  ],
+  "before": {
+    "tests": 42,
+    "failed": 34,
+    "passed": 8,
+    "qualification": "Some tests report the null configuration directly; others assert its downstream refusal/restore effects. All original failures are retained without inventing a direct stack trace for the latter.",
+    "sourceProof": "tmp/builder/round10-before-source.json",
+    "receipt": "tmp/builder/round10-before-results.json"
+  },
+  "preservation": [
+    {
+      "class": "io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest",
+      "source": {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+        "digest": "010c03f54bdfe94f39a1af5a02043845aab7d57cdcd937ba6b5abd838587cd0c"
+      },
+      "before": {
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0
+      },
+      "after": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.xml",
+      "xmlDigest": "0e9113ab444a58a7bb2fdf67004e2cca2025a4a2d7de2c42f0862a3ac89f42f7"
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest",
+      "source": {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationDeviceTest.java",
+        "digest": "1238eadc234860046582b5444d4c7255a308dfd8757cd67e4d1651c6418ecb5c"
+      },
+      "before": {
+        "tests": 9,
+        "failures": 8,
+        "errors": 0,
+        "skipped": 0
+      },
+      "after": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest.xml",
+      "xmlDigest": "e253568451e477019efa48a219ea459c51fee7b8cc75d5abf8e54ac52c1f4ffe"
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest",
+      "source": {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationTransactionTest.java",
+        "digest": "87537d4a96fc714b761736a1ba1e245736f3e589c35f9c52abf7d2d906074cfb"
+      },
+      "before": {
+        "tests": 7,
+        "failures": 6,
+        "errors": 0,
+        "skipped": 0
+      },
+      "after": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest.xml",
+      "xmlDigest": "3b976fcb57b4852e0b7e353d91c1db63fcc92df4ed317469c2ce9bb5896cc535"
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest",
+      "source": {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+        "digest": "1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0"
+      },
+      "before": {
+        "tests": 17,
+        "failures": 14,
+        "errors": 0,
+        "skipped": 0
+      },
+      "after": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.xml",
+      "xmlDigest": "fb6ec7b652653cebdd88fece606481eabf2baf1b525b9579ea69d99ece3b4953"
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.PlannedCpuCompositionTest",
+      "source": {
+        "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+        "digest": "b54bb15ebe5b257b8baf56c2868be40ba6ecdd964de96bfbbb6d5d3df924c783"
+      },
+      "before": {
+        "tests": 6,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0
+      },
+      "after": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.PlannedCpuCompositionTest.xml",
+      "xmlDigest": "0022cba5aa6201e219294434388880d7c88c4334fe6b8b518b0b31e2da2e5219"
+    }
+  ],
+  "explicitRequired": [
+    {
+      "class": "io.justsearch.indexerworker.server.Release030ConfiguredHeadlessRecoveryTest",
+      "tests": 1,
+      "passed": 1,
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.Release030ConfiguredHeadlessRecoveryTest.xml",
+      "xmlDigest": "a2b52a89fc99e89d7eafc8ea696339dd07b984d6b275257a8ec581656631ef3b"
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+      "tests": 8,
+      "passed": 8,
+      "xml": "modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+      "xmlDigest": "0c85e3024f7774684a49e2b7496376790d35c11bba2e936e6c57eef862452417"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.RootWatcherRegistryTest",
+      "tests": 7,
+      "passed": 7,
+      "xml": "modules/worker-services/build/test-results/test/TEST-io.justsearch.indexerworker.services.RootWatcherRegistryTest.xml",
+      "xmlDigest": "490276b6174460fd8b388045187350214f551430e491219c32f69fc0a3a3bab6"
+    }
+  ],
+  "fullSuites": [
+    {
+      "module": "indexer-worker",
+      "tests": 1556,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 29,
+      "passed": 1527,
+      "classes": 220
+    },
+    {
+      "module": "worker-services",
+      "tests": 2036,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 18,
+      "passed": 2017,
+      "classes": 359
+    }
+  ],
+  "additionalFailures": [
+    {
+      "module": "worker-services",
+      "class": "io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest",
+      "name": "argFileEncodingRoundTripsThroughTheJdkParser()",
+      "outcome": "failure",
+      "message": "org.opentest4j.AssertionFailedError: argfile encoding must round-trip ==> expected: <C:\\tab\\back\\form\\already\\\\doubled\\dir with spaces\\a\"quoted\".jar> but was: <NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm/after\nC:\\tab\\back\\form\\already\\\\doubled\\dir with spaces\\a\"quoted\".jar>"
+    }
+  ],
+  "confirmedPreexisting": [
+    {
+      "class": "io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest",
+      "name": "argFileEncodingRoundTripsThroughTheJdkParser()",
+      "baseline": "95b6cd2db0c1e8db0cb20a25ba70911b4433056e",
+      "evidence": "Prior independent C5 baseline execution; no fresh baseline run claimed. The baseline XML explicitly captures before-phase JDK_JAVA_OPTIONS contamination; report names the baseline and this limitation. Shared pool has since moved to another revision, so no current pool source/build is used.",
+      "baselineXml": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round10-preexisting-baseline-PersistentExtractionSandboxTest.xml",
+      "baselineXmlDigest": "c9e3294c4fbfaf4f44f3546fb16fcc12da2e2b814bc27c68ba8b3d626f991873",
+      "baselineReport": "/home/elias/.cache/justsearch-upgrade-reports/verifier-C5-checks/report.txt",
+      "baselineReportDigest": "b623d4be94ba99b0df5a29ae62935b7fe27eefe1ac34eb52ee18ffe2668e4ac5",
+      "baselineMessage": "org.opentest4j.AssertionFailedError: argfile encoding must round-trip ==> expected: <C:\\tab\\back\\form\\already\\\\doubled\\dir with spaces\\a\"quoted\".jar> but was: <NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/.cache/am/ek050o8t/tmp/builder/jvm/before\nC:\\tab\\back\\form\\already\\\\doubled\\dir with spaces\\a\"quoted\".jar>",
+      "testSourceIdenticalTo95b6cd2db": true,
+      "testSourceDigest": "bd647b2a185499a8bca02cb4ae363f92194b8ff3cfac66208cf4161b679b88aa"
+    }
+  ],
+  "resources": {
+    "heap": "2GiB/test fork",
+    "forkEveryClasses": 20,
+    "parallelForks": 1,
+    "gradleWorkers": 1,
+    "fixedBeforeTemporaryDirectory": "tmp/builder/jvm/before",
+    "fixedAfterTemporaryDirectory": "tmp/builder/jvm/after",
+    "largeFixtureGenerated": false
+  },
+  "commands": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests '*ActivationPhysicalEncoderCapsTest' --tests '*KnowledgeServerQueryPreparationDeviceTest' --tests '*KnowledgeServerQueryPreparationTransactionTest' --tests '*KnowledgeServerQuerySettingsOwnerTest' --tests '*PlannedCpuCompositionTest' --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round7-tmp.gradle --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round10-resources.gradle --max-workers=1 --no-parallel --no-configuration-cache -PskipWebBuild=true -PskipErrorProneTests=false --continue",
+      "exitCode": 1,
+      "log": "tmp/builder/round10-before-gradle.log",
+      "logDigest": "ff5f9ed16c968d82d2b615f6223852f07e9926f2d6e4a7a9307b6bf8b9a94ce9"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:worker-services:compileJava :modules:worker-services:compileTestJava :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:indexer-worker:test :modules:worker-services:test --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round7-tmp.gradle --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round10-resources.gradle --max-workers=1 --no-parallel --no-configuration-cache -PskipWebBuild=true -PskipErrorProneTests=false --continue",
+      "exitCode": 1,
+      "log": "tmp/builder/round10-after-gradle.log",
+      "logDigest": "e4968ab4da988e36949970bc37e715c7e4071c593b4395285a85fbbc82d467ef"
+    }
+  ],
+  "producer": "tmp/builder/round10-collect-results.py",
+  "producerDigest": "5c6c9ebd8bf9cda75dcdf5861968c3a65563df9f967b8f8ac703b38b358f9b66",
+  "qualification": "The five unchanged classes failed on exact d7 product before the production guard. Full normal Gradle test tasks run after, without test filters; skipped/asset/platform/tag cases are not passes. No module-wide fake-volume autodetection was introduced. The premature queued wrapper was cancelled before slot acquisition and executed no Gradle/test work."
+}

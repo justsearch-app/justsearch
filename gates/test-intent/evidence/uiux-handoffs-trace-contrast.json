@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T15:55:15.418Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "8e75ebf7f1c0c191d783e0c19e3d24e993406db8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Main.imports.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/azt482ih/tmp/test-intent-vitest-82700-1792770910815.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1533
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#HO5 source preview text clears AA in both themes and every card state",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:42539c8defc77a63e8b3c44426b91f606b99cf2875addf15832c08123d1291c2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 source preview text clears AA in both themes and every card state",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "12bb2beb3",
+    "revision": "12bb2beb38ee54fb0eaa8b483feff4a41b06d8d3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Main.imports.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/azt482ih/tmp/test-intent-vitest-82700-1792770913564.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1692,
+        "output": "JSON report written to /home/elias/.cache/am/azt482ih/tmp/test-intent-vitest-82700-1792770913564.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#HO5 source preview text clears AA in both themes and every card state",
+        "classification": "assertion",
+        "detail": "HO5 source preview text clears AA in both themes and every card state:  AssertionError: light source preview on var(--cp-selected-region, var(--surface-2)): 4.29:1: expected 4.287670650504948 to be greater than or equal to 4.5\n    at /home/elias/.cache/am/azt482ih/tmp/test-intent-before-ujXbu1/modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts:791:82"
+      }
+    ]
+  },
+  "digest": "sha256:c72d197f91765f32311a56f451cbb0ab602e1f8d7c423a270427318112e83e18"
+}

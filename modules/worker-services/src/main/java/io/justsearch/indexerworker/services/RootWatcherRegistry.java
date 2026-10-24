@@ -56,6 +56,8 @@ public final class RootWatcherRegistry {
    * even when it was added again in between.
    */
   private final Map<Path, Long> removedAt = new ConcurrentHashMap<>();
+  // Unlike the historical removal count, this blocks even a later call with stale Head membership.
+  private final Set<Path> removedRoots = ConcurrentHashMap.newKeySet();
   // Retained while absent and across runtime handovers, never persisted across Engine restarts.
   private final Map<Path, RootIdentity> returnIdentities = new ConcurrentHashMap<>();
   private final Set<Path> pendingRecovery = ConcurrentHashMap.newKeySet();
@@ -159,6 +161,7 @@ public final class RootWatcherRegistry {
       returnIdentities.put(normalized, candidate.rootIdentity());
     }
     awaitingVolume.remove(normalized);
+    removedRoots.remove(normalized);
     return new WatchResult(true, null);
   }
 
@@ -179,6 +182,7 @@ public final class RootWatcherRegistry {
       }
     }
     awaitingVolume.put(normalized, collection == null ? "" : collection);
+    removedRoots.remove(normalized);
     log.info("Root watcher waits for the volume first seen at {}; another volume is there now",
         normalized);
     return new WatchResult(false, "ROOT_NOT_DIRECTORY: " + normalized
@@ -237,6 +241,7 @@ public final class RootWatcherRegistry {
       return false;
     }
     removedAt.put(normalized, ++removals);
+    removedRoots.add(normalized);
     if (watcher != null) {
       watcher.forgetRoot(normalized);
     }
@@ -285,6 +290,16 @@ public final class RootWatcherRegistry {
     return watch(root.toString(), collection);
   }
 
+  /** Admission and root removal share this monitor; a completed removal cannot be undone. */
+  synchronized int admitRecovery(Path root, long mark, java.util.function.BooleanSupplier declared,
+      java.util.function.IntSupplier admission) {
+    if (removedSince(root, mark)) return 0;
+    if (successor != null) return successor.admitRecovery(root, handoverMark, declared, admission);
+    if (removedRoots.contains(root.toAbsolutePath().normalize())) return 0;
+    return declared.getAsBoolean() || subscriptions.containsKey(root.toAbsolutePath().normalize())
+        || awaitingVolume.containsKey(root.toAbsolutePath().normalize()) ? admission.getAsInt() : 0;
+  }
+
   /** The registry that currently owns this one's roots: itself, or its latest successor. */
   RootWatcherRegistry current() {
     return successor == null ? this : successor.current();
@@ -303,6 +318,7 @@ public final class RootWatcherRegistry {
     }
     if (next == this) throw new IllegalArgumentException("A registry cannot succeed itself");
     next.returnIdentities.putAll(returnIdentities);
+    next.removedRoots.addAll(removedRoots);
     next.pendingRecovery.addAll(pendingRecovery);
     for (Subscription watched : List.copyOf(subscriptions.values())) {
       if (io.justsearch.configuration.PlatformPaths.isLinux() && watcher != null

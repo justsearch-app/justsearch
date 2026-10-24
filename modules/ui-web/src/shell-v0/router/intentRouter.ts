@@ -12,7 +12,7 @@ import type { NavigationHandler } from './navigationHandler.js';
 import type { InvocationHandler } from './invocationHandler.js';
 import type { ResolutionResult, Suggestion } from './resolution.js';
 import { interactivePolicy, type RecoveryPolicy } from './recoveryPolicy.js';
-import { setPendingForceShape, setPendingAutoRun } from '../utils/compose.js';
+import { setPendingForceShape, setPendingAutoRun, setPendingSelection } from '../utils/compose.js';
 
 export interface RouterConfig {
   navigationHandler: NavigationHandler;
@@ -193,7 +193,9 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
           // intent pipeline as a navigation carrying the query text in state.
           const target = config.querySurfaceId ?? DEFAULT_QUERY_SURFACE_ID;
           const stateKey = config.queryStateKey ?? DEFAULT_QUERY_STATE_KEY;
-          const navState = { ...intent.address.state, [stateKey]: intent.address.query };
+          const navState = target === 'core.search-v3-surface'
+            ? { [stateKey]: intent.address.query }
+            : { ...intent.address.state, [stateKey]: intent.address.query };
           const resolution = config.resolveSurface(target);
           const action = policy(resolution);
           switch (action.kind) {
@@ -241,7 +243,9 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
           // catalog (default core.rag-ask); V1 lowers to the chat surface that hosts the shape.
           const target = config.answerSurfaceId ?? DEFAULT_ANSWER_SURFACE_ID;
           const stateKey = config.answerStateKey ?? DEFAULT_ANSWER_STATE_KEY;
-          const navState = { ...intent.address.state, [stateKey]: intent.address.prompt };
+          const navState = target === 'core.search-v3-surface'
+            ? { [stateKey]: intent.address.prompt, forceShapeId: intent.address.shape }
+            : { ...intent.address.state, [stateKey]: intent.address.prompt };
           const resolution = config.resolveSurface(target);
           const action = policy(resolution);
           // 548 §4.5: an `answer` verb is "navigate-and-run". Park the requested
@@ -254,6 +258,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
           // surface (restoreSearch executes the fetch). compose()/askAi paths
           // leave these unset — they prefill and wait for the user's Send.
           const parkAnswerRun = (): void => {
+            if (target === 'core.search-v3-surface') setPendingSelection(null);
             setPendingForceShape(intent.address.kind === 'answer' ? intent.address.shape : null);
             setPendingAutoRun(true);
           };

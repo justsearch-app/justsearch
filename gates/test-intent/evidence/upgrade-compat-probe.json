@@ -1,0 +1,70 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:02d28b63ca3bb0d89bea1d6e7648bc43a7eecbc22872502c987b55e41959b9bd"
+  },
+  "createdAt": "2026-10-22T03:38:28.044Z",
+  "revision": "56e27e059e1fdffe4673403792ff418f4a1fd4fe",
+  "tree": "68fc395b696b6ede4d9541f5328001a3efa03034",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm/evidence",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.Release030UpgradeProbeTest.interruptedMigrationFixturesKeepTheirServingIndexAndJobs\" --rerun :modules:worker-services:test --tests '*WorkerUserExclusionsAdmissionTest' --rerun :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:indexer-worker:pmdTest :modules:ui:headlessDist -x :modules:ui:bundleSidecarResources -PskipWebBuild=true -PskipErrorProneTests=false --console=plain --no-configuration-cache --continue -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm/evidence --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm-tmp.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1086343
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3d566167badec53d150e2c5e4a4444001fc0dd5ec49545465678fa602ff9440c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "56e27e059",
+    "revision": "56e27e059e1fdffe4673403792ff418f4a1fd4fe",
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CompatibilityTest.java",
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExtractionRecoveryTest.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.Release030UpgradeProbeTest.interruptedMigrationFixturesKeepTheirServingIndexAndJobs\" --rerun :modules:worker-services:test --tests '*WorkerUserExclusionsAdmissionTest' --rerun :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:indexer-worker:pmdTest -PskipWebBuild=true -PskipErrorProneTests=false --console=plain --no-configuration-cache --continue -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm/evidence --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm-tmp.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 172263
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:651a946a3f35636d7306a31d8d4de447a7093efbbf0e6cde29473cad9abbdbfb"
+}
