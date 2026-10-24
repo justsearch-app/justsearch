@@ -36,3 +36,13 @@ author-session: funnel-timeout-builder
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "e9e48de5-620a-4c70-abc9-0fdb6be8f2d7",
+  "verdict": "accept",
+  "digest": "sha256:f2a635f86f8a16aa6a8ac279b70644f85ffbec5c2b4fa454bbfd9e6ebc35d9b0"
+}
+```
