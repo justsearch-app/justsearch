@@ -56,6 +56,15 @@ class InferenceConfigFromEnvironmentTest {
         new SysProps()
             .set("justsearch.llm.model_path", "rel/rel-model.gguf")
             .set("justsearch.mmproj.model", "none")
+            // Exercise the baseDir argument with no configured base in this fixture snapshot.
+            .source(EnvRegistry.HOME.configKey(), ResolvedConfigBuilder.ORDINAL_JVM_ARG,
+                "test_fixture", null)
+            .source(EnvRegistry.HOME.configKey(), ResolvedConfigBuilder.ORDINAL_ENV_VAR,
+                "test_fixture", null)
+            .source(EnvRegistry.DATA_DIR.configKey(), ResolvedConfigBuilder.ORDINAL_JVM_ARG,
+                "test_fixture", null)
+            .source(EnvRegistry.DATA_DIR.configKey(), ResolvedConfigBuilder.ORDINAL_ENV_VAR,
+                "test_fixture", null)
             .initStore()) {
       InferenceConfig cfg = InferenceConfig.fromEnvironment(tempDir);
       assertEquals(model, cfg.modelPath());
