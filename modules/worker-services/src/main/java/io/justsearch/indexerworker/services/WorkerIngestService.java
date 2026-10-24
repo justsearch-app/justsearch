@@ -1270,13 +1270,15 @@ public final class WorkerIngestService {
 
   private void journalAndProjectPrefixDeleteToServing(PathPrefixScope scope) {
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
-    if (candidateGeneration == null) return;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
         || !active.isAcceptingWrites()) {
       throw WorkerServiceException.unavailable(
-          "Serving projection is unavailable during migration; retry shortly");
+          "Removal did not complete: the search index is read-only or unavailable. "
+              + "Wait for index recovery, then retry Remove.");
     }
-    switchBufferOps.journalDeletePrefixForGeneration(candidateGeneration, scope);
+    if (candidateGeneration != null) {
+      switchBufferOps.journalDeletePrefixForGeneration(candidateGeneration, scope);
+    }
     if (active == ingestLifecycle) return;
     deletePrefix(active.indexingCoordinator(), scope);
     active.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
@@ -2103,7 +2105,7 @@ public final class WorkerIngestService {
 
         DeleteByPathResponse unavailable =
             indexRuntimeUnavailableReply(
-                "deleteByPath", deleteByPathResponse(-1, "Index runtime not available"));
+                "deleteByPath", deleteByPathResponse(-1, "The search index is not ready. Wait for index recovery, then retry Remove."));
         if (unavailable != null) {
           return unavailable;
         }

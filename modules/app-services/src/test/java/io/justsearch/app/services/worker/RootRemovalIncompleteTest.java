@@ -69,6 +69,10 @@ final class RootRemovalIncompleteTest {
     if (step.equals("save")) {
       assertThrows(java.io.UncheckedIOException.class,
           () -> ops.removeWatchedPath(root, TestEngineContexts.internal()));
+    } else if (step.equals("delete") || step.equals("buffered")) {
+      var refusal = assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
+          () -> ops.removeWatchedPath(root, TestEngineContexts.internal()));
+      assertTrue(refusal.getMessage().contains("Removal did not complete"));
     } else {
       assertEquals(-1, assertDoesNotThrow(() -> ops.removeWatchedPath(root, TestEngineContexts.internal())));
     }
@@ -163,7 +167,8 @@ final class RootRemovalIncompleteTest {
     var before = state.captureRootProducer(root, true);
     var ops = ops(roots, state, mock(RootLifecycleOps.WorkerWatchFn.class),
         (path, context) -> DeleteByPathResponse.newBuilder().setError("forced failure").build());
-    assertEquals(-1, ops.removeWatchedPath(root, TestEngineContexts.internal()));
+    assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
+        () -> ops.removeWatchedPath(root, TestEngineContexts.internal()));
     var calls = new java.util.concurrent.atomic.AtomicInteger();
     for (var fence : List.of(before, state.captureRootProducer(root, true))) {
       fence.run(calls::incrementAndGet, () -> -1);
@@ -180,6 +185,33 @@ final class RootRemovalIncompleteTest {
     state.markRootUnavailable(root, RootLifecycleOps.ROOT_MISSING_REASON);
     state.recordRecordedWalk(root, false, RootLifecycleOps.ROOT_MISSING_REASON);
     assertIncomplete(ops, root);
+  }
+
+  @Test
+  void unavailableServingReasonReachesCallerAndKeepsRetryEntry() throws Exception {
+    Path root = Files.createDirectory(temp.resolve("read-only-folder"));
+    Path file = temp.resolve("read-only-roots.json");
+    var roots = new ConcurrentHashMap<Path, Instant>();
+    var state = new WatchedRootsState(roots, new WatchedRootsStore(file, null));
+    state.register(root, "corpus", false);
+    state.persist();
+    var refusal = new io.justsearch.app.api.knowledge.KnowledgeClientException(
+        io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,
+        "Removal did not complete: the search index is read-only or unavailable. "
+            + "Wait for index recovery, then retry Remove.");
+    var ops = ops(roots, state, mock(RootLifecycleOps.WorkerWatchFn.class),
+        (path, context) -> { throw refusal; });
+    assertSame(refusal, assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
+        () -> ops.removeWatchedPath(root, TestEngineContexts.internal())));
+    assertIncomplete(ops, root);
+    var restoredRoots = new ConcurrentHashMap<Path, Instant>();
+    var restored = new WatchedRootsState(restoredRoots, new WatchedRootsStore(file, null));
+    restored.loadPersistedRoots();
+    var retry = ops(restoredRoots, restored, mock(RootLifecycleOps.WorkerWatchFn.class),
+        (path, context) -> deleted());
+    assertIncomplete(retry, root);
+    assertEquals(1, retry.removeWatchedPath(root, TestEngineContexts.internal()));
+    assertTrue(restoredRoots.isEmpty());
   }
 
   private static void assertIncomplete(RootLifecycleOps ops, Path root) {

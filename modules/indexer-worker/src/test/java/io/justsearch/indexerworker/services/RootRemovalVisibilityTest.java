@@ -93,14 +93,29 @@ final class RootRemovalVisibilityTest extends LuceneExecutorTestBase {
       assertEquals(1, serving.textQueryOps().searchText("quokka", 10, null).totalHits());
       var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
           base, writer.openedIndexPath(), writer, serving, null, 0L);
-      var response = service.deleteByPath(DeleteByPathRequest.newBuilder()
-          .setPath(root.toString()).build(), CallContext.none());
-      assertFalse(response.getError().isEmpty() && !response.getBuffered() && response.getDeletedJobs() >= 0,
+      var refusal = assertThrows(WorkerServiceException.class, () -> service.deleteByPath(
+          DeleteByPathRequest.newBuilder().setPath(root.toString()).build(), CallContext.none()),
           "a read-only serving view must not confirm removal after a failed rebuild");
+      assertEquals(WorkerServiceException.Status.UNAVAILABLE, refusal.status());
+      assertTrue(refusal.getMessage().contains("Removal did not complete"), refusal.getMessage());
       assertEquals(1, serving.textQueryOps().searchText("quokka", 10, null).totalHits());
       writer.commitOps().maybeRefreshBlocking();
       assertEquals(1, writer.textQueryOps().searchText("quokka", 10, null).totalHits(),
           "refusal must precede the writer effect too");
+    }
+    try (var queue = new SqliteJobQueue(temp.resolve("failed-jobs.db"));
+        var serving = open(activePath);
+        var writer = open(manager.resolveGenerationPathStrict(building))) {
+      queue.open();
+      var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+          base, writer.openedIndexPath(), writer, serving, null, 0L);
+      var retried = service.deleteByPath(DeleteByPathRequest.newBuilder()
+          .setPath(root.toString()).build(), CallContext.none());
+      assertEquals("", retried.getError());
+      assertFalse(retried.getBuffered());
+      assertEquals(0, serving.textQueryOps().searchText("quokka", 10, null).totalHits(),
+          "retry must reach the serving view even though the migration is FAILED");
+      assertEquals(0, writer.textQueryOps().searchText("quokka", 10, null).totalHits());
     }
   }
 

@@ -600,8 +600,19 @@ final class RootLifecycleOps {
             workerWatchFn.unwatch(normalized.toString(), engineContext);
             if (!coveredByAncestor) {
                 DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
-                if (response == null || !response.getError().isEmpty() || response.getBuffered()
-                        || response.getDeletedJobs() < 0 || response.getDeletedJobs() > Integer.MAX_VALUE) {
+                if (response != null && response.getBuffered()) {
+                    throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
+                            io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,
+                            "Removal did not complete because the index is rebuilding. "
+                                    + "Retry Remove when the rebuild finishes.");
+                }
+                if (response != null && !response.getError().isEmpty()) {
+                    throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
+                            io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,
+                            "Removal did not complete: " + response.getError());
+                }
+                if (response == null || response.getDeletedJobs() < 0
+                        || response.getDeletedJobs() > Integer.MAX_VALUE) {
                     log.warn("Worker did not confirm removal of {}: {}", normalized, response);
                     return -1;
                 }
@@ -616,6 +627,10 @@ final class RootLifecycleOps {
             return -1;
         } catch (Exception e) {
             EngineRefusals.rethrow(e);
+            if (e instanceof io.justsearch.app.api.knowledge.KnowledgeClientException refusal
+                    && refusal.status() == io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE) {
+                throw refusal;
+            }
             log.error("Root removal incomplete for: {}", normalized, e);
             return -1;
         }

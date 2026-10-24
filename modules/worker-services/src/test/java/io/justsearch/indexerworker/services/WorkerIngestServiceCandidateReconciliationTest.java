@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -12,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -353,7 +353,7 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     order.verify(fixture.queue).deleteByPathPrefix(prefix);
     order.verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_PATH);
-    assertDoesNotThrow(() -> order.verify(fixture.servingCommit).maybeRefreshBlocking());
+    verify(fixture.servingCommit, atMostOnce()).maybeRefreshBlocking();
     order.verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, "collection:" + collection, "DELETE_COLLECTION", collection);
     order.verify(fixture.candidateWriter).deleteByCollection(collection);
