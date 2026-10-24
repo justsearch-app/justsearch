@@ -62,6 +62,10 @@ export class SettingsWindow extends JfElement {
   // idle mounting only shifts WHEN the (still boot-synchronous, non-open) mount happens.
   private shouldMount = false;
   private recoveryFocusRequested = false;
+  private readonly cancelRecoveryOnUserActivity = (): void => {
+    this.recoveryFocusRequested = false;
+    (this.mounted as SettingsSurface | null)?.cancelSettingsRecoveryFocus?.();
+  };
   private idleHandle: number | null = null;
   private cancelIdle: (() => void) | null = null;
   // 855 §11.2 merge-blocker: set by `dismiss()` right before `open` flips false, consumed by the
@@ -153,9 +157,17 @@ export class SettingsWindow extends JfElement {
     // The catalog boots asynchronously; re-render when it lands so the content mounts on arrival.
     this.unsubscribeCatalog = onSurfaceCatalogChange(() => this.requestUpdate());
     this.scheduleIdleMount();
+    for (const type of ['pointerdown', 'keydown']) {
+      window.addEventListener(type, this.cancelRecoveryOnUserActivity, true);
+    }
+    window.addEventListener('blur', this.cancelRecoveryOnUserActivity);
   }
 
   override disconnectedCallback(): void {
+    for (const type of ['pointerdown', 'keydown']) {
+      window.removeEventListener(type, this.cancelRecoveryOnUserActivity, true);
+    }
+    window.removeEventListener('blur', this.cancelRecoveryOnUserActivity);
     this.recoveryFocusRequested = false;
     this.unsubscribeCatalog?.();
     this.unsubscribeCatalog = null;
@@ -305,7 +317,6 @@ export class SettingsWindow extends JfElement {
     return html`
       <dialog
         aria-label=${label}
-        @focusin=${() => (this.mounted as SettingsSurface | null)?.cancelSettingsRecoveryFocus?.()}
         @cancel=${(e: Event) => {
           e.preventDefault();
           this.requestClose();

@@ -790,6 +790,51 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
     expect(win.open, 'a later bootstrap must not replay an already-followed recovery route').toBe(false);
   });
 
+  it.each(['pointerdown', 'keydown', 'blur'])('R2 cancels a startup recovery arrival after %s outside Settings', async (event) => {
+    window.history.replaceState(null, '', `/#justsearch://surface/${SETTINGS_ID}?focusSettingsRecovery=true`);
+    let release!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/registry/surfaces')) return new Promise<Response>((resolve) => { release = resolve; });
+      return Promise.resolve(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+    }));
+    const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');
+    try {
+      const shell = await renderShell();
+      const chosen = document.createElement('button'); document.body.append(chosen);
+      try {
+        if (event === 'blur') window.dispatchEvent(new Event('blur'));
+        else document.dispatchEvent(event === 'keydown'
+          ? new KeyboardEvent('keydown', { key: 'Shift', bubbles: true })
+          : new Event('pointerdown', { bubbles: true }));
+        release(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+        await settle();
+        expect(focus, 'a startup user action cancels the pending recovery request').not.toHaveBeenCalled();
+        expect(window.location.hash).not.toContain('focusSettingsRecovery');
+        expect(windowOf(shell).open, 'a deferred modal arrival must not take focus either').toBe(false);
+      } finally { chosen.remove(); }
+    } finally { focus.mockRestore(); }
+  });
+
+  it('R2 preserves a startup recovery arrival across app focus moves', async () => {
+    window.history.replaceState(null, '', `/#justsearch://surface/${SETTINGS_ID}?focusSettingsRecovery=true`);
+    let release!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/registry/surfaces')) return new Promise<Response>((resolve) => { release = resolve; });
+      return Promise.resolve(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+    }));
+    const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');
+    const chosen = document.createElement('button'); document.body.append(chosen);
+    try {
+      const shell = await renderShell();
+      chosen.focus(); // App boot/mount focus, without user input.
+      release(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
+      await settle();
+      expect(focus, 'app focus must preserve the startup recovery request').toHaveBeenCalledTimes(1);
+      expect(windowOf(shell).open).toBe(true);
+      expect(window.location.hash).not.toContain('focusSettingsRecovery');
+    } finally { focus.mockRestore(); chosen.remove(); }
+  });
+
   it('R2 forwards a fresh recovery URL to the existing pending focus walk', async () => {
     window.history.replaceState(null, '', `/#justsearch://surface/${SETTINGS_ID}?focusSettingsRecovery=true`);
     const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');

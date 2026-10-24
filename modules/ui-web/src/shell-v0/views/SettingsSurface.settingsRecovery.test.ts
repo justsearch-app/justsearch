@@ -119,15 +119,56 @@ describe('CR37c settings recovery', () => {
     expect(deepActiveElement()).toBe(invokeButton(surface));
   });
 
+  it('R2 retains the pending hand-off across app focus moves inside shadow roots', async () => {
+    const { surface, close } = await mountRecoveryWindow();
+    const nav = surface.shadowRoot!.querySelector('jf-settings-nav') as Rendered;
+    await nav.updateComplete;
+    const input = nav.shadowRoot!.querySelector<HTMLInputElement>('input')!;
+    const events: string[] = [];
+    close.addEventListener('focusout', () => events.push('origin focusout'));
+    input.addEventListener('focusin', () => events.push('input focusin'));
+    input.focus(); // App-driven: no key, pointer or window blur occurred.
+    expect(events).toEqual(['origin focusout', 'input focusin']);
+    observe('settings_recovery'); await settle(surface);
+    expect(deepActiveElement(), `programmatic focus emitted ${events.join(', ')} without user input`).toBe(invokeButton(surface));
+  });
+
   it('R2 drops pending recovery focus when the user moves focus, even if they return', async () => {
     const { surface, close } = await mountRecoveryWindow();
     const nav = surface.shadowRoot!.querySelector('jf-settings-nav')!;
     await (nav as Rendered).updateComplete;
+    close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, composed: true }));
     nav.shadowRoot!.querySelector<HTMLInputElement>('input')!.focus();
     close.focus();
     observe('settings_recovery'); await settle(surface);
     expect(invokeButton(surface)).not.toBeNull();
     expect(deepActiveElement()).toBe(close);
+  });
+
+  it.each(['pointerdown', 'keydown', 'blur'])('R2 drops pending recovery focus after %s outside the Settings dialog', async (event) => {
+    const { surface, close } = await mountRecoveryWindow();
+    const other = document.createElement('button'); document.body.append(other);
+    if (event === 'blur') window.dispatchEvent(new Event('blur'));
+    else other.dispatchEvent(event === 'keydown'
+      ? new KeyboardEvent('keydown', { key: 'Shift', bubbles: true })
+      : new Event('pointerdown', { bubbles: true }));
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement(), 'user activity anywhere cancels the pending hand-off').toBe(close);
+  });
+
+  it.each(['keydown', 'pointerdown'])('R2 cancels user %s focus movement inside a shadow root', async (event) => {
+    const { surface } = await mountRecoveryWindow();
+    const nav = surface.shadowRoot!.querySelector('jf-settings-nav') as Rendered;
+    await nav.updateComplete;
+    const input = nav.shadowRoot!.querySelector<HTMLInputElement>('input')!;
+    input.dispatchEvent(event === 'keydown'
+      ? new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, composed: true })
+      : new Event('pointerdown', { bubbles: true, composed: true }));
+    input.focus();
+    observe('settings_recovery'); await settle(surface);
+    expect(invokeButton(surface)).not.toBeNull();
+    expect(deepActiveElement()).toBe(input);
   });
 
   it('R2 drops pending recovery focus when Settings closes and is reopened normally', async () => {
@@ -174,6 +215,7 @@ describe('CR37c settings recovery', () => {
     await nav.updateComplete;
     const search = nav.shadowRoot!.querySelector<HTMLInputElement>('input')!;
     window.focusSettingsRecovery(); await window.updateComplete;
+    search.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
     search.focus(); await settle(surface);
     expect(deepActiveElement()).toBe(search);
   });
@@ -185,6 +227,7 @@ describe('CR37c settings recovery', () => {
     await nav.updateComplete;
     const search = nav.shadowRoot!.querySelector<HTMLInputElement>('input')!;
     window.focusSettingsRecovery();
+    search.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
     search.focus();
     await window.updateComplete; await settle(surface);
     expect(deepActiveElement()).toBe(search);

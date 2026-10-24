@@ -1709,6 +1709,31 @@ export class Shell extends JfElement {
     // `bindRouterDispatch` helper; removed in the slice-492 follow-up
     // since the indirection had no behavioral benefit).
     const router = this.intentRouter;
+    // A recovery URL is still pending while schemas/status bootstrap. User activity wins
+    // over that deferred modal arrival (opening the dialog would itself take focus).
+    let stopStartupRecoveryFocus = (): void => {};
+    const startupAddress = parseUrl(window.location.hash.slice(1));
+    if (startupAddress?.kind === 'navigate' && startupAddress.target === SETTINGS_SURFACE_ID &&
+        (startupAddress.state.focusSettingsRecovery === true || startupAddress.state.focusSettingsRecovery === 'true')) {
+      const controller = new AbortController();
+      stopStartupRecoveryFocus = () => controller.abort();
+      const cancelStartupRecovery = (): void => {
+        stopStartupRecoveryFocus();
+        const current = parseUrl(window.location.hash.slice(1));
+        if (current?.kind !== 'navigate' || current.target !== SETTINGS_SURFACE_ID ||
+            !('focusSettingsRecovery' in current.state)) return;
+        const destination = this.activeId
+          ? `#${canonicalize({ kind: 'navigate', target: this.activeId, state: {} })}`
+          : window.location.pathname + window.location.search;
+        if (!this.activeId) navigationHandled = true;
+        window.history.replaceState(window.history.state, '', destination);
+      };
+      for (const type of ['pointerdown', 'keydown']) {
+        window.addEventListener(type, cancelStartupRecovery, { capture: true, signal: controller.signal });
+      }
+      window.addEventListener('blur', cancelStartupRecovery, { signal: controller.signal });
+      this.sourceTeardowns.push(stopStartupRecoveryFocus);
+    }
     let nativeRequestHandled = false;
     let startingSources = false;
     const dispatch = (intent: Parameters<typeof router.dispatch>[0],
@@ -1741,6 +1766,7 @@ export class Shell extends JfElement {
       }
     }));
     void fetchAndRegisterSurfaceSchemas(this.apiBase).then(() => {
+      stopStartupRecoveryFocus();
       // Surface schemas arrived asynchronously. If we disconnected
       // before that resolved, skip source bootstrap entirely.
       if (this.disconnected) return;

@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-recovery-reset-builder-4_t_bkji
+author-session: uiux-recovery-reset-builder-osqd8c2e
 ---
 
 # Test-intent entries
@@ -52,6 +52,27 @@ A durable R2 journal check rejects copying an incoming recovery URL onto the dep
 All earlier evidence is refreshed in default dependency-link mode. Private browser scripts, status
 samples, screenshots and logs under `tmp/recovery-reset-poll/` are scaffolding. Existing acceptance
 or rejection records are preserved; no record is authored or amended by this builder.
+
+Continuation after independent check of f3bc416ae4 and the evidence-failure investigation:
+only key press, pointer press and window blur cancel pending recovery intent, across the app.
+Focusin and focused-origin focusout also fire for app-driven focus; both triggers and their native
+opening exception are removed. Three durable Shell and three Settings-window repair checks cover
+actual startup user activity. Two durable shadow-input checks and an app-focus startup check preserve
+existing behavior. A new durable app-focus check fails on f3bc416ae4 and on the abandoned focus-event
+candidate: after input.focus(), origin focusout/input focusin cancel the hand-off without user input.
+The retained cancellation checks now explicitly issue user key/pointer input before moving focus,
+in line with the clarified source below; their expected focus and hold outcomes remain.
+
+The isolated first-status check passed on the abandoned candidate, so the earlier intermittent
+failure's exact event is not established. The old runner discarded its assertion report. Deterministic
+unit and real-interface checks confirm the app-focus cancellation defect, and both pass after removing
+the focus triggers. Real keyboard/pointer startup, app-only focus, R1-R4, polling, timing, startup,
+Back/Forward and journal checks are rerun under tmp/recovery-reset-input-only/, with screenshots.
+The evidence wrapper retains every raw Vitest report, including fail-before assertions; default link
+mode remains in use. The startup arrival is consumed into the current main surface URL on user input,
+since opening a native modal would itself move focus. All original hand-offs remain; no journal code
+or journal tests are changed, including the deferred same-surface conversation defect.
+Existing acceptance/rejection records are retained; this builder authors no acceptance record.
 
 ```json
 {
@@ -174,6 +195,16 @@ or rejection records are preserved; no record is authored or amended by this bui
           "quote": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
           "location": "task t-20261019-bd718f agreement R2 delayed-status focus continuation (2026-10-23)",
           "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "quote": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-recovery-reset-focus-repair.json",
@@ -209,6 +240,16 @@ or rejection records are preserved; no record is authored or amended by this bui
           "choice": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
           "quote": "The intent is dropped when the user moves focus or leaves Settings, or when the status shows no recovery hold. Never pull focus away from somewhere the user put it.",
           "location": "task t-20261019-bd718f agreement R2 delayed-status focus continuation (2026-10-23)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "quote": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
           "label": "agent choice; agent-adopted (delegated-choice)"
         }
       ],
@@ -517,6 +558,145 @@ or rejection records are preserved; no record is authored or amended by this bui
         "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "R2 cancels queued/delegated recovery focus and deferred startup modal arrival only after key press, pointer press or window blur anywhere in the app. The chosen main control retains focus and the one-shot flag is consumed.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "The deferred recovery modal arrival must preserve the control the user chose before startup completed.",
+          "choice": "Cancel the deferred recovery arrival and restore the current main surface address when startup user activity wins; opening the native modal would otherwise move focus to Close even without a Reset hand-off. An uninterrupted recovery URL retains its existing landing. Window blur cancels a request when focus leaves for another window.",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "quote": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-user-action-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after pointerdown outside Settings",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after keydown outside Settings",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 cancels a startup recovery arrival after blur outside Settings",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after keydown outside the Settings dialog",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 drops pending recovery focus after blur outside the Settings dialog"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Actual key and pointer input still cancels inside nested shadow roots. App-only startup focus does not cancel the normal recovery arrival.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "quote": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Focus moves the app makes itself must not cancel it.",
+          "quote": "Focus moves the app makes itself must not cancel it.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "A user's focus move inside a shadow root must still cancel it.",
+          "quote": "A user's focus move inside a shadow root must still cancel it.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-user-action-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 cancels user keydown focus movement inside a shadow root",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 cancels user pointerdown focus movement inside a shadow root",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 preserves a startup recovery arrival across app focus moves"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Programmatic focusout/focusin inside shadow roots is not user input and must preserve the pending Reset hand-off. Key/pointer/window-blur cancellation replaces focus-event triggers.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "quote": "Only something the user did cancels the pending hand-off: a key press, a pointer press, or the window losing focus to another window.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Focus moves the app makes itself must not cancel it.",
+          "quote": "Focus moves the app makes itself must not cancel it.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "A user's focus move inside a shadow root must still cancel it.",
+          "quote": "A user's focus move inside a shadow root must still cancel it.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "whatever you think is best",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-23 (delegation quoted in CR37c builder assignment)",
+          "delegationScope": "CR37c R2 startup recovery hand-off, clarified during evidence failure investigation.",
+          "choice": "Prefer the smallest rule that holds. If key presses, pointer presses and window blur cover every user-caused focus change you tested, drop the focus-event triggers rather than filtering them.",
+          "quote": "Prefer the smallest rule that holds. If key presses, pointer presses and window blur cover every user-caused focus change you tested, drop the focus-event triggers rather than filtering them.",
+          "location": "task t-20261019-bd718f evidence-failure investigation continuation (2026-10-24)",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-recovery-reset-app-focus-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains the pending hand-off across app focus moves inside shadow roots"
+      ],
+      "repaired": true
     }
   ]
 }

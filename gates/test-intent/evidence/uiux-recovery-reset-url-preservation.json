@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T23:00:19.709Z",
-  "revision": "b649e9aa66b44f5ce013e75058cdcb4f139e694b",
-  "tree": "d826ab7ecc77292783ae904b7d123881853cb4e7",
+  "createdAt": "2026-10-24T01:02:17.309Z",
+  "revision": "f3bc416ae4f5de4f25e3536167e3c8593c9264bc",
+  "tree": "9b7ab93c5f4fe2de96d912a2f0b2b4ff3dbb7dfe",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-poll/evidence-tmp/test-intent-vitest-2821679-1792796414250.json\"",
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-636581-1792803731009.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5458
+      "durationMs": 6299
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#R2 does not focus Reset for a false recovery URL flag",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:130a49c47adcafc5168b8599df236b6ce05467697a9d991725ee9e47cce6e37e",
+      "contentDigest": "sha256:4323556e5e19b931eefc3db01b387d7af8b92ea1eb5d741f21cede4d90c2180b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:89ba3708b65c4c30e09e9b394d147a227348275a0e48bd06d7f87e7f8ab45580"
+  "digest": "sha256:cfc008524b2a38fb3d728f052c7fed6d5db9d3dd22346827eaec2995b7846d34"
 }
