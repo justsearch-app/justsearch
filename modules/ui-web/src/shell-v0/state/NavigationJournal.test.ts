@@ -76,6 +76,16 @@ describe('NavigationJournal', () => {
       expect(state.entries[0]!.url).toBe('justsearch://surface/core.search-surface?query=rust');
     });
 
+    it('R2 keeps an incoming recovery URL out of the departing surface journal entry', () => {
+      const stage = 'justsearch://surface/core.unified-chat-surface';
+      recordNavigation('core.unified-chat-surface', stage, 'Search', 'RAIL');
+      window.location.hash = '#justsearch://surface/core.settings-surface?focusSettingsRecovery=true';
+      recordNavigation('core.settings-surface', 'justsearch://surface/core.settings-surface', 'Settings', 'URL_BAR');
+      const state = getJournalState();
+      expect(state.entries[0]!.url).toBe(stage);
+      expect(state.entries.every(entry => !entry.url.includes('focusSettingsRecovery'))).toBe(true);
+    });
+
     it('de-duplicates consecutive same-surface navigations', () => {
       recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.search-surface', 'url2', 'Search', 'RAIL');

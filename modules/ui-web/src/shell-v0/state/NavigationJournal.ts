@@ -122,6 +122,9 @@ function snapshotCurrentEntry(): void {
   const hash = window.location.hash;
   if (!hash || !hash.startsWith('#justsearch://')) return;
   const currentUrl = hash.slice(1);
+  // On boot/popstate the URL already names the incoming surface, not the departing one.
+  const address = parseUrl(currentUrl);
+  if (address?.kind !== 'navigate' || address.target !== entries[cursor]!.surfaceId) return;
   if (entries[cursor]!.url !== currentUrl) {
     entries[cursor] = { ...entries[cursor]!, url: currentUrl };
   }

@@ -151,8 +151,8 @@ def cmd_ui_a11y_gate(ctx, ui_url, output_dir, timeout_ms):
     --fixtures state and compares its axe violations to the surface's accepted
     knownRules. Exit 0 = clean, 1 = a NEW violation or any serious/critical violation
     (including baselined rules), 2 = capture/axe error.
-    Also runs on PRs as the advisory `Measured axe` job in ci.yml (ADR-0026 amendment
-    2026-09-05); that lane is not a required check, so run this locally too.
+    Also runs on PRs as the required `Measured axe` job in ci.yml (ADR-0026 amendment
+    2026-09-05, promoted to required 2026-10-24); run it locally before you push.
     """
     from .. import ui_a11y_gate, ui_shot
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-23T19:42:20.060Z" hostname="elias-systemproductname" time="1.059">
+  <properties/>
+  <testcase name="rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload()" classname="io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest" time="1.031"/>
+  <testcase name="legacyNumericVerdictLoadsWithoutRejudging()" classname="io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/home/elias/.cache/am/4ihj5hgc/tmp/gradle-home/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.17.7/fbf3d6d649ed37fc9e9c59480a05be0a26e3c2da/byte-buddy-agent-1.17.7.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>
