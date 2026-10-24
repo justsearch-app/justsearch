@@ -111,10 +111,11 @@ public sealed interface SelectionPayload
    * Tempdoc 549 Slice 4 (G33/G111 LLM narration). A search-pipeline trace the user asked the
    * LLM to explain in words. {@code scope} is "query" (whole-query trace) or "hit" (a single
    * result's ranking provenance); {@code summary} is the FE-rendered trace text fed to the LLM
-   * as context. Carries no per-hit raw doc content — privacy-safe like the underlying trace.
+   * as context. Optional {@code docId} identifies the hit for source navigation only.
+   * Carries no per-hit raw doc content — privacy-safe like the underlying trace.
    */
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  record SearchTrace(String scope, String summary) implements SelectionPayload {
+  record SearchTrace(String scope, String summary, String docId) implements SelectionPayload {
     public SearchTrace {
       scope = (scope == null || scope.isBlank()) ? "query" : scope;
       summary = summary == null ? "" : summary;

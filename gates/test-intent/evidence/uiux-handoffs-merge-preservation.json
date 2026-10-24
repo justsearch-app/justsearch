@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T23:41:34.295Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "5299d2f639e3297bc41201404741e64c15eebb14",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3385233-1792798890018.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4276
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts#merge ordinary hand-off keeps its forced shape and exact selection",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.mergeHandoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf186ab775975b05c2990dd20aaa9c170b948b73b614e09944452451e4fcf00e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "merge ordinary hand-off keeps its forced shape and exact selection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge an unscoped Summarize input failure is not a no-matching-files result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "merge an unscoped Summarize input failure is not a no-matching-files result",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:250e282dc3fe4c3d9e860a2d87dd90c2e5f88d3a4c04cca452835deae68e544c"
+}

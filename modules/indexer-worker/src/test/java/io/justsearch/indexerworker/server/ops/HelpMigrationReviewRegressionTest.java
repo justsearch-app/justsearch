@@ -52,10 +52,10 @@ final class HelpMigrationReviewRegressionTest {
           new AtomicReference<>(""), () -> null, () -> null, ignored -> {},
           LoggerFactory.getLogger(getClass()));
       assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
-      assertEquals("default", queue.pollPending(1).getFirst().collection());
+      assertNull(queue.pollPending(1).getFirst().collection());
       var operation = queue.listSwitchBufferOpsStrict().getFirst();
       assertEquals(migration.building_generation(), operation.generation());
-      assertEquals("default", SwitchBufferUpsert.decode(operation.payload()).collection());
+      assertNull(SwitchBufferUpsert.decode(operation.payload()).collection());
     }
   }
 

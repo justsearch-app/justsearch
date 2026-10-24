@@ -1,0 +1,247 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T00:13:43.999Z",
+  "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+  "tree": "9262f571b6a2a8ecc51656b5a95d64c153dbdde8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3761331-1792800805900.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6645
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'inline trace'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 selection identity survives edited text and record reload: 'inline trace'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'shortened'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 selection identity survives edited text and record reload: 'shortened'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'different question'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 selection identity survives edited text and record reload: 'different question'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'empty record question'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 selection identity survives edited text and record reload: 'empty record question'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 a document summary cannot acquire Explain framing by editing its question",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 a document summary cannot acquire Explain framing by editing its question",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 legacy trace subject remains Explain without consulting editable words",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 legacy trace subject remains Explain without consulting editable words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 a trace with no document identity remains trace-only after reload",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f3695f0903eaf9d676a7f1bc1a136ef05c2c1b52ad3bd8879a1f9e0249d46034",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 a trace with no document identity remains trace-only after reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'inline trace'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'inline trace'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'shortened'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'shortened'",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'different question'",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6aa3aa072204d90c31b12f6979317c138a84fa83a3ba7bff54b38d16e036e2b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'different question'",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f25592889",
+    "revision": "f25592889dd67ee157f753d5c77ae36c9d134994",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3761331-1792800815112.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8527,
+        "output": "JSON report written to /home/elias/.cache/am/71n4orv3/tmp/test-intent-vitest-3761331-1792800815112.json\n\nWP1.3b evidence: --cache=false --configLoader runner --maxWorkers=2\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'inline trace'",
+        "classification": "assertion",
+        "detail": "HO5 selection identity survives edited text and record reload: 'inline trace':  AssertionError: expected 'Based on your documents' to be 'Explains the ranking of chosen-orchar…' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:25:59\n    at processTicksAndRejections (n"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'shortened'",
+        "classification": "assertion",
+        "detail": "HO5 selection identity survives edited text and record reload: 'shortened':  AssertionError: expected 'Based on your documents' to be 'Explains the ranking of chosen-orchar…' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:25:59"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'different question'",
+        "classification": "assertion",
+        "detail": "HO5 selection identity survives edited text and record reload: 'different question':  AssertionError: expected 'Based on your documents' to be 'Explains the ranking of chosen-orchar…' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:25:59"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 selection identity survives edited text and record reload: 'empty record question'",
+        "classification": "assertion",
+        "detail": "HO5 selection identity survives edited text and record reload: 'empty record question':  AssertionError: expected 'Based on your documents' to be 'Explains the ranking of chosen-orchar…' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:25:59"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 a document summary cannot acquire Explain framing by editing its question",
+        "classification": "assertion",
+        "detail": "HO5 a document summary cannot acquire Explain framing by editing its question:  AssertionError: expected 'Explains the ranking of chosen-orchar…' not to contain 'Explains the ranking'\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:35:63\n    at file:///home/elias/dev/justsearch/.claude/wo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 legacy trace subject remains Explain without consulting editable words",
+        "classification": "assertion",
+        "detail": "HO5 legacy trace subject remains Explain without consulting editable words:  AssertionError: expected 'Based on your documents' to be 'Explains the ranking of chosen-orchar…' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:39:99\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts#HO5 a trace with no document identity remains trace-only after reload",
+        "classification": "assertion",
+        "detail": "HO5 a trace with no document identity remains trace-only after reload:  AssertionError: expected 'Searched your documents but found not…' to be 'Explains the ranking trace' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/sv3-selectionTrust.test.ts:44:69\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'inline trace'",
+        "classification": "assertion",
+        "detail": "HO5 edited Explain keeps selection identity before send: 'inline trace':  AssertionError: expected undefined to be 'search-trace' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:524:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'shortened'",
+        "classification": "assertion",
+        "detail": "HO5 edited Explain keeps selection identity before send: 'shortened':  AssertionError: expected undefined to be 'search-trace' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:524:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'different question'",
+        "classification": "assertion",
+        "detail": "HO5 edited Explain keeps selection identity before send: 'different question':  AssertionError: expected undefined to be 'search-trace' // Object.is equality\n    at /home/elias/.cache/am/71n4orv3/tmp/test-intent-before-4AJOd9/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:524:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/"
+      }
+    ]
+  },
+  "digest": "sha256:9273d369bc88fe37c554fb3450036dd4853d283890609a00f4689e045b0d2312"
+}

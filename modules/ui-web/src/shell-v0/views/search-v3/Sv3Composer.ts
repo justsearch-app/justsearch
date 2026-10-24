@@ -1108,6 +1108,7 @@ export class Sv3Composer extends JfElement {
     schemaDraft: { type: String, attribute: false },
     schemaError: { state: true },
     structuredError: { type: String, attribute: false },
+    taskNotice: { type: String, attribute: 'task-notice' },
     degradationOpen: { state: true },
   };
 
@@ -1130,6 +1131,7 @@ export class Sv3Composer extends JfElement {
   declare schemaDraft: string;
   declare private schemaError: string;
   declare structuredError: string;
+  declare taskNotice: string;
   /**
    * The live run accepts a mid-run submit as a STEER that joins it (an agent run does; an ask stream
    * has no such channel). It is what decides whether a submit while the slot is Stop is a refusal or
@@ -1246,6 +1248,7 @@ export class Sv3Composer extends JfElement {
     this.schemaDraft = '';
     this.schemaError = '';
     this.structuredError = '';
+    this.taskNotice = '';
     this.scopeLabel = '';
     this.modelLabel = '';
     this.draft = '';
@@ -1489,6 +1492,7 @@ export class Sv3Composer extends JfElement {
                 : nothing}
             </div>
           </div>
+          ${this.taskNotice === '' ? nothing : html`<p class="notice" role="status">${this.taskNotice}</p>`}
           ${this.tier === 'structured' ? html`<div class="schema-field">
             <label for="sv3-schema">JSON schema</label>
             <textarea id="sv3-schema" rows="3" data-testid="sv3-composer-schema"
