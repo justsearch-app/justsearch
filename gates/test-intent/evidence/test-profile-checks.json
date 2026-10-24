@@ -1,0 +1,1126 @@
+{
+  "scope": "fb6884 test-environment guard, local Linux checks; independent acceptance is reserved for the verifier.",
+  "createdAt": "2026-10-23T06:28:10.106217+00:00",
+  "baseline": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+  "preflight": ".agents/preflight does not exist in this checkout.",
+  "G1_G2": {
+    "repairEvidence": "test-profile-isolation.json",
+    "before": "Both probe methods assertion-failed on the actual developer user.home/HOME; no real profile contents read or written.",
+    "after": "Both methods executed and passed, also as late-registered integrationTest and systemTest tasks.",
+    "lateTaskCommand": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:configuration:integrationTest :modules:configuration:systemTest --init-script <own-init-script> -PskipWebBuild=true --console=plain",
+    "lateTasks": [
+      {
+        "task": ":modules:configuration:integrationTest",
+        "junit": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 2,
+          "skippedCases": []
+        }
+      },
+      {
+        "task": ":modules:configuration:systemTest",
+        "junit": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 2,
+          "skippedCases": []
+        }
+      }
+    ],
+    "lateTaskMarkers": [
+      "PROFILE_TIER systemTest: home=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-guard-y7UYTd/g3/modules/configuration/build/test-profile/systemTest/home ort=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-guard-y7UYTd/g3/modules/configuration/build/ort-optimized",
+      "PROFILE_TIER integrationTest: home=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-guard-y7UYTd/g3/modules/configuration/build/test-profile/integrationTest/home ort=/home/elias/dev/justsearch/.claude/worktrees/data-folder/tmp/agent-tmp/profile-guard-y7UYTd/g3/modules/configuration/build/ort-optimized"
+    ],
+    "instrumentationAttempt": "First temporary init script also targeted the included build-logic build and failed before tests (configuration project absent). Restricted the temporary script to builds containing that project; both tasks then executed successfully.",
+    "temporaryInitScript": "gradle.projectsEvaluated {\n  def configuration = gradle.rootProject.findProject(':modules:configuration')\n  if (configuration == null) return\n  def buildDirectory = configuration.layout.buildDirectory\n  ['integrationTest', 'systemTest'].each { tier ->\n    configuration.tasks.register(tier, org.gradle.api.tasks.testing.Test) {\n      testClassesDirs = configuration.sourceSets.test.output.classesDirs\n      classpath = configuration.sourceSets.test.runtimeClasspath\n      filter.includeTestsMatching('io.justsearch.configuration.TestProfileIsolationTest')\n      doLast {\n        def home = new File(systemProperties['user.home'])\n        assert home == new File(buildDirectory.get().asFile, \"test-profile/${tier}/home\")\n        def ort = new File(environment['JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR'])\n        def expectedOrt = (System.getProperty('os.name').startsWith('Windows')\n            ? new File(System.getProperty('java.io.tmpdir'), 'js-ort-test-configuration')\n            : new File(buildDirectory.get().asFile, 'ort-optimized'))\n        assert ort == expectedOrt\n        logger.lifecycle(\"PROFILE_TIER ${tier}: home=${home} ort=${ort}\")\n      }\n    }\n  }\n}\n",
+    "javaChildAudit": "test-profile-java-children.json",
+    "javaChildLaunchRecords": 73,
+    "explicitJvmHomeRecords": 2,
+    "knownGap": "Java child JVM user.home is not inherited from parent properties. Missing explicit child home/data settings are deferred by the owner; G2 checks inherited environment only. No JAVA_TOOL_OPTIONS/JDK_JAVA_OPTIONS injected."
+  },
+  "G3": {
+    "evidence": "test-profile-g3.json",
+    "result": "One actual addWatchedPath test passed with the incident harness setters removed only in a disposable clone. Task-home watched_roots.json created; fake-HOME sentinel bytes and directory entries unchanged; harness restored."
+  },
+  "G4": {
+    "candidateEvidence": "test-profile-runner-candidate.json",
+    "historicalEvidence": "test-profile-runner-historical.json",
+    "result": "Both probe methods executed and passed in each actual checkout; historical checkout uses the old convention.",
+    "nodeRegressionBefore": "New runner CLI profile assertion fails on the baseline runner: candidate HOME must use its checkout profile.",
+    "nodeCommand": "node --test scripts/governance/gates/test-intent/run-evidence-cli.test.mjs scripts/governance/gates/test-intent/run-evidence-cleanup.test.mjs scripts/governance/gates/test-intent/units.test.mjs",
+    "nodeResult": "17 outer tests passed, 3 Windows-only tests skipped; wrapped units.test reports all 40 passed."
+  },
+  "G5": {
+    "cacheSequence": {
+      "populate": {
+        "taskLines": [
+          "> Task :modules:configuration:test"
+        ],
+        "actionableTaskSummary": [
+          "13 actionable tasks: 1 executed, 12 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 9s",
+        "logSha256": "ee1f4c899460f586cb8f9b8347c8aab3ff7535861dd4eb187ec2128a0cb21228"
+      },
+      "restore": {
+        "taskLines": [
+          "> Task :modules:configuration:test FROM-CACHE"
+        ],
+        "actionableTaskSummary": [
+          "9 actionable tasks: 1 from cache, 8 up-to-date"
+        ],
+        "configurationCacheReused": true,
+        "buildResult": "BUILD SUCCESSFUL in 3s",
+        "logSha256": "e7479e136ea952d44adcc4e3fd93ab685af577ec68f6b829d41ecde0aefcbf77"
+      },
+      "repeat": {
+        "taskLines": [
+          "> Task :modules:configuration:test UP-TO-DATE"
+        ],
+        "actionableTaskSummary": [
+          "9 actionable tasks: 9 up-to-date"
+        ],
+        "configurationCacheReused": true,
+        "buildResult": "BUILD SUCCESSFUL in 680ms",
+        "logSha256": "472e8592b132a210ae99ef09d1d5b1e7792eb021f406391eb415cfb66681a80d"
+      }
+    },
+    "cacheCommands": "Three separate guarded :modules:configuration:test calls in the disposable candidate clone: populate; remove only its own probe XML; restore; identical repeat.",
+    "cachePreservation": "GRADLE_USER_HOME retained; build-logic/configuration compilation reused FROM-CACHE outputs across clones; test outputs restored FROM-CACHE and next invocation UP-TO-DATE with configuration-cache reuse.",
+    "ort": "Late integrationTest and systemTest assert the unchanged single module build/ort-optimized path; no task-profile ORT cache substitution. Existing Windows js-ort-test-<module> branch unchanged."
+  },
+  "G6": {
+    "moduleDiscovery": "Searched test/testFixtures source sets for user.home, canonical JustSearch home/data properties/environment and PlatformPaths resolution. Other modules only matching PlatformPaths OS predicates were excluded; ui-web is outside scope.",
+    "clientEnvironment": "HOME=<own-scratch>/fake-home GRADLE_USER_HOME=/home/elias/.gradle JUSTSEARCH_HOME=<own-scratch>/inherited-home JUSTSEARCH_DATA_DIR=<own-scratch>/inherited-data",
+    "moduleRuns": [
+      {
+        "module": "configuration",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:configuration:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 347,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 347,
+          "skippedCases": []
+        },
+        "taskLines": [
+          "> Task :modules:configuration:test"
+        ],
+        "actionableTaskSummary": [
+          "13 actionable tasks: 13 executed"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 25s",
+        "logSha256": "06295af511bee61204a9ca072061d9c1abc8c8d5e50840f88c49b80bf4cff082"
+      },
+      {
+        "module": "ui",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:ui:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 2151,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "passed": 2150,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.ui.api.mcp.McpEntityCarriageMetricTest",
+              "case": "real 781-v2 cell: carriage measured on real document geometries",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: run scripts/analysis/771-entity-carriage/extract-bridge-cases.py and pass -Djustsearch.entityCarriage.casesTsv=<tsv> to measure a real cell"
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:ui:test"
+        ],
+        "actionableTaskSummary": [
+          "89 actionable tasks: 50 executed, 28 from cache, 11 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 9m 30s",
+        "logSha256": "31ac428791a32def2cd58122fc97ae156b7ba177dfc1129f181fdbaf5bbb3184"
+      },
+      {
+        "module": "app-services",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:app-services:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 4197,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 11,
+          "passed": 4186,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+              "case": "immediateWrapperExitRetainsTheActualSurvivorEveryTime()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+              "case": "membershipSettlesWhileTheJobCountLagsAnExit()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatJobEndFailureTest",
+              "case": "aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest",
+              "case": "aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest",
+              "case": "aFailureJoiningTheJobLeavesNoProcessBehind()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest",
+              "case": "strictModeLaunchesAndRefusesAsTheJdkDoes()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+              "case": "4f — No Supplier<T> field escape outside late-binding holders (deferred)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+              "case": "4e — LAZY phases return Memoized<T> / Supplier<T> (deferred)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+              "case": "4d — Phase Output records have no mutable-collection components (deferred)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.gpu.DeviceFactsMachineTest",
+              "case": "thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.worker.UnreadableRootAvailabilityTest",
+              "case": "aRootThatCannotBeListedShowsTheRootLevelUnavailableState()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACE is set through the Windows ACL view"
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:app-services:test"
+        ],
+        "actionableTaskSummary": [
+          "77 actionable tasks: 1 executed, 76 up-to-date"
+        ],
+        "configurationCacheReused": true,
+        "buildResult": "BUILD SUCCESSFUL in 11m 32s",
+        "logSha256": "c94a465e33779b22c72163c096ea887fdd9d14a44d59f6cd8f1aaf577324b9e8"
+      },
+      {
+        "module": "worker-services",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:worker-services:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 1979,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 18,
+          "passed": 1961,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.indexerworker.extract.PreparedExtractionInputTest",
+              "case": "optionalLocalPreparationTiming()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: assumption is not true"
+            },
+            {
+              "class": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+              "case": "commandOnPathIsNeverLaunched()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+              "case": "scoopPathLaunchesRealExecutable()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+              "case": "transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest",
+              "case": "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest",
+              "case": "everyProductionTesseractProbeHasExactOwnerAndClosedWindow(String)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.IndexedSourceUnreadableTest",
+              "case": "aLockedSourceWithIndexedContentIsReportedAsIndexedSourceUnreadable()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+              "case": "theFreshnessCheckKeepsTheDocumentWhenItsDriveLetterNowHoldsAnotherVolume()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+              "case": "admissionStillRetiresASourceDeletedFromTheSameVolume()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+              "case": "admissionKeepsTheSourceWhenItsDriveLetterNowHoldsAnotherVolume()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+              "case": "admissionKeepsTheSourceWhenItsDriveLetterIsUnmapped()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+              "case": "aFileReplacedByADanglingJunctionIsRetired()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: junctions are a Windows reparse point"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+              "case": "anAccessDeniedSourceIsRetriedWithoutATimeLimit()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACL is set through the Windows ACL view"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+              "case": "aLockedSourceIsRetriedWithoutATimeLimit()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.RootPresenceGuardTest",
+              "case": "anUnreadableVolumeRecordVouchesForNothing()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: volume identity and NOSHARE locks are Windows features"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.RootPresenceGuardTest",
+              "case": "aDifferentFolderMappedAtTheSameLetterDoesNotVouch()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.SyncDirectoryOpsCandidateDiscoveryTest",
+              "case": "windowsNativeFileIdSmokeAlsoCoversRefsWhenTempDirectoryIsOnRefs()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.splade.SpladeIndexContentCrashHarnessTest",
+              "case": "batch-encode every parent and reconstructed chunk text from the crashed index",
+              "reason": ""
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:worker-services:test"
+        ],
+        "actionableTaskSummary": [
+          "64 actionable tasks: 6 executed, 1 from cache, 57 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 3m 39s",
+        "logSha256": "3caf1dbe6d97dff3e98278de15ab5e1c4c40c00766e7aa8473912813ccf33ad6"
+      },
+      {
+        "module": "indexer-worker",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:indexer-worker:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 1437,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 28,
+          "passed": 1409,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+              "case": "long text in batch is chunked, not truncated",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+              "case": "single-item batch delegates correctly",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+              "case": "empty batch returns empty list",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+              "case": "short texts in batch match single-embed results",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+              "case": "mixed short and long texts in batch all produce correct results",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "different texts produce different embeddings",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "similar texts produce similar embeddings",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "empty text produces valid embedding",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "embedding is deterministic",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "embedding is L2-normalized (unit length)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "produces 768-dimensional embedding",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+              "case": "short text produces single chunk",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest",
+              "case": "aLockedSourceIsStillRetriedPastTheSevenDayWindow()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest",
+              "case": "aLockedSourceIsNotRequeuedWithinSeconds()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: share modes are a Windows file-system feature"
+            },
+            {
+              "class": "io.justsearch.indexerworker.loop.UnreadableAndReplacedSourceQueueTest",
+              "case": "aFileReplacedByADanglingJunctionLeavesTheIndex()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: junctions are a Windows reparse point"
+            },
+            {
+              "class": "io.justsearch.indexerworker.server.CommittedBootDeferredRootTest",
+              "case": "theOriginalVolumeReturningReconcilesTheRootAndRemovesThePreviousGeneration()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.server.CommittedBootDeferredRootTest",
+              "case": "aBootWithThePreviousGenerationServesTheOtherRootsWhileARootIsOnAnotherVolume()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.server.CommittedBootRemovedDeferredRootTest",
+              "case": "aDeferredRootRemovedWhileAnotherVolumeIsMappedIsNeverIndexedWatchedOrRecorded()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.server.CommittedBootRemovedDeferredRootTest",
+              "case": "theRemovedRootAddedAgainWithTheOriginalVolumeIndexesItAndNothingOfTheOther()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.server.ConfiguredCollectionVolumeTest",
+              "case": "aConfiguredCollectionWhoseLetterHoldsAnotherVolumeRecordsNothingAndKeepsItsIndex()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.server.UpgradeRootVolumeSeedingTest",
+              "case": "anUpgradeWhereTheLetterHoldsAnotherVolumeRecordsNothingUntilTheDriveReturns()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.CommittedBootRootVolumeTest",
+              "case": "theCommittedBootReconcileDefersARootOnAnotherVolumeUntilItReturns()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.DifferentVolumeRootStateTest",
+              "case": "aRootWhoseLetterNowHoldsAnotherVolumeShowsTheRootLevelState()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.DifferentVolumeRootStateTest",
+              "case": "aRootOnTheSameVolumeStillWalksNormally()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.PruneDeniedSubfolderTest",
+              "case": "aDeniedSubfolderDoesNotStopTheDeletionsBesideIt()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACL is set through icacls"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.RootVolumeCheckTest",
+              "case": "theVolumeCheckTheHeadAsksEachCycleTellsAnotherVolumeWithoutAWalk()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.WatcherDeleteDifferentVolumeTest",
+              "case": "aWatcherDeleteOnAnotherVolumeAtTheSameLetterRemovesNothing()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.indexerworker.services.WatcherDeleteDifferentVolumeTest",
+              "case": "aWatcherDeleteOnTheSameVolumeStillRemovesTheDocument()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters and volume identity exist on Windows only"
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:indexer-worker:test"
+        ],
+        "actionableTaskSummary": [
+          "86 actionable tasks: 5 executed, 81 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 4m 46s",
+        "logSha256": "6c38bd8fa257e9df9adbb3eeb0c98000fb967d6e2bd3b2c7f18242926da561d3"
+      },
+      {
+        "module": "app-engine",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:app-engine:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 762,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 9,
+          "passed": 753,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.engine.EngineLinuxRootVolumeLiveTest",
+              "case": "absentDifferentUnknownAndReturningFilesystemsPreserveTheOriginalIndex()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "watchingResumesWithoutARestartWhenTheOriginalVolumeReturnsAfterABoot()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aRestartOntoAnotherVolumeKeepsTheOriginalText()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "watcherEventsOnAnotherVolumeIndexNothing()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aRestartWhileUnavailableKeepsTheLastIndexedTime()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "theOriginalVolumeReturningIsIndexedAndPrunedAsBefore()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement",
+              "case": "primaryRateWithAndWithoutProbeChurn(Path)",
+              "reason": ""
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:app-engine:test"
+        ],
+        "actionableTaskSummary": [
+          "80 actionable tasks: 2 executed, 78 up-to-date"
+        ],
+        "configurationCacheReused": true,
+        "buildResult": "BUILD SUCCESSFUL in 11m 17s",
+        "logSha256": "0d1c5471517e58e922e9c88c389052120180f70650c2e694e78fd62e2d2bd678"
+      },
+      {
+        "module": "app-inference",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:app-inference:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 560,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "passed": 559,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.inference.ChatCrashLeftoverTest",
+              "case": "aCrashRestartEndsWhatTheCrashedServerLeftInItsJob()",
+              "reason": ""
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:app-inference:test"
+        ],
+        "actionableTaskSummary": [
+          "35 actionable tasks: 2 executed, 33 up-to-date"
+        ],
+        "configurationCacheReused": true,
+        "buildResult": "BUILD SUCCESSFUL in 1m 59s",
+        "logSha256": "3df4ebb1c47c07ba8fe060d9c70f62cc6370e766e39cb57b904f4cf05ba0b4cc"
+      },
+      {
+        "module": "app-launcher",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:app-launcher:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 108,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 108,
+          "skippedCases": []
+        },
+        "taskLines": [
+          "> Task :modules:app-launcher:test"
+        ],
+        "actionableTaskSummary": [
+          "86 actionable tasks: 2 executed, 84 up-to-date"
+        ],
+        "configurationCacheReused": true,
+        "buildResult": "BUILD SUCCESSFUL in 1m 30s",
+        "logSha256": "60908ef7aca516854c02f2a4dc34e6a0cd0ebfc843f4516e80c5e1ded9981a77"
+      },
+      {
+        "module": "app-observability",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:app-observability:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 641,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 641,
+          "skippedCases": []
+        },
+        "taskLines": [
+          "> Task :modules:app-observability:test"
+        ],
+        "actionableTaskSummary": [
+          "50 actionable tasks: 3 executed, 47 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 51s",
+        "logSha256": "1d36e593b59325762eadd22276668347c4662b8c0a71710042f2cc0b4fad692a"
+      },
+      {
+        "module": "ort-common",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:ort-common:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 378,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "passed": 372,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.ort.GpuAutoDetectionTest",
+              "case": "probe detects CUDA DLLs in conventional path",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.ort.GpuAutoDetectionTest",
+              "case": "probe returns empty / driver-only when sentinel exists but core DLLs missing",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.ort.NativeGpuLinuxLiveTest",
+              "case": "driverReportsDeviceIdentityAndMemoryWithoutSubprocesses()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.ort.OnnxMetadataProbeTest",
+              "case": "everyLocallyAvailableShippedModelMatchesRuntime()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: No shipped model binaries locally available"
+            },
+            {
+              "class": "io.justsearch.ort.OnnxMetadataProbeTest",
+              "case": "everyLocallyAvailableShippedModelUsesZeroNameOrMetadataSessions()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: No shipped model binaries locally available"
+            },
+            {
+              "class": "io.justsearch.ort.OnnxResolvedShapeProbeTest",
+              "case": "shippedCapabilitiesStillNeedNoProbeSessions()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: No shipped model binaries locally available"
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:ort-common:test"
+        ],
+        "actionableTaskSummary": [
+          "20 actionable tasks: 3 executed, 17 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 44s",
+        "logSha256": "24e47f7ea98c67b30f4b24b41f4e84911cf0f0101a265b808d053646a20dfa70"
+      },
+      {
+        "module": "reranker",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:reranker:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 71,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 71,
+          "skippedCases": []
+        },
+        "taskLines": [
+          "> Task :modules:reranker:test"
+        ],
+        "actionableTaskSummary": [
+          "21 actionable tasks: 2 executed, 19 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 3s",
+        "logSha256": "b1198af0d9df226e7f6bed429aa142a521dd7640d46f1bca3b9d8826674e3c2f"
+      },
+      {
+        "module": "telemetry",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:telemetry:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 96,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "passed": 95,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.telemetry.CollectorSmokeIT",
+              "case": "emitsSignalsWhenCollectorPresent()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: OTELCOL_BIN not provided; skipping CollectorSmokeIT"
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:telemetry:test"
+        ],
+        "actionableTaskSummary": [
+          "14 actionable tasks: 2 executed, 12 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 8s",
+        "logSha256": "1b39893e900f2fe2c3ec27ac49e6c87f3548fb21cfef4314bf5c22636201624a"
+      },
+      {
+        "module": "worker-core",
+        "exitCode": 0,
+        "command": "tmp/mem-guard.sh <own-memory-log> -- js-gradle-slot ./gradlew :modules:worker-core:test -PskipWebBuild=true --console=plain",
+        "junit": {
+          "tests": 476,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 8,
+          "passed": 468,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+              "case": "loadRealVocabulary()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: models/bge-m3/BAAI-bge-m3 (requires tokenizer.json) not found walking 8 parent directories up from /home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/worker-core; JUSTSEARCH_BGE_M3_MODEL_PATH env override also unset or invalid"
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+              "case": "doc vector from embedWithSpans is bit-identical to embed()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+              "case": "embed() sanity: produces a unit-length vector",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+              "case": "single span covering the whole doc matches an isolated embed() within epsilon",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+              "case": "multi-span: each chunk vector is unit-length and chunks differ",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+              "case": "long doc (> maxSeqLen tokens) returns null",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.index.GenerationPointerWindowsSharingTest",
+              "case": "windowsSharingDenialRetriesUntilTheReaderReleasesTheCurrentPointer()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.indexerworker.tokenizer.NoDeviceTokenizerCacheTest",
+              "case": "cpuTokenizerStartsAfterAGpuArchitectureCacheWasCreated(Path)",
+              "reason": ""
+            }
+          ]
+        },
+        "taskLines": [
+          "> Task :modules:worker-core:test"
+        ],
+        "actionableTaskSummary": [
+          "48 actionable tasks: 2 executed, 46 up-to-date"
+        ],
+        "configurationCacheReused": false,
+        "buildResult": "BUILD SUCCESSFUL in 1m 53s",
+        "logSha256": "854feb4d993529f5ed5fe5943ff140c1d69725c9b4efa6ffce9a8ee4d4253879"
+      }
+    ],
+    "fixtureAdjustments": [
+      {
+        "file": "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsContractTest.java",
+        "reason": "Task data override must be absent for platform-default fixtures. Same fixture inputs and assertions now run in an explicit fixture-home child; existing Java/Node fixture split unchanged.",
+        "baselineResult": "Selected adapted class BUILD SUCCESSFUL in 3s; two actual platform-default fixture children ran.",
+        "candidateResult": "Full configuration suite passed."
+      },
+      {
+        "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java",
+        "reason": "Relative-model-path fixture previously supplied only dataDir; resolved paths prefer justsearch.home. Fixture now also saves, supplies and restores its own temporary home, with unchanged assertions.",
+        "observedFailure": "Initial full app-services: 4197 tests, 1 failure (this fixture), 11 skipped. Targeted class before: 6 tests, 1 assertion failure.",
+        "fixedTargetedResult": "6 passed, 0 skipped.",
+        "fixedFullResult": {
+          "tests": 4197,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 11,
+          "passed": 4186,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+              "case": "immediateWrapperExitRetainsTheActualSurvivorEveryTime()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatJobAccountingTest",
+              "case": "membershipSettlesWhileTheJobCountLagsAnExit()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatJobEndFailureTest",
+              "case": "aLeftoverThatCannotBeEndedIsRecordedCountedAndItsExitRecorded()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest",
+              "case": "aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest",
+              "case": "aFailureJoiningTheJobLeavesNoProcessBehind()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.api.runtime.child.ChatLaunchFailureTextTest",
+              "case": "strictModeLaunchesAndRefusesAsTheJdkDoes()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+              "case": "4f — No Supplier<T> field escape outside late-binding holders (deferred)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+              "case": "4e — LAZY phases return Memoized<T> / Supplier<T> (deferred)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+              "case": "4d — Phase Output records have no mutable-collection components (deferred)",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.gpu.DeviceFactsMachineTest",
+              "case": "thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.services.worker.UnreadableRootAvailabilityTest",
+              "case": "aRootThatCannotBeListedShowsTheRootLevelUnavailableState()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: the deny ACE is set through the Windows ACL view"
+            }
+          ]
+        }
+      },
+      {
+        "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java",
+        "reason": "Static publishConfig callers declare temporary data folders. Contributing that fixture value at default priority let the guard JVM property override it, sharing a queue across fixtures. Use the same explicit test-fixture priority as the existing SSOT contribution. All recovery, queue and migration assertions/timeouts unchanged.",
+        "observedFailure": {
+          "junit": {
+            "tests": 762,
+            "failures": 10,
+            "errors": 0,
+            "skipped": 9
+          },
+          "failedCases": [
+            {
+              "class": "io.justsearch.app.engine.RecoverableQuitReplayTest",
+              "name": "configuredUnitReplaysOnceWithoutDuplicateChunks(Path)",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: 06:01:08.229 [main] INFO io.justsearch.configuration.JustSearchConfigurationLoader -- Using SSOT from repo layout: /home/elias/dev/justsearch/.\n[intermediate child log retained in raw XML]\n.905 [deferred-model-init] INFO io.justsearch.indexerworker.server.KnowledgeServer -- Background model init complete (20ms)\norg.sqlite.SQLiteException: [SQLITE_ERROR] SQL error or missing database (no such table: jobs)\n\tat org.sqlite.core.DB.newSQLException(DB.java:1179)\n\tat org.sqlite.core.DB.newSQLException(DB.java:1190)\n\tat org.sqlite.core.DB.throwex(DB.java:1150)\n\tat org.sqlite.core.NativeDB.prepare_utf8(Native Method)\n\tat org.sqlite.core.NativeDB.prepare(NativeDB.java:135)\n\tat org.sqlite.core.DB.prepare(DB.java:264)\n\tat org.sqlite.jdbc3.JDBC3Statement.lambda$executeQuery$1(JDBC3Statement.java:87)\n\tat org.sqlite.jdbc3.JDBC3Statement.withConnectionTimeout(JDBC3Statement.java:458)\n\tat org.sqlite.jdbc3.JDBC3Statement.executeQuery(JDBC3Statement.java:85)\n\tat io.justsearch.app.engine.RecoverableQuitReplayTest$Probe.run(RecoverableQuitReplayTest.java:217)\n\tat io.justsearch.app.engine.RecoverableQuitReplayTest$Probe.main(RecoverableQuitReplayTest.java:144)\n ==> expected: <1> but was: <99>"
+            },
+            {
+              "class": "io.justsearch.app.engine.RichDocumentInProcessTest",
+              "name": "a PDF is extracted, indexed and found by its extracted content, in process",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: indexing queue drained ==> expected: <0> but was: <2455>"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineReadWhileWriteTest",
+              "name": "concurrent searches succeed while documents are being indexed, and the index is consistent afterwards",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: indexing must finish while concurrent searches run ==> expected: <true> but was: <false>"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootInProcessPortsTest",
+              "name": "ingest through IndexingService, find through SearchPort, with no process boundary",
+              "kind": "failure",
+              "message": "org.sqlite.SQLiteException: [SQLITE_ERROR] SQL error or missing database (no such table: ingestion_ledger)"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineNativePointerBootMutationTest",
+              "name": "recordedBulkPostPointerStopRecoversAfterWritableQueueAndReplayWitnesses()",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: recorded cutover did not reach the real post-pointer transition ==> expected: <true> but was: <false>"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineNativePointerBootMutationTest",
+              "name": "nativePointerCutRetainsMutationsAcrossCancelledPublicationAndReopen()",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: Green file work must be terminal before broad deletion ==> expected: <true> but was: <false>"
+            },
+            {
+              "class": "io.justsearch.app.engine.RecoverableChunkCompletenessTest",
+              "name": "interruptedWatchedAndRecordedIngestReplaysEveryDeclaredChunk(Path)",
+              "kind": "failure",
+              "message": "org.sqlite.SQLiteException: [SQLITE_ERROR] SQL error or missing database (no such table: jobs)"
+            },
+            {
+              "class": "io.justsearch.app.engine.RecordedBulkEngineRestartTest",
+              "name": "preparedBulkSurvivesBuildRestartAndActivatesInProcess()",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: the live promoted successor never wrote terminal success ==> expected: <true> but was: <false>"
+            },
+            {
+              "class": "io.justsearch.app.engine.RecordedBulkEngineRestartTest",
+              "name": "incompleteRegisteredSourceWaitsOnAForExactRecordedApproval()",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: an incomplete source must wait for the user's candidate-bound decision ==> expected: <true> but was: <false>"
+            },
+            {
+              "class": "io.justsearch.app.engine.RecordedBulkEngineRestartTest",
+              "name": "registeredNoFileSourceReplaysNewerUpdateDeleteAndAdditionAcrossBuildRestart()",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: the candidate never promoted after exact no-file replay ==> expected: <true> but was: <false>"
+            }
+          ],
+          "buildResult": "BUILD FAILED in 29m 41s",
+          "fixtureBeforeSha256": "c7f41ed9511296e8bf9b2e6a26a95a70c7f5d227b016b86d5037adfa968664cb"
+        },
+        "fixedFullResult": {
+          "tests": 762,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 9,
+          "passed": 753,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.engine.EngineLinuxRootVolumeLiveTest",
+              "case": "absentDifferentUnknownAndReturningFilesystemsPreserveTheOriginalIndex()",
+              "reason": ""
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "watchingResumesWithoutARestartWhenTheOriginalVolumeReturnsAfterABoot()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aRestartOntoAnotherVolumeKeepsTheOriginalText()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "watcherEventsOnAnotherVolumeIndexNothing()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "aRestartWhileUnavailableKeepsTheLastIndexedTime()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+              "case": "theOriginalVolumeReturningIsIndexedAndPrunedAsBefore()",
+              "reason": "org.opentest4j.TestAbortedException: Assumption failed: SUBST drive letters exist on Windows only"
+            },
+            {
+              "class": "io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement",
+              "case": "primaryRateWithAndWithoutProbeChurn(Path)",
+              "reason": ""
+            }
+          ]
+        }
+      },
+      {
+        "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigFromEnvironmentTest.java",
+        "reason": "The relative-model-path case exercises the baseDir argument with no configured base. Its snapshot now explicitly omits task-injected home/data entries at JVM and environment ordinals, using the existing source helper. Process properties/env and ORT environment contributions remain isolated; original entry point and assertions unchanged.",
+        "observedModuleFailure": {
+          "junit": {
+            "tests": 560,
+            "failures": 2,
+            "errors": 0,
+            "skipped": 1
+          },
+          "failedCases": [
+            {
+              "class": "io.justsearch.app.inference.InferenceConfigFromEnvironmentTest",
+              "name": "Relative LLM_MODEL_PATH override is resolved against baseDir",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: expected: </home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/app-inference/build/tmp/test-jvm/test/junit-5819401256848850181/rel/rel-model.gguf> but was: </home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/app-inference/build/test-profile/test/home/.justsearch/rel/rel-model.gguf>"
+            },
+            {
+              "class": "io.justsearch.app.inference.ManagedLlamaAuthenticationTest",
+              "name": "aBinaryThatRefusesTheEnvironmentKeyFailsAndIsCleanedUp()",
+              "kind": "failure",
+              "message": "java.nio.file.NoSuchFileException: /home/elias/dev/justsearch/.claude/worktrees/data-folder/modules/app-inference/build/tmp/test-jvm/test/junit-8992687698508480587/data/logs/llama-server.log"
+            }
+          ],
+          "buildResult": "BUILD FAILED in 2m 1s"
+        },
+        "fixedFullResult": {
+          "tests": 560,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "passed": 559,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.inference.ChatCrashLeftoverTest",
+              "case": "aCrashRestartEndsWhatTheCrashedServerLeftInItsJob()",
+              "reason": ""
+            }
+          ]
+        }
+      },
+      {
+        "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java",
+        "reason": "Read the captured managed child AppendToLog target instead of guessing the old dataDir fallback location. Explicit task JUSTSEARCH_HOME now owns that log. Refusal text, no-secret, no-retry, cleanup and fault-injection assertions unchanged; typed stdio assertion added.",
+        "observedFailure": "Initial full module: NoSuchFileException at the guessed fixture data/logs/llama-server.log; the guard home selects the child log target.",
+        "fixedFullResult": {
+          "tests": 560,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "passed": 559,
+          "skippedCases": [
+            {
+              "class": "io.justsearch.app.inference.ChatCrashLeftoverTest",
+              "case": "aCrashRestartEndsWhatTheCrashedServerLeftInItsJob()",
+              "reason": ""
+            }
+          ]
+        }
+      },
+      {
+        "file": "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherInternalsTest.java",
+        "reason": "The unset-data fallback case now removes JUSTSEARCH_DATA_DIR only in an owned child with explicit temporary JVM home and JUnit-owned working directory. The same reflective ensureDataDir call and both original suffix/existence assertions run in the child; parent timeout/exit assertions propagate failure. Fixed-folder best-effort cleanup retired because @TempDir owns the output.",
+        "observedModuleFailure": {
+          "junit": {
+            "tests": 108,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "failedCases": [
+            {
+              "class": "io.justsearch.applauncher.LauncherInternalsTest",
+              "name": "ensureDataDirCreatesDefaultDirectory()",
+              "kind": "failure",
+              "message": "org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+            }
+          ],
+          "buildResult": "BUILD FAILED in 1m 11s"
+        },
+        "fixedFullResult": {
+          "tests": 108,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": 108,
+          "skippedCases": []
+        }
+      }
+    ]
+  },
+  "G7": {
+    "status": "unverified",
+    "reason": "Linux host; Windows CI lanes not run here. USERPROFILE/APPDATA/LOCALAPPDATA covered by executed local JVM and child assertions; Windows CI remains for the verifier."
+  },
+  "governance": {
+    "command": "node scripts/governance/gates/test-intent/cli.mjs --base $(git merge-base HEAD origin/main)",
+    "exitCode": 1,
+    "result": "All eight flagged items covered; sole problem is acceptance-missing, reserved for the independent verifier.",
+    "output": "test-intent: FAIL (base b62fc592175f via explicit b62fc592175fd8fb47dc296586770b7e0e571d16; event local)\nFlagged items (8):\n  [covered] M build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt — build configuration: changed lines touch test selection or execution (+113 names test selection or execution; 22 lines)\n  [covered] M modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java — JVM test source set 'test'\n  [covered] M modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceConfigFromEnvironmentTest.java — JVM test source set 'test'\n  [covered] M modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java — JVM test source set 'test'\n  [covered] M modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherInternalsTest.java — JVM test source set 'test'\n  [covered] M modules/app-services/src/test/java/io/justsearch/app/services/gpu/StoredChatBudgetTest.java — JVM test source set 'test'\n  [covered] M modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsContractTest.java — JVM test source set 'test'\n  [covered] A modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java — JVM test source set 'test'\nProblems (1):\n  test-intent/acceptance-missing: gates/test-intent/.changesets/test-profile-isolation.md: no acceptance record (current digest sha256:f32035cb7c3f35ef9f1609a67e6a4cc231f6fc289c9a78a20eaccea2ac708bc2)\nChangeset gates/test-intent/.changesets/test-profile-isolation.md: current digest sha256:f32035cb7c3f35ef9f1609a67e6a4cc231f6fc289c9a78a20eaccea2ac708bc2 — gates/test-intent/.changesets/test-profile-isolation.md: no acceptance record (current digest sha256:f32035cb7c3f35ef9f1609a67e6a4cc231f6fc289c9a78a20eaccea2ac708bc2)\nOut of scope by design (tempdoc 966 D1): script and gate self-tests under scripts/ and the jseval suite (governance tooling, not product tests). Changed here and not flagged: 1 file(s).\nHow to fix: read docs/reference/testing/test-intent.md.\n  Acceptance records go under '## Acceptance records' and are written by the acceptor: cli.mjs accept <changeset> ...\n"
+  },
+  "sharedResources": [
+    "Existing /home/elias/.gradle dependency/build caches and Gradle daemon pool via js-gradle-slot; shared scheduler slots. No running application or browser borrowed.",
+    "Host NVIDIA GPU devices were exposed to test JVMs; individual hardware-probe access was not traced. No exclusive GPU reservation was made."
+  ],
+  "temporaryResources": "Shared clones under own TMPDIR; each tree has its own build folders, fake homes, child processes and memory logs. No shared dependency trees written by checks; only normal Gradle cache use."
+}

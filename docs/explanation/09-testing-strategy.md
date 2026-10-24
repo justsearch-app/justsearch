@@ -121,8 +121,8 @@ retired TS e2e tier described below:
   a structured `.measure.json` fact-sheet — accessibility tree, axe violations, geometry, console
   errors — so correctness is judged from facts, not eyeballing a PNG. `jseval ui-shot <step>`
   captures one surface; `jseval ui-a11y-gate` / `ui-proportion-gate` gate regressions
-  (`ui-a11y-gate` also runs on PRs as the advisory `Measured axe` job — ADR-0026 amendment
-  2026-09-05; `ui-proportion-gate` stays local-only);
+  (`ui-a11y-gate` runs on frontend-selected PRs as the required `Measured axe` job — ADR-0026 amendment
+  2026-10-24; `ui-proportion-gate` stays local-only);
   `jseval ui-diff` / `ui-critic` / `ui-fuzz` are deeper situational passes. For fixture-based checks, run
   `jseval ui-a11y-gate` and `jseval ui-proportion-gate` (both capture fixture state).
 
@@ -149,6 +149,7 @@ Evidence tiers:
 |---|---|---|
 | Hosted-required unit evidence | `Unit tests (app-ui)`, `Unit tests (search-worker)`, and `Unit tests (platform-contracts)` with `-PskipWebBuild=true` | Must stay deterministic on standard hosted runners and produce attribution from JUnit XML. |
 | Hosted-required harness evidence | `jseval Python suite` — `scripts/jseval/tests` on the hosted Linux runner, without the `agent`/`ui`/`scan` extras so their `pytest.importorskip` guards are exercised | Required since 2026-09-05 (ADR-0044 amendment). Must stay fully mocked and backend-free; a test that needs a live backend belongs in another tier. |
+| Hosted-required accessibility evidence | `Measured axe` — `jseval ui-a11y-gate` over the baseline register in fixture state | Required since 2026-10-24 (ADR-0026 / ADR-0044 amendments). New rules, serious/critical violations even in baselined rules, and missing/errored scans fail. Frontend-selected PRs, main pushes and dispatch run it; other PRs report skipped. |
 | Local parser/fixture evidence | PDF/OCR/Office fixture tests disabled under `CI=true` | Must be declared in `scripts/ci/test-evidence-policy.v1.json` with replacement evidence and cadence. |
 | Local worker-process integration evidence | `src/integrationTest` cases that spawn worker/server processes | Must be declared when skipped under `CI=true`; run locally before changing the owned integration surface. |
 | Opt-in system/AI evidence | `modules/system-tests` tags and opt-in Gradle flags | Owned by the system-tests source sets and documented tags. |
