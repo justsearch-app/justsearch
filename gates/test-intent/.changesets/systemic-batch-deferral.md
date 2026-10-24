@@ -1741,3 +1741,14 @@ Round16 exact6cd245b6a before:1 intended charged-source assertion failure and1 h
   "note": "Reject entry 15 and I10/U17 because shared stored text-field schema passes the canary yet charges healthy files and gives minute-scale retries."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16c0e-cf9c-7573-b862-3e0b6dc414d7",
+  "verdict": "reject",
+  "digest": "sha256:73cb420e9379a2bf4805f1ed879678039df20059d6488cc6b59d62528cbaf2f8",
+  "note": "A canonical source alias disappearing during a real write is deferred uncounted during an outage, regressing the baseline per-file K2/U19 policy."
+}
+```
