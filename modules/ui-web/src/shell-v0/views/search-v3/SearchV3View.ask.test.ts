@@ -20,6 +20,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
+import { projectSv3RecordTurns } from './sv3-record.js';
+import { applySv3Record, latestTurnRef, settleTurn, submitInSession, SV3_SESSIONS_EMPTY } from './sv3-sessions.js';
 import { resetSearchState } from '../../state/searchState.js';
 import {
   __feedContactForTest,
@@ -381,6 +383,82 @@ describe('the transcript is the session, in order', () => {
     next.emit('done', {});
     next.end();
     await settle(el);
+  });
+
+  it('announces a checking attempt once across navigation, rerender and remount, then announces a new attempt', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'who owns Cobalt?');
+    const main = await region(el, 'jf-sv3-main');
+    stream.emit('chunk', { text: 'Ada owns Cobalt.' });
+    stream.emit('rag.citation_checking', {});
+    await settle(el);
+    expect(q(main, 'sv3-checking-announcement')?.textContent).toContain('Checking the answer');
+    const sessions = el.sessions;
+    el.sessions = { ...sessions, activeId: null };
+    await settle(el);
+    expect(q(main, 'sv3-checking-announcement')?.textContent?.trim() ?? '').toBe('');
+    el.sessions = sessions;
+    await settle(el);
+    expect(q(main, 'sv3-citation-checking')).not.toBeNull();
+    expect(q(main, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+    (main as Mounted & { requestUpdate(): void }).requestUpdate();
+    await settle(el);
+    expect(q(main, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+    // A new component with the same active attempt stands in for a window recreated by navigation.
+    const restored = document.createElement('jf-sv3-main') as typeof main & {
+      turns: readonly import('./sv3-sessions.js').Sv3Turn[]; checkingTurnId: string | null;
+    };
+    restored.turns = sessions.sessions[0]!.turns;
+    restored.checkingTurnId = el.askCheckingTurnId;
+    document.body.appendChild(restored);
+    await restored.updateComplete;
+    expect(q(restored, 'sv3-citation-checking')).not.toBeNull();
+    expect(q(restored, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+    restored.remove();
+    stream.emit('done', {}); stream.end(); await settle(el);
+    const next = stubStream();
+    await ask(el, 'a new question');
+    next.emit('chunk', { text: 'Another answer.' }); next.emit('rag.citation_checking', {});
+    await settle(el);
+    expect(q(main, 'sv3-checking-announcement')?.textContent).toContain('Checking the answer');
+    next.emit('done', {}); next.end(); await settle(el);
+  });
+
+  it('keeps an unfinished-check disclosure when a later finishing step fails', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'who owns Cobalt?');
+    const main = await region(el, 'jf-sv3-main');
+    stream.emit('rag.citations', { citations: [source(0)] });
+    stream.emit('chunk', { text: 'Ada owns Cobalt.' });
+    stream.emit('rag.citation_checking', {});
+    stream.emit('rag.citation_matches', { matches: [], groundingIncomplete: true });
+    stream.emit('error', { error: 'later finishing step failed', errorCode: 'CONSUMER_ERROR' });
+    stream.end(); await settle(el);
+    const turn = turnsOf(main)[0] as HTMLElement;
+    expect(turn.getAttribute('data-status')).toBe('failed');
+    expect(el.sessions.sessions[0]?.turns[0]?.detail).not.toBe('');
+    expect(textIn(turn, 'sv3-turn-coverage')).toContain('Grounding check did not complete');
+    expect(q(main, 'sv3-citation-checking')).toBeNull();
+    const records = projectSv3RecordTurns([
+      { id: 'q', kind: 'USER_MESSAGE', content: 'who owns Cobalt?', originator: 'user',
+        occurredAt: new Date().toISOString(), attributes: { shapeId: 'core.rag-ask' } },
+      { id: 'a', kind: 'ERROR', content: 'later finishing step failed', originator: 'agent',
+        occurredAt: new Date().toISOString(), attributes: { shapeId: 'core.rag-ask',
+          errorCode: 'CONSUMER_ERROR', claimMatches: { matches: [], groundingIncomplete: true } } },
+    ]);
+    expect(records[0]?.evidence?.groundingIncomplete).toBe(true);
+    expect(records[0]?.status).toBe('failed');
+    const cold = submitInSession(SV3_SESSIONS_EMPTY, 'who owns Cobalt?', Date.now(), 'ask', 'cold-cobalt');
+    el.sessions = applySv3Record(
+      settleTurn(cold, latestTurnRef(cold)!, 'failed', Date.now()), 'cold-cobalt', records,
+    );
+    await settle(el);
+    expect(turnsOf(main)[0]?.getAttribute('data-status')).toBe('failed');
+    expect(textIn(turnsOf(main)[0] as HTMLElement, 'sv3-turn-coverage')).toContain('Grounding check did not complete');
   });
 
   it.each(['error', 'CANCELLED', 'done', 'drop'])(

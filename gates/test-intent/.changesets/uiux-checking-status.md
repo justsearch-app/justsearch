@@ -9,7 +9,7 @@ author-session: uiux-checking-status-pz8kayz9
 
 Scenarios are agent choice, adopted under the user's delegation.
 
-Execution evidence is complete for seven UI and five Java repair-check selections: candidate passes
+Execution evidence is complete for nine UI and seven Java repair-check selections: candidate passes
 and assertion failures on fc0c268eb. Six preservation selections pass before and after, without
 skips. The clean baseline reproduced the full UI task's ArchUnit heap failure at the unchanged
 384 MiB heap. The authorized targeted service and UI/HTTP suites pass; CI remains the authority
@@ -151,12 +151,12 @@ measurement and were corrected before the single complete six-block run.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The real SSE parser drives the visible status and an outside-busy live region, leaves streamed reference literals unchanged, clears every terminal and result, deduplicates repeated start signals, and binds fast follow-ups to their own turn. Live and cold readers retain only an explicit unfinished fact, without fabricated counts; zero-match and historical unknown records remain distinct. Existing expectations are retained.",
+      "behaviour": "The real SSE parser drives the visible status and an outside-busy live region, leaves streamed reference literals unchanged, clears every terminal and result, deduplicates repeated start signals, and binds fast follow-ups to their own turn. Live and cold readers retain only an explicit unfinished fact, without fabricated counts; zero-match and historical unknown records remain distinct. Existing expectations are retained. Announcement receipts deduplicate an attempt across navigation and remount; failed turns retain an explicit incomplete-check disclosure.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f user delegation 2026-10-19",
+          "delegationLocation": "task t-20261019-bd718f request",
           "delegationScope": "The citation-trust designs and the agent-adopted WP4.3 scenarios and amendments quoted in the builder assignment.",
           "choice": "S12.1: When the citation check actually starts on an Ask answer, the turn shows a status that the answer is being checked against the user's sources, driven by an Engine signal, not a timer. It ends when the check's result arrives or the turn settles, whichever comes first (decision D7).\n\nS12.2: The status clears on every outcome: result, check timeout, check failure, a later finishing step failing, connection drop, turn error, and Stop (the turn is then shown as stopped, also after cold reload, as WP1.2 delivers). Checked by holding the citation check, and separately holding a later finishing step: the status shows only during the first.\n\nS12.4: While the status shows, the answer text stays as it streamed: no reference literal is stripped and restored, no marks flash; at settlement marks appear once.\n\nS12.6: The status is announced while the check is running, once per attempt, with no stale announcement after settlement; the announcing region is not inside the transcript's aria-busy subtree (Sv3Main.ts:1815) or is otherwise shown to announce during the check. Legible in both themes, forced colors, about 360 px; motion respects reduced-motion.\n\nS12.7: Two conversations, or a fast follow-up sent right after settlement, never show the status on the wrong turn.\n\nS10.7: When the check did not finish (time limit or failure), the turn says the check did not complete, using the existing vocabulary for that state (evidenceProjection.ts:663-673, :755), and invents no counts; the panel does not call unjudged sources not cited and the frame does not call the answer not grounded. This stays distinguishable from a completed check with zero matches and from a historical record with no facts, live, after cold reload and after an Engine restart (decision D2).\n\nD2: Unfinished check (S10.7). Options: Head emits zero counts (draft); frontend infers from missing facts; Head stores an explicit incomplete-check fact. Recommend the explicit fact, mapped to the existing grounding-incomplete state (the agent plane already uses the NONE scorer stamp for this, agentEvidence.ts:86-97). Why: zero counts claim an examination that never happened; inference cannot tell old records apart.",
           "label": "agent choice, adopted under the user's delegation"
@@ -164,6 +164,8 @@ measurement and were corrected before the single complete six-block run.
       ],
       "evidence": "gates/test-intent/evidence/uiux-checking-status-ui.json",
       "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#announces a checking attempt once across navigation, rerender and remount, then announces a new attempt",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#keeps an unfinished-check disclosure when a later finishing step fails",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#checks only from the Engine signal through the citation result, preserving the streamed text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on error even without a result",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#clears checking and its announcement on CANCELLED even without a result",
@@ -181,12 +183,12 @@ measurement and were corrected before the single complete six-block run.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Observe the Engine dispatch with a held scorer and a separately held later finisher. Start is Ask-only and absent for skipped checks; text precedes the check result and terminal. Timeout, exceptional, null and NONE outcomes emit and store the same explicit incomplete envelope without counts. The saved question exists during checking. A later finishing failure still follows the check result. Stop preserves a check fact already delivered live; the existing nonfatal-service-failure expectation now requires that fact instead of silence.",
+      "behaviour": "Observe the Engine dispatch with a held scorer and a separately held later finisher. Start is Ask-only and absent for skipped checks; text precedes the check result and terminal. Timeout, exceptional, null and NONE outcomes emit and store the same explicit incomplete envelope without counts. The saved question exists during checking. A later finishing failure still follows the check result. Stop preserves a check fact already delivered live; the existing nonfatal-service-failure expectation now requires that fact instead of silence. Later consumer/controller exceptions and STOP_ERROR keep an emitted incomplete-check fact and the failure code through cold history and Engine reconstruction.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f user delegation 2026-10-19",
+          "delegationLocation": "task t-20261019-bd718f request",
           "delegationScope": "The citation-trust designs and the agent-adopted WP4.3 scenarios and amendments quoted in the builder assignment.",
           "choice": "S12.1: When the citation check actually starts on an Ask answer, the turn shows a status that the answer is being checked against the user's sources, driven by an Engine signal, not a timer. It ends when the check's result arrives or the turn settles, whichever comes first (decision D7).\n\nS12.2: The status clears on every outcome: result, check timeout, check failure, a later finishing step failing, connection drop, turn error, and Stop (the turn is then shown as stopped, also after cold reload, as WP1.2 delivers). Checked by holding the citation check, and separately holding a later finishing step: the status shows only during the first.\n\nS12.3: The status never shows when no check runs: an answer without sources, a blank answer, a check skipped for lack of verification sources (StreamingCitationMatcher.java:156-162), a model answer (WP4.2b) and a Delegate run.\n\nS10.7: When the check did not finish (time limit or failure), the turn says the check did not complete, using the existing vocabulary for that state (evidenceProjection.ts:663-673, :755), and invents no counts; the panel does not call unjudged sources not cited and the frame does not call the answer not grounded. This stays distinguishable from a completed check with zero matches and from a historical record with no facts, live, after cold reload and after an Engine restart (decision D2).\n\nD2: Unfinished check (S10.7). Options: Head emits zero counts (draft); frontend infers from missing facts; Head stores an explicit incomplete-check fact. Recommend the explicit fact, mapped to the existing grounding-incomplete state (the agent plane already uses the NONE scorer stamp for this, agentEvidence.ts:86-97). Why: zero counts claim an examination that never happened; inference cannot tell old records apart.\n\nF2: After Engine loss during checking, and after model-answer failure or context overflow, cold reload retains the saved question and accurately represents its failed or unfinished attempt. It never shows a completed empty answer, silently retries, or duplicates the question. The original no-evidence outcome remains intact.\n\nN12.2: Streaming, Stop and late Stop as WP1.2 delivered them; a Stop during the check is saved as stopped.",
           "label": "agent choice, adopted under the user's delegation"
@@ -194,6 +196,8 @@ measurement and were corrected before the single complete six-block run.
       ],
       "evidence": "gates/test-intent/evidence/uiux-checking-status-java.json",
       "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java#unfinishedCheckFactSurvivesALaterFinishingFailure",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#incompleteCheckSurvivesALaterFailureAcrossHttpAndEngineRestart",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java#checkingEndsWithItsResultBeforeALaterFinishingStep",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java#unfinishedCheckIsExplicitLiveAndOnTheStoredAnswer",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java#skippedChecksNeverStartAndSummarizeKeepsItsVocabulary",
@@ -212,7 +216,7 @@ measurement and were corrected before the single complete six-block run.
         {
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f user delegation 2026-10-19",
+          "delegationLocation": "task t-20261019-bd718f request",
           "delegationScope": "The citation-trust designs and the agent-adopted WP4.3 scenarios and amendments quoted in the builder assignment.",
           "choice": "S10.7: When the check did not finish (time limit or failure), the turn says the check did not complete, using the existing vocabulary for that state (evidenceProjection.ts:663-673, :755), and invents no counts; the panel does not call unjudged sources not cited and the frame does not call the answer not grounded. This stays distinguishable from a completed check with zero matches and from a historical record with no facts, live, after cold reload and after an Engine restart (decision D2).\n\nN12.1: Existing event order (text, then rag.citation_matches, then done). The old window, Summarize, MCP, API and Java stream readers ignore the new signal without errors.\n\nN12.2: Streaming, Stop and late Stop as WP1.2 delivered them; a Stop during the check is saved as stopped.",
           "label": "agent choice, adopted under the user's delegation"
@@ -236,5 +240,45 @@ measurement and were corrected before the single complete six-block run.
   ]
 }
 ```
+
+## Checking-status rejection repair (builder observations)
+
+The 6db83d87b rejection is addressed by per-attempt announcement receipts in per-tab storage,
+retaining explicit check facts in later-error persistence, and rendering an incomplete disclosure
+for failed turns. All three delegation locations use `task t-20261019-bd718f request`; kind and
+agent-adopted wording are unchanged. The acceptance/rejection section is unchanged; this content
+requires fresh independent acceptance.
+
+Two new UI checks pass on the candidate and fail by assertion on 6db83d87b. A real browser probe
+against a private 6db83d87b Engine repeats the announcement after switching between existing
+conversation controls while the actual CPU scorer is held; the candidate keeps the visible
+checking row without repeating the announcement. Reload does not restore checking or resend;
+a new question and an actual Retry each announce as new attempts. Remount/rerender and cold
+failed-record disclosure also have unit coverage.
+
+The new Java check and real HTTP matrix pass on the candidate and fail by assertion on
+6db83d87b: the old error record has no `claimMatches` although the incomplete fact was emitted.
+The three HTTP outcomes are a later consumer exception, controller exception and STOP_ERROR.
+Each keeps the fact and error code through cold history and a reconstructed Engine/history API.
+Machine evidence: `gates/test-intent/evidence/uiux-checking-status-repair-ui-6db.json` and
+`gates/test-intent/evidence/uiux-checking-status-repair-java-6db.json`. The original UI/Java
+repair evidence is refreshed against fc0c268eb; six preservation selections (eight cases)
+pass before and after, without skips. No compatibility patch or copied dependency tree was used:
+run-evidence ran in default link mode from disposable shared clones. Its Vitest subprocesses
+used the requested runner loader and disabled cache through the temporary Node preload, with
+VITEST_MAX_WORKERS=2, to keep writes outside node_modules.
+
+Final checks: lint/typecheck pass; full Vitest with `--cache=false --configLoader runner`
+passes 608 files / 7,646 tests; targeted service/UI suites pass 156/125 tests, zero skips;
+UnreferencedCodeTest passes three cases; affected PMD and installDist pass. UI gates pass 28/28
+and all 14 requested governance gates pass. Live completion, timeout, Stop, connection loss,
+Engine loss/restart and scorer failure pass with cold reload/restart and no automatic resend.
+The unchanged 6db83d87b Engine reads the candidate's timeout fact through history and thread APIs.
+Raw browser/HTTP reports and exact commands are under `tmp/checking-repair/`.
+
+The scorer, progress emission, matcher barrier and normal completion path are unchanged.
+Only error persistence changes on the Engine, so the conditional D10 rerun is not required.
+The test-intent check against fc0c268eb has no delegation/evidence errors; its sole error is the
+missing fresh independent acceptance. No acceptance record is authored by this builder.
 
 ## Acceptance records

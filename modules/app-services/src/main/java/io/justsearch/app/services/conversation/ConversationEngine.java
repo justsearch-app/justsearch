@@ -637,7 +637,7 @@ public final class ConversationEngine {
         conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
         persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
-            injectorRun.terminalError.payload().get("errorCode"));
+            injectorRun.terminalError.payload().get("errorCode"), null);
       }
       return;
     }
@@ -675,7 +675,7 @@ public final class ConversationEngine {
     if (ai == null || !ai.isAvailable()) {
       emitError(sink, "AI service unavailable", "AI_OFFLINE");
       persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-          "AI service unavailable", "AI_OFFLINE");
+          "AI service unavailable", "AI_OFFLINE", null);
       return;
     }
 
@@ -718,7 +718,7 @@ public final class ConversationEngine {
           String reason = "Extraction input exceeds the model context budget; shorten the instruction, schema or inputs.";
           emitError(sink, reason, "INPUT_TOO_LARGE");
           persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-              reason, "INPUT_TOO_LARGE");
+              reason, "INPUT_TOO_LARGE", null);
           return;
         }
 
@@ -739,7 +739,7 @@ public final class ConversationEngine {
           }
           emitError(sink, e.getMessage(), e.errorCode);
           persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-              e.getMessage(), e.errorCode);
+              e.getMessage(), e.errorCode, null);
           return;
         } catch (RuntimeException failure) {
           // Preserve synchronous failures for the API adapter's existing classification, while
@@ -747,7 +747,7 @@ public final class ConversationEngine {
           if (failure instanceof io.justsearch.app.api.EngineWorkCancelledException
               || refusalEvent(failure) != null) throw failure;
           persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-              failure.getMessage() == null ? failure.toString() : failure.getMessage(), "LLM_ERROR");
+              failure.getMessage() == null ? failure.toString() : failure.getMessage(), "LLM_ERROR", null);
           throw failure;
         }
         accumulatedFinalText = finalText;
@@ -768,7 +768,7 @@ public final class ConversationEngine {
             LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
             emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
             persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-                "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+                "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR", mergedDoneEntries.get("claimMatches"));
             return;
           }
           result.events().forEach(sink);
@@ -815,7 +815,7 @@ public final class ConversationEngine {
           LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
           emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
           persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-              "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
+              "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR", mergedDoneEntries.get("claimMatches"));
           return;
         }
 
@@ -849,7 +849,7 @@ public final class ConversationEngine {
             String reason = String.valueOf(ctx.attributes().getOrDefault("validation.reason", "Conversation terminated with error"));
             emitError(sink, reason, "CONTROLLER_STOP");
             persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-                reason, "CONTROLLER_STOP");
+                reason, "CONTROLLER_STOP", mergedDoneEntries.get("claimMatches"));
             return;
           }
           case CONTINUE -> ctx.incrementIteration();
@@ -862,7 +862,7 @@ public final class ConversationEngine {
       if ("core.extract".equals(shape.id().value())) {
         emitError(sink, "Extraction validation retry limit reached", "CONTROLLER_STOP");
         persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-            "Extraction validation retry limit reached", "CONTROLLER_STOP");
+            "Extraction validation retry limit reached", "CONTROLLER_STOP", mergedDoneEntries.get("claimMatches"));
       } else {
         emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
       }
@@ -1297,7 +1297,7 @@ public final class ConversationEngine {
 
   private void persistRetrievalError(String recordId, ConversationShape shape,
       Map<String, Object> retrievalMetadata, String standaloneQuestion, String message,
-      Object errorCode) {
+      Object errorCode, Object claimMatches) {
     if (recordId == null || conversationStore == null) {
       return;
     }
@@ -1307,6 +1307,7 @@ public final class ConversationEngine {
     error.put("terminalError", true);
     if (errorCode instanceof String code && !code.isBlank()) error.put("errorCode", code);
     error.putAll(retrievalMetadata);
+    putIfPresent(error, "claimMatches", claimMatches);
     // The "Interpreted as" note belongs to the turn whatever its outcome: a rewrite that was followed
     // by a failed retrieval, a failed generation or a Stop was still shown live, so the record keeps it.
     putIfPresent(error, "standaloneQuestion", standaloneQuestion);

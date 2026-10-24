@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:50:33.611Z",
+  "createdAt": "2026-10-24T01:41:30.639Z",
   "revision": "fc0c268eb9303507749034cb342d17cdcf906325",
-  "tree": "3a6cd756b899e311c84c049856fdf077928a0341",
+  "tree": "252c0150ce27ad2f9c6f4ddffbfb2684b5f3b044",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.CitationCheckingStatusTest.completedZeroMatchesIsDifferentFromAnUnfinishedCheck\" --tests \"io.justsearch.app.services.conversation.StreamingCitationIntegrationTest\" --tests \"io.justsearch.app.services.conversation.shapes.CitationMatchesDeclarationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3092
+      "durationMs": 5195
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheTurnFinishedChangesNothing\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4375
+      "durationMs": 6062
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java#completedZeroMatchesIsDifferentFromAnUnfinishedCheck",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9848cbd77373318a693d5eb0c167eed269dcb65c96f0b9e6b0100e4e70beb3f9",
+      "contentDigest": "sha256:2af7025a3cb29f986f393858199ce8df25954f025b4d28cc61a1b6eeec7bb162",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -88,7 +88,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "contentDigest": "sha256:7ed0767f2c43aa18d04a4fe834053f980b31412fa2f19402a35d64041597b9ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -103,7 +103,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheTurnFinishedChangesNothing",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "contentDigest": "sha256:7ed0767f2c43aa18d04a4fe834053f980b31412fa2f19402a35d64041597b9ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -118,7 +118,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "contentDigest": "sha256:7ed0767f2c43aa18d04a4fe834053f980b31412fa2f19402a35d64041597b9ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -131,5 +131,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:63b4979504594825ab9c147c5dbadff3ad6557a75b9e608d6e77f2238f577f43"
+  "digest": "sha256:0a6f34e9ce75f78485dd9a5fcb6a34dc86c6f453ea1d946e118650c85a5a9a85"
 }

@@ -315,6 +315,21 @@ function hasTerminalText(items: readonly Sv3RunFeedItem[]): boolean {
   return false;
 }
 
+// Per-tab attempt receipts survive a remount/reload; they never restore a checking status.
+const checkingAnnouncementsWithoutStorage = new Set<string>();
+function firstCheckingAnnouncement(attemptId: string): boolean {
+  try {
+    const key = `jf.sv3.checking-announced.${attemptId}`;
+    if (sessionStorage.getItem(key) !== null) return false;
+    sessionStorage.setItem(key, '1');
+    return true;
+  } catch {
+    if (checkingAnnouncementsWithoutStorage.has(attemptId)) return false;
+    checkingAnnouncementsWithoutStorage.add(attemptId);
+    return true;
+  }
+}
+
 export class Sv3Main extends JfElement {
   static styles = [
     sv3Shared,
@@ -1760,7 +1775,17 @@ export class Sv3Main extends JfElement {
     this.followEnd = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_END_SLACK_PX;
   };
 
+  private checkingAnnouncementAttempt: string | null = null;
+  private checkingAnnouncement = '';
+
   protected override willUpdate(): void {
+    const checking = this.transcriptArmRendered
+      ? this.turns.find((turn) => this.isChecking(turn))?.id ?? null : null;
+    if (checking !== this.checkingAnnouncementAttempt) {
+      this.checkingAnnouncementAttempt = checking;
+      this.checkingAnnouncement = checking !== null && firstCheckingAnnouncement(checking)
+        ? 'Checking the answer against your sources…' : '';
+    }
     const focused = deepActiveElement();
     if (focused?.getRootNode() === this.shadowRoot && focused?.matches('[data-model-answer]')
       && (focused.getAttribute('data-model-answer') !== this.turns.at(-1)?.id || !this.modelActionTurn(this.turns.at(-1))
@@ -1877,7 +1902,7 @@ export class Sv3Main extends JfElement {
   private transcript(turns: readonly Sv3Turn[]): TemplateResult {
     return html`
       <div class="visually-hidden" role="status" aria-atomic="true" data-testid="sv3-checking-announcement">${
-        turns.some((turn) => this.isChecking(turn)) ? 'Checking the answer against your sources…' : ''
+        this.checkingAnnouncement
       }</div>
       <div
         class="scroller sv3-scroller"
@@ -2079,7 +2104,8 @@ export class Sv3Main extends JfElement {
 
   /** The shared Ask coverage note; ordinary turn text, outside streaming announcements. */
   private coverageNote(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.kind !== 'ask' || turn.status !== 'complete' || turn.evidence === null) return nothing;
+    if (turn.kind !== 'ask' || turn.evidence === null
+      || (turn.status !== 'complete' && turn.evidence.groundingIncomplete !== true)) return nothing;
     const evidence = turn.evidence;
     const note = coverageNote(groundingCoverage(
       evidence.marks, turn.answer, coverageHonesty(evidence), evidence.sentencesTotal,

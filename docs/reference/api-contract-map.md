@@ -779,7 +779,8 @@ is preserved.
 
 An unfinished citation check (timeout, failure or no scorer result) emits
 `rag.citation_matches` with `{ "matches": [], "groundingIncomplete": true }`. The same envelope
-is stored as the assistant message's `claimMatches`. `groundingIncomplete` is optional; absence
+is stored as the assistant message's `claimMatches`, including on an error outcome when a later
+finishing step fails. The failure remains an error. `groundingIncomplete` is optional; absence
 in historical records remains an unknown fact, not an inferred failure. An unfinished check
 reports no sentence or source-coverage counts. A completed check with zero matches still reports
 its real coverage facts and does not set `groundingIncomplete`. The field is carried as an

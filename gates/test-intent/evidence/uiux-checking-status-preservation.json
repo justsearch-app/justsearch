@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-23T20:50:23.304Z",
-  "revision": "fc0c268eb9303507749034cb342d17cdcf906325",
-  "tree": "c32438bc8da54462e3929610f08485e81d4b8f41",
+  "createdAt": "2026-10-24T01:41:17.413Z",
+  "revision": "6db83d87becc244a23ea4b0763bc85f4a29c7641",
+  "tree": "1f7aeb808fac05abdee860863c3d3de0afda96a7",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.CitationCheckingStatusTest.completedZeroMatchesIsDifferentFromAnUnfinishedCheck\" --tests \"io.justsearch.app.services.conversation.StreamingCitationIntegrationTest\" --tests \"io.justsearch.app.services.conversation.shapes.CitationMatchesDeclarationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6094
+      "durationMs": 3059
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheTurnFinishedChangesNothing\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5886
+      "durationMs": 4713
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java#completedZeroMatchesIsDifferentFromAnUnfinishedCheck",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/CitationCheckingStatusTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9848cbd77373318a693d5eb0c167eed269dcb65c96f0b9e6b0100e4e70beb3f9",
+      "contentDigest": "sha256:2af7025a3cb29f986f393858199ce8df25954f025b4d28cc61a1b6eeec7bb162",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -88,7 +88,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2c3a9b83469aa0e25fe9431e6b832fe623b437886e529e9fee45aaaa087b0565",
+      "contentDigest": "sha256:7ed0767f2c43aa18d04a4fe834053f980b31412fa2f19402a35d64041597b9ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -103,7 +103,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheTurnFinishedChangesNothing",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2c3a9b83469aa0e25fe9431e6b832fe623b437886e529e9fee45aaaa087b0565",
+      "contentDigest": "sha256:7ed0767f2c43aa18d04a4fe834053f980b31412fa2f19402a35d64041597b9ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -118,7 +118,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2c3a9b83469aa0e25fe9431e6b832fe623b437886e529e9fee45aaaa087b0565",
+      "contentDigest": "sha256:7ed0767f2c43aa18d04a4fe834053f980b31412fa2f19402a35d64041597b9ff",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -131,5 +131,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:09be880c962a249228e85ea3e6fad8f1651c394c428c623b5004617189548009"
+  "digest": "sha256:e87e6420c4f582a4a60d417172007c398edd0d1edded8db7e61e5c9fcf5029ed"
 }

@@ -154,6 +154,32 @@ final class CitationCheckingStatusTest {
     assertFalse(names.contains("done"));
   }
 
+  @Test
+  void unfinishedCheckFactSurvivesALaterFinishingFailure() {
+    StreamConsumer failing = new StreamConsumer() {
+      public String id() { return "test.failing-after-incomplete"; }
+      public StreamConsumerResult onChunk(String text, ConversationContext ctx) {
+        return StreamConsumerResult.empty();
+      }
+      public StreamConsumerResult onDone(String text, ConversationContext ctx) {
+        throw new IllegalStateException("later finishing step failed");
+      }
+    };
+    var events = new CopyOnWriteArrayList<SseEvent>();
+    run(engine("core.rag-ask", TEXT, true,
+        CompletableFuture.failedFuture(new IllegalStateException("scorer failed")),
+        new CountDownLatch(0), Duration.ofSeconds(5), failing), "core.rag-ask", events);
+    var result = events.stream().filter(e -> e.name().equals("rag.citation_matches")).findFirst();
+    assertTrue(result.isPresent(), "the unfinished check reports its fact before the later failure");
+    var fact = result.orElseThrow().payload();
+    assertEquals(true, fact.get("groundingIncomplete"));
+    assertTrue(names(events).contains("error"), "the later failure is still reported");
+    var cold = new FileConversationStore(data).loadHistory("conv").getLast();
+    assertEquals(fact, cold.get("claimMatches"), "a later failure cannot erase an emitted check fact");
+    assertEquals(true, cold.get("terminalError"));
+    assertEquals("CONSUMER_ERROR", cold.get("errorCode"));
+  }
+
   private ConversationEngine engine(String shapeId, String text, boolean sources,
       CompletableFuture<DocumentService.CitationMatchResult> scored, CountDownLatch entered,
       Duration timeout, StreamConsumer... later) {
