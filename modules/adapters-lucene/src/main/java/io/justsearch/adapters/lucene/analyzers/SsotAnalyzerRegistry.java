@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.KeywordAnalyzer;
@@ -38,6 +39,7 @@ public final class SsotAnalyzerRegistry {
   private static final org.slf4j.Logger log =
       org.slf4j.LoggerFactory.getLogger(SsotAnalyzerRegistry.class);
   private static final String CLASSPATH_ANALYZERS = "/SSOT/catalogs/analyzers.v1.json";
+  private static final AtomicBoolean BUNDLED_CATALOG_WARNED = new AtomicBoolean();
 
   private final Map<String, AnalyzerDefinition> definitionsById;
   private final Map<String, AnalyzerDescriptor> descriptorsById;
@@ -57,7 +59,7 @@ public final class SsotAnalyzerRegistry {
       // round 2 finding #6). The "loaded from repo" outcome is not
       // user-actionable.
       log.debug("Loaded analyzers catalog from repo path: {}/SSOT/catalogs/analyzers.v1.json", repoRoot.getAbsolutePath());
-    } else {
+    } else if (BUNDLED_CATALOG_WARNED.compareAndSet(false, true)) {
       log.warn("Using bundled analyzers catalog (SSOT repo root not found). "
           + "This is expected in packaged deployments but may indicate misconfiguration in development. "
           + "Loaded from classpath: {}", CLASSPATH_ANALYZERS);
