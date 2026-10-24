@@ -1088,6 +1088,10 @@
         "fields": []
       },
       {
+        "name": "rag.citation_checking",
+        "fields": []
+      },
+      {
         "name": "rag.citation_matches",
         "fields": []
       },

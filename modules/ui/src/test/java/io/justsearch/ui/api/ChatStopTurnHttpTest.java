@@ -58,6 +58,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -207,6 +209,93 @@ final class ChatStopTurnHttpTest {
       assertNull(outcome.get("terminalError"), history.toString());
       assertEquals(NOTE, outcome.get("standaloneQuestion"), history.toString());
       assertEquals(2, history.size(), history.toString());
+    }
+  }
+
+  @ParameterizedTest(name = "incompleteCheckSurvivesALaterFailureAcrossHttpAndEngineRestart({0})")
+  @ValueSource(strings = {"consumer", "controller", "stop-error"})
+  void incompleteCheckSurvivesALaterFailureAcrossHttpAndEngineRestart(String outcome) throws Exception {
+    Map<String, Object> fact = Map.of("matches", List.of(), "groundingIncomplete", true);
+    StreamConsumer check = new StreamConsumer() {
+      @Override public String id() { return "core.test-incomplete-check"; }
+      @Override public StreamConsumerResult onChunk(String text, ConversationContext ctx) {
+        return StreamConsumerResult.empty();
+      }
+      @Override public StreamConsumerResult onDone(String text, ConversationContext ctx) {
+        return new StreamConsumerResult(List.of(new SseEvent("rag.citation_matches", fact)),
+            List.of(), List.of(), Map.of("claimMatches", fact));
+      }
+    };
+    StreamConsumer failure = new StreamConsumer() {
+      @Override public String id() { return "core.test-later-failure"; }
+      @Override public StreamConsumerResult onChunk(String text, ConversationContext ctx) {
+        return StreamConsumerResult.empty();
+      }
+      @Override public StreamConsumerResult onDone(String text, ConversationContext ctx) {
+        throw new IllegalStateException("later finishing step failed");
+      }
+    };
+    IterationController controller = outcome.equals("consumer") ? null : new IterationController() {
+      @Override public String id() { return "core.test-later-controller-failure"; }
+      @Override public IterationDecision next(ConversationContext ctx) {
+        if (outcome.equals("controller")) throw new IllegalStateException("later controller failed");
+        return IterationDecision.STOP_ERROR;
+      }
+    };
+    String errorCode = outcome.equals("consumer") ? "CONSUMER_ERROR"
+        : outcome.equals("controller") ? "CONTROLLER_ERROR" : "CONTROLLER_STOP";
+    start(List.of("Ada owns Cobalt."), List.of(),
+        outcome.equals("consumer") ? List.of(check, failure) : List.of(check), controller);
+    ai.release.countDown();
+    try (Dispatch turn = dispatch("conv-1", "t-1", "Who owns Cobalt?")) {
+      turn.awaitEnd();
+      String wire = turn.received();
+      assertTrue(wire.contains("groundingIncomplete"), wire);
+      assertTrue(wire.indexOf("event: rag.citation_matches") < wire.indexOf("event: error"), wire);
+      assertTrue(wire.contains(errorCode), wire);
+      assertFalse(wire.contains("event: done"), wire);
+    }
+    Map<String, Object> cold = new FileConversationStore(storeDir).loadHistory("conv-1").getLast();
+    assertEquals(fact, cold.get("claimMatches"), "cold history must retain the fact already emitted live");
+    assertEquals(true, cold.get("terminalError"));
+    assertEquals(errorCode, cold.get("errorCode"));
+    app.stop(); chat.shutdown();
+    start(List.of());
+    HttpResponse<String> reloaded = client.send(HttpRequest.newBuilder(URI.create(
+        "http://127.0.0.1:" + app.port() + "/api/chat/conversations/conv-1/history")).GET().build(),
+        HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, reloaded.statusCode(), reloaded.body());
+    var messages = MAPPER.readTree(reloaded.body()).path("messages");
+    assertTrue(messages.get(messages.size() - 1).path("claimMatches")
+        .path("groundingIncomplete").asBoolean(), reloaded.body());
+    assertTrue(reloaded.body().contains(errorCode), reloaded.body());
+  }
+
+  @Test
+  void stoppedAnswerKeepsTheCheckFactAlreadyShownLive() throws Exception {
+    var later = heldStep();
+    Map<String, Object> fact = Map.of("matches", List.of(), "groundingIncomplete", true);
+    StreamConsumer check = new StreamConsumer() {
+      @Override public String id() { return "core.test-incomplete-check"; }
+      @Override public StreamConsumerResult onChunk(String text, ConversationContext ctx) {
+        return StreamConsumerResult.empty();
+      }
+      @Override public StreamConsumerResult onDone(String text, ConversationContext ctx) {
+        return new StreamConsumerResult(List.of(new SseEvent("rag.citation_matches", fact)),
+            List.of(), List.of(), Map.of("claimMatches", fact));
+      }
+    };
+    start(List.of("Ada owns"), List.of(), List.of(check, later.consumer()));
+    ai.release.countDown();
+    try (Dispatch turn = dispatch("conv-1", "t-1", "And who owns it?")) {
+      turn.awaitEvent("rag.citation_matches");
+      assertTrue(later.reached.await(5, TimeUnit.SECONDS));
+      stop("conv-1", "t-1");
+      turn.close();
+      later.step.countDown();
+      Map<String, Object> saved = awaitOutcome("conv-1").get(1);
+      assertEquals("CANCELLED", saved.get("disposition"));
+      assertEquals(fact, saved.get("claimMatches"), "a Stop preserves the fact already shown live");
     }
   }
 
