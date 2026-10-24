@@ -161,6 +161,68 @@ final class Release030RootRecoveryIsolationTest {
   }
 
   @Test
+  void rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(@TempDir Path temporary) throws Exception {
+    Path root = Release030Fixture.unpack("small", temporary), alpha = root.resolve("roots/alpha");
+    Path beta = root.resolve("roots/beta");
+    ConfigStore previous = ConfigStore.globalOrNull();
+    var installed = configure(root);
+    var membership = new AtomicReference<>(List.of(alpha, beta));
+    try {
+      var models = new ReleasedModelIdentities(root);
+      try (models) {
+        try (var executors = new TestEngineExecutors();
+            var server = declaredBoot(root, membership.get(), membership::get, executors)) {
+          stopRecovery(server);
+          openWriter(server);
+          var ingest = server.appServices().ingestService();
+          ingest.setRootWatcherRegistry(new RootWatcherRegistry());
+          assertTrue(ingest.watchRoot(WatchRootRequest.newBuilder().setRootPath(alpha.toString()).build(),
+              CallContext.none()).getWatching());
+          Files.writeString(alpha.resolve("not-admitted-before-fence.txt"), "removedbeforefencecobalt");
+          var reached = new CountDownLatch(1);
+          var resume = new CountDownLatch(1);
+          var once = new AtomicBoolean();
+          var failure = new AtomicReference<Throwable>();
+          Thread worker = new Thread(() -> {
+            try {
+              ingest.recoverRelease030Root(alpha, null, () -> {
+                if (once.compareAndSet(false, true)) {
+                  reached.countDown();
+                  try { assertTrue(resume.await(20, TimeUnit.SECONDS)); }
+                  catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return true; }
+                }
+                return false;
+              });
+            } catch (Exception | Error problem) { failure.set(problem); }
+          }, "release030-before-fence-removal");
+          worker.start();
+          try {
+            assertTrue(reached.await(20, TimeUnit.SECONDS), "authority passed; sync has not captured its fence");
+            assertTrue(ingest.unwatchRoot(UnwatchRootRequest.newBuilder().setRootPath(alpha.toString()).build(),
+                CallContext.none()).getUnwatched());
+            assertTrue(ingest.deleteByPath(DeleteByPathRequest.newBuilder().setPath(alpha.toString()).build(),
+                CallContext.none()).getError().isBlank());
+            assertEquals(0, count(root, "path LIKE '" + key(alpha) + "/%'"));
+            assertTrue(membership.get().contains(alpha), "Head membership remains during Worker cleanup");
+          } finally { resume.countDown(); worker.join(20_000); }
+          assertFalse(worker.isAlive());
+          assertNull(failure.get());
+          assertEquals(0, count(root, "path LIKE '" + key(alpha) + "/%'"),
+              "C6: a removal after authority must reject recovery even while Head membership remains");
+          membership.set(List.of(beta));
+        }
+        try (var executors = new TestEngineExecutors();
+            var restarted = declaredBoot(root, membership.get(), membership::get, executors)) {
+          stopRecovery(restarted);
+          openWriter(restarted);
+          assertEquals(0, count(root, "path LIKE '" + key(alpha) + "/%'"),
+              "C6: the removed root's jobs must remain absent after restart");
+        }
+      }
+    } finally { ConfigStore.restoreGlobal(installed, previous); }
+  }
+
+  @Test
   void recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(@TempDir Path temporary) throws Exception {
     Path root = Release030Fixture.unpack("small", temporary), alpha = root.resolve("roots/alpha");
     Path file = alpha.resolve("file-01.txt");

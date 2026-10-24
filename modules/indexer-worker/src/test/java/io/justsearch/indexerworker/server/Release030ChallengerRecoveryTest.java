@@ -231,7 +231,7 @@ final class Release030ChallengerRecoveryTest {
             field.set(service, walks);
             for (int tick = 0; tick < 4; tick++) recover(server);
             long calls = org.mockito.Mockito.mockingDetails(walks).getInvocations().stream()
-                .filter(call -> call.getMethod().getName().equals("execute") && call.getArguments().length == 6
+                .filter(call -> call.getMethod().getName().equals("execute") && call.getArguments().length == 7
                     && call.getArgument(0).equals(root.resolve("roots/alpha").toString())).count();
             assertEquals(boot == 0 ? 1 : 0, calls,
                 "F5: a durable cooldown prevents a full rewalk on each recovery tick and restart");

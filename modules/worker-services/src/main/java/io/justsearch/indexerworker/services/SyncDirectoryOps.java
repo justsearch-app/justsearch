@@ -69,18 +69,9 @@ final class SyncDirectoryOps {
   private final int pathCharCap;
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
   private volatile java.util.function.BiPredicate<Path, Path> rootOwnership = (root, file) -> true;
-  /** Captures root membership/removal evidence before the walk; fences each bounded queue batch. */
-  private volatile java.util.function.Function<Path,
-      java.util.function.ToIntFunction<java.util.function.IntSupplier>> recoveryAdmissionFence =
-          root -> java.util.function.IntSupplier::getAsInt;
 
   void setRootOwnership(java.util.function.BiPredicate<Path, Path> ownership) {
     rootOwnership = java.util.Objects.requireNonNull(ownership, "ownership");
-  }
-
-  void setRecoveryAdmissionFence(java.util.function.Function<Path,
-      java.util.function.ToIntFunction<java.util.function.IntSupplier>> fence) {
-    recoveryAdmissionFence = java.util.Objects.requireNonNull(fence, "fence");
   }
 
   void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
@@ -571,6 +562,14 @@ final class SyncDirectoryOps {
   SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode) {
+    return execute(rootPath, force, provenance, cancelled, collection, admissionMode,
+        java.util.function.IntSupplier::getAsInt);
+  }
+
+  SyncDirectoryResponse execute(String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
+      String collection, AdmissionMode admissionMode,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission) {
     boolean upgradeRecovery = admissionMode == AdmissionMode.UPGRADE_RECOVERY;
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
@@ -580,12 +579,13 @@ final class SyncDirectoryOps {
               + "Root path does not exist or is not a directory");
     }
 
-    java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission =
-        upgradeRecovery ? recoveryAdmissionFence.apply(root) : java.util.function.IntSupplier::getAsInt;
     int filesAdded = 0;
     int filesDeleted = 0;
 
     try {
+      if (upgradeRecovery && recoveryAdmission.applyAsInt(() -> 1) != 1) {
+        return syncDirectoryErrorResponse("Upgrade recovery root was removed or is no longer declared");
+      }
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
       PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled, upgradeRecovery);
 

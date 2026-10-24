@@ -266,13 +266,6 @@ public final class WorkerIngestService {
     this.syncOps.setUserExclusions(this::isUserExcluded);
     this.syncOps.setRootOwnership((root, file) -> !underNestedRoot(
         root.toAbsolutePath().normalize(), file.toAbsolutePath().normalize()));
-    this.syncOps.setRecoveryAdmissionFence(root -> {
-      RootWatcherRegistry registry = rootWatcherRegistry;
-      long mark = registry.removalMark();
-      return admission -> registry.admitRecovery(root, mark,
-          () -> exclusionRoots.get().stream().anyMatch(path -> path.toAbsolutePath().normalize()
-              .equals(root.toAbsolutePath().normalize())) || configuredRecoveryRoots.contains(root), admission);
-    });
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -1090,6 +1083,9 @@ public final class WorkerIngestService {
   public SyncDirectoryResponse recoverRelease030Root(Path root, String collection,
       java.util.function.BooleanSupplier cancelled) {
     try (var ignoredMutation = mutationLease()) {
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      // Any removal after this authority decision must invalidate the ensuing sync.
+      long mark = registry.removalMark();
       SyncDirectoryResponse refused = refuseSyncOfRootOnAnotherVolume(root.toString());
       if (refused != null) return refused;
       if (!rootWitness.admits(root) || !canApplyWatcherReceipts()) {
@@ -1097,7 +1093,10 @@ public final class WorkerIngestService {
       }
       var binding = rootWatcherRegistry.subscription(root);
       return syncOps.execute(root.toString(), true, null, cancelled,
-          binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY);
+          binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY,
+          admission -> registry.admitRecovery(root, mark,
+              () -> exclusionRoots.get().stream().anyMatch(path -> path.toAbsolutePath().normalize()
+                  .equals(root.toAbsolutePath().normalize())) || configuredRecoveryRoots.contains(root), admission));
     }
   }
 
