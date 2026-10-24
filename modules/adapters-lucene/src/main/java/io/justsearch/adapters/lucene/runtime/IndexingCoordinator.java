@@ -9,15 +9,20 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.TelemetryEvents;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +49,7 @@ public final class IndexingCoordinator {
 
   private final RuntimeSession session;
   private final Supplier<WritePathOps> writeOps;
+  private final FileTime writerLockCreatedAt;
 
   /**
    * Single serialization primitive for all mutating ops. Reentrant so same-thread nested calls
@@ -52,8 +58,14 @@ public final class IndexingCoordinator {
   private final ReentrantLock dispatchLock = new ReentrantLock();
 
   IndexingCoordinator(RuntimeSession session, Supplier<WritePathOps> writeOps) {
+    this(session, writeOps, null);
+  }
+
+  IndexingCoordinator(RuntimeSession session, Supplier<WritePathOps> writeOps,
+      FileTime writerLockCreatedAt) {
     this.session = session;
     this.writeOps = writeOps;
+    this.writerLockCreatedAt = writerLockCreatedAt;
   }
 
   /**
@@ -99,6 +111,11 @@ public final class IndexingCoordinator {
         var snapshot = session.snapshot;
         var tragic = snapshot.writer().getTragicException();
         if (tragic != null) throw new IndexWriterUnavailableException("IndexWriter failed", tragic);
+        if (snapshot.directory() instanceof FSDirectory directory
+            && !Objects.equals(writerLockCreatedAt, Files.getAttribute(
+                directory.getDirectory().resolve(IndexWriter.WRITE_LOCK_NAME), "creationTime"))) {
+          throw new IndexWriterUnavailableException("Index writer lock was replaced");
+        }
         ComponentsFactory.probeDocument(snapshot.writer().getConfig(),
             session.fieldMapper.ingestionCanaryDocument());
         String name = null;

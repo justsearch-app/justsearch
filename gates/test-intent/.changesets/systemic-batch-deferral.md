@@ -33,7 +33,7 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 | O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
-| O10 full mapped document with the live writer configuration, including token/norm/doc-values validation | [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
+| O10 full mapped document with live writer configuration and native lock identity | [live lock loss/replacement and isolation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java), [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
 | K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
@@ -821,7 +821,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "label": "agent choice under adopted orchestrator design"
         }
       ],
-      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-full-mapping.json",
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-live-lock.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
@@ -1236,6 +1236,85 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10 live native write-lock proof: a deleted or replaced lock cannot pass the canary while raw Directory operations work. The running loop keeps healthy sources at zero attempts and reaches its existing tragic path; repeated healthy probes preserve live document/commit state and shared analyzer usability.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round15 live writer lock health proof and its necessary metadata plumbing, with inherited behavior and acceptance records unchanged.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "Round15 orchestrator instruction: reject missing or replaced native live write locks, using existence and creation-time comparison equivalent to NativeFSLock.ensureValid. Lucene IndexWriter.getDirectory returns directoryOrig rather than its private LockValidatingDirectoryWrapper; no public held-lock getter exists. Capture the same filesystem creationTime attribute immediately after opening the live writer, from its actual FSDirectory path, within ComponentsFactory's existing I/O cleanup boundary. Carry it through Components to the one-shot coordinator; no global cache, reflection, new directory wrapper, schema or option. Probe reads creationTime from that same live directory before the unchanged mapped RAM-write and raw-directory checks. Missing files throw through the existing typed I/O boundary; different creationTime throws IndexWriterUnavailableException. Read-only opens have no writer identity, and non-filesystem injected test directories have no native file lock to validate. Existing bare coordinator test construction remains available without manufacturing a lock identity. Each reopened runtime captures its own fresh identity. The supplied real running-loop deletion case and repeated-probe isolation oracle are retained verbatim apart from class/fixture helper names and an SPDX header. A new replacement case proves that existence plus raw Directory writability does not prove lock identity, then restores the original inode and proves healthy probe recovery without changing real documents or commit state. No GitHub issue action is authorized or taken. These are delegated implementation choices under the orchestrator decision, never owner-words."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-live-lock.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java#lostLiveNativeWriteLockMustNotPassHealthProof",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java#replacementLockCannotImpersonateTheHeldNativeLock"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ComponentsInjectionTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The existing Components record constructor gains writerLockCreatedAt. The unchanged ByteBuffersDirectory injection fixture passes null because it has no native filesystem write lock. All original inputs, preconditions, fault setup, assertions and tags remain; no oracle changes. Its existing test is executed before with the original signature and after with the added metadata argument.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round15 live writer lock health proof and its necessary metadata plumbing, with inherited behavior and acceptance records unchanged.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "Round15 orchestrator instruction: reject missing or replaced native live write locks, using existence and creation-time comparison equivalent to NativeFSLock.ensureValid. Lucene IndexWriter.getDirectory returns directoryOrig rather than its private LockValidatingDirectoryWrapper; no public held-lock getter exists. Capture the same filesystem creationTime attribute immediately after opening the live writer, from its actual FSDirectory path, within ComponentsFactory's existing I/O cleanup boundary. Carry it through Components to the one-shot coordinator; no global cache, reflection, new directory wrapper, schema or option. Probe reads creationTime from that same live directory before the unchanged mapped RAM-write and raw-directory checks. Missing files throw through the existing typed I/O boundary; different creationTime throws IndexWriterUnavailableException. Read-only opens have no writer identity, and non-filesystem injected test directories have no native file lock to validate. Existing bare coordinator test construction remains available without manufacturing a lock identity. Each reopened runtime captures its own fresh identity. The supplied real running-loop deletion case and repeated-probe isolation oracle are retained verbatim apart from class/fixture helper names and an SPDX header. A new replacement case proves that existence plus raw Directory writability does not prove lock identity, then restores the original inode and proves healthy probe recovery without changing real documents or commit state. No GitHub issue action is authorized or taken. These are delegated implementation choices under the orchestrator decision, never owner-words."
+        }
+      ]
     }
   ]
 }
@@ -1456,6 +1535,16 @@ Round13 follow-up: the real native tragedy exposed a baseline worker-status prec
 The exact df6092ffe fail-before check is reused with an identical test-source hash: actual native tragedy and callback1, public status WAITING, both healthy rows charged1/minute and no prompt recovery. The same ERROR assertion remains unchanged. One combined candidate invocation reruns all round10–13 targets, I7/WAITING/INDEXING/capped backlog, I6 and supplied D9–D12 verifier checks, plus main/test compile and PMD for adapters-lucene, worker-services and indexer-worker. Completed in one successful Gradle call: all126 targeted executions pass with zero skips, including the37-case matrix, U19, I7/WAITING/INDEXING/capped backlog, I6 and every round10–13 target. All56 supplied verifier product checks plus1 environment check pass with zero skips. Main/test compile and all six PMD reports pass with zero violations. The unchanged native check now observes ERROR, the actual fatal callback once, and both files DONE/attempts0 after restart in1193ms (supplied equivalent1191ms), preserving second-scale durable deadlines without source, enqueue or deadline edits. Status repair alone is+20/-2; complete round13 product delta is+52/-7 (net+45), five existing classes. [Before](../../../tmp/builder/round13/before.txt), [after](../../../tmp/builder/round13/after.txt), [fresh execution summary](../../../tmp/builder/round13/status-verification-summary.json), [single Gradle command/output](../../../tmp/builder/round13/status-after-gradle.log), [report](../../../tmp/builder/round13/report.md), [execution evidence](../evidence/systemic-batch-deferral-live-config.json). The initial failed status evidence remains archived, never relabeled. Existing acceptance records below remain byte-for-byte unchanged; independent acceptance is pending.
 
 Round14 implements full mapped canary coverage and confirmed-absent source policy (entries22–24), plus the exact typed tragic-writer boundary assertion (entry25). Product +38/-8 (net +30), four existing classes. Exact29f315fb1: three native/coverage assertion failures and the focused generic-versus-typed boundary assertion fail as intended. After:129 U17/U19 targets including37 matrix states,59 supplied verifier product checks and1 environment check pass without skips. Main/test compile and6 PMD reports pass. Full module results retain one known launcher-NOTE environment failure and48 existing skips; the unchanged eight extraction checks run in a fresh JVM in the same combined call. A failed mapping-only candidate and the subsequent outdated type-oracle failure remain archived; the final single-line type-oracle correction reruns all three filesystem-policy methods, retaining all unchanged results under hashes. The native AccessDeniedException and eight free-deferral assertions are preserved. No schema/acceptance-record changes or commit. [Report and decisions](../../../tmp/builder/round14/report.md), [before](../../../tmp/builder/round14/before.txt), [after](../../../tmp/builder/round14/after.txt), [counts/retention](../../../tmp/builder/round14/verification-summary.json), [field audit](../../../tmp/builder/round14/field-coverage-audit.md), [execution evidence](../evidence/systemic-batch-deferral-full-mapping.json).
+
+
+Round15 adds native live-lock identity to the same O10 health proof. The only new health predicate compares the lock file's current creationTime with its open-time value, the same identity attribute NativeFSLock.ensureValid uses; absence is an I/O failure. Acquisition/open guards, RAM mapping/config proof, raw directory probe, typed tragedy behavior, backoff, status and source retry policy remain unchanged. The creation-time read is inside the existing component cleanup scope, and the coordinator is scoped to that one writer's lifetime. The non-filesystem injection fixture receives only a new null metadata argument. Exact2d25b4102 before:2 intended assertions and2 preservation passes. After:133 targets including37 matrix states and61 supplied verifier product checks plus1 environment check pass without skips. Main/test compile and6 PMD reports pass. Full modules retain1 known launcher-NOTE environment failure(s) and48 existing skips. Product+28/-4 (net+24). [Report](../../../tmp/builder/round15/report.md), [before](../../../tmp/builder/round15/before.txt), [after](../../../tmp/builder/round15/after.txt), [counts](../../../tmp/builder/round15/verification-summary.json), [execution evidence](../evidence/systemic-batch-deferral-live-lock.json). Existing acceptance records below are unchanged.
+
+| State | Before | Required after | Check |
+| --- | --- | --- | --- |
+| Native lock deleted after warm-up, same loop/writer | Canary passes; actual writes go tragic, rows stay uncounted | Canary rejects; zero attempts and real failure path preserved | LiveWriterLockHealthTest.lostLiveNativeWriteLockMustNotPassHealthProof |
+| New lock file replaces the held inode | Canary passes although replacement exists and raw Directory works | Canary rejects changed creationTime; restoring original inode restores healthy proof | LiveWriterLockHealthTest.replacementLockCannotImpersonateTheHeldNativeLock |
+| Healthy repeated probes | Live document/commit state and analyzer unchanged | Same preservation | LiveWriterLockHealthTest.repeatedProbeLeavesLiveDocumentsAndSharedAnalyzerUsable |
+| Existing in-memory component injection | Existing assertions pass with original signature | Same assertions with null native-lock metadata | ComponentsInjectionTest.usesInjectedComponentsWithoutDisk |
 
 ## Acceptance records
 

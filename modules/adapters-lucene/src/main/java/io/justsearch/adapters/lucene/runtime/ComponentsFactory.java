@@ -10,6 +10,7 @@ import io.justsearch.indexing.runtime.IndexOpenGuard;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.MMapDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -387,10 +389,12 @@ final class ComponentsFactory {
             nrtOnDemandMaxStaleMs,
             reopenTargetMs,
             reopenHardMs,
-            runtimeConfiguration);
+            runtimeConfiguration, null);
       }
 
       w = new IndexWriter(dir, cfg);
+      var writerLockCreatedAt = (FileTime) Files.getAttribute(
+          ((FSDirectory) dir).getDirectory().resolve(IndexWriter.WRITE_LOCK_NAME), "creationTime");
       // A writer now exists, so this session CAN die mid-commit: invalidate the previous clean
       // shutdown. RuntimeSession.close() re-writes it if this writer closes cleanly. Deliberately
       // outside the integrity-tier block above — whether the next boot scans is a separate question
@@ -430,7 +434,7 @@ final class ComponentsFactory {
           nrtOnDemandMaxStaleMs,
           reopenTargetMs,
           reopenHardMs,
-          runtimeConfiguration);
+          runtimeConfiguration, writerLockCreatedAt);
     } catch (Exception e) {
       // Best-effort cleanup to avoid leaking file handles (especially on Windows).
       try {
