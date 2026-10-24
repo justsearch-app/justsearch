@@ -1395,6 +1395,17 @@ export interface DeleteCascadeResult {
   cancelled?: boolean;
 }
 
+/** Java's equalsIgnoreCase uses single-code-point casing, including dotted I and final sigma. */
+function sameDeleteParentId(left: string, right: string): boolean {
+  const fold = (id: string): string => Array.from(id, point => {
+    const upper = point.toUpperCase();
+    // Full JS casing can expand a character (ß -> SS); the store does not expand characters.
+    const simple = Array.from(upper).length === 1 ? upper : point;
+    return String.fromCodePoint(simple.toLowerCase().codePointAt(0)!);
+  }).join('');
+  return left.length === right.length && fold(left) === fold(right);
+}
+
 /** Client walk over complete direct-child reads; no recent-list cap and no recursive server delete. */
 async function readDeleteTree(root: string): Promise<{ tree: DeleteTreeEntry[]; locked: boolean }> {
   const tree: DeleteTreeEntry[] = [];
@@ -1423,7 +1434,8 @@ async function readDeleteTree(root: string): Promise<{ tree: DeleteTreeEntry[]; 
     tree.push({ ...toConversation(row, listRequests, {}), depth: next.depth, busy: row.busy });
     const children = rows.filter(r => r.sessionId !== next.id);
     for (const child of children.reverse()) {
-      if (typeof child.sessionId !== 'string' || child.parentSessionId !== next.id) {
+      if (typeof child.sessionId !== 'string' || typeof child.parentSessionId !== 'string'
+          || !sameDeleteParentId(child.parentSessionId, next.id)) {
         throw new Error('The Engine could not confirm the conversation tree.');
       }
       pending.push({ id: child.sessionId, depth: next.depth + 1 });

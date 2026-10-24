@@ -518,7 +518,8 @@ public final class ChatController {
     if (!forkRead) result.addAll(runBackedRows(shapeId, limit, storeRows));
     if (childrenOf != null) {
       result.removeIf(row -> !childrenOf.equals(row.get("sessionId"))
-          && !childrenOf.equals(row.get("parentSessionId")));
+          && !(row.get("parentSessionId") instanceof String savedParentId
+              && childrenOf.equalsIgnoreCase(savedParentId)));
       var work = conversationStore.conversationWork();
       for (var row : result) row.put("busy", work != null && work.isBusy((String) row.get("sessionId")));
     }

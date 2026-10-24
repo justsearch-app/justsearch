@@ -21,7 +21,9 @@
  *
  * Side-effect registers <jf-sv3-sidebar>.
  */
-import { html, css, nothing, type TemplateResult } from 'lit';
+import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
+import { repeat } from 'lit/directives/repeat.js';
+import { deepActiveElement } from '../../utils/keyboardHandler.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { icon } from '../../components/Icon.js';
 import { sv3Shared } from './sv3-shared-styles.js';
@@ -233,15 +235,12 @@ export class Sv3Sidebar extends JfElement {
   declare announcement: string;
 
   /**
-   * The discard this panel has asked for and not yet seen land, with the two rows either side of it
-   * recorded AT REQUEST TIME — afterwards the list no longer contains the row, so its neighbours
-   * cannot be found from it.
+   * The discard this panel has asked for and not yet seen land. Keep its label for the announcement
+   * after the authority removes it; focus is decided from who holds it when the removal lands.
    */
   private pendingDiscard: {
     readonly id: string;
     readonly label: string;
-    readonly successorId: string | null;
-    readonly predecessorId: string | null;
   } | null = null;
 
   constructor() {
@@ -287,11 +286,8 @@ export class Sv3Sidebar extends JfElement {
    * The row's discard request, named. Whether it is ALLOWED is the window's call, not the panel's.
    * `discard` rather than `remove`: the latter would shadow `Element.remove()` on this host.
    *
-   * The panel also takes on what only IT knows: where the focus should land afterwards. Lit reuses
-   * the row nodes, so a discarded row's Delete button stays under the keyboard and silently becomes
-   * the NEXT conversation's Delete — a second Enter would then delete a conversation the reader
-   * never chose (measured, tempdoc 831 D2). The neighbours are recorded here because after the
-   * removal there is no row left to find them from.
+   * The panel announces a confirmed removal. Keyboard ownership is checked at render time, since
+   * the reader may have returned to typing while the deletion was in flight.
    */
   private discard(id: string, event: Event): void {
     event.stopPropagation();
@@ -300,8 +296,6 @@ export class Sv3Sidebar extends JfElement {
     this.pendingDiscard = {
       id,
       label: rows[at]?.label ?? '',
-      successorId: rows[at + 1]?.id ?? null,
-      predecessorId: at > 0 ? (rows[at - 1]?.id ?? null) : null,
     };
     // EMPTIED on the request, filled when the removal lands. A live region speaks on MUTATION, so
     // discarding two conversations that happen to share a title would set the same string twice and
@@ -316,52 +310,50 @@ export class Sv3Sidebar extends JfElement {
     );
   }
 
-  /**
-   * The discard landed: say so, and put the keyboard somewhere it can carry on from.
-   *
-   * The target is the SUCCESSOR'S ROW BUTTON — never its Delete — so the key that discarded one
-   * conversation cannot discard the next one by repeating itself. Falling back through predecessor
-   * to the new-search control means the focus is never simply dropped, which is what happened when
-   * the last row went.
-   */
-  protected override willUpdate(): void {
-    const pending = this.pendingDiscard;
-    if (pending === null) return;
+  /** Keep focus outside removed rows untouched, including rows removed by another window. */
+  protected override willUpdate(changed: PropertyValues<this>): void {
     const rows = this.flatRows();
-    if (rows.some((row) => row.id === pending.id)) return; // the window has not removed it (yet)
-    this.pendingDiscard = null;
-    // Decided BEFORE the render that will show the shortened list, so the announcement rides that
-    // same update instead of scheduling a second one.
-    this.announcement = pending.label === '' ? 'Conversation deleted' : `${pending.label} deleted`;
-    this.focusAfterDiscard =
-      [pending.successorId, pending.predecessorId].find(
-        (id) => id !== null && rows.some((row) => row.id === id),
-      ) ?? null;
-    this.focusPending = true;
+    const previous = changed.get('groups');
+    if (previous) {
+      const oldRows = previous.flatMap(group => group.rows);
+      const focused = deepActiveElement();
+      const root = focused?.getRootNode();
+      const host = root instanceof ShadowRoot ? root.host : null;
+      const rendered = [...(this.shadowRoot?.querySelectorAll('jf-sv3-session-row') ?? [])];
+      const at = rendered.indexOf(host as Sv3SessionRow);
+      const removed = oldRows[at];
+      if (focused && removed && !rows.some(row => row.id === removed.id)) {
+        const survivor = [...oldRows.slice(at + 1), ...oldRows.slice(0, at).reverse()]
+          .find(old => rows.some(row => row.id === old.id));
+        this.focusAfterDiscard = { id: survivor?.id ?? null, from: focused };
+        this.announcement = removed.label === '' ? 'Conversation deleted' : `${removed.label} deleted`;
+      }
+    }
+    const pending = this.pendingDiscard;
+    if (pending && !rows.some(row => row.id === pending.id)) {
+      this.pendingDiscard = null;
+      this.announcement = pending.label === '' ? 'Conversation deleted' : `${pending.label} deleted`;
+    }
   }
 
-  /** Set for exactly one update: the row to hand the keyboard to, or null for the new-search control. */
-  private focusAfterDiscard: string | null = null;
-  private focusPending = false;
+  private focusAfterDiscard: { id: string | null; from: Element } | null = null;
 
   protected override updated(): void {
-    if (!this.focusPending) return;
-    this.focusPending = false;
-    void this.placeFocusAfterDiscard(this.focusAfterDiscard);
+    const pending = this.focusAfterDiscard;
+    this.focusAfterDiscard = null;
+    if (pending) void this.placeFocusAfterDiscard(pending.id, pending.from);
   }
 
-  private async placeFocusAfterDiscard(survivorId: string | null): Promise<void> {
-    if (survivorId === null) {
-      this.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="sv3-sidebar-new"]')?.focus();
-      return;
-    }
-    const index = this.flatRows().findIndex((row) => row.id === survivorId);
+  private async placeFocusAfterDiscard(survivorId: string | null, from: Element): Promise<void> {
+    const index = this.flatRows().findIndex(row => row.id === survivorId);
     const rows = [...(this.shadowRoot?.querySelectorAll<Sv3SessionRow>('jf-sv3-session-row') ?? [])];
     const row = index < 0 ? undefined : rows[index];
-    if (row === undefined) return;
-    // The row owns its own shadow root, so it may still be one update away from having a button.
-    await row.updateComplete;
-    row.focusRow();
+    if (row) await row.updateComplete;
+    // An awaited row update must not take focus back from a reader who has already moved on.
+    const focused = deepActiveElement();
+    if (focused !== from && focused !== this.ownerDocument.body) return;
+    if (row?.isConnected) row.focusRow();
+    else this.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-sidebar-announcer"]')?.focus();
   }
 
   private toggleCollapsed(event: Event): void {
@@ -425,14 +417,14 @@ export class Sv3Sidebar extends JfElement {
           `
         : html`
             <div class="groups">
-              ${this.groups.map(
+              ${repeat(this.groups, (group) => group.id,
                 (group) => html`
                   <div class="group" data-testid="sv3-sidebar-group">
                     <div class="group-label" data-testid="sv3-sidebar-group-label">
                       ${group.label}
                     </div>
                     <div class="rows">
-                      ${group.rows.map(
+                      ${repeat(group.rows, (row) => row.id,
                         (row) => html`
                           <jf-sv3-session-row
                             data-testid="sv3-sidebar-row"
@@ -475,6 +467,7 @@ export class Sv3Sidebar extends JfElement {
         aria-live="polite"
         aria-atomic="true"
         data-testid="sv3-sidebar-announcer"
+        tabindex="-1"
       >
         ${this.announcement}
       </div>

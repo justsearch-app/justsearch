@@ -9,27 +9,25 @@ function name(row: DeleteTreeEntry): string {
 
 /** Native nested lists expose the same parentage visually and to assistive technology. */
 export function confirmConversationTree(_children: string[], tree: DeleteTreeEntry[]): Promise<boolean> {
-  const branches = new Map<string, TemplateResult[]>();
-  const rendered = new Map<string, TemplateResult>();
+  const branches = new Map<number, TemplateResult[]>();
   for (const row of [...tree].reverse()) {
-    const children = branches.get(row.id) ?? [];
+    // The validated walk already supplies preorder/depth, even when a saved parent uses an alias.
+    const children = branches.get(row.depth + 1) ?? [];
+    branches.delete(row.depth + 1);
     const item = html`<li>
       <strong>${name(row)}</strong>
       <div>${row.id} · ${row.createdAt > 0 && Number.isFinite(row.createdAt) ? `Created ${new Date(row.createdAt).toLocaleString()}` : 'Creation time unknown'}${row.messageCount === undefined ? '' : ` · ${row.messageCount} own messages`}</div>
       ${row.parentSessionId ? html`<div>Branched from ${row.parentSessionId} at ${row.branchPointMessageId ?? 'unknown message'}</div>` : ''}
       ${children.length > 0 ? html`<ol>${children}</ol>` : ''}
     </li>`;
-    rendered.set(row.id, item);
-    if (row.parentSessionId) {
-      const siblings = branches.get(row.parentSessionId) ?? [];
-      siblings.unshift(item);
-      branches.set(row.parentSessionId, siblings);
-    }
+    const siblings = branches.get(row.depth) ?? [];
+    siblings.unshift(item);
+    branches.set(row.depth, siblings);
   }
   return confirmAsync({
     title: 'Delete conversation and branches?',
     message: html`<div>Permanently delete ${tree.length} conversation${tree.length === 1 ? '' : 's'} and their agent runs? This cannot be undone.</div>
-      <ol>${rendered.get(tree[0]?.id ?? '')}</ol>`,
+      <ol>${branches.get(0) ?? []}</ol>`,
     variant: 'danger',
     confirmLabel: `Delete all (${tree.length})`,
   });

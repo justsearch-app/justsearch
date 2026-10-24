@@ -570,6 +570,160 @@ Agent choices adopted under the user's quoted delegation; never owner words. All
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreCaseIdsTest.java#throwawayPrefixCaseVariantsCannotAcquireBranches"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "F1: only a removed row may hand focus off. Preserve composer and surviving-row focus through single/tree/other-window removal; retain keyed row/shelf identity; a final removal focuses a non-destructive announcement. Replaces the old New search focus expectation. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4b follow-up F1/TD10 and F2, adopted by the orchestrator under the remaining UI/UX delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F1 (TD10)",
+          "choice": "a tree delete, or any row removal, never moves focus that is outside the removed rows. Focus is moved only when it was on a removed row, and then to a surviving row or a neutral place where Space or Enter does nothing destructive. A draft is never cleared by keys typed during or after a delete."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-focus.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve composer focus ownership",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve survivor focus ownership",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve composer focus ownership",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve removed focus ownership",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve survivor focus ownership",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals leave the keyboard on a neutral target when no row survives",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals leave the keyboard on a neutral target when no row survives",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 any row removal preserves focus in a surviving shelf",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 any row removal moves focus only when the removed row held it",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#falls back to a neutral deletion announcement when the list empties"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "F1 preservation: deleting a single focused row still hands focus to a surviving row button, never its Delete action. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4b follow-up F1/TD10 and F2, adopted by the orchestrator under the remaining UI/UX delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F1 (TD10)",
+          "choice": "a tree delete, or any row removal, never moves focus that is outside the removed rows. Focus is moved only when it was on a removed row, and then to a surviving row or a neutral place where Space or Enter does nothing destructive. A draft is never cleared by keys typed during or after a delete."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-focus-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve removed focus ownership"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "For successor/predecessor/final-row focus checks, place focus back on the invoker at the fake DELETE boundary after consent. The new contract is focus ownership when removal lands; happy-dom does not implement native deep dialog-invoker restoration. Successor/predecessor assertions stay. The deliberately changed unsafe New search fallback is accounted for by the New F1 entry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4b follow-up F1/TD10 and F2, adopted by the orchestrator under the remaining UI/UX delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F1 (TD10)",
+          "choice": "a tree delete, or any row removal, never moves focus that is outside the removed rows. Focus is moved only when it was on a removed row, and then to a surviving row or a neutral place where Space or Enter does nothing destructive. A draft is never cleared by keys typed during or after a delete."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeleteCaseParent.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "F2: client validates case-variant parent links using Java simple case semantics, including dotted I, final sigma and capital sharp S; confirmation receives every child with its depth before a leaf-first walk. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4b follow-up F1/TD10 and F2, adopted by the orchestrator under the remaining UI/UX delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F2",
+          "choice": "the window's tree walk matches parent ids the same way the store does, so the dialog names every conversation that will be deleted or that blocks deletion."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-case-tree-client.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/conversationDeleteCaseParent.test.ts#F2 names and deletes a child of Root saved under rOoT",
+        "modules/ui-web/src/shell-v0/state/conversationDeleteCaseParent.test.ts#F2 names and deletes a child of id-i saved under ID-İ",
+        "modules/ui-web/src/shell-v0/state/conversationDeleteCaseParent.test.ts#F2 names and deletes a child of id-σ saved under ID-ς",
+        "modules/ui-web/src/shell-v0/state/conversationDeleteCaseParent.test.ts#F2 names and deletes a child of id-ß saved under ID-ẞ"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerDeleteTreeCaseTest.java"
+      ],
+      "class": "New",
+      "behaviour": "F2: complete childrenOf reads return saved children under any case variant of the parent, with the original parent facts and query identity intact. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4b follow-up F1/TD10 and F2, adopted by the orchestrator under the remaining UI/UX delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F2",
+          "choice": "the window's tree walk matches parent ids the same way the store does, so the dialog names every conversation that will be deleted or that blocks deletion."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-case-tree-api.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerDeleteTreeCaseTest.java#completeChildReadUsesTheStoresCaseInsensitiveParentComparison"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "F2: native confirmation renders every member of the validated preorder tree at its supplied depth, including case-variant saved parents, while retaining their original branch facts. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "WP1.4b follow-up F1/TD10 and F2, adopted by the orchestrator under the remaining UI/UX delegation.",
+          "label": "agent choice, adopted under the user's delegation",
+          "scenario": "F2",
+          "choice": "the window's tree walk matches parent ids the same way the store does, so the dialog names every conversation that will be deleted or that blocks deletion."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-case-tree-dialog.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts#F2 renders every validated tree member when saved parent casing differs"
+      ],
+      "repaired": true
     }
   ]
 }
