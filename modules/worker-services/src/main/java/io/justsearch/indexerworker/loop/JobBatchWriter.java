@@ -24,6 +24,7 @@ import io.opentelemetry.api.trace.Tracer;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -51,6 +52,7 @@ public final class JobBatchWriter {
   private static final Tracer TRACER = GlobalOpenTelemetry.getTracer("indexing");
 
   private final IndexingCoordinator indexingCoordinator;
+  private final WorkerIngestionAuthority ingestionAuthority;
   private final WorkerSignalBus signalBus;
   private final EmbeddingProviderLifecycle embeddingLifecycle;
   private final Supplier<SpladeEncoder> spladeEncoderSupplier;
@@ -73,6 +75,7 @@ public final class JobBatchWriter {
       io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
 
   public JobBatchWriter(
+      WorkerIngestionAuthority ingestionAuthority,
       IndexingCoordinator indexingCoordinator,
       WorkerSignalBus signalBus,
       EmbeddingProviderLifecycle embeddingLifecycle,
@@ -89,6 +92,7 @@ public final class JobBatchWriter {
       BooleanSupplier chunkSpladeEnabledSupplier,
       Supplier<RunningRuntime> activeLexicalSource,
       FileMutationFence fileMutationFence) {
+    this.ingestionAuthority = ingestionAuthority;
     this.indexingCoordinator = indexingCoordinator;
     this.signalBus = signalBus;
     this.embeddingLifecycle = embeddingLifecycle;
@@ -281,7 +285,7 @@ public final class JobBatchWriter {
                         contentExtractor.extractionPolicy(), ex.provenance()),
                     writeFailures.retryAtMs())));
       } else {
-        writeFailures.failure(e, ex.filePath(), systemic -> {
+        Consumer<Boolean> record = systemic -> {
           var outcome = journal.outcome(
               IngestionOutcomeClass.WRITE_FAILED,
               IngestionReasonCodes.WRITE_FAILED,
@@ -294,7 +298,10 @@ public final class JobBatchWriter {
             if (systemic) jobQueue.deferClaim(ex.claim(), outcome, entry, writeFailures.retryAtMs());
             else jobQueue.markClaimFailed(ex.claim(), outcome, entry);
           });
-        });
+        };
+        if (ingestionAuthority.presence(ex.filePath(), ex.claim().ingestionRoot())
+            == SourcePresence.Verdict.ABSENT) record.accept(false);
+        else writeFailures.failure(e, ex.filePath(), record);
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }

@@ -439,6 +439,7 @@ public class IndexingLoop implements Closeable {
             (long delta) -> indexedSinceCommit += delta);
     this.writer =
         new JobBatchWriter(
+            ingestionAuthority,
             indexingCoordinator,
             signalBus,
             embeddingLifecycle,

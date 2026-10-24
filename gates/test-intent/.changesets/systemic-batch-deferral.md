@@ -34,7 +34,7 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O10 full mapped document with live writer configuration, native lock identity and live field schema | [stored-schema mismatch and healthy pending-work control](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java), [live lock loss/replacement and isolation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java), [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
-| K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
+| K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [writer-time vanished canonical alias](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
 | K5 document values exceed store limit | [real SQLITE_LIMIT_LENGTH on long document path, normal probe succeeds](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
@@ -821,7 +821,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "label": "agent choice under adopted orchestrator design"
         }
       ],
-      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-live-schema.json",
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-writer-source-absence.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
@@ -1355,6 +1355,87 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java#incompatibleStoredTextSchemaMustNotChargeEveryHealthySource"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java"
+      ],
+      "class": "New",
+      "behaviour": "K2/U19: a source admitted through a symlinked parent whose canonical path disappears during a real Lucene write is charged one per-file attempt with RETRY_WITH_BACKOFF, even while a shared outage fails the canary. Its healthy peer remains uncounted and deferred.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator round-seventeen narrow writer confirmed-absence fallback, preserving U17/U19, round10–16 checks and all acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "The orchestrator requires the writer to reuse the extractor round14 confirmed-absence fallback: WorkerIngestionAuthority.presence(source, ingestionRoot) == ABSENT makes a write failure per-file, even when the canonical path can no longer be compared and the shared canary fails. Pass the loop's existing configured ingestionAuthority to JobBatchWriter; do not construct another production presence checker. Reuse the existing outcome callback with systemic=false before BatchServiceFailures classification. This preserves root-witness/exclusion policy, retry semantics, healthy-peer outage deferral and all draining logic. Four standalone writer test fixtures add only the newly required constructor argument, with every original assertion unchanged. The native verifier reproduction and all original fault/assertions are retained apart from class/fixture helper names, SPDX and compile-visible StandardTokenizer (the contiguous fault marker and all fault/oracles remain), with exact RETRY_WITH_BACKOFF and healthy-peer zero-attempt assertions added. These are delegated implementation choices under an orchestrator instruction, never owner-words."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-writer-source-absence.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java#canonicalSourceVanishingDuringRealWriteStillCostsAFileAttemptDuringOutage"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/HeldFileWriter.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkWriteChunkDeclarationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/VduNativePublicationFixture.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "JobBatchWriter now receives the same configured WorkerIngestionAuthority as the loop extractor. These four standalone fixtures add only the required authority argument to the constructor. Original fault setup, preconditions, inputs, assertions and tags are unchanged. Relevant publication, revision-race, exclusion and bulk-write checks execute on the original baseline signature and adapted candidate signature.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator round-seventeen narrow writer confirmed-absence fallback, preserving U17/U19, round10–16 checks and all acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "The orchestrator requires the writer to reuse the extractor round14 confirmed-absence fallback: WorkerIngestionAuthority.presence(source, ingestionRoot) == ABSENT makes a write failure per-file, even when the canonical path can no longer be compared and the shared canary fails. Pass the loop's existing configured ingestionAuthority to JobBatchWriter; do not construct another production presence checker. Reuse the existing outcome callback with systemic=false before BatchServiceFailures classification. This preserves root-witness/exclusion policy, retry semantics, healthy-peer outage deferral and all draining logic. Four standalone writer test fixtures add only the newly required constructor argument, with every original assertion unchanged. The native verifier reproduction and all original fault/assertions are retained apart from class/fixture helper names, SPDX and compile-visible StandardTokenizer (the contiguous fault marker and all fault/oracles remain), with exact RETRY_WITH_BACKOFF and healthy-peer zero-attempt assertions added. These are delegated implementation choices under an orchestrator instruction, never owner-words."
+        }
+      ]
     }
   ]
 }
@@ -1596,6 +1677,14 @@ Round16 extends O10 to the existing live index field schema. The probe borrows t
 | Healthy ordinary reopened schema and pending work | ExistingSchemaHealthTest.ordinaryStoredSchemaStillPassesWithoutPublishingPendingWork; inherited pending-isolation/config/field-family checks remain. |
 
 Round16 exact6cd245b6a before:1 intended charged-source assertion failure and1 healthy stored-schema preservation pass. After:135 targets including37 matrix states, 69 supplied verifier product checks and1 environment check pass without skips. Main/test compile and6 PMD reports pass. Full modules retain1 known launcher-NOTE environment failure(s) and48 existing skips. Product+14/-3 (net+11). [Report](../../../tmp/builder/round16/report.md), [before](../../../tmp/builder/round16/before.txt), [after](../../../tmp/builder/round16/after.txt), [counts](../../../tmp/builder/round16/verification-summary.json), [execution evidence](../evidence/systemic-batch-deferral-live-schema.json). Initial full PMD lint is corrected by one explanatory comment; fresh PMD/native controls pass and all retained compiled classes are identical (see retention-proof.json). Existing acceptance records below are unchanged.
+
+## Round seventeen: writer confirmed source absence
+
+Entries29–30 repair only the writer failure classification and adapt its existing test constructors. The loop passes its already configured ingestion authority into the batch writer. An ABSENT verdict bypasses shared-outage classification and invokes the unchanged per-file journal/queue callback; unknown/present sources keep the accepted pipeline-health rule. The extractor already applies this same policy. No second filesystem check, schema column, retry rule or canary mechanism is added.
+
+The verifier's unrefreshed buffered-field-schema case is explicitly accepted as a same-as-baseline residual in verifier-D16-checks/counterexample-buffered-schema.md. It is outside this narrow repair, remains unchanged, and is reported separately from passing preservation checks. The refreshed control and every previously passing supplied check remain required.
+
+Round17 exact8f9cc9c2e before: writer alias regression fails with attempts0; candidate attempts1/RETRY_WITH_BACKOFF, healthy peer0. All140 named executions/37 matrix states pass; supplied product71 pass with1 accepted unrefreshed-schema baseline residual, environment1 pass. Main/test compile and6 PMD pass. Full suites retain the known launcher-NOTE failure and48 conditional skips. Product+10/-2net8. [Report](../../../tmp/builder/round17/report.md), [before](../../../tmp/builder/round17/before.txt), [after](../../../tmp/builder/round17/after.txt), [counts](../../../tmp/builder/round17/verification-summary.json), [evidence](../evidence/systemic-batch-deferral-writer-source-absence.json). Existing acceptance records are unchanged.
 
 ## Acceptance records
 

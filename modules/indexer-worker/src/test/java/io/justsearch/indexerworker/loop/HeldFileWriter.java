@@ -60,7 +60,7 @@ public final class HeldFileWriter {
     when(extractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
     // The freshness check passes: the file was there when the writer checked it.
     var staleResolver = mock(StaleSnapshotResolver.class);
-    writer = new JobBatchWriter(
+    writer = new JobBatchWriter(new WorkerIngestionAuthority(),
         coordinator,
         mock(WorkerSignalBus.class),
         mock(EmbeddingProviderLifecycle.class),
