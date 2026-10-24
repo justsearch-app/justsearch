@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.FileSystemException;
 import java.util.ArrayList;
@@ -72,7 +73,8 @@ final class BatchServiceFailures {
         }
       }
     }
-    return false;
+    return !Files.isReadable(source)
+        || (sourceRealPath != null && !Files.isReadable(sourceRealPath));
   }
 
   void unavailable(Throwable failure, Consumer<Boolean> record) {
