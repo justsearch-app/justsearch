@@ -69,7 +69,7 @@ final class RootRemovalIncompleteTest {
     if (step.equals("save")) {
       assertThrows(java.io.UncheckedIOException.class,
           () -> ops.removeWatchedPath(root, TestEngineContexts.internal()));
-    } else if (step.equals("delete") || step.equals("buffered")) {
+    } else if (step.equals("buffered")) {
       var refusal = assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
           () -> ops.removeWatchedPath(root, TestEngineContexts.internal()));
       assertTrue(refusal.getMessage().contains("Removal did not complete"));
@@ -167,8 +167,7 @@ final class RootRemovalIncompleteTest {
     var before = state.captureRootProducer(root, true);
     var ops = ops(roots, state, mock(RootLifecycleOps.WorkerWatchFn.class),
         (path, context) -> DeleteByPathResponse.newBuilder().setError("forced failure").build());
-    assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
-        () -> ops.removeWatchedPath(root, TestEngineContexts.internal()));
+    assertEquals(-1, ops.removeWatchedPath(root, TestEngineContexts.internal()));
     var calls = new java.util.concurrent.atomic.AtomicInteger();
     for (var fence : List.of(before, state.captureRootProducer(root, true))) {
       fence.run(calls::incrementAndGet, () -> -1);

@@ -606,12 +606,7 @@ final class RootLifecycleOps {
                             "Removal did not complete because the index is rebuilding. "
                                     + "Retry Remove when the rebuild finishes.");
                 }
-                if (response != null && !response.getError().isEmpty()) {
-                    throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
-                            io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,
-                            "Removal did not complete: " + response.getError());
-                }
-                if (response == null || response.getDeletedJobs() < 0
+                if (response == null || !response.getError().isEmpty() || response.getDeletedJobs() < 0
                         || response.getDeletedJobs() > Integer.MAX_VALUE) {
                     log.warn("Worker did not confirm removal of {}: {}", normalized, response);
                     return -1;

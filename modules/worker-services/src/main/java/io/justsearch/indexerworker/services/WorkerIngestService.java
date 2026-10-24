@@ -2105,9 +2105,11 @@ public final class WorkerIngestService {
 
         DeleteByPathResponse unavailable =
             indexRuntimeUnavailableReply(
-                "deleteByPath", deleteByPathResponse(-1, "The search index is not ready. Wait for index recovery, then retry Remove."));
+                "deleteByPath", deleteByPathResponse(-1, "Index runtime not available"));
         if (unavailable != null) {
-          return unavailable;
+          throw WorkerServiceException.unavailable(
+              "Removal did not complete: the search index is not ready. "
+                  + "Wait for index recovery, then retry Remove.");
         }
 
         try {

@@ -46,15 +46,20 @@ final class SwitchingRootRemovalVisibilityTest extends LuceneExecutorTestBase {
       queue.open();
       var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
           base, activePath, deferred ? null : (RunningRuntime) serving, serving, null, 0L);
+      if (deferred) {
+        var refusal = assertThrows(WorkerServiceException.class, () -> service.deleteByPath(
+            DeleteByPathRequest.newBuilder().setPath(root.toString()).build(), CallContext.none()));
+        assertEquals(WorkerServiceException.Status.UNAVAILABLE, refusal.status());
+        assertTrue(refusal.getMessage().contains("Removal did not complete"), refusal.getMessage());
+        assertTrue(queue.listSwitchBufferOpsStrict().isEmpty());
+        return;
+      }
       var response = service.deleteByPath(DeleteByPathRequest.newBuilder()
           .setPath(root.toString()).build(), CallContext.none());
       assertFalse(response.getError().isEmpty() && !response.getBuffered() && response.getDeletedJobs() >= 0,
           "a buffered or unwritable switch cannot acknowledge removal completion");
-      if (deferred) assertTrue(queue.listSwitchBufferOpsStrict().isEmpty());
-      else {
-        assertTrue(response.getBuffered());
-        assertEquals(1, queue.listSwitchBufferOpsStrict().size(), "ordinary switch keeps its durable retry receipt");
-      }
+      assertTrue(response.getBuffered());
+      assertEquals(1, queue.listSwitchBufferOpsStrict().size(), "ordinary switch keeps its durable retry receipt");
     }
   }
 
