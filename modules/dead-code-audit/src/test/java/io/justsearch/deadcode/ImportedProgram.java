@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.deadcode;
 
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
 
@@ -17,10 +20,8 @@ import org.junit.jupiter.api.Timeout;
  * asks for 2g, and whole-classpath scanners in this repo are the tests that go red with
  * {@code TimeoutException} under concurrent-agent CPU load (`.claude/rules/agent-lessons.md`).
  *
- * <p>Analyses extend this class so the shared import runs in bounded setup, outside the 30-second
- * per-test default in {@code JvmBaseConventionsPlugin}. The import has its own 120-second budget:
- * it took about 4 seconds idle and 41 seconds with three CPU burners per available CPU. Test bodies
- * retain the default timeout; neither import nor analysis gets an unbounded wait.
+ * <p>Inherited setup preemptively bounds both the import and waiting for its lock to 120 seconds.
+ * Setup overrides the repository's 30-second default, which still bounds each test body.
  */
 abstract class ImportedProgram {
 
@@ -29,7 +30,7 @@ abstract class ImportedProgram {
   @BeforeAll
   @Timeout(120)
   static void importProgram() {
-    classes();
+    assertTimeoutPreemptively(Duration.ofSeconds(120), ImportedProgram::classes);
   }
 
   static synchronized JavaClasses classes() {
