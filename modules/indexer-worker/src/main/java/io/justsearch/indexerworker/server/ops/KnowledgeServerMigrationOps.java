@@ -2495,6 +2495,17 @@ public final class KnowledgeServerMigrationOps {
     if (context.jobQueue() == null || context.roots() == null) {
       throw new IOException("Missing migration queue or roots");
     }
+    // The loaded roots are the ownership authority for this entire walk. Do not consult live
+    // watcher declarations between roots: they may change while enumeration is in progress.
+    List<ResolvedConfig.FileSource> roots = List.copyOf(context.roots());
+    List<Path> declared = roots.stream()
+        .map(source -> source.path().toAbsolutePath().normalize()).toList();
+    Map<Path, PathPrefixScope> scopes = new HashMap<>();
+    for (Path root : declared) {
+      scopes.put(root, new PathPrefixScope(root.toString(), declared.stream()
+          .filter(path -> !path.equals(root) && path.startsWith(root))
+          .map(Path::toString).toList()));
+    }
     if (context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
       scopeLegacyPrefixes(queue, null, publisher);
     }
@@ -2503,8 +2514,9 @@ public final class KnowledgeServerMigrationOps {
     ArrayList<JobQueue.EnqueueEntry> batch = new ArrayList<>(batchSize);
     long lastPersistMs = 0L;
 
-    for (ResolvedConfig.FileSource source : context.roots()) {
+    for (ResolvedConfig.FileSource source : roots) {
       Path root = source.path();
+      PathPrefixScope scope = scopes.get(root.toAbsolutePath().normalize());
       boolean help = io.justsearch.configuration.InternalCollections.HELP.equals(source.collection());
       requireEnumerationRunning(context);
       while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
@@ -2528,6 +2540,7 @@ public final class KnowledgeServerMigrationOps {
         while (iterator.hasNext()) {
           Path path = iterator.next();
           requireEnumerationRunning(context);
+          if (scope.excludes(path.toAbsolutePath().normalize().toString())) continue;
           BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
           if (attributes.isDirectory()) continue;
           if (help && !path.toString().endsWith(".md")) continue;
