@@ -125,7 +125,10 @@ async function discoverApiEngine(explicitPort, discovery) {
     if (!token) throw new Error('An explicit port requires JUSTSEARCH_SESSION_TOKEN');
     const port = Number(override);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid API port');
-    return { port, token, engine: null };
+    // The token goes only to the proven Engine of a runtime manifest naming the port.
+    const { selected, tried } = await discovery.selectPinned(discovery.standardCandidates(), port);
+    if (!selected) throw new Error(discovery.pinRefusals(explicitPort != null ? `--port ${port}` : `JUSTSEARCH_API_PORT=${port}`, tried).join('\n'));
+    return { port, token, engine: selected };
   }
   const { selected } = await discovery.selectEngine(discovery.standardCandidates());
   return selected ? { port: selected.port, token: selected.token, engine: selected } : null;
@@ -186,7 +189,8 @@ function resolvePendingId(target, wantOperationId, timeoutSeconds, discovery) {
       target,
       {
         path: '/api/advisory/authorization-pending/stream',
-        headers: { Accept: 'text/event-stream', ...(target.token ? { 'X-JustSearch-Session': target.token } : {}) },
+        headers: { Accept: 'text/event-stream' },
+        credential: true,
         timeoutMs: timeoutSeconds * 1000,
       },
       (res) => {

@@ -20,6 +20,14 @@
  *     fails with err.code 'ENGINE_NOT_PROVEN'. A reused connection needs no new proof: a process
  *     that binds the port later cannot take over an established connection. So there is no gap
  *     between a check and the request it guards, and the OS is asked once per connection.
+ *  4. A port the operator pinned (--port, JUSTSEARCH_API_PORT): selectPinned() looks for a
+ *     manifest naming that port; when one does, the pin is that manifest Engine and gets the
+ *     proof above (a manifest that names the port but fails it is a refusal, never a fallback).
+ *     When none does, nothing proves what answers there, so the clients refuse the pin: the
+ *     session token (JUSTSEARCH_SESSION_TOKEN for a pin) goes only to a proven Engine.
+ *  5. Idle pooled connections are retired after IDLE_RETIRE_MS (http.Agent timeout, idleRetireMs),
+ *     before the Engine's own idle expiry (Jetty: 30 s) can close one just as a request is
+ *     written on it.
  *
  * Why the socket owner: whatever answers on the port can claim any pid and instanceId, so only
  * the OS's record of who holds the connection ties the endpoint to the manifest's process.
@@ -62,7 +70,26 @@ function startupWaitMs(env = process.env) {
   return /^\d+$/.test(raw) ? Number(raw) : STARTUP_WAIT_MS;
 }
 const PROBE_MAX_BYTES = 64 * 1024;
+/** A pooled connection idle this long is closed by the agent (the Engine closes idle ones at 30 s). */
+const IDLE_RETIRE_MS = 25000;
+const IDLE_RETIRE_ENV = 'JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS';
+
+/**
+ * The idle retirement both clients' agents use: IDLE_RETIRE_MS, unless
+ * JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS holds a whole number of milliseconds. That variable is a
+ * test seam (so a test can scale the boundary down with its fixture's idle expiry) and is read
+ * only here.
+ */
+function idleRetireMs(env = process.env) {
+  const raw = String(env[IDLE_RETIRE_ENV] ?? '').trim();
+  return /^\d+$/.test(raw) ? Number(raw) : IDLE_RETIRE_MS;
+}
 const OS_QUERY_TIMEOUT_MS = 10000;
+/**
+ * The Roaming folder lookup starts PowerShell, whose first start on a cold or busy machine takes
+ * about 10 s (a fresh hosted Windows runner took 10.06 s and 10.8 s), so it gets its own bound.
+ */
+const ROAMING_QUERY_TIMEOUT_MS = 30000;
 /** The server may not have accepted a fresh connection yet; it is looked up again this often. */
 const PROOF_RETRY_MS = 10;
 
@@ -125,33 +152,52 @@ function windowsTool(...parts) {
   return path.win32.join(nonEmpty(process.env.SystemRoot) || 'C:\\Windows', 'System32', ...parts);
 }
 
-function runTool(file, args) {
+function runTool(file, args, timeoutMs = OS_QUERY_TIMEOUT_MS) {
   return new Promise((resolve) => {
     execFile(
       file,
       args,
-      { encoding: 'utf8', timeout: OS_QUERY_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
-      (error, stdout) => resolve(error ? { error: error.message } : { stdout }),
+      { encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+      (error, stdout) =>
+        resolve(error ? { error: error.message, timedOut: error.killed === true && error.code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' } : { stdout }),
     );
   });
+}
+
+function roamingQuery() {
+  return {
+    file: windowsTool('WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    args: [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      "[Console]::OutputEncoding = [Text.Encoding]::UTF8; [Environment]::GetFolderPath('ApplicationData')",
+    ],
+    timeoutMs: ROAMING_QUERY_TIMEOUT_MS,
+  };
+}
+
+function lookupError(code, detail) {
+  return Object.assign(new Error(`the Roaming folder lookup ${detail}`), { code });
 }
 
 /**
  * The RoamingAppData known folder as Windows reports it ([Environment]::GetFolderPath
  * ('ApplicationData') calls the shell folder API, as Tauri's dirs-sys does through
  * SHGetKnownFolderPath). Covers a process started without APPDATA and a redirected folder.
- * Resolves to null when it cannot be asked.
+ * Resolves to null off Windows. A lookup that does not answer within its bound rejects with
+ * code ROAMING_LOOKUP_TIMEOUT, and one that fails or answers no absolute folder with
+ * ROAMING_LOOKUP_FAILED, so discovery names it instead of skipping the folder silently.
+ * query ({file, args, timeoutMs}) replaces the PowerShell lookup in tests.
  */
-async function roamingAppDataFromOs() {
-  if (process.platform !== 'win32') return null;
-  const res = await runTool(windowsTool('WindowsPowerShell', 'v1.0', 'powershell.exe'), [
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    "[Console]::OutputEncoding = [Text.Encoding]::UTF8; [Environment]::GetFolderPath('ApplicationData')",
-  ]);
-  const folder = res.stdout ? res.stdout.trim() : '';
-  return folder && path.win32.isAbsolute(folder) ? folder : null;
+async function roamingAppDataFromOs(query = process.platform === 'win32' ? roamingQuery() : null) {
+  if (!query) return null;
+  const res = await runTool(query.file, query.args, query.timeoutMs);
+  if (res.timedOut) throw lookupError('ROAMING_LOOKUP_TIMEOUT', `(${path.basename(query.file)}) did not answer within ${query.timeoutMs} ms`);
+  if (res.error) throw lookupError('ROAMING_LOOKUP_FAILED', `(${path.basename(query.file)}) failed: ${res.error}`);
+  const folder = res.stdout.trim();
+  if (!path.win32.isAbsolute(folder)) throw lookupError('ROAMING_LOOKUP_FAILED', `(${path.basename(query.file)}) answered ${JSON.stringify(folder)}, not an absolute folder`);
+  return folder;
 }
 
 /** A /proc/net/tcp{,6} address (hex, kernel byte order) as dotted IPv4, or null if not IPv4. */
@@ -287,20 +333,23 @@ function provenConnection(engine, options, done) {
   return undefined;
 }
 
-const pinnedAgent = new http.Agent({ keepAlive: true });
+const SESSION_HEADER = 'x-justsearch-session';
+
+/** Connections to a port no manifest names: used as given, never with a credential (engineRequest). */
+const unprovenAgent = new http.Agent({ keepAlive: true, timeout: idleRetireMs() });
 const engineAgents = new Map();
 
 function engineKey(engine) {
   return [engine.dataDir, engine.pid, engine.instanceId, engine.port].join('\0');
 }
 
-/** One keep-alive agent per manifest Engine, whose connections are proven (provenConnection). */
+/** The keep-alive agent for a target: per manifest Engine, connections proven by owner (provenConnection). */
 function agentFor(engine) {
-  if (!engine) return pinnedAgent;
+  if (!engine) return unprovenAgent;
   const key = engineKey(engine);
   let agent = engineAgents.get(key);
   if (!agent) {
-    agent = new http.Agent({ keepAlive: true });
+    agent = new http.Agent({ keepAlive: true, timeout: idleRetireMs() });
     agent.createConnection = (options, done) => provenConnection(engine, options, done);
     engineAgents.set(key, agent);
   }
@@ -316,26 +365,49 @@ function forgetEngine(engine) {
 }
 
 /**
- * The only way the clients send a request to an Engine: http.request to 127.0.0.1 through
- * agentFor(target.engine). target is { port, engine }: engine is the manifest candidate
- * ({ dataDir, pid, instanceId, port }), or null for a port the operator named (--port,
- * JUSTSEARCH_API_PORT), which is used as given. Returns the http.ClientRequest; a failed proof
- * surfaces as its 'error' with err.code 'ENGINE_NOT_PROVEN' (and err.status, err.detail).
+ * The only way the clients send a request to an Engine: one http.request to 127.0.0.1 through
+ * agentFor(target.engine), ended here with body. target is { port, engine, token }: engine is the
+ * manifest candidate ({ dataDir, pid, instanceId, port }) and token its session token (from that
+ * validated manifest, or JUSTSEARCH_SESSION_TOKEN for a pin the manifest names; '' is dev mode).
+ * engine null is a port nothing proves: it gets public probes only. The request's identity (the
+ * Engine's pid/instanceId) and token are left on it (req.connectionIdentity, req.connectionToken).
+ * credential: true adds the token (X-JustSearch-Session) and fails closed: on a target with no
+ * engine, or once the connection is proven when the target holds no token (not a string), the
+ * request is destroyed before anything is written, with err.code 'ENGINE_NOT_PROVEN' or
+ * 'NO_TOKEN'. session ({ id, identity }: what a client negotiated with one Engine) adds
+ * Mcp-Session-Id when id is set (a server may assign none); for any other identity the request is
+ * destroyed before anything is written, with err.code 'SESSION_TARGET_CHANGED', so nothing
+ * negotiated with one Engine (session id, protocol version) reaches another, whether or not it
+ * assigned a session id. Returns the http.ClientRequest; a failed proof surfaces as its 'error'
+ * with err.code 'ENGINE_NOT_PROVEN' (and err.status, err.detail).
  */
-function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, timeoutMs }, onResponse) {
+function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, timeoutMs, body, credential = false, session = null }, onResponse) {
   const engine = target.engine || null;
-  return http.request(
-    {
-      host: '127.0.0.1',
-      port: engine ? engine.port : target.port,
-      path: urlPath,
-      method,
-      headers,
-      timeout: timeoutMs,
-      agent: agentFor(engine),
-    },
+  const req = http.request(
+    { host: '127.0.0.1', port: engine ? engine.port : target.port, path: urlPath, method, headers, timeout: timeoutMs, agent: agentFor(engine) },
     onResponse,
   );
+  const identity = engine ? `${engine.pid}/${engine.instanceId}` : null;
+  req.connectionToken = target.token;
+  req.connectionIdentity = identity;
+  const refuse = (code, message) => process.nextTick(() => req.destroy(Object.assign(new Error(message), { code })));
+  if ((credential || session) && !engine) {
+    refuse('ENGINE_NOT_PROVEN', `nothing proves what answers port ${target.port}; nothing that needs the Engine was sent`);
+    return req;
+  }
+  if (session && session.identity !== identity) {
+    refuse('SESSION_TARGET_CHANGED', 'the MCP session was opened on another Engine than this connection reaches; nothing was sent');
+    return req;
+  }
+  if (credential && typeof target.token !== 'string') {
+    // Decided once a connection is proven, so a replaced Engine surfaces as ENGINE_NOT_PROVEN.
+    req.once('socket', () => req.destroy(Object.assign(new Error(`the Engine on port ${target.port} offers no session token; nothing that needs one was sent`), { code: 'NO_TOKEN' })));
+    return req;
+  }
+  if (credential && target.token) req.setHeader(SESSION_HEADER, target.token);
+  if (session && session.id) req.setHeader('mcp-session-id', session.id);
+  req.end(body);
+  return req;
 }
 
 /** true alive, false dead, null unknown. EPERM means it exists under another user. */
@@ -389,7 +461,6 @@ function getJson(target, urlPath, timeoutMs) {
     );
     req.on('timeout', () => req.destroy(new Error(`no answer within ${timeoutMs} ms`)));
     req.on('error', (e) => done({ status: 0, error: e.message, proof: e.code === 'ENGINE_NOT_PROVEN' ? e : null }));
-    req.end();
   });
 }
 
@@ -427,7 +498,7 @@ function readManifest(candidate) {
     return reject(candidate, 'malformed', `manifest API port ${JSON.stringify(port)} is not a port`);
   }
   if (pidState(pid) === false) {
-    return reject(candidate, 'stale', `pid ${pid} is not running (port ${port})`);
+    return Object.assign(reject(candidate, 'stale', `pid ${pid} is not running (port ${port})`), { port });
   }
   return { manifest, pid, instanceId, port };
 }
@@ -494,10 +565,55 @@ async function selectEngine(candidates, options = {}) {
   const tried = [];
   for (let candidate of candidates) {
     if (candidate && !candidate.dataDir && typeof candidate.resolveDataDir === 'function') {
-      candidate = { source: candidate.source, dataDir: await candidate.resolveDataDir() };
+      try {
+        candidate = { source: candidate.source, dataDir: await candidate.resolveDataDir() };
+      } catch (err) {
+        // The folder could not be determined: name why among the folders tried.
+        tried.push({ source: candidate.source, dataDir: null, ok: false, status: err.code || 'lookup-failed', detail: err.message });
+        continue;
+      }
     }
     if (!candidate || !nonEmpty(candidate.dataDir)) continue;
-    if (tried.some((t) => sameFolder(t.dataDir, candidate.dataDir))) continue;
+    if (tried.some((t) => t.dataDir && sameFolder(t.dataDir, candidate.dataDir))) continue;
+    const result = await validateCandidate(candidate, options);
+    tried.push(result);
+    if (result.ok) return { selected: result, tried };
+  }
+  return { selected: null, tried };
+}
+
+/**
+ * The Engine behind a pinned port: the first candidate whose manifest names port and passes
+ * validateCandidate. Result: { selected, tried }; tried lists the candidates whose manifest named
+ * the port, including a stale one (its pid is gone). selected null with tried non-empty is a
+ * refusal: the port belongs to a manifest Engine that is not proven, and the pin must not be
+ * used without that proof. Both empty: no manifest names the port, so nothing can prove what
+ * answers it and the clients refuse the pin as well.
+ */
+async function selectPinned(candidates, port, options = {}) {
+  const seen = [];
+  const tried = [];
+  for (let candidate of candidates) {
+    if (candidate && !candidate.dataDir && typeof candidate.resolveDataDir === 'function') {
+      let dataDir = null;
+      try {
+        dataDir = await candidate.resolveDataDir();
+      } catch {
+        // A folder that cannot be determined holds no manifest this pin can be checked against.
+      }
+      candidate = { source: candidate.source, dataDir };
+    }
+    if (!candidate || !nonEmpty(candidate.dataDir)) continue;
+    if (seen.some((dataDir) => sameFolder(dataDir, candidate.dataDir))) continue;
+    seen.push(candidate.dataDir);
+    const read = readManifest(candidate);
+    if (read.ok === false && read.status === 'stale' && read.port === port) {
+      // A manifest whose Engine is gone still names the port: whatever answers there now is not
+      // that Engine, and the pin is not one no manifest names.
+      tried.push({ ...read, detail: `${manifestPathFor(candidate.dataDir)} names this port, but its ${read.detail}` });
+      continue;
+    }
+    if (read.ok === false || read.port !== port) continue;
     const result = await validateCandidate(candidate, options);
     tried.push(result);
     if (result.ok) return { selected: result, tried };
@@ -528,18 +644,34 @@ function standardCandidates({ env = process.env, platform = null, userHome = nul
 
 /** One line per folder tried, for error messages. */
 function describeTried(tried) {
-  return tried.map((t) => `${t.source}: ${t.dataDir} (${t.ok ? 'selected' : `${t.status}: ${t.detail}`})`);
+  return tried.map((t) => `${t.source}: ${t.dataDir ?? 'folder unknown'} (${t.ok ? 'selected' : `${t.status}: ${t.detail}`})`);
+}
+
+/**
+ * Why a pin (label, e.g. '--port 4242') was refused, from selectPinned's tried (the manifests
+ * naming the port, none proven; empty when none names it), one line each with the next step.
+ */
+function pinRefusals(label, tried) {
+  if (tried.length === 0) {
+    return [`${label}: refused, no runtime manifest names this port, so nothing proves the Engine there and JUSTSEARCH_SESSION_TOKEN is not sent to it; set JUSTSEARCH_DATA_DIR to that Engine's data folder so its runtime manifest is found`];
+  }
+  return describeTried(tried).map((line) => `${label}: refused, the manifest naming this port is not proven (${line}); what answers the port is not the Engine that manifest describes, so restart that Engine (it rewrites its manifest) or check which process owns the port`);
 }
 
 module.exports = {
   DESKTOP_APP_IDENTIFIER,
   STARTUP_WAIT_MS,
+  IDLE_RETIRE_MS,
+  idleRetireMs,
   startupWaitMs,
   desktopAppDataDir,
   validateCandidate,
   selectEngine,
+  selectPinned,
   engineRequest,
+  ROAMING_QUERY_TIMEOUT_MS,
   roamingAppDataFromOs,
   standardCandidates,
   describeTried,
+  pinRefusals,
 };
