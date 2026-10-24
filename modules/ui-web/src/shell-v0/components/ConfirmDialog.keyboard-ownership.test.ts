@@ -41,6 +41,7 @@ async function button(host: ConfirmDialog, name: string) {
 function enter(target: Element) {
   const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true, cancelable: true });
   target.dispatchEvent(event);
+  target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true, composed: true, cancelable: true }));
   return event;
 }
 
