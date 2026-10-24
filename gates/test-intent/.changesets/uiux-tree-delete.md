@@ -574,3 +574,16 @@ Agent choices adopted under the user's quoted delegation; never owner words. All
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "d2eb935c-499f-4a69-b6cc-b0b29f989ffd",
+  "verdict": "accept",
+  "digest": "sha256:8eb8c1d6d373c4e0090e5176813445f45d81c3d4ac1f07f0cf9cdeaa291e9392",
+  "note": "Re-ran all 8 evidence files in default link mode: every new/repaired check fails by assertion on its recorded before-ref and on c29fcddc1e, passes on d3c0b39e12; the reconnect preservation check passes before and after. FileConversationStoreSafeIdsTest's changed expectation (branching from _title_ refused) matches U1; no conflicting decision in docs/decisions. Gap, not a test-intent defect: no check covers focus after a tree delete lands (draft lost when typing during the walk)."
+}
+```
