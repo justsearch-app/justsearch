@@ -20,7 +20,9 @@ class FileMemoryStoreConditionalTest {
 
   // Reflection lets the identical probe run on the baseline and fail because the operation is absent.
   private static String revision(FileMemoryStore store) throws Exception {
-    Object entry = ((List<?>) FileMemoryStore.class.getMethod("versionedMemories").invoke(store)).getFirst();
+    var snapshot = assertDoesNotThrow(() -> FileMemoryStore.class.getMethod("versionedMemories"),
+        "The store must expose records with atomic conditional-delete revisions");
+    Object entry = ((List<?>) snapshot.invoke(store)).getFirst();
     return (String) entry.getClass().getMethod("revision").invoke(entry);
   }
 
@@ -52,13 +54,7 @@ class FileMemoryStoreConditionalTest {
 
   @Test
   void identicalReinsertionAndRestartInvalidateButReadsOrderFormattingAndLockDoNot() throws Exception {
-    var key = new io.justsearch.agent.api.encryption.DataKeyState() {
-      boolean locked;
-      public boolean enabled() { return false; }
-      public boolean locked() { return locked; }
-      public byte[] dek() { return new byte[32]; }
-    };
-    var store = new FileMemoryStore(dir, new io.justsearch.agent.api.encryption.StoreCipher(key));
+    var store = new FileMemoryStore(dir);
     store.remember(record("original"));
     String first = revision(store);
     assertEquals(first, revision(store));
@@ -109,23 +105,32 @@ class FileMemoryStoreConditionalTest {
   void everyRecordFieldAndUnambiguousBoundariesAffectRevision() throws Exception {
     var store = new FileMemoryStore(dir);
     store.remember(record("original"));
-    String original = revision(store);
+    revision(store);
     String json = Files.readString(dir.resolve("memory.json"));
     for (String[] change : List.of(
         new String[]{"same", "other"}, new String[]{"fact", "preference"},
         new String[]{"original", "updated"}, new String[]{"conv", "conversation"},
         new String[]{"primary", "secondary"}, new String[]{"1970-01-01T00:00:00Z", "1970-01-01T00:00:01Z"})) {
+      Files.writeString(dir.resolve("memory.json"), json);
+      store.onKeyUnlocked();
+      String before = revision(store);
       Files.writeString(dir.resolve("memory.json"), json.replace(change[0], change[1]));
       store.onKeyUnlocked();
-      assertNotEquals(original, revision(store), change[0]);
+      assertNotEquals(before, revision(store), change[0]);
     }
-    for (MemoryRecord changed : List.of(
-        new MemoryRecord("same", "ab", "c", null, null, Instant.EPOCH),
-        new MemoryRecord("same", "a", "bc", null, null, Instant.EPOCH),
-        new MemoryRecord("same", "fact", "original", "", null, Instant.EPOCH))) {
-      store.remember(changed);
-      assertNotEquals(original, revision(store));
-    }
+    store.remember(new MemoryRecord("same", "ab", "c", null, null, Instant.EPOCH));
+    String concatenated = revision(store);
+    String boundaries = Files.readString(dir.resolve("memory.json"))
+        .replace("\"kind\" : \"ab\"", "\"kind\" : \"a\"")
+        .replace("\"content\" : \"c\"", "\"content\" : \"bc\"");
+    Files.writeString(dir.resolve("memory.json"), boundaries);
+    store.onKeyUnlocked();
+    assertNotEquals(concatenated, revision(store), "field boundaries must be unambiguous");
+    String nullSource = revision(store);
+    Files.writeString(dir.resolve("memory.json"),
+        boundaries.replace("\"sourceConversationId\" : null", "\"sourceConversationId\" : \"\""));
+    store.onKeyUnlocked();
+    assertNotEquals(nullSource, revision(store), "null and empty provenance are distinct");
   }
 
   @Test

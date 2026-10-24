@@ -61,6 +61,45 @@ class MemoryConditionalHttpTest {
     }
   }
 
+  @Test
+  void unconditionedHttpRememberAndForgetKeepTokenAndReplacementSemantics() throws Exception {
+    var store = new FileMemoryStore(dir);
+    var controller = new MemoryController(store);
+    var app = Javalin.create(c -> c.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()));
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var client = HttpClient.newHttpClient()) {
+      app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> {});
+      new ApiSecurityFilters(true, "private-test-token", new EventBuffer(), executor, null).install(app);
+      app.get("/api/memory", controller::handleList);
+      app.post("/api/memory", controller::handleRemember);
+      app.delete("/api/memory/{id}", controller::handleForget);
+      app.start("127.0.0.1", 0);
+      URI base = URI.create("http://127.0.0.1:" + app.port() + "/api/memory");
+      for (String method : List.of("GET", "POST", "DELETE")) {
+        var denied = client.send(HttpRequest.newBuilder(URI.create(base + (method.equals("DELETE") ? "/same" : "")))
+            .method(method, HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, denied.statusCode(), method);
+      }
+      for (String content : List.of("original", "replacement")) {
+        var remembered = client.send(HttpRequest.newBuilder(base)
+            .header("X-JustSearch-Session", "private-test-token").header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"id\":\"same\",\"content\":\"" + content + "\"}"))
+            .build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, remembered.statusCode());
+      }
+      assertEquals("replacement", store.whatItKnows().getFirst().content());
+      for (int attempt = 0; attempt < 2; attempt++) {
+        var legacy = client.send(HttpRequest.newBuilder(URI.create(base + "/same"))
+            .header("X-JustSearch-Session", "private-test-token").DELETE().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, legacy.statusCode());
+        assertTrue(JsonMapper.builder().build().readTree(legacy.body()).get("ok").asBoolean());
+        assertTrue(store.whatItKnows().isEmpty());
+      }
+    } finally {
+      app.stop();
+    }
+  }
+
   private static String revision(HttpClient client, URI base) throws Exception {
     var response = client.send(HttpRequest.newBuilder(base).GET().build(), HttpResponse.BodyHandlers.ofString());
     var node = JsonMapper.builder().build().readTree(response.body()).get("memories").get(0).get("revision");
