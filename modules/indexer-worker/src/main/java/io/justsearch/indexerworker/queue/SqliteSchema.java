@@ -53,7 +53,10 @@ public final class SqliteSchema {
       ON CONFLICT(path) DO UPDATE SET
         state=excluded.state, attempts=excluded.attempts, last_updated=excluded.last_updated,
         collection=excluded.collection, size_bytes=excluded.size_bytes, scan_id=excluded.scan_id,
-        originator=excluded.originator, transport=excluded.transport, unit_revision=excluded.unit_revision,
+        originator=excluded.originator, transport=excluded.transport,
+        unit_revision=CASE WHEN jobs.unit_revision LIKE 'release030-unscoped/%'
+          AND excluded.ingestion_root IS NULL AND excluded.unit_revision NOT LIKE 'release030-unscoped/%'
+          THEN 'release030-unscoped/' || excluded.unit_revision ELSE excluded.unit_revision END,
         walk_seen_epoch=excluded.walk_seen_epoch, planned_source_sha256=excluded.planned_source_sha256,
         ingestion_root=excluded.ingestion_root, error_message=NULL, retry_after=NULL, first_failed_at=NULL,
         content_hash=NULL, last_outcome_class=NULL, last_reason_code=NULL, last_retry_policy=NULL,

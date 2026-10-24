@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Test;
  * {@code build.gradle.kts} puts on the classpath, so a NEW module is covered only once it is added
  * there — the same dependency the whole-program dead-code analysis already has.
  */
-class SystemAccessFunnelTest {
+class SystemAccessFunnelTest extends ImportedProgram {
 
   /** The sanctioned funnel. A call whose ORIGIN is in this package is the funnel, not a bypass. */
   private static final String FUNNEL_PACKAGE_PREFIX = "io.justsearch.configuration.";
@@ -79,7 +79,7 @@ class SystemAccessFunnelTest {
 
   @Test
   void every_system_access_outside_the_configuration_funnel_is_on_the_allowlist() {
-    Set<String> observed = observedSites(ImportedProgram.classes());
+    Set<String> observed = observedSites(classes());
     Set<String> allowed = readAllowlist();
 
     List<String> newSites = new ArrayList<>(observed);
