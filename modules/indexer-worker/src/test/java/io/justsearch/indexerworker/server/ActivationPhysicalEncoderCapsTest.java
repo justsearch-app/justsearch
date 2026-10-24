@@ -79,6 +79,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -146,6 +147,7 @@ final class ActivationPhysicalEncoderCapsTest {
           "refused activation leaves one physical encoder owner");
       fixture.closed.forEach((handle, closed) -> assertTrue(closed.get() || active.contains(handle),
           "every refused candidate handle must retire"));
+      fixture.assertTokenizerOwners();
     }
   }
 
@@ -180,6 +182,7 @@ final class ActivationPhysicalEncoderCapsTest {
           "one physical replacement session is constructed for every changed role");
       verify(fixture.producer).parkProducerModelsForEncoderRecovery();
       verify(fixture.successor).resumeProducerAfterCutover();
+      fixture.assertTokenizerOwners();
     }
   }
 
@@ -211,6 +214,8 @@ final class ActivationPhysicalEncoderCapsTest {
     private final Map<SessionHandle, AtomicBoolean> closed =
         Collections.synchronizedMap(new IdentityHashMap<>());
     private final Map<SessionHandle, AtomicBoolean> warmed =
+        Collections.synchronizedMap(new IdentityHashMap<>());
+    private final Map<SessionHandle, AtomicInteger> tokenizerReleases =
         Collections.synchronizedMap(new IdentityHashMap<>());
     private final AtomicBoolean refuseValidation = new AtomicBoolean();
     private final AtomicBoolean preparationCompleted = new AtomicBoolean();
@@ -365,6 +370,22 @@ final class ActivationPhysicalEncoderCapsTest {
       installPassingSelfTest(activation);
     }
 
+    private org.mockito.stubbing.Answer<Object> tokenizerClose(SessionHandle handle) {
+      var releases = new AtomicInteger();
+      assertNull(tokenizerReleases.put(handle, releases));
+      return ignored -> {
+        assertTrue(closed.get(handle).get(), "sessions retire before their tokenizer");
+        assertEquals(1, releases.incrementAndGet(), "tokenizer released exactly once");
+        return null;
+      };
+    }
+
+    private void assertTokenizerOwners() {
+      tokenizerReleases.forEach((handle, releases) -> assertEquals(
+          closed.get(handle).get() ? 1 : 0, releases.get(),
+          "retired candidates release tokenizers; published owners keep them"));
+    }
+
     private void property(String name, String value) {
       properties.putIfAbsent(name, System.getProperty(name));
       if (value == null) System.clearProperty(name);
@@ -382,6 +403,7 @@ final class ActivationPhysicalEncoderCapsTest {
         operations.close();
         releaseProducerLease();
         server.close();
+        assertTokenizerOwners();
       } finally {
         executors.close();
         ConfigStoreRebuilder.rememberDevicePlanner(null);
@@ -451,7 +473,9 @@ final class ActivationPhysicalEncoderCapsTest {
 
     NativeStandins(Fixture fixture, boolean candidate) {
       inference = mockConstruction(CrossEncoderReranker.class, (mock, context) -> {
-        SessionHandle handle = (SessionHandle) context.arguments().getFirst();
+        Object owner = context.arguments().getFirst();
+        SessionHandle handle = owner instanceof RerankerAssembly assembly
+            ? assembly.sessions() : (SessionHandle) owner;
         when(mock.isGpuAvailable()).thenAnswer(ignored -> fixture.warmed.get(handle).get()
             && !fixture.closed.get(handle).get());
         when(mock.rerank(anyString(), anyList(), anyLong())).thenAnswer(ignored -> {
@@ -481,17 +505,27 @@ final class ActivationPhysicalEncoderCapsTest {
             return handle;
           });
       embedding.when(() -> OnnxEmbeddingEncoder.buildAssembly(any(), any(), anyInt(), anyInt(), anyBoolean(), any()))
-          .thenAnswer(call -> new EmbeddingAssembly(call.getArgument(0),
-              new EmbeddingShape(512, false, OnnxEmbeddingEncoder.PoolingStrategy.MEAN_POOL, 512, 768),
-              mock(HuggingFaceTokenizer.class), new ModelCapabilities(ModelCapabilities.PoolingMode.MEAN,
-                  512, 768, ModelPrecision.FP32, ModelPrecision.FP16, "", "", Map.of(), List.of())));
+          .thenAnswer(call -> {
+            var token = mock(HuggingFaceTokenizer.class);
+            doAnswer(fixture.tokenizerClose(call.getArgument(0))).when(token).close();
+            return new EmbeddingAssembly(call.getArgument(0),
+                new EmbeddingShape(512, false, OnnxEmbeddingEncoder.PoolingStrategy.MEAN_POOL, 512, 768),
+                token, new ModelCapabilities(ModelCapabilities.PoolingMode.MEAN,
+                    512, 768, ModelPrecision.FP32, ModelPrecision.FP16, "", "", Map.of(), List.of()));
+          });
       splade.when(() -> SpladeEncoder.buildAssembly(any(), any(), any()))
-          .thenAnswer(call -> new SpladeAssembly(call.getArgument(0),
-              mock(SpladeShape.class),
-              mock(HuggingFaceTokenizer.class), mock(Vocabulary.class), null));
+          .thenAnswer(call -> {
+            var token = mock(HuggingFaceTokenizer.class);
+            doAnswer(fixture.tokenizerClose(call.getArgument(0))).when(token).close();
+            return new SpladeAssembly(call.getArgument(0), mock(SpladeShape.class),
+                token, mock(Vocabulary.class), null);
+          });
       reranker.when(() -> CrossEncoderReranker.buildAssembly(any(), any(), any(), anyInt()))
-          .thenAnswer(call -> new RerankerAssembly(call.getArgument(0), new RerankerShape(512, false),
-              mock(RerankerTokenizer.class)));
+          .thenAnswer(call -> {
+            var token = mock(RerankerTokenizer.class);
+            doAnswer(fixture.tokenizerClose(call.getArgument(0))).when(token).close();
+            return new RerankerAssembly(call.getArgument(0), new RerankerShape(512, false), token);
+          });
     }
 
     @Override public void close() {

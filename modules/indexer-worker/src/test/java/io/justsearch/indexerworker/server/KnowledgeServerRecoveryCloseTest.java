@@ -173,9 +173,29 @@ final class KnowledgeServerRecoveryCloseTest {
     sourceOwner.bindNer(sourceNer);
     sourceOwner.releaseModelReady();
     var sourceQuery = new QueryRoleSet(partition.query());
-    var recoveredSurface = new InferenceSurface(Optional.empty(),
-        Optional.of(mock(NerAssembly.class)), Optional.empty(), Optional.empty(), Optional.empty(),
-        Optional.empty(), mock(io.justsearch.ort.PolicySnapshot.class), List.of(), fullObservation);
+    var nativeTokens = new java.util.ArrayList<ai.djl.huggingface.tokenizers.HuggingFaceTokenizer>();
+    var tokenReleases = new java.util.concurrent.atomic.AtomicInteger();
+    java.util.function.Supplier<InferenceSurface> recoveredSurface = () -> {
+      var sessions = mock(io.justsearch.ort.SessionHandle.class);
+      when(sessions.status()).thenReturn(io.justsearch.ort.OrtCudaStatus.notConfigured());
+      var status = new AtomicReference<>(io.justsearch.ort.SessionHandle.RetirementStatus.ACTIVE);
+      when(sessions.retirementStatus()).thenAnswer(ignored -> status.get());
+      doAnswer(ignored -> {
+        status.set(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+        return null;
+      }).when(sessions).close();
+      var tokenizer = mock(ai.djl.huggingface.tokenizers.HuggingFaceTokenizer.class);
+      doAnswer(ignored -> {
+        assertEquals(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED, status.get());
+        tokenReleases.incrementAndGet();
+        return null;
+      }).when(tokenizer).close();
+      nativeTokens.add(tokenizer);
+      return new InferenceSurface(Optional.empty(),
+          Optional.of(new NerAssembly(sessions, null, tokenizer, null, null)),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+          mock(io.justsearch.ort.PolicySnapshot.class), List.of(sessions), fullObservation);
+    };
     var newlyMissingObservation = new InferenceSurface.ComponentObservation(
         Optional.of(projection.digest()), Set.of(io.justsearch.ort.EncoderRole.NER),
         Set.of(io.justsearch.ort.EncoderRole.NER), Optional.of(querySelection));
@@ -195,6 +215,20 @@ final class KnowledgeServerRecoveryCloseTest {
         MockedConstruction<NerService> constructedNer = mockConstruction(NerService.class)) {
       var encoder = components.handle("encoders");
       var producer = mock(DefaultWorkerAppServices.class);
+      var producerHold = new AtomicReference<Runnable>();
+      doAnswer(call -> {
+        Runnable prior = producerHold.getAndSet(call.getArgument(0));
+        if (prior != null) prior.run();
+        return null;
+      }).when(producer).replaceProducerModelLease(any());
+      org.mockito.stubbing.Answer<Void> releaseProducer = call -> {
+        Runnable prior = producerHold.getAndSet(null);
+        if (prior != null) prior.run();
+        return null;
+      };
+      doAnswer(releaseProducer).when(producer).parkProducerModelsForEncoderRecovery();
+      doAnswer(releaseProducer).when(producer).close();
+
       var lexical = mock(WorkerAppServices.class);
       var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
       when(producer.prepareTextOnlyEncoderRecoveryView(runtime)).thenReturn(lexical);
@@ -206,7 +240,8 @@ final class KnowledgeServerRecoveryCloseTest {
           any(), any())).thenAnswer(invocation -> {
             int attempt = compositionAttempts.getAndIncrement();
             if (attempt == 0) cancelled.set(true);
-            return attempt == 1 ? newlyMissingSurface : recoveredSurface;
+            else assertEquals(1, tokenReleases.get(), "cancelled native owner retires before another composition");
+            return attempt == 1 ? newlyMissingSurface : recoveredSurface.get();
           });
       indexProjection.when(() -> IndexConfigurationProjection.digest(any(), any(), any(), any(),
           any(), any(), org.mockito.ArgumentMatchers.anyLong(),
@@ -265,6 +300,7 @@ final class KnowledgeServerRecoveryCloseTest {
       assertEquals(2, encoder.snapshot().recoveryAttempts());
       assertEquals(1, constructedNer.constructed().size());
       org.mockito.Mockito.verify(constructedNer.constructed().getFirst()).close();
+      assertEquals(1, tokenReleases.get(), "cancelled candidate releases its tokenizer");
       try (var lexicalServing = server.captureServingView()) {
         assertNull(lexicalServing.encoderSet(),
             "cancellation after retirement must leave lexical service without reopening native");
@@ -295,6 +331,11 @@ final class KnowledgeServerRecoveryCloseTest {
           org.mockito.ArgumentMatchers.isNull(), any(), org.mockito.ArgumentMatchers.isNull(),
           org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(), any());
       org.mockito.Mockito.verify(producer).resumeProducerAfterCutover();
+      assertEquals(2, nativeTokens.size());
+      assertEquals(1, tokenReleases.get(), "published owner keeps its tokenizer alive");
+      server.close();
+      assertEquals(2, tokenReleases.get(), "shutdown releases the recovered owner too");
+      for (var tokenizer : nativeTokens) org.mockito.Mockito.verify(tokenizer).close();
     } finally {
       if (sourceView != null) releaseServingModelSets(sourceView);
       if (!sourceQuery.isClosed()) sourceQuery.close();
