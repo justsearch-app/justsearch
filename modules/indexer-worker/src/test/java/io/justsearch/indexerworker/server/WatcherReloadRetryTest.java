@@ -50,6 +50,7 @@ final class WatcherReloadRetryTest extends LuceneExecutorTestBase {
           WorkerBootFixture.workerConfig(layout.dataDir())));
       var incumbent = mock(DefaultWorkerAppServices.class, RETURNS_DEEP_STUBS);
       when(incumbent.ingestService()).thenReturn(oldIngest);
+      when(incumbent.resolvedConfig()).thenReturn(io.justsearch.configuration.resolved.ConfigStore.global().get());
       server.appServices = incumbent;
       set(server, "ingestLifecycle", original);
       set(server, "searchLifecycle", original);
@@ -77,6 +78,7 @@ final class WatcherReloadRetryTest extends LuceneExecutorTestBase {
         assertFalse(queue.listSwitchBufferOpsStrict().isEmpty());
 
         var replacement = mock(DefaultWorkerAppServices.class, RETURNS_DEEP_STUBS);
+        when(replacement.resolvedConfig()).thenReturn(io.justsearch.configuration.resolved.ConfigStore.global().get());
         doAnswer(ignored -> {
           when(replacement.ingestService()).thenReturn(ingest(queue, current.get(), layout));
           return replacement;

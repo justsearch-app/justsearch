@@ -161,6 +161,48 @@ final class Release030RootRecoveryIsolationTest {
   }
 
   @Test
+  void laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(@TempDir Path temporary) throws Exception {
+    Path root = Release030Fixture.unpack("small", temporary), alpha = root.resolve("roots/alpha");
+    Path beta = root.resolve("roots/beta");
+    ConfigStore previous = ConfigStore.globalOrNull();
+    var installed = configure(root);
+    var membership = new AtomicReference<>(List.of(alpha, beta));
+    try {
+      var models = new ReleasedModelIdentities(root);
+      try (models) {
+        try (var executors = new TestEngineExecutors();
+            var server = declaredBoot(root, membership.get(), membership::get, executors)) {
+          stopRecovery(server);
+          openWriter(server);
+          var ingest = server.appServices().ingestService();
+          ingest.setRootWatcherRegistry(new RootWatcherRegistry());
+          assertTrue(ingest.watchRoot(WatchRootRequest.newBuilder().setRootPath(alpha.toString()).build(),
+              CallContext.none()).getWatching());
+          assertTrue(ingest.unwatchRoot(UnwatchRootRequest.newBuilder().setRootPath(alpha.toString()).build(),
+              CallContext.none()).getUnwatched());
+          assertTrue(ingest.deleteByPath(DeleteByPathRequest.newBuilder().setPath(alpha.toString()).build(),
+              CallContext.none()).getError().isBlank());
+          assertEquals(0, count(root, "path LIKE '" + key(alpha) + "/%'"));
+          assertTrue(membership.get().contains(alpha), "Head membership still lags Worker removal");
+          for (int pass = 0; pass < 2; pass++) {
+            ingest.recoverRelease030Root(alpha, null, () -> false);
+            assertEquals(0, count(root, "path LIKE '" + key(alpha) + "/%'"),
+                "X5: a later recovery call must not undo a completed Worker removal");
+          }
+          membership.set(List.of(beta));
+        }
+        try (var executors = new TestEngineExecutors();
+            var restarted = declaredBoot(root, membership.get(), membership::get, executors)) {
+          activate(restarted);
+          assertEquals(0, count(root, "path LIKE '" + key(alpha) + "/%'"),
+              "X5: no recreated jobs survive restart after Head membership cleanup");
+          assertFalse(search(restarted, "nebula").contains(key(alpha.resolve("file-01.txt"))));
+        }
+      }
+    } finally { ConfigStore.restoreGlobal(installed, previous); }
+  }
+
+  @Test
   void rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(@TempDir Path temporary) throws Exception {
     Path root = Release030Fixture.unpack("small", temporary), alpha = root.resolve("roots/alpha");
     Path beta = root.resolve("roots/beta");

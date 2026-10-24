@@ -16,6 +16,8 @@ The Round 7 review follow-up restores real lookup by default and uses explicit, 
 
 The Round 8 producer batches the requested candidate compile/PMD and both UUID profiles in one slotted Gradle call. Its fresh before receipts come from test-first execution on unchanged committed bee392629 product in this checkout, not a rebuilt before checkout. Only the added C6 method runs before; all unchanged C5 cases run after. The signature-only cooldown observer retains its earlier before receipt and baseline after verifying byte equivalence apart from the observed argument count. No expectation or assertion is changed in that observer.
 
+Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed change is the verifier record only), plus two-profile preservation. Historical C6 before evidence retains its original baseline; no fresh C6 failure is claimed on 1e5742df9.
+
 ```json
 {
   "entries": [
@@ -577,7 +579,7 @@ The Round 8 producer batches the requested candidate compile/PMD and both UUID p
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java"
       ],
       "class": "New",
-      "behaviour": "C5: four parent sync/upgrade recovery cases retain empty-mount and replacement-volume nested roots' indexed content across restart, preserve their child admissions unchanged, still prune the parent's conclusive deletion, and keep a denied nested folder from blocking the parent's recovery; a root removed after spool discovery admits no recreated jobs; a modified DONE source loses its eight-day-old failure history, survives one transient parser timeout, retries into search and remains searchable after restart. Tests use the authentic small 0.3.0 fixture and the real Worker boot. C6 additionally rejects a removal between authority proof and sync-entry fence capture while Head membership remains; jobs stay absent after restart.",
+      "behaviour": "C5: four parent sync/upgrade recovery cases retain empty-mount and replacement-volume nested roots' indexed content across restart, preserve their child admissions unchanged, still prune the parent's conclusive deletion, and keep a denied nested folder from blocking the parent's recovery; a root removed after spool discovery admits no recreated jobs; a modified DONE source loses its eight-day-old failure history, survives one transient parser timeout, retries into search and remains searchable after restart. Tests use the authentic small 0.3.0 fixture and the real Worker boot. C6 additionally rejects a removal between authority proof and sync-entry fence capture while Head membership remains; jobs stay absent after restart. X5: a later recovery call after Worker unwatch/deletion also rejects stale Head membership; no recreated jobs or alpha search content remain after normal Head membership cleanup and restart.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -615,15 +617,24 @@ The Round 8 producer batches the requested candidate compile/PMD and both UUID p
           "delegationScope": "Narrow C6 repair on bee392629; preserve rounds 6\u20137, #910 and U19 in both UUID modes. Resume with remaining work autonomously within this scope; no commit or issue actions.",
           "choice": "Capture the same registry instance and its removal mark before root-volume/authority proof. Pass the resulting per-call admission closure explicitly to sync; check it before pruning/walking and again under the existing unwatch monitor for every bounded admission batch, retaining registry-handover checks. Remove the late-capture factory field and setter. No new saved state, schema or walk throughput change; no scale generation. The new test pauses at the first sync-entry cancellation callback, keeps Head membership while Worker unwatch/deletion complete, then resumes recovery, requires zero jobs and checks zero again after Head membership cleanup and a real restart. Both profiles fail before at 18 recreated jobs rather than zero, on unchanged bee392629 product. The unchanged cooldown observer is adapted only from the six-argument execute signature to the seven-argument signature; its inputs, expected call counts, fault injection, conditions and search/restart assertions remain identical. The unchanged original C5 expectations retain their earlier executed fail-before receipts in gates/test-intent/evidence/upgrade-compat-round7-review.json; only C6 is asserted to fail on the later bee392629 baseline.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "a root removal the Worker has carried out must block recovery of that root until the root is added again, not only removals after the call's mark.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round 9 X4/X5 narrow repairs on 1e5742df9; preserve rounds 6\u20138, #910 and U19 in both UUID modes. Resume with remaining work autonomously; no commit, schema or GitHub issue actions.",
+          "choice": "Retain an in-memory removal tombstone through producer handover, separate from the historical removal generation that still rejects old in-flight work. Only an explicit accepted add restores authority. Normal Head removal durably removes membership before the following restart; recovery then excludes that root. Invoke two later recovery passes with stale Head membership after real unwatch/deletion, then restart with beta only and check zero alpha jobs and no alpha search content. Preserve the earlier executed C6 before receipt on bee392629 for the unchanged prior oracle; fresh X5 before uses 1e5742df9.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round8.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round9.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java#rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java#rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java#laterRecoveryDuringHeadRemovalLagCannotRecreateJobs"
       ],
       "repaired": true,
-      "historicalEvidence": "gates/test-intent/evidence/upgrade-compat-round7-review.json"
+      "historicalEvidence": "gates/test-intent/evidence/upgrade-compat-round8.json"
     },
     {
       "items": [
@@ -791,6 +802,113 @@ The Round 8 producer batches the requested candidate compile/PMD and both UUID p
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UpgradeUnscopedDebtReadmissionTest.java"
       ],
       "repaired": true
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ConfiguredHeadlessRecoveryTest.java",
+        "modules/indexer-worker/build.gradle.kts"
+      ],
+      "behaviour": "X4: authentic v13 queue through real HeadlessApp/YAML recovers an offline-added unqueued configured file, finishes configured and bundled-help recovery, and retains search across restart without rebuilding. The Gradle argument provider and isolated runtime configuration execute that new real-entry-point check without adding UI resources to the parent test classpath.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U10",
+          "quote": "Files added, modified and conclusively deleted across the upgrade show correctly in search after the upgrade and after another restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Find the real cause and fix it in one place.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round 9 X4/X5 narrow repairs on 1e5742df9; preserve rounds 6\u20138, #910 and U19 in both UUID modes. Resume with remaining work autonomously; no commit, schema or GitHub issue actions.",
+          "choice": "Shared post-construction wiring restores configured recovery membership from each producer snapshot, including the deferred writer, via existing seeding. Keep declared-root boot seeding and volume checks. Use a separately resolved, locked UI runtime only in the HeadlessApp child JVM: the initial testRuntimeOnly dependency also added UI resources and JARs to every parent test; 1 GiB executors exhausted their heap and their incomplete suites are not passes. A cache-safe classpath argument provider supplies that isolated runtime without changing the parent test classpath or ordinary UUID lookup. The read-only queue trace confirms search publication precedes queue acknowledgement (PROCESSING then DONE/SUCCESS_FULL); retain the DONE requirement with the existing bounded await. Use the established var-models/try(models) resource style to resolve PMD without changing resource ownership. Re-execute the literal finalized X4/X5 checks on the reusable sparse 1e5742df9 checkout and the repaired candidate, with compile/PMD and the complete requested indexer matrix. This supersedes the initial harness receipts, which remain diagnostic evidence. HOME/DATA stay under fixed JVM temp folders; stop each child and reuse each small data folder across its first boot and restart. No schema or scale change. The isolated parent also exceeded the private 1 GiB executor limit in a full serial matrix; retain that cancelled failure and run the final unchanged assertions with a 2 GiB indexer heap, sequential batches of 20 classes, one fork and one Gradle worker. Available machine memory was checked before this runner-only capacity adjustment; production heap settings are unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round9.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ConfiguredHeadlessRecoveryTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootWatcherRegistryTest.java"
+      ],
+      "behaviour": "X5: removal blocks later recovery through handover; a deliberate re-add restores new recovery while rejecting the old in-flight mark.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U10",
+          "quote": "Files added, modified and conclusively deleted across the upgrade show correctly in search after the upgrade and after another restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Keep it small and in-memory if that suffices for the restart case.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round 9 X4/X5 narrow repairs on 1e5742df9; preserve rounds 6\u20138, #910 and U19 in both UUID modes. Resume with remaining work autonomously; no commit, schema or GitHub issue actions.",
+          "choice": "Retain removal authority across registry handover. Normal Head removal persists membership cleanup; the subsequent boot does not declare that root and completes its checkpoint without walking. Preserve historical removal counts across re-add for already-issued calls. This additional check covers rejection, handover, explicit re-add and the old-call fence.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round9.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootWatcherRegistryTest.java#removalBlocksLaterRecoveryThroughHandoverUntilAnExplicitAdd"
+      ],
+      "repaired": true
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WatcherReloadRetryTest.java"
+      ],
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Supply the real immutable fixture configuration from both producer doubles when post-construction wiring now reads resolvedConfig(). A deep-stubbed configuration otherwise invents a mock bundled-help Path whose getParent() never terminates. Preserve every original source path, root, collection, opener/reconstruction failure, mutation, count and assertion. The adapted check is executed on 1e5742df9 as preservation and on the repaired candidate in both UUID modes; its blank skipped/resource-exhausted earlier attempts are not passes. Receipt: gates/test-intent/evidence/upgrade-compat-round9-watcher-preservation.json.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Re-run the round 6-8 checks, #910's tests and U19 in both UUID modes, plus compile and PMD, in as few Gradle calls as possible.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round 9 preservation of the existing failed-opener/failed-reconstruction watcher obligation while fixing configured-root wiring. No changed oracle or production workaround for mock Paths.",
+          "choice": "Bind only the two producer-double configuration accessors to ConfigStore.global().get(), the same snapshot the fixture already published. Keep all fault injection and final deletion/debt assertions byte-identical. Run this adaptation before and after rather than count a blank skip or executor OOM as success.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }
