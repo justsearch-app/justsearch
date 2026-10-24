@@ -22,9 +22,10 @@ The default evidence runner uses linked dependencies; its before-tree is an isol
       ],
       "class": "Adaptation",
       "moved": [
-        "input re-encoding"
+        "input re-encoding",
+        "signature"
       ],
-      "whatMoved": "Rows now carry valid revisions; successful deletion fixtures carry removed:true; scripted fetches omit the retired preliminary GET. Confirmation cancellation, single activation, refusal handling, admission replay refusal, focus, lost-response reconciliation, retained navigation, drafts and locked-state assertions remain intact.",
+      "whatMoved": "The locked-state delete probe passes its row revision to the updated private method. Rows now carry valid revisions; successful deletion fixtures carry removed:true; scripted fetches omit the retired preliminary GET. Confirmation cancellation, single activation, refusal handling, admission replay refusal, focus, lost-response reconciliation, retained navigation, drafts and locked-state assertions remain intact.",
       "sources": [
         {
           "kind": "owner-words",

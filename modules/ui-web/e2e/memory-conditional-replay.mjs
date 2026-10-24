@@ -153,18 +153,14 @@ try {
   proxy.keepAliveTimeout = 60000;
   proxy.listen(0, '127.0.0.1'); await once(proxy, 'listening');
   const origin = `http://127.0.0.1:${proxy.address().port}`;
-  const candidates = (await fs.readdir(path.join(os.homedir(), '.cache/ms-playwright')))
-    .filter(name => name.startsWith('chromium-')).sort().reverse();
-  const executablePath = path.join(os.homedir(), '.cache/ms-playwright', candidates[0], 'chrome-linux64/chrome');
-  browser = await chromium.launch({ executablePath, headless: true, args: ['--disable-extensions'] });
+  browser = await chromium.launch({ headless: true, args: ['--disable-extensions'] });
   const page = await browser.newPage({ extraHTTPHeaders: { 'X-JustSearch-Session': manifest.head.sessionToken } });
   // Load the actual application and use its navigation, member tabs and confirmation dialog.
   await page.goto(origin + '?api_port=' + proxy.address().port);
   await page.locator('jf-shell').waitFor();
-  await page.evaluate(async () => {
-    const { requestSurfaceNavigation } = await import('/src/shell-v0/controllers/navigateRequest.ts');
-    requestSurfaceNavigation('core.brain-surface');
-  });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('jf-navigate-to-surface', {
+    detail: { surfaceId: 'core.brain-surface' },
+  })));
   await page.getByRole('tab', { name: 'Memory', exact: true }).click();
   await page.locator('jf-memory-surface').getByRole('button', { name: 'Forget: original memory', exact: true }).click();
   await page.evaluate(() => fetch('/api/memory'));
@@ -192,10 +188,9 @@ try {
   assert.doesNotMatch(ui, /Forgotten/);
   await page.locator('jf-memory-surface').getByText('The current item was kept;', { exact: false }).waitFor();
   console.log(JSON.stringify({ scenario: 'F3', result: 'pass', deletes, data }));
-  const navigation = async id => page.evaluate(async target => {
-    const { requestSurfaceNavigation } = await import('/src/shell-v0/controllers/navigateRequest.ts');
-    requestSurfaceNavigation(target);
-  }, id);
+  const navigation = async id => page.evaluate(target => document.dispatchEvent(
+    new CustomEvent('jf-navigate-to-surface', { detail: { surfaceId: target } }),
+  ), id);
   const openMemory = async surface => {
     await navigation('core.search-v3-surface');
     await page.locator('jf-sv3-window').waitFor();
@@ -323,6 +318,8 @@ try {
     const value = JSON.parse(await fs.readFile(path.join(data, 'runtime/manifest.json'), 'utf8'));
     assert.notEqual(value.instanceId, manifest.instanceId);
     assert.equal(value.pid, engine.pid);
+    assert.ok(value.head?.sessionToken, 'the restarted Engine must publish its new token before use');
+    assert.equal(value.head.apiPort, enginePort);
     return value;
   });
   auth['X-JustSearch-Session'] = restarted.head.sessionToken;

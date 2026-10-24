@@ -190,7 +190,7 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
     const el = await mount();
     expect(text(el)).toContain(fact.content);
 
-    await (el as unknown as { forget(id: string): Promise<void> }).forget('m1');
+    await (el as unknown as { forget(id: string, revision: string): Promise<void> }).forget('m1', fact.revision);
     await settle(el);
 
     // Pre-806 the status was ignored, so a 423 was followed by a re-list that (while locked) came back
