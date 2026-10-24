@@ -30,3 +30,13 @@ author-session: 01a16d0b-5288-7e62-a22f-a292cbcb80ed
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-energy-poller-1",
+  "verdict": "accept",
+  "digest": "sha256:cbe5af6209a4ac0b9f9763e1951cd9d9fd33ffef1ac667b07402e34d1924bdaa"
+}
+```
