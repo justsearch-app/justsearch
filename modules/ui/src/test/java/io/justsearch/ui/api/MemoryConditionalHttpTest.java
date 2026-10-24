@@ -15,6 +15,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
 class MemoryConditionalHttpTest {
@@ -59,6 +61,56 @@ class MemoryConditionalHttpTest {
     } finally {
       app.stop();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "invalid", "*", "", "{revision}", "{stale}",
+      "{revision}, invalid", "invalid, {revision}", "{revision}, {revision}"
+  })
+  void authenticatedDeleteRejectsTheWholeMultiValuePrecondition(String additionalValue) throws Exception {
+    var store = new FileMemoryStore(dir);
+    var record = new MemoryRecord("same", "fact", "confirmed fact", null, "primary", Instant.EPOCH);
+    store.remember(record);
+    var controller = new MemoryController(store);
+    var app = Javalin.create(c -> c.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper()));
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var client = HttpClient.newHttpClient()) {
+      app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> {});
+      new ApiSecurityFilters(true, "private-test-token", new EventBuffer(), executor, null).install(app);
+      app.get("/api/memory", controller::handleList);
+      app.delete("/api/memory/{id}", controller::handleForget);
+      app.start("127.0.0.1", 0);
+      URI base = URI.create("http://127.0.0.1:" + app.port() + "/api/memory");
+      var response = client.send(HttpRequest.newBuilder(base)
+          .header("X-JustSearch-Session", "private-test-token").GET().build(),
+          HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, response.statusCode());
+      String current = JsonMapper.builder().build().readTree(response.body())
+          .get("memories").get(0).get("revision").asString();
+      String other = additionalValue.replace("{revision}", current)
+          .replace("{stale}", "\"" + "0".repeat(64) + "\"");
+      // The equivalent combined field must also reject every malformed or extra list element.
+      assertInvalidPrecondition(client, base, store, record, List.of(current + ", " + other));
+      // HttpClient emits these as separate field lines; the first valid value must not hide the rest.
+      assertInvalidPrecondition(client, base, store, record, List.of(current, other));
+    } finally {
+      app.stop();
+    }
+  }
+
+  private void assertInvalidPrecondition(HttpClient client, URI base, FileMemoryStore store,
+      MemoryRecord record, List<String> fields) throws Exception {
+    var request = HttpRequest.newBuilder(URI.create(base + "/same"))
+        .header("X-JustSearch-Session", "private-test-token");
+    fields.forEach(value -> request.header("If-Match", value));
+    var response = client.send(request.DELETE().build(), HttpResponse.BodyHandlers.ofString());
+    assertAll(fields.toString(),
+        () -> assertEquals(400, response.statusCode(), response.body()),
+        () -> assertEquals("INVALID_REQUEST",
+            JsonMapper.builder().build().readTree(response.body()).get("errorCode").asString()),
+        () -> assertEquals(List.of(record), store.whatItKnows()),
+        () -> assertEquals(List.of(record), new FileMemoryStore(dir).whatItKnows()));
   }
 
   @Test

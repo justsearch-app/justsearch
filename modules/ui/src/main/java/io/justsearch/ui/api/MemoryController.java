@@ -9,6 +9,7 @@ import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.app.api.ApiErrorCode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,7 +118,8 @@ public final class MemoryController {
         ctx.json(Map.of("ok", true));
         return;
       }
-      if (!revision.matches("\"[0-9a-f]{64}\"")) {
+      if (Collections.list(ctx.req().getHeaders("If-Match")).size() != 1
+          || !revision.matches("\"[0-9a-f]{64}\"")) {
         ctx.status(400).json(Map.of("errorCode", ApiErrorCode.INVALID_REQUEST.name(),
             "error", "If-Match must contain one memory revision"));
         return;
