@@ -1841,3 +1841,14 @@ Round17 exact8f9cc9c2e before: writer alias regression fails with attempts0; can
   "note": "A canonical source alias disappearing during a real write is deferred uncounted during an outage, regressing the baseline per-file K2/U19 policy."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16ca8-07d1-76d3-a91a-9dc6f745c377",
+  "verdict": "reject",
+  "digest": "sha256:2f6f329caa879c8697020166a0cbdfe2971dd0d631de0513d402dd9f43b422f4",
+  "note": "Reject entries 14 and 15: source-parent permission loss behind a canonical alias defers the source at zero attempts rather than the baseline per-file charge (U19/K2)."
+}
+```
