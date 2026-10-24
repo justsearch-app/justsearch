@@ -61,3 +61,14 @@ The owner resolved the M2 fixture conflict on 2026-10-24. Independent acceptance
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-migration-collection-1",
+  "verdict": "accept",
+  "digest": "sha256:3a96633a66bc018c03da3d77c6918d60a1a5701886abf2858db3b6d3981a537c",
+  "note": "Agreed M1-M9 pass on candidate 24de22f923; new ownership checks fail on 08200f4a5, M3 and all three adapted protections pass on both. Both full module test tasks pass and real Engine migration/cutover, labels and filtered searches pass. R1 is pre-existing and explicitly excluded by the orchestrator scope decision; no other defect found. Evidence: tmp/verification/report.md."
+}
+```
