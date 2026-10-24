@@ -213,6 +213,7 @@ public final class JobBatchExtractor {
 
     long startTime = System.currentTimeMillis();
     FileEnvelope envelope = null;
+    Path sourceRealPath = null;
 
     try {
       SourceAdmission admission = ingestionAuthority.admit(claim);
@@ -251,6 +252,7 @@ public final class JobBatchExtractor {
         return null;
       }
       envelope = admission.envelope();
+      sourceRealPath = filePath.toRealPath();
       String docUid;
       DocumentIdentityStore identityStore = null;
       try {
@@ -279,7 +281,7 @@ public final class JobBatchExtractor {
           // This receiver rejects every document independently of its content.
           identityFailures.unavailable(identityError, recordFailure);
         } else {
-          identityFailures.failure(identityError, filePath, recordFailure);
+          identityFailures.failure(identityError, filePath, sourceRealPath, recordFailure);
         }
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
@@ -372,7 +374,7 @@ public final class JobBatchExtractor {
       }
 
       return new ExtractedJob(
-          claim, artifact, startTime, envelope, sourceSha256, docUid);
+          claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath);
 
     } catch (IngestionServiceUnavailableException
         | EngineExecutorRejectedException
@@ -401,8 +403,10 @@ public final class JobBatchExtractor {
                 entry, extractionFailures.retryAtMs());
             else jobQueue.markClaimFailed(claim, original, entry);
           });
-      if (ingestionAuthority.presence(filePath, claim.ingestionRoot()) != SourcePresence.Verdict.ABSENT
-          && !BatchServiceFailures.sourceFailure(e, filePath)
+      var presence = ingestionAuthority.presence(filePath, claim.ingestionRoot());
+      if (presence != SourcePresence.Verdict.ABSENT
+          && presence != SourcePresence.Verdict.SOURCE_UNREADABLE
+          && !BatchServiceFailures.sourceFailure(e, filePath, sourceRealPath)
           && !(e instanceof IOException io && sourceAccessOutcome(claim, io) != null)) {
         extractionFailures.failure(e, record);
       } else record.accept(false);

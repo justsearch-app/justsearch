@@ -19,7 +19,14 @@ public record ExtractedJob(
     long startTime,
     FileEnvelope envelope,
     String sourceSha256,
-    String docUid) {
+    String docUid,
+    Path sourceRealPath) {
+
+  /** Legacy fixture without a captured source identity; production captures it while readable. */
+  public ExtractedJob(JobQueue.IndexJob claim, ValidatedExtractionArtifact artifact, long startTime,
+      FileEnvelope envelope, String sourceSha256, String docUid) {
+    this(claim, artifact, startTime, envelope, sourceSha256, docUid, null);
+  }
 
   public Path filePath() { return claim.path(); }
 

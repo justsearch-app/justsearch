@@ -34,7 +34,7 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O10 full mapped document with live writer configuration, native lock identity and live field schema | [stored-schema mismatch and healthy pending-work control](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java), [live lock loss/replacement and isolation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java), [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
-| K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [writer-time vanished canonical alias](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
+| K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [writer-time vanished canonical alias](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java), [canonical permission loss and readable retarget](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java), [empty-target retarget preservation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
 | K5 document values exceed store limit | [real SQLITE_LIMIT_LENGTH on long document path, normal probe succeeds](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
@@ -821,7 +821,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "label": "agent choice under adopted orchestrator design"
         }
       ],
-      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-writer-source-absence.json",
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-captured-source-path.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
@@ -1436,6 +1436,85 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "choice": "The orchestrator requires the writer to reuse the extractor round14 confirmed-absence fallback: WorkerIngestionAuthority.presence(source, ingestionRoot) == ABSENT makes a write failure per-file, even when the canonical path can no longer be compared and the shared canary fails. Pass the loop's existing configured ingestionAuthority to JobBatchWriter; do not construct another production presence checker. Reuse the existing outcome callback with systemic=false before BatchServiceFailures classification. This preserves root-witness/exclusion policy, retry semantics, healthy-peer outage deferral and all draining logic. Four standalone writer test fixtures add only the newly required constructor argument, with every original assertion unchanged. The native verifier reproduction and all original fault/assertions are retained apart from class/fixture helper names, SPDX and compile-visible StandardTokenizer (the contiguous fault marker and all fault/oracles remain), with exact RETRY_WITH_BACKOFF and healthy-peer zero-attempt assertions added. These are delegated implementation choices under an orchestrator instruction, never owner-words."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java"
+      ],
+      "class": "New",
+      "behaviour": "K2/U19: canonical source permission loss during a real write is per-file even while a shared analyzer outage fails the canary. Preserve the captured physical source identity across both permission loss and retargeting the submitted symlinked parent to a readable replacement. Source attempts1/RETRY_WITH_BACKOFF; healthy peer attempts0/DEFER_WITHOUT_ATTEMPT.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator round-eighteen captured source identity and unreadable-presence repair, preserving U17/U19 and round10–17 behavior and all existing acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "The orchestrator requires fixing the alias class: call toRealPath exactly once after successful source admission while access is available, before shared-store/extraction work; carry the result in the in-memory ExtractedJob through writing. Compare FileSystemException.file to normalized claimed and captured real paths with no current filesystem lookup; remove isSameFile and its IOException handling. Pass the same captured path to extraction/identity failure classification. Existing presence fallbacks in extractor and writer also treat SOURCE_UNREADABLE like ABSENT, preserving each existing per-file outcome callback. Root-unavailable and unknown present-source service failures keep the accepted health proof rule. A six-argument legacy ExtractedJob fixture constructor delegates with null captured path, so existing fixtures/oracles remain untouched. No schema, canonical source ownership, retry policy, canary, pacing, status or persistent identity change. Capture is per admitted claim and is refreshed on retry/restart, not persisted. The original independent permission fault is copied with class/helper/SPDX/compile-visible tokenizer compatibility edits and the existing DisabledOnOs(WINDOWS) convention for POSIX permission checks; every original fault and assertion remains. A second parameter retargets the alias to a readable replacement before denying the original parent: the source remains PRESENT, and only the captured real path can recognize the real canonical AccessDeniedException. Both variants must fail on the exact baseline. The supplied empty-target retarget and D16 vanished-source cases are preservation checks. Strengthened assertions require exact RETRY_WITH_BACKOFF and healthy-peer attempts0/DEFER. This is a delegated implementation choice under the orchestrator decision, never owner-words."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-captured-source-path.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: retargeting a submitted parent link to an empty directory during a real write leaves the old canonical bytes present, charges the missing alias source once with RETRY_WITH_BACKOFF, and keeps its genuinely unhealthy peer uncharged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator round-eighteen captured source identity and unreadable-presence repair, preserving U17/U19 and round10–17 behavior and all existing acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "The orchestrator requires fixing the alias class: call toRealPath exactly once after successful source admission while access is available, before shared-store/extraction work; carry the result in the in-memory ExtractedJob through writing. Compare FileSystemException.file to normalized claimed and captured real paths with no current filesystem lookup; remove isSameFile and its IOException handling. Pass the same captured path to extraction/identity failure classification. Existing presence fallbacks in extractor and writer also treat SOURCE_UNREADABLE like ABSENT, preserving each existing per-file outcome callback. Root-unavailable and unknown present-source service failures keep the accepted health proof rule. A six-argument legacy ExtractedJob fixture constructor delegates with null captured path, so existing fixtures/oracles remain untouched. No schema, canonical source ownership, retry policy, canary, pacing, status or persistent identity change. Capture is per admitted claim and is refreshed on retry/restart, not persisted. The original independent permission fault is copied with class/helper/SPDX/compile-visible tokenizer compatibility edits and the existing DisabledOnOs(WINDOWS) convention for POSIX permission checks; every original fault and assertion remains. A second parameter retargets the alias to a readable replacement before denying the original parent: the source remains PRESENT, and only the captured real path can recognize the real canonical AccessDeniedException. Both variants must fail on the exact baseline. The supplied empty-target retarget and D16 vanished-source cases are preservation checks. Strengthened assertions require exact RETRY_WITH_BACKOFF and healthy-peer attempts0/DEFER. This is a delegated implementation choice under the orchestrator decision, never owner-words."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-captured-source-path.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java"
+      ]
     }
   ]
 }
@@ -1685,6 +1764,14 @@ Entries29–30 repair only the writer failure classification and adapt its exist
 The verifier's unrefreshed buffered-field-schema case is explicitly accepted as a same-as-baseline residual in verifier-D16-checks/counterexample-buffered-schema.md. It is outside this narrow repair, remains unchanged, and is reported separately from passing preservation checks. The refreshed control and every previously passing supplied check remain required.
 
 Round17 exact8f9cc9c2e before: writer alias regression fails with attempts0; candidate attempts1/RETRY_WITH_BACKOFF, healthy peer0. All140 named executions/37 matrix states pass; supplied product71 pass with1 accepted unrefreshed-schema baseline residual, environment1 pass. Main/test compile and6 PMD pass. Full suites retain the known launcher-NOTE failure and48 conditional skips. Product+10/-2net8. [Report](../../../tmp/builder/round17/report.md), [before](../../../tmp/builder/round17/before.txt), [after](../../../tmp/builder/round17/after.txt), [counts](../../../tmp/builder/round17/verification-summary.json), [evidence](../evidence/systemic-batch-deferral-writer-source-absence.json). Existing acceptance records are unchanged.
+
+## Round eighteen: capture source identity before aliases become inaccessible
+
+Entries31–32 implement the orchestrator's full alias-class repair. The admitted source's real path is captured once while readable, before shared stores and parsing; ExtractedJob carries it in memory to the writer. Failure classification compares normalized exception paths to the claim and that captured identity without a new filesystem lookup. The old isSameFile fallback is removed. Extractor and writer reuse the same presence policy, treating SOURCE_UNREADABLE like ABSENT for the existing per-file callback. Unknown folder availability keeps its existing policy. The compatibility constructor leaves all existing test inputs/oracles intact. Captured paths are neither new document identities nor jobs.db columns and are recaptured after retry/restart.
+
+The native permission check has the original case and a readable-retarget counterexample; the latter prevents the presence fallback from concealing a missing capture. Both must fail on exactc3ddc3603 before and pass after. D16 vanished alias, the supplied empty-target retarget, parser-time source disappearance and U19 ladder/unreadable checks preserve their outcomes before and after. The accepted unrefreshed-schema residual remains separately recorded and unchanged.
+
+Round18 exactc3ddc3603 before: both permission-loss variants fail at source attempts0; after attempts1/RETRY_WITH_BACKOFF, healthy peer0, including a readable retarget requiring captured identity. Retarget/vanish/U19 controls pass before and after. All143 named checks/37 matrix states pass; supplied product73 pass with1 accepted unrefreshed-schema residual, environment1 pass. Compile and6 PMD pass. Full suites retain the known launcher-NOTE failure and50 conditional skips. Product+29/-18net11. [Report](../../../tmp/builder/round18/report.md), [before](../../../tmp/builder/round18/before.txt), [after](../../../tmp/builder/round18/after.txt), [counts](../../../tmp/builder/round18/verification-summary.json), [evidence](../evidence/systemic-batch-deferral-captured-source-path.json). Existing acceptance records are unchanged.
 
 ## Acceptance records
 

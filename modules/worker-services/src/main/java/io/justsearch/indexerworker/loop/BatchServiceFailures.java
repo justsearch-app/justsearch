@@ -6,10 +6,8 @@ import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.FileSystemException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -48,8 +46,8 @@ final class BatchServiceFailures {
 
   boolean succeeded() { return succeeded; }
 
-  void failure(Throwable failure, Path source, Consumer<Boolean> record) {
-    if (sourceFailure(failure, source)) record.accept(false);
+  void failure(Throwable failure, Path source, Path sourceRealPath, Consumer<Boolean> record) {
+    if (sourceFailure(failure, source, sourceRealPath)) record.accept(false);
     else failure(failure, record);
   }
 
@@ -60,16 +58,17 @@ final class BatchServiceFailures {
   }
 
   // Source IO remains per-file even if a simultaneous infrastructure probe would fail.
-  static boolean sourceFailure(Throwable failure, Path source) {
+  static boolean sourceFailure(Throwable failure, Path source, Path sourceRealPath) {
     Throwable cause = failure;
     for (int depth = 0; cause != null && depth < 16; depth++, cause = cause.getCause()) {
       if (cause instanceof FileSystemException fs && fs.getFile() != null) {
         try {
-          Path failed = Path.of(fs.getFile());
-          if (source.toAbsolutePath().normalize().equals(failed.toAbsolutePath().normalize())
-              || Files.isSameFile(source, failed)) return true;
-        } catch (IOException | java.nio.file.InvalidPathException inaccessible) {
-          // Admission/presence separately handles sources that cannot be opened at all.
+          Path failed = Path.of(fs.getFile()).toAbsolutePath().normalize();
+          if (source.toAbsolutePath().normalize().equals(failed)
+              || (sourceRealPath != null
+                  && sourceRealPath.toAbsolutePath().normalize().equals(failed))) return true;
+        } catch (java.nio.file.InvalidPathException invalid) {
+          // An invalid path cannot identify this source.
         }
       }
     }

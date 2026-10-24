@@ -299,9 +299,10 @@ public final class JobBatchWriter {
             else jobQueue.markClaimFailed(ex.claim(), outcome, entry);
           });
         };
-        if (ingestionAuthority.presence(ex.filePath(), ex.claim().ingestionRoot())
-            == SourcePresence.Verdict.ABSENT) record.accept(false);
-        else writeFailures.failure(e, ex.filePath(), record);
+        var presence = ingestionAuthority.presence(ex.filePath(), ex.claim().ingestionRoot());
+        if (presence == SourcePresence.Verdict.ABSENT
+            || presence == SourcePresence.Verdict.SOURCE_UNREADABLE) record.accept(false);
+        else writeFailures.failure(e, ex.filePath(), ex.sourceRealPath(), record);
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }
