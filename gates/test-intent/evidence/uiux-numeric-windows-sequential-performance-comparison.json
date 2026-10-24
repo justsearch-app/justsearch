@@ -1,0 +1,250 @@
+{
+  "before": {
+    "medianNanos": 228767085,
+    "runs": [
+      {
+        "run": 0,
+        "suiteNanos": 223051052,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 1,
+        "suiteNanos": 222586930,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 2,
+        "suiteNanos": 245580375,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 3,
+        "suiteNanos": 228767085,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 4,
+        "suiteNanos": 232487604,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      }
+    ],
+    "models": [
+      [
+        "model.onnx",
+        "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+      ],
+      [
+        "tokenizer.json",
+        "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+      ],
+      [
+        "config.json",
+        "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+      ]
+    ],
+    "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+    "resources": [
+      "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=11.93115234375"
+    ]
+  },
+  "after": {
+    "medianNanos": 335980629,
+    "runs": [
+      {
+        "run": 0,
+        "suiteNanos": 309562236,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 1,
+        "suiteNanos": 352831024,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 2,
+        "suiteNanos": 335980629,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 3,
+        "suiteNanos": 340671128,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "run": 4,
+        "suiteNanos": 263522404,
+        "scored": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "matched": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1
+        ]
+      }
+    ],
+    "models": [
+      [
+        "model.onnx",
+        "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+      ],
+      [
+        "tokenizer.json",
+        "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+      ],
+      [
+        "config.json",
+        "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+      ]
+    ],
+    "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+    "resources": [
+      "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=11.6962890625"
+    ]
+  },
+  "ratio": 1.4686580851436735,
+  "withinTenPercent": false
+}

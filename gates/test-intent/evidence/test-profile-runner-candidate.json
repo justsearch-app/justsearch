@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8b9daf75db39c2d49db638569cb427536e5189e31ea50a08e5d4f2b8a1c0cb10"
+  },
+  "createdAt": "2026-10-23T01:26:42.322Z",
+  "revision": "b62fc592175fd8fb47dc296586770b7e0e571d16",
+  "tree": "ee920d0b729c14c1883bb4c527264c96170a8676",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.TestProfileIsolationTest.testJvmUsesTaskLocalProfile\" --tests \"io.justsearch.configuration.TestProfileIsolationTest.plainChildInheritsTaskLocalProfile\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2533
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#testJvmUsesTaskLocalProfile",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:98212e9dbc016ea3b315e61c0ee5990507e1f2f65c881b6011282ca5b9d42b7b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "testJvmUsesTaskLocalProfile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java#plainChildInheritsTaskLocalProfile",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:98212e9dbc016ea3b315e61c0ee5990507e1f2f65c881b6011282ca5b9d42b7b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plainChildInheritsTaskLocalProfile()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:bafb361b2a25215e38ea7b8678220a00ec2eeff01416c138adbd770ef1c6f42e"
+}
