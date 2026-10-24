@@ -34,8 +34,8 @@ import org.junit.jupiter.api.Test;
  * still perfectly knowable, and before this an unreadable NER model file meant a
  * genuinely-different-shape index opened silently for as long as that file stayed unreadable.
  *
- * <p>The WARN text itself is asserted in {@code InvariantSuiteIT} (the only module with logback on
- * the test classpath). What is pinned here is the two inputs that WARN is built from: which branch
+ * <p>The WARN text itself is asserted in {@code InvariantSuiteIT} in indexing's integration suite.
+ * What is pinned here is the two inputs that WARN is built from: which branch
  * the guard is in ({@link ParityDiagnostics#determinateInputComparisonAvailable}) and which model
  * inputs it names ({@link IndexFingerprint#indeterminateModelInputs()}).
  */
