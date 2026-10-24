@@ -48,6 +48,7 @@ public final class WatchedRootsState {
   // Shared across client instances; do not hold the state monitor while calling the Engine.
   private final Object lifecycleLock = new Object();
   private static final String INITIALIZATION_PENDING = "ROOT_INITIALIZATION_PENDING";
+  static final String REMOVAL_INCOMPLETE = "Removal incomplete. Live watching is not confirmed; retry Remove.";
 
   Object lifecycleLock() {
     return lifecycleLock;
@@ -91,11 +92,17 @@ public final class WatchedRootsState {
         synchronized (WatchedRootsState.this) {
           stale = (watchedOnly && !watchedRoots.containsKey(root))
               || retiredRoots.entrySet().stream().anyMatch(entry -> entry.getValue() > revision
-                  && (root.equals(entry.getKey()) || entry.getKey().startsWith(root)
-                      || (root.startsWith(entry.getKey()) && !watchedRoots.containsKey(root))));
+                  && affectedBy(entry.getKey()))
+              || walkErrors.entrySet().stream().anyMatch(entry -> REMOVAL_INCOMPLETE.equals(entry.getValue())
+                  && affectedBy(entry.getKey()));
         }
         return stale ? retired.get() : producer.get();
       }
+    }
+
+    private boolean affectedBy(Path removed) {
+      return root.equals(removed) || removed.startsWith(root)
+          || (root.startsWith(removed) && !watchedRoots.containsKey(root));
     }
   }
 
@@ -200,6 +207,7 @@ public final class WatchedRootsState {
   }
 
   synchronized void markIndexed(Path root) {
+    if (isRemovalIncomplete(root)) return;
     var statusBefore = statusContent();
     watchedRoots.put(root, Instant.now(clock));
     walkErrors.remove(root);
@@ -243,7 +251,7 @@ public final class WatchedRootsState {
    * changed.
    */
   synchronized boolean markRootUnavailable(Path root, String reason) {
-    if (!watchedRoots.containsKey(root) || reason.equals(walkErrors.get(root))) {
+    if (!watchedRoots.containsKey(root) || isRemovalIncomplete(root) || reason.equals(walkErrors.get(root))) {
       return false;
     }
     walkErrors.put(root, reason);
@@ -284,7 +292,7 @@ public final class WatchedRootsState {
    */
   public void recordRecordedWalk(Path root, boolean complete, String terminalReasonCode) {
     synchronized (this) {
-      if (!watchedRoots.containsKey(root)) {
+      if (!watchedRoots.containsKey(root) || isRemovalIncomplete(root)) {
         return;
       }
       if (RootLifecycleOps.isRootUnavailableReason(terminalReasonCode)) {
@@ -362,6 +370,18 @@ public final class WatchedRootsState {
   /** The latest orphan-prune outcome for a root, or {@code null} if none recorded. */
   OrphanPrune getDriftCorrected(Path root) {
     return driftCorrected.get(root);
+  }
+
+  /** Save retry intent before any watcher or index effect; legacy files simply lack this error. */
+  synchronized void beginRemoval(Path root) {
+    var statusBefore = statusContent();
+    walkErrors.put(root, REMOVAL_INCOMPLETE);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
+    persist();
+  }
+
+  boolean isRemovalIncomplete(Path root) {
+    return REMOVAL_INCOMPLETE.equals(walkErrors.get(root));
   }
 
   synchronized void removeRootAndPersist(Path root) {

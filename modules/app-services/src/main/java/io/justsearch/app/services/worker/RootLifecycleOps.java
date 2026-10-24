@@ -197,8 +197,9 @@ final class RootLifecycleOps {
             // refreshed) availability cache says the folder is gone, so the wire's
             // walkError→"unavailable" path fires WITHOUT a Files stat on this (request) thread (U4).
             // A live missing-folder overrides a stale persisted walk error; when it returns, the real
-            // persisted state shows through again (the availability overlay is non-destructive).
-            String walkError = isRootAvailable(root) ? persistedWalkError : ROOT_MISSING_REASON;
+            // persisted state shows through again. A saved removal reason stays visible until retry.
+            String walkError = watchedRootsState.isRemovalIncomplete(root) || isRootAvailable(root)
+                    ? persistedWalkError : ROOT_MISSING_REASON;
             boolean walkCompleted = watchedRootsState.isWalkCompleted(root);
             // Tempdoc 626 §Axis-C — the latest reconcile's delete-detection verification outcome.
             boolean deleteDetectionUnverified = watchedRootsState.isDeleteDetectionUnverified(root);
@@ -274,8 +275,12 @@ final class RootLifecycleOps {
     // ========== Root Add/Remove ==========
 
     void addWatchedPath(Path path, EngineContext engineContext) {
+        Path normalized = path == null ? null : path.toAbsolutePath().normalize();
+        var existing = normalized != null && watchedRoots.containsKey(normalized)
+                ? watchedRootsState.captureRootProducer(normalized, true) : null;
         synchronized (watchedRootsState.lifecycleLock()) {
-            addWatchedPathOwned(path, engineContext);
+            if (existing == null) addWatchedPathOwned(path, engineContext);
+            else existing.run(() -> { addWatchedPathOwned(path, engineContext); return null; }, () -> null);
         }
     }
 
@@ -284,6 +289,7 @@ final class RootLifecycleOps {
             return;
         }
         Path normalized = path.toAbsolutePath().normalize();
+        if (watchedRootsState.isRemovalIncomplete(normalized)) return;
         // Register root so the fenced walk's membership check doesn't abort the walk.
         // No label reaches this entry point — the contract calls it "primary collection"
         // (IndexingService#addWatchedPath), which is DEFAULT_COLLECTION. One root must carry ONE
@@ -382,9 +388,13 @@ final class RootLifecycleOps {
      * @param path the root path to watch
      */
     void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
+        Path normalized = path == null ? null : path.toAbsolutePath().normalize();
+        var existing = normalized != null && watchedRoots.containsKey(normalized)
+                ? watchedRootsState.captureRootProducer(normalized, true) : null;
         WatchInitialization initialization;
         synchronized (watchedRootsState.lifecycleLock()) {
-            initialization = prepareWatchedRoot(collection, path);
+            initialization = existing == null ? prepareWatchedRoot(collection, path)
+                    : existing.run(() -> prepareWatchedRoot(collection, path), () -> null);
         }
         if (initialization == null) return;
         // The caller must release this monitor before the Engine worker acquires its fence.
@@ -581,56 +591,37 @@ final class RootLifecycleOps {
         boolean coveredByAncestor = watchedRoots.keySet().stream()
                 .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root));
 
-        // Stop only this declaration; independently declared descendants retain their watchers.
+        // Membership plus its retry reason must survive a stop at any later step.
+        // Keep durable-store failures visible to the caller, as before.
+        watchedRootsState.beginRemoval(normalized);
+        int deletedJobs = 0;
         try {
+            // Independently declared descendants retain their watchers and documents.
             workerWatchFn.unwatch(normalized.toString(), engineContext);
-        } catch (io.justsearch.app.api.EngineAdmissionException
-                | io.justsearch.core.execution.EngineExecutorRejectedException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            EngineRefusals.rethrow(e);
-            log.warn("Worker unwatch failed for {}", normalized, e);
-            return -1;
-        }
-
-        if (coveredByAncestor) {
-            watchedRootsState.removeRootAndPersist(normalized);
-            forgetAvailabilityUnder(normalized);
-            return 0;
-        }
-
-        // 2. Call the index port to delete indexed data
-        int deletedJobs;
-        try {
-            DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
-
-            if (!response.getError().isEmpty() || response.getDeletedJobs() < 0) {
-                log.error("deleteByPath RPC returned error: {} (deletedJobs={})",
-                        response.getError(), response.getDeletedJobs());
-                return -1;
-            } else {
+            if (!coveredByAncestor) {
+                DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
+                if (response == null || !response.getError().isEmpty() || response.getBuffered()
+                        || response.getDeletedJobs() < 0 || response.getDeletedJobs() > Integer.MAX_VALUE) {
+                    log.warn("Worker did not confirm removal of {}: {}", normalized, response);
+                    return -1;
+                }
                 deletedJobs = (int) response.getDeletedJobs();
-                log.info("deleteByPath RPC success: {} jobs deleted", deletedJobs);
             }
         } catch (io.justsearch.app.api.EngineAdmissionException
                 | io.justsearch.core.execution.EngineExecutorRejectedException e) {
             throw e;
         } catch (CircuitBreakerOpenException e) {
             log.debug(
-                    "removeWatchedPath deleteByPath rejected by circuit breaker for {}", normalized);
+                    "Root removal rejected by circuit breaker for {}", normalized);
             return -1;
         } catch (Exception e) {
             EngineRefusals.rethrow(e);
-            log.error("deleteByPath RPC failed for: {}", normalized, e);
+            log.error("Root removal incomplete for: {}", normalized, e);
             return -1;
         }
-
-        // Retain persisted roots until all cleanup succeeds so incomplete removal can be retried.
+        // Only a completed delete permits the durable declaration (and retry marker) to go.
         watchedRootsState.removeRootAndPersist(normalized);
-        // Round 8 (task t-20261013-ef3c41, S8): nothing of a removed root is kept, so the same
-        // folder added again starts from its own first availability check.
         forgetAvailabilityUnder(normalized);
-
         return deletedJobs;
     }
 
@@ -690,6 +681,7 @@ final class RootLifecycleOps {
                         : io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL;
 
         for (Path root : roots) {
+            if (watchedRootsState.isRemovalIncomplete(root)) continue;
             if (!Files.exists(root)) {
                 log.warn("Watched root no longer exists, skipping: {}", root);
                 continue;
@@ -737,6 +729,7 @@ final class RootLifecycleOps {
         List<Path> rootsToReindex = List.copyOf(watchedRoots.keySet());
         for (Path root : rootsToReindex) {
             Path normalized = root.toAbsolutePath().normalize();
+            if (watchedRootsState.isRemovalIncomplete(normalized)) continue;
             var fence = watchedRootsState.captureRootProducer(normalized, true);
             // Tempdoc 885 §UD open item 4 — the root→collection mapping IS persisted now, so the
             // label the user chose survives the restart. Both arms read the same one; a root
