@@ -3490,7 +3490,9 @@ public final class KnowledgeServer implements Closeable {
     svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
     if (svc instanceof DefaultWorkerAppServices producer) {
       // Configured roots belong to every replacement producer, including the deferred writer.
-      svc.ingestService().seedConfiguredRoots(configuredRoots(producer.resolvedConfig().collections()));
+      var configuration = producer.resolvedConfig();
+      svc.ingestService().seedConfiguredRoots(
+          configuredRoots(configuration == null ? null : configuration.collections()));
     }
     svc.ingestService().setProjectionSemanticDeferralSupplier(() -> {
       // A FENCED source writer is open for recovery replay only. A writable Lucene runtime

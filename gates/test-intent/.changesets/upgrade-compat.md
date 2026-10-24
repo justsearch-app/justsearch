@@ -841,13 +841,22 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
           "delegationScope": "Round 9 X4/X5 narrow repairs on 1e5742df9; preserve rounds 6\u20138, #910 and U19 in both UUID modes. Resume with remaining work autonomously; no commit, schema or GitHub issue actions.",
           "choice": "Shared post-construction wiring restores configured recovery membership from each producer snapshot, including the deferred writer, via existing seeding. Keep declared-root boot seeding and volume checks. Use a separately resolved, locked UI runtime only in the HeadlessApp child JVM: the initial testRuntimeOnly dependency also added UI resources and JARs to every parent test; 1 GiB executors exhausted their heap and their incomplete suites are not passes. A cache-safe classpath argument provider supplies that isolated runtime without changing the parent test classpath or ordinary UUID lookup. The read-only queue trace confirms search publication precedes queue acknowledgement (PROCESSING then DONE/SUCCESS_FULL); retain the DONE requirement with the existing bounded await. Use the established var-models/try(models) resource style to resolve PMD without changing resource ownership. Re-execute the literal finalized X4/X5 checks on the reusable sparse 1e5742df9 checkout and the repaired candidate, with compile/PMD and the complete requested indexer matrix. This supersedes the initial harness receipts, which remain diagnostic evidence. HOME/DATA stay under fixed JVM temp folders; stop each child and reuse each small data folder across its first boot and restart. No schema or scale change. The isolated parent also exceeded the private 1 GiB executor limit in a full serial matrix; retain that cancelled failure and run the final unchanged assertions with a 2 GiB indexer heap, sequential batches of 20 classes, one fork and one Gradle worker. Available machine memory was checked before this runner-only capacity adjustment; production heap settings are unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Fix in production, not in the tests: a missing configuration or collection list seeds no configured roots.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Round 10 R1: restore five unchanged preservation classes on d7e0a43bc, retain real configured-root recovery, run both full module suites and compile/PMD. No test edits or commit.",
+          "choice": "Snapshot producer.resolvedConfig once and pass an absent configuration to the existing configuredRoots(null) empty-root guard. Never borrow global configuration to authorize roots. Keep the five test sources byte-identical: fresh before has 34 failures of 42; full candidate indexer suite restores all 42 and the headless/restart and root-isolation checks. Full worker suite has only the argfile stdout failure also recorded by the independent 95b6cd2db baseline; retain it and its baseline receipt rather than alter the test or unrelated extraction code. Attach the new preservation evidence while preserving the rejection history; independent acceptance remains required.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/upgrade-compat-round9.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ConfiguredHeadlessRecoveryTest.java"
       ],
-      "repaired": true
+      "repaired": true,
+      "preservationEvidence": "gates/test-intent/evidence/upgrade-compat-round10.json"
     },
     {
       "class": "New",
