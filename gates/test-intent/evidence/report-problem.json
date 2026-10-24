@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T22:07:04.876Z",
+  "revision": "b86305aa189bde33a874eaab5ceac6105b05f1cf",
+  "tree": "707cb8dba984910ad80403c3717bbbe0a64d892b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::urls_accept_only_web_and_mail\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 46133
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/views/HelpSurface.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1922550-1792793222585.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2287
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C1-C2 invokes the summary once, copies it, and opens only the exact template URL",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C1-C2 invokes the summary once, copies it, and opens only the exact template URL",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C3 still opens the report when the summary operation fails",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C3 still opens the report when the summary operation fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C3 still opens the report when the clipboard refuses",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C3 still opens the report when the clipboard refuses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C3 still opens the report when the clipboard throws",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C3 still opens the report when the clipboard throws",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C3 treats a missing summary as a copy failure and opens the report",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C3 treats a missing summary as a copy failure and opens the report",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C4 shows the URL as selectable text if opening fails (copied: true)",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C4 shows the URL as selectable text if opening fails (copied: true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C4 shows the URL as selectable text if opening fails (copied: false)",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C4 shows the URL as selectable text if opening fails (copied: false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C4 reports a blocked popup through the shared browser opener",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C4 reports a blocked popup through the shared browser opener",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#C5 preserves export arguments and success/error receipts without opening a report",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:73705e6d3f1dc858048220d1004d741dd93deb6f09b95fc016a601391b014ac2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — Report a problem C5 preserves export arguments and success/error receipts without opening a report",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::urls_accept_only_web_and_mail",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:77e4a8fa9b03b6af2e2499595726007fc85b7a9139fe4bd42293c287e0c9307f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::urls_accept_only_web_and_mail",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:94645960f94ab556222adb9682131b45b3e1b3708c910a58d825a6ad68fdfba9"
+}

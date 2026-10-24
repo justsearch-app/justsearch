@@ -2848,6 +2848,7 @@ mod open_guard_tests {
             "http://example.com/a?q=1#fragment",
             "HTTPS://example.com/?q=1#f",
             "MAILTO:user@example.com?subject=Hi#f",
+            "https://github.com/justsearch-app/justsearch/issues/new?template=bug_report.md",
         ] {
             assert!(validate_external_url(url).is_ok(), "{url}");
         }

@@ -84,7 +84,8 @@ final class ManagedLlamaAuthenticationTest {
     assertEquals(1, launches.size(), "no unauthenticated retry");
     key(0);
     assertTrue(control.list().isEmpty(), "failed child was cleaned up");
-    String log = Files.readString(tmp.resolve("data/logs/llama-server.log"));
+    String log = Files.readString(
+        assertInstanceOf(ChildSpec.Stdio.AppendToLog.class, launches.getFirst().stdio()).file());
     assertTrue(log.contains("LLAMA_API_KEY rejected"),
         "binary refusal is observable without exposing the key");
     assertFalse(log.contains(key(0)), "a failed launch must not log its key");

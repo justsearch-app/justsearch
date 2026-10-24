@@ -35,7 +35,7 @@ function getCapabilities(): ReadonlySet<string> {
 }
 
 /** External links and local files use distinct, validated native commands. */
-async function openExternalUrl(url: string): Promise<void> {
+export async function openExternalUrl(url: string): Promise<void> {
   try {
     if (isTauriRuntime()) {
       const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
@@ -43,7 +43,9 @@ async function openExternalUrl(url: string): Promise<void> {
       await invoke('open_external_url', { url });
       return;
     }
-    globalThis.open(url, '_blank');
+    if (globalThis.open(url, '_blank') === null) {
+      throw new Error('Could not open your browser.');
+    }
   } catch (error) {
     emitEphemeralToast({ message: String(error), severity: 'error' });
     throw error;

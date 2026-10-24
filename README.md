@@ -254,6 +254,8 @@ Indexing, retrieval, and built-in AI inference run locally. Network activity has
   MCP host configuration also launches user-chosen tools, whose data handling and network access you control.
   Links you open can launch an external browser.
 
+**Report a problem** only opens the bug report page in your browser; JustSearch itself sends nothing.
+
 There is no built-in usage analytics service. For the trust boundaries and verification anchors, see the
 [threat model](docs/reference/security/threat-model.md).
 
