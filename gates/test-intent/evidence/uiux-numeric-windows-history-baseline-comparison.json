@@ -1,0 +1,63 @@
+{
+  "before": [
+    {
+      "method": "legacyNumericVerdictLoadsWithoutRejudging()",
+      "type": "java.lang.IllegalArgumentException",
+      "message": "java.lang.IllegalArgumentException: No such conversation: legacy",
+      "stack": [
+        "java.lang.IllegalArgumentException: No such conversation: legacy",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.requireSession(FileConversationStore.java:688)",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.appendMessage(FileConversationStore.java:297)",
+        "\tat io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest.legacyNumericVerdictLoadsWithoutRejudging(NumericCitationHistoryTest.java:76)",
+        "\tat java.base/java.lang.reflect.Method.invoke(Method.java:565)"
+      ]
+    },
+    {
+      "method": "rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload()",
+      "type": "java.lang.IllegalArgumentException",
+      "message": "java.lang.IllegalArgumentException: No such conversation: CROSS_ENCODER",
+      "stack": [
+        "java.lang.IllegalArgumentException: No such conversation: CROSS_ENCODER",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.requireSession(FileConversationStore.java:688)",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.appendMessage(FileConversationStore.java:297)",
+        "\tat io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest.rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload(NumericCitationHistoryTest.java:49)",
+        "\tat java.base/java.lang.reflect.Method.invoke(Method.java:565)"
+      ]
+    }
+  ],
+  "after": [
+    {
+      "method": "legacyNumericVerdictLoadsWithoutRejudging()",
+      "type": "java.lang.IllegalArgumentException",
+      "message": "java.lang.IllegalArgumentException: No such conversation: legacy",
+      "stack": [
+        "java.lang.IllegalArgumentException: No such conversation: legacy",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.requireSession(FileConversationStore.java:688)",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.appendMessage(FileConversationStore.java:297)",
+        "\tat io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest.legacyNumericVerdictLoadsWithoutRejudging(NumericCitationHistoryTest.java:76)",
+        "\tat java.base/java.lang.reflect.Method.invoke(Method.java:565)"
+      ]
+    },
+    {
+      "method": "rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload()",
+      "type": "java.lang.IllegalArgumentException",
+      "message": "java.lang.IllegalArgumentException: No such conversation: CROSS_ENCODER",
+      "stack": [
+        "java.lang.IllegalArgumentException: No such conversation: CROSS_ENCODER",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.requireSession(FileConversationStore.java:688)",
+        "\tat io.justsearch.app.services.conversation.FileConversationStore.appendMessage(FileConversationStore.java:297)",
+        "\tat io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest.rejectedSentenceStaysScoredInLiveAndColdReloadedAskPayload(NumericCitationHistoryTest.java:49)",
+        "\tat java.base/java.lang.reflect.Method.invoke(Method.java:565)"
+      ]
+    }
+  ],
+  "baseline": "8592620d0b42b8f337c4205bdfde11fca03ef79c",
+  "sourceHashes": {
+    "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/NumericCitationHistoryTest.java": "c546486661b74dec3e3f62a18cdf7b3a95dea77003d9f5d589b7a49c0af4f74d",
+    "modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java": "3ce9b17f4fe33c39b0db832dc68f617792b84a76148a66943a69a769fc7cac4c"
+  },
+  "exitCodes": {
+    "before": 1,
+    "after": 1
+  }
+}
