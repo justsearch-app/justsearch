@@ -235,7 +235,6 @@ public final class GpuResidencySampler implements AutoCloseable {
     }
     boolean detectionOn = userContext != null && detectionEnabled();
     UserContextSample context = detectionOn ? readContext() : null;
-    Set<Long> ours = pids();
     Instant now = clock.instant();
     ResidencyObservation observation;
     synchronized (publication) {
@@ -243,11 +242,13 @@ public final class GpuResidencySampler implements AutoCloseable {
       Long dedicatedBytes = null;
       Long sharedBytes = null;
       Long externalBytes = null;
+      Set<Long> ours = Set.of();
       boolean pressure;
       if (sample != null
           && sample.known()
           && sample.source() == GpuMemorySource.PDH
           && !sample.processes().isEmpty()) {
+        ours = pids();
         long dedicated = 0;
         long shared = 0;
         for (Long pid : ours) {

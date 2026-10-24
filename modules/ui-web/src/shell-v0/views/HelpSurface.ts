@@ -18,6 +18,8 @@ import { JfElement } from '../primitives/JfElement.js';
 import { surfaceScrollLayoutStyles } from '../primitives/surfaceLayout.js';
 import { ReceiptController } from '../primitives/receiptController.js';
 import { copyToClipboard } from '../utils/clipboardCopy.js';
+import { getOperationClient } from '../operations/OperationClient.js';
+import { openExternalUrl } from '../plugin-api/capabilities/platform.js';
 import { icon } from '../components/Icon.js';
 import '../aggregate-substrate/components/JfOperation.js';
 // 569 §15 — render the Help reference content through the projection engine (the 3rd real surface).
@@ -39,6 +41,8 @@ interface ShortcutRow {
   keys: string;
   desc: string;
 }
+
+const BUG_REPORT_URL = 'https://github.com/justsearch-app/justsearch/issues/new?template=bug_report.md';
 
 const FAQ: FaqItem[] = [
   {
@@ -225,6 +229,15 @@ export class HelpSurface extends JfElement {
       flex-direction: column;
       align-items: flex-end;
     }
+    .report-problem {
+      padding: var(--justsearch-shell-action-button-padding, 0.5rem 1rem);
+      border: 1px solid var(--justsearch-shell-form-button-border, #ccc);
+      border-radius: var(--justsearch-shell-form-input-radius, 4px);
+      background: var(--justsearch-shell-form-button-bg, transparent);
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+    }
     @media (max-width: 48rem) {
       .header {
         flex-direction: column;
@@ -252,6 +265,8 @@ export class HelpSurface extends JfElement {
       margin-top: 0.5rem;
       font-size: var(--font-size-xs);
       color: var(--text-secondary);
+      user-select: text;
+      overflow-wrap: anywhere;
     }
     .summary-receipt.error {
       color: var(--text-danger);
@@ -387,12 +402,41 @@ export class HelpSurface extends JfElement {
   }
 
   private async handleSummarySuccess(e: CustomEvent<OpSuccessEventDetail>): Promise<void> {
-    const summary = e.detail?.structuredData?.['summary'];
-    const copied = typeof summary === 'string' && await this.copyText(summary);
+    const copied = await this.copySummary(e.detail?.structuredData?.['summary']);
     this.summaryReceipt.flash(
       copied ? 'Diagnostic summary copied.' : 'Could not copy diagnostic summary.',
       { key: copied ? 'summary-success' : 'summary-error' },
     );
+  }
+
+  private async copySummary(summary: unknown): Promise<boolean> {
+    return typeof summary === 'string' && await this.copyText(summary);
+  }
+
+  private async reportProblem(): Promise<void> {
+    let copied = false;
+    try {
+      const result = await getOperationClient(this.apiBase || globalThis.location?.origin || '')
+        .invokeWithConsent('core.copy-diagnostic-summary', { args: {} }, { consented: false });
+      copied = await this.copySummary(result.structuredData?.['summary']);
+    } catch {
+      // A summary or clipboard failure must not prevent the user from reporting the problem.
+    }
+
+    try {
+      await openExternalUrl(BUG_REPORT_URL);
+      this.summaryReceipt.flash(
+        copied
+          ? 'Summary copied. Paste it into the report, check it, then submit on GitHub.'
+          : "Couldn't copy the summary. Use Copy diagnostic summary, then paste it into the report.",
+        { key: copied ? 'summary-success' : 'summary-error', durationMs: 60_000 },
+      );
+    } catch {
+      this.summaryReceipt.flash(
+        `Couldn't open your browser. Open this page: ${BUG_REPORT_URL}`,
+        { key: 'summary-error', durationMs: 60_000 },
+      );
+    }
   }
 
   private handleSummaryError(_e: CustomEvent<OpErrorEventDetail>): void {
@@ -453,6 +497,9 @@ export class HelpSurface extends JfElement {
           <p class="subtitle">Copy a redacted summary or export the full local diagnostics bundle.</p>
         </div>
         <div class="diagnostic-actions">
+          <div class="diagnostic-action">
+            <button class="report-problem" type="button" @click=${() => void this.reportProblem()}>Report a problem</button>
+          </div>
           <div class="diagnostic-action">
             <jf-operation
               operation-id="core.copy-diagnostic-summary"

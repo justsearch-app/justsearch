@@ -28,6 +28,8 @@ import { authorizedFetch } from '../api/authorizedFetch.js';
 import { reasonFor } from '../state/readinessNotice.js';
 import { unavailableBecause } from '../state/availability.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+import { confirmAsync } from '../components/ConfirmDialog.js';
+import type { JfButton } from '../components/Button.js';
 
 interface MemoryItem {
   readonly id: string;
@@ -35,6 +37,7 @@ interface MemoryItem {
   readonly content: string;
   readonly actor: string;
   readonly createdAt: string;
+  readonly sourceConversationId?: string;
 }
 
 /**
@@ -59,6 +62,7 @@ export class MemorySurface extends JfElement {
     mutationError: { state: true },
     loadError: { state: true },
     loading: { state: true },
+    announcement: { state: true },
   };
 
   declare apiBase: string;
@@ -69,8 +73,11 @@ export class MemorySurface extends JfElement {
   declare mutationError: string;
   declare loadError: string;
   declare loading: boolean;
+  declare announcement: string;
 
+  private unresolvedForget?: { id: string; index: number };
   private loadVersion = 0;
+  private visitVersion = 0;
 
   constructor() {
     super();
@@ -82,6 +89,7 @@ export class MemorySurface extends JfElement {
     this.mutationError = '';
     this.loadError = '';
     this.loading = true;
+    this.announcement = '';
   }
 
   connectedCallback(): void {
@@ -95,10 +103,12 @@ export class MemorySurface extends JfElement {
    *
    *  806 W1: `mutationError` settles the same way — it reports ONE attempt, so it must not outlive the
    *  navigation that ended it (a stale "nothing was saved" beside a list that has since reloaded). */
-  static override transientState = { busy: false, mutationError: '', loading: false, loadError: '' };
+  static override transientState = { busy: false, mutationError: '', loading: false, loadError: '', announcement: '' };
 
   protected override settleTransients(): void {
+    this.unresolvedForget = undefined;
     ++this.loadVersion;
+    ++this.visitVersion;
     super.settleTransients();
   }
 
@@ -106,27 +116,33 @@ export class MemorySurface extends JfElement {
     return this.apiBase || '';
   }
 
-  private async loadMemories(): Promise<void> {
+  private async loadMemories(): Promise<boolean> {
     const version = ++this.loadVersion;
     this.loading = true;
     try {
       const r = await authorizedFetch(`${this.base()}/api/memory`);
-      if (version !== this.loadVersion) return;
+      if (version !== this.loadVersion) return false;
       if (!r.ok) {
         this.loadError = 'Memories are unavailable. Try opening Memory again after the stored memories can be read.';
-        return;
+        return false;
       }
       const j = (await r.json()) as { memories?: MemoryItem[]; locked?: boolean };
-      if (version !== this.loadVersion) return;
-      this.memories = Array.isArray(j.memories) ? j.memories : [];
-      // Tempdoc 806 W1: the wire distinguishes "cannot read" from "nothing learned" — carry it, so the
-      // render can. An older backend omits the field ⇒ `false` (readable), the pre-806 behaviour.
-      this.locked = j.locked === true;
+      if (version !== this.loadVersion) return false;
+      // The API always emits a boolean lock state. Missing or malformed metadata cannot establish
+      // presence or absence, even when the list itself looks valid.
+      if (typeof j.locked !== 'boolean' || !Array.isArray(j.memories) || j.memories.some(m =>
+        !m || typeof m.id !== 'string' || typeof m.content !== 'string')) {
+        throw new Error('Invalid memory list');
+      }
+      this.memories = j.memories;
+      this.locked = j.locked;
       this.loadError = '';
+      return !this.locked;
     } catch {
       if (version === this.loadVersion) {
-        this.loadError = 'Memories are unavailable. Could not reach the backend.';
+        this.loadError = 'Memories are unavailable. Could not read the stored memories.';
       }
+      return false;
     } finally {
       if (version === this.loadVersion) this.loading = false;
     }
@@ -147,6 +163,7 @@ export class MemorySurface extends JfElement {
   private async remember(): Promise<void> {
     const content = this.rememberDraft.trim();
     if (!content || this.busy || this.locked || this.loading || this.loadError) return;
+    const visit = this.visitVersion;
     this.busy = true;
     this.mutationError = '';
     try {
@@ -155,6 +172,7 @@ export class MemorySurface extends JfElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, kind: 'fact' }),
       });
+      if (visit !== this.visitVersion || !this.isConnected) return;
       if (!r.ok) {
         // The write did NOT land: keep the draft (it is the user's unsaved text) and re-read, so the
         // list shown is the server's answer rather than an optimistic one.
@@ -165,24 +183,125 @@ export class MemorySurface extends JfElement {
       this.rememberDraft = '';
       await this.loadMemories();
     } catch {
-      this.mutationError = 'Could not reach the backend — nothing was saved.';
+      if (visit === this.visitVersion && this.isConnected) {
+        this.mutationError = 'Could not reach the backend — nothing was saved.';
+      }
     } finally {
-      this.busy = false;
+      if (visit === this.visitVersion) this.busy = false;
     }
   }
 
-  private async forget(id: string): Promise<void> {
+  private async confirmForget(memory: MemoryItem): Promise<void> {
+    if (this.busy || this.locked || this.loading || this.loadError) return;
+    const visit = this.visitVersion;
+    const index = this.memories.findIndex(m => m.id === memory.id);
+    let confirmed = false;
+    this.busy = true;
+    this.announcement = '';
+    try {
+      confirmed = await confirmAsync({
+        title: 'Forget this memory?',
+        message: `Forget “${memory.content}”? The assistant will no longer remember this item. This cannot be undone.`,
+        confirmLabel: 'Forget',
+        cancelLabel: 'Cancel',
+      });
+      if (confirmed && visit === this.visitVersion && this.isConnected) {
+        // The store/API has no conditional forget. Re-read immediately before deleting so consent
+        // cannot knowingly apply to a replacement at the same id. A read/delete race remains.
+        const readable = await this.loadMemories();
+        if (visit !== this.visitVersion || !this.isConnected) return;
+        if (!readable) {
+          if (this.locked && !this.loadError) this.noteMutationFailure(423, 'forgotten');
+          else this.mutationError = 'Could not check this memory. Nothing was forgotten. Reload memories and try again.';
+          return;
+        }
+        const current = this.memories.find(m => m.id === memory.id);
+        if (!current) {
+          this.mutationError = '';
+          this.announcement = 'This item is no longer in memory. Nothing was forgotten by this request.';
+          return;
+        }
+        if ((['content', 'kind', 'actor', 'createdAt', 'sourceConversationId'] as const)
+          .some(field => current[field] !== memory[field])) {
+          this.mutationError = 'This memory changed while confirmation was open. Review the current item and choose Forget again.';
+          return;
+        }
+        await this.forget(memory.id);
+      }
+    } finally {
+      if (visit === this.visitVersion) {
+        this.busy = false;
+        if (confirmed && this.isConnected) await this.focusMemory(index, visit);
+      }
+    }
+  }
+
+  private async focusMemory(index: number, visit: number): Promise<void> {
+    await this.updateComplete;
+    if (visit !== this.visitVersion || !this.isConnected) return;
+    const buttons = this.shadowRoot!.querySelectorAll<JfButton>('.list jf-button');
+    const input = this.shadowRoot!.querySelector<HTMLInputElement>('input.draft');
+    const next = buttons[Math.min(Math.max(index, 0), buttons.length - 1)]
+      ?? (input?.disabled ? this.shadowRoot!.querySelector<JfButton>('jf-button[label="Reload memories"]') : null);
+    if (next) {
+      await next.updateComplete;
+      const control = next.shadowRoot?.querySelector('jf-control');
+      if (control) await (control as JfElement).updateComplete;
+      if (visit === this.visitVersion && this.isConnected) next.focus();
+    } else if (input && !input.disabled) input.focus();
+  }
+
+  private reconcileForget(): void {
+    if (!this.unresolvedForget) return;
     this.mutationError = '';
+    this.announcement = this.memories.some(m => m.id === this.unresolvedForget!.id)
+      ? 'The forget response was lost. The store confirms this item is still in memory. You can try Forget again.'
+      : 'The forget response was lost. The store confirmed this item is absent.';
+    this.unresolvedForget = undefined;
+  }
+
+  private async reloadMemories(): Promise<void> {
+    if (this.busy || this.loading) return;
+    const visit = this.visitVersion;
+    const index = this.unresolvedForget?.index ?? 0;
+    if (!this.unresolvedForget) this.mutationError = '';
+    this.announcement = '';
+    const readable = await this.loadMemories();
+    if (visit !== this.visitVersion || !this.isConnected) return;
+    if (readable) this.reconcileForget();
+    await this.focusMemory(index, visit);
+  }
+
+  private async forget(id: string): Promise<void> {
+    const visit = this.visitVersion;
+    this.mutationError = '';
+    this.announcement = '';
+    let lost = false;
+    let failed = false;
     try {
       const r = await authorizedFetch(`${this.base()}/api/memory/${encodeURIComponent(id)}`, {
         method: 'DELETE',
-      });
-      // Re-read either way: on failure the record is STILL there and the list must show it (a
-      // "forgotten" item that quietly returns on unlock is the privacy defect this closes).
-      if (!r.ok) this.noteMutationFailure(r.status, 'forgotten');
-      await this.loadMemories();
+      }, { retry: false });
+      if (visit !== this.visitVersion || !this.isConnected) return;
+      failed = !r.ok;
+      if (failed) this.noteMutationFailure(r.status, 'forgotten');
     } catch {
-      this.mutationError = 'Could not reach the backend — nothing was forgotten.';
+      if (visit !== this.visitVersion || !this.isConnected) return;
+      lost = true;
+      this.unresolvedForget = { id, index: this.memories.findIndex(m => m.id === id) };
+      this.mutationError = 'The forget response was lost. The outcome is unknown; checking the stored memories…';
+    }
+    // A dropped response can follow a durable write. Only a fresh, readable list resolves it.
+    const readable = await this.loadMemories();
+    if (visit !== this.visitVersion || !this.isConnected) return;
+    if (lost) {
+      if (!readable) {
+        this.mutationError = 'The forget response was lost. The outcome is unknown. Reload memories after the store is available or unlocked to check.';
+        return;
+      }
+      this.reconcileForget();
+    } else if (readable && !failed && !this.memories.some(m => m.id === id)) {
+      this.announcement = 'Forgotten.';
     }
   }
 
@@ -214,6 +333,7 @@ export class MemorySurface extends JfElement {
         <!-- Tempdoc 571 §11 / 578: the page <h1> is owned by the shell topbar (surface title); this
              surface renders <h2> so it does not emit a second <h1> when embedded as a host member. -->
         <h2 class="surface-title-h">Memory</h2>
+        <p class="announcement" role="status" aria-live="polite">${this.announcement}</p>
 
         <section>
           <h2>What it knows</h2>
@@ -232,9 +352,15 @@ export class MemorySurface extends JfElement {
                       <span class="content">${m.content}</span>
                       <jf-button
                         size="sm"
-                        label="Forget"
-                        title="Forget this"
-                        .onActivate=${() => void this.forget(m.id)}
+                        label=${`Forget: ${m.content}`}
+                        .availability=${this.busy ? unavailableBecause('A memory change is in progress', true) : undefined}
+                        @keydown=${(e: KeyboardEvent) => {
+                          if (e.repeat && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
+                        .onActivate=${() => this.confirmForget(m)}
                       >
                         Forget
                       </jf-button>
@@ -244,6 +370,11 @@ export class MemorySurface extends JfElement {
           ${this.mutationError
             ? html`<p class="mutation-error" role="alert">${this.mutationError}</p>`
             : nothing}
+          <jf-button
+            label="Reload memories"
+            ?disabled=${this.busy || this.loading}
+            .onActivate=${() => this.reloadMemories()}
+          >Reload memories</jf-button>
           <div class="add-row">
             <input
               class="draft"
@@ -303,6 +434,7 @@ export class MemorySurface extends JfElement {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        flex-wrap: wrap;
       }
       .kind {
         font-size: var(--font-size-xs);
@@ -312,6 +444,18 @@ export class MemorySurface extends JfElement {
       }
       .content {
         flex: 1;
+        min-width: 8rem;
+        overflow-wrap: anywhere;
+      }
+      .announcement {
+        margin: 0;
+      }
+      .announcement:empty {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
       }
       .empty {
         opacity: 0.6;
@@ -340,9 +484,11 @@ export class MemorySurface extends JfElement {
         display: flex;
         gap: 0.5rem;
         margin-top: 0.25rem;
+        flex-wrap: wrap;
       }
       .draft {
         flex: 1;
+        min-width: 0;
         padding: 0.35rem 0.5rem;
       }
       /* 574 B1 — the action buttons are jf-button atoms now; the base button{} fork is gone. */

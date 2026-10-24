@@ -1,0 +1,264 @@
+{
+  "first": {
+    "tests": 183,
+    "failures": 59,
+    "errors": 0,
+    "skipped": 0,
+    "failedClasses": {
+      "io.justsearch.app.services.ai.runtime.RuntimeActivationServiceTest": 7,
+      "io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest": 1,
+      "io.justsearch.app.services.settings.SettingsCommitCoordinatorTest": 47,
+      "io.justsearch.app.services.ai.install.AiInstallOnnxSettingsProducerTest": 4
+    },
+    "sqliteRequestsWindows": true,
+    "sqliteUnsatisfiedLink": true,
+    "mockitoRequestsJavaExe": true
+  },
+  "retry": {
+    "tests": 183,
+    "failures": 49,
+    "errors": 0,
+    "skipped": 0,
+    "failedClasses": {
+      "io.justsearch.app.services.ai.runtime.RuntimeActivationServiceTest": 6,
+      "io.justsearch.app.services.settings.SettingsCommitCoordinatorTest": 43
+    },
+    "sqliteRequestsWindows": true,
+    "sqliteUnsatisfiedLink": true,
+    "mockitoRequestsJavaExe": false
+  },
+  "baseline": {
+    "tests": 183,
+    "failures": 49,
+    "errors": 0,
+    "skipped": 0,
+    "failedClasses": {
+      "io.justsearch.app.services.ai.runtime.RuntimeActivationServiceTest": 6,
+      "io.justsearch.app.services.settings.SettingsCommitCoordinatorTest": 43
+    },
+    "sqliteRequestsWindows": true,
+    "sqliteUnsatisfiedLink": true,
+    "mockitoRequestsJavaExe": false
+  },
+  "baselineRef": "f1f173020",
+  "candidate": "631837df7 with uncommitted normalization repair",
+  "retryFailuresIdenticalToBaseline": true,
+  "sourceIdentity": [
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java",
+      "baseline": "f1f173020",
+      "identical": true,
+      "sha256": "10332ef04a6d1315b040288edc9b801a5624d16b952c0215c316b69bcfc00b65"
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/BulkDutyFloorUnderDeviceGateTest.java",
+      "baseline": "f1f173020",
+      "identical": true,
+      "sha256": "879773491dc702c5be00c2b7beea904730b91d5247bee374076f54c1bf53dcd3"
+    },
+    {
+      "file": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/pacing/IndexingPacing.java",
+      "baseline": "f1f173020",
+      "identical": true,
+      "sha256": "f92efec15de155a749631cf2f30d4e2e0e0f7ba16522a547ff35aa2e5e326fbe"
+    },
+    {
+      "file": "modules/ort-common/src/main/java/io/justsearch/ort/DeviceEncoderGate.java",
+      "baseline": "f1f173020",
+      "identical": true,
+      "sha256": "0efb9aaed12e4ea750b0fd310cee7816b431fca962604812f03086a5f565070b"
+    }
+  ],
+  "observedCause": "RuntimeActivationServiceTest.selectWindowsNativeFixture sets os.name=Windows 11 before library initialization on Linux; native loader requests Windows libraries; the first run also tried bin/java.exe for Mockito attachment. The fixture is identical on f1f173020; isolated private java.io.tmpdir did not remove these errors.",
+  "citationPathRun": {
+    "totals": {
+      "tests": 73,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "classes": [
+      {
+        "name": "io.justsearch.app.services.conversation.StreamingCitationIntegrationTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "Conversation shapes \u2014 the citation-matches declaration matches the producer",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.conversation.spi.NumericCitationHistoryTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "LazyDocumentService \u2014 literal-text citation forwarding",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "Citation inclusion \u2014 persistence round-trip (tempdoc 849)",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.conversation.spi.RAGContextVerificationSourcesTest",
+        "tests": "11",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "matchSentenceLexical \u2014 fast word-overlap matching",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "onDone \u2014 authoritative matching",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.feedback.AgentCitationContributorTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "extractCompleteSentences \u2014 sentence segmentation",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "StreamingCitationMatcher \u2014 the payload hop to the browser",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "onChunk \u2014 streaming citation deltas",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.inference.InferenceObservabilityArchTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "DocAccess \u2014 the doc path publishes its citation and verification source",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "io.justsearch.app.services.conversation.spi.StreamingCitationMatcherTest",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ]
+  },
+  "schedulerComparison": [
+    {
+      "side": "after",
+      "exit": 0,
+      "xml": {
+        "name": "io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest",
+        "tests": "1",
+        "skipped": "0",
+        "failures": "0",
+        "errors": "0",
+        "timestamp": "2026-10-23T19:41:39.499Z",
+        "hostname": "elias-systemproductname",
+        "time": "0.077"
+      },
+      "failure": []
+    },
+    {
+      "side": "before",
+      "exit": 0,
+      "xml": {
+        "name": "io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest",
+        "tests": "1",
+        "skipped": "0",
+        "failures": "0",
+        "errors": "0",
+        "timestamp": "2026-10-23T19:41:46.161Z",
+        "hostname": "elias-systemproductname",
+        "time": "0.084"
+      },
+      "failure": []
+    }
+  ],
+  "rerankerSuite": {
+    "tests": 104,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "numericWindowEvidence": {
+    "testFileDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+    "allFourteenMethodsCoveredExactlyOnce": true,
+    "afterChecksPassed": 14,
+    "before": [
+      {
+        "file": "uiux-numeric-windows-repaired.json",
+        "ref": "f1f173020",
+        "assertionFailures": 7
+      },
+      {
+        "file": "uiux-numeric-windows-normalization-repaired.json",
+        "ref": "631837df7",
+        "assertionFailures": 2
+      }
+    ]
+  }
+}

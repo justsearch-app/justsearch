@@ -108,6 +108,7 @@ describe('ConfirmDialog (slice 457)', () => {
         cancelable: true,
       }),
     );
+    el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true, composed: true, cancelable: true }));
   }
 
   async function openTypedDialog(typed: string): Promise<{ el: ConfirmDialog; input: HTMLInputElement }> {
@@ -135,7 +136,7 @@ describe('ConfirmDialog (slice 457)', () => {
 
   it('typed-confirm: the document-level Enter stands down while the reader is typing', async () => {
     // THE 864 regression test. Focus is in the confirm input and the phrase already matches, so
-    // Enter belongs to the INPUT's own @keydown. The document-level listener must not fire a second
+    // A press dispatched on the host does not represent activation of the input. It must not fire a second
     // `confirm` — its old retargeted-`target` test could not see the input, so it fired one here,
     // which is precisely what its own comment said must not happen. A COMPLETE phrase is the
     // discriminating case: with a partial one the match gate hides the defect.
@@ -160,6 +161,7 @@ describe('ConfirmDialog (slice 457)', () => {
         cancelable: true,
       }),
     );
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true, composed: true, cancelable: true }));
     expect(confirms).toBe(1);
   });
 

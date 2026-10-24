@@ -139,7 +139,8 @@ final class EngineTestHarness implements AutoCloseable {
             .put("justsearch.ssot.path", ResolvedConfigBuilder.ORDINAL_JVM_ARG, "test_fixture",
                 "isolated_ssot", extraConfig.getOrDefault("justsearch.ssot.path",
                     dataDir.resolve("SSOT").toAbsolutePath().toString()))
-            .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
+            .put("justsearch.data.dir", ResolvedConfigBuilder.ORDINAL_JVM_ARG, "test_fixture",
+                "isolated_data", dataDir.toAbsolutePath().toString())
             .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString());
     for (Map.Entry<String, String> entry : extraConfig.entrySet()) {
       builder = builder.putDefault(entry.getKey(), entry.getValue());
