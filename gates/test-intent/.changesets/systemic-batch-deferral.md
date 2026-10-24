@@ -1579,3 +1579,14 @@ Round14 implements full mapped canary coverage and confirmed-absent source polic
   "note": "The writer canary passes a shared document-values outage that charges a healthy file, and a vanished canonical source alias is incorrectly deferred as an outage."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16ae6-e647-7c82-aee6-b6d24ded077d",
+  "verdict": "reject",
+  "digest": "sha256:35203612e163fc5d224c83bc340a3b2a6a68a8453c38780af105bd6f17f64ea2",
+  "note": "I10 fails because the writer canary passes after the live native write lock disappears, despite real writes failing on that infrastructure state."
+}
+```
