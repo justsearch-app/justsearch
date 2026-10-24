@@ -51,3 +51,13 @@ Archived evidence SHA-256 values (bound by this changeset text):
 - `deps-happy-dom-21-mutations.json`: `8f538e1e30e6d53b4cf8514f7e57cb01ec564801a7a15de37b054ecb2a237d77`
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "602f2ee3-8f6d-4615-a933-4844103a7491",
+  "verdict": "accept",
+  "digest": "sha256:65e4aa1921904f7adbe6892d6fa0df880559ab05b0952115a15ea78df34137b8"
+}
+```
