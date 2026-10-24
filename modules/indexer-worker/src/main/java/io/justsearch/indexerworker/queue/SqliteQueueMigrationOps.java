@@ -90,6 +90,16 @@ final class SqliteQueueMigrationOps {
               + ")");
     }
 
+    // SqliteJobQueue captures a v13 header generation before this atomic ladder. Prefix only
+    // the revisions born from that actual v13 snapshot, never a fresh/current database merely
+    // accompanied by somebody else's recovery sidecar. A killed ladder rolls back to v13.
+    int release030Generation = 0;
+    if (current == 13) {
+      try (var query = conn.createStatement(); var row = query.executeQuery("PRAGMA application_id")) {
+        if (row.next()) release030Generation = row.getInt(1);
+      }
+    }
+
     // One transaction owner handles both the version ladder and repairs on a current schema.
     if (current < SqliteSchema.TARGET_VERSION) backupAction.perform();
 
@@ -105,7 +115,7 @@ final class SqliteQueueMigrationOps {
     try {
       while (current < targetVersion) {
         int nextVersion = current + 1;
-        applyMigration(conn, nextVersion);
+        applyMigration(conn, nextVersion, release030Generation);
         current = nextVersion;
         log.info("Applied migration to version {}", nextVersion);
 
@@ -141,6 +151,10 @@ final class SqliteQueueMigrationOps {
    * @throws SQLException if the migration fails
    */
   private static void applyMigration(Connection conn, int version) throws SQLException {
+    applyMigration(conn, version, 0);
+  }
+
+  private static void applyMigration(Connection conn, int version, int release030Generation) throws SQLException {
     switch (version) {
       case 1 -> {
         // V0 → V1: Initial schema (tables created in initSchema)
@@ -280,9 +294,15 @@ final class SqliteQueueMigrationOps {
         log.info("V15 to V16: Identified durable switch-buffer replacements");
       }
       case 17 -> {
+        boolean bornHere = !columnExists(conn, "jobs", "unit_revision");
         addColumnIfMissing(conn, "unit_revision", SqliteSchema.MIGRATE_V16_TO_V17_UNIT_REVISION);
-        try (Statement stmt = conn.createStatement()) {
-          stmt.execute(SqliteSchema.BACKFILL_UNIT_REVISIONS);
+        String prefix = release030Generation > 0 && bornHere
+            ? SqliteJobQueue.RELEASE030 + "job/" + release030Generation + "/" : "";
+        try (var update = conn.prepareStatement("""
+            UPDATE jobs SET unit_revision=? || lower(hex(randomblob(16))) WHERE unit_revision=''
+            """)) {
+          update.setString(1, prefix);
+          update.executeUpdate();
         }
         log.info("V16 to V17: Identified durable queue admissions");
       }

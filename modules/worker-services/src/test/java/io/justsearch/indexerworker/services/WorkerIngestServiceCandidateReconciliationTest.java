@@ -326,6 +326,7 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     assertEquals("", collectionResponse.getError());
     assertEquals(1, collectionResponse.getDeletedDocs());
 
+    order.verify(fixture.queue).isRelease030ExactFile(Path.of(watched));
     var watchedReceipt = ArgumentCaptor.forClass(String.class);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
         eq(fixture.buildingGeneration), eq(IngestResponses.switchBufferPathKey(watched)), eq("DELETE"), watchedReceipt.capture());

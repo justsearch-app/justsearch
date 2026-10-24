@@ -28,6 +28,9 @@ public final class SourcePresence {
    * t-20261013-ef3c41, rounds 4 and 5).
    */
   public interface RootCheck {
+    /** Release-v13 exact work has read authority only; its absence never authorizes deletion. */
+    default boolean isRelease030ExactFile(Path file) { return false; }
+
     /**
      * True while {@code folder} may vouch that something beneath it is gone: a present, listable
      * folder that is the same folder, on the same volume, as when it was first seen.
@@ -82,9 +85,10 @@ public final class SourcePresence {
     if (first == PathPresence.PRESENT) {
       return Verdict.PRESENT;
     }
+    boolean rooted = answersAsRoot(file, root);
+    if (!rooted && rootCheck.isRelease030ExactFile(file)) return Verdict.SOURCE_UNREADABLE;
     Path folder = vouchingFolder(file, root);
-    boolean vouches =
-        answersAsRoot(file, root) ? rootCheck.vouches(folder) : rootCheck.vouchesForFile(folder);
+    boolean vouches = rooted ? rootCheck.vouches(folder) : rootCheck.vouchesForFile(folder);
     if (!vouches) {
       return Verdict.ROOT_UNAVAILABLE;
     }

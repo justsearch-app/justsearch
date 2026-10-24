@@ -28,6 +28,7 @@
         "docValues": { "type": "boolean" },
         "roles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
         "multiValued": { "type": "boolean" },
+        "compatibleAddition": { "type": "boolean", "description": "An optional stored keyword without roles may be absent from an older compatible index. Not part of its physical fingerprint." },
         "unique": { "type": "boolean" },
         "rmwPolicy": {
           "type": "string",

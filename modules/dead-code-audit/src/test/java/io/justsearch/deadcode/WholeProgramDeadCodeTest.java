@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Test;
  * encoded as the {@code isRoot*} skips below, mirroring GraalVM native-image's
  * reachability-metadata categories (reflection / JNI / serialization / proxies / entry points).
  */
-class WholeProgramDeadCodeTest {
+class WholeProgramDeadCodeTest extends ImportedProgram {
 
   /**
    * Packages whose public API is an external contract (modules published to GitHub Packages via a
@@ -109,7 +109,7 @@ class WholeProgramDeadCodeTest {
   void no_new_whole_program_dead_classes() {
     // Shared with SystemAccessFunnelTest so the whole-program import happens once per JVM
     // rather than once per analysis (tempdoc 883: this module gained a second whole-program rule).
-    JavaClasses classes = ImportedProgram.classes();
+    JavaClasses classes = classes();
 
     assertWholeProgramCoverage(classes);
 

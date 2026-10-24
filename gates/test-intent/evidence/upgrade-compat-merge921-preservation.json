@@ -1,0 +1,335 @@
+{
+  "kind": "executed-preservation-receipt",
+  "check": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java",
+  "createdAt": "2026-10-24T05:57:59Z",
+  "originalSourceDigest": "21ac9c7d812a60ef8c91fcffdac0aa9fbcdddbe5ef02e4c988f12cc754f6c8d8",
+  "sourceDigest": "e8ac23011db80bc700f22e396af96135e4ced9253665c0cfd8e8d6c962424848",
+  "historicalEvidence": {
+    "path": "gates/test-intent/evidence/upgrade-compat-round9.json",
+    "fileDigest": "a0095a74a2b894778beff0c8b2a31f3d4237f1c62ac627fbe662cba8b64b9ce1"
+  },
+  "historicalBefore": "Recorded Round9 candidate, now committed as 523f0c722; exact original test source and existing executed 8-case XML per mode. No new before checkout/run is claimed.",
+  "change": "Only encode the existing Head boot root list in watched_roots.json. Every original test operation, root, assertion, fault and expected value is byte-identical.",
+  "qualification": "The first merge matrix failed four stale-declaration preconditions per profile at the parent own-deletion assertion; those failures remain in the original receipts. A fresh focused run supersedes only this class per mode.",
+  "producer": "tmp/builder/merge921-collect-results.py",
+  "producerDigest": "dcb112c1e0899e7b9e400b4156b7f72383311307919e87a6ef0868029489c459",
+  "runs": [
+    {
+      "mode": "Present",
+      "beforeRecordedRound9Candidate": {
+        "path": "modules/indexer-worker/build/test-results/ciUnitTestRound9CapacityVolumePresent/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+        "digest": "9e8ca74fa98779888a6cf044472e6ccab754ec3cc4c0a05166d594724575255b",
+        "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcomes": [
+          {
+            "name": "recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[1] true, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[2] false, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[3] true, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[4] false, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedBeforeSpoolAdmissionCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          }
+        ]
+      },
+      "originalMergeAttempt": {
+        "path": "modules/indexer-worker/build/test-results/ciUnitTestMerge921VolumePresent/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+        "digest": "a929ea60a4795b7ce4cbabd2df0a0378110df560bcb08385697961891276ba54",
+        "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+        "tests": 8,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "outcomes": [
+          {
+            "name": "recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[1] true, false",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "[2] false, false",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "[3] true, true",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "[4] false, true",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedBeforeSpoolAdmissionCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          }
+        ]
+      },
+      "after": {
+        "path": "modules/indexer-worker/build/test-results/ciUnitTestMerge921RootFixtureVolumePresent/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+        "digest": "04ea9836058d6e32ee56484284f54f843151e87e3ff294ec53249639a04ac49e",
+        "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcomes": [
+          {
+            "name": "recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[1] true, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[2] false, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[3] true, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[4] false, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedBeforeSpoolAdmissionCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "Absent",
+      "beforeRecordedRound9Candidate": {
+        "path": "modules/indexer-worker/build/test-results/ciUnitTestRound9CapacityVolumeAbsent/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+        "digest": "9aa543908455edba252560de6b7c600b5b58a44b0ed771befa14da7c23797404",
+        "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcomes": [
+          {
+            "name": "recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[1] true, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[2] false, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[3] true, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[4] false, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedBeforeSpoolAdmissionCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          }
+        ]
+      },
+      "originalMergeAttempt": {
+        "path": "modules/indexer-worker/build/test-results/ciUnitTestMerge921VolumeAbsent/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+        "digest": "921495fa65f2ca19db53ab6fa0e0b130c7064779cd503b671d2e84793ae1bb83",
+        "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+        "tests": 8,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "outcomes": [
+          {
+            "name": "recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[1] true, false",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "[2] false, false",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "[3] true, true",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "[4] false, true",
+            "result": "failure",
+            "message": "org.opentest4j.AssertionFailedError: the available parent still prunes its own conclusive deletion ==> expected: <false> but was: <true>"
+          },
+          {
+            "name": "rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedBeforeSpoolAdmissionCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          }
+        ]
+      },
+      "after": {
+        "path": "modules/indexer-worker/build/test-results/ciUnitTestMerge921RootFixtureVolumeAbsent/TEST-io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest.xml",
+        "digest": "ad1440c695d9f83d556c08a152b62e89a7036fa19ffde71d7a007488b2d88137",
+        "class": "io.justsearch.indexerworker.server.Release030RootRecoveryIsolationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "outcomes": [
+          {
+            "name": "recoveredDoneFileGetsANewFailureWindowAndRetriesItsUpdate(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "laterRecoveryDuringHeadRemovalLagCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[1] true, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[2] false, false",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[3] true, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "[4] false, true",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          },
+          {
+            "name": "rootRemovedBeforeSpoolAdmissionCannotRecreateJobs(Path)",
+            "result": "passed",
+            "message": ""
+          }
+        ]
+      }
+    }
+  ],
+  "logs": {
+    "tmp/builder/merge921-gradle.log": "086e0318703f3045e6bb614823ae5a58229666827a73058fff8fc3c83bd453ff",
+    "tmp/builder/merge921-fixture-gradle.log": "2879e8e3e9d828dd422834d8592e74938f0c43345a60313ee9c8f270f9261925",
+    "tmp/builder/merge921-runner-setup-failure.log": "e2bef6a9d0b633a0eb6b0315cb365a93067da29c1e9252a195a9b1730919675d"
+  }
+}

@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
 
 /** A separate JVM halts at real durability boundaries; no source checkout is modified. */
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class WatcherDeleteCrashRecoveryTest extends LuceneExecutorTestBase {
   @TempDir Path temp;
 
@@ -147,6 +148,7 @@ final class WatcherDeleteCrashRecoveryTest extends LuceneExecutorTestBase {
 
   public static final class CrashWorker {
     public static void main(String[] args) throws Exception {
+      NoVolumeIdentityExtension.installVolumeLookupIfAbsent();
       String cut = args[0]; Path base = Path.of(args[1]), index = Path.of(args[2]), root = Path.of(args[3]);
       Path database = Path.of(args[4]), file = Path.of(args[5]);
       try (var executors = new TestEngineExecutors();
