@@ -990,3 +990,14 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
   "note": "Reject the configured-root/headless entry (Release030ConfiguredHeadlessRecoveryTest.java and modules/indexer-worker/build.gradle.kts), specifically its full-suite preservation claim: R2 ExtractionHelperWindowRecordsTest.markdownAndTextParsesWriteNoHelperWindowRecords passes the c29fcddc1e main full suite in 1.431 seconds but times out at its 30-second limit on snapshot 2af5e30fc8 (31.747 seconds elapsed). A focused retry passes in 1.603 seconds; the original full-suite failure remains unexplained. No product-code cause is asserted. R1's 42 unchanged checks and all 84 Release030 cases in each UUID profile pass, including the corrected uniform-child-profile crash rerun. Recommend a quiet --clean-checkout worker-suite rerun, retaining these results. Initial temp-path/configuration deviations are retained in verifier evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-8_vhx2u-r2",
+  "verdict": "accept",
+  "digest": "sha256:ffad9dd4dedd07b876d9b7c78a4bc790297f38945d2cb3fe7fd7b5e1afd0cad4",
+  "note": "Scoped R2 acceptance under the requested full-suite-success criterion on 01af31f1230fa75f74f7e33c0cb848c4189bcede: candidate worker-services full suite passed 2036 tests with zero failures/errors and 18 skipped; merge base c29fcddc1e passed 2031 with zero failures/errors and 18 skipped. R2 passed in 2.573s and 2.009s respectively. Test-start load averages were candidate 17.59/13.09/11.58 and baseline 5.65/7.39/9.22. Extraction/R2 bytecode and normalized runtime classpath are identical, with no UI/indexer-worker leak; no changed code is on the direct standalone R2 path. Five class repetitions on each tree remain UNVERIFIED: prolonged shared-slot waits and a cancelled driver leaving its queued wrapper without an accessible tool handle blocked execution. Candidate first full suite used the machine-default checkout-local JVM temp folder; baseline used the corrected fixed before folder; corrected candidate rerun never started. This does not prove the original timeout was load. No product code changed, and no broad upgrade scenario was reverified. The existing rejection is retained; this record does not itself settle the gate tie-break requirement."
+}
+```
