@@ -93,3 +93,11 @@ condition = "AND"
 regexTarget = "line"
 regexes = ['''^\+?\s*"(?:operation_key|operationKey)"\s*:\s*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",?\s*$''']
 paths = ['''^docs/design/lane-f-engine-jvm/evidence/E/.+\.json$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Test-intent evidence: SHA-256 digests of compiled class files, keyed by class file name"
+condition = "AND"
+regexTarget = "match"
+regexes = ['''\.class"\s*:\s*"[0-9a-f]{64}"''']
+paths = ['''^gates/test-intent/evidence/[^/]+\.json$''']

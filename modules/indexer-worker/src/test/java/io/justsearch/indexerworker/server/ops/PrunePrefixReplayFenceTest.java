@@ -503,6 +503,13 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
   @Test
   void aReplayedPruneOfAFolderWithNoRecordedVolumeRemovesNothingAndStaysBuffered()
       throws Exception {
+    if (System.getProperty("os.name", "").startsWith("Linux")) {
+      org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(Path.of("/dev/disk/by-uuid")),
+          "real Linux UUID lookup requires /dev/disk/by-uuid");
+    }
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        io.justsearch.indexerworker.services.NoVolumeIdentityExtension.volumeIdentityAvailable(root),
+        "the real missing-record comparison requires native comparable volume evidence");
     // The boot replay: no live Worker yet. The folder was never added by the person, so no
     // volume is recorded for it, and nothing proves it is the folder the prune was meant for.
     Path gone = Files.writeString(root.resolve("gone.txt"), "gone");
@@ -515,6 +522,30 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
 
     assertEquals(3, committedRows(path), "an unproven root vouches for no deletion");
     assertEquals(List.of("PRUNE_PREFIX"), buffered().stream().map(op -> op.op()).toList());
+  }
+
+  @Test
+  void aReplayedPruneWithoutAVolumeRecordIsRetainedWithInjectedEvidence()
+      throws Exception {
+    // This branch requires comparable volume evidence, but no saved record. The initial
+    // unavailable-identity policy is separately pinned by RootVolumeUnknownIdentityTest.
+    try (var ignored = io.justsearch.indexerworker.services.NoVolumeIdentityExtension
+        .withVolumeIdentity(true)) {
+      assertTrue(io.justsearch.indexerworker.services.NoVolumeIdentityExtension
+          .volumeIdentityAvailable(root), "comparable volume precondition is injected");
+      // The boot replay: no live Worker yet. The folder was never added by the person, so no
+      // volume is recorded for it, and nothing proves it is the folder the prune was meant for.
+      Path gone = Files.writeString(root.resolve("gone.txt"), "gone");
+      String path = key(gone);
+      indexed(runtime, path, 2);
+      bufferPrune(null);
+      Files.delete(gone);
+
+      KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(bestEffort(runtime, null));
+
+      assertEquals(3, committedRows(path), "an unproven root vouches for no deletion");
+      assertEquals(List.of("PRUNE_PREFIX"), buffered().stream().map(op -> op.op()).toList());
+    }
   }
 
   // ------------------------------------------------------- RP8: restart states
