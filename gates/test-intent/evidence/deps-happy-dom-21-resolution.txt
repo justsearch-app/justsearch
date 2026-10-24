@@ -1,0 +1,60 @@
+Result: done. Happy-dom remains at 21.0.4. All final required checks passed.
+Completed UTC: 2026-10-23T23:41:16Z
+Baseline: 6444b457a019d2c8363573b04b2695bccb6aaa54. Working changes uncommitted.
+Changed: modules/ui-web/package-lock.json, modules/ui-web/package.json, modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts, modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts, modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts, modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.test.ts
+
+Cause and scope:
+All nine failures are test-environment differences. No product defect or product-code repair was required.
+The old DOM had no Element.getAnimations; 21.0.4 provides it (animation-api-probe.json). AdvisoryToastHost.dismiss therefore follows its existing browser branch: mark the toast exiting and remove it on animationend, with a 250 ms timeout fallback. The old tests expected immediate removal at the click/supersede/dwell deadline.
+The tests now dispatch animationend on the actual departing toast after its dismissal trigger. Fake-clock dwell deadlines, focus assertions, node identity assertions, acknowledgement and visible-count assertions are preserved. Every original assertion line in the four changed files is unchanged.
+
+Release notes reviewed:
+https://github.com/capricorn86/happy-dom/releases/tag/v21.0.0
+21.0.0 disables external stylesheet and iframe loading by default for SSRF protection. These tests use inline component styles and do not load external CSS/iframes, so those defaults were not changed.
+https://github.com/capricorn86/happy-dom/releases/tag/v20.12.0
+20.12.0 added animation APIs inside the 20.10.6 -> 21.0.4 update range. Source tarball comparison confirms getAnimations was added. releases.json preserves the intermediate changelog.
+
+Complete list of original failing tests (full-unit-diagnosis.log, exit 1):
+1. src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when Extraction complete. overflows the stack
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+2. src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when Extraction failed: invalid JSON overflows the stack
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+3. src/shell-v0/components/advisory/AdvisoryToastHost.focus.test.ts > XD2 keeps the focused toast action when An unrelated notice overflows the stack
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+4. src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts > XD2 keeps each polite live region with its own toast when an older outcome expires
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+5. src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts > XD2 keeps a retained toast mounted during focusout to its retargeted host
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+6. src/shell-v0/components/advisory/AdvisoryToastHost.keyboardFocus.test.ts > XD2 keeps a retained toast mounted during focusout to its nested native control
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+7. src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > clicking a toast acknowledges + dismisses it
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+8. src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > visible dismiss control (round 7 — dismissal was click-anywhere and undiscoverable) > activating it acknowledges + dismisses exactly once (the wrapper stops the toast click)
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+9. src/shell-v0/components/advisory/AdvisoryToastHost.test.ts > AdvisoryToastHost (Group A2 + B4) > 602 R4 — prunes a superseded local toast that left the snapshot
+   Classification: test-environment animation timing. Fix: complete the departing toast exit before checking the original dismissal/focus/live-region outcome.
+
+Counterexamples (own shared clone tmp/agent-tmp/happy-counterexamples; original checkout product code never edited):
+Unmutated product: all 36 tests in four files pass.
+Disable actual toast removal: 10 tests fail, including all nine repaired cases.
+Disable focused-toast retention: all five focus cases fail.
+Replace stable toast keys with positional keys: the live-region identity test fails.
+All expected mutation runs exit 1; mappings and exact source mutations are in counterexamples.json and counterexample-coverage.json. The isolated clone product file was restored after each experiment.
+
+Checks:
+npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4 -> exit 0; 608 files, 7646 tests passed (unchanged shared clone at HEAD); before-unit.log
+npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4 -> exit 1; 4 files failed, 604 passed; 9 tests failed, 7637 passed; full-unit-diagnosis.log
+npm run test:unit:run --prefix modules/ui-web -- src/shell-v0/components/advisory/AdvisoryToastHost{,.focus,.keyboardFocus,.identity}.test.ts --maxWorkers=4 (four explicit paths) -> exit 0; 4 files, 36 tests passed; fixed-focused-unit.log
+npm exec -- eslint src/shell-v0/components/advisory/AdvisoryToastHost{,.focus,.keyboardFocus,.identity}.test.ts --max-warnings=0 (four explicit paths; cwd modules/ui-web) -> exit 0; changed-tests-eslint.log
+npm exec --offline --yes --package=license-checker -- license-checker --production --json --relativeOnly > ../../build/npm-licenses.json (cwd modules/ui-web) -> exit 0; license-checker.log
+node scripts/codegen/gen-notices.mjs --check -> exit 0; final-notices.log
+node scripts/ci/regen-all.mjs --check -> exit 0; all 6 generated file sets match; final-regen-all.log
+npm ci --prefix modules/ui-web -> exit 0; 283 packages added; existing 1 moderate audit finding remains; final-npm-ci.log
+export GITHUB_TOKEN="$(gh auth token)"; node scripts/ci/report-github-advisories.mjs -> exit 0; final-advisory-report.log
+node scripts/governance/run.mjs --gate npm-audit --mode gate -> exit 0; 1 gate evaluated, 0 fail, 0 findings; npm-audit: pass; final-npm-audit-gate.log
+npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4 -> exit 0; 608 files, 7646 tests passed; 82.79s; final-full-unit.log
+
+Supply-chain review: report.txt contains the earlier review, with registry.json, attestations.json, provenance-decoded.json, tarball/source diffs, official-source comparisons and PSL verification. No additional dependency versions were resolved by the test repair. Happy-dom 21.0.4 is the first patched version for GHSA-834v-8h66-3h79. Final GitHub report no longer lists that advisory; existing accepted advisories remain, and the required governance gate passes.
+Notices: fresh ui-web production license dump used; happy-dom is dev-only. JVM/Cargo license reports retained from this checkout previous dependency build; no JVM/Cargo inputs changed. Committed notices required no change.
+Resources: this checkout own node_modules and isolated shared-clone node_modules, common npm download/tool cache, own ephemeral test servers, read-only GitHub/npm/publicsuffix sources. No owner running application, shared dev stack or GPU used. No Gradle invocation needed for the test-only repair. .agents/preflight is absent.
+Open: none. No commits, pushes or GitHub writes performed. Independent verification remains the orchestrator responsibility.

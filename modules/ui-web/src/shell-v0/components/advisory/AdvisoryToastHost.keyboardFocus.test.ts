@@ -31,6 +31,7 @@ it.each(['retargeted host', 'nested native control'])('XD2 keeps a retained toas
     action.focus();
     emitEphemeralToast({ message: 'Arrival', severity: 'info', supersede: false, durationMs: 5000 });
     await host.updateComplete;
+    const arrival = host.shadowRoot!.querySelectorAll('.toast')[2]!;
     expect(action.isConnected).toBe(true);
     // Keyboard navigation can yield to the renderer between focusout and focusin. Exercise that
     // gap with the browser's retargeted host as well as a raw node under two shadow roots.
@@ -46,7 +47,10 @@ it.each(['retargeted host', 'nested native control'])('XD2 keeps a retained toas
     external.focus(); await host.updateComplete;
     expect(first.isConnected, 'protection ends when focus really leaves').toBe(false);
     expect(document.activeElement).toBe(external);
-    await vi.advanceTimersByTimeAsync(5000); await host.updateComplete;
+    await vi.advanceTimersByTimeAsync(5000);
+    // Complete the CSS exit now that Happy DOM exposes getAnimations().
+    arrival.dispatchEvent(new Event('animationend'));
+    await host.updateComplete;
     expect(first.isConnected).toBe(true);
     expect(first.querySelector('jf-system-notice')!.getAttribute('aria-live')).toBe('off');
     expect(document.activeElement).toBe(external);

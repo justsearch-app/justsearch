@@ -177,7 +177,7 @@ public final class CitationScorer implements Closeable {
     long startNanos = System.nanoTime();
     SessionAcquisitionRequest.from(request).remainingNanos();
     return scoreClaims(sentences.stream().map(NumericConsistency::claim).toList(), chunkTexts,
-        chunkDocIds, threshold, deadlineMs, request, startNanos);
+        chunkDocIds, threshold, deadlineMs, request, null, startNanos);
   }
 
   /** Scores parsed claims under the same default authority as the plain-text entry point. */
@@ -201,7 +201,20 @@ public final class CitationScorer implements Closeable {
       long deadlineMs,
       InferenceRequest request) {
     return scoreClaims(claims, chunkTexts, chunkDocIds, threshold, deadlineMs, request,
-        System.nanoTime());
+        null, System.nanoTime());
+  }
+
+  /** Scores unchanged model windows with source-aware numeric eligibility. */
+  public ScoringResult scoreClaims(
+      List<NumericConsistency.Claim> claims,
+      List<String> chunkTexts,
+      List<String> chunkDocIds,
+      double threshold,
+      long deadlineMs,
+      InferenceRequest request,
+      List<NumericConsistency.Window> windows) {
+    return scoreClaims(claims, chunkTexts, chunkDocIds, threshold, deadlineMs, request,
+        windows, System.nanoTime());
   }
 
   private ScoringResult scoreClaims(
@@ -211,6 +224,7 @@ public final class CitationScorer implements Closeable {
       double threshold,
       long deadlineMs,
       InferenceRequest request,
+      List<NumericConsistency.Window> windows,
       long startNanos) {
     var authority = SessionAcquisitionRequest.from(request);
     authority.remainingNanos();
@@ -228,7 +242,8 @@ public final class CitationScorer implements Closeable {
     int sentencesMatched = 0;
     int sentencesScored = 0;
     String[] chunksArray = chunkTexts.toArray(new String[0]);
-    NumericConsistency numeric = new NumericConsistency(claims, chunkTexts);
+    NumericConsistency numeric = windows == null ? new NumericConsistency(claims, chunkTexts)
+        : NumericConsistency.forWindows(claims, windows);
 
     for (int si = 0; si < claims.size(); si++) {
       authority.remainingNanos();
