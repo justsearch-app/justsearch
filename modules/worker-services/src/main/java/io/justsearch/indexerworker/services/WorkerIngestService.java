@@ -2100,6 +2100,9 @@ public final class WorkerIngestService {
                     scope.prefix(), List.of(), scope.excludedSubtrees());
             if (jobsDeleted < 0) throw new IllegalStateException("Path-prefix queue deletion failed");
             ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
+            ingestLifecycle.commitOps().maybeRefreshBlocking();
+            if (searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime serving
+                && serving != ingestLifecycle) serving.commitOps().maybeRefreshBlocking();
             log.info("deleteByPath complete: {} jobs deleted for prefix: {}", jobsDeleted, pathPrefix);
             return deleteByPathResponse(jobsDeleted, "");
           });

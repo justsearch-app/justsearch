@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -351,6 +352,7 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     order.verify(fixture.queue).deleteByPathPrefix(prefix);
     order.verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_PATH);
+    assertDoesNotThrow(() -> order.verify(fixture.servingCommit).maybeRefreshBlocking());
     order.verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, "collection:" + collection, "DELETE_COLLECTION", collection);
     order.verify(fixture.candidateWriter).deleteByCollection(collection);
