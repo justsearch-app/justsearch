@@ -289,10 +289,15 @@ public final class IndexingCoordinator {
 
   /** Replays a broad delete while preserving strictly certified later file admissions. */
   public void deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> fileIds) {
+    deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, fileIds, List.of());
+  }
+
+  public void deleteByPathPrefixExcludingAcceptedSurvivors(
+      String pathPrefix, List<String> fileIds, List<String> excludedSubtrees) {
     acquireReadLockTimed();
     try {
       dispatchLock.lock();
-      try { writeOps.get().deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, fileIds); }
+      try { writeOps.get().deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, fileIds, excludedSubtrees); }
       finally { dispatchLock.unlock(); }
     } finally { releaseWriteBarrierAndReport(); }
   }

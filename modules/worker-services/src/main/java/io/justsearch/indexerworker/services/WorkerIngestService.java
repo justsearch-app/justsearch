@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
@@ -265,6 +267,7 @@ public final class WorkerIngestService {
         confirmedDeletionMarker);
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
+    this.syncOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -272,8 +275,31 @@ public final class WorkerIngestService {
         jobQueue,
         this.indexingPacing,
         confirmedDeletionMarker);
+    this.candidateDiscoveryOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.switchBufferOps =
         new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager);
+  }
+
+  private Path declaredRootsDirectory;
+
+  /** The authored declarations include roots whose worker watch has not initialized yet. */
+  public void setDeclaredRootsDirectory(Path dataDir) {
+    declaredRootsDirectory = dataDir;
+  }
+
+  public PathPrefixScope prefixScope(String prefix) {
+    Path root = Path.of(prefix).toAbsolutePath().normalize();
+    var declarations = new java.util.HashSet<>(rootWatcherRegistry.current().declaredRoots());
+    try {
+      if (declaredRootsDirectory == null) declarations.addAll(exclusionRoots.get());
+      else declarations.addAll(io.justsearch.configuration.persistence.WatchedRootsFormat
+          .declaredPaths(declaredRootsDirectory));
+    } catch (IOException | RuntimeException unreadable) {
+      throw WorkerServiceException.unavailable("Watched-root declarations are unreadable");
+    }
+    return new PathPrefixScope(root.toString(),
+        declarations.stream().filter(path -> !path.equals(root) && path.startsWith(root))
+            .map(Path::toString).toList());
   }
 
   /** Bound once by the composing Worker owner before any request is published. */
@@ -465,6 +491,10 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(publisher, "publisher");
     syncOps.setPruneGuardFactory(publisher::pruneGuard);
     syncOps.setPruneWriterFence(publisher.pruneWriterFence);
+    syncOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));
+    candidateDiscoveryOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));
+    declaredRootsDirectory = publisher.declaredRootsDirectory;
+    setRootWatcherRegistry(publisher.rootWatcherRegistry.current());
   }
 
   /**
@@ -529,10 +559,12 @@ public final class WorkerIngestService {
     return withFileMutationFence(() -> {
       Path file = Path.of(deletion.path());
       Path root = bufferedDeleteRoot(deletion);
+      var scope = prefixScope(root.toString());
+      String normalizedFile = file.toAbsolutePath().normalize().toString();
+      if (!scope.contains(normalizedFile)) {
+        return scope.excludes(normalizedFile) ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.UNCERTAIN;
+      }
       var binding = rootWatcherRegistry.subscription(root);
-      if (io.justsearch.configuration.PlatformPaths.isLinux()
-          && deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER
-          && !rootWatcherRegistry.ownsPath(root, file)) return BufferedDeleteReplay.UNCERTAIN;
       String collection = binding == null ? deletion.collection() : binding.collection();
       if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY
           && collection == null) {
@@ -644,8 +676,6 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
-      if (io.justsearch.configuration.PlatformPaths.isLinux()
-          && !rootWatcherRegistry.ownsPath(witness.root(), path)) return;
       if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
           path, witness.root())) return;
       acceptWatcherUpsertUnderLease(collection, path, witness.root());
@@ -654,6 +684,7 @@ public final class WorkerIngestService {
   }
 
   private boolean acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
+    if (!prefixScope(root.toString()).contains(path.toAbsolutePath().normalize().toString())) return false;
     if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)) {
       return false;
     }
@@ -687,8 +718,6 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(witness, "witness");
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
-      if (io.justsearch.configuration.PlatformPaths.isLinux()
-          && !rootWatcherRegistry.ownsPath(witness.root(), Path.of(normalizedPath))) return;
       acceptWatcherDeleteUnderLease(
           normalizedPath, directEffect, false, true, witness.root(), witness.rootIdentity());
     }
@@ -697,6 +726,8 @@ public final class WorkerIngestService {
   private boolean acceptWatcherDeleteUnderLease(
       String normalizedPath, Runnable directEffect, boolean requireConfirmedAbsence,
       boolean skipUnlessConfirmedAbsent, Path requiredRoot, RootIdentity expectedRootIdentity) {
+    if (requiredRoot != null && !prefixScope(requiredRoot.toString())
+        .contains(Path.of(normalizedPath).toAbsolutePath().normalize().toString())) return false;
     return withFileMutationFence(() -> {
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
@@ -814,8 +845,7 @@ public final class WorkerIngestService {
           continue;
         }
         SyncDirectoryResponse result = io.justsearch.configuration.PlatformPaths.isLinux()
-            ? syncOps.execute(root.toString(), false, null, () -> false, subscription.collection(),
-                file -> rootWatcherRegistry.ownsPath(root, file))
+            ? syncOps.execute(root.toString(), false, null, () -> false, subscription.collection())
             : syncDirectory(SyncDirectoryRequest.newBuilder()
                 .setRootPath(root.toString()).setForce(false).build(), CallContext.none());
         if (!result.getError().isBlank() || result.getSkipped()
@@ -1148,7 +1178,7 @@ public final class WorkerIngestService {
         if (event == null) return;
         // Re-enumerate all present files, as startup does. The loop still skips unchanged stamps.
         var result = syncOps.execute(root.toString(), true, null, () -> false,
-            subscription.collection(), file -> registry.ownsPath(root, file));
+            subscription.collection());
         if (!result.getError().isBlank() || result.getSkipped()
             || result.getDeleteDetectionUnverified()) return;
       }
@@ -1215,7 +1245,7 @@ public final class WorkerIngestService {
     active.commitOps().commitAndTrack(reason);
   }
 
-  private void journalAndProjectPrefixDeleteToServing(String pathPrefix) {
+  private void journalAndProjectPrefixDeleteToServing(PathPrefixScope scope) {
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
@@ -1223,10 +1253,9 @@ public final class WorkerIngestService {
       throw WorkerServiceException.unavailable(
           "Serving projection is unavailable during migration; retry shortly");
     }
-    String normalizedPrefix = resolveNormalizedPathPrefix(pathPrefix);
-    switchBufferOps.journalDeletePrefixForGeneration(candidateGeneration, normalizedPrefix);
+    switchBufferOps.journalDeletePrefixForGeneration(candidateGeneration, scope);
     if (active == ingestLifecycle) return;
-    active.indexingCoordinator().deleteByPathPrefix(normalizedPrefix);
+    deletePrefix(active.indexingCoordinator(), scope);
     active.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
   }
 
@@ -2029,50 +2058,65 @@ public final class WorkerIngestService {
     }
   }
 
+  private static void deletePrefix(io.justsearch.adapters.lucene.runtime.IndexingCoordinator writer,
+      PathPrefixScope scope) {
+    if (scope.excludedSubtrees().isEmpty()) writer.deleteByPathPrefix(scope.prefix());
+    else writer.deleteByPathPrefixExcludingAcceptedSurvivors(
+        scope.prefix(), List.of(), scope.excludedSubtrees());
+  }
+
   public DeleteByPathResponse deleteByPath(DeleteByPathRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
-    String pathPrefix = request.getPath();
-    log.info("deleteByPath RPC called for prefix: {}", pathPrefix);
+      synchronized (rootWatcherRegistry.current()) {
+        String pathPrefix = request.getPath();
+        log.info("deleteByPath RPC called for prefix: {}", pathPrefix);
 
-    DeleteByPathResponse blank =
-        blankReply(pathPrefix, deleteByPathResponse(0, "Path prefix is required"));
-    if (blank != null) {
-      return blank;
-    }
-
-    DeleteByPathResponse unavailable =
-        indexRuntimeUnavailableReply(
-            "deleteByPath", deleteByPathResponse(-1, "Index runtime not available"));
-    if (unavailable != null) {
-      return unavailable;
-    }
-
-    try {
-      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
-        if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
-          return switchBufferOps.bufferDeleteByPathDuringSwitching(sbq, pathPrefix);
+        DeleteByPathResponse blank =
+            blankReply(pathPrefix, deleteByPathResponse(0, "Path prefix is required"));
+        if (blank != null) {
+          return blank;
         }
-        throw IngestSwitchBufferOps.switchingUnavailable();
+
+        DeleteByPathResponse unavailable =
+            indexRuntimeUnavailableReply(
+                "deleteByPath", deleteByPathResponse(-1, "Index runtime not available"));
+        if (unavailable != null) {
+          return unavailable;
+        }
+
+        try {
+          var scope = prefixScope(pathPrefix);
+          if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
+            if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
+              return switchBufferOps.bufferDeleteByPathDuringSwitching(sbq, scope);
+            }
+            throw IngestSwitchBufferOps.switchingUnavailable();
+          }
+
+          return withFileMutationFence(() -> {
+            journalAndProjectPrefixDeleteToServing(scope);
+            if (scope.excludedSubtrees().isEmpty()) ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
+            else deletePrefix(ingestLifecycle.indexingCoordinator(), scope);
+            int jobsDeleted = scope.excludedSubtrees().isEmpty()
+                ? jobQueue.deleteByPathPrefix(pathPrefix)
+                : jobQueue.deleteByPathPrefixExcludingAcceptedSurvivors(
+                    scope.prefix(), List.of(), scope.excludedSubtrees());
+            if (jobsDeleted < 0) throw new IllegalStateException("Path-prefix queue deletion failed");
+            ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
+            log.info("deleteByPath complete: {} jobs deleted for prefix: {}", jobsDeleted, pathPrefix);
+            return deleteByPathResponse(jobsDeleted, "");
+          });
+
+        } catch (WorkerServiceException e) {
+          // Must precede the catch-all: the SWITCHING branch above throws UNAVAILABLE from inside
+          // this try. Swallowed, it would come back as a successful-looking response carrying
+          // error=<message> and deleted=-1 instead of the UNAVAILABLE status the caller retries on.
+          throw e;
+        } catch (Exception e) {
+          log.error("deleteByPath failed for prefix: {}", pathPrefix, e);
+          return deleteByPathResponse(-1, e.getMessage());
+        }
       }
-
-      return withFileMutationFence(() -> {
-        journalAndProjectPrefixDeleteToServing(pathPrefix);
-        ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
-        int jobsDeleted = jobQueue.deleteByPathPrefix(pathPrefix);
-        ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
-        log.info("deleteByPath complete: {} jobs deleted for prefix: {}", jobsDeleted, pathPrefix);
-        return deleteByPathResponse(jobsDeleted, "");
-      });
-
-    } catch (WorkerServiceException e) {
-      // Must precede the catch-all: the SWITCHING branch above throws UNAVAILABLE from inside
-      // this try. Swallowed, it would come back as a successful-looking response carrying
-      // error=<message> and deleted=-1 instead of the UNAVAILABLE status the caller retries on.
-      throw e;
-    } catch (Exception e) {
-      log.error("deleteByPath failed for prefix: {}", pathPrefix, e);
-      return deleteByPathResponse(-1, e.getMessage());
-    }
     }
   }
 
@@ -2350,11 +2394,8 @@ public final class WorkerIngestService {
 
       Path root = parsedRoot(rootPath);
       var binding = rootWatcherRegistry.subscription(root);
-      java.util.function.Predicate<Path> ownsPath = io.justsearch.configuration.PlatformPaths.isLinux()
-              && root != null && rootWatcherRegistry.hasNestedRoots(root)
-          ? file -> rootWatcherRegistry.ownsPath(root, file) : null;
       return syncOps.execute(rootPath, force, provenance, ctx::cancelled,
-          binding == null ? null : binding.collection(), ownsPath);
+          binding == null ? null : binding.collection());
     }
   }
 
@@ -2656,7 +2697,15 @@ public final class WorkerIngestService {
    * t-20261013-ef3c41, S2 and S8).
    */
   private io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
-    return RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
+    var authority = RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
+    var scope = prefixScope(root.toString());
+    return new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() { return authority.rootCurrent(); }
+      @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
+        return scope.excludes(file.toString())
+            ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : authority.presence(file);
+      }
+    };
   }
 
   /**
@@ -3668,48 +3717,50 @@ public final class WorkerIngestService {
   public io.justsearch.ipc.WatchRootResponse watchRoot(
       io.justsearch.ipc.WatchRootRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
-      String rootPath = request.getRootPath();
-      if (rootPath.isBlank()) {
-        throw WorkerServiceException.invalidArgument("WatchRootRequest.root_path is required");
-      }
-      // A registration change can leave an event gap after an earlier root scan even if that
-      // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
-      markReplayUncertainForWatchChangeDuringMigration();
-      try {
-        // Task t-20261013-ef3c41, round 5 (S8): no watcher is registered on another volume at the
-        // root's path, so its creates and changes are never indexed into the root. The watch is
-        // held and registered once a walk or sync finds the recorded volume back. Round 8 (refined
-        // decision 2): only the person's add records the root's volume; a root with none recorded
-        // is held the same way.
-        if (request.getRootAdded()) {
-          Path added = parsedRoot(rootPath);
-          if (added != null) {
-            rootWitness.recordAdded(added);
-          }
+      synchronized (rootWatcherRegistry.current()) {
+        String rootPath = request.getRootPath();
+        if (rootPath.isBlank()) {
+          throw WorkerServiceException.invalidArgument("WatchRootRequest.root_path is required");
         }
-        Path held = rootOnAnotherVolume(rootPath);
-        Path parsed = parsedRoot(rootPath);
-        if (held == null && io.justsearch.configuration.PlatformPaths.isLinux()
-            && parsed != null && !Files.isDirectory(parsed)) held = parsed;
-        RootWatcherRegistry.WatchResult result =
-            held != null
-                ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
-                : rootWatcherRegistry.watch(rootPath, request.getCollection());
-        if (result.watching()) {
-          // A watch that reaches a service which cannot apply receipts (a deferred view whose
-          // writer upgrade already ran its reconcile before this subscription existed) queues
-          // them for whichever writer is current when the watcher's reconcile thread runs them.
-          if (canApplyWatcherReceipts()) reconcilePendingWatcherRoots();
-          else rootWatcherRegistry.applyPendingReceiptsLater();
-        }
-        return io.justsearch.ipc.WatchRootResponse.newBuilder()
-            .setWatching(result.watching())
-            .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
-            .build();
-      } finally {
-        // A migration can begin after the first check but before registry mutation completes.
-        // Recheck while this request still holds its mutation lease so the final fence sees it.
+        // A registration change can leave an event gap after an earlier root scan even if that
+        // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
         markReplayUncertainForWatchChangeDuringMigration();
+        try {
+          // Task t-20261013-ef3c41, round 5 (S8): no watcher is registered on another volume at the
+          // root's path, so its creates and changes are never indexed into the root. The watch is
+          // held and registered once a walk or sync finds the recorded volume back. Round 8 (refined
+          // decision 2): only the person's add records the root's volume; a root with none recorded
+          // is held the same way.
+          if (request.getRootAdded()) {
+            Path added = parsedRoot(rootPath);
+            if (added != null) {
+              rootWitness.recordAdded(added);
+            }
+          }
+          Path held = rootOnAnotherVolume(rootPath);
+          Path parsed = parsedRoot(rootPath);
+          if (held == null && io.justsearch.configuration.PlatformPaths.isLinux()
+              && parsed != null && !Files.isDirectory(parsed)) held = parsed;
+          RootWatcherRegistry.WatchResult result =
+              held != null
+                  ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
+                  : rootWatcherRegistry.watch(rootPath, request.getCollection());
+          if (result.watching()) {
+            // A watch that reaches a service which cannot apply receipts (a deferred view whose
+            // writer upgrade already ran its reconcile before this subscription existed) queues
+            // them for whichever writer is current when the watcher's reconcile thread runs them.
+            if (canApplyWatcherReceipts()) reconcilePendingWatcherRoots();
+            else rootWatcherRegistry.applyPendingReceiptsLater();
+          }
+          return io.justsearch.ipc.WatchRootResponse.newBuilder()
+              .setWatching(result.watching())
+              .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
+              .build();
+        } finally {
+          // A migration can begin after the first check but before registry mutation completes.
+          // Recheck while this request still holds its mutation lease so the final fence sees it.
+          markReplayUncertainForWatchChangeDuringMigration();
+        }
       }
     }
   }
@@ -3717,27 +3768,65 @@ public final class WorkerIngestService {
   public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(
       io.justsearch.ipc.UnwatchRootRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
-      markReplayUncertainForWatchChangeDuringMigration();
-      try {
-        boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
-        forgetRemovedRoot(request.getRootPath());
-        if (jobQueue instanceof SwitchBufferCapableQueue journal) {
-          String key = "watcher-reconcile:" + Path.of(request.getRootPath()).toAbsolutePath().normalize();
-          var obsolete = journal.listSwitchBufferOpsStrict().stream()
-              .filter(receipt -> (key.equals(receipt.key()) && WATCHER_RECONCILE.equals(receipt.op()))
-                  || (io.justsearch.configuration.PlatformPaths.isLinux()
-                      && "DELETE".equals(receipt.op())
-                      && watcherDeleteForRemovedRoot(receipt, request.getRootPath())))
-              .toList();
-          if (journal.removeReplayedSwitchBufferOps(obsolete) != obsolete.size()) {
-            throw WorkerServiceException.unavailable("Removed-root reconciliation cleanup changed");
-          }
-        }
-        return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
-      } finally {
+      synchronized (rootWatcherRegistry.current()) {
         markReplayUncertainForWatchChangeDuringMigration();
+        try {
+          if (request.getClearAllRoots()) {
+            var roots = new java.util.HashSet<>(rootWatcherRegistry.current().declaredRoots());
+            try {
+              roots.addAll(io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(declaredRootsDirectory));
+            } catch (IOException unreadable) {
+              throw WorkerServiceException.unavailable("Watched-root declarations are unreadable");
+            }
+            if (!roots.isEmpty() && (ingestLifecycle == null || !ingestLifecycle.isAcceptingWrites())) {
+              throw WorkerServiceException.unavailable("Root cleanup requires a writable index");
+            }
+            // Drain issued watcher events before taking the writer fence they may need.
+            for (Path root : roots) forgetWatchRoot(root.toString());
+            return withFileMutationFence(() -> {
+              for (Path root : roots) {
+                var scope = new PathPrefixScope(root.toString(), List.of());
+                journalAndProjectPrefixDeleteToServing(scope);
+                deletePrefix(ingestLifecycle.indexingCoordinator(), scope);
+                if (jobQueue.deleteByPathPrefix(scope.prefix()) < 0) {
+                  throw WorkerServiceException.unavailable("Root queue cleanup failed");
+                }
+                ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
+              }
+              return io.justsearch.ipc.UnwatchRootResponse.newBuilder()
+                  .setUnwatched(!roots.isEmpty()).setRootsCleared(true).build();
+            });
+          }
+          boolean removed = forgetWatchRoot(request.getRootPath());
+          return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
+        } finally {
+          markReplayUncertainForWatchChangeDuringMigration();
+        }
       }
     }
+  }
+
+  private boolean forgetWatchRoot(String rootPath) {
+    if (rootPath == null || rootPath.isBlank()) {
+      throw WorkerServiceException.invalidArgument("UnwatchRootRequest.root_path is required");
+    }
+    boolean removed = rootWatcherRegistry.unwatch(rootPath);
+    Path removedRoot = Path.of(rootPath).toAbsolutePath().normalize();
+    bootExclusionRoots = bootExclusionRoots.stream().filter(root -> !root.equals(removedRoot)).toList();
+    forgetRemovedRoot(rootPath);
+    if (jobQueue instanceof SwitchBufferCapableQueue journal) {
+      String key = "watcher-reconcile:" + Path.of(rootPath).toAbsolutePath().normalize();
+      var obsolete = journal.listSwitchBufferOpsStrict().stream()
+          .filter(receipt -> (key.equals(receipt.key()) && WATCHER_RECONCILE.equals(receipt.op()))
+              || (io.justsearch.configuration.PlatformPaths.isLinux()
+                  && "DELETE".equals(receipt.op())
+                  && watcherDeleteForRemovedRoot(receipt, rootPath)))
+          .toList();
+      if (journal.removeReplayedSwitchBufferOps(obsolete) != obsolete.size()) {
+        throw WorkerServiceException.unavailable("Removed-root reconciliation cleanup changed");
+      }
+    }
+    return removed;
   }
 
   private static boolean watcherDeleteForRemovedRoot(
@@ -3758,13 +3847,11 @@ public final class WorkerIngestService {
       return;
     }
     try {
-      Path root = Path.of(rootPath).toAbsolutePath().normalize();
-      rootWitness.forgetUnder(rootPath, io.justsearch.configuration.PlatformPaths.isLinux()
-              && rootWatcherRegistry.hasNestedRoots(root)
-          ? file -> rootWatcherRegistry.ownsPath(root, file) : ignored -> true);
+      rootWitness.forgetUnder(rootPath, prefixScope(rootPath).excludedSubtrees());
     } catch (IOException | RuntimeException notForgotten) {
       log.warn("unwatchRoot: could not drop the recorded volume under {}: {}", rootPath,
           notForgotten.getMessage());
+      throw WorkerServiceException.unavailable("Removed-root volume cleanup failed; retry shortly");
     }
   }
 

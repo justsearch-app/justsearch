@@ -274,12 +274,17 @@ public final class WritePathOps {
   }
 
   void deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> fileIds) {
-    // Normalize the prefix (case-insensitive on Windows, ensure trailing separator)
+    deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, fileIds, List.of());
+  }
+
+  void deleteByPathPrefixExcludingAcceptedSurvivors(
+      String pathPrefix, List<String> fileIds, List<String> excludedSubtrees) {
     String normalized = normalizePathPrefix(pathPrefix);
     try {
       // Use 'path' field for prefix matching (works for both parent docs and chunks)
       Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
-          new PrefixQuery(new Term(SchemaFields.PATH, normalized)), fileIds, List.of());
+          QueryFilterBuilder.excludingSubtrees(
+              new PrefixQuery(new Term(SchemaFields.PATH, normalized)), excludedSubtrees), fileIds, List.of());
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null || !w.isOpen()) {

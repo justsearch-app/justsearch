@@ -74,10 +74,10 @@ final class RootLifecycleOpsConcurrencyTest {
       var scanning = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
           (path, collection, mode, globs, progress, context) -> {
             scanCalls.incrementAndGet();
-            documents.add("first batch");
+            documents.add(path + ":first batch");
             entered.countDown();
             await(release);
-            documents.add("last batch");
+            documents.add(path + ":last batch");
             return io.justsearch.ipc.ScanRootProgress.newBuilder().setComplete(true).build();
           }, watcher(watchers, path -> {}),
           (path, context) -> deleted(), (id, context) -> null,
@@ -95,7 +95,7 @@ final class RootLifecycleOpsConcurrencyTest {
       }
       var removing = ops(roots, state, watcher(watchers, path -> {}), (path, owned) -> {
         assertEquals(0, release.getCount(), "deletion must follow producer exit");
-        documents.clear();
+        documents.removeIf(document -> !document.startsWith(nested.toString()));
         return deleted();
       });
       var scan = new FutureTask<Void>(() -> {
@@ -116,11 +116,11 @@ final class RootLifecycleOpsConcurrencyTest {
         scan.get(2, TimeUnit.SECONDS);
         assertEquals(1, remove.get(2, TimeUnit.SECONDS).intValue());
         queued.forEach(body -> body.accept(context));
-        assertEquals(1, scanCalls.get(), "removed membership must fence queued initial/reindex scans");
-        assertTrue(documents.isEmpty(), "the last scan batch must be deleted before success");
-        assertTrue(watchers.isEmpty());
-        assertTrue(roots.isEmpty());
-        assertTrue(reloaded(rootsFile).isEmpty());
+        assertEquals(2, scanCalls.get(), "P's queued scan is fenced; C's producer still completes");
+        assertEquals(Set.of(nested + ":first batch", nested + ":last batch"), documents);
+        assertEquals(Set.of(nested.toString()), watchers);
+        assertEquals(Set.of(nested), roots.keySet());
+        assertEquals(Set.of(nested), reloaded(rootsFile).keySet());
       } finally {
         release.countDown();
         scanThread.join(2_000);
@@ -370,9 +370,9 @@ final class RootLifecycleOpsConcurrencyTest {
       release.countDown();
       add.get(2, TimeUnit.SECONDS);
       assertEquals(1, remove.get(2, TimeUnit.SECONDS).intValue());
-      assertTrue(watchers.isEmpty(), "completed removal must stop the newly created nested watcher");
-      assertTrue(roots.isEmpty());
-      assertTrue(reloaded(rootsFile).isEmpty());
+      assertEquals(Set.of(nested.toString()), watchers, "C's initializing watcher survives P's removal");
+      assertEquals(Set.of(nested), roots.keySet());
+      assertEquals(Set.of(nested), reloaded(rootsFile).keySet());
     } finally {
       release.countDown();
       addThread.join(2_000);

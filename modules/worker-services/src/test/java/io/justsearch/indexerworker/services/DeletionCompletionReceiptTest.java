@@ -25,7 +25,8 @@ final class DeletionCompletionReceiptTest {
         .thenReturn(true);
     var switching = new IngestSwitchBufferOps(mock(JobQueue.class), generations);
     String path = temp.resolve("excluded").toString();
-    var prefix = switching.bufferDeleteByPathDuringSwitching(queue, path);
+    var prefix = switching.bufferDeleteByPathDuringSwitching(queue,
+        new io.justsearch.adapters.lucene.runtime.PathPrefixScope(path, java.util.List.of()));
     var file = switching.bufferDeleteByIdDuringSwitching(queue, path);
     verify(queue, times(2)).putSwitchBufferForGeneration(eq(building), anyString(), anyString(), anyString());
     assertTrue(buffered(prefix));

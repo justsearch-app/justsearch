@@ -226,8 +226,7 @@ final class EngineRootRetirementTest {
       long epoch = epoch(fixture, KEY);
       var producer = fixture.client().enumerateWatchedRecordedRoot(fixture.plan(), KEY, epoch,
           TestEngineContexts.FOREGROUND, new CancelToken());
-      var removal = new FutureTask<>(() -> fixture.client().removeWatchedPath(
-          nested ? fixture.root().getParent() : fixture.root(), TestEngineContexts.FOREGROUND));
+      var removal = removal(fixture);
       var removalThread = new Thread(removal);
       try {
         assertTrue(entered.await(5, TimeUnit.SECONDS));
@@ -320,7 +319,7 @@ final class EngineRootRetirementTest {
     assertEquals(0, fixture.queue().queueDepth(), "no resumed or stale producer may recreate jobs");
     assertTrue(fixture.roots().watchedPaths().isEmpty());
     assertTrue(WatchedRootsState.load(fixture.data()).watchedPaths().isEmpty());
-    verify(fixture.runtime().indexingCoordinator()).deleteByPathPrefix(fixture.removalRoot().toString());
+    verify(fixture.runtime().indexingCoordinator()).deleteByPathPrefix(fixture.root().toString());
   }
 
   private static long epoch(Fixture fixture, String key) {
@@ -331,7 +330,7 @@ final class EngineRootRetirementTest {
     return fixture(directory, files, pacing, false);
   }
 
-  private static Fixture fixture(Path directory, int files, IndexingPacing pacing, boolean nested) throws Exception {
+  static Fixture fixture(Path directory, int files, IndexingPacing pacing, boolean nested) throws Exception {
     return fixture(directory, files, pacing, nested, false);
   }
 
@@ -365,8 +364,7 @@ final class EngineRootRetirementTest {
     var client = client(registry, services, roots, 5_000);
     var plan = new RecordedRootPlan(layout.activeGenerationId(), List.of(
         new RecordedRootPlan.Root(root, null, true, false, List.of(), List.of())));
-    return new Fixture(root, data, roots, queue, services, registry, client, plan, service, runtime,
-        nested ? root.getParent() : root);
+    return new Fixture(root, data, roots, queue, services, registry, client, plan, service, runtime);
   }
 
   private static DefaultEngineExecutorRegistry boundedRegistry() {
@@ -393,9 +391,9 @@ final class EngineRootRetirementTest {
     }
   }
 
-  private record Fixture(Path root, Path data, WatchedRootsState roots, SqliteJobQueue queue,
+  record Fixture(Path root, Path data, WatchedRootsState roots, SqliteJobQueue queue,
       WorkerAppServices services, DefaultEngineExecutorRegistry registry, EngineKnowledgeClient client,
-      RecordedRootPlan plan, WorkerIngestService service, RunningRuntime runtime, Path removalRoot) implements AutoCloseable {
+      RecordedRootPlan plan, WorkerIngestService service, RunningRuntime runtime) implements AutoCloseable {
     @Override
     public void close() throws Exception {
       try {

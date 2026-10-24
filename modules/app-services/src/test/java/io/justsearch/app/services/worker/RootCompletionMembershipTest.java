@@ -48,7 +48,7 @@ final class RootCompletionMembershipTest {
     Thread walker = Thread.ofPlatform().unstarted(walking);
     roots.walker = walker;
     var removing = new FutureTask<Void>(() -> {
-      state.removeRootAndNested(path);
+      state.removeRootAndPersist(path);
       return null;
     });
     Thread remover = Thread.ofPlatform().unstarted(removing);

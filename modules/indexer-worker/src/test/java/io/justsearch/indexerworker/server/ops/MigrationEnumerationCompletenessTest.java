@@ -230,7 +230,11 @@ final class MigrationEnumerationCompletenessTest {
           "g-building", "prefix:" + prefix, "DELETE_PREFIX", prefix));
       assertEquals(1, queue.deleteByPathPrefix(prefix));
 
-      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      var publisher = new io.justsearch.indexerworker.services.WorkerIngestService(queue, null, null,
+          io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(),
+          directory.resolve("index"), directory.resolve("index/active"), null, null, null, 0L);
+      publisher.useExclusionRoots(() -> List.of(root));
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context, publisher));
       assertEquals("DELETE_PREFIX", queue.listSwitchBufferOpsStrict().getLast().op());
       assertTrue(queue.pollPending(1).isEmpty(),
           "the resumed baseline must not enqueue a file below the accepted prefix delete");
