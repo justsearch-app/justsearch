@@ -197,6 +197,9 @@ class WorkerUserExclusionsAdmissionTest {
   @SuppressWarnings("unchecked")
   private static JobQueue queue(List<Path> admitted) {
     JobQueue queue = mock(JobQueue.class);
+    // Keep the real forwarding signature so this double still observes every admitted path.
+    when(queue.enqueueMaintenanceScanEntries(any(), nullable(String.class), nullable(String.class)))
+        .thenCallRealMethod();
     when(queue.enqueueEntries(any(), nullable(String.class))).thenAnswer(call -> {
       List<JobQueue.EnqueueEntry> entries = call.getArgument(0);
       entries.forEach(entry -> admitted.add(entry.path()));
