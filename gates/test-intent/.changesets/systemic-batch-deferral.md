@@ -1939,3 +1939,14 @@ Round18 exactc3ddc3603 before: both permission-loss variants fail at source atte
   "note": "Reject entries 14 and 15: source-parent permission loss behind a canonical alias defers the source at zero attempts rather than the baseline per-file charge (U19/K2)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16d32-17ce-7f81-abea-bf305440d5ae",
+  "verdict": "reject",
+  "digest": "sha256:9ca123393a2bc6f74ada1cf350c8b3a65a426207af861047f495c06b563b0144",
+  "note": "U19/K2 regresses: real FileInputStream permission failures on the source are deferred with zero attempts, while baseline charges one."
+}
+```
