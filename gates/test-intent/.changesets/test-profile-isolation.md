@@ -183,3 +183,14 @@ Independent acceptance remains pending.
   "note": "Verified e46586059: included-build worker and inherited child profile probe fails on 1ebd070b7 and passes here; committed module profile probe passes; included-build repeat is UP-TO-DATE. Prior G3-G6 evidence retained; Windows runtime remains unverified. Evidence: tmp/verify-guard-evidence/reverify-e46586059/results.json"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-guard-1",
+  "verdict": "accept",
+  "digest": "sha256:8527ab7b9209d0dab32e06402edc894c53cd96496cae8652752505a14e19b3bc",
+  "note": "Verified 58a81c186 independently: new runner oracle rejects dad7077a1; clean GPU 8/8 on both; GPU=true reproduces same three assertions on both; full UI 2162 executed passes, one skip with 1g heap, 90s default timeout and normal build-local temp directories. Default full 384m OOMs on both; lifecycle timeout oracle passes alone on both at default 30s."
+}
+```
