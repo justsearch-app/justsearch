@@ -33,7 +33,7 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 | O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
-| O10 full mapped document with live writer configuration and native lock identity | [live lock loss/replacement and isolation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java), [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
+| O10 full mapped document with live writer configuration, native lock identity and live field schema | [stored-schema mismatch and healthy pending-work control](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java), [live lock loss/replacement and isolation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java), [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
 | K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
 | K3 single parser rejection | [mixed poison and healthy peer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) and [actual document analyzer IO](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java) |
 | K4 poison only | [singleton/all-poison, real passing parser canary, terminal FAILED](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
@@ -821,7 +821,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "label": "agent choice under adopted orchestrator design"
         }
       ],
-      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-live-lock.json",
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-live-schema.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
@@ -1315,6 +1315,46 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "choice": "Round15 orchestrator instruction: reject missing or replaced native live write locks, using existence and creation-time comparison equivalent to NativeFSLock.ensureValid. Lucene IndexWriter.getDirectory returns directoryOrig rather than its private LockValidatingDirectoryWrapper; no public held-lock getter exists. Capture the same filesystem creationTime attribute immediately after opening the live writer, from its actual FSDirectory path, within ComponentsFactory's existing I/O cleanup boundary. Carry it through Components to the one-shot coordinator; no global cache, reflection, new directory wrapper, schema or option. Probe reads creationTime from that same live directory before the unchanged mapped RAM-write and raw-directory checks. Missing files throw through the existing typed I/O boundary; different creationTime throws IndexWriterUnavailableException. Read-only opens have no writer identity, and non-filesystem injected test directories have no native file lock to validate. Existing bare coordinator test construction remains available without manufacturing a lock identity. Each reopened runtime captures its own fresh identity. The supplied real running-loop deletion case and repeated-probe isolation oracle are retained verbatim apart from class/fixture helper names and an SPDX header. A new replacement case proves that existence plus raw Directory writability does not prove lock identity, then restores the original inode and proves healthy probe recovery without changing real documents or commit state. No GitHub issue action is authorized or taken. These are delegated implementation choices under the orchestrator decision, never owner-words."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java"
+      ],
+      "class": "New",
+      "behaviour": "O10: a stored live field-schema mismatch that prevents all ordinary mapper writes fails the full canary and keeps healthy source attempts at zero with second-scale visible deferral. A normal reopened content schema still passes repeated probes without changing the real writer sequence, document count, pending state or analyzer.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Implement the orchestrator round-sixteen narrow live-field-schema consistency repair, preserving U17/U19, all round10–15 checks and existing acceptance records.",
+          "label": "agent choice under orchestrator decision",
+          "choice": "The orchestrator explicitly requires comparing canary definitions against the current live searcher field schema without a real-writer flush or commit. Reuse SearcherBridge.withSearcherNoRefresh to borrow the current published reader under existing write-barrier/dispatch locks. After the existing mapped canary is indexed/flushed only in RAM, combine its reader with the borrowed reader in a non-owning MultiReader and invoke FieldInfos.getMergedFieldInfos. Installed Lucene10.4 bytecode shows its Builder calls FieldInfo.verifySameSchema and the same validators used by IndexWriter FieldNumbers: index options, omit norms, term vectors, doc-values type/skip-index type, all point dimensions/byte widths, vector dimension/encoding/similarity; global parent/soft-delete metadata is validated by the builder. No handwritten schema property list or message matching is added. Empty live readers have no stored schema to compare and skip the extra RAM reader. Both temporary reader references are released without closing the borrowed reader; the existing bridge releases its searcher reference. All writer/runtime/analyzer/directory/lock/config checks remain. The native verifier setup/oracles are copied unchanged except package fixture/class helpers and SPDX. An added healthy stored-schema control checks buffered work and analyzer isolation. This is an agent implementation choice under the orchestrator decision, never owner-words. The copied verifier compatibility catch initially failed PMD EmptyCatchBlock. The project rule explicitly permits documented empty catches; add only an inline explanatory comment, retaining every original assertion and all executable code. Verify the resulting check class is byte-for-byte identical to the class actually executed before and in the full candidate. Re-run PMD and both native controls in one focused call; retain the unchanged broader suites only under complete compiled-class and source guards. Preserve the initial lint finding/raw failed build rather than relabelling it green."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-live-schema.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java#incompatibleStoredTextSchemaMustNotChargeEveryHealthySource"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -1545,6 +1585,17 @@ Round15 adds native live-lock identity to the same O10 health proof. The only ne
 | New lock file replaces the held inode | Canary passes although replacement exists and raw Directory works | Canary rejects changed creationTime; restoring original inode restores healthy proof | LiveWriterLockHealthTest.replacementLockCannotImpersonateTheHeldNativeLock |
 | Healthy repeated probes | Live document/commit state and analyzer unchanged | Same preservation | LiveWriterLockHealthTest.repeatedProbeLeavesLiveDocumentsAndSharedAnalyzerUsable |
 | Existing in-memory component injection | Existing assertions pass with original signature | Same assertions with null native-lock metadata | ComponentsInjectionTest.usesInjectedComponentsWithoutDisk |
+
+Round16 extends O10 to the existing live index field schema. The probe borrows the current searcher without refresh and runs Lucene's own FieldInfos merge validator over the live and disposable mapped-canary readers. Only the RAM writer is flushed; the live writer receives no operation or commit. An empty live reader has no stored definitions to compare. Existing lifecycle/configuration/directory/lock checks and retry/status policies remain unchanged.
+
+| Schema obligation | Native implementation / check |
+| --- | --- |
+| Index options, norms and term-vector storage | Lucene FieldInfo.verifySameSchema, via FieldInfos.getMergedFieldInfos; native stored `content` DOCS versus normal mapper positions is rejected. [ExistingSchemaHealthTest](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java). |
+| Doc-values type and skip-index type; point data/index dimensions and byte width; vector dimension, encoding and similarity | The same Lucene schema validators used by IndexWriter.FieldNumbers; no duplicated property comparisons. [Installed contract](../../../tmp/builder/round16/native-schema-contract.txt). |
+| Parent and soft-delete field metadata | Lucene merged-field-info builder/global field-number validation. |
+| Healthy ordinary reopened schema and pending work | ExistingSchemaHealthTest.ordinaryStoredSchemaStillPassesWithoutPublishingPendingWork; inherited pending-isolation/config/field-family checks remain. |
+
+Round16 exact6cd245b6a before:1 intended charged-source assertion failure and1 healthy stored-schema preservation pass. After:135 targets including37 matrix states, 69 supplied verifier product checks and1 environment check pass without skips. Main/test compile and6 PMD reports pass. Full modules retain1 known launcher-NOTE environment failure(s) and48 existing skips. Product+14/-3 (net+11). [Report](../../../tmp/builder/round16/report.md), [before](../../../tmp/builder/round16/before.txt), [after](../../../tmp/builder/round16/after.txt), [counts](../../../tmp/builder/round16/verification-summary.json), [execution evidence](../evidence/systemic-batch-deferral-live-schema.json). Initial full PMD lint is corrected by one explanatory comment; fresh PMD/native controls pass and all retained compiled classes are identical (see retention-proof.json). Existing acceptance records below are unchanged.
 
 ## Acceptance records
 

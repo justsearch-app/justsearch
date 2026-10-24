@@ -116,8 +116,11 @@ public final class IndexingCoordinator {
                 directory.getDirectory().resolve(IndexWriter.WRITE_LOCK_NAME), "creationTime"))) {
           throw new IndexWriterUnavailableException("Index writer lock was replaced");
         }
-        ComponentsFactory.probeDocument(snapshot.writer().getConfig(),
-            session.fieldMapper.ingestionCanaryDocument());
+        new SearcherBridge(session).withSearcherNoRefresh(searcher -> {
+          ComponentsFactory.probeDocument(snapshot.writer().getConfig(),
+              session.fieldMapper.ingestionCanaryDocument(), searcher.getIndexReader());
+          return null;
+        });
         String name = null;
         try {
           try (var output = snapshot.directory().createTempOutput(

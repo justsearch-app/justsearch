@@ -30,6 +30,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LiveIndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.MultiReader;
 import org.apache.lucene.index.NoMergePolicy;
 import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper;
@@ -62,10 +63,17 @@ final class ComponentsFactory {
   private ComponentsFactory() {}
 
   /** Owns the disposable RAM writer lifecycle while borrowing the live indexing components. */
-  static void probeDocument(LiveIndexWriterConfig live, Document document) throws IOException {
+  static void probeDocument(LiveIndexWriterConfig live, Document document, IndexReader liveReader)
+      throws IOException {
     try (var directory = new ByteBuffersDirectory();
         var canary = new IndexWriter(directory, probeConfig(live))) {
       WritePathOps.probeDocument(canary, document);
+      if (!liveReader.leaves().isEmpty()) {
+        try (var reader = DirectoryReader.open(canary);
+            var combined = new MultiReader(new IndexReader[] {liveReader, reader}, false)) {
+          FieldInfos.getMergedFieldInfos(combined); // Lucene's own complete schema consistency check.
+        }
+      }
     }
   }
 
