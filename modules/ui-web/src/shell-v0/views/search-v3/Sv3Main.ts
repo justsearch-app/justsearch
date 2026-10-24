@@ -316,18 +316,18 @@ function hasTerminalText(items: readonly Sv3RunFeedItem[]): boolean {
 }
 
 // Per-tab attempt receipts survive a remount/reload; they never restore a checking status.
-const checkingAnnouncementsWithoutStorage = new Set<string>();
+const checkingAnnouncements = new Set<string>();
 function firstCheckingAnnouncement(attemptId: string): boolean {
+  if (checkingAnnouncements.has(attemptId)) return false;
+  checkingAnnouncements.add(attemptId);
   try {
     const key = `jf.sv3.checking-announced.${attemptId}`;
     if (sessionStorage.getItem(key) !== null) return false;
     sessionStorage.setItem(key, '1');
-    return true;
   } catch {
-    if (checkingAnnouncementsWithoutStorage.has(attemptId)) return false;
-    checkingAnnouncementsWithoutStorage.add(attemptId);
-    return true;
+    // The page remembers the receipt even if tab storage becomes unavailable.
   }
+  return true;
 }
 
 export class Sv3Main extends JfElement {

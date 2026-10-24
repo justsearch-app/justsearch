@@ -426,6 +426,86 @@ describe('the transcript is the session, in order', () => {
     next.emit('done', {}); next.end(); await settle(el);
   });
 
+  it.each(['getItem', 'setItem'] as const)(
+    'does not reannounce a checking attempt when storage initially works then %s throws', async (method) => {
+      aiOnline();
+      const stream = stubStream();
+      const el = await mount();
+      try {
+        await ask(el, 'storage changes during this attempt');
+        const main = await region(el, 'jf-sv3-main');
+        stream.emit('chunk', { text: 'Ada owns Cobalt.' });
+        stream.emit('rag.citation_checking', {});
+        await settle(el);
+        expect(q(main, 'sv3-checking-announcement')?.textContent).toContain('Checking the answer');
+        const sessions = el.sessions;
+        el.sessions = { ...sessions, activeId: null };
+        await settle(el);
+        const storage = sessionStorage;
+        vi.stubGlobal('sessionStorage', {
+          getItem(key: string) {
+            if (key.startsWith('jf.sv3.checking-announced.')) {
+              if (method === 'getItem') throw new Error('storage became unavailable');
+              return null; // Receipt unavailable; writing its replacement also fails.
+            }
+            return storage.getItem(key);
+          },
+          setItem(key: string, value: string) {
+            if (method === 'setItem' && key.startsWith('jf.sv3.checking-announced.')) {
+              throw new Error('storage became unwritable');
+            }
+            storage.setItem(key, value);
+          },
+          removeItem: storage.removeItem.bind(storage),
+          clear: storage.clear.bind(storage),
+          key: storage.key.bind(storage),
+          get length() { return storage.length; },
+        });
+        el.sessions = sessions;
+        await settle(el);
+        expect(q(main, 'sv3-citation-checking')).not.toBeNull();
+        expect(q(main, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+      } finally {
+        stream.emit('done', {}); stream.end(); await settle(el);
+      }
+    },
+  );
+
+  it('announces once across navigation when storage is unavailable from the start', async () => {
+    const storage = sessionStorage;
+    vi.stubGlobal('sessionStorage', {
+      getItem(key: string) {
+        if (key.startsWith('jf.sv3.checking-announced.')) throw new Error('storage unavailable');
+        return storage.getItem(key);
+      },
+      setItem: storage.setItem.bind(storage),
+      removeItem: storage.removeItem.bind(storage),
+      clear: storage.clear.bind(storage),
+      key: storage.key.bind(storage),
+      get length() { return storage.length; },
+    });
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    try {
+      await ask(el, 'storage unavailable throughout this attempt');
+      const main = await region(el, 'jf-sv3-main');
+      stream.emit('chunk', { text: 'Ada owns Cobalt.' });
+      stream.emit('rag.citation_checking', {});
+      await settle(el);
+      expect(q(main, 'sv3-checking-announcement')?.textContent).toContain('Checking the answer');
+      const sessions = el.sessions;
+      el.sessions = { ...sessions, activeId: null };
+      await settle(el);
+      el.sessions = sessions;
+      await settle(el);
+      expect(q(main, 'sv3-citation-checking')).not.toBeNull();
+      expect(q(main, 'sv3-checking-announcement')?.textContent?.trim()).toBe('');
+    } finally {
+      stream.emit('done', {}); stream.end(); await settle(el);
+    }
+  });
+
   it('keeps an unfinished-check disclosure when a later finishing step fails', async () => {
     aiOnline();
     const stream = stubStream();

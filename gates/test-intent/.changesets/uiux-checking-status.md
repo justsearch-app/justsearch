@@ -151,7 +151,7 @@ measurement and were corrected before the single complete six-block run.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The real SSE parser drives the visible status and an outside-busy live region, leaves streamed reference literals unchanged, clears every terminal and result, deduplicates repeated start signals, and binds fast follow-ups to their own turn. Live and cold readers retain only an explicit unfinished fact, without fabricated counts; zero-match and historical unknown records remain distinct. Existing expectations are retained. Announcement receipts deduplicate an attempt across navigation and remount; failed turns retain an explicit incomplete-check disclosure.",
+      "behaviour": "The real SSE parser drives the visible status and an outside-busy live region, leaves streamed reference literals unchanged, clears every terminal and result, deduplicates repeated start signals, and binds fast follow-ups to their own turn. Live and cold readers retain only an explicit unfinished fact, without fabricated counts; zero-match and historical unknown records remain distinct. Existing expectations are retained. Announcement receipts deduplicate an attempt across navigation and remount; failed turns retain an explicit incomplete-check disclosure. Page-lifetime receipts are always recorded in memory and checked before storage, including when storage becomes unavailable after an earlier successful announcement.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -164,6 +164,9 @@ measurement and were corrected before the single complete six-block run.
       ],
       "evidence": "gates/test-intent/evidence/uiux-checking-status-ui.json",
       "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#does not reannounce a checking attempt when storage initially works then getItem throws",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#does not reannounce a checking attempt when storage initially works then setItem throws",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#announces once across navigation when storage is unavailable from the start",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#announces a checking attempt once across navigation, rerender and remount, then announces a new attempt",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#keeps an unfinished-check disclosure when a later finishing step fails",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#checks only from the Engine signal through the citation result, preserving the streamed text",
@@ -280,5 +283,39 @@ The scorer, progress emission, matcher barrier and normal completion path are un
 Only error persistence changes on the Engine, so the conditional D10 rerun is not required.
 The test-intent check against fc0c268eb has no delegation/evidence errors; its sole error is the
 missing fresh independent acceptance. No acceptance record is authored by this builder.
+
+## Storage availability repair (fc34d2d198; builder observations)
+
+Cause: a successful storage read/write did not populate the page's fallback set. When storage
+subsequently failed, revisiting the held attempt treated it as unseen. The receipt is now checked
+in memory first and added there before every storage path, including a stored receipt found after
+reload. Storage continues to carry receipts across reload where it is available.
+
+The two new durable Ask/SSE unit cases fail by assertion on fc34d2d198: for both `getItem` and
+`setItem`, the revisited live region contains "Checking the answer against your sources…" instead
+of the expected empty string. They pass after the repair. A third durable case preserves navigation
+with storage unavailable from the start; the existing navigation/rerender/remount/new-attempt case
+also passes before and after. Streams are settled in `finally` before test teardown.
+
+Machine-generated fail-before evidence is
+`gates/test-intent/evidence/uiux-checking-status-storage-fc34.json`. The package UI evidence was
+refreshed against fc0c268eb in default link mode from a disposable shared clone, using the same
+runner-loader/cache policy and two workers described above. No dependencies were modified.
+
+An owned headless Chromium component fixture reproduces both failures on fc34d2d198 and passes
+both on the candidate. Ordinary navigation, unavailable-from-start storage and reload pass on both.
+This fixture loads the real `Sv3Main` module and native browser storage, holding a streaming Ask
+turn in the component; it does not start an Engine or issue/replay a question. Raw fixture reports
+are in `gates/test-intent/evidence/uiux-checking-status-storage-browser.json`; fixture driver and
+logs are under `tmp/checking-storage/`.
+
+Final checks: lint and typecheck pass; full Vitest with `--cache=false --configLoader runner
+--maxWorkers=2` passes 608 files / 7,649 tests. UI gates pass 28/28; the 14 requested governance
+gates, including wire, pass. `git diff --check` passes. The test-intent check against fc0c268eb has
+no source/evidence errors; its sole error is missing fresh independent acceptance. The existing
+acceptance-record section is unchanged; this builder has not authored acceptance. The Engine/scorer path is unchanged.
+Resources: shared CPU/RAM and read-only installed dependencies; no GPU, existing service or desktop
+browser. Private fixture servers/browsers were closed; created short profile/temp paths and the
+shared clone were removed. Changes are uncommitted.
 
 ## Acceptance records
