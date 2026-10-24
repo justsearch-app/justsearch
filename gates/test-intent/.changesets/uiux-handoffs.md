@@ -1016,6 +1016,18 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/SelectionContextInjectorLiteralTextTest.java"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/NoEvidenceDispatchHttpTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/NoEvidencePersistenceTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ModelStructuredPersistenceTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Register the real SelectionContextInjector (core.selection) in the three private fixture registries that dispatch core.rag-ask or core.extract, using each fixture's DocumentService and AI supplier. NoEvidenceDispatchHttpTest uses the production RAGAskShape injector list, which now requires this registration. The two persistence fixtures retain their deliberate synthetic shape injector lists and terminal fault paths. All request inputs, preconditions, fault injection, observations, assertions, expected outcomes, tags and conditions remain unchanged. No production behavior or expectation changes."
     }
   ]
 }
