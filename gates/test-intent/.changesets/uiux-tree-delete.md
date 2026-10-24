@@ -545,6 +545,31 @@ Agent choices adopted under the user's quoted delegation; never owner words. All
           "label": "agent choice, adopted under the user's delegation"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreCaseIdsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "U1 case variants: deletion protects saved children whose parent id differs only by case; uppercase and mixed-case throwaway prefixes refuse both ordinary and empty-prefix branching. Childless case-variant throwaway cleanup still succeeds. Durable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "U1",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX work, including WP1.4b deleting conversations without losing dependent history; orchestrator U1 case-variant repair decision.",
+          "choice": "Deleting a conversation is refused while any saved conversation names it as parent under any case variant of its id. Branching from a throwaway session is refused under any case variant of the prefix.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-case-ids.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreCaseIdsTest.java#savedParentCaseVariantsPreventDeletion",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreCaseIdsTest.java#throwawayPrefixCaseVariantsCannotAcquireBranches"
+      ],
+      "repaired": true
     }
   ]
 }

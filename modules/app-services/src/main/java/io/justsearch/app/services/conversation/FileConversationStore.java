@@ -428,7 +428,7 @@ public final class FileConversationStore implements ConversationStore {
     try (var ignoredWriting = conversationWork.start(parentSessionId); var ignoredDestination = conversationWork.start(newSessionId)) {
       StoreIds.requireValid(parentSessionId);
       StoreIds.requireValid(newSessionId);
-      if (parentSessionId.startsWith(THROWAWAY_SESSION_PREFIX)) {
+      if (parentSessionId.regionMatches(true, 0, THROWAWAY_SESSION_PREFIX, 0, THROWAWAY_SESSION_PREFIX.length())) {
         throw new IllegalArgumentException("Cannot branch from an internal throwaway session");
       }
       Objects.requireNonNull(parentSessionId, "parentSessionId");
@@ -764,7 +764,8 @@ public final class FileConversationStore implements ConversationStore {
       for (Path sessionDir : dirs) {
         if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
         Map<String, Object> meta = readMeta(sessionDir.getFileName().toString());
-        if (meta != null && parentSessionId.equals(meta.get("parentSessionId"))) {
+        if (meta != null && meta.get("parentSessionId") instanceof String savedParentId
+            && parentSessionId.equalsIgnoreCase(savedParentId)) {
           children.add(sessionDir.getFileName().toString());
         }
       }
