@@ -7,13 +7,13 @@ author-session: 01a16b11-7dde-7782-a173-32f8fb9e2ec9
 
 # Test-intent entries
 
-The original entries cover the six modified existing tests relative to the merge-base with
+These entries cover the six modified existing tests relative to the merge-base with
 origin/main (8b7517f869ec48da7ed2bdcc57de0bbb643be2c1), on candidate 9e62d16d4d.
 They distinguish added lifecycle oracles from fixture adaptations. The one new measurement
 method has two entries of the same class, one per opt-in execution mode, so both D4 files are
 bound into the independent acceptance digest. No existing assertion is weakened or replaced; the old/new observations below explicitly identify the added oracles.
 
-For the original entries, the owner words used as expectation authority are “the memory issue needs a different
+The owner words used as expectation authority are “the memory issue needs a different
 fix in general” (task t-20261022-f9aafb, user turn 2026-10-22). The later “takeover and proceed
 with item 2,3 and 4” (2026-10-23) records continuation; this changeset does not infer a new
 contract from the unspecified numbered items. B-S1..B-S8 and B-P1..B-P11 are proposals drafted
@@ -271,114 +271,6 @@ is hand-authored or edited after the runner writes it.
         "old": "Existing packing/acquisition-failure assertions and verifications.",
         "new": "Identical assertions and verifications; only the retirement-status instrumentation on the fake handle changes."
       }
-    },
-    {
-      "items": [
-        "modules/reranker/src/test/java/io/justsearch/reranker/StandaloneCloseCompatibilityTest.java"
-      ],
-      "class": "New",
-      "repaired": true,
-      "behaviour": "Standalone CitationScorer and CrossEncoderReranker close remains quiet for null, ACTIVE, RETIRING and REFUSED dispositions returned after a normal handle close. The tokenizer is retained, then released exactly once after a subsequent confirmed retirement. A separate preservation check requires strict assembly.close to keep throwing on refusal and release only after retirement.",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "quote": "A shutdown path or caller that used to close quietly must not start failing, and B-P5 still requires that a refused or unconfirmed retirement keeps tokenizer ownership for a retry.",
-          "location": "task t-20261022-f9aafb user turn 2026-10-24"
-        },
-        {
-          "kind": "defect-source",
-          "stronger": {
-            "kind": "owner-words",
-            "quote": "A shutdown path or caller that used to close quietly must not start failing, and B-P5 still requires that a refused or unconfirmed retirement keeps tokenizer ownership for a retry.",
-            "location": "task t-20261022-f9aafb user turn 2026-10-24"
-          },
-          "reproduction": "On 0fe343c55d, use a SessionHandle whose close returns normally and whose retirementStatus remains REFUSED (or null, as the 72 numeric-citation fixtures do). Close a standalone wrapper. Its private assembly throws IllegalStateException instead of returning quietly as on main. The new assertDoesNotThrow is the failing assertion; the tokenizer must remain unreleased until a later successful retirement. NerService additionally propagates a native close exception that main catches; EmbeddingService wraps a checked BackendException that main logs. Both need quiet retries with ownership retained."
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/tokenizer-ownership-close-compatibility.json",
-      "newChecks": [
-        "modules/reranker/src/test/java/io/justsearch/reranker/StandaloneCloseCompatibilityTest.java"
-      ],
-      "oracleChanges": [
-        {
-          "old": "No standalone quiet-close/refusal/retry regression checks in this new file.",
-          "new": "Standalone CitationScorer and CrossEncoderReranker close remains quiet for null, ACTIVE, RETIRING and REFUSED dispositions returned after a normal handle close. The tokenizer is retained, then released exactly once after a subsequent confirmed retirement. A separate preservation check requires strict assembly.close to keep throwing on refusal and release only after retirement."
-        }
-      ],
-      "expectationWarrant": "This follow-up has explicit owner words for both quiet observable close and retained retry ownership. These checks derive from that instruction, not from the assembly implementation or adoption of the earlier B-S/B-P scenario set."
-    },
-    {
-      "items": [
-        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/StandaloneCloseCompatibilityTest.java"
-      ],
-      "class": "New",
-      "repaired": true,
-      "behaviour": "Standalone embedding, BGE-M3, SPLADE, BERT NER, NerService and EmbeddingService close remains quiet when a handle returns normally with null, ACTIVE, RETIRING or REFUSED status. Each retains its tokenizer owner for retry and releases it exactly once only after confirmed retirement. NerService also preserves main's non-fatal handling of a thrown native close exception and retries that owner.",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "quote": "A shutdown path or caller that used to close quietly must not start failing, and B-P5 still requires that a refused or unconfirmed retirement keeps tokenizer ownership for a retry.",
-          "location": "task t-20261022-f9aafb user turn 2026-10-24"
-        },
-        {
-          "kind": "defect-source",
-          "stronger": {
-            "kind": "owner-words",
-            "quote": "A shutdown path or caller that used to close quietly must not start failing, and B-P5 still requires that a refused or unconfirmed retirement keeps tokenizer ownership for a retry.",
-            "location": "task t-20261022-f9aafb user turn 2026-10-24"
-          },
-          "reproduction": "On 0fe343c55d, use a SessionHandle whose close returns normally and whose retirementStatus remains REFUSED (or null, as the 72 numeric-citation fixtures do). Close a standalone wrapper. Its private assembly throws IllegalStateException instead of returning quietly as on main. The new assertDoesNotThrow is the failing assertion; the tokenizer must remain unreleased until a later successful retirement. NerService additionally propagates a native close exception that main catches; EmbeddingService wraps a checked BackendException that main logs. Both need quiet retries with ownership retained."
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/tokenizer-ownership-close-compatibility.json",
-      "newChecks": [
-        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/StandaloneCloseCompatibilityTest.java"
-      ],
-      "oracleChanges": [
-        {
-          "old": "No standalone quiet-close/refusal/retry regression checks in this new file.",
-          "new": "Standalone embedding, BGE-M3, SPLADE, BERT NER, NerService and EmbeddingService close remains quiet when a handle returns normally with null, ACTIVE, RETIRING or REFUSED status. Each retains its tokenizer owner for retry and releases it exactly once only after confirmed retirement. NerService also preserves main's non-fatal handling of a thrown native close exception and retries that owner."
-        }
-      ],
-      "expectationWarrant": "This follow-up has explicit owner words for both quiet observable close and retained retry ownership. These checks derive from that instruction, not from the assembly implementation or adoption of the earlier B-S/B-P scenario set."
-    },
-    {
-      "items": [
-        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/WrapperCloseRetryTest.java"
-      ],
-      "class": "Defect pin",
-      "defectSource": {
-        "kind": "defect-source",
-        "stronger": {
-          "kind": "owner-words",
-          "quote": "A shutdown path or caller that used to close quietly must not start failing, and B-P5 still requires that a refused or unconfirmed retirement keeps tokenizer ownership for a retry.",
-          "location": "task t-20261022-f9aafb user turn 2026-10-24"
-        },
-        "reproduction": "On 0fe343c55d, use a SessionHandle whose close returns normally and whose retirementStatus remains REFUSED (or null, as the 72 numeric-citation fixtures do). Close a standalone wrapper. Its private assembly throws IllegalStateException instead of returning quietly as on main. The new assertDoesNotThrow is the failing assertion; the tokenizer must remain unreleased until a later successful retirement. NerService additionally propagates a native close exception that main catches; EmbeddingService wraps a checked BackendException that main logs. Both need quiet retries with ownership retained."
-      },
-      "reproduction": "Transplant this updated test file onto 0fe343c55d. checkedBackendFailureRetainsBackendForRetry now asserts a quiet first close after a checked BackendException, and the NER case of failedCloseCanBeRetriedWithoutLeakingTheTokenizer now asserts a quiet first close after an injected native exception. Both fail by AssertionFailedError on the branch's newly throwing close behavior. Main catches these exceptions; this follow-up restores that observable behavior while preserving retry ownership.",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "quote": "A shutdown path or caller that used to close quietly must not start failing, and B-P5 still requires that a refused or unconfirmed retirement keeps tokenizer ownership for a retry.",
-          "location": "task t-20261022-f9aafb user turn 2026-10-24"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/tokenizer-ownership-close-compatibility.json",
-      "newChecks": [
-        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/WrapperCloseRetryTest.java"
-      ],
-      "oracleChanges": [
-        {
-          "old": "checkedBackendFailureRetainsBackendForRetry: assertThrows(IllegalStateException.class, service::close);",
-          "new": "assertDoesNotThrow(service::close); The existing unavailable-after-close, successful retry, repeated-close and one tokenizer release assertions remain."
-        },
-        {
-          "old": "NER case in failedCloseCanBeRetriedWithoutLeakingTheTokenizer allows either a normal return or IllegalStateException through try/catch.",
-          "new": "assertDoesNotThrow(wrapper::close); The non-NER thrown-native-failure assertions and all retry/release assertions remain unchanged."
-        }
-      ],
-      "expectationWarrant": "This is an oracle change, not Adaptation. The earlier branch test incorrectly required a new exception for a checked backend close failure; the owner now explicitly requires preserving main's quiet close. The changed NER assertion also strengthens the prior permissive observation to the explicitly requested quiet behavior. Other native session/tokenizer exceptions continue propagating from wrappers where they propagated on main."
     }
   ]
 }
@@ -403,81 +295,6 @@ Remove only the recorded hardlinks afterwards. Each mode's raw
 the JSON proves execution, while those logs record the measurements. Runs are serial and use
 their own server, executors, temporary indexes and profiles. Shared resources touched: Gradle/npm caches
 and GPU 0 for real-model device initialization; no running application or dev stack is used.
-
-## PR 940 follow-up: standalone close compatibility
-
-The follow-up candidate starts at 0fe343c55d. The owner explicitly requires preserving quiet
-close behavior and retaining ownership after unconfirmed retirement (quoted in the new entries).
-This does not adopt the rest of the earlier agent-drafted B-S/B-P scenarios.
-
-The repair changes production behavior rather than rewriting the four numeric-citation fixtures.
-Their 72 teardown failures expose an exception added by assembly.close after a normally returning
-handle.close; a real NativeSessionHandle can also return REFUSED after native cleanup failure.
-Standalone wrappers now use the assembly's boolean retirement attempt, retain incomplete owners,
-and add no exception for that disposition. Strict assembly.close remains the server surface's
-retirement signal. Session/tokenizer exceptions still propagate where main propagated them.
-NerService and checked embedding-backend failures keep main's non-fatal handling; retries keep
-the owner/backend reachable. An embedding service checks completion before discarding its backend.
-
-Production caller audit: KnowledgeServer bootstrap, full replacement/recovery and query-only
-settings construct borrowing wrappers; NerService.borrowing constructs a borrowing BERT wrapper.
-EncoderSet and QueryRoleSet close the strict surface before their wrappers, so server retirement
-still fails and retains owners on refusal. RerankerDeadlineBench is the only production caller of
-a raw standalone constructor. Other construction sites are tests/integration checks in reranker,
-worker-core, worker-services, indexer-worker, app-engine and system-tests. Benchmarks, app-services
-and ort-common are included as consumers in the expanded verification. No numeric scoring oracle,
-input, tag, condition or expected score is changed.
-
-The new D4 run uses [tokenizer-ownership-close-runner.patch](../evidence/tokenizer-ownership-close-runner.patch)
-only in its scratch clone, with before ref 0fe343c55d and all three test files as whole-class
-check IDs. It retains the slot/shared-clone isolation changes and batches the independent module
-Test tasks into one Gradle invocation per tree, with task-local filters, an explicit --rerun for
-each task and --continue so both modules execute despite expected before-state failures. It
-changes no assertion, result parser, failure classification or evidence serialization. The JSON
-records the actual commands and producer digest. There are no production overlays or before patches.
-All pre-existing acceptance records below are preserved unchanged; the verifier must re-accept
-the new digest. The builder writes no acceptance record.
-
-### Observed follow-up checks (2026-10-24)
-
-Both baseline lane runs use the untouched 0fe343c55d production code in an isolated shared clone.
-The exact CI lane commands use CI=true and JUSTSEARCH_PR_CI=true, as the PR workflow does,
-with the same task lists and flags from .github/workflows/ci.yml, prefixed by js-gradle-slot.
-
-| Check | Observed result |
-| --- | --- |
-| Before search-worker-1 | Exit 1: worker-services reports 1,008 tests, 21 failed, 10 skipped; Nx3b 12 / Nx3d 9 failures. |
-| Before search-worker-2 | Exit 1: worker-services reports 1,069 tests, 51 failed, 14 skipped; Window 42 / Nx3c 9 failures. Other lane tasks without results after that failure are unrun. |
-| After search-worker-1 | Exit 0: indexer-worker 835 XML cases / 5 skipped, worker-services 994 / 10 skipped, adapters-lucene 799 / 3 skipped; zero failures. |
-| After search-worker-2 | Exit 0: indexer-worker 669 XML cases / 28 skipped, worker-services 1,036 / 15 skipped, worker-core 512 / 19 skipped, configuration 348, core 127, indexing 87, core-contracts 38, ipc-common 4; zero failures. |
-| After consumer suites | Exit 0: worker-services 2,030 XML cases / 25 skipped, app-services 4,259 / 11 skipped, app-engine 762 / 9 skipped, reranker 117 / 4 skipped, benchmarks 104, system-tests 96, ort-common 378 / 6 skipped; zero failures. Benchmarks classes compiled. |
-| After static checks | Exit 0: pmdMain, pmdTest and spotlessCheck for worker-core and reranker. |
-| D4 run-evidence | Exit 0: candidate command exits 0 with 40 passing cases and no skips; before command exits 1 with 35 distinct assertion failures (105 failed executions under CI retries). All three class IDs classify as assertion failures before. |
-| Local test-intent gate | Exit 1, expected: acceptance-stale only. No author acceptance added. |
-
-Every baseline failure is IllegalStateException in scorer.close() at the fixture's teardown
-line 73, from RerankerAssembly.close reporting "Assembly sessions have not retired: null".
-The console's before lane-2 count matches CI; its XML aggregate additionally includes one
-skipped entry. The first candidate lane-2 attempt failed compilation because the new cross-role
-test referenced SPLADE's package-private OutputFormat from another package. The test was moved
-to the SPLADE package without changing assertions or production visibility; that failed attempt
-is not a passing check.
-
-The full consumer Test tasks ran in one serial slot invocation (with --continue), alongside
-benchmarks:classes and the changed modules' static checks. The three compatibility/retry
-classes executed all 40 cases with zero failures or skips in the full suites. Model-dependent
-and platform-dependent skips are reported above, rather than counted as executed passes.
-The constructor callers in system-tests' integration source set need real-model integration
-coverage; the reported system-tests result is its unit Test task, not that integration tier.
-No running application or dev stack was reused; shared resources were the Gradle slots and
-Gradle/npm caches.
-
-The D4 before output reports 25 tests / 24 failures for reranker and 89 / 81 for worker-core.
-Retries account for 105 failed executions of 35 distinct failing cases; retries of a parameterized
-method also re-execute its passing SPLADE/embedding arguments. The candidate runs 9 reranker
-and 31 worker-core cases, all passing with no skips. The generated evidence retains the actual
-before failure output, commands, source digests and producer digest. The producer digest matches
-the scratch runner made by applying the recorded patch; the repository runner stays unchanged.
 
 ## Acceptance records
 
