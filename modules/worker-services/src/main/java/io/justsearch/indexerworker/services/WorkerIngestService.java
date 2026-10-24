@@ -249,6 +249,7 @@ public final class WorkerIngestService {
             indexingLoop,
             signalBus,
             migrationSwitchingMaxDurationMs);
+    this.statusOps.setMigrationReplayFailure(() -> watcherReplayFailure);
     this.statusOps.setOpenedRuntimePaths(
         searchLifecycle == null ? null : searchLifecycle.openedIndexPath(),
         ingestLifecycle == null ? null : ingestLifecycle.openedIndexPath());
@@ -772,6 +773,67 @@ public final class WorkerIngestService {
   }
 
   private static final String WATCHER_RECONCILE = WatcherRootReconciliation.OPERATION;
+  private volatile String watcherReplayFailure;
+
+  public void watcherReplayRefusal(String reason) { watcherReplayFailure = reason; }
+
+  /** Failure callbacks cannot take admission: they can arrive while the final fence is held. */
+  public void retainUnavailableWatcherRoot(WorkerMutationAdmission.RootUncertainty uncertainty) {
+    var debt = uncertainty.debt();
+    if (mutationAdmission == null || !(jobQueue instanceof SwitchBufferCapableQueue journal)) {
+      throw WorkerServiceException.unavailable("Watcher root debt has no durable owner");
+    }
+    mutationAdmission.markRootUnavailable(uncertainty);
+    if (journal.listSwitchBufferOpsStrict().stream().anyMatch(receipt ->
+        debt.key().equals(receipt.key()) && WATCHER_RECONCILE.equals(receipt.op()))) return;
+    if (!journal.putSwitchBuffer(debt.key(), WATCHER_RECONCILE, debt.encode())) {
+      mutationAdmission.markReplayUncertain();
+      throw IngestSwitchBufferOps.switchBufferUnavailable();
+    }
+  }
+
+  /** Called only with committed per-path evidence, never with a receipt alone. */
+  public void watcherRootReconciled(WatcherRootReconciliation debt,
+      List<WorkerMutationAdmission.RootUncertainty> captured) {
+    if (mutationAdmission == null) return;
+    for (var exact : captured) {
+      if (exact.debt().equals(debt)) mutationAdmission.reconciledRoot(exact);
+    }
+  }
+
+  public List<WorkerMutationAdmission.RootUncertainty> unavailableWatcherRoots() {
+    return mutationAdmission == null ? List.of() : mutationAdmission.unavailableRoots();
+  }
+
+  public boolean acknowledgeWatcherReplay(java.util.function.BooleanSupplier acknowledgement) {
+    return mutationAdmission == null ? acknowledgement.getAsBoolean()
+        : mutationAdmission.acknowledgeReconciledRoots(acknowledgement);
+  }
+
+  /** Restore observation before releasing a repaired root's uncertainty under the final fence. */
+  public void resumeReconciledWatcherRoot(WatcherRootReconciliation debt) throws IOException {
+    Path root = Path.of(debt.root());
+    var registry = rootWatcherRegistry.current();
+    var identity = registry.registeredIdentity(root);
+    if (identity == null) {
+      // On boot, fresh replay already matched this root against frozen durable membership.
+      if (!registry.watch(root.toString(), debt.collection()).watching()) {
+        throw new IOException("Reconciled watcher root could not be registered");
+      }
+      identity = registry.registeredIdentity(root);
+    }
+    if (identity == null || !identity.matchesReceipt(debt.rootIdentity())) {
+      throw new IOException("Reconciled watcher registration identity is unavailable");
+    }
+    registry.resumeAwaitingVolume(root);
+    var subscription = registry.subscription(root);
+    if (subscription == null || !registry.isCurrentAndActive(subscription)
+        || !subscription.rootIdentity().matchesReceipt(debt.rootIdentity())
+        || !java.util.Objects.equals(normalizeRootCollection(subscription.collection()),
+            normalizeRootCollection(debt.collection()))) {
+      throw new IOException("Reconciled watcher root is not observed by its declared owner");
+    }
+  }
 
   private void deferWatcherRootReconciliation(Path root, RootIdentity expectedRootIdentity) {
     try {

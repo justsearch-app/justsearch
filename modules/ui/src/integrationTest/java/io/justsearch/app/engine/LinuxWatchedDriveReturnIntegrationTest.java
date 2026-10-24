@@ -394,24 +394,25 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     }
   }
 
-  // REMOUNT-MIGRATION-REPLAY: reproduced on unmodified main b62fc5921 with these same checks.
-  // Seed both receipt kinds, unmount/return at either migration barrier, request cutover, restart.
-  // Retained WATCHER_RECONCILE/native journal rows prevent a writable survivor; migration is out of scope.
-  @org.junit.jupiter.api.Disabled("REMOUNT-MIGRATION-REPLAY: main also cannot resume with these retained journal rows")
-  @org.junit.jupiter.params.ParameterizedTest(name = "returnDuringBootMigrationWaitsForSurvivingRuntime({0})")
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"migration-before-switching", "migration-green-drained"})
+  @org.junit.jupiter.params.ParameterizedTest(name = "returnDuringBootMigrationPromotes({0}, restart={1})")
+  @org.junit.jupiter.params.provider.CsvSource({
+      "migration-before-switching,false", "migration-green-drained,false",
+      "migration-before-switching,true", "migration-green-drained,true"})
   @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
-  @Timeout(240)
-  void returnDuringBootMigrationWaitsForSurvivingRuntime(String point) throws Exception {
+  @Timeout(300)
+  void returnDuringBootMigrationPromotes(String point, boolean restart) throws Exception {
     try (var volume = LinuxLoopVolume.create(directory.resolve("loop"))) {
       Path mount = volume.mounted();
       Path root = Files.createDirectory(mount.resolve("documents"));
       Path gone = Files.writeString(root.resolve("gone.txt"), "migrationmountgone original");
       Path kept = Files.writeString(root.resolve("kept.txt"), "migrationmountkept original");
+      Path modified = Files.writeString(root.resolve("modified.txt"), "migrationoldcontent original");
+      var modifiedTime = Files.getLastModifiedTime(modified);
       try (var old = fixture()) {
         old.client.addWatchedRoot("default", root, CONTEXT);
         old.awaitCount("migrationmountgone", 1);
         old.awaitCount("migrationmountkept", 1);
+        old.awaitCount("migrationoldcontent", 1);
       }
       stampForeignFingerprint();
       var reached = new CountDownLatch(1);
@@ -422,9 +423,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           assertTrue(release.await(120, TimeUnit.SECONDS), "release the owned migration barrier");
         }
       };
-      try (var refusals = new MigrationRefusals(); var surviving = fixture(hook)) {
-        String active = surviving.client.getStatus(CONTEXT).getMigration().getActiveGenerationId();
-        List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> beforeReturn;
+      try (var surviving = fixture(hook)) {
         try {
           assertTrue(reached.await(30, TimeUnit.SECONDS), "real migration must reach " + point);
           awaitPhysicalWatcher(surviving, root, true, 10);
@@ -432,92 +431,144 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           var beforeAbsence = surviving.queue().listSwitchBufferOpsStrict();
           volume.away();
           awaitPhysicalWatcher(surviving, root, false, 10);
+          // Establish whether a real unmount used the incarnation-ended callback.
+          assertRootScopedUnavailableFailure(surviving, root);
           volume.label("JS_MIGRATE_AWAY");
-          Files.delete(volume.attachAndMount(false).resolve("documents/gone.txt"));
+          Path elsewhere = volume.attachAndMount(false).resolve("documents");
+          Files.delete(elsewhere.resolve("gone.txt"));
+          Files.writeString(elsewhere.resolve("modified.txt"), "migrationnewcontent original");
+          Files.setLastModifiedTime(elsewhere.resolve("modified.txt"), modifiedTime);
           volume.away();
           volume.label("");
           volume.holdDecoy();
           assertEquals(1, surviving.count("migrationmountgone"));
           assertEquals(1, surviving.count("migrationmountkept"));
-          beforeReturn = surviving.queue().listSwitchBufferOpsStrict();
-          assertTrue(beforeReturn.containsAll(beforeAbsence), "absence keeps every pre-existing receipt");
+          assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeAbsence),
+              "absence keeps every accepted receipt");
+          if (!restart && point.equals("migration-before-switching")) {
+            release.countDown();
+            long fenced = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (!surviving.client.getStatus(CONTEXT).getMigration().getPauseReason()
+                .contains("Cutover fenced:") && System.nanoTime() < fenced) Thread.sleep(50);
+            assertTrue(surviving.client.getStatus(CONTEXT).getMigration().getPauseReason()
+                .contains("Cutover fenced:"), "status must name the root evidence blocking cutover");
+            assertEquals(1, surviving.count("migrationmountkept"), "the fenced Engine remains readable");
+            Thread.sleep(65_000); // evidence can return after the per-attempt SWITCHING budget
+            assertEquals("SWITCHING", surviving.client.getStatus(CONTEXT).getMigration().getMigrationState());
+            assertEquals(1, surviving.count("migrationmountkept"));
+          }
           assertEquals(mount, volume.attachAndMount(false));
-          Thread.sleep(6_000);
-          assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn),
-              "transition keeps every receipt, including both seeded receipt kinds");
-          if (point.equals("migration-green-drained")) {
-            // The orchestrator's deadline amendment allows a held cutover to exceed 60 seconds.
-            Thread.sleep(30_000);
-            assertEquals(1, surviving.count("migrationmountgone"));
-            Thread.sleep(30_000);
-            assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn),
-                "the extended cutover hold retains every receipt");
+          if (restart) {
+            var closing = CompletableFuture.runAsync(() -> {
+              try { surviving.close(); }
+              catch (Exception failure) { throw new java.util.concurrent.CompletionException(failure); }
+            });
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (!(boolean) inherited(surviving.server, "closeStarted")
+                && System.nanoTime() < until) Thread.sleep(10);
+            assertTrue((boolean) inherited(surviving.server, "closeStarted"));
+            release.countDown();
+            closing.get(60, TimeUnit.SECONDS);
+          } else {
+            release.countDown();
+            assertPromotedDrive(surviving, root);
           }
         } finally { release.countDown(); }
-        refusals.awaitRefusal();
-        assertFalse(survivingWriterAccepts(surviving), "the refused migration cannot publish its candidate");
-        assertEquals(active, surviving.client.getStatus(CONTEXT).getMigration().getActiveGenerationId());
-        assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn),
-            "refusal keeps every receipt and journal row");
-        assertEquals(1, surviving.count("migrationmountgone"), "refusal prunes nothing from the serving root");
-        assertEquals(1, surviving.count("migrationmountkept"));
-        assertTrue(surviving.client.getWatchedRoots(CONTEXT).stream()
-            .anyMatch(declared -> root.equals(declared.path())),
-            "the root stays declared after the transition refuses promotion");
-        awaitPhysicalWatcher(surviving, root, false, 1);
-        Thread.sleep(1_000);
-        assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn));
-        assertEquals(1, surviving.count("migrationmountgone"));
-        assertEquals(1, surviving.count("migrationmountkept"));
-        // Existing manual control requests SWITCHING and truthfully requires a restart. The
-        // restart creates a fresh producer and enumerates the mounted roots before retrying.
-        var retry = surviving.client.requestCutover(true, CONTEXT);
-        assertTrue(retry.accepted());
-        assertTrue(retry.restartRequired());
-      } finally { release.countDown(); }
-      try (var restarted = fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.NO_HOOK)) {
-        long writable = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
-        while (!survivingWriterAccepts(restarted) && System.nanoTime() < writable) Thread.sleep(50);
-        assertTrue(survivingWriterAccepts(restarted), "the existing restart/rescan route publishes a writable survivor");
-        long started = System.nanoTime();
-        awaitPhysicalWatcher(restarted, root, true, 60);
-        long registered = System.nanoTime();
-        assertTrue(registered - started < TimeUnit.SECONDS.toNanos(60));
-        restarted.awaitCount("migrationmountgone", 0);
-        restarted.awaitCount("migrationmountkept", 1);
-        restarted.awaitReceipts(0, "surviving runtime settles the retained reconciliation receipt");
-        assertTrue(System.nanoTime() - registered < TimeUnit.SECONDS.toNanos(60));
+      }
+      if (restart) {
+        try (var restarted = fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.NO_HOOK)) {
+          assertPromotedDrive(restarted, root);
+        }
       }
     }
   }
 
-  private static final class MigrationRefusals implements AutoCloseable {
-    private final ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger)
-        org.slf4j.LoggerFactory.getLogger(io.justsearch.indexerworker.server.KnowledgeServer.class);
-    private final ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> events =
-        new ch.qos.logback.core.read.ListAppender<>();
-
-    MigrationRefusals() {
-      events.list = new java.util.concurrent.CopyOnWriteArrayList<>();
-      events.start();
-      logger.addAppender(events);
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  @Timeout(150)
+  void watcherAdmissionWaitingAtFinalFenceRunsOnThePublishedWriter() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("watched"));
+    Files.writeString(root.resolve("seed.txt"), "fenceseed");
+    try (var old = fixture()) {
+      old.client.addWatchedRoot("default", root, CONTEXT);
+      old.awaitCount("fenceseed", 1);
     }
-
-    void awaitRefusal() throws Exception {
-      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-      while (!refused() && System.nanoTime() < until) Thread.sleep(50);
-      assertTrue(refused(), "existing migration safety refuses the unrecorded watcher mutation");
+    stampForeignFingerprint();
+    var reached = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    try (var f = fixture(transition -> {
+      if (transition.point().equals("migration-green-drained")) {
+        reached.countDown();
+        assertTrue(release.await(60, TimeUnit.SECONDS));
+      }
+    })) {
+      try {
+        assertTrue(reached.await(30, TimeUnit.SECONDS));
+        awaitPhysicalWatcher(f, root, true, 10);
+        var before = f.queue().listSwitchBufferOpsStrict();
+        Path late = Files.writeString(root.resolve("late.txt"), "fencequeuedadmission");
+        long waiting = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        boolean blocked;
+        do {
+          blocked = Thread.getAllStackTraces().values().stream().anyMatch(stack ->
+              java.util.Arrays.stream(stack).anyMatch(frame -> frame.getClassName().endsWith("$WatcherCallbacks")
+                  && frame.getMethodName().equals("acquireTarget")));
+          if (!blocked) Thread.sleep(10);
+        } while (!blocked && System.nanoTime() < waiting);
+        assertTrue(blocked, "the actual watcher admission must wait on the held final fence");
+        assertEquals(before, f.queue().listSwitchBufferOpsStrict());
+        release.countDown();
+        f.awaitCount("fencequeuedadmission", 1);
+        assertTrue(survivingWriterAccepts(f));
+        var runtime = (io.justsearch.adapters.lucene.runtime.RunningRuntime) inherited(f.server, "ingestLifecycle");
+        assertEquals("default", runtime.documentFieldOps().getDocumentFieldOrThrow(
+            late.toString(), io.justsearch.indexing.SchemaFields.COLLECTION));
+      } finally { release.countDown(); }
     }
+  }
 
-    private boolean refused() {
-      return events.list.stream().anyMatch(event -> event.getFormattedMessage()
-          .toLowerCase(java.util.Locale.ROOT).contains("unrecorded watcher mutation"));
+  private static void assertRootScopedUnavailableFailure(Fixture f, Path root) throws Exception {
+    Object admission = invoke(f.server.appServices(), "mutationAdmission", new Class<?>[0]);
+    // Physical watch completion and its failure sink are separate asynchronous observations.
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    try {
+      List<?> roots;
+      do {
+        roots = (List<?>) invoke(admission, "unavailableRoots", new Class<?>[0]);
+        if (!roots.isEmpty()) break;
+        Thread.sleep(10);
+      } while ((boolean) invoke(admission, "runtimeReplayCertain", new Class<?>[0])
+          && System.nanoTime() < until);
+      assertTrue((boolean) invoke(admission, "runtimeReplayCertain", new Class<?>[0]),
+          "an observed root loss must leave the runtime-wide certificate intact");
+      assertTrue(roots.stream().anyMatch(item -> item.toString().contains(root.toString())),
+          "the real watcher termination must retain root-scoped uncertainty");
+    } catch (NoSuchMethodException baseline) {
+      while ((boolean) invoke(admission, "replayCertain", new Class<?>[0])
+          && System.nanoTime() < until) Thread.sleep(10);
+      assertTrue((boolean) invoke(admission, "replayCertain", new Class<?>[0]),
+          "the real unmount must not permanently poison promotion");
     }
+  }
 
-    @Override public void close() {
-      logger.detachAppender(events);
-      events.stop();
+  private static void assertPromotedDrive(Fixture f, Path root) throws Exception {
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+    while (!survivingWriterAccepts(f) && System.nanoTime() < until) Thread.sleep(50);
+    assertTrue(survivingWriterAccepts(f), "one writable runtime must serve search and ingest");
+    assertEquals("IDLE", f.client.getStatus(CONTEXT).getMigration().getMigrationState());
+    awaitPhysicalWatcher(f, root, true, 60);
+    f.awaitCount("migrationmountgone", 0);
+    f.awaitCount("migrationmountkept", 1);
+    f.awaitCount("migrationoldcontent", 0);
+    f.awaitCount("migrationnewcontent", 1);
+    f.awaitReceipts(0, "promotion acknowledges the exact reconciled versions");
+    var runtime = (io.justsearch.adapters.lucene.runtime.RunningRuntime) inherited(f.server, "ingestLifecycle");
+    for (String name : List.of("kept.txt", "modified.txt")) {
+      assertEquals("default", runtime.documentFieldOps().getDocumentFieldOrThrow(
+          root.resolve(name).toString(), io.justsearch.indexing.SchemaFields.COLLECTION));
     }
+    Files.writeString(root.resolve("after-promotion.txt"), "migrationnewadmission");
+    f.awaitCount("migrationnewadmission", 1);
   }
 
   private static boolean survivingWriterAccepts(Fixture fixture) throws Exception {

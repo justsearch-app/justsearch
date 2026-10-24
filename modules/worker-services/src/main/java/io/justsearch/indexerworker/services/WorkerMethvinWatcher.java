@@ -100,6 +100,21 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private final java.util.Set<PendingDelete> settlingDeletes = ConcurrentHashMap.newKeySet();
 
   private final Consumer<RuntimeException> routingFailureSink;
+
+  /** Only an observed unavailable root can produce this recoverable, incarnation-bound debt. */
+  public static final class RootUnavailableFailure extends RuntimeException {
+    private final WorkerMutationAdmission.RootUncertainty uncertainty;
+
+    private RootUnavailableFailure(RootWatcherRegistry.Subscription registration, Exception cause) {
+      super("Watched root became unavailable: " + registration.root(), cause);
+      uncertainty = new WorkerMutationAdmission.RootUncertainty(
+          new io.justsearch.indexerworker.queue.WatcherRootReconciliation(
+              registration.root().toString(), registration.rootIdentity().toString(),
+              registration.collection()), registration.watcherEpoch());
+    }
+
+    public WorkerMutationAdmission.RootUncertainty uncertainty() { return uncertainty; }
+  }
   private final EventRouter eventRouter;
   private final BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink;
   private final WitnessedUpsertSink witnessedUpsertPathSink;
@@ -439,12 +454,17 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     Path normalized = root.toAbsolutePath().normalize();
     AtomicBoolean currentEpoch = new AtomicBoolean();
     AtomicBoolean firstFailure = new AtomicBoolean();
+    AtomicReference<RootWatcherRegistry.Subscription> unavailable = new AtomicReference<>();
     watchers.computeIfPresent(
         normalized,
         (ignored, current) -> {
           if (current.registration().watcherEpoch() == watcherEpoch) {
             currentEpoch.set(true);
             firstFailure.set(failedEpochs.put(normalized, watcherEpoch) != watcherEpoch);
+            if (current.registration().rootIdentity().volume() != null
+                && java.nio.file.Files.notExists(normalized)) {
+              unavailable.set(current.registration());
+            }
           }
           return current;
         });
@@ -455,7 +475,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
           failure.getClass().getSimpleName(),
           failure);
       routingFailureSink.accept(
-          failure instanceof RuntimeException runtime
+          unavailable.get() != null ? new RootUnavailableFailure(unavailable.get(), failure)
+              : failure instanceof RuntimeException runtime
               ? runtime
               : new IllegalStateException(
                   "Worker watcher failed unexpectedly for " + normalized, failure));

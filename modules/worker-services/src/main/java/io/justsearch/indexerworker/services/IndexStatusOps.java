@@ -106,6 +106,10 @@ final class IndexStatusOps {
   private final IndexingLoop indexingLoop;
   private final WorkerSignalBus signalBus;
   private final long migrationSwitchingMaxDurationMs;
+  private Supplier<String> migrationReplayFailure = () -> null;
+
+  void setMigrationReplayFailure(Supplier<String> supplier) { migrationReplayFailure = supplier; }
+
   private Path openedSearchPath;
   private Path openedIngestPath;
 
@@ -645,6 +649,7 @@ final class IndexStatusOps {
 
     MigrationProgressSnapshot mp =
         migrationProgressSupplier == null ? null : migrationProgressSupplier.get();
+    String replayFailure = migrationReplayFailure.get();
 
     long switchBufferDepth =
         jobQueue instanceof SwitchBufferCapableQueue sbq ? sbq.switchBufferDepth() : 0L;
@@ -732,9 +737,9 @@ final class IndexStatusOps {
         .setPaused(
             stateSnapshot != null && Boolean.TRUE.equals(stateSnapshot.migration_paused()))
         .setPauseReason(
-            stateSnapshot == null || stateSnapshot.pause_reason() == null
-                ? ""
-                : stateSnapshot.pause_reason())
+            stateSnapshot != null && stateSnapshot.pause_reason() != null
+                && !stateSnapshot.pause_reason().isBlank() ? stateSnapshot.pause_reason()
+                : replayFailure == null ? "" : "Cutover fenced: " + replayFailure)
         .setPausedAtMs(
             stateSnapshot == null || stateSnapshot.paused_at_ms() == null
                 ? 0L
