@@ -1066,3 +1066,14 @@ These tests are durable. The earlier receiver-repair evidence overlays the curre
   "note": "Accept the post-merge Adaptation only, under the package's prior accepted intent. The three fixture registrations change no assertions, expectations, inputs or injected faults. NoEvidenceDispatchHttpTest fails before on unregistered core.selection and all five cases pass after; both persistence fixtures already pass before and after (ten tests). Production assembly is unchanged and real CPU Engine Ask, no-match Ask and BAD_SELECTION checks pass on both revisions. No hand-off scenarios were re-judged."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-oct55-q9",
+  "verdict": "accept",
+  "digest": "sha256:06bedc54dcfc1eb430b1d8c456965aac5abb8aefec1f165b9f35895322691439",
+  "note": "Correction: initial main-* checks used the source local main and are excluded. Exact ef349ea16c3f checks now pass: 57 UI and 59 JVM tests. Accept the merge Adaptation: reverting only per-conversation handling makes the new test assertion-fail on missing returned status; exact candidate passes. Independent outcomes and private CPU Engine/Chromium checks pass, including checking starting after navigation away, once-per-attempt announcements and two live Asks. This accepts test intent only. The separate explicit current-origin/main gate fails after PR #939 advanced the base beyond this snapshot."
+}
+```
