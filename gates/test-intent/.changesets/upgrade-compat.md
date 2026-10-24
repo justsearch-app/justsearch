@@ -1001,3 +1001,14 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
   "note": "Scoped R2 acceptance under the requested full-suite-success criterion on 01af31f1230fa75f74f7e33c0cb848c4189bcede: candidate worker-services full suite passed 2036 tests with zero failures/errors and 18 skipped; merge base c29fcddc1e passed 2031 with zero failures/errors and 18 skipped. R2 passed in 2.573s and 2.009s respectively. Test-start load averages were candidate 17.59/13.09/11.58 and baseline 5.65/7.39/9.22. Extraction/R2 bytecode and normalized runtime classpath are identical, with no UI/indexer-worker leak; no changed code is on the direct standalone R2 path. Five class repetitions on each tree remain UNVERIFIED: prolonged shared-slot waits and a cancelled driver leaving its queued wrapper without an accessible tool handle blocked execution. Candidate first full suite used the machine-default checkout-local JVM temp folder; baseline used the corrected fixed before folder; corrected candidate rerun never started. This does not prove the original timeout was load. No product code changed, and no broad upgrade scenario was reverified. The existing rejection is retained; this record does not itself settle the gate tie-break requirement."
 }
 ```
+
+```json
+{
+  "kind": "tie-break",
+  "role": "reviewer",
+  "session": "01a16dfe-82b8-7bd2-b29e-fb3eee5a85ee",
+  "verdict": "accept",
+  "digest": "sha256:ffad9dd4dedd07b876d9b7c78a4bc790297f38945d2cb3fe7fd7b5e1afd0cad4",
+  "note": "R2 is best classified as an environment timeout, not a candidate regression: extraction/test bytecode and runtime classpath are unchanged, C7's full suites pass on both trees, and C6's failed run completes all 1,000 documents with uniform slowdown also affecting the companion test. The exact resource bottleneck remains unproven; my optional focused run never started because no shared Gradle slot became available within 180 seconds."
+}
+```
