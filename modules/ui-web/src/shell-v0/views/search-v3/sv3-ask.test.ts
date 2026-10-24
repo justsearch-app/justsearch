@@ -125,6 +125,16 @@ async function askWith(payload: Record<string, unknown>, meta?: Record<string, u
 }
 
 describe('the search v3 ask path reads the producer off the payload (847 §1.5)', () => {
+  it('keeps the explicit unfinished-check fact without inventing coverage counts', async () => {
+    const evidence = await askWith({ matches: [], groundingIncomplete: true });
+    expect(evidence.groundingIncomplete).toBe(true);
+    expect(evidence.sentencesScored).toBeUndefined();
+    expect(evidence.sentencesTotal).toBeUndefined();
+    expect(evidence.sourceCoverage).toBeUndefined();
+    expect(sourceGrounding(0, evidence.matches, DOC, undefined, evidence.groundingIncomplete).state)
+      .toBe('grounding-incomplete');
+  });
+
   it('mints NO mark from an embedding-cosine payload, while the cross-encoder twin marks', async () => {
     const cosine = await askWith(matchPayload('EMBEDDING_COSINE'));
     const crossEncoder = await askWith(matchPayload('CROSS_ENCODER'));

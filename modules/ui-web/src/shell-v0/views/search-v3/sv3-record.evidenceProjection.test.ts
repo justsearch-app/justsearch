@@ -141,6 +141,23 @@ describe('T6 — the ANSWER plane is untouched by the discrimination', () => {
     },
   ];
 
+  it('distinguishes an unfinished Ask check from zero matches and historical missing facts on cold load', () => {
+    const read = (claimMatches: unknown) => projectSv3RecordTurns([
+      event('u1', 'USER_MESSAGE', 'Who owns Cobalt?'),
+      event('a1', 'ASSISTANT_MESSAGE', 'Ada owns Cobalt.', {
+        citations: RAG_SOURCES, ...(claimMatches === undefined ? {} : { claimMatches }),
+      }),
+    ])[0]!.evidence!;
+    const incomplete = read({ matches: [], groundingIncomplete: true });
+    expect(incomplete.groundingIncomplete).toBe(true);
+    expect(incomplete.sentencesTotal).toBeUndefined();
+    const state = sourceGrounding(0, incomplete.matches, undefined, undefined, incomplete.groundingIncomplete);
+    expect(state.tier).toBeNull();
+    expect(sourceGroundingLabel(state)).toBe('Retrieved · grounding check did not complete');
+    expect(read({ matches: [], sentencesTotal: 1, sentencesScored: 1 }).groundingIncomplete).toBeUndefined();
+    expect(read(undefined).groundingIncomplete).toBeUndefined();
+  });
+
   it('reads `citations` + `claimMatches` exactly as before when there is no `sources` key', () => {
     clock = 0;
     const [turn] = projectSv3RecordTurns([

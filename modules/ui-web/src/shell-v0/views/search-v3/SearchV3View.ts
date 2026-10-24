@@ -765,6 +765,7 @@ export class SearchV3View extends JfElement {
     aiSnapshot: { state: true },
     streaming: { state: true },
     askStopping: { state: true },
+    askCheckingTurnId: { state: true },
     sidebarWidthPx: { state: true },
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
     sidebarNarrow: { type: Boolean, reflect: true, attribute: 'sidebar-narrow' },
@@ -812,6 +813,8 @@ export class SearchV3View extends JfElement {
   declare streaming: boolean;
   /** Where the reader's Stop on the streaming answer stands, until the Engine ends the turn. */
   declare askStopping: Sv3StopState | null;
+  /** The signal belongs to this turn alone and is never saved with a conversation. */
+  declare askCheckingTurnId: string | null;
   /**
    * The sidebar's chosen width (tempdoc 822 Phase F5). Kept EXPANDED-only: collapsing renders the
    * icon rail without touching this number, which is what makes "expand restores the width I chose"
@@ -1033,6 +1036,7 @@ export class SearchV3View extends JfElement {
     this.aiSnapshot = null;
     this.streaming = false;
     this.askStopping = null;
+    this.askCheckingTurnId = null;
     this.sidebarWidthPx = SV3_SIDEBAR_DEFAULT_PX;
     this.sidebarCollapsed = false;
     this.sidebarNarrow = false;
@@ -3308,6 +3312,7 @@ export class SearchV3View extends JfElement {
         this.askAbort = null;
         this.askStop = null;
         this.askStopping = null;
+        this.askCheckingTurnId = null;
         this.streaming = false;
         this.askReasoningTurnId = null;
         this.settleAiActivity();
@@ -3335,6 +3340,9 @@ export class SearchV3View extends JfElement {
         onDelta: (text) => {
           if (text) rememberServerConversation(ref.sessionId);
           this.sessions = appendTurnDelta(this.sessions, ref, text);
+        },
+        onChecking: (checking) => {
+          if (this.askAbort === abort) this.askCheckingTurnId = checking ? ref.turnId : null;
         },
         onEvidence: (evidence) => {
           this.sessions = setTurnEvidence(this.sessions, ref, evidence);
@@ -4473,6 +4481,7 @@ export class SearchV3View extends JfElement {
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
           .stopping=${this.askStopping}
+          .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"
         ></jf-sv3-main>
         <!-- 859 §B — ONE positioned wrapper for the whole dock, so its height is one observable
