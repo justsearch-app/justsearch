@@ -33,7 +33,14 @@ import org.junit.jupiter.api.Test;
 @DisplayName("SelectionContextInjector — the verification text is the injected text")
 final class SelectionContextInjectorLiteralTextTest {
 
-  private static final String DOC = "/docs/pagination.md";
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
+  private String DOC;
+
+  @org.junit.jupiter.api.BeforeEach
+  void createSelectedFiles() throws Exception {
+    DOC = java.nio.file.Files.writeString(directory.resolve("pagination.md"), BODY).toString();
+    java.nio.file.Files.writeString(directory.resolve("baking.md"), "Sourdough starters need a warm kitchen and a patient baker.");
+  }
 
   /** Long enough that the 200-char excerpt is unmistakably a different string. */
   private static final String BODY =
@@ -115,7 +122,7 @@ final class SelectionContextInjectorLiteralTextTest {
                     "kind", "citation",
                     "citation",
                         Map.of(
-                            "parentDocId", "/docs/missing.md",
+                            "parentDocId", directory.resolve("missing.md").toString(),
                             "chunkIndex", 0,
                             "startChar", 0,
                             "endChar", 10,
@@ -135,7 +142,7 @@ final class SelectionContextInjectorLiteralTextTest {
         new StubDocs(
             Map.of(
                 DOC, new DocumentRecord(DOC, BODY, Map.of()),
-                "/docs/baking.md", new DocumentRecord("/docs/baking.md", other, Map.of())));
+                directory.resolve("baking.md").toString(), new DocumentRecord(directory.resolve("baking.md").toString(), other, Map.of())));
     var ctx =
         ctx(
             Map.of(
@@ -146,7 +153,7 @@ final class SelectionContextInjectorLiteralTextTest {
                     "items",
                         List.of(
                             Map.of("id", DOC, "kind", "search-hit"),
-                            Map.of("id", "/docs/baking.md", "kind", "search-hit")))));
+                            Map.of("id", directory.resolve("baking.md").toString(), "kind", "search-hit")))));
 
     InjectorResult result = new SelectionContextInjector(docs).inject(ctx);
 
@@ -220,7 +227,7 @@ final class SelectionContextInjectorLiteralTextTest {
     return (List<VerificationSource>) stashed;
   }
 
-  private static SelectionContextInjector injector() {
+  private SelectionContextInjector injector() {
     return new SelectionContextInjector(
         new StubDocs(Map.of(DOC, new DocumentRecord(DOC, BODY, Map.of()))));
   }

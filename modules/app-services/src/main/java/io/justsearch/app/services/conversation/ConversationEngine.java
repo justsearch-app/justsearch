@@ -776,7 +776,8 @@ public final class ConversationEngine {
           mergedDoneEntries.putAll(result.donePayloadEntries());
         }
         mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
-        if ("core.extract".equals(shape.id().value()) && !injectorRun.citations.isEmpty()) {
+        if (("core.extract".equals(shape.id().value()) || "core.summarize".equals(shape.id().value()))
+            && !injectorRun.citations.isEmpty()) {
           mergedDoneEntries.put("citations", injectorRun.citations);
         }
 
@@ -1504,6 +1505,11 @@ public final class ConversationEngine {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("role", "user");
     m.put("content", text == null ? "" : text);
+    // Preserve the request's input identity without making editable prose a provenance flag.
+    if (body.get("selection") instanceof Map<?, ?> selection
+        && selection.get("kind") instanceof String kind && !kind.isBlank()) {
+      m.put("selectionKind", kind);
+    }
     return m;
   }
 

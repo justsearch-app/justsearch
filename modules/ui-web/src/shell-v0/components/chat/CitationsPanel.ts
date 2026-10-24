@@ -75,6 +75,7 @@ export class CitationsPanel extends JfElement {
     showWeak: { state: true },
     sourcesExpanded: { type: Boolean, attribute: false },
     externalDisclosure: { type: Boolean, attribute: false },
+    resultBeingExplained: { type: Boolean, attribute: false },
   };
 
   declare citations: CitationMatch[];
@@ -115,11 +116,14 @@ export class CitationsPanel extends JfElement {
    * {@link sourcesExpanded} — a host that hides the toggle must not leave a body permanently open.
    */
   declare externalDisclosure: boolean;
+  /** A ranking trace names its subject; it supplies no document passage or grounding verdict. */
+  declare resultBeingExplained: boolean;
 
   private selectedSourceUnsub: (() => void) | null = null;
 
   constructor() {
     super();
+    this.resultBeingExplained = false;
     this.citations = [];
     this.sources = [];
     this.sourceCoverage = [];
@@ -277,7 +281,7 @@ export class CitationsPanel extends JfElement {
       padding-top: 0.4rem;
       border-top: 1px solid var(--border-subtle);
       font-size: var(--font-size-sm);
-      color: var(--text-secondary);
+      color: var(--text-primary);
       line-height: 1.5;
       transition:
         opacity var(--duration-fast) var(--ease-standard),
@@ -506,7 +510,9 @@ export class CitationsPanel extends JfElement {
     // evidence record, not ad-hoc field reads.
     const item = toEvidenceItem(s);
     // Tempdoc 565 §29 Tier-3 — the cited file's basename, for the open-file affordance below the card.
-    const docName = s.parentDocId.split('/').pop() ?? s.parentDocId;
+    const docName = this.resultBeingExplained
+      ? filenameOf(s.parentDocId)
+      : s.parentDocId.split('/').pop() ?? s.parentDocId;
     // Tempdoc 822 §5.4 — the SAME two fields `MarkdownBlock.makeMarker` keys its marks on
     // (`parentDocId` + `startLine`, through the one `sourceKey` authority), so the card and the
     // inline `[n]` resolve to one identity and the two surfaces cannot silently disagree.
@@ -532,7 +538,9 @@ export class CitationsPanel extends JfElement {
           aria-current=${selected ? 'true' : nothing}
           @click=${(e: MouseEvent) => this.onSourceClick(s, e)}
         >
-          <div class="header">
+          ${this.resultBeingExplained
+            ? html`<div class="sentence">Result being explained: ${docName}</div>`
+            : html`<div class="header">
             ${grounding && !suppressGroundingFor(item.inclusion)
               ? this.renderGrounding(grounding, item.acquisition)
               : nothing}
@@ -551,7 +559,7 @@ export class CitationsPanel extends JfElement {
             ${item.headingText
               ? html`<div class="detail">Section: ${item.headingText}</div>`
               : nothing}
-          </div>
+          </div>`}
         </button>
         <button
           class="source-open"

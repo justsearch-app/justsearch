@@ -45,6 +45,9 @@
  *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
+import { takeSearchV3Handoff } from '../../utils/compose.js';
+import type { SelectionPayload } from '../../../api/types/selection.js';
+import type { ShapeId } from '../unifiedChatRequest.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import { JfElement } from '../../primitives/JfElement.js';
@@ -171,6 +174,7 @@ import {
 // channel every region's fix-it control leaves through.
 import {
   deriveSv3HistoryLocked,
+  sv3ExplainsRankingTrace,
   sv3RecordItemStopsRun,
   projectSv3Corpus,
   type Sv3RemedyDetail,
@@ -964,6 +968,22 @@ export class SearchV3View extends JfElement {
   private askAbort: AbortController | null = null;
   /** The reader's Stop for that ask: the Engine is asked to end the turn, and its stream says how. */
   private askStop: (() => void) | null = null;
+  private readonly liveAsks = new Map<string, {
+    abort: AbortController; stop: () => void; reasoning: ReasoningController;
+    turnId: string; stopping: Sv3StopState | null; checkingTurnId: string | null;
+  }>();
+
+  /** The slot belongs to the place on screen; streams keep their own handles until they settle. */
+  private syncActiveAsk(): void {
+    const ask = this.liveAsks.get(this.sessions.activeId ?? '');
+    this.streaming = ask !== undefined;
+    this.askAbort = ask?.abort ?? null;
+    this.askStop = ask?.stop ?? null;
+    this.askStopping = ask?.stopping ?? null;
+    this.askCheckingTurnId = ask?.checkingTurnId ?? null;
+    this.askReasoningTurnId = ask?.turnId ?? null;
+    if (ask !== undefined) this.askReasoning = ask.reasoning;
+  }
   /**
    * What this window remembers about the delegated run it dispatched — including the explicit turn
    * ref that is its `activeTurnId`. Not reactive state: it is mutated in place by the controller's
@@ -996,7 +1016,7 @@ export class SearchV3View extends JfElement {
    * per ask, exactly as the shipped window holds it (`views/UnifiedChatView.ts:645`) — its blocks are
    * handed to the turn at the terminal, which is what makes a past turn's thinking survive the reset.
    */
-  private readonly askReasoning = new ReasoningController(() => this.requestUpdate());
+  private askReasoning = new ReasoningController(() => this.requestUpdate());
   /**
    * The turn the ask controller above is streaming for, or null (tempdoc 848 §2.7). Handed down so
    * the transcript binds the live thinking to ONE turn by id, exactly as it binds the run feed —
@@ -1124,7 +1144,8 @@ export class SearchV3View extends JfElement {
       if (change === 'restore') this.followStoreConversation(state.activeId);
     });
     void loadConversations();
-    this.restoreLastViewed();
+    window.addEventListener('sv3-handoff', this.receiveHandoff);
+    if (!this.receiveHandoff()) this.restoreLastViewed();
     // Cold-load reattach, started here and NOT awaited: discovery is a network round-trip now
     // (tempdoc 834 §15.3) and mount must not block on it. The ordering it used to buy — the run
     // already on the controller before the first presence look — is instead carried by the
@@ -1235,7 +1256,7 @@ export class SearchV3View extends JfElement {
     this.agentUnsubscribe = null;
     // Lifecycle containment: an unmounted window's stream would keep a connection open against the
     // shared channel budget and settle a turn nobody can see.
-    this.abortAsk();
+    for (const ask of this.liveAsks.values()) { ask.abort.abort(); ask.reasoning.destroy(); }
     // The controller runs a 1s tick while the model is thinking; an unmounted window's tick would go
     // on requesting updates on a detached element forever.
     this.askReasoning.destroy();
@@ -1247,6 +1268,7 @@ export class SearchV3View extends JfElement {
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
+    window.removeEventListener('sv3-handoff', this.receiveHandoff);
     window.removeEventListener('online', this.retryContextOnReconnect);
     // Tempdoc 864 PR E — LAST, so a re-parent is recorded however the teardown above went. See
     // {@link movedRatherThanEntered}.
@@ -1279,6 +1301,11 @@ export class SearchV3View extends JfElement {
     this.movedRatherThanEntered = true;
     queueMicrotask(() => {
       this.movedRatherThanEntered = false;
+      if (!this.isConnected && this.preparedHandoff !== null) {
+        this.preparedHandoff = null;
+        this.handoffNotice = ''; this.handoffBlocked = false;
+        this.search.clearScope();
+      }
     });
   }
 
@@ -1390,7 +1417,7 @@ export class SearchV3View extends JfElement {
    * reason.
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has('sessions')) this.upgradeOpenPaneAnchor();
+    if (changed.has('sessions')) { this.syncActiveAsk(); this.upgradeOpenPaneAnchor(); }
     this.syncForkReads();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
       this.reflowSidebar();
@@ -1729,6 +1756,14 @@ export class SearchV3View extends JfElement {
       streaming: this.streaming,
     });
     if (items.length === 0 && branch.length === 0) return;
+    const turn = session.turns.find(turn => turn.id === detail.turnId);
+    const shapeId = turn?.shapeId;
+    const retryNote = turn?.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn ?? null)
+      ? this.summaryInputs.has(detail.turnId) ? 'Explain with the original ranking trace.' : 'After reload, start Explain from the result again.'
+      : shapeId === 'core.extract' ? this.structuredNote(detail.turnId)
+      : shapeId === 'core.summarize'
+        ? this.summaryInputs.has(detail.turnId) ? 'Summarize with the original inputs.' : 'Opens Summarize; choose the original inputs before sending.'
+        : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId));
     const chosen = await openContextMenu({
       // The branch acts lead: they fork the conversation, and the context acts change what the next
       // prompt carries within it. The reference window orders them the same way.
@@ -1739,9 +1774,7 @@ export class SearchV3View extends JfElement {
           // files when this window limited the turn, otherwise all files (a reloaded turn included).
           label:
             item.id === 'retry'
-              ? `${item.label} · ${session.turns.find(turn => turn.id === detail.turnId)?.kind === 'model'
-                ? 'This answer does not search your files.' : session.turns.find(turn => turn.id === detail.turnId)?.shapeId === 'core.extract'
-                  ? this.structuredNote(detail.turnId) : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
+              ? `${item.label} · ${retryNote}`
               : item.label,
           icon: 'git-branch' as const,
           category: 'ai' as const,
@@ -2039,6 +2072,25 @@ export class SearchV3View extends JfElement {
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
     const tier: Sv3ComposerTier | 'model' = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
+    if (turn?.shapeId === 'core.summarize' && detail.action !== 'branch') {
+      const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn.question;
+      if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
+      const inputs = this.summaryInputs.get(turn.id);
+      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask')) return;
+      this.tier = 'ask';
+      this.preparedHandoff = { shapeId: 'core.summarize', selection: inputs?.selection ?? null };
+      if (inputs === undefined) {
+        this.handoffBlocked = true;
+        this.handoffNotice = sv3ExplainsRankingTrace(turn)
+          ? 'Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.'
+          : 'No readable summary input is saved. Choose the original files or passage before sending.';
+        this.writeDraft(text);
+        this.requestUpdate();
+      } else {
+        await this.runAsk(text, inputs.scope);
+      }
+      return;
+    }
     if (tier === 'structured' && detail.action !== 'branch') {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
@@ -2855,10 +2907,11 @@ export class SearchV3View extends JfElement {
       this.searchNow(text);
       return;
     }
+    if (this.handoffBlocked) return;
     // A chord pressed in Search mode reached here past none of the composer's run rules — the
     // composer's slot was the search slot — so they are applied here, the same ones.
     if (this.tier === 'search' && this.chordRefused()) return;
-    if (this.steerableRun !== null) {
+    if (this.preparedHandoff === null && this.steerableRun !== null) {
       this.steerLiveRun(text);
       return;
     }
@@ -2870,8 +2923,8 @@ export class SearchV3View extends JfElement {
       void this.runAsk(text, this.search.pendingScope, this.schemaDraft);
       return;
     }
-    // The prepared files belong to an Ask sent FROM the result list, and to that one Ask only.
-    void this.runAsk(text, this.search.showing ? this.search.takeScope() : null);
+    // A hand-off and a results Ask share the same fixed, one-send file scope.
+    void this.runAsk(text, this.search.showing || this.preparedHandoff !== null || this.placeScopes.has(this.sessions.activeId ?? '') ? this.search.takeScope() : null);
   }
 
   /** Whether a response or a delegated run is live — the slot's `running`, read in one place. */
@@ -2889,7 +2942,7 @@ export class SearchV3View extends JfElement {
    * send, a live run takes only a steer, and an idle window delegates only when the agent can run.
    */
   private chordRefused(): boolean {
-    const run = this.projectRun();
+    const run = this.run?.sessionId === this.sessions.activeId ? this.projectRun() : null;
     if (run !== null && run.prompts.length > 0) return true;
     if (this.isRunning(run)) return this.steerableRun === null;
     return this.delegateUnavailableReason !== '';
@@ -2996,6 +3049,9 @@ export class SearchV3View extends JfElement {
    * Leaving the hero is not leaving a place: its draft travels, as it always has.
    */
   private swapPlace(to: string): void {
+    const leavingHandoff = this.preparedHandoff !== null;
+    this.preparedHandoff = null;
+    this.handoffNotice = ''; this.handoffBlocked = false;
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
     if (from === to) return;
     if (from !== null) this.placeDrafts.set(from, this.currentDraft());
@@ -3003,7 +3059,13 @@ export class SearchV3View extends JfElement {
     this.search.hide();
     this.askInConversation();
     const composer = this.composer;
-    if (from !== null && composer !== null) composer.draft = this.placeDrafts.get(to) ?? '';
+    if ((from !== null || this.placeDrafts.has(to)) && composer !== null) composer.draft = this.placeDrafts.get(to) ?? '';
+    if (leavingHandoff || this.placeScopes.has(to)) {
+      this.search.clearScope();
+      this.search.prepare(this.placeScopes.get(to) ?? null);
+    }
+    const savedTier = this.placeTiers.get(to);
+    if (savedTier !== undefined) this.tier = savedTier;
   }
 
   /** Opening a conversation from Search mode: Enter now continues it. */
@@ -3169,6 +3231,99 @@ export class SearchV3View extends JfElement {
     return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
   }
 
+  private preparedHandoff: { shapeId: ShapeId | 'core.summarize' | null; selection: SelectionPayload | null } | null = null;
+  private handoffNotice = '';
+  private handoffBlocked = false;
+  private readonly placeScopes = new Map<string, Sv3AskScope | null>();
+  private readonly placeTiers = new Map<string, Sv3ComposerTier>();
+  private readonly summaryInputs = new Map<string, { scope: Sv3AskScope | null; selection: SelectionPayload | null }>();
+
+  private receiveHandoff = (): boolean => {
+    const incoming = takeSearchV3Handoff();
+    if (incoming === null) return false;
+    const { state, selection } = incoming;
+    const shape = typeof state.forceShapeId === 'string' ? state.forceShapeId : (state.affordance === 'extract' || state.mode === 'structured' ? 'core.extract'
+        : state.affordance === 'documents' || state.mode === 'ask' || Object.hasOwn(state, 'docIds') ? 'core.rag-ask' : null);
+    const query = typeof state.query === 'string' ? state.query : '';
+    // Preserve the outgoing place without stopping or steering its work.
+    const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
+    const restoredDraftOwner = from === null ? readLastViewedConversation() : null;
+    if (from !== null && from !== RESULTS_PLACE) {
+      this.placeDrafts.set(from, this.currentDraft());
+      this.placeScopes.set(from, this.search.pendingScope);
+      this.placeTiers.set(from, this.tier);
+    } else if (restoredDraftOwner !== null && this.preparedHandoff === null) {
+      this.placeDrafts.set(restoredDraftOwner, this.currentDraft());
+    } else if (from !== RESULTS_PLACE && this.tier !== 'search' && this.preparedHandoff === null && this.currentDraft().trim() !== '') {
+      const id = createConversationId();
+      const now = Date.now();
+      this.sessions = mergeStoreConversations(this.sessions, [{ id, title: 'Unsent draft', firstUserMessage: this.currentDraft(), createdAt: now, lastActiveAt: now }]);
+      this.placeDrafts.set(id, this.currentDraft());
+      this.placeScopes.set(id, this.search.pendingScope);
+      this.placeTiers.set(id, this.tier);
+    }
+    this.renamingId = null;
+    this.palette?.dismiss();
+    this.sessions = startNewSession(this.sessions);
+    this.search.hide();
+    this.search.clearScope();
+    this.closePane();
+    setActiveConversation(null);
+    clearLastViewedConversation();
+    this.preparedHandoff = null;
+    this.handoffNotice = ''; this.handoffBlocked = false;
+    this.tier = shape === null ? 'search' : shape === 'core.extract' ? 'structured' : 'ask';
+    this.tierFollowsPlace = false;
+    const allowed = ['core.rag-ask', 'core.free-chat', 'core.summarize', 'core.extract'];
+    let shapeId: ShapeId | 'core.summarize' = allowed.includes(shape ?? '') ? shape as ShapeId | 'core.summarize' : 'core.rag-ask';
+    if (shape !== null && !allowed.includes(shape)) this.handoffNotice = 'This shape is unavailable. Prepared in Ask; review before sending.';
+    let paths: string[] = [];
+    if (Array.isArray(state.docIds)) paths = state.docIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '');
+    else if (typeof state.docIds === 'string' && state.docIds.trim() !== '') paths = [state.docIds];
+    if (selection !== null) {
+      switch (selection.kind) {
+        case 'item': paths = [selection.itemId]; break;
+        case 'text-range': paths = [selection.address?.docId]; break;
+        case 'citation': paths = [selection.citation?.parentDocId]; break;
+        case 'result-set': paths = Array.isArray(selection.items) ? selection.items.map(item => item?.id) : []; break;
+      }
+    }
+    paths = [...new Set(paths)].filter(path => typeof path === 'string' && path.trim() !== '');
+    if (paths.length > 0 && shapeId === 'core.free-chat') {
+      shapeId = 'core.rag-ask';
+      this.handoffNotice = 'This mode cannot read files. Prepared in Ask over the chosen files; review before sending.';
+    }
+    const invalidSelection = selection !== null &&
+      (!['item', 'text-range', 'citation', 'result-set', 'search-trace', 'health-condition'].includes(selection.kind) ||
+       ['item', 'text-range', 'citation', 'result-set'].includes(selection.kind) && paths.length === 0);
+    if (paths.length > 0) this.search.prepare({ paths });
+    if (shape === null) this.preparedHandoff = { shapeId: null, selection: null };
+    if (shape !== null) {
+      this.preparedHandoff = { shapeId, selection: selection ?? (paths.length > 0
+        ? { kind: 'result-set', items: paths.map(id => ({ id, kind: 'doc' as const })) } : null) };
+      if (Object.hasOwn(state, 'docIds') && paths.length === 0 && shapeId !== 'core.extract' && selection === null ||
+          shapeId === 'core.summarize' && paths.length === 0 && selection === null) {
+        this.handoffBlocked = true;
+        this.handoffNotice = 'No readable document was supplied. Choose a file before sending.';
+      }
+    }
+    if (invalidSelection) {
+      this.handoffBlocked = true;
+      this.handoffNotice = 'Invalid selection. Choose the files or passage again before sending.';
+    }
+    if (typeof state.mode === 'string' && !['search', 'ask', 'structured'].includes(state.mode)) {
+      this.handoffBlocked = true;
+      this.handoffNotice = 'Unknown hand-off mode. Review the task before sending.';
+    }
+    this.writeDraft(query);
+    if (this.tier === 'search' && query.trim() !== '') { this.search.type(query); this.search.show(); }
+    void this.setComposerState('docked');
+    this.requestUpdate();
+    void this.updateComplete.then(async () => { const c = this.composer; if (c !== null) { await c.updateComplete; c.focusField(); } });
+    emitEphemeralToast({ message: this.handoffNotice || `${this.tier === 'search' ? 'Search' : shapeId === 'core.summarize' ? 'Summarize' : this.tier === 'structured' ? 'Structured' : 'Ask'} prepared${paths.length ? ': ' + paths.join(', ') : ''}.`, severity: 'info' });
+    return true;
+  };
+
   private schemaDraft = '';
   private structuredError = '';
   private readonly structuredInputs = new Map<string, { schema: string; scope: Sv3AskScope | null }>();
@@ -3186,9 +3341,16 @@ export class SearchV3View extends JfElement {
    * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
   private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false): Promise<void> {
-    const question = rawQuestion.trim();
+    let question = rawQuestion.trim();
     if (question === '' || this.streaming) return;
     if (modelAnswer && this.modelAnswerUnavailableReason !== '') return;
+    const handoff = modelAnswer ? null : this.preparedHandoff;
+    const shapeId = modelAnswer ? SV3_MODEL_SHAPE_ID : schema !== undefined ? 'core.extract' : handoff?.shapeId ?? SV3_ASK_SHAPE_ID;
+    // Keep the actual trace visible in the durable user turn even if its instructions were edited.
+    if (shapeId === 'core.summarize' && handoff?.selection?.kind === 'search-trace') {
+      const trace = handoff.selection.summary;
+      if (typeof trace === 'string' && trace && !question.includes(trace)) question += `\n\nRanking trace:\n${trace}`;
+    }
     if (schema !== undefined && (scope?.paths.length ?? 0) > 5) {
       this.structuredError = 'Choose at most 5 files for one extraction.';
       this.requestUpdate();
@@ -3215,18 +3377,24 @@ export class SearchV3View extends JfElement {
         this.contextAskPending.delete(sessionId);
       }
     }
+    if (!modelAnswer) {
+      this.preparedHandoff = null;
+      this.handoffNotice = ''; this.handoffBlocked = false;
+    }
     this.leaveResultsBySending();
-    const shapeId = modelAnswer ? SV3_MODEL_SHAPE_ID : schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract';
-    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId);
+    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId, handoff?.selection?.kind);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
+    if (shapeId === 'core.summarize') this.summaryInputs.set(ref.turnId, { scope, selection: handoff?.selection ?? null });
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
+    if (!modelAnswer) this.placeScopes.delete(ref.sessionId);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
     if (!modelAnswer && schema === undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
+    const sentDraftRevision = composer?.draftRevision;
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -3240,26 +3408,29 @@ export class SearchV3View extends JfElement {
     // The id the Stop names is this dispatch's own, never the turn's place in the list, which another
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
     const dispatchId = crypto.randomUUID();
+    const reasoning = new ReasoningController(() => this.requestUpdate());
     let stopAsked = false;
     const stop = (): void => {
       if (stopAsked) return;
       stopAsked = true;
-      this.askStopping = { turnId: ref.turnId, state: 'stopping' };
+      const ask = this.liveAsks.get(ref.sessionId);
+      if (ask === undefined) return;
+      ask.stopping = { turnId: ref.turnId, state: 'stopping' };
+      this.syncActiveAsk();
       void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId).then((taken) => {
-        if (taken || this.askAbort !== abort) return;
+        if (taken || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
         // Refused or unanswered: the answer goes on, and Stop can be pressed again.
         stopAsked = false;
-        this.askStopping = { turnId: ref.turnId, state: 'failed' };
+        ask.stopping = { turnId: ref.turnId, state: 'failed' };
+        this.syncActiveAsk();
       });
     };
-    this.askAbort = abort;
-    this.askStop = stop;
-    this.streaming = true;
+    this.liveAsks.set(ref.sessionId, { abort, stop, reasoning, turnId: ref.turnId, stopping: null, checkingTurnId: null });
+    this.syncActiveAsk();
     // The controller is per-ASK, not per-turn: it accumulates and times one stream's thinking, and
     // the blocks it finalizes are written onto the turn below. Resetting here is what stops the
     // previous answer's thinking appearing under this one.
-    this.askReasoning.reset();
-    this.askReasoningTurnId = ref.turnId;
+    reasoning.reset();
     // The app-wide activity indicator, raised for the duration and settled at the terminal below
     // (inventory G11). Cancelling through the SAME stop the Stop control uses, so there is one way
     // to stop this turn however the reader reaches it.
@@ -3284,8 +3455,8 @@ export class SearchV3View extends JfElement {
         // The thinking is closed out and RECORDED on the turn at every terminal, including a halt:
         // what the model thought before the reader stopped it was really produced, and dropping it
         // would lose evidence the window actually received (inventory C9).
-        this.askReasoning.finalize();
-        this.sessions = setTurnReasoning(this.sessions, ref, [...this.askReasoning.reasoningBlocks]);
+        reasoning.finalize();
+        this.sessions = setTurnReasoning(this.sessions, ref, [...reasoning.reasoningBlocks]);
         this.sessions = settleTurn(
           this.sessions,
           ref,
@@ -3308,20 +3479,18 @@ export class SearchV3View extends JfElement {
       // Only THIS dispatch's terminal may clear the window's busy state: a later ask has already
       // installed its own controller, and clearing it here would strand a live stream with a Send
       // control in the slot.
-      if (this.askAbort === abort) {
-        this.askAbort = null;
-        this.askStop = null;
-        this.askStopping = null;
-        this.askCheckingTurnId = null;
-        this.streaming = false;
-        this.askReasoningTurnId = null;
-        this.settleAiActivity();
-      }
+      if (this.liveAsks.get(ref.sessionId)?.abort === abort) this.liveAsks.delete(ref.sessionId);
+      reasoning.destroy();
+      this.syncActiveAsk();
+      if (this.liveAsks.size === 0 && this.agentController()?.runInFlight !== true) this.settleAiActivity();
+      this.requestUpdate();
     };
     await sv3Ask(
       {
         apiBase: this.apiBase,
         schema,
+        shapeId,
+        selection: handoff?.selection,
         question,
         conversationId: ref.sessionId,
         modelAnswer,
@@ -3342,13 +3511,16 @@ export class SearchV3View extends JfElement {
           this.sessions = appendTurnDelta(this.sessions, ref, text);
         },
         onChecking: (checking) => {
-          if (this.askAbort === abort) this.askCheckingTurnId = checking ? ref.turnId : null;
+          const ask = this.liveAsks.get(ref.sessionId);
+          if (ask?.abort !== abort) return;
+          ask.checkingTurnId = checking ? ref.turnId : null;
+          this.syncActiveAsk();
         },
         onEvidence: (evidence) => {
           this.sessions = setTurnEvidence(this.sessions, ref, evidence);
         },
         onReasoning: (payload) => {
-          this.askReasoning.handleReasoningChunk(payload);
+          reasoning.handleReasoningChunk(payload);
         },
         onRewrite: (standalone) => {
           this.sessions = setTurnRewrite(this.sessions, ref, standalone);
@@ -3387,10 +3559,15 @@ export class SearchV3View extends JfElement {
         },
         onLeft: () => settle('left'),
         onFailed: (message, code) => {
-          const noEvidence = !modelAnswer && schema === undefined && code === 'NO_CONTENT' && scope === null;
+          const noEvidence = shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
+          if (handoff !== null && this.sessions.activeId === ref.sessionId && this.composer === composer && composer?.draftRevision === sentDraftRevision) {
+            this.preparedHandoff = handoff;
+            this.search.prepare(scope);
+            this.writeDraft(question);
+          }
         },
       },
     );
@@ -3415,6 +3592,9 @@ export class SearchV3View extends JfElement {
   private onTierChange(event: Event): void {
     const tier = (event as CustomEvent<Sv3TierChange>).detail?.tier;
     if (!isSv3Tier(tier)) return;
+    if (this.preparedHandoff !== null) this.search.clearScope();
+    this.preparedHandoff = null;
+    this.handoffNotice = ''; this.handoffBlocked = false;
     this.tier = tier;
     this.tierFollowsPlace = false;
     if (tier === 'structured' && this.search.showing && this.search.pendingScope === null) {
@@ -3517,7 +3697,7 @@ export class SearchV3View extends JfElement {
    */
   private get steerableRun(): AgentSessionController | null {
     const ctrl = this.agentController();
-    if (ctrl === null || this.run === null) return null;
+    if (ctrl === null || this.run === null || (this.run.sessionId !== this.sessions.activeId && !(this.sessions.activeId === null && this.preparedHandoff === null)) || this.search.showing) return null;
     if (ctrl.runKind !== 'agent') return null;
     return directiveAvailable(ctrl, { kind: 'interject', text: '' }) ? ctrl : null;
   }
@@ -3534,6 +3714,8 @@ export class SearchV3View extends JfElement {
     // Defence in depth, not a second gate: the composer already refuses an unavailable delegate and
     // keeps the draft. This exists because `delegate` is reachable from the window's own routing.
     if (this.delegateUnavailableReason !== '') return;
+    this.preparedHandoff = null;
+    this.handoffNotice = ''; this.handoffBlocked = false;
     this.leaveResultsBySending();
     this.sessions = submitInSession(this.sessions, text, Date.now(), 'agent', createConversationId());
     const ref = latestTurnRef(this.sessions);
@@ -3878,7 +4060,7 @@ export class SearchV3View extends JfElement {
   private onRunDecision(event: Event): void {
     const ctrl = this.agentController();
     const detail = (event as CustomEvent<Sv3RunDecision>).detail;
-    if (ctrl === null || detail === undefined) return;
+    if (ctrl === null || detail === undefined || this.preparedHandoff !== null || (this.sessions.activeId !== null && this.run?.sessionId !== this.sessions.activeId)) return;
     if (detail.kind === 'budget') {
       // B8 — RAISE is a different directive, not a third value of the gate's decision: the gate is
       // resolved by finalize/stop, whereas raising extends the run's allowance and leaves the gate to
@@ -4179,6 +4361,8 @@ export class SearchV3View extends JfElement {
   /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
   private forgetDeletedConversations(ids: readonly string[]): void {
     for (const gone of ids) {
+      this.placeScopes.delete(gone);
+      this.placeTiers.delete(gone);
       this.recordReads.get(gone)?.abort();
       this.recordReads.delete(gone);
       for (const [id, pending] of this.pendingRunRecords) {
@@ -4249,6 +4433,8 @@ export class SearchV3View extends JfElement {
    * guarantee, so the fix is to not make the write at all.
    */
   private resetToHero(): void {
+    this.preparedHandoff = null;
+    this.handoffNotice = ''; this.handoffBlocked = false;
     this.abortAsk();
     // DETACHED, not halted (Slice 516 FIX-T1's rule, applied to the run half). A delegated run is
     // hosted by the product-wide controller and may be watched elsewhere, so this window stops
@@ -4364,11 +4550,12 @@ export class SearchV3View extends JfElement {
     const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
-    const pendingPrompt = run !== null && run.prompts.length > 0;
-    const scope = this.search.showing || this.tier === 'structured' ? this.search.pendingScope : null;
+    const visibleRun = !this.search.showing && (this.run?.sessionId === this.sessions.activeId || this.sessions.activeId === null && this.preparedHandoff === null) ? run : null;
+    const pendingPrompt = visibleRun !== null && visibleRun.prompts.length > 0;
+    const scope = this.search.showing || this.tier === 'structured' || this.preparedHandoff !== null || this.placeScopes.has(this.sessions.activeId ?? '') ? this.search.pendingScope : null;
     const slot = sv3PrimaryAction({
       pendingPrompt,
-      running: this.isRunning(run),
+      running: this.isRunning(visibleRun),
       followUp: turns.length > 0,
       tier: this.tier,
       steerable: this.steerableRun !== null,
@@ -4426,7 +4613,7 @@ export class SearchV3View extends JfElement {
         }}
         @sv3-composer-submit=${this.onComposerSubmit}
         @sv3-composer-draft=${this.onComposerDraft}
-        @sv3-composer-scope-clear=${() => this.search.clearScope()}
+        @sv3-composer-scope-clear=${() => { this.search.clearScope(); this.preparedHandoff = null; this.handoffNotice = ''; this.handoffBlocked = false; this.requestUpdate(); }}
         @sv3-results-filter-remove=${this.onResultsFilterRemove}
         @sv3-results-ask=${this.onResultsAsk}
         @sv3-results-clear-selection=${() => this.search.select([])}
@@ -4465,7 +4652,7 @@ export class SearchV3View extends JfElement {
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
           ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}
           .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.structuredNote(t.id)]))}
-          .run=${run}
+          .run=${visibleRun}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
           .unconfirmedSteerNotes=${this.unconfirmedSteerNotes}
           ?record-notice=${this.recordNotice}
@@ -4503,7 +4690,7 @@ export class SearchV3View extends JfElement {
           slot-reason=${slot.reason}
           halt-reason=${slot.haltReason}
           ?steerable=${this.steerableRun !== null}
-          unavailable-reason=${this.askUnavailableReason}
+          unavailable-reason=${this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason}
           delegate-unavailable-reason=${this.delegateUnavailableReason}
           .degradation=${this.degradation}
           ?detailed=${isAdvancedMode()}
@@ -4512,6 +4699,7 @@ export class SearchV3View extends JfElement {
           tier=${this.tier}
           .schemaDraft=${this.schemaDraft}
           .structuredError=${this.structuredError}
+          task-notice=${this.handoffNotice || (this.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
           scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"

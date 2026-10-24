@@ -895,6 +895,24 @@ export class UnifiedChatView extends JfElement {
     }
   }
 
+  private handoffShape: string | null = null;
+  private handoffSelection: ReturnType<typeof takePendingSelection> = null;
+
+  private captureHandoff(): void {
+    const shape = takePendingForceShape();
+    const selection = takePendingSelection();
+    if (shape !== null || selection !== null) {
+      this.handoffShape = shape;
+      this.handoffSelection = selection;
+    }
+  }
+
+  private clearHandoff(): void {
+    this.handoffShape = null;
+    this.handoffSelection = null;
+    this.autoRunPending = false;
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
     // Tempdoc 565 §12.3.E — re-render when the cross-surface source selection changes (chip highlight).
@@ -948,6 +966,7 @@ export class UnifiedChatView extends JfElement {
     // `answer` lowering. maybeAutoRun() fires once the prompt + AI capability
     // are both present (here, in the store subscription, or in the aiState
     // subscription — whichever settles last).
+    this.captureHandoff();
     this.autoRunPending = takePendingAutoRun();
     this.maybeAutoRun();
     // Tempdoc 526 §14.5 T3 — pinnedDocIds is sourced from selectionState's
@@ -977,6 +996,7 @@ export class UnifiedChatView extends JfElement {
       if (s.affordance !== 'none') {
         this.affordance = s.affordance;
       }
+      this.captureHandoff();
       this.maybeAutoRun();
     });
     // Tempdoc 609 (M1) — do NOT reset the chat store on mount. `query` (composer draft prefill)
@@ -1010,7 +1030,7 @@ export class UnifiedChatView extends JfElement {
     const lastViewed = readLastViewedConversation();
     if (lastViewed && this.thread.length === 0) {
       this.showResumePrompt = false;
-      void this.loadConversation(lastViewed, 'core.free-chat');
+      void this.loadConversation(lastViewed, 'core.free-chat', true);
     }
     this.aiStateUnsubscribe = subscribeAiState((s) => this.applyAiState(s));
     // Tempdoc 561 C-2: the dial change only re-grades chrome (placeholder / send label / rail
@@ -1202,6 +1222,7 @@ export class UnifiedChatView extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.clearHandoff();
     super.disconnectedCallback();
     this.uiModeUnsubscribe?.();
     this.uiModeUnsubscribe = null;
@@ -2117,7 +2138,8 @@ export class UnifiedChatView extends JfElement {
     if (this.affordance === 'retrieve') this.affordance = 'none';
   }
 
-  private async loadConversation(sessionId: string, shapeId: string): Promise<void> {
+  private async loadConversation(sessionId: string, shapeId: string, restoringOnMount = false): Promise<void> {
+    if (!restoringOnMount) this.clearHandoff();
     // Slice 516 FIX-T1 — cancel any in-flight stream so its onDone doesn't
     // write into the new conversation's thread. AbortError is caught in
     // consumeShapeStream; neither onDone nor onError fires, so no further
@@ -2291,6 +2313,8 @@ export class UnifiedChatView extends JfElement {
   }
 
   private newConversation(): void {
+    this.clearHandoff();
+    takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
     // Slice 516 FIX-T1 — cancel any in-flight stream so its onDone doesn't
     // append to the new (empty) thread.
     this.abortController?.abort();
@@ -2726,6 +2750,7 @@ export class UnifiedChatView extends JfElement {
 
   /** Assignment IS explicit selection (tab clicks, tests, restores) — it pins the tier sticky. */
   set affordance(v: Affordance) {
+    this.clearHandoff();
     this.explicitAffordance = v;
   }
 
@@ -6211,6 +6236,13 @@ export class UnifiedChatView extends JfElement {
    * note on {@link handleCardScopeFile}), so the union is a plain string-set merge.
    */
   private effectiveDocIds(): string[] {
+    const selected = this.handoffSelection;
+    switch (selected?.kind) {
+      case 'item': return [selected.itemId];
+      case 'text-range': return [selected.address.docId];
+      case 'citation': return [selected.citation.parentDocId];
+      case 'result-set': return [...new Set(selected.items.map(item => item.id))];
+    }
     const ids = new Set<string>(this.pinnedDocIds);
     for (const chip of this.scopeChips) {
       for (const id of chip.docIds) ids.add(id);
@@ -6251,7 +6283,8 @@ export class UnifiedChatView extends JfElement {
     // the askAi-vs-direct-route fork by removing the legacy affordanceToShape
     // fallback; SEND-button flows now share the (operation, kind, affordance)
     // → shapeId table with compose()-driven flows.
-    const forced = takePendingForceShape();
+    const forced = this.handoffShape ?? takePendingForceShape();
+    this.handoffShape = null;
     const shapeId: ShapeId = (forced as ShapeId | null) ?? this.dispatchShape();
     // Tempdoc 526 §12.4 — drain the pending selection set by compose() on the
     // navigation event. It is a ONE-SHOT register that only compose()-driven
@@ -6261,7 +6294,7 @@ export class UnifiedChatView extends JfElement {
     // to what the user actually has selected — the live selection IS the
     // document they mean.
     const selection =
-      takePendingSelection() ?? selectionItemToWirePayload(getCurrentSelection().items[0]);
+      this.handoffSelection ?? takePendingSelection() ?? selectionItemToWirePayload(getCurrentSelection().items[0]);
     const body = buildRequestBody(
       shapeId,
       text,
@@ -6270,6 +6303,7 @@ export class UnifiedChatView extends JfElement {
       this.effectiveDocIds(),
       selection,
     );
+    this.handoffSelection = null;
 
     // Tempdoc 561 P-A/P-B: stamp the surface conversationId on EVERY dispatch so the backend records
     // the answer-plane turn (incl. ephemeral RAG, which carries no sessionId) onto the ONE canonical

@@ -352,12 +352,18 @@ public final class RAGContext implements ContextInjector {
       question = s;
     }
     List<String> docIds = extractDocIds(body);
+    Object selectedIds = ctx.attributes().get(ATTR_DOC_IDS);
+    if (selectedIds instanceof List<?> ids) docIds = ids.stream().filter(String.class::isInstance).map(String.class::cast).toList();
     // Tempdoc 883 decision 3 — ONE budget per request, built before anything is asked for, so the
     // shape of the ask and the cut that follows it cannot disagree about how much room there is.
     ContextBudget budget = budgetFor(onlineAi, ctx);
 
     if (question == null || question.isBlank()) {
       return InjectorResult.terminalError(errorEvent("No question provided", "NO_QUESTION"));
+    }
+    // Passage and trace hand-offs already supplied their exact material. Retrieval must not replace it.
+    if (body.get("selection") != null && selectedIds == null) {
+      return InjectorResult.messagesOnly(List.of(Map.of("role", "user", "content", question)));
     }
     int topK = extractTopK(body, budget, engineContext);
     // Stash docIds + fileCount for the done enricher (set even on retrieval failure).

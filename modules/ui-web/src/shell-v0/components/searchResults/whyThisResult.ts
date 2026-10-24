@@ -13,7 +13,7 @@
  *
  * Extracted from SearchSurface's private `renderWhy`/`traceChipsFor`/
  * `tracePartsFor`/`handleExplainWhy` so the in-window tier is a true peer, not a
- * fork. Input is structural (`{ title, trace? }`) so both `SearchHit`
+ * fork. Input is structural (`{ id?, path?, title, trace? }`) so both `SearchHit`
  * (searchState) and `SearchHitSnapshot` (plugin wire) satisfy it without coupling.
  */
 
@@ -24,6 +24,8 @@ import { compose } from '../../utils/compose.js';
 
 /** The minimal hit shape the disclosure reads — satisfied by SearchHit + SearchHitSnapshot. */
 export interface WhyHit {
+  id?: string;
+  path?: string;
   title: string;
   trace?: HitStage[];
 }
@@ -68,11 +70,16 @@ export function tracePartsFor(hit: WhyHit): string[] {
 function explainWhy(hit: WhyHit): void {
   const parts = tracePartsFor(hit);
   if (parts.length === 0) return;
+  const summary = parts.join(' · ');
+  const docId = hit.path?.trim() ? hit.path
+    : hit.id?.trim() && !hit.id.startsWith('chunk:') ? hit.id : undefined;
+  // The existing user message is the durable, inspectable copy of the model input.
+  const notice = docId ? '' : '\n\nNo document link is available for this result; the ranking trace is shown below.';
   compose({
     operation: 'core.summarize',
     source: 'SEARCH_WHY',
-    userPrompt: `Explain why this result ("${hit.title}") ranked where it did.`,
-    selection: { kind: 'search-trace', scope: 'hit', summary: parts.join(' · ') },
+    userPrompt: `Explain why this result ("${hit.title}") ranked where it did.${notice}\n\nRanking trace:\n${summary}`,
+    selection: { kind: 'search-trace', scope: 'hit', summary, ...(docId ? { docId } : {}) },
   });
 }
 
