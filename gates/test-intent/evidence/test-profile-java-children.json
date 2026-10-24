@@ -1,0 +1,1333 @@
+{
+  "scope": "Java child launch sites in JVM test/integrationTest/systemTest/testFixtures sources, including command factories, generated fake-server scripts and reachable production extraction/dev-runner launchers. ui-web is excluded.",
+  "method": "Source inventory of ProcessBuilder, Runtime.exec, ChildSpec, java.home, current process command, @argfile and shared command factories. Native shell/OCR/SUBST/junction helpers, in-process compilers, nonexecuted ArchUnit source canaries and unused getWorkerJvmArgs are excluded.",
+  "decision": "Owner: G2 covers environment-based resolution only. No JAVA_TOOL_OPTIONS/JDK_JAVA_OPTIONS injection. Missing explicit Java home/data paths remain known gaps for the following product step.",
+  "entries": [
+    {
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java",
+      "sites": [
+        {
+          "line": 36,
+          "source": "ProcessBuilder builder = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "data directory argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
+      "sites": [
+        {
+          "line": 65,
+          "source": "Process holder = new ProcessBuilder(List.of(java, \"--enable-native-access=ALL-UNNAMED\","
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "dataDir argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java",
+      "sites": [
+        {
+          "line": 37,
+          "source": "Process holder = new ProcessBuilder(List.of(java, \"--enable-native-access=ALL-UNNAMED\","
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java",
+      "sites": [
+        {
+          "line": 91,
+          "source": "ProcessBuilder builder = new ProcessBuilder(command(Holder.class, data.toString(), mode))"
+        },
+        {
+          "line": 269,
+          "source": "Process wrapper = OwnedHelper.start(new ProcessBuilder(command(Wrapper.class, dir.toString())), \"owned launcher\");"
+        },
+        {
+          "line": 288,
+          "source": "Process child = new ProcessBuilder(command(Child.class)).start();"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "Holder and Wrapper receive a directory; Child receives no directory",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LateWindowExitTest.java",
+      "sites": [
+        {
+          "line": 33,
+          "source": "Process p=OwnedHelper.start(new ProcessBuilder(javaExecutable,\"--version\")"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "java --version only"
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildHelperReceiptWitnessTest.java",
+      "sites": [
+        {
+          "line": 61,
+          "source": "return new ProcessBuilder(command);"
+        }
+      ],
+      "kind": "Java ProcessBuilder helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "java(entry,args) forwards caller-provided directory arguments",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowBoundaryTest.java",
+      "sites": [
+        {
+          "line": 72,
+          "source": "return new ProcessBuilder(command);"
+        }
+      ],
+      "kind": "Java ProcessBuilder helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "java(entry,args) forwards caller-provided directory arguments",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ChildWindowLedgerWitnessTest.java",
+      "sites": [
+        {
+          "line": 61,
+          "source": "return new ProcessBuilder(command);"
+        }
+      ],
+      "kind": "Java ProcessBuilder helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "java(main,args) forwards caller-provided directory arguments",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/CrashConsoleFollowsClientTest.java",
+      "sites": [
+        {
+          "line": 31,
+          "source": "Process p = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        },
+        {
+          "line": 89,
+          "source": "Process helper = OwnedHelper.start(new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(), \"-cp\", System.getProperty(\"java.class.path\"), Crash.class.getName())"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "Probe receives dir; Crash receives no path",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/JobWitnessIntentTest.java",
+      "sites": [
+        {
+          "line": 33,
+          "source": "Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/LinuxContainmentBootTest.java",
+      "sites": [
+        {
+          "line": 17,
+          "source": "Process probe = new ProcessBuilder(launcher, \"-cp\", System.getProperty(\"java.class.path\"),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowOwnerIdentityTest.java",
+      "sites": [
+        {
+          "line": 34,
+          "source": "Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        },
+        {
+          "line": 70,
+          "source": "child = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java",
+      "sites": [
+        {
+          "line": 79,
+          "source": "Process process = new ProcessBuilder(command).redirectErrorStream(true).start();"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "runProbe forwards its caller args",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java",
+      "sites": [
+        {
+          "line": 27,
+          "source": "Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WitnessWindowRaceTest.java",
+      "sites": [
+        {
+          "line": 29,
+          "source": "Process p = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        },
+        {
+          "line": 81,
+          "source": "Process helper = OwnedHelper.start(new ProcessBuilder(java, \"--version\")"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "Nested helper uses java --version"
+    },
+    {
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSequenceTest.java",
+      "sites": [
+        {
+          "line": 405,
+          "source": "Process child = new ProcessBuilder(javaExecutable.toString(), \"@\" + argumentFile,"
+        },
+        {
+          "line": 431,
+          "source": "Process child = new ProcessBuilder(javaExecutable.toString(), \"@\" + argumentFile,"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "childDirectory/dataDir argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
+      "sites": [
+        {
+          "line": 138,
+          "source": "Process process = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "data-directory argument applied through EngineTestHarness.publishConfig as an explicit resolved-config fixture input; no JVM data/home property override",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "data directory in @argfile",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "The shared harness now contributes this argument at test-fixture JVM-arg priority, so the child queue uses its declared data directory. JVM user.home remains without an explicit override and is a deferred gap."
+    },
+    {
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableQuitReplayTest.java",
+      "sites": [
+        {
+          "line": 114,
+          "source": "Process process = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "data-directory argument applied through EngineTestHarness.publishConfig as an explicit resolved-config fixture input; no JVM data/home property override",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "data directory in @argfile",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "The shared harness now contributes this argument at test-fixture JVM-arg priority, so the child queue uses its declared data directory. JVM user.home remains without an explicit override and is a deferred gap."
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java",
+      "sites": [
+        {
+          "line": 365,
+          "source": "new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", \"java\").toString(), \"-cp\","
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "home argument for lingerer identity files",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
+      "sites": [
+        {
+          "line": 159,
+          "source": "new ProcessBuilder("
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+      "sites": [
+        {
+          "line": 106,
+          "source": "ProcessBuilder builder = new ProcessBuilder(command)"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+      "sites": [
+        {
+          "line": 241,
+          "source": "Process child = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", executable).toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "operation-store file argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockExclusionTest.java",
+      "sites": [
+        {
+          "line": 67,
+          "source": "var child = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", executable).toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "directory argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockFailureTest.java",
+      "sites": [
+        {
+          "line": 127,
+          "source": "var child = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", executable).toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "directory argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/TestProfileIsolationTest.java",
+      "sites": [
+        {
+          "line": 59,
+          "source": "Process child = new ProcessBuilder(command).redirectOutput(output.toFile())"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "temporary Java source file and environment names; child only prints environment",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/ContendedFileReadsTest.java",
+      "sites": [
+        {
+          "line": 399,
+          "source": "Process process = new ProcessBuilder("
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "target, ready and release file arguments",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java",
+      "sites": [
+        {
+          "line": 75,
+          "source": "new ProcessBuilder(java.toString(), \"@\" + argFile)"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
+      "sites": [
+        {
+          "line": 259,
+          "source": "Process child = new ProcessBuilder(argv(\"server\", home)).inheritIO().start();"
+        },
+        {
+          "line": 268,
+          "source": "new ProcessBuilder(argv(\"linger\", home)).redirectOutput(ProcessBuilder.Redirect.DISCARD)"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "home argument for fixture files",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "sites": [
+        {
+          "line": 258,
+          "source": "new ProcessBuilder(command(\"server\", home, port))"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "home argument for fixture files",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java",
+      "sites": [
+        {
+          "line": 266,
+          "source": "Process child = new ProcessBuilder(java.toString(), \"@\" + args, KeystoreDurabilityTest.class.getName(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "dir argument for the keystore",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java",
+      "sites": [
+        {
+          "line": 154,
+          "source": "Process child = new ProcessBuilder(java.toString(), \"@\" + args, KeystoreDurabilityTest.class.getName(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "dir argument for the keystore",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleEvidenceTest.java",
+      "sites": [
+        {
+          "line": 547,
+          "source": "Process crash = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", \"java\").toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "database-file argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "The separate jcmd histogram is a JDK diagnostic tool, not a product JVM launch."
+    },
+    {
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleV24MigrationEvidenceTest.java",
+      "sites": [
+        {
+          "line": 65,
+          "source": "Process crash = new ProcessBuilder(javaTool(\"java\"), \"-Xmx1g\","
+        },
+        {
+          "line": 160,
+          "source": "Process probe = new ProcessBuilder(javaTool(\"java\"), \"-Xmx1g\","
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "database-file argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "The separate javac process compiles a fixture; it does not launch a product JVM."
+    },
+    {
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java",
+      "sites": [
+        {
+          "line": 132,
+          "source": "Process child = new ProcessBuilder(java, \"--enable-native-access=ALL-UNNAMED\", \"@\" + arguments,"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "base, index, root, database and file arguments",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/util/IndexRootLockExclusionTest.java",
+      "sites": [
+        {
+          "line": 123,
+          "source": "var child = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", executable).toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "indexBase argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/util/IndexRootLockFailureTest.java",
+      "sites": [
+        {
+          "line": 121,
+          "source": "var child = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", executable).toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "directory argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/harness/IsolatedBackendFixture.java",
+      "sites": [
+        {
+          "line": 173,
+          "source": "ProcessBuilder pb = new ProcessBuilder(cmd);"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "-Djustsearch.data.dir plus JUSTSEARCH_DATA_DIR and JUSTSEARCH_HOME = dataDir",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "dataDir",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "Environment is cleared then replaced with buildEnv(), which starts with System.getenv(); extraSystemProperties/extraEnv can override defaults."
+    },
+    {
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java",
+      "sites": [
+        {
+          "line": 481,
+          "source": "Process child = new ProcessBuilder(java, \"--enable-native-access=ALL-UNNAMED\", \"@\" + arguments,"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "directory argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTokenizerPrivacyTest.java",
+      "sites": [
+        {
+          "line": 26,
+          "source": "Process child = new ProcessBuilder("
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureTest.java",
+      "sites": [
+        {
+          "line": 19,
+          "source": "Process child = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "Probe sets justsearch.data.dir from its directory argument",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "dir argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java",
+      "sites": [
+        {
+          "line": 70,
+          "source": "var builder = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", executable)"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/onnx/TokenWindowsTest.java",
+      "sites": [
+        {
+          "line": 100,
+          "source": "new ProcessBuilder("
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/GenerationPointerDurabilityTest.java",
+      "sites": [
+        {
+          "line": 114,
+          "source": "var command = new ProcessBuilder(Path.of(System.getProperty(\"java.home\"), \"bin\", \"java\").toString(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "index base argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java",
+      "sites": [
+        {
+          "line": 74,
+          "source": "Process observed = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();"
+        },
+        {
+          "line": 88,
+          "source": "Process observed = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();"
+        },
+        {
+          "line": 101,
+          "source": "Process observed = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();"
+        },
+        {
+          "line": 114,
+          "source": "Process observed = new ProcessBuilder(javaCommand(IgnoringShutdownChild.class)).start();"
+        }
+      ],
+      "kind": "Direct JVM launches through javaCommand helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java",
+      "sites": [
+        {
+          "line": 190,
+          "source": "Process realChild = new ProcessBuilder(javaCommand(ExtractionSandboxChild.class)).start();"
+        },
+        {
+          "line": 261,
+          "source": "Process realChild = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();"
+        },
+        {
+          "line": 545,
+          "source": "new ProcessBuilder("
+        },
+        {
+          "line": 768,
+          "source": "Process realChild = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();"
+        },
+        {
+          "line": 928,
+          "source": "Process victim = new ProcessBuilder(javaCommand(ExitingChild.class)).start();"
+        },
+        {
+          "line": 936,
+          "source": "Process orphan = new ProcessBuilder(command).start();"
+        }
+      ],
+      "kind": "Direct JVM launches through javaCommand/@argfile helpers",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:43",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:74",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:88",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:101",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:114",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java:35",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java:101",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java:164",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PolicyDrivenFormatCapabilityTest.java:96",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:93",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:128",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:163",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:190",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:194",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:224",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:261",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:292",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:350",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:376",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:415",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:427",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:440",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:482",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:561",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:584",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:609",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:627",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:659",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:678",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:687",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:704",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:738",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:768",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:777",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:811",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:822",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:843",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:859",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:901",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:928",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:934",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxChildControlTest.java:57"
+      ]
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PolicyDrivenFormatCapabilityTest.java",
+      "sites": [
+        {
+          "line": 99,
+          "source": "Process child = new ProcessBuilder(command)"
+        }
+      ],
+      "kind": "Direct JVM launch through javaCommand helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java",
+      "sites": [
+        {
+          "line": 52,
+          "source": "var builder = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "JUSTSEARCH_HOME=home; APPDATA/LOCALAPPDATA are fixture directories; JUSTSEARCH_DATA_DIR deliberately removed",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "data argument and -Duser.dir=data",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "No user.home override. Scenario deliberately removes JUSTSEARCH_DATA_DIR to exercise executable discovery."
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java",
+      "sites": [
+        {
+          "line": 26,
+          "source": "Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        },
+        {
+          "line": 69,
+          "source": "Process probe = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "probe arguments, not home/data overrides",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java",
+      "sites": [
+        {
+          "line": 32,
+          "source": "ProcessBuilder builder = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java",
+      "sites": [
+        {
+          "line": 101,
+          "source": "Process child = new ProcessBuilder(PersistentExtractionSandboxTest.javaCommand("
+        }
+      ],
+      "kind": "Direct JVM launch through javaCommand helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduCrashRecoveryTest.java",
+      "sites": [
+        {
+          "line": 35,
+          "source": "var child = new ProcessBuilder(java, \"@\" + args, Probe.class.getName(),"
+        }
+      ],
+      "kind": "direct JVM launch",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "index directory argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/FakeChild.java",
+      "sites": [
+        {
+          "line": 76,
+          "source": "public static List<String> argv(String mode) {"
+        }
+      ],
+      "kind": "shared ChildControl test helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "optional signal-file path embedded in mode",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java:266",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java:267",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java:268",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java:99",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java:105",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperExitOnceTest.java:36",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperStopRecordTest.java:35",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java:26",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildLifetimeTest.java:63",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildLifetimeTest.java:89",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerReconcilerTest.java:149",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java:68",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java:506",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java:664",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperRollbackTest.java:42"
+      ]
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java",
+      "sites": [
+        {
+          "line": 954,
+          "source": "static List<String> javaCommand(Class<?> mainClass, String... jvmArgs) {"
+        }
+      ],
+      "kind": "shared extraction test helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:43",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:74",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:88",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:101",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java:114",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java:35",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java:101",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java:164",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PolicyDrivenFormatCapabilityTest.java:96",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:93",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:128",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:163",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:190",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:194",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:224",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:261",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:292",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:350",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:376",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:415",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:427",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:440",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:482",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:561",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:584",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:609",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:627",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:659",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:678",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:687",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:704",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:738",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:768",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:777",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:811",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:822",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:843",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:859",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:901",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:928",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java:934",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxChildControlTest.java:57"
+      ]
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java",
+      "sites": [
+        {
+          "line": 453,
+          "source": "static Path install(Path dir, String... behaviour) throws IOException {"
+        }
+      ],
+      "kind": "generated Java launcher script",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "-Dfake.llama.home=dir",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java:115",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java:344",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java:355",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java:450",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLeftoverTest.java:80",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java:113",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java:203",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java:223",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java:240",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java:256",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java:317",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java:63",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java:61",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java:80",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java:103",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java:124",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java:143",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java:126",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatFailureScopeTest.java:81",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java:71",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLatchOrderTest.java:73",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerPreservedChildTest.java:50",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProgressTest.java:22",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestGpuBarrierTest.java:72",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java:126",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java:143",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServerTest.java:34"
+      ]
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java",
+      "sites": [
+        {
+          "line": 212,
+          "source": "public static Path install(Path dir, long startDelayMs) throws IOException {"
+        }
+      ],
+      "kind": "generated Java launcher script",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "-Dfake.llama.home=dir",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java:51",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java:110",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRetryBudgetTest.java:108",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationAuthenticationTest.java:33",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationAuthenticationTest.java:98"
+      ]
+    },
+    {
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StreamingFakeLlamaServer.java",
+      "sites": [
+        {
+          "line": 225,
+          "source": "public static Path install(Path dir) throws IOException {"
+        }
+      ],
+      "kind": "generated Java launcher script",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "-Dfake.llama.home=dir",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProxyStreamAcrossReconfigureTest.java:76",
+        "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java:81"
+      ]
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerTestAccess.java",
+      "sites": [
+        {
+          "line": 74,
+          "source": "static List<String> javaArgv(Class<?> main) {"
+        }
+      ],
+      "kind": "shared ChildControl test helper",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": "",
+      "callSites": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java:265",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java:290"
+      ]
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+      "sites": [
+        {
+          "line": 127,
+          "source": "private static ChildSpec sleepingSpec(Path tmp) throws Exception {"
+        }
+      ],
+      "kind": "ChildControl Java command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaStopVerificationTest.java",
+      "sites": [
+        {
+          "line": 29,
+          "source": "var argv = List.of(Path.of(System.getProperty(\"java.home\"), \"bin\", \"java\").toString(),"
+        }
+      ],
+      "kind": "ChildControl Java command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppExtractionQuitTest.java",
+      "sites": [
+        {
+          "line": 44,
+          "source": "var spec = new ChildSpec(ChildKind.EXTRACTION,"
+        }
+      ],
+      "kind": "ChildControl Java command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExtractionSandboxChaosTest.java",
+      "sites": [
+        {
+          "line": 280,
+          "source": "private String chaosChildCommand() throws IOException {"
+        }
+      ],
+      "kind": "extraction override command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/chaos/ExtractionSandboxOrphanE2ETest.java",
+      "sites": [
+        {
+          "line": 209,
+          "source": "private static String chaosChildCommand() throws IOException {"
+        }
+      ],
+      "kind": "extraction override command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "none",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
+      "sites": [
+        {
+          "line": 251,
+          "source": "static List<String> argv(String mode, Path home) throws Exception {"
+        }
+      ],
+      "kind": "ChildControl fixture command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "home argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java",
+      "sites": [
+        {
+          "line": 242,
+          "source": "private static List<String> command(String mode, Path home, int port) throws Exception {"
+        }
+      ],
+      "kind": "self-test command",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "home argument",
+      "knownGap": "JVM user.home is not isolated; the task environment is inherited unless the note says otherwise.",
+      "note": ""
+    },
+    {
+      "file": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommand.java",
+      "sites": [
+        {
+          "line": 163,
+          "source": "static List<String> defaultCommand(...) -> jvmOptions(...)"
+        }
+      ],
+      "kind": "production extraction command reachable from tests",
+      "explicitJustSearchDataOrHome": "none",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "extraction request input/output paths, not a profile override",
+      "knownGap": "No JVM user.home or JustSearch data/home property is forwarded; environment-based resolution is isolated by G2.",
+      "note": "Both inline argv and @argfile forms use jvmOptions at line 186."
+    },
+    {
+      "file": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
+      "sites": [
+        {
+          "line": 914,
+          "source": "node real-writer-recovery.mjs"
+        },
+        {
+          "line": 1056,
+          "source": "node real-writer-recovery.mjs processing-family scenarios"
+        }
+      ],
+      "kind": "Node -> dev-runner -> Engine Java launch, plus extraction override",
+      "explicitJustSearchDataOrHome": "Engine: --data-dir work/data -> -Djustsearch.data.dir, JUSTSEARCH_DATA_DIR and JUSTSEARCH_HOME in dev-runner.cjs:1014,2849-2850. Extraction override: no Java home/data properties.",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "work/data and processing child request paths",
+      "knownGap": "Engine and extraction children have no explicit JVM user.home.",
+      "note": "real-writer-recovery.mjs:206,632,638 scopes data; EngineSupervisedRecoveryE2ETest.java:1074-1087 supplies the Java extraction override."
+    },
+    {
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AvailabilityWindowTest.java",
+      "sites": [
+        {
+          "line": 17,
+          "source": "exercise(Path.of(ProcessHandle.current().info().command().orElseThrow()), true);"
+        }
+      ],
+      "kind": "Java --version via OCR availability helper",
+      "explicitJustSearchDataOrHome": "none added by this launcher",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "see caller/command record",
+      "knownGap": "No explicit JVM user.home; profile isolation depends on supplied arguments and inherited environment.",
+      "note": "TikaOcrRuntime invokes the supplied JVM executable with --version; no product JVM entry point."
+    },
+    {
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleV24MigrationEvidenceTest.java",
+      "sites": [
+        {
+          "line": 154,
+          "source": "Process compiler = new ProcessBuilder(javaTool(\"javac\"), \"-cp\", System.getProperty(\"queue.scale.classpath\"),"
+        }
+      ],
+      "kind": "JDK javac child",
+      "explicitJustSearchDataOrHome": "none added by this launcher",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "see caller/command record",
+      "knownGap": "No explicit JVM user.home; profile isolation depends on supplied arguments and inherited environment.",
+      "note": "Compiles the historical queue fixture into the explicitly supplied output folder. No product entry point."
+    },
+    {
+      "file": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/DefaultChildControl.java",
+      "sites": [
+        {
+          "line": 279,
+          "source": "ProcessBuilder builder = new ProcessBuilder(spec.argv());"
+        }
+      ],
+      "kind": "production Java-capable launch helper",
+      "explicitJustSearchDataOrHome": "none added by this launcher",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "see caller/command record",
+      "knownGap": "No explicit JVM user.home; profile isolation depends on supplied arguments and inherited environment.",
+      "note": "Builds spec.argv verbatim, inherits environment then applies spec.envOverrides; WindowsEngineJob/BoundChildProcess perform the physical launch."
+    },
+    {
+      "file": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/OwnedHelper.java",
+      "sites": [
+        {
+          "line": 124,
+          "source": "public static Process start(ProcessBuilder builder, String purpose) throws IOException {"
+        }
+      ],
+      "kind": "production Java-capable launch helper",
+      "explicitJustSearchDataOrHome": "none added by this launcher",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "see caller/command record",
+      "knownGap": "No explicit JVM user.home; profile isolation depends on supplied arguments and inherited environment.",
+      "note": "Forwards the supplied ProcessBuilder to BoundChildProcess without adding JVM profile arguments."
+    },
+    {
+      "file": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/BoundChildProcess.java",
+      "sites": [
+        {
+          "line": 81,
+          "source": "public static Process start(ProcessBuilder original) throws IOException {"
+        }
+      ],
+      "kind": "production Java-capable launch helper",
+      "explicitJustSearchDataOrHome": "none added by this launcher",
+      "explicitJvmUserHome": false,
+      "explicitFixturePath": "see caller/command record",
+      "knownGap": "No explicit JVM user.home; profile isolation depends on supplied arguments and inherited environment.",
+      "note": "Forwards command/env through its Linux bound-exec wrapper or starts the builder on other OSes; adds no JVM profile arguments."
+    },
+    {
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsContractTest.java",
+      "sites": [
+        {
+          "line": 98,
+          "source": "var builder = new ProcessBuilder("
+        }
+      ],
+      "kind": "platform-default contract fixture child",
+      "explicitJustSearchDataOrHome": "Contract fixture sysprops/env only; task JUSTSEARCH_DATA_DIR and LOCALAPPDATA are removed so fallback resolution is observed.",
+      "explicitJvmUserHome": true,
+      "explicitFixturePath": "-Duser.home=contract fixture userHome; argfile/stdout under JUnit @TempDir",
+      "knownGap": "none: the child receives an explicit fixture user.home and only resolves paths; it writes no profile data.",
+      "note": "This replaces the parent JVM property mutation so the existing default Linux/macOS fixture expectations remain meaningful with the task guard."
+    },
+    {
+      "file": "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherInternalsTest.java",
+      "sites": [
+        {
+          "line": 56,
+          "source": "var builder = new ProcessBuilder("
+        }
+      ],
+      "kind": "fixture JVM launch",
+      "explicitJustSearchDataOrHome": "explicit -Duser.home=<JUnit temp>/home; data property blank at startup and cleared in fixture; JUSTSEARCH_DATA_DIR removed only in child",
+      "explicitJvmUserHome": true,
+      "explicitFixturePath": "JUnit-owned working directory makes build/applauncher-data private; @argfile and output are JUnit-owned",
+      "knownGap": "",
+      "note": "Default-path oracle fixture only. Inherits task-local HOME/USERPROFILE/APPDATA/LOCALAPPDATA/XDG/JUSTSEARCH_HOME; no global JVM-option environment injection."
+    }
+  ],
+  "counts": {
+    "records": 72,
+    "sites": 90,
+    "withExplicitJvmUserHome": 1,
+    "withoutExplicitJustSearchDataOrHome": 67
+  },
+  "ownerDecision": {
+    "quote": "Java children: no JVM-option injection (no JAVA_TOOL_OPTIONS or JDK_JAVA_OPTIONS; they print to stderr, affect every java process and have split the Gradle daemon pool before). G2 covers environment-based resolution only. Instead, list every test-launched Java child (ProcessBuilder/launch helpers reachable from test source sets) and say whether it receives an explicit data/home path; those that don't are a known gap, reported in your reply, not fixed here (they belong to the product step that follows).",
+    "location": "task fb6884 user turn 3"
+  }
+}

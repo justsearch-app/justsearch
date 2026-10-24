@@ -39,9 +39,10 @@ follows a newer run that covers the requested commit. If main fails in your chan
 a fix or revert PR at once through the normal path. Report a failure in a test listed in
 `scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.
 
-Measured axe remains advisory and runs on PRs when the frontend input lane is selected.
+Measured axe is required (2026-10-24 amendment below) and runs on PRs when the frontend input
+lane is selected; other PRs report skipped.
 Secret scan and Public claims always run. The classifier fails safe for unknown paths, workflow
-changes, missing diff evidence and non-PR events. Fixed jobs preserve the twelve required names;
+changes, missing diff evidence and non-PR events. Fixed jobs preserve the thirteen required names;
 aggregates accept success or intentional skip and reject failure or cancellation. Main writes the
 Gradle cache that PRs read. PR pushes cancel their predecessor; main keeps its running run.
 
@@ -62,3 +63,22 @@ requires a queue. No new PR secrets or write permissions are introduced.
 The Linux Java lanes use disjoint class shards balanced from hosted per-class attribution.
 Selected PR lanes run supervisor conformance with only the six listed exclusions; main and
 manual runs exercise every case. Repository-wide static documentation checks run in Public claims.
+
+## Amendment 2026-10-24: Measured axe becomes required
+
+The advisory decision is superseded: `measured-axe` reports as **Measured axe** and is
+included in the CI signal policy's required checks. Since 2026-10-21 it passed all 59
+selected PR runs in the promotion record, with zero failures. This satisfies the stable
+advisory record required by ADR-0026 and ADR-0044. Serious and critical accessibility
+violations block merges.
+
+Selection is unchanged: affected frontend inputs on PRs, always on main pushes and manual
+dispatch. An unselected PR reports the literal job as skipped, matching `jseval Python suite`.
+No merge-group trigger is added. The gate still fails on every new rule regardless of impact,
+on serious/critical violations even in baselined rules, and on missing, null or errored scans;
+its job and gate step do not continue on error.
+
+Required-lane bookkeeping includes the local reproduction entry, a measured wall-clock policy
+row and `ci-walltime.needs` dependency. The dated advisory history above remains historical.
+Branch protection is updated by the maintainer after this change merges; repository settings
+are outside this change.

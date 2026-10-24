@@ -1,0 +1,56 @@
+{
+  "beforeRef": "631837df7",
+  "xmlTimestamp": "2026-10-23T19:42:01.878Z",
+  "tests": 3,
+  "failures": 2,
+  "skips": 0,
+  "testFileDigest": "sha256:412a387d05ce7c24dae900815a3499de4e0a1ebbfe9057231f59255dfb1e7ea7",
+  "cases": [
+    {
+      "method": "preservesOtherLengthChangingUnicodeAtWindowBoundaries()",
+      "outcome": "passed",
+      "assertionMessages": []
+    },
+    {
+      "method": "scoresCombiningMarksAcrossWindowBoundary()",
+      "outcome": "failed",
+      "assertionMessages": [
+        "org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxḸ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>"
+      ]
+    },
+    {
+      "method": "keepsCombiningBoundaryValuesWindowLocal()",
+      "outcome": "failed",
+      "assertionMessages": [
+        "org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "org.opentest4j.AssertionFailedError: Worker cross-encoder supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "org.opentest4j.AssertionFailedError: raw cosine supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "org.opentest4j.AssertionFailedError: Worker cross-encoder supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "org.opentest4j.AssertionFailedError: raw cosine supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <CROSS_ENCODER> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1200Ḹ (1501 chars) ==> expected: <EMBEDDING_COSINE> but was: <NONE>",
+        "Suppressed: org.opentest4j.AssertionFailedError: Worker cross-encoder supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "Suppressed: org.opentest4j.AssertionFailedError: raw cosine supplied=true: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "Suppressed: org.opentest4j.AssertionFailedError: Worker cross-encoder supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>",
+        "Suppressed: org.opentest4j.AssertionFailedError: raw cosine supplied=false: answer=The shipment contains 1200., passageTail=xxxxxxxxxxxxxxxxxxxxxxxxxxḸ1200below-threshold (1520 chars) ==> expected: <0> but was: <1>"
+      ]
+    }
+  ],
+  "observedExceptions": [
+    "java.lang.StringIndexOutOfBoundsException: Range [0, 1500) out of bounds for length 1499"
+  ],
+  "baselinePreservation": "uiux-numeric-windows-preservation-before.xml (f1f173020)",
+  "after": "uiux-numeric-windows-normalization-repaired.json"
+}
