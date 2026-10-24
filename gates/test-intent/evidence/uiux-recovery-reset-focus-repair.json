@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T01:01:50.373Z",
+  "revision": "f3bc416ae4f5de4f25e3536167e3c8593c9264bc",
+  "tree": "719a788cfd45eeb19745450bfbbd98d028b09c60",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-630089-1792803704121.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2487
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains recovery route focus until the first status reveals the hold",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 retains recovery route focus until the first status reveals the hold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 never steals focus moved during the existing asynchronous focus walk",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 never steals focus moved during the existing asynchronous focus walk",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 cancels a repeated recovery route when the user moves focus before the window updates",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 cancels a repeated recovery route when the user moves focus before the window updates",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "53aecead5",
+    "revision": "53aecead5417c2a91c29fabc582e774d2938d240",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-630089-1792803707799.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2347,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-630089-1792803707799.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 retains recovery route focus until the first status reveals the hold",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 retains recovery route focus until the first status reveals the hold:  AssertionError: expected <button class=\"close\" …(4)>…(1)</button> to be <button class=\"invoke\" …(1)></button> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-aQy3VH/modules/ui-web/src/shell-v0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 never steals focus moved during the existing asynchronous focus walk",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 never steals focus moved during the existing asynchronous focus walk:  AssertionError: expected <button class=\"invoke\" …(1)></button> to be <input type=\"text\" …(3)></input> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-aQy3VH/modules/ui-web/src/shell-v0/views/S"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 cancels a repeated recovery route when the user moves focus before the window updates",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 cancels a repeated recovery route when the user moves focus before the window updates:  AssertionError: expected <button class=\"invoke\" …(1)></button> to be <input type=\"text\" …(3)></input> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-aQy3VH/modules/ui-web/src/shell-v0/views/S"
+      }
+    ]
+  },
+  "digest": "sha256:6aa8e80d6e5e00238ebc0572ddc6df09cb5913a03b67b88cdd67fbe581eb724f"
+}
