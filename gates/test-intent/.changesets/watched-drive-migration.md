@@ -11,6 +11,9 @@ The owner adopted successful promotion, current content, exact acknowledgement, 
 status and automatic retry in scenarios v2 plus Amendment A1. Replace the disabled reproduction's
 refusal expectation with that outcome; keep its real loop mounts, identity checks and owned cleanup.
 The separate watcher-admission case preserves the existing final-fence handoff contract.
+Default ownership uses the index policy's null representation and the live watcher's `default`
+name interchangeably; named collections must still match. Replay must preserve a later admission's
+exact revision, and its projection-verification refusal must appear in status.
 
 ```json
 {
@@ -29,6 +32,11 @@ The separate watcher-admission case preserves the existing final-fence handoff c
       },
       "reproduction": "returnDuringBootMigrationPromotes holds migration-before-switching or migration-green-drained, unmounts the owned loop filesystem, deletes a source elsewhere, returns the same root, and attempts promotion with and without restart.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "canonicalise default ownership consistently in reconciliation's field comparison, the queue comparison and admission; keep exact-revision verification; and make a verification refusal set the visible refusal/fence status instead of only logging (D7).",
+          "location": "task drive-migration user turn adopting the round-4 investigation repair plan"
+        },
         {
           "kind": "owner-adopted-scenario",
           "task": "drive-migration",

@@ -127,7 +127,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
 
   @ParameterizedTest
   @ValueSource(strings = {"unchanged", "same-stamp"})
-  void implicitDefaultDeclarationKeepsTheLiveWatchersLabelAndCurrentContent(String change)
+  void implicitDefaultDeclarationKeepsTheLiveWatchersOwnershipAndCurrentContent(String change)
       throws Exception {
     try (var f = new Fixture()) {
       Path file = f.file("default.txt", "old bytes");
@@ -149,8 +149,55 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       var replay = f.prepare();
       assertTrue(replay.isPresent(), "the persisted default and live default name own the same root");
       assertEquals(change.equals("same-stamp") ? "new bytes" : "old bytes", f.content(file));
-      assertEquals("default", f.collection(file));
+      assertNull(f.collection(file), "the index default has no stored collection term");
       assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay.orElseThrow()));
+    }
+  }
+
+  @Test
+  void exactRevisionRefusalIsVisibleAndKeepsTheReadableProjection() throws Exception {
+    try (var f = new Fixture()) {
+      Path kept = f.file("kept.txt", "readable while fenced");
+      f.admit(kept, "notes");
+      var receipts = f.queue.listSwitchBufferOpsStrict();
+      String accepted = f.revision(kept);
+      assertEquals(1, f.queue.enqueueEntriesWithExactCollection(
+          List.of(JobQueue.EnqueueEntry.stat(kept)), "notes"));
+      assertNotEquals(accepted, f.revision(kept));
+      f.usePublisher(new RootWatcherRegistry());
+      assertTrue(f.prepare().isEmpty(), "a replaced queue revision cannot satisfy the old receipt");
+      assertEquals(receipts, f.queue.listSwitchBufferOpsStrict());
+      assertEquals("readable while fenced", f.content(kept));
+      String reason = f.publisher.indexStatus(io.justsearch.ipc.StatusRequest.getDefaultInstance(),
+          CallContext.none()).getMigration().getPauseReason();
+      assertTrue(reason.contains("Cutover fenced:") && reason.contains(kept.toString()), reason);
+    }
+  }
+
+  @Test
+  void laterDefaultAdmissionKeepsItsExactRevisionAcrossReconciliation() throws Exception {
+    try (var f = new Fixture()) {
+      Path kept = f.file("kept.txt", "kept after restart");
+      f.roots = List.of(new ResolvedConfig.FileSource(f.root, null));
+      var debt = new WatcherRootReconciliation(
+          f.root.toString(), RootIdentity.capture(f.root).toString(), "default");
+      assertTrue(f.queue.putSwitchBuffer(debt.key(), WatcherRootReconciliation.OPERATION, debt.encode()));
+      f.admit(kept, null); // Resumed enumeration follows the retained root receipt.
+      var receipt = f.queue.listSwitchBufferOpsStrict().stream()
+          .filter(op -> "UPSERT".equals(op.op())).findFirst().orElseThrow();
+      var admission = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(receipt.payload());
+      String before = f.revision(kept);
+      var prepared = f.prepare();
+      String after = f.revision(kept);
+      System.out.println("kept.txt reconciliation receipt=" + admission.unitRevision()
+          + " queue-before=" + before + " queue-after=" + after);
+      assertEquals(admission.unitRevision(), before);
+      assertEquals(before, after, "reconciliation must preserve a later accepted revision");
+      assertTrue(prepared.isPresent());
+      assertNull(f.collection(kept));
+      assertTrue(f.queue.matchesAcceptedFileProjection(kept.toString(), admission.unitRevision(),
+          admission.sourceSha256(), SourceContentHash.sha256(kept)));
+      assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, prepared.orElseThrow()));
     }
   }
 
@@ -482,7 +529,8 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
 
     Path file(String name, String content) throws Exception { return Files.writeString(root.resolve(name), content); }
     void usePublisher(RootWatcherRegistry registry) {
-      publisher = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+      publisher = new WorkerIngestService(queue, null,
+          org.mockito.Mockito.mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class), IndexingPacing.unthrottled(),
           temporary, temporary, runtime, runtime, null, 0L);
       publisher.setRootWatcherRegistry(registry);
       publisher.setDeclaredRootsDirectory(temporary);
@@ -512,6 +560,13 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     }
     String content(Path path) { return runtime.documentFieldOps().getDocumentField(path.toString(), SchemaFields.CONTENT); }
     String collection(Path path) { return runtime.documentFieldOps().getDocumentField(path.toString(), SchemaFields.COLLECTION); }
+    String revision(Path path) throws Exception {
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temporary.resolve("queue.db"));
+           var query = connection.prepareStatement("SELECT unit_revision FROM jobs WHERE path = ?")) {
+        query.setString(1, path.toString());
+        try (var row = query.executeQuery()) { assertTrue(row.next()); return row.getString(1); }
+      }
+    }
     java.util.Optional<KnowledgeServerMigrationOps.StrictReplay> prepare() throws Exception {
       long drained = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
       while (queue.jobStateCountsStrict().pendingCount() + queue.jobStateCountsStrict().processingCount() > 0

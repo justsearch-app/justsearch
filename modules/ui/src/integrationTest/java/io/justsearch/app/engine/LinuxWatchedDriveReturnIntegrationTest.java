@@ -577,8 +577,9 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     f.awaitReceipts(0, "promotion acknowledges the exact reconciled versions");
     var runtime = (io.justsearch.adapters.lucene.runtime.RunningRuntime) inherited(f.server, "ingestLifecycle");
     for (String name : List.of("kept.txt", "modified.txt")) {
-      assertEquals("default", runtime.documentFieldOps().getDocumentFieldOrThrow(
-          root.resolve(name).toString(), io.justsearch.indexing.SchemaFields.COLLECTION));
+      String collection = runtime.documentFieldOps().getDocumentFieldOrThrow(
+          root.resolve(name).toString(), io.justsearch.indexing.SchemaFields.COLLECTION);
+      assertEquals("default", collection == null ? "default" : collection);
     }
     Files.writeString(root.resolve("after-promotion.txt"), "migrationnewadmission");
     f.awaitCount("migrationnewadmission", 1);

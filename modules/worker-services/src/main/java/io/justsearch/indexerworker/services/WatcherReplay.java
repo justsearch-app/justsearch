@@ -133,10 +133,10 @@ public final class WatcherReplay implements AutoCloseable {
             throw new IOException("Watcher reconciliation deletion did not apply");
           }
         } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
-      } else if (!matches(path, source) || !queue.matchesExpectedCollection(Path.of(path), debt.collection())) {
+      } else if (!matches(path, source) || !matchesQueueCollection(Path.of(path))) {
         var entry = new JobQueue.EnqueueEntry(Path.of(path), Files.size(Path.of(path)), null, source)
             .withinRoot(Path.of(debt.root()));
-        if (queue.enqueueEntriesWithExactCollection(List.of(entry), debt.collection()) != 1) {
+        if (queue.enqueueEntriesWithExactCollection(List.of(entry), rootOwnerCollection(debt.collection())) != 1) {
           throw new IOException("Watcher reconciliation file admission failed: " + path);
         }
       }
@@ -180,8 +180,14 @@ public final class WatcherReplay implements AutoCloseable {
     if (source.isEmpty()) return target.indexCountOps().countByIdAndChunksStrict(path) == 0;
     var fields = target.documentFieldOps();
     return source.equals(fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256))
-        && Objects.equals(normalizeCollection(debt.collection()),
-            normalizeCollection(fields.getDocumentFieldOrThrow(path, SchemaFields.COLLECTION)));
+        && Objects.equals(rootOwnerCollection(debt.collection()),
+            rootOwnerCollection(fields.getDocumentFieldOrThrow(path, SchemaFields.COLLECTION)));
+  }
+
+  private boolean matchesQueueCollection(Path path) {
+    String collection = rootOwnerCollection(debt.collection());
+    return queue.matchesExpectedCollection(path, collection)
+        || collection == null && queue.matchesExpectedCollection(path, IngestCollectionPolicy.DEFAULT_COLLECTION);
   }
 
   private String observe(String path) throws IOException {

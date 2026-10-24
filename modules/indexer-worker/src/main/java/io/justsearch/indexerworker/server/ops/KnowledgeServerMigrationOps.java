@@ -1876,6 +1876,8 @@ public final class KnowledgeServerMigrationOps {
       context.ingestLifecycle().commitOps().maybeRefreshBlocking();
     } catch (RuntimeException unavailable) {
       context.log().warn("Buffered UPSERT reader could not refresh", unavailable);
+      if (context.publisher() != null) context.publisher().watcherReplayRefusal(
+          "Buffered UPSERT reader could not refresh: " + unavailable.getMessage());
       return false;
     }
     int awaited = 0;
@@ -1920,6 +1922,8 @@ public final class KnowledgeServerMigrationOps {
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
         if (!settled) {
           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
+          if (context.publisher() != null) context.publisher().watcherReplayRefusal(
+              "Buffered UPSERT lacks its accepted target projection: " + upsert.path());
           return false;
         }
       }
@@ -1931,6 +1935,8 @@ public final class KnowledgeServerMigrationOps {
       return !finalEffects || certifyReplayFileDeleteScopes(context, orderedOps, deleteOrder, reconciliations);
     } catch (IOException | RuntimeException unavailable) {
       context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
+      if (context.publisher() != null) context.publisher().watcherReplayRefusal(
+          "Buffered UPSERT projection evidence is unreadable: " + unavailable.getMessage());
       return false;
     }
   }
