@@ -24,13 +24,7 @@ These four files share one instrumentation warrant. Their existing oracles are p
         "instrumentation"
       ],
       "whatMoved": "The test driver now dispatches animationend on the actual departing toast after the original click, dismiss-control activation, superseding snapshot or dwell-timer expiry. Happy-dom 21.0.4 exposes Element.getAnimations(), so the existing product dismissal branch waits for CSS animation completion instead of taking the immediate-removal fallback that the previous test DOM used. AdvisoryToastHost.test.ts retains its acknowledgement, exactly-once dismissal and superseded-record checks. The three focus-overflow cases retain their focused action, returning sibling identity and silent reannouncement checks; the two keyboard-focusout cases retain both relatedTarget variants, nested-control/external focus and remount checks. The identity case retains both original live-region objects, aria attributes, staggered expiries and final empty-state checks. All original inputs, preconditions, click/focus/store triggers, fake-clock advances, observations, assertions, test names, tags, conditions and test selection are kept. No product code or fault injection changed; the added event completes the animation lifecycle before the same outcomes are observed.",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "location": "task t-20261023-2e899d user turn Decision: keep happy-dom 21.0.4, Next item 3",
-          "quote": "If the cause is a test-environment difference, make the smallest change to the tests or the test setup (vitest config, setup files) that restores what each test checks. Never weaken an assertion so it passes: the test must still fail if the product behavior it guards breaks. Show that for each changed test, for example by temporarily breaking the product behavior."
-        }
-      ],
+      "sources": [],
       "evidence": "gates/test-intent/evidence/deps-happy-dom-21.json"
     }
   ]
