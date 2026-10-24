@@ -54,10 +54,6 @@ final class IngestResponses {
     return PathNormalizer.normalizePath(rawDocId);
   }
 
-  static String normalizeDeletePrefixForMutation(String rawPathPrefix) {
-    return PathNormalizer.normalizePath(rawPathPrefix);
-  }
-
   static String resolveNormalizedPathPrefix(String rawPathPrefix) {
     String normalized = PathNormalizer.normalizePathPrefix(rawPathPrefix);
     return normalized == null ? rawPathPrefix : normalized;

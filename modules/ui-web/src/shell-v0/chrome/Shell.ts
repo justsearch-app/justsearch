@@ -281,7 +281,7 @@ import {
   fetchAndRegisterSurfaceSchemas,
   registerCoreStores,
 } from '../router/bootstrap.js';
-import type { StateSnapshot } from '../router/types.js';
+import type { ShellAddressNavigation, StateSnapshot } from '../router/types.js';
 import type { TransportTag } from '../router/transports.js';
 // Slice 501 — Navigation chrome (journal + saved views).
 import {
@@ -1534,6 +1534,16 @@ export class Shell extends JfElement {
       listSurfaces().some((s) => s.id === id);
     const operationClient = new OperationClient({ apiBase: this.apiBase });
     this.operationClient = operationClient;
+    // Bootstrap may finish after the user has already navigated (and closed a modal).
+    // Neither its URL read nor its journal fallback may replay that navigation.
+    let navigationHandled = false;
+    const persistentAddress = (address: ShellAddressNavigation): ShellAddressNavigation => {
+      if (address.target !== SETTINGS_SURFACE_ID || !address.state ||
+          !('focusSettingsRecovery' in address.state)) return address;
+      const state = { ...address.state };
+      delete state.focusSettingsRecovery;
+      return { ...address, state };
+    };
     const navigationHandler = createNavigationHandler({
       setActiveSurface: (id) => {
         // Slice 496 P1+P6 — track previous surface for navigation toast.
@@ -1605,7 +1615,16 @@ export class Shell extends JfElement {
         // left alone afterwards.
         if (!win.open) this.settingsOpenPushed = info.pushed;
         win.open = true;
-        if (state?.focusSettingsRecovery === true) win.focusSettingsRecovery();
+        if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
+          win.focusSettingsRecovery();
+        }
+        // The focus request belongs to this arrival only. Keep the destination in history,
+        // but hand focus off to Settings' cancellable pending intent instead of replaying it.
+        const current = parseUrl(window.location.hash.slice(1));
+        if (current?.kind === 'navigate' && current.target === SETTINGS_SURFACE_ID &&
+            current.state && 'focusSettingsRecovery' in current.state) {
+          window.history.replaceState(window.history.state, '', `#${canonicalize(persistentAddress(current))}`);
+        }
       },
     });
     const invocationHandler = createInvocationHandler({
@@ -1669,11 +1688,12 @@ export class Shell extends JfElement {
     // and update bookmark state after every navigation.
     this.intentRouter.subscribe((intent, outcome) => {
       if (intent.address.kind === 'navigate' && (outcome.status === 'dispatched' || outcome.status === 'auto-corrected')) {
+        navigationHandled = true;
         if (!isNavigatingHistoryNow()) {
           // Settle a claimed conversation before recording the surface that follows it.
           // A browser traversal has already moved its address and must never push here.
           if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
-          const url = canonicalize(intent.address);
+          const url = canonicalize(persistentAddress(intent.address));
           const label = deriveRichLabel(
             intent.address.target,
             url,
@@ -1689,11 +1709,36 @@ export class Shell extends JfElement {
     // `bindRouterDispatch` helper; removed in the slice-492 follow-up
     // since the indirection had no behavioral benefit).
     const router = this.intentRouter;
+    // A recovery URL is still pending while schemas/status bootstrap. User activity wins
+    // over that deferred modal arrival (opening the dialog would itself take focus).
+    let stopStartupRecoveryFocus = (): void => {};
+    const startupAddress = parseUrl(window.location.hash.slice(1));
+    if (startupAddress?.kind === 'navigate' && startupAddress.target === SETTINGS_SURFACE_ID &&
+        (startupAddress.state.focusSettingsRecovery === true || startupAddress.state.focusSettingsRecovery === 'true')) {
+      const controller = new AbortController();
+      stopStartupRecoveryFocus = () => controller.abort();
+      const cancelStartupRecovery = (): void => {
+        stopStartupRecoveryFocus();
+        const current = parseUrl(window.location.hash.slice(1));
+        if (current?.kind !== 'navigate' || current.target !== SETTINGS_SURFACE_ID ||
+            !('focusSettingsRecovery' in current.state)) return;
+        const destination = this.activeId
+          ? `#${canonicalize({ kind: 'navigate', target: this.activeId, state: {} })}`
+          : window.location.pathname + window.location.search;
+        if (!this.activeId) navigationHandled = true;
+        window.history.replaceState(window.history.state, '', destination);
+      };
+      for (const type of ['pointerdown', 'keydown']) {
+        window.addEventListener(type, cancelStartupRecovery, { capture: true, signal: controller.signal });
+      }
+      window.addEventListener('blur', cancelStartupRecovery, { signal: controller.signal });
+      this.sourceTeardowns.push(stopStartupRecoveryFocus);
+    }
     let nativeRequestHandled = false;
     let startingSources = false;
     const dispatch = (intent: Parameters<typeof router.dispatch>[0],
                       options?: Parameters<typeof router.dispatch>[1]): void => {
-      if (nativeRequestHandled && startingSources && intent.transport === 'URL_BAR') return;
+      if (startingSources && (nativeRequestHandled || navigationHandled) && intent.transport === 'URL_BAR') return;
       void router.dispatch(intent, options);
     };
     // Sources are constructed eagerly; their `start(...)` returns a
@@ -1721,6 +1766,7 @@ export class Shell extends JfElement {
       }
     }));
     void fetchAndRegisterSurfaceSchemas(this.apiBase).then(() => {
+      stopStartupRecoveryFocus();
       // Surface schemas arrived asynchronously. If we disconnected
       // before that resolved, skip source bootstrap entirely.
       if (this.disconnected) return;
@@ -1763,7 +1809,7 @@ export class Shell extends JfElement {
       const hash = window.location.hash;
       const urlDispatched =
         typeof hash === 'string' && hash.startsWith('#justsearch://');
-      if (!urlDispatched && !nativeRequestHandled) {
+      if (!urlDispatched && !nativeRequestHandled && !navigationHandled) {
         // Tempdoc 609 §R (T2.2) — resume where you left off: on a cold boot with no deep-link, restore the
         // LAST surface (with its saved state) from the persisted NavigationJournal; fall back to the rail
         // default when the journal is empty (a first-ever launch, or after clearing history). The journal

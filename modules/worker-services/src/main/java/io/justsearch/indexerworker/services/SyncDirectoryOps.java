@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
 import io.justsearch.adapters.lucene.runtime.CommitOps;
@@ -68,11 +70,6 @@ final class SyncDirectoryOps {
   private final int pathScanCap;
   private final int pathCharCap;
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
-  private volatile java.util.function.BiPredicate<Path, Path> rootOwnership = (root, file) -> true;
-
-  void setRootOwnership(java.util.function.BiPredicate<Path, Path> ownership) {
-    rootOwnership = java.util.Objects.requireNonNull(ownership, "ownership");
-  }
 
   void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
     userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
@@ -90,6 +87,15 @@ final class SyncDirectoryOps {
       root -> RootPresenceGuard.capture(root, null);
   /** Holds off file publications while the prune applies a batch; the ingest service supplies it. */
   private volatile PruneOps.WriterFence pruneWriterFence = PruneOps.WriterFence.NONE;
+
+  private java.util.function.Function<Path, PathPrefixScope>
+      prefixScopeFactory = root -> new PathPrefixScope(
+          root.toString(), List.of());
+
+  void setPrefixScopeFactory(
+      java.util.function.Function<Path, PathPrefixScope> factory) {
+    prefixScopeFactory = java.util.Objects.requireNonNull(factory);
+  }
 
   SyncDirectoryOps(
       ReadPathOps readPathOps,
@@ -204,11 +210,13 @@ final class SyncDirectoryOps {
     } catch (RuntimeException invalid) {
       throw new IOException("Invalid reconciliation root", invalid);
     }
+    var scope = prefixScopeFactory.apply(root);
     RootIdentityLease identityLease = RootIdentity.hold(root);
     try {
       identityLease.requireCurrent();
       var budget = new PathBudget(pathCharCap);
-      Set<String> indexedPaths = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled);
+      Set<String> indexedPaths = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled, scope);
+      indexedPaths.removeIf(scope::excludes);
       Set<String> seenDiskPaths = new HashSet<>();
       List<Path> eligibleFiles = new ArrayList<>();
       Files.walkFileTree(
@@ -218,6 +226,7 @@ final class SyncDirectoryOps {
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                 throws IOException {
               checkCancelled(cancelled);
+              if (scope.excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
               if (!Files.isReadable(dir)) {
                 throw new IOException("Reconciliation directory is unreadable: " + dir);
               }
@@ -234,6 +243,7 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
                 throws IOException {
               checkCancelled(cancelled);
+              if (scope.excludes(file.toString())) return FileVisitResult.CONTINUE;
               if (attrs.isSymbolicLink()) {
                 throw new IOException("Reconciliation does not follow symbolic links: " + file);
               }
@@ -372,7 +382,9 @@ final class SyncDirectoryOps {
                   new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
               org.apache.lucene.search.BooleanClause.Occur.MUST_NOT)
           .build();
-      var result = readPathOps.search(query, limit,
+      var scopedQuery = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.excludingSubtrees(
+          query, prefixScopeFactory.apply(root).excludedSubtrees());
+      var result = readPathOps.search(scopedQuery, limit,
           Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
               SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
           LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, null);
@@ -414,7 +426,7 @@ final class SyncDirectoryOps {
 
   private Set<String> getIndexedPathsUnderPrefixStrict(
       String prefix, PathBudget budget,
-      java.util.function.BooleanSupplier cancelled) throws IOException {
+      java.util.function.BooleanSupplier cancelled, PathPrefixScope scope) throws IOException {
     if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
     Set<String> paths = new LinkedHashSet<>();
     Set<String> cursors = new HashSet<>();
@@ -428,12 +440,14 @@ final class SyncDirectoryOps {
                   new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
               org.apache.lucene.search.BooleanClause.Occur.MUST_NOT)
           .build();
+      org.apache.lucene.search.Query scopedQuery = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder
+          .excludingSubtrees(query, scope.excludedSubtrees());
       Path root = Path.of(prefix).toAbsolutePath().normalize();
       String normalizedRootPrefix = PathNormalizer.normalizePathPrefix(root.toString());
       String cursor = null;
       do {
         checkCancelled(cancelled);
-        var result = readPathOps.search(query, 256,
+        var result = readPathOps.search(scopedQuery, 256,
             Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID),
             LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
         if (result == null) throw new IOException("Serving index path scan returned no result");
@@ -583,6 +597,7 @@ final class SyncDirectoryOps {
     int filesDeleted = 0;
 
     try {
+      var scope = prefixScopeFactory.apply(root);
       if (upgradeRecovery && recoveryAdmission.applyAsInt(() -> 1) != 1) {
         return syncDirectoryErrorResponse("Upgrade recovery root was removed or is no longer declared");
       }
@@ -603,7 +618,7 @@ final class SyncDirectoryOps {
       // set (can be large). We enqueue all disk files and rely on IndexingLoop's "unchanged"
       // fast-path.
       if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
-      Set<String> indexedPaths = indexedPathsForSync(rootPath, force, cancelled);
+      Set<String> indexedPaths = indexedPathsForSync(rootPath, force, cancelled, scope);
       if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
       SyncDirectoryResponse scanSkip =
           handleSyncIndexedPathsScanSkipIfNeeded(rootPath, force, indexedPaths, filesDeleted);
@@ -716,14 +731,13 @@ final class SyncDirectoryOps {
     // is present and listable. The guard is
     // re-checked at every batch boundary, so a drive unplugged mid-prune stops it instead of
     // reading as "every file is gone".
-    PruneOps.PresenceGuard original = pruneGuardFactory.apply(root);
-    PruneOps.PresenceGuard guard = !upgradeRecovery ? original : new PruneOps.PresenceGuard() {
-      @Override public boolean rootCurrent() { return original.rootCurrent(); }
+    PruneOps.PresenceGuard authority = pruneGuardFactory.apply(root);
+    PruneOps.PresenceGuard guard = new PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() { return authority.rootCurrent(); }
       @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
-        // Excluded rows are retained, without borrowing uncertainty as deletion authority or
-        // requiring their contents to become readable before eligible recovery can complete.
-        return excludedRecoveryPath(file, root)
-            ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : original.presence(file);
+        return prefixScopeFactory.apply(root).excludes(file.toString())
+                || (upgradeRecovery && excludedRecoveryPath(file, root))
+            ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : authority.presence(file);
       }
     };
     // Tempdoc 885 item 3: the throttle callback the prune already invokes every N documents is now
@@ -741,11 +755,11 @@ final class SyncDirectoryOps {
   }
 
   private Set<String> indexedPathsForSync(String rootPath, boolean force,
-      java.util.function.BooleanSupplier cancelled) {
+      java.util.function.BooleanSupplier cancelled, PathPrefixScope scope) {
     if (force) {
       return null;
     }
-    return getIndexedPathsUnderPrefix(rootPath, cancelled);
+    return getIndexedPathsUnderPrefix(rootPath, cancelled, scope);
   }
 
   // ==================== Walk logic ====================
@@ -772,8 +786,8 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
               if (stopped()) return FileVisitResult.TERMINATE;
+              if (prefixScopeFactory.apply(root).excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
               if (dir.equals(root)) return FileVisitResult.CONTINUE;
-              if (!rootOwnership.test(root, dir)) return FileVisitResult.SKIP_SUBTREE;
               String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
               if (IngestionSkipPolicy.isSkippedDirectoryName(name)
                   || (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(dir, root))) {
@@ -785,8 +799,8 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
               if (stopped()) return FileVisitResult.TERMINATE;
+              if (prefixScopeFactory.apply(root).excludes(file.toString())) return FileVisitResult.CONTINUE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-              if (!rootOwnership.test(root, file)) return FileVisitResult.CONTINUE;
               if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
@@ -839,7 +853,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
               if (stopped()) return FileVisitResult.TERMINATE;
-              if (!rootOwnership.test(root, file)) return FileVisitResult.CONTINUE;
+              if (prefixScopeFactory.apply(root).excludes(file.toString())) return FileVisitResult.CONTINUE;
               if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
@@ -861,8 +875,9 @@ final class SyncDirectoryOps {
           () -> cancelled.getAsBoolean() || walkInterrupted[0]
               || Thread.currentThread().isInterrupted(), entries -> {
             // Recheck scoped policy at admission while retaining the spool's bounded batches.
+            var admissionScope = prefixScopeFactory.apply(root);
             var admitted = entries.stream()
-                .filter(entry -> rootOwnership.test(root, entry.path()))
+                .filter(entry -> !admissionScope.excludes(entry.path().toString()))
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();
@@ -893,14 +908,14 @@ final class SyncDirectoryOps {
    * matching on doc_id, which can misclassify legitimate paths.
    */
   private Set<String> getIndexedPathsUnderPrefix(String prefix,
-      java.util.function.BooleanSupplier cancelled) {
+      java.util.function.BooleanSupplier cancelled, PathPrefixScope scope) {
     Set<String> paths = new HashSet<>();
     if (readPathOps == null) {
       return paths;
     }
 
     try {
-      String normalizedPrefix = PathNormalizer.normalizePath(prefix);
+      String normalizedPrefix = PathNormalizer.normalizePathPrefix(prefix);
 
       var prefixQuery =
           new org.apache.lucene.search.PrefixQuery(
@@ -914,6 +929,8 @@ final class SyncDirectoryOps {
                   org.apache.lucene.search.BooleanClause.Occur.MUST_NOT)
               .build();
 
+      var scopedQuery = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.excludingSubtrees(
+          query, scope.excludedSubtrees());
       String cursor = null;
       final int batchSize = 256;
       long pathChars = 0;
@@ -921,7 +938,7 @@ final class SyncDirectoryOps {
         if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return null;
         var result =
             readPathOps.search(
-                query,
+                scopedQuery,
                 batchSize,
                 Set.of(SchemaFields.DOC_ID),
                 LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC,

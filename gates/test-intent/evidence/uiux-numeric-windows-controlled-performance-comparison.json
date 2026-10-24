@@ -1,0 +1,798 @@
+{
+  "method": "B A B A B A; unchanged CPU scorer fixture; each independent JVM has two warm-up suites and five measured suites; compare medians of the three five-suite medians on each side",
+  "settings": "CUDA_VISIBLE_DEVICES=-1; identical Gradle test JVM configuration; --max-workers=1; same private JVM temp directory; private per-side ONNX cache; same read-only models",
+  "order": [
+    {
+      "side": "before",
+      "repeat": 1,
+      "medianNanos": 205134107
+    },
+    {
+      "side": "after",
+      "repeat": 1,
+      "medianNanos": 158099065
+    },
+    {
+      "side": "before",
+      "repeat": 2,
+      "medianNanos": 169654048
+    },
+    {
+      "side": "after",
+      "repeat": 2,
+      "medianNanos": 200968327
+    },
+    {
+      "side": "before",
+      "repeat": 3,
+      "medianNanos": 357160615
+    },
+    {
+      "side": "after",
+      "repeat": 3,
+      "medianNanos": 239954076
+    }
+  ],
+  "before": {
+    "runs": [
+      {
+        "repeat": 1,
+        "xml": "uiux-numeric-windows-controlled-performance-before-1.xml",
+        "medianNanos": 205134107,
+        "suites": [
+          {
+            "run": 0,
+            "suiteNanos": 253540575,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 1,
+            "suiteNanos": 203664117,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 2,
+            "suiteNanos": 205134107,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 3,
+            "suiteNanos": 212761322,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 4,
+            "suiteNanos": 193676706,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          }
+        ],
+        "models": [
+          [
+            "model.onnx",
+            "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          ],
+          [
+            "tokenizer.json",
+            "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+          ],
+          [
+            "config.json",
+            "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+          ]
+        ],
+        "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+        "resources": [
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.29833984375"
+        ]
+      },
+      {
+        "repeat": 2,
+        "xml": "uiux-numeric-windows-controlled-performance-before-2.xml",
+        "medianNanos": 169654048,
+        "suites": [
+          {
+            "run": 0,
+            "suiteNanos": 165136856,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 1,
+            "suiteNanos": 161631213,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 2,
+            "suiteNanos": 169654048,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 3,
+            "suiteNanos": 176646949,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 4,
+            "suiteNanos": 182589920,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          }
+        ],
+        "models": [
+          [
+            "model.onnx",
+            "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          ],
+          [
+            "tokenizer.json",
+            "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+          ],
+          [
+            "config.json",
+            "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+          ]
+        ],
+        "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+        "resources": [
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=7.89892578125"
+        ]
+      },
+      {
+        "repeat": 3,
+        "xml": "uiux-numeric-windows-controlled-performance-before-3.xml",
+        "medianNanos": 357160615,
+        "suites": [
+          {
+            "run": 0,
+            "suiteNanos": 362468939,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 1,
+            "suiteNanos": 323855993,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 2,
+            "suiteNanos": 317202581,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 3,
+            "suiteNanos": 357160615,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 4,
+            "suiteNanos": 357856951,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          }
+        ],
+        "models": [
+          [
+            "model.onnx",
+            "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          ],
+          [
+            "tokenizer.json",
+            "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+          ],
+          [
+            "config.json",
+            "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+          ]
+        ],
+        "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+        "resources": [
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.64501953125"
+        ]
+      }
+    ],
+    "medianNanos": 205134107
+  },
+  "after": {
+    "runs": [
+      {
+        "repeat": 1,
+        "xml": "uiux-numeric-windows-controlled-performance-after-1.xml",
+        "medianNanos": 158099065,
+        "suites": [
+          {
+            "run": 0,
+            "suiteNanos": 160822858,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 1,
+            "suiteNanos": 155939831,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 2,
+            "suiteNanos": 158099065,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 3,
+            "suiteNanos": 157845745,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 4,
+            "suiteNanos": 158489944,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          }
+        ],
+        "models": [
+          [
+            "model.onnx",
+            "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          ],
+          [
+            "tokenizer.json",
+            "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+          ],
+          [
+            "config.json",
+            "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+          ]
+        ],
+        "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+        "resources": [
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.1943359375"
+        ]
+      },
+      {
+        "repeat": 2,
+        "xml": "uiux-numeric-windows-controlled-performance-after-2.xml",
+        "medianNanos": 200968327,
+        "suites": [
+          {
+            "run": 0,
+            "suiteNanos": 220727095,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 1,
+            "suiteNanos": 193566595,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 2,
+            "suiteNanos": 200968327,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 3,
+            "suiteNanos": 202633678,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 4,
+            "suiteNanos": 186704456,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          }
+        ],
+        "models": [
+          [
+            "model.onnx",
+            "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          ],
+          [
+            "tokenizer.json",
+            "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+          ],
+          [
+            "config.json",
+            "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+          ]
+        ],
+        "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+        "resources": [
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=7.34619140625"
+        ]
+      },
+      {
+        "repeat": 3,
+        "xml": "uiux-numeric-windows-controlled-performance-after-3.xml",
+        "medianNanos": 239954076,
+        "suites": [
+          {
+            "run": 0,
+            "suiteNanos": 245245611,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 1,
+            "suiteNanos": 239236217,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 2,
+            "suiteNanos": 239954076,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 3,
+            "suiteNanos": 235373995,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          },
+          {
+            "run": 4,
+            "suiteNanos": 244299290,
+            "scored": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "matched": [
+              0,
+              0,
+              1,
+              1,
+              0,
+              1
+            ]
+          }
+        ],
+        "models": [
+          [
+            "model.onnx",
+            "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          ],
+          [
+            "tokenizer.json",
+            "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+          ],
+          [
+            "config.json",
+            "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e"
+          ]
+        ],
+        "fixtures": "894fc9dbefeaf5fecb5141a6954331bc3981e84fd3fb2da7d0fb92b23040fa69",
+        "resources": [
+          "NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=9.5361328125"
+        ]
+      }
+    ],
+    "medianNanos": 200968327
+  },
+  "ratio": 0.9796924067824567,
+  "withinTenPercent": true
+}

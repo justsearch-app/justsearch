@@ -106,8 +106,39 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       // genuinely Windows-only methods retain their "windows" tag and OS preconditions.
       val windowsOnly = project.findProperty("windowsOnly")?.toString()?.toBoolean() ?: false
       val isWindowsHost = HostPlatform.isWindows
+      // Linux with glibc: native-heap trimming is a no-op elsewhere (musl, Windows).
+      val isGlibcHost = HostPlatform.isLinux && project.providers.exec {
+        commandLine("sh", "-c", "getconf GNU_LIBC_VERSION 2>/dev/null || true")
+      }.standardOutput.asText.get().trim().startsWith("glibc ")
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
+        // Test profiles belong to the task, never to the developer running Gradle. Resolve at
+        // execution time so absolute checkout paths do not become build/configuration-cache inputs.
+        // Keep profile isolation in sync with build-logic/build.gradle.kts: that build cannot
+        // apply this plugin while compiling it.
+        val testProfile = project.layout.buildDirectory.dir("test-profile/$name")
+        doFirst {
+          val profile = testProfile.get().asFile
+          val home = profile.resolve("home")
+          val paths = mapOf(
+              "HOME" to home, "USERPROFILE" to home,
+              "APPDATA" to home.resolve("AppData/Roaming"),
+              "LOCALAPPDATA" to home.resolve("AppData/Local"),
+              "XDG_CONFIG_HOME" to home.resolve(".config"),
+              "XDG_DATA_HOME" to home.resolve(".local/share"),
+              "XDG_CACHE_HOME" to home.resolve(".cache"),
+              "XDG_STATE_HOME" to home.resolve(".local/state"))
+          paths.values.forEach { it.mkdirs() }
+          (this as Test).apply {
+            systemProperty("user.home", home.absolutePath)
+            // Clear inherited overrides; YAML and test fixtures retain their normal precedence.
+            systemProperties.remove("justsearch.data.dir")
+            systemProperties.remove("justsearch.home")
+            environment.remove("JUSTSEARCH_HOME")
+            environment.remove("JUSTSEARCH_DATA_DIR")
+            paths.forEach { (key, path) -> environment(key, path.absolutePath) }
+          }
+        }
         // Keep the known Linux flake cases visible on main, while PRs prove the remaining cases.
         if (!isWindowsHost && project.providers.environmentVariable("JUSTSEARCH_PR_CI").orNull == "true") {
           project.rootProject.file("scripts/ci/pr-flakes.tsv").readLines()
@@ -150,6 +181,12 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         maxHeapSize = "384m"
         jvmArgs("--sun-misc-unsafe-memory-access=warn", "--enable-native-access=ALL-UNNAMED",
             "-XX:+UseCompactObjectHeaders")
+        // Return freed native memory (ONNX Runtime sessions, tokenizers) to the OS, as the Engine
+        // does (modules/ui/build.gradle.kts). Without it, a test JVM that boots the real models per
+        // method kept about 1.1 GiB more after each server close and two such JVMs filled swap.
+        if (isGlibcHost) {
+          jvmArgs("-XX:TrimNativeHeapInterval=30000")
+        }
         systemProperty("junit.jupiter.execution.timeout.default", "30s")
         systemProperty("junit.jupiter.execution.timeout.mode", "disabled_on_debug")
         // Tempdoc 965 J3: inputs the tests read but Gradle did not track, so a cached result could

@@ -273,9 +273,16 @@ public final class IndexCountOps {
   /** Strict final-scope proof for a committed prefix delete; exceptions are certified by caller. */
   public int countPathPrefixExcludingAcceptedSurvivorsStrict(
       String prefix, List<String> fileIds, List<String> projectionIds) throws IOException {
+    return countPathPrefixExcludingAcceptedSurvivorsStrict(prefix, fileIds, projectionIds, List.of());
+  }
+
+  public int countPathPrefixExcludingAcceptedSurvivorsStrict(
+      String prefix, List<String> fileIds, List<String> projectionIds, List<String> excludedSubtrees)
+      throws IOException {
     if (prefix == null || prefix.isBlank()) throw new IllegalArgumentException("Empty delete prefix");
-    return countUnexpectedSurvivors(new PrefixQuery(new Term(SchemaFields.PATH,
-        QueryFilterBuilder.normalizePathPrefix(prefix))), fileIds, projectionIds);
+    return countUnexpectedSurvivors(QueryFilterBuilder.excludingSubtrees(
+        new PrefixQuery(new Term(SchemaFields.PATH, QueryFilterBuilder.normalizePathPrefix(prefix))),
+        excludedSubtrees), fileIds, projectionIds);
   }
 
   /** Strict final-scope proof for a committed collection delete, including parent and chunk docs. */

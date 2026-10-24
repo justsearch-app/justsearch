@@ -2,11 +2,13 @@ package io.justsearch.configuration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -14,8 +16,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tempdoc 501 §3.6: cross-language contract for {@link PlatformPaths#resolveDataDir}.
@@ -34,6 +38,8 @@ import org.junit.jupiter.api.TestFactory;
 final class PlatformPathsContractTest {
 
   private static final ObjectMapper JSON = new ObjectMapper();
+
+  @TempDir Path temporary;
 
   @TestFactory
   List<DynamicTest> resolveDataDirMatchesContractSpec() throws IOException {
@@ -62,60 +68,55 @@ final class PlatformPathsContractTest {
     return false;
   }
 
-  private static void runFixture(JsonNode fixture) {
+  private void runFixture(JsonNode fixture) throws Exception {
     String platform = fixture.path("platform").asText();
     String userHome = fixture.path("userHome").asText();
     Map<String, String> env = jsonMapToString(fixture.path("env"));
     Map<String, String> sysprops = jsonMapToString(fixture.path("sysprops"));
     String expected = fixture.path("expected").asText();
 
-    // Hermetic override: PlatformPaths reads from System.getProperty / System.getenv.
-    // We can't override real env from Java, so we snapshot+restore sysprops and skip
-    // fixtures that depend on env-var overrides we can't apply. For env-var-driven
-    // fixtures we install a small shim by replacing process env via a sysprop alias
-    // pattern when supported; otherwise the test is documented and skipped.
-    //
-    // The cleanest approach for full coverage is to add a package-private overload
-    // PlatformPaths.resolveDataDir(EnvLookup, SysPropLookup, PlatformLookup) — done
-    // below via reflection-friendly indirection if/when needed.
-    //
-    // For now: fixtures that depend purely on sysprops or platform-default with no
-    // env contribution are runnable here. Env-driven fixtures are exercised by the
-    // Node contract test (which can freely override process.env).
-
     if (!env.isEmpty() && !sysprops.containsKey("justsearch.data.dir")) {
-      // Java can't override System.getenv hermetically; this fixture is the Node side's
-      // responsibility. Record a passing test that documents the split.
+      // Keep the existing Java/Node fixture split; the Node runner owns env-driven fixtures.
       return;
     }
 
-    Map<String, String> savedProps = new HashMap<>();
-    for (String key : List.of(
-        "justsearch.data.dir",
-        "user.home", "os.name")) {
-      savedProps.put(key, System.getProperty(key));
-    }
+    // A process boundary lets the fixture remove the task's protective data override without
+    // changing the parent JVM's profile. The child uses only the contract's declared sources.
+    List<String> arguments = new ArrayList<>();
+    arguments.add("-Duser.home=" + userHome);
+    sysprops.forEach((key, value) -> arguments.add("-D" + key + "=" + value));
+    arguments.add("-cp");
+    arguments.add(System.getProperty("java.class.path"));
+    arguments.add(PathProbe.class.getName());
+    arguments.add(osNameFor(platform));
+    Path argFile = Files.createTempFile(temporary, "path-fixture-", ".args");
+    Files.write(argFile, arguments.stream()
+        .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+        .toList());
+    Path output = Files.createTempFile(temporary, "path-fixture-", ".out");
+    String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
+    var builder = new ProcessBuilder(
+        Path.of(System.getProperty("java.home"), "bin", executable).toString(), "@" + argFile)
+        .redirectOutput(output.toFile()).redirectError(ProcessBuilder.Redirect.INHERIT);
+    builder.environment().remove("JUSTSEARCH_DATA_DIR");
+    builder.environment().remove("LOCALAPPDATA");
+    builder.environment().putAll(env);
+    Process child = builder.start();
     try {
-      for (Map.Entry<String, String> e : sysprops.entrySet()) {
-        System.setProperty(e.getKey(), e.getValue());
-      }
-      System.setProperty("user.home", userHome);
-      System.setProperty("os.name", osNameFor(platform));
-
-      Path actual = PlatformPaths.resolveDataDir();
-      Path expectedPath = Paths.get(expected);
-      assertEquals(
-          expectedPath.toString().replace('\\', '/'),
-          actual.toString().replace('\\', '/'),
+      assertTrue(child.waitFor(20, TimeUnit.SECONDS), "path fixture must exit");
+      assertEquals(0, child.exitValue());
+      assertEquals(Paths.get(expected).toString().replace('\\', '/'),
+          Files.readString(output).strip().replace('\\', '/'),
           "Fixture " + fixture.path("name").asText() + " — Java resolution");
     } finally {
-      for (Map.Entry<String, String> e : savedProps.entrySet()) {
-        if (e.getValue() == null) {
-          System.clearProperty(e.getKey());
-        } else {
-          System.setProperty(e.getKey(), e.getValue());
-        }
-      }
+      if (child.isAlive()) { child.destroyForcibly(); child.waitFor(); }
+    }
+  }
+
+  public static final class PathProbe {
+    public static void main(String[] args) {
+      System.setProperty("os.name", args[0]);
+      System.out.println(PlatformPaths.resolveDataDir());
     }
   }
 

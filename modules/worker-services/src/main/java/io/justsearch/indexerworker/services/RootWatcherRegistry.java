@@ -67,7 +67,7 @@ public final class RootWatcherRegistry {
    * Set once a reload's replacement registry took over this one's roots. Watch changes that still
    * reach this retired registry go to the successor, so none is lost and no removal is undone.
    */
-  private RootWatcherRegistry successor;
+  private volatile RootWatcherRegistry successor;
   private long handoverMark;
 
   /** How a successor re-registers one handed-over root (a volume check may hold it instead). */
@@ -301,7 +301,7 @@ public final class RootWatcherRegistry {
   }
 
   /** The registry that currently owns this one's roots: itself, or its latest successor. */
-  synchronized RootWatcherRegistry current() {
+  RootWatcherRegistry current() {
     return successor == null ? this : successor.current();
   }
 
@@ -361,6 +361,15 @@ public final class RootWatcherRegistry {
     return false;
   }
 
+  /** Active, held and retained return declarations partition an ancestor's scope. */
+  Set<Path> declaredRoots() {
+    if (successor != null) return successor.declaredRoots();
+    var roots = new java.util.HashSet<>(subscriptions.keySet());
+    roots.addAll(awaitingVolume.keySet());
+    roots.addAll(returnIdentities.keySet());
+    return Set.copyOf(roots);
+  }
+
   /** Cheap health checks only: healthy always-present roots incur no filesystem observations. */
   Set<Path> recoveryRoots() {
     Set<Path> roots = new java.util.HashSet<>(awaitingVolume.keySet());
@@ -371,22 +380,6 @@ public final class RootWatcherRegistry {
       });
     }
     return roots;
-  }
-
-  boolean hasNestedRoots(Path root) {
-    return java.util.stream.Stream.of(subscriptions.keySet(), awaitingVolume.keySet(), returnIdentities.keySet())
-        .flatMap(Set::stream).anyMatch(other -> !other.equals(root) && other.startsWith(root));
-  }
-
-  /** A nested declaration keeps its own files even while its watcher is held or dead. */
-  boolean ownsPath(Path root, Path file) {
-    Path normalizedRoot = root.toAbsolutePath().normalize();
-    Path normalizedFile = file.toAbsolutePath().normalize();
-    if (!normalizedFile.startsWith(normalizedRoot)) return false;
-    // The retained identities also cover the publication gap while a watcher is replaced.
-    return java.util.stream.Stream.of(subscriptions.keySet(), awaitingVolume.keySet(), returnIdentities.keySet())
-        .flatMap(Set::stream).noneMatch(other -> !other.equals(normalizedRoot)
-            && other.startsWith(normalizedRoot) && normalizedFile.startsWith(other));
   }
 
   RootIdentity registeredIdentity(Path root) {

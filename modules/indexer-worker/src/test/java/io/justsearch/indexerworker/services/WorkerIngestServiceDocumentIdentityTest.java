@@ -133,7 +133,9 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
           journal.stream()
           .map(op -> "DELETE".equals(op.op())
               ? io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(op.payload()).path()
-              : op.payload())
+              : "DELETE_PREFIX".equals(op.op())
+                  ? io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(op.payload()).prefix()
+                  : op.payload())
           .collect(java.util.stream.Collectors.toSet()));
       assertEquals(Set.of("DELETE", "DELETE_PREFIX", "DELETE_COLLECTION"), journal.stream()
           .map(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp::op)

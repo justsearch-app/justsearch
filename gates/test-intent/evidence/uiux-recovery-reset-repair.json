@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-24T01:01:36.619Z",
+  "revision": "f3bc416ae4f5de4f25e3536167e3c8593c9264bc",
+  "tree": "5113ff72ba58405f1aa8cf0f7d2fc65117723a05",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-626668-1792803687542.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4231
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 exposes the existing reset in every tier only for the observed recovery hold",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 exposes the existing reset in every tier only for the observed recovery hold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 focuses the actual reset control in every tier without a View-tier detour",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 focuses the actual reset control in every tier without a View-tier detour",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f2f68846b2ed12e003dfb9566d39f24dde5595adc20d7545a3c8ef7a2357d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-task-list routes recovery directly to Reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 jf-task-list routes recovery directly to Reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-status-deck routes recovery directly to Reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 jf-status-deck routes recovery directly to Reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-health-surface routes recovery directly to Reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 jf-health-surface routes recovery directly to Reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-library-surface routes recovery directly to Reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 jf-library-surface routes recovery directly to Reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-settings-surface routes recovery directly to Reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 jf-settings-surface routes recovery directly to Reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-sv3-window routes recovery directly to Reset without offering Resume",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 jf-sv3-window routes recovery directly to Reset without offering Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 the indexing overlay and waiting folder rows direct recovery to Reset",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:764313bfd12f888f436f06671642e1c167f5994c468c2cdbc09453a25847061c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37 keyboard continuity and recovery CR37c R2 the indexing overlay and waiting folder rows direct recovery to Reset",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bcab79eeb",
+    "revision": "bcab79eeb6eb53167968701d6ff2aeef8aa2c8fd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-626668-1792803693014.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3426,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-vitest-626668-1792803693014.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 exposes the existing reset in every tier only for the observed recovery hold",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R1 exposes the existing reset in every tier only for the observed recovery hold:  AssertionError: USER can reset during recovery: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts:280:78"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R1 preserves confirmation, cancellation, errors and successful reset handling in User tier:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts:289:39\n    at runNextTicks (node:intern"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R2 focuses the actual reset control in every tier without a View-tier detour",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R2 focuses the actual reset control in every tier without a View-tier detour:  AssertionError: recovery does not detour to developer settings: expected 'developer' to be 'appearance' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/views"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts:344:39\n    at runNextTicks (node:intern"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+        "classification": "assertion",
+        "detail": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts:359:39\n    at runNextTicks (node:intern"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-task-list routes recovery directly to Reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 jf-task-list routes recovery directly to Reset without offering Resume:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-status-deck routes recovery directly to Reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 jf-status-deck routes recovery directly to Reset without offering Resume:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-health-surface routes recovery directly to Reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 jf-health-surface routes recovery directly to Reset without offering Resume:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-library-surface routes recovery directly to Reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 jf-library-surface routes recovery directly to Reset without offering Resume:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-settings-surface routes recovery directly to Reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 jf-settings-surface routes recovery directly to Reset without offering Resume:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 jf-sv3-window routes recovery directly to Reset without offering Resume",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 jf-sv3-window routes recovery directly to Reset without offering Resume:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#CR37c R2 the indexing overlay and waiting folder rows direct recovery to Reset",
+        "classification": "assertion",
+        "detail": "CR37 keyboard continuity and recovery CR37c R2 the indexing overlay and waiting folder rows direct recovery to Reset:  AssertionError: expected 'Open Settings at View tier' to contain 'Open Settings at Reset to defaults'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-recovery-reset/tmp/recovery-reset-input-only/evidence-tmp/test-intent-before-AaAigh/modules/ui-web/src/shell-v0/components/IndexingPause.test"
+      }
+    ]
+  },
+  "digest": "sha256:ac1ae9ecc7d3c1bf2dd219c9420268ee6581e04124d663899d9e08453b269859"
+}

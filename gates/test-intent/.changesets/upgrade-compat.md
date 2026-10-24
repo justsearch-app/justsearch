@@ -627,14 +627,16 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round9.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-merge921.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java#rootRemovedAfterAuthorityBeforeFenceCannotRecreateJobs",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java#laterRecoveryDuringHeadRemovalLagCannotRecreateJobs"
       ],
       "repaired": true,
-      "historicalEvidence": "gates/test-intent/evidence/upgrade-compat-round8.json"
+      "historicalEvidence": "gates/test-intent/evidence/upgrade-compat-round8.json",
+      "precedingEvidence": "gates/test-intent/evidence/upgrade-compat-round9.json",
+      "sourceAdaptationEvidence": "gates/test-intent/evidence/upgrade-compat-merge921-preservation.json"
     },
     {
       "items": [
@@ -906,6 +908,26 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
           "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Round 9 preservation of the existing failed-opener/failed-reconstruction watcher obligation while fixing configured-root wiring. No changed oracle or production workaround for mock Paths.",
           "choice": "Bind only the two producer-double configuration accessors to ConfigStore.global().get(), the same snapshot the fixture already published. Keep all fault injection and final deletion/debt assertions byte-identical. Run this adaptation before and after rather than count a blank skip or executor OOM as success.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java"
+      ],
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Encode the existing explicit Head boot root list in the fixture watched_roots.json as well. The authentic archive originally declares alpha and beta; the C18 setup intentionally supplies parent and alpha instead. The shared #921 prefix scope now reads authored declarations, so stale beta correctly prevents the original parent-own-deletion assertion from passing. No original root, operation, fault, membership transition, expected count, search or restart assertion changes. Keep the eight failed original merge cases as diagnostic failures; fresh both-mode execution supersedes only this one eight-case class per profile. Receipt: gates/test-intent/evidence/upgrade-compat-merge921-preservation.json.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Resolve the conflicts so there is one code path for nested-root protection.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Preserve #921 removal and branch recovery/prune/fence/removal-block semantics; stage resolution without committing; run the named both-UUID checks.",
+          "choice": "Use PathPrefixScope for every nested-root decision, including configured roots. Retain existing recovery admission modes and the registry removal fence/block. Adapt only the test root-declaration encoding to the canonical authored source now consumed by that shared authority, preserving every original oracle. Reuse the recorded passing Round9 source-identical eight-case receipt as historical preservation evidence, not a new before run; execute the adapted class freshly in both modes after the combined merge matrix.",
           "label": "agent choice"
         }
       ]

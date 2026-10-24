@@ -326,6 +326,11 @@ final class Release030RootRecoveryIsolationTest {
   private static KnowledgeServer declaredBoot(Path root, List<Path> roots,
       java.util.function.Supplier<java.util.Collection<Path>> membership, TestEngineExecutors executors)
       throws Exception {
+    // The authored declarations and the Head's boot membership describe the same fixture roots.
+    var declarations = roots.stream().map(path -> java.util.Map.of("path", path.toString())).toList();
+    Files.writeString(root.resolve("data/watched_roots.json"),
+        new tools.jackson.databind.ObjectMapper().writeValueAsString(
+            java.util.Map.of("schemaVersion", 1, "roots", declarations)));
     var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
         WorkerBootFixture.workerConfig(root.resolve("data")), null));
     org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());

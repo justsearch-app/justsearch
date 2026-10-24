@@ -32,7 +32,11 @@ it.each(['Extraction complete.', 'Extraction failed: invalid JSON', 'An unrelate
     expect([...host.shadowRoot!.querySelectorAll('jf-system-notice')].map(n => n.textContent)).toEqual([
       expect.stringContaining('Existing 0'), expect.stringContaining('Existing 2'), expect.stringContaining(message),
     ]);
-    await vi.advanceTimersByTimeAsync(500); await host.updateComplete;
+    const arrival = host.shadowRoot!.querySelectorAll('.toast')[2]!;
+    await vi.advanceTimersByTimeAsync(500);
+    // Happy DOM exposes getAnimations(); finish the exit after the dwell timer fires.
+    arrival.dispatchEvent(new Event('animationend'));
+    await host.updateComplete;
     expect(host.shadowRoot!.activeElement).toBe(original);
     expect(host.shadowRoot!.querySelectorAll('jf-system-notice')[1]).toBe(displaced);
     expect(displaced.getAttribute('aria-live'), 'a returning sibling must not announce again').toBe('off');

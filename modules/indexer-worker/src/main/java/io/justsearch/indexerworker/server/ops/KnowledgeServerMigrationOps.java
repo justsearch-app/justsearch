@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server.ops;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.core.JacksonException;
 import io.justsearch.configuration.persistence.WatchedRootsFormat;
@@ -646,6 +648,7 @@ public final class KnowledgeServerMigrationOps {
     if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
         || generation == null || generation.isBlank() || ownedSources == null) return false;
     try {
+      scopeLegacyPrefixes(scoped, active, null);
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
           .stream().filter(op -> generation.equals(op.generation())).toList();
       if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
@@ -740,7 +743,14 @@ public final class KnowledgeServerMigrationOps {
         id = deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT ? deletion.path() : null;
         expectedKey = "path:" + deletion.path();
       }
-      case "DELETE_PREFIX" -> expectedKey = "prefix:" + op.payload();
+      case "DELETE_PREFIX" -> {
+        var scope = PathPrefixScope.decode(op.payload());
+        if (!op.key().startsWith("prefix:")
+            || !new PathPrefixScope(op.key().substring(7), List.of()).prefix().equals(scope.prefix())) {
+          throw new IllegalArgumentException("Prefix receipt has an invalid key");
+        }
+        expectedKey = op.key();
+      }
       case "DELETE_COLLECTION" -> {
         if (!IngestCollectionPolicy.isDeletable(op.payload())) {
           throw new IllegalArgumentException("Protected collection cannot certify deletion");
@@ -804,8 +814,7 @@ public final class KnowledgeServerMigrationOps {
     return switch (deletion.op().op()) {
       case "DELETE" -> deletion.id() != null && deletion.id().equals(document.id());
       case "PROJECTION" -> !deletion.upsert() && deletion.id().equals(document.id());
-      case "DELETE_PREFIX" -> document.path() != null && document.path().startsWith(
-          io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(deletion.op().payload()));
+      case "DELETE_PREFIX" -> PathPrefixScope.decode(deletion.op().payload()).contains(document.path());
       case "DELETE_COLLECTION" -> deletion.op().payload().equals(document.collection());
       default -> false;
     };
@@ -872,8 +881,16 @@ public final class KnowledgeServerMigrationOps {
     }
     String scope = deletion.op().payload();
     if ("DELETE_PREFIX".equals(deletion.op().op())) {
-      return !queue.hasNonterminalJobsByPathPrefixStrict(scope)
-          && active.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(scope, files, projections) == 0;
+      var prefixScope = PathPrefixScope.decode(scope);
+      if (prefixScope.excludedSubtrees().isEmpty()) {
+        String prefix = PathPrefixScope.isLegacy(scope) ? scope : prefixScope.prefix();
+        return !queue.hasNonterminalJobsByPathPrefixStrict(prefix)
+            && active.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(
+                prefix, files, projections) == 0;
+      }
+      return !queue.hasNonterminalJobsByPathPrefixStrict(prefixScope.prefix(), prefixScope.excludedSubtrees())
+          && active.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(
+              prefixScope.prefix(), files, projections, prefixScope.excludedSubtrees()) == 0;
     }
     return !queue.hasNonterminalJobsByCollectionStrict(scope)
         && active.indexCountOps().countCollectionExcludingAcceptedSurvivorsStrict(scope, files, projections) == 0;
@@ -965,6 +982,36 @@ public final class KnowledgeServerMigrationOps {
     catch (RuntimeException unreadable) { return false; }
   }
 
+  private static void scopeLegacyPrefixes(SwitchBufferCapableQueue queue, RunningRuntime runtime,
+      WorkerIngestService publisher) {
+    var declarations = new AtomicReference<Set<Path>>();
+    queue.scopeLegacyPrefixReceipts(prefix -> {
+      if (publisher != null) return publisher.prefixScope(prefix);
+      if (declarations.get() == null) {
+        var configuration = runtime == null ? null : runtime.resolvedConfig();
+        if (configuration == null) {
+          throw new IllegalStateException("Legacy prefix conversion requires watched-root declarations");
+        }
+        try {
+          declarations.set(WatchedRootsFormat.declaredPaths(
+              configuration.paths().dataDir()));
+        } catch (IOException unreadable) {
+          throw new java.io.UncheckedIOException(unreadable);
+        }
+      }
+      return scopeFromDeclarations(prefix, declarations.get());
+    });
+  }
+
+  private static PathPrefixScope scopeFromDeclarations(String prefix, java.util.Collection<Path> roots) {
+    String normalized = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(prefix);
+    return new PathPrefixScope(prefix, roots.stream().map(Path::toString)
+        .filter(root -> {
+          String child = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(root);
+          return !child.equals(normalized) && child.startsWith(normalized);
+        }).toList());
+  }
+
   private static List<SwitchBufferCapableQueue.SwitchBufferOp> strictReplayOps(
       SwitchBufferCapableQueue queue, String generation) {
     return queue.listSwitchBufferOpsStrict().stream()
@@ -1006,6 +1053,7 @@ public final class KnowledgeServerMigrationOps {
     boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
     List<SwitchBufferCapableQueue.SwitchBufferOp> allOps;
     try {
+      scopeLegacyPrefixes(sbq, context.ingestLifecycle(), context.publisher());
       allOps = exactRead ? strictReplayOps(sbq, context.replayGeneration()).stream()
               .filter(op -> includeUnscoped || context.replayGeneration().equals(op.generation()))
               .toList()
@@ -1015,6 +1063,13 @@ public final class KnowledgeServerMigrationOps {
                       && context.replayGeneration().equals(op.generation()))).toList();
     } catch (RuntimeException unreadable) {
       context.log().warn("Switch buffer cannot certify final replay", unreadable);
+      return new ReplayOutcome(false, List.of());
+    }
+    // Conversion replaces a receipt revision. An approval to skip the old exact version
+    // cannot silently turn into permission to apply its replacement's destructive effect.
+    if (!context.approvedGapVersions().isEmpty()
+        && !new java.util.HashSet<>(allOps).containsAll(context.approvedGapVersions())) {
+      context.log().warn("Approved gap receipts changed before replay; retaining snapshot");
       return new ReplayOutcome(false, List.of());
     }
     boolean deferredVdu = !allowVdu && allOps.stream().anyMatch(op -> isVduBufferKind(op.op()));
@@ -1221,15 +1276,23 @@ public final class KnowledgeServerMigrationOps {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
               List<String> survivors = fileSurvivorExclusions.getOrDefault(op, List.of());
-              if (survivors.isEmpty()) {
-                context.ingestLifecycle().indexingCoordinator().deleteByPathPrefix(payload);
-                if (context.jobQueue().deleteByPathPrefix(payload) < 0) {
+              var scope = PathPrefixScope.decode(payload);
+              String prefix = PathPrefixScope.isLegacy(payload) ? payload : scope.prefix();
+              if (scope.excludedSubtrees().isEmpty() && survivors.isEmpty()) {
+                context.ingestLifecycle().indexingCoordinator().deleteByPathPrefix(prefix);
+                if (context.jobQueue().deleteByPathPrefix(prefix) < 0) {
                   throw new IllegalStateException("Buffered prefix queue deletion failed");
                 }
+              } else if (scope.excludedSubtrees().isEmpty()) {
+                context.ingestLifecycle().indexingCoordinator()
+                    .deleteByPathPrefixExcludingAcceptedSurvivors(prefix, survivors);
+                context.jobQueue().deleteByPathPrefixExcludingAcceptedSurvivors(prefix, survivors);
               } else {
                 context.ingestLifecycle().indexingCoordinator()
-                    .deleteByPathPrefixExcludingAcceptedSurvivors(payload, survivors);
-                context.jobQueue().deleteByPathPrefixExcludingAcceptedSurvivors(payload, survivors);
+                    .deleteByPathPrefixExcludingAcceptedSurvivors(
+                        prefix, survivors, scope.excludedSubtrees());
+                context.jobQueue().deleteByPathPrefixExcludingAcceptedSurvivors(
+                    scope.prefix(), survivors, scope.excludedSubtrees());
               }
               mutatedLucene = true;
             } catch (Exception e) {
@@ -1631,7 +1694,7 @@ public final class KnowledgeServerMigrationOps {
    * hands them to the live publisher.
    */
   private static WorkerIngestService replayService(DrainSwitchBufferContext context) {
-    return new WorkerIngestService(
+    var service = new WorkerIngestService(
         context.jobQueue(),
         null,
         context.signalBus(),
@@ -1642,6 +1705,11 @@ public final class KnowledgeServerMigrationOps {
         null,
         null,
         0L);
+    if (context.publisher() != null) service.prunesUnder(context.publisher());
+    else if (context.ingestLifecycle() != null && context.ingestLifecycle().resolvedConfig() != null) {
+      service.setDeclaredRootsDirectory(context.ingestLifecycle().resolvedConfig().paths().dataDir());
+    }
+    return service;
   }
 
   /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
@@ -2071,8 +2139,13 @@ public final class KnowledgeServerMigrationOps {
             certifiedPaths.add(removed.id());
           }
         }
-        if (context.jobQueue().hasJobsByPathPrefixOutsideCertifiedReplayPaths(
-            deletion.op().payload(), certifiedPaths)) return false;
+        var scope = PathPrefixScope.decode(deletion.op().payload());
+        boolean unexpected = scope.excludedSubtrees().isEmpty()
+            ? context.jobQueue().hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+                PathPrefixScope.isLegacy(deletion.op().payload()) ? deletion.op().payload() : scope.prefix(), certifiedPaths)
+            : context.jobQueue().hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+                scope.prefix(), certifiedPaths, scope.excludedSubtrees());
+        if (unexpected) return false;
       }
     }
     return true;
@@ -2296,11 +2369,12 @@ public final class KnowledgeServerMigrationOps {
       String payload = deletion.payload();
       switch (deletion.op().toUpperCase(Locale.ROOT)) {
         case "DELETE_PREFIX" -> {
-          if (payload == null || payload.isBlank() || !("prefix:" + payload).equals(deletion.key())) {
+          var scope = PathPrefixScope.decode(payload);
+          if (!deletion.key().startsWith("prefix:")
+              || !new PathPrefixScope(deletion.key().substring(7), List.of()).prefix().equals(scope.prefix())) {
             throw new IllegalArgumentException("Buffered prefix delete has an invalid key");
           }
-          matches |= path != null && path.startsWith(
-              io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(payload));
+          matches |= scope.contains(path);
         }
         case "DELETE_COLLECTION" -> {
           if (!IngestCollectionPolicy.isDeletable(payload)
@@ -2411,9 +2485,18 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public static int enqueueAllFilesUnderRoots(EnqueueContext context) throws IOException {
+    return enqueueAllFilesUnderRoots(context, null);
+  }
+
+  /** Scan roots may omit nested declarations; freeze legacy receipts using replay's authority. */
+  public static int enqueueAllFilesUnderRoots(EnqueueContext context, WorkerIngestService publisher)
+      throws IOException {
     requireEnumerationRunning(context);
     if (context.jobQueue() == null || context.roots() == null) {
       throw new IOException("Missing migration queue or roots");
+    }
+    if (context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
+      scopeLegacyPrefixes(queue, null, publisher);
     }
     int total = 0;
     int batchSize = 2_000;
