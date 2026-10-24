@@ -979,3 +979,14 @@ Round 9 records fresh X4/X5 before checks on 1e5742df9 (the subsequent committed
   "note": "Reject: 34 unchanged settings/query preservation checks pass on main and fail at the new configured-root wiring, despite successful upgrade and scale recovery checks."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16d32-190d-76c0-a76a-f1d3f72788cd",
+  "verdict": "reject",
+  "digest": "sha256:ffad9dd4dedd07b876d9b7c78a4bc790297f38945d2cb3fe7fd7b5e1afd0cad4",
+  "note": "Reject the configured-root/headless entry (Release030ConfiguredHeadlessRecoveryTest.java and modules/indexer-worker/build.gradle.kts), specifically its full-suite preservation claim: R2 ExtractionHelperWindowRecordsTest.markdownAndTextParsesWriteNoHelperWindowRecords passes the c29fcddc1e main full suite in 1.431 seconds but times out at its 30-second limit on snapshot 2af5e30fc8 (31.747 seconds elapsed). A focused retry passes in 1.603 seconds; the original full-suite failure remains unexplained. No product-code cause is asserted. R1's 42 unchanged checks and all 84 Release030 cases in each UUID profile pass, including the corrected uniform-child-profile crash rerun. Recommend a quiet --clean-checkout worker-suite rerun, retaining these results. Initial temp-path/configuration deviations are retained in verifier evidence."
+}
+```
