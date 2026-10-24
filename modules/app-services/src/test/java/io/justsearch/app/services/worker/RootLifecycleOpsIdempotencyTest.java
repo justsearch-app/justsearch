@@ -148,6 +148,17 @@ final class RootLifecycleOpsIdempotencyTest {
           (body, context) -> {});
       var context = io.justsearch.app.services.TestEngineContexts.internal();
 
+      if (failure.equals("nestedUnwatch")) {
+        assertEquals(7, ops.removeWatchedPath(root, context), "C's failing unwatch is never called for P");
+        assertEquals(java.util.Set.of(nested), watchedRoots.keySet());
+        assertEquals(-1, ops.removeWatchedPath(nested, context), "C's own failed removal stays retryable");
+        assertTrue(watchedRoots.containsKey(nested));
+        failing.set(false);
+        assertEquals(7, ops.removeWatchedPath(nested, context));
+        assertTrue(watchedRoots.isEmpty());
+        continue;
+      }
+
       if (failure.startsWith("capacity")) {
         org.junit.jupiter.api.Assertions.assertSame(refusal,
             org.junit.jupiter.api.Assertions.assertThrows(
@@ -171,11 +182,16 @@ final class RootLifecycleOpsIdempotencyTest {
       failing.set(false);
       unwatched.clear();
       assertEquals(7, ops.removeWatchedPath(root, context));
-      assertEquals(java.util.List.of(root.toString(), nested.toString()), unwatched);
-      assertTrue(watchedRoots.isEmpty());
+      assertEquals(java.util.List.of(root.toString()), unwatched);
+      assertEquals(java.util.Set.of(nested), watchedRoots.keySet());
       reopenedRoots.clear();
       reopened.loadPersistedRoots();
-      assertTrue(reopenedRoots.isEmpty(), "successful retry must persist the completed removal");
+      assertEquals(java.util.Set.of(nested), reopenedRoots.keySet(), "retry removes P and retains C durably");
+      assertEquals("nested-collection", reopened.getCollection(nested));
+      assertEquals(7, ops.removeWatchedPath(nested, context));
+      reopenedRoots.clear();
+      reopened.loadPersistedRoots();
+      assertTrue(reopenedRoots.isEmpty(), "removing both completes both durable removals");
     }
   }
 

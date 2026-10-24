@@ -59,7 +59,7 @@ final class PeriodicCycleRemovedRootTest {
           // The person removes another root while this cycle's walk is with the Worker.
           Path other = roots.stream().filter(r -> !r.equals(synced)).findFirst().orElseThrow();
           removedDuringCycle[0] = other;
-          state.removeRootAndNestedAndPersist(other);
+          state.removeRootAndPersist(other);
         }));
     IngestRpcExecutor rpc = new IngestRpcExecutor() {
       @Override
