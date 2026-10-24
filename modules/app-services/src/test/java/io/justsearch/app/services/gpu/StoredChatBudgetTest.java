@@ -69,13 +69,17 @@ final class StoredChatBudgetTest {
     Path missing = models.resolve(io.justsearch.configuration.model.ChatModelProfile.STANDARD.modelFile());
     Path relative = models.getFileName().resolve(missing.getFileName());
     String previousBase = System.getProperty(EnvRegistry.DATA_DIR.sysProp());
+    String previousHome = System.getProperty(EnvRegistry.HOME.sysProp());
     io.justsearch.configuration.resolved.ResolvedConfig cfg;
     try {
       System.setProperty(EnvRegistry.DATA_DIR.sysProp(), models.getParent().toString());
+      System.setProperty(EnvRegistry.HOME.sysProp(), models.getParent().toString());
       cfg = rebuild(12282, relative, 99);
     } finally {
       if (previousBase == null) System.clearProperty(EnvRegistry.DATA_DIR.sysProp());
       else System.setProperty(EnvRegistry.DATA_DIR.sysProp(), previousBase);
+      if (previousHome == null) System.clearProperty(EnvRegistry.HOME.sysProp());
+      else System.setProperty(EnvRegistry.HOME.sysProp(), previousHome);
     }
     assertEncodersPlanned(cfg);
     var resolution = ConfigStoreRebuilder.planOf(cfg).orElseThrow();

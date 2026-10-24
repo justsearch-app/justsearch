@@ -111,6 +111,16 @@
       ]
     },
     {
+      "check": "Measured axe",
+      "mode": "local-subset",
+      "commands": [
+        "python -m pip install -e \"scripts/jseval[ui]\" -c scripts/jseval/requirements.lock.txt",
+        "npm ci --prefix modules/ui-web --audit=false",
+        "python -m playwright install --with-deps chromium",
+        "python -m jseval ui-a11y-gate --output-dir build/ci/ui-a11y"
+      ]
+    },
+    {
       "check": "cla-assistant",
       "mode": "hosted-only",
       "reason": "Depends on GitHub contributor identity, signatures, and organization-side CLA state."

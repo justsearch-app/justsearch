@@ -315,7 +315,7 @@ describe('CR37 keyboard continuity and recovery', () => {
       expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/core.indexing-resume/invoke'))).toBe(true);
     });
 
-    it(`CR37a ${tag} explains damaged settings and navigates to the existing reset without offering Resume`, async () => {
+    it(`CR37c R2 ${tag} routes recovery directly to Reset without offering Resume`, async () => {
       observe('PAUSED', 'settings_recovery');
       const el = await mount(tag);
       const text = el.shadowRoot!.textContent!;
@@ -326,8 +326,8 @@ describe('CR37 keyboard continuity and recovery', () => {
       const control = await controls(el);
       expect(control.shadowRoot!.textContent).not.toContain('Resume indexing');
       const open = button(control);
-      expect(open.textContent).toContain('Open Settings at View tier');
-      expect(control.shadowRoot!.textContent).toContain('In Settings, set View tier to Operator, then Reset to defaults.');
+      expect(open.textContent).toContain('Open Settings at Reset to defaults');
+      expect(control.shadowRoot!.textContent).not.toContain('set View tier to Operator');
       open.focus();
       expect(control.shadowRoot!.activeElement).toBe(open);
       const navigate = vi.fn();
@@ -341,7 +341,7 @@ describe('CR37 keyboard continuity and recovery', () => {
     });
   }
 
-  it('CR37a the indexing overlay and waiting folder rows direct settings recovery to Settings', async () => {
+  it('CR37c R2 the indexing overlay and waiting folder rows direct recovery to Reset', async () => {
     const status = snapshot('PAUSED');
     status.operating!.indexing!.reasons = ['settings_recovery'];
     const progress = selectIndexingProgress(status, true, 3, []);
@@ -349,7 +349,7 @@ describe('CR37 keyboard continuity and recovery', () => {
     Object.assign(overlay, { progress, activity: progress.activity });
     await settle(overlay);
     expect(overlay.shadowRoot!.textContent).toContain('saved settings were damaged and replaced by defaults');
-    expect(button(await controls(overlay)).textContent).toContain('Open Settings at View tier');
+    expect(button(await controls(overlay)).textContent).toContain('Open Settings at Reset to defaults');
     const row = { status: 'indexed', fileCount: 10, inFlightCount: 3, failedCount: 2 } as IndexedRootView;
     const ctx = { relativeTime: '', verifiedRelativeTime: '', provisional: false, indexingPaused: true,
       indexingPauseReason: 'settings_recovery' };

@@ -112,6 +112,33 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       }.standardOutput.asText.get().trim().startsWith("glibc ")
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
+        // Test profiles belong to the task, never to the developer running Gradle. Resolve at
+        // execution time so absolute checkout paths do not become build/configuration-cache inputs.
+        // Keep profile isolation in sync with build-logic/build.gradle.kts: that build cannot
+        // apply this plugin while compiling it.
+        val testProfile = project.layout.buildDirectory.dir("test-profile/$name")
+        doFirst {
+          val profile = testProfile.get().asFile
+          val home = profile.resolve("home")
+          val paths = mapOf(
+              "HOME" to home, "USERPROFILE" to home,
+              "APPDATA" to home.resolve("AppData/Roaming"),
+              "LOCALAPPDATA" to home.resolve("AppData/Local"),
+              "XDG_CONFIG_HOME" to home.resolve(".config"),
+              "XDG_DATA_HOME" to home.resolve(".local/share"),
+              "XDG_CACHE_HOME" to home.resolve(".cache"),
+              "XDG_STATE_HOME" to home.resolve(".local/state"))
+          paths.values.forEach { it.mkdirs() }
+          (this as Test).apply {
+            systemProperty("user.home", home.absolutePath)
+            // Clear inherited overrides; YAML and test fixtures retain their normal precedence.
+            systemProperties.remove("justsearch.data.dir")
+            systemProperties.remove("justsearch.home")
+            environment.remove("JUSTSEARCH_HOME")
+            environment.remove("JUSTSEARCH_DATA_DIR")
+            paths.forEach { (key, path) -> environment(key, path.absolutePath) }
+          }
+        }
         // Keep the known Linux flake cases visible on main, while PRs prove the remaining cases.
         if (!isWindowsHost && project.providers.environmentVariable("JUSTSEARCH_PR_CI").orNull == "true") {
           project.rootProject.file("scripts/ci/pr-flakes.tsv").readLines()
