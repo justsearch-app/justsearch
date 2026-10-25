@@ -800,3 +800,14 @@ The record below is historical and stale after the TD10a repair and added checks
   "note": "Re-ran all 8 evidence files in default link mode: every new/repaired check fails by assertion on its recorded before-ref and on c29fcddc1e, passes on d3c0b39e12; the reconnect preservation check passes before and after. FileConversationStoreSafeIdsTest's changed expectation (branching from _title_ refused) matches U1; no conflicting decision in docs/decisions. Gap, not a test-intent defect: no check covers focus after a tree delete lands (draft lost when typing during the walk)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-o2tkn8b7",
+  "verdict": "accept",
+  "digest": "sha256:8947be494620fd7b4ab584294c00f9cb4e46b3d0f7b4faff926dc73a96865ae3",
+  "note": "Independent verification of e1f247b291326f510980fa2389eb19b6dbf1beb7. Default-link evidence reruns match check-file digests: seven repair checks fail before by erased-text assertions and pass after; five preservation checks pass both. Reviewed package New/Adaptation expectations against delegated TD/TN/F1/F2 intent. Private Engine HTTP and native headless Chromium reproduce single/tree draft loss before and preservation after, with focus, reload, lost response, restart, F2, concurrent branch and classic History coverage. Full candidate Vitest, typecheck, lint, UI gates and measured preservation gates pass. Model-dependent concurrent sends remain unit-verified only; no JVM suite pass is claimed this round."
+}
+```
