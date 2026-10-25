@@ -35,7 +35,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /** Shared-service lifecycle matrix, including the verifier D6 real closed-identity reproduction. */
-final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
+class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
+  static final String WRITER_AND_IDENTITY_STATES = "(WRITER|IDENTITY)_.*";
   @TempDir Path temp;
 
   enum State {
@@ -54,7 +55,7 @@ final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
 
   @org.junit.jupiter.api.Timeout(45)
   @ParameterizedTest(name = "{0}")
-  @EnumSource(State.class)
+  @EnumSource(value = State.class, names = WRITER_AND_IDENTITY_STATES, mode = EnumSource.Mode.MATCH_NONE)
   void sharedServiceStatesDeferHealthyFilesAndRecover(State state) throws Exception {
     try (var h = new Scenario()) {
       h.install(state);

@@ -23,15 +23,15 @@ Final round-eleven verification:114 targeted executions pass without skips, incl
 
 | Case | Current check (real running loop unless direct SQL guard) |
 |---|---|
-| O1 writer lifecycle, with actual tragic writer ERROR before outage WAITING/INDEXING until restart | [real tragic ERROR, one-shot callback and restart](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [37-state matrix: WRITER_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) and [closed-runtime/stop](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java) |
+| O1 writer lifecycle, with actual tragic writer ERROR before outage WAITING/INDEXING until restart | [real tragic ERROR, one-shot callback and restart](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [writer states](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java) and [closed-runtime/stop](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java) |
 | O2 index folder | [real unwritable Lucene writer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java) |
-| O3 identity/path stores | [37-state matrix: IDENTITY_*/PATH_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
+| O3 identity/path stores | [identity states](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java), [path states](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
 | O4 jobs.db | [persistent READONLY, poll and committed outcomes](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java) |
-| O5 sandbox/executor | [37-state matrix: EXTRACTION_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
-| O6 registry | [37-state matrix: EXTRACTOR_*](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
+| O5 sandbox/executor | [extraction states](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
+| O6 registry | [registry states](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java) |
 | O7 snapshot/temp | [four real parent/child missing/read-only cases](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java) |
 | O8 untyped infrastructure (including projection writer) | [actual missing child support jar](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java), [unknown live protocol](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [untyped invalid shared parser output](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
-| O9 identity busy/closed/read-only/capacity | [37-state matrix](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
+| O9 identity busy/closed/read-only/capacity | [identity states](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java), [native fixed-width identity limit with passing extraction](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java) |
 | K1 interleaved poison | [real child crash, six healthy interleavings and exhaustion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java), [terminal parser rejection, both orders](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java) |
 | O10 full mapped document with live writer configuration, native lock identity and live field schema | [stored-schema mismatch and healthy pending-work control](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java), [live lock loss/replacement and isolation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java), [shared doc-values outage](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java), [every mapped field family](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java), [shared invalid norms](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java), [every live config setting](../../../modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java), [real invalid first-token positions and recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java), [retired analyzer](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [every mapped text field](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java), [real-index isolation and analyzer reuse](../../../modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java) |
 | K2 failures on the source itself, including confirmed absent canonical aliases, stay per-file always; other document-specific failures are per-file whenever the pipeline is healthy, and may be deferred while a proven outage lasts | [vanished canonical source](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java), [writer-time vanished canonical alias](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java), [canonical permission loss and readable retarget](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java), [java.io source streams](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java), [java.io after readable retarget](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java), [empty-target retarget preservation](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java), [canonical source/source companion](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java), [companion charged in first recovered batch](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java), [unreadable-source ladder/recovery](../../../modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java) |
@@ -788,11 +788,10 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
       ],
       "class": "New",
-      "behaviour": "Round-ten O1–O7/K6 preservation with the agreed health rule: real service probe faults share the outage state; all 37 lifecycle states, WAITING, 64-row cap extension, per-file ladder/revival and cooperative stop survive. Poison is charged on its first failure when the pipeline canary passes; healthy batches cannot renew grace, because grace no longer exists. Snapshot and unknown extraction failures now run one canary immediately per failed batch rather than relying on path ownership or three grace batches.",
+      "behaviour": "Round-ten O1–O7/K6 preservation with the agreed health rule: real service probe faults share the outage state; WAITING, 64-row cap extension, per-file ladder/revival and cooperative stop survive. Poison is charged on its first failure when the pipeline canary passes; healthy batches cannot renew grace, because grace no longer exists. Snapshot and unknown extraction failures now run one canary immediately per failed batch rather than relying on path ownership or three grace batches. Current matrix obligations are detached into the source-bound parent/child declarations below after the class/discovery/shard split; all37 actual lifecycle cases and every original oracle remain, with fresh exact-source matrix evidence. This entry retains every remaining non-matrix obligation and its immutable historical evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -830,7 +829,6 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java#outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java#readOnlyStoreRemainsUncountedBeyondAmbiguousGrace",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
       ],
       "repaired": false
@@ -1740,6 +1738,72 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "split"
+      ],
+      "whatMoved": "Class/discovery/shard identity deliberately changes: extensible SharedServiceAvailabilityTest keeps17 non-WRITER/non-IDENTITY states via explicit State.class MATCH_NONE; final same-package child overrides the identical method with MATCH_ANY of the one inherited compile-time prefix regex and only calls super(state), moving20 states. Unknown prefixes remain in parent. Parent method body, all37 State constants/faults, four real failed batches/eight refusals,1/2/4/8 cap, forward shared deadline, WAITING/ready0/processing0, actual repair/two real Lucene documents/DONE/attempts0, Timeout45, inherited TempDir and final AfterEach cleanup are byte-identical. Existing class classifier assigns parent hash−1198787594 bucket0/ciUnitTest1 and childhash91988839 bucket1/ciUnitTest2 with no override. Full test runtime classpath retains parent/support even where discovery filters exclude them. Existing maxParallelForks2 is unchanged; no new executor or concurrency mechanism. Every writable resource is invocation-owned; supplied corpus must already contain the two immutable readable source files. This redistributes hosted work and does not claim the whole local runtime shrinks or that hosted completion is already proven.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Existing settled U17/U19 shared availability and recovery scenarios. Orchestrator expressly selected the matrix class split for existing CI class-hash shards; product/scenarios, assertions/cycles, timeouts and CI/workflow/budget/fork policies remain frozen.",
+          "label": "agent choice under explicit orchestrator design",
+          "choice": "Use inheritance and complementary JUnit5.14.4 enum filters to preserve one actual scenario body while distributing class discovery across the existing shards. Both source files and all actual local/historical/shard XML are bound by new D4 evidence; no test-budget, timeout, assertion or CI/configuration edit."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Current source-bound17-state PATH/EXTRACTOR/EXTRACTION parent matrix retains every original real fault/refusal/cap/deadline/status/recovery and cleanup assertion. On exact29f2a76f849b7f1742dc5d4f23b2350a2392803a, the five registry/policy/structured cases fail the original availability assertions (uncounted claims or four-real-batch refusal) and the other12 parent states pass; current candidate all17 pass. All20 writer/identity preservation states remain in the child declaration. Exact local37 and real ciUnitTest1/2 partitions must contain every State once with0skips/duplicates.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Existing settled U17/U19 shared availability and recovery scenarios. Orchestrator expressly selected the matrix class split for existing CI class-hash shards; product/scenarios, assertions/cycles, timeouts and CI/workflow/budget/fork policies remain frozen.",
+          "label": "agent choice under explicit orchestrator design",
+          "choice": "Retain the existing repaired registry/closed-provider expectation under settled O1–O7; this declaration follows the new source identity rather than borrowing the old whole-file digest. Historical comparison adds only four separately hashed fail-closed compile-API shims whose methods the original loop never invokes; final test faults/assertions remain unchanged."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-matrix-class-split.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Current20-state WRITER/IDENTITY child matrix is preservation: exactly the same State faults and inherited scenario body pass on historical29f2a76f8 and current candidate. Child evidence also binds the complete parent source through both newChecks and explicit sourceDependencies, so a later inherited oracle/fixture edit invalidates its evidence. Parent17 includes five original registry repairs; all37 real cycles, cap/status/forward deadline and actual repair assertions are retained. Local and actual shard XML must prove17+20 disjoint exact union with no skips/duplicate states; no claim whole local runtime shrinks or hosted budget is proven locally.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Existing settled U17/U19 shared availability and recovery scenarios. Orchestrator expressly selected the matrix class split for existing CI class-hash shards; product/scenarios, assertions/cycles, timeouts and CI/workflow/budget/fork policies remain frozen.",
+          "label": "agent choice under explicit orchestrator design",
+          "choice": "Separate preservation-child and repaired-parent declarations so the passing writer/identity historical controls are never falsely labelled fail-before repairs. The source split is an Adaptation above; these New declarations retain every pre-existing current matrix obligation under accurate source-bound evidence."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-matrix-class-split.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
+      ],
+      "repaired": false
     }
   ]
 }
@@ -2039,6 +2103,14 @@ The sandbox oracle now follows already-settled shared startup unavailability: fi
 Initial round-22 eight-case source test (archived before the synchronization correction) on the still-old df4 helper plus reviewed wrapper cleanup: two intended immediate-charge assertion failures and six control passes. Metadata-only candidate: all eight pass, including both real byte-EIO recovery paths and both FIFO cases without rescue. The identical final sandbox source fails on exact bc1c1f72 for RETRY_WITH_BACKOFF instead of DEFER_WITHOUT_ATTEMPT and passes on candidate. All named admission/alias/probe/VM/reference checks and touched compile/PMD checks pass in CI Error Prone mode. The initial sandbox evidence producer assumed the old baseline had BatchServiceFailures; it stopped before Gradle, was corrected to record the absent class, and the setup failure is retained. No full module invocation or independent acceptance is claimed. Old acceptance bytes remain unchanged. [Round-22 execution evidence](../evidence/systemic-batch-deferral-round22.json), [logs and manifests](../../../tmp/builder/round22/).
 
 Round-22 test synchronization correction: orchestrator review identified an unsafe test observation/update, not a reproduced product defect. The repaired live-loop test observes only forward movement of the saved deadline (>= its original outage observation), then attempts one expiry guarded by the exact escaped owned identity, currently observed retry_after, attempts=0, DEFER_WITHOUT_ATTEMPT and PENDING. If the loop already advanced or charged the row, zero matches leave recovery untouched. This validates a non-backwards repair observation and avoids rewinding a charged row; it does not promise that repair freezes a live scheduler deadline. The loop never restarts, byte EIO stays present, initial attempts0/DEFER, healthy peer DONE and final attempts1/RETRY_WITH_BACKOFF remain required, with all eight modes and Timeout35 unchanged. This is a test-oracle correction within the explicit delegated recovery choice, not an Adaptation or a relaxation of source/per-file policy. Original report/source/D4 bytes are archived under tmp/builder/round22/synchronization-before. Fresh exact-final-source proof uses one shared exact df4 before clone and the candidate; only this class plus indexer test compile/PMD are rerun. Sandbox and the other named narrow results are retained under identical source and product hashes, not claimed freshly executed. No production byte or other test file changed in this correction; old acceptance records remain byte-identical. The named D4 evidence and manifest distinguish both source snapshots.
+
+## Matrix class split for existing hosted shards
+
+The orchestrator selects a class/discovery/shard Adaptation only. Parent SharedServiceAvailabilityTest retains17 PATH/EXTRACTOR/EXTRACTION states; final same-package WriterAndIdentityServiceAvailabilityTest overrides the identical method and delegates only to super(state) for20 WRITER/IDENTITY states. The one inherited compile-time regex, explicit State.class, MATCH_NONE/MATCH_ANY and display name {0} preserve complementary discovery, including future unmatched prefixes in the parent. The entire actual scenario body,37 enum constants/faults, four real failed batches/eight refusals,1/2/4/8 cap, common forward deadline, WAITING/ready0/processing0, real repair/two Lucene docs/DONE/attempts0, Timeout45, inherited TempDir and final AfterEach cleanup are unchanged. All product bytes and CI/workflow/configuration/budget/heap/tag/filter-policy bytes remain pinned to64e728e2d8.
+
+Existing class hashes assign parent−1198787594 to bucket0/ciUnitTest1 and child91988839 to bucket1/ciUnitTest2 with no overrides. Actual local XML reports17+20 unique states, all37 passing with0skips/duplicates. Actual ciUnitTest1 XML reports the parent17 once (269.390s) and the existing six architecture guardrails passing; actual ciUnitTest2 XML reports the child20 once (314.617s). Their disjoint union exactly equals local37. Runtime classpaths are identical and include superclass/support classes even when discovery excludes them. Existing maxParallelForks2 is unchanged; every writable resource is invocation-owned and the external test corpus is one prepopulated read-only two-file folder reused by all phases. Matrix Gradle calls run serially; no new concurrency framework is introduced. These are local measurements, not a claim that whole local runtime shrinks or that a hosted lane is green within its existing25-minute budget.
+
+Fresh final-source comparison on exact29f2a76f849b7f1742dc5d4f23b2350a2392803a reports32 preservation passes and five original registry/policy/structured assertion failures. The three registry failures charge a file; closed policy/structured providers instead violate the four-real-batch refusal assertion. Only four separately hashed absent probe API declarations are added in that owned before copy, all throw-only/fail-closed. Original loop/writer/extractor bytecode contains no call to any shim, and no fault/assertion is altered. The initial untracked evidence init script failed before matrix execution due to a configuration-cache closure reference; that failure is retained and never relabelled. Its exact-source compilation/PMD results remain valid. The corrected local run also passes the19 named admission/alias/probe/VM/read-only/Writer/reference checks. Parent fixture/method and source-consumer audits are retained. Entry15 keeps every remaining obligation and immutable historical D4; current matrix obligations move to the repaired-parent and preservation-child declarations. Child evidence binds parent source through both newChecks and explicit sourceDependencies. All old acceptance bytes remain unchanged; no independent acceptance is claimed. [Fresh D4](../evidence/systemic-batch-deferral-matrix-class-split.json), [raw XML/logs/hashes](../../../tmp/builder/class-split/).
 
 ## Acceptance records
 
