@@ -1,0 +1,129 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "adaptation": {
+      "actualProducer": "tmp/builder/step7/collect-upgrade-d4.mjs",
+      "actualProducerDigest": "sha256:d88f40f7fc0fa9d2505c5c5d7326435c9e0955f61f20c21b98c56eeb7d83c8ec",
+      "identityDecoder": "tmp/builder/step7/read-gradle-identities.py",
+      "identityDecoderDigest": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+      "mode": "Read actual completed preserved XML/binary executions. Canonical runner not invoked; this is an explicitly adapted collection envelope, not a claim that canonical run-evidence executed these tests."
+    }
+  },
+  "createdAt": "2026-10-25T21:43:28.103Z",
+  "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+  "tree": "44f1a35bc5cccf0ce1a80d5108747f91f3340f85",
+  "environment": {
+    "kind": "artifact-collection environment, not old execution JVM identity",
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.22.0",
+    "originalExecutionEnvironment": {
+      "path": "tmp/builder/evidence/reproduction/environment.json",
+      "sha256": "sha256:a6d6ea40a1df8869bacedb98519ab3385b69e4ebb0a0d05c9974862f9a5d83fe",
+      "bytes": 604
+    },
+    "originalAfterHarness": {
+      "path": "tmp/builder/evidence/reproduction/test-jvm-after.gradle",
+      "sha256": "sha256:c2a592c5c0e0d35fa08d63d1cf1f10fd7c1fe47157fa7cdb90fd0e3e9d75a814",
+      "bytes": 760
+    }
+  },
+  "runs": [
+    {
+      "command": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \":modules:adapters-lucene:test\" \":modules:adapters-lucene:integrationTest\" \":modules:worker-core:test\" \":modules:worker-services:test\" \":modules:indexing:test\" \":modules:indexing:integrationTest\" \":modules:benchmarks:test\" \":modules:app-engine:test\" \":modules:ui:test\" \":modules:ui:integrationTest\" \":modules:app-launcher:test\" \":modules:app-launcher:integrationTest\" \":modules:system-tests:test\" \":modules:indexer-worker:retirementHttpEvidence\" \":modules:indexer-worker:compileJava\" \":modules:adapters-lucene:compileJava\" \":modules:worker-core:compileJava\" \":modules:worker-services:compileJava\" \":modules:indexer-worker:pmdMain\" \":modules:indexer-worker:pmdTest\" \":modules:adapters-lucene:pmdMain\" \":modules:adapters-lucene:pmdTest\" \":modules:worker-core:pmdMain\" \":modules:worker-core:pmdTest\" \":modules:worker-services:pmdMain\" \":modules:worker-services:pmdTest\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/test-jvm-after.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-PskipWebBuild=true\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"--continue\"",
+      "kind": "original frozen command",
+      "commandArtifact": {
+        "path": "tmp/builder/evidence/after-final-complete-verification-command.json",
+        "sha256": "sha256:7900a3af9c1c316b687da511d85741fdc04b007dc08b8d164786af8ff7e13968",
+        "bytes": 2066
+      },
+      "completion": "Named indexer-worker suites completed; outer program later interrupted inside downstream app-engine. Global exit is not relabelled passed."
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:507250dc3604313918184b8aac43b6faef3352adbe7cf41f055198e46626a5db",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030UpgradeProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs(Path)",
+          "method": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030UpgradeProbeTest.xml",
+        "sha256": "sha256:6d6f4ff3a3dd7d5305dfd1b05d09850849b800d35a7940b6652759e244cdc314",
+        "bytes": 111879
+      },
+      "suiteTimestamp": "2026-10-24T23:17:40.214Z"
+    }
+  ],
+  "failBefore": {
+    "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+    "purpose": "preservation before",
+    "runs": [
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030UpgradeProbeTest.xml",
+          "sha256": "sha256:7717d7a5d26fcbfc697d7401c0aa38506faac4fcefa23944d74172b9f82a650d",
+          "bytes": 117816
+        },
+        "originalExecutionCommand": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.alreadyDoneExplicitFileOnServingGenerationSurvivesResume\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.modernUnownedAdmissionCannotBorrowRetiredBuildAuthority\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.uncertifiedServingGenerationKeepsOriginalMigration\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring\" \"--tests\" \"io.justsearch.indexerworker.server.Release030UpgradeProbeTest.interruptedMigrationFixturesKeepTheirServingIndexAndJobs\" \":modules:indexer-worker:retirementHttpEvidence\" \"--continue\" \"-PskipWebBuild=true\" \"-PskipErrorProneTests=false\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence-before.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/step7/before-temp.gradle\"",
+        "originalArgvProvenance": "before-command.json records exact fresh argv"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030UpgradeProbeTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs(Path)",
+            "method": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030UpgradeProbeTest.xml",
+          "sha256": "sha256:7717d7a5d26fcbfc697d7401c0aa38506faac4fcefa23944d74172b9f82a650d",
+          "bytes": 117816
+        },
+        "suiteTimestamp": "2026-10-25T21:31:13.954Z"
+      }
+    ]
+  },
+  "sourceBindings": {
+    "path": "gates/test-intent/evidence/upgrade-retire-source-bindings.json",
+    "sha256": "sha256:455717504ee117e7d2fea5e0b56b21be1e4f08f57c66cce929164017b98819b3"
+  },
+  "scope": {
+    "after": "immutable frozen code represented by d9663d16, executed with HEAD 8292 and original dirty manifest",
+    "currentCollector": "1bb20567032b5f2af0700b9f04013b79f0aa132f",
+    "integratedProductionChanges": 95,
+    "notFreshCurrentIntegratedBehavior": true,
+    "acceptanceAuthored": false
+  },
+  "digest": "sha256:827c07194d38554a7dca3a334cf30729ec57e464cc810b560e21daf3496bf187"
+}

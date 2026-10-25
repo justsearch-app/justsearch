@@ -1,11 +1,13 @@
 ---
 schema: test-intent.v1
-task: upgrade-retire
+task: t-20261020-c2e24a
 author-role: builder
-author-session: codex-upgrade-retire-20261024
+author-session: 01a16e27-471b-7b13-962b-48b7ad3a8943
 ---
 
 # Test-intent entries
+
+Owner adoption is task `t-20261020-c2e24a`, agreed 2026-10-20 with the exact words “i agree, proceed accordingly”. The author is thread `01a16e27-471b-7b13-962b-48b7ad3a8943`. Orchestrator design and corrupt/budget rulings remain delegated choices, never owner words. Every original U6/U13 and must-not-break obligation and all six amendments remain in force. D4 collection is explicitly frozen-code evidence; integrated production dependencies differ and are not silently treated as a fresh recovery run.
 
 U6 and U13 were delegated verbatim in the builder assignment on 2026-10-24. The
 amended PR4 design governs the implementation. No acceptance record is authored here. Verification continues under the orchestrator's rulings: corrupt-commit backup-first assertions pass on base; both base and candidate resume over-budget independent debt in MIGRATING, so the restart expectation follows base. Builder check evidence is recorded outside the repository; acceptance remains reserved for independent verifiers. The budget matrix exercises finite limits, exact limits, -1, forceSwitching and restart; it is preservation coverage, not a claimed new fail-before repair.
@@ -25,13 +27,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with all remaining work",
-          "delegationLocation": "2026-10-24 builder assignment, orchestrator decisions",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Interrupted release-0.3.0 retirement and recovery through restart; no commit, schema change or product option.",
           "choice": "Repair the observed shutdown race by draining maintenance cooperatively, matching the existing indexing-loop shutdown policy. Observe scheduler shutdown directly in the ownership fixture while preserving all ownership and ordering requirements; prove original/adapted checks on base.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "classificationRationale": "Adaptation of instrumentation: the diff replaces the interrupt latch used to detect close entry with the registered scheduler shutdown notification. Registration/cadence, the running callback, release latch, close-waits and queue-stays-open predicates are unchanged. Original and adapted ownership checks pass on 8292; the added real-writer shutdown check separately pins safe non-interruption. No owner words are attributed to this implementation choice."
     },
     {
       "class": "Adaptation",
@@ -45,10 +48,12 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "sources": [
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U13",
           "quote": "Waiting jobs do not authorize an incomplete cutover where a migration does run: backoff-only work is not treated as drained, and the failed-job budget and explicit overrides apply as configured.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         }
       ]
     },
@@ -66,15 +71,17 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "sources": [
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U13",
           "quote": "Waiting jobs do not authorize an incomplete cutover where a migration does run: backoff-only work is not treated as drained, and the failed-job budget and explicit overrides apply as configured.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with all remaining work",
-          "delegationLocation": "2026-10-24 builder assignment, orchestrator decisions",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Retire obsolete interrupted release-0.3.0 migrations on base 8292c62e3, preserving #893 recovery; no commit, schema change or option.",
           "choice": "Cancel only with a positive compatibility certificate for A. Reconcile every A/B difference against sources and retain uncertain obligations and B. Keep new mutations ordered by accepted_order in the existing fenced journal during replay. Preserve preparation/root debt until retirement and both pointer copies are normalized. Use authentic fixtures and real admission for receipt-bearing variants.",
           "label": "agent choice"
@@ -91,7 +98,15 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#actualDeadlineFailureRestartsWithIndependentExhaustedDebt",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#indexedExhaustedExactContentIsNotDiscardedAtCutover",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover"
-      ]
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-retire-native-preservation.json",
+      "classificationRationale": "New, not mechanical Adaptation or Obsolete: the actual diff changes authentic native-fixture inputs to a genuine analyzer incompatibility. U6 supersedes the former assumption that a compatible interrupted release must migrate. The same native recovery/retention obligations and assertions are exercised under a true native precondition, before and after; compatible retirement has separate checks. No guarded obligation is removed.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
     },
     {
       "class": "New",
@@ -101,9 +116,18 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "behaviour": "Preserve A generation identity, original analyzer/model identities and all legacy queue rows across interrupted-fixture boot. The former exact commit-fingerprint equality assumed read-only A: U6 opens A writable and compatible optional-field additions legitimately restamp its fingerprint. Preserve the compatibility identities explicitly instead. No exception or row-retention assertion changes. This is a preservation check on both trees.",
       "sources": [
         {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U6",
+          "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with all remaining work",
-          "delegationLocation": "2026-10-24 builder assignment, orchestrator decisions",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Retire obsolete interrupted release-0.3.0 migrations on base 8292c62e3, preserving #893 recovery; no commit, schema change or option.",
           "choice": "Cancel only with a positive compatibility certificate for A. Reconcile every A/B difference against sources and retain uncertain obligations and B. Keep new mutations ordered by accepted_order in the existing fenced journal during replay. Preserve preparation/root debt until retirement and both pointer copies are normalized. Use authentic fixtures and real admission for receipt-bearing variants.",
           "label": "agent choice"
@@ -112,7 +136,15 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "repaired": false,
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs"
-      ]
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-retire-serving-identity.json",
+      "classificationRationale": "New preservation oracle, not mechanical Adaptation or Obsolete: the diff removes whole-fingerprint equality and explicitly retains A generation, analyzer and all three model identities plus every legacy queue row. U6 and amendment 2 permit additive optional-field restamping, so the full serialized fingerprint was a stronger input assumption than the adopted compatibility proposition. The retained proposition is established before and after, rather than treating code output as a source.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
     },
     {
       "class": "Adaptation",
@@ -127,10 +159,12 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "sources": [
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U13",
           "quote": "Waiting jobs do not authorize an incomplete cutover where a migration does run: backoff-only work is not treated as drained, and the failed-job budget and explicit overrides apply as configured.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         }
       ]
     },
@@ -151,30 +185,34 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "sources": [
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U6",
           "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         },
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U13",
           "quote": "Waiting jobs do not authorize an incomplete cutover where a migration does run: backoff-only work is not treated as drained, and the failed-job budget and explicit overrides apply as configured.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with all remaining work",
-          "delegationLocation": "2026-10-24 builder assignment, orchestrator decisions",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Retire obsolete interrupted release-0.3.0 migrations on base 8292c62e3, preserving #893 recovery; no commit, schema change or option.",
           "choice": "Cancel only with a positive compatibility certificate for A. Reconcile every A/B difference against sources and retain uncertain obligations and B. Keep new mutations ordered by accepted_order in the existing fenced journal during replay. Preserve preparation/root debt until retirement and both pointer copies are normalized. Use authentic fixtures and real admission for receipt-bearing variants.",
           "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Continue PR 4. Do not commit.",
-          "delegationLocation": "2026-10-24 continuation, orchestrator rulings 1\u20133",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Resume PR4 and settle corrupt-commit and budget preservation loops before completing the original checks.",
           "choice": "Corrupt A follows base's backup-first boot while B, migration state and receipts match base; assert the same outcome on both trees. Run budget checks unchanged on base first; follow base if it also resumes MIGRATING, otherwise repair any candidate regression. These rulings reset the repeated-failure loops. Executed base budget checks show the same MIGRATING restart phase as the candidate; retain the first-boot FAILED budget assertion and use MIGRATING for that restart, with A retained. The earlier timing-only U13 probe passed base and is not fail-before evidence; observe promotion entry deterministically using the real booted queue and writer.",
           "label": "agent choice"
@@ -192,9 +230,18 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java#completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#modernUnownedAdmissionCannotBorrowRetiredBuildAuthority",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java#closeDrainsMaintenanceWithoutInterruptingTheServingWriter"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java#closeDrainsMaintenanceWithoutInterruptingTheServingWriter",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement"
       ],
-      "repaired": true
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/upgrade-retire-recovery-repaired.json",
+      "classificationRationale": "New repaired behavior: each named check requires an actual assertion failure on 8292 and a real completed frozen-code execution. Evidence explicitly distinguishes frozen production dependencies from integrated main; no current integrated recovery pass is inferred. Reappeared DELETE is explicitly listed so all 50 repaired invocations are bound.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
     },
     {
       "class": "New",
@@ -206,30 +253,34 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "sources": [
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U6",
           "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         },
         {
           "kind": "owner-adopted-scenario",
-          "task": "upgrade-retire",
+          "task": "t-20261020-c2e24a",
           "scenario": "U13",
           "quote": "Waiting jobs do not authorize an incomplete cutover where a migration does run: backoff-only work is not treated as drained, and the failed-job budget and explicit overrides apply as configured.",
-          "label": "agent-drafted, owner-adopted"
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with all remaining work",
-          "delegationLocation": "2026-10-24 builder assignment, orchestrator decisions",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Retire obsolete interrupted release-0.3.0 migrations on base 8292c62e3, preserving #893 recovery; no commit, schema change or option.",
           "choice": "Cancel only with a positive compatibility certificate for A. Reconcile every A/B difference against sources and retain uncertain obligations and B. Keep new mutations ordered by accepted_order in the existing fenced journal during replay. Preserve preparation/root debt until retirement and both pointer copies are normalized. Use authentic fixtures and real admission for receipt-bearing variants.",
           "label": "agent choice"
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Continue PR 4. Do not commit.",
-          "delegationLocation": "2026-10-24 continuation, orchestrator rulings 1\u20133",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "Resume PR4 and settle corrupt-commit and budget preservation loops before completing the original checks.",
           "choice": "Corrupt A follows base's backup-first boot while B, migration state and receipts match base; assert the same outcome on both trees. Run budget checks unchanged on base first; follow base if it also resumes MIGRATING, otherwise repair any candidate regression. These rulings reset the repeated-failure loops. Executed base budget checks show the same MIGRATING restart phase as the candidate; retain the first-boot FAILED budget assertion and use MIGRATING for that restart, with A retained. The earlier timing-only U13 probe passed base and is not fail-before evidence; observe promotion entry deterministically using the real booted queue and writer.",
           "label": "agent choice"
@@ -240,7 +291,15 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
       ],
-      "repaired": false
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/upgrade-retire-certificates-budgets.json",
+      "classificationRationale": "New preservation coverage: all 12 invocations pass before and on frozen code. Negative certificates and budget protections are not labelled repairs. Corrupt A keeps native backup-first behavior; restarted over-budget cases follow actual base MIGRATING while first-boot FAILED, exact/unlimited limits, overrides and completion protections remain asserted.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
     }
   ]
 }
