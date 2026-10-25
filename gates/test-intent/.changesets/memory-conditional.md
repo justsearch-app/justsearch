@@ -104,3 +104,13 @@ The default evidence runner uses linked dependencies; its before-tree is a detac
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-memory-forget-final",
+  "verdict": "accept",
+  "digest": "sha256:d2959b39a28bb2ae08be42f1b69b3813d0942727c585e82336251c3fa3df2c8a"
+}
+```
