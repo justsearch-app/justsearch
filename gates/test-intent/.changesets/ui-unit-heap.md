@@ -63,3 +63,25 @@ acceptor reviews this choice and its execution evidence.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17379-088f-7fe1-9030-d13823e965ee",
+  "verdict": "accept",
+  "digest": "sha256:7c9eac0869bebab7df4522d87e6b47b4c07bbd852a831b1a472cf09173daa48d",
+  "note": "Independent exact-candidate local verification: real 384m baseline executor OOM dump/stack admitted and independently parsed; CI Error Prone compile and PMD pass; fresh complete UI runs pass twice (2178 passed, one unchanged optional-corpus skip); both shards pass and their case/status union equals both full runs; original inner-body/literal/constructor tokens and global 1296/216 continuity guards retained; actual JUnit partial-setup and invocation-failure cleanup plus close-order/suppression probes pass. 72 root Test configurations compared: only UI test/ciUnitTest1/2 heap changes; standalone shard1 +2.37% wall time. Adaptation explicitly changes aggregate allowance to six 30s invocations plus separate hooks, preserving functional oracle; no overall 30s cap claimed. Same model family by supplied preference, independent session and checkout only. Hosted C3 and Windows execution remain unverified; no publication performed. Evidence: /home/elias/.cache/jsv-bc37c1-verifier-2/evidence."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a172e0-9080-7942-b8b0-0837c22cfb1e",
+  "verdict": "accept",
+  "digest": "sha256:7c9eac0869bebab7df4522d87e6b47b4c07bbd852a831b1a472cf09173daa48d",
+  "note": "Third-session source/evidence audit of c04a4de32ef13eec7602a1162d52fe659c44467d and independent verdict: Incidental heap scope and Adaptation are supported by the owner delegation and established test contract. The 1296 sample body and assertions, shared state trajectory and publisher-before-components cleanup are preserved. Aggregate scheduling explicitly changes to six 30-second invocation budgets, not an unchanged whole-matrix deadline. Independent two full runs and both shard union pass; real failure/partial-setup cleanup probes and actual CI compile/PMD pass; solo shard timing is +2.37%. No product semantics changed. Hosted C3 remains pending and corpus skip/Windows limits remain explicit. Same-family independence is separate sessions and committed snapshots only. No additional tests run by this audit."
+}
+```
