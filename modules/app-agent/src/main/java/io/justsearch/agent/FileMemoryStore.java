@@ -11,6 +11,11 @@ import io.justsearch.configuration.persistence.StoreFormatVersions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.UUID;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -39,6 +44,11 @@ public final class FileMemoryStore implements MemoryStore {
   private final Path file;
   private final StoreCipher cipher;
   private Map<String, MemoryRecord> byId = new LinkedHashMap<>();
+  // Validators are process-local and never serialized. Retain incarnations across key locks:
+  // locking, unlocking and formatting changes do not create new memories.
+  private final Map<String, Long> incarnations = new LinkedHashMap<>();
+  private final String revisionEpoch = UUID.randomUUID().toString();
+  private long nextIncarnation;
   private boolean loaded;
   private MemoriesUnavailableException unavailable;
 
@@ -149,6 +159,7 @@ public final class FileMemoryStore implements MemoryStore {
     Map<String, MemoryRecord> snapshot = new LinkedHashMap<>(byId);
     byId.put(record.id(), record);
     persistOrRollback(snapshot);
+    incarnations.put(record.id(), ++nextIncarnation);
   }
 
   @Override
@@ -166,6 +177,50 @@ public final class FileMemoryStore implements MemoryStore {
   }
 
   @Override
+  public synchronized List<VersionedMemory> versionedMemories() {
+    return whatItKnows().stream()
+        .map(record -> new VersionedMemory(record, revision(record)))
+        .toList();
+  }
+
+  @Override
+  public synchronized ForgetResult forgetIf(String id, String expectedRevision) {
+    requireUnlocked();
+    MemoryRecord current = byId.get(id);
+    if (current == null) {
+      return new ForgetResult(false, null);
+    }
+    if (!revision(current).equals(expectedRevision)) {
+      return new ForgetResult(false, current);
+    }
+    forget(id);
+    return new ForgetResult(true, null);
+  }
+
+  private String revision(MemoryRecord record) {
+    try {
+      MessageDigest hash = MessageDigest.getInstance("SHA-256");
+      hashField(hash, revisionEpoch);
+      hashField(hash, Long.toString(incarnations.get(record.id())));
+      hashField(hash, record.id());
+      hashField(hash, record.kind());
+      hashField(hash, record.content());
+      hashField(hash, record.sourceConversationId());
+      hashField(hash, record.actor());
+      hashField(hash, record.createdAt().toString());
+      return "\"" + HexFormat.of().formatHex(hash.digest()) + "\"";
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is required for memory revisions", e);
+    }
+  }
+
+  private static void hashField(MessageDigest hash, String value) {
+    byte[] bytes = value == null ? new byte[0] : value.getBytes(StandardCharsets.UTF_8);
+    hash.update(ByteBuffer.allocate(Integer.BYTES).putInt(value == null ? -1 : bytes.length).array());
+    hash.update(bytes);
+  }
+
+  @Override
   public synchronized void forget(String id) {
     if (id == null) {
       return;
@@ -177,6 +232,7 @@ public final class FileMemoryStore implements MemoryStore {
     Map<String, MemoryRecord> snapshot = new LinkedHashMap<>(byId);
     byId.remove(id);
     persistOrRollback(snapshot);
+    incarnations.remove(id);
   }
 
   @Override
@@ -188,6 +244,7 @@ public final class FileMemoryStore implements MemoryStore {
     Map<String, MemoryRecord> snapshot = new LinkedHashMap<>(byId);
     byId.clear();
     persistOrRollback(snapshot);
+    incarnations.clear();
   }
 
   private void load() {
@@ -224,12 +281,19 @@ public final class FileMemoryStore implements MemoryStore {
         MemoryRecord rec = fromMap(r);
         candidate.put(rec.id(), rec);
       }
+      incarnations.keySet().retainAll(candidate.keySet());
+      for (String id : candidate.keySet()) {
+        if (!incarnations.containsKey(id)) {
+          incarnations.put(id, ++nextIncarnation);
+        }
+      }
       byId = candidate;
       loaded = true;
       unavailable = null;
     } catch (NoSuchFileException e) {
       // Only a definite absence is a first run; exists() also returns false on access failures.
       byId = new LinkedHashMap<>();
+      incarnations.clear();
       loaded = true;
       unavailable = null;
     } catch (CorruptDurableStoreException

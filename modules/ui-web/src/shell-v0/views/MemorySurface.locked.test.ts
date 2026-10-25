@@ -72,7 +72,7 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
 
   it("shows unavailable on first open and revisit, then reloads after recovery", async () => {
     const fact = {
-      id: "m1",
+      id: "m1", revision: '"' + 'a'.repeat(64) + '"',
       kind: "fact",
       content: "all memories recovered",
       actor: "chat",
@@ -106,7 +106,7 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
     scriptFetch([
       {
         status: 200,
-        body: { locked: false, memories: [{ id: "old", content: "stale fact" }] },
+        body: { locked: false, memories: [{ id: "old", revision: '"' + 'a'.repeat(64) + '"', content: "stale fact" }] },
       },
       { status: 503, body: {} },
     ]);
@@ -176,7 +176,7 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
 
   it('a 423 forget does NOT make the fact vanish: it stays listed and the failure is shown', async () => {
     const fact = {
-      id: 'm1',
+      id: 'm1', revision: '"' + 'a'.repeat(64) + '"',
       kind: 'fact',
       content: 'the fact the user wants gone',
       actor: 'primary',
@@ -190,7 +190,7 @@ describe('MemorySurface — 806 W1 locked-state truthfulness', () => {
     const el = await mount();
     expect(text(el)).toContain(fact.content);
 
-    await (el as unknown as { forget(id: string): Promise<void> }).forget('m1');
+    await (el as unknown as { forget(id: string, revision: string): Promise<void> }).forget('m1', fact.revision);
     await settle(el);
 
     // Pre-806 the status was ignored, so a 423 was followed by a re-list that (while locked) came back
