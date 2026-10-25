@@ -52,7 +52,8 @@ afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.restoreAl
 describe('Library retained-base exclusions', () => {
   it('RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs', async () => {
     const { library, send } = fixture();
-    const paths = ['/docs/name', '/docs/name ', '/docs/back\\name', '/docs/back/name', '/docs/tab\t'];
+    const paths = ['/docs/name', '/docs/name ', '/docs/back\\name', '/docs/back/name', '/docs/tab\t',
+      '/docs/name\u00a0', '/docs/name\u200b'];
     const entries = paths.map((path, index) => ({ literal: { version: 1,
       id: `aa10bcec-4102-47f8-a26d-d02346c8a21${index}`, path, scope: 'FILE' } }));
     send.mockResolvedValueOnce(json({ ui: { excludePatterns: entries }, witness: observed }))
@@ -64,7 +65,8 @@ describe('Library retained-base exclusions', () => {
     const names = Array.from(library.shadowRoot?.querySelectorAll('section[aria-label="Exact paths kept out"] code') ?? [],
       (node) => node.textContent);
     expect(names).toEqual(['"/docs/name"', '"/docs/name " (1 trailing whitespace character)',
-      '"/docs/back\\\\name"', '"/docs/back/name"', '"/docs/tab\\t" (1 trailing whitespace character)']);
+      '"/docs/back\\\\name"', '"/docs/back/name"', '"/docs/tab\\t" (1 trailing whitespace character)',
+      '"/docs/name\\u00a0" (1 trailing whitespace character)', '"/docs/name\\u200b"']);
     expect(new Set(names).size).toBe(paths.length);
     expect(library.excludesText).toBe('');
     library.remove();

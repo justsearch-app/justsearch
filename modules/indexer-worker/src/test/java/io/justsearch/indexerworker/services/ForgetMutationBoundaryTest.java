@@ -115,13 +115,17 @@ final class ForgetMutationBoundaryTest extends LuceneExecutorTestBase {
         var fields = new LinkedHashMap<String, Object>();
         fields.put(SchemaFields.DOC_ID, docId); fields.put(SchemaFields.DOC_UID, "forget-parent-uid");
         fields.put(SchemaFields.PATH, id); fields.put(SchemaFields.CONTENT, "indexed source");
-        if (!docId.equals(id)) fields.put(SchemaFields.PARENT_DOC_ID, id);
+        if (!docId.equals(id)) {
+          fields.put(SchemaFields.PARENT_DOC_ID, id); fields.put(SchemaFields.IS_CHUNK, true);
+        }
         runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
       }
       runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID,
           PathNormalizer.normalizeKey(sibling), SchemaFields.PATH, PathNormalizer.normalizeKey(sibling),
           SchemaFields.DOC_UID, "forget-sibling-uid", SchemaFields.CONTENT, "indexed sibling")));
       runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(3, runtime.indexCountOps().countByIdAndChunksStrict(id),
+          "the deletion probe begins with one parent and two real owned chunks");
       queue.enqueue(List.of(source, sibling));
       var file = new FileMutationFence(); Object owner = new Object();
       var admission = new WorkerMutationAdmission(owner);

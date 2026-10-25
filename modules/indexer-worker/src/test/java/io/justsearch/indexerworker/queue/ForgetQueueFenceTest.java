@@ -158,4 +158,31 @@ final class ForgetQueueFenceTest {
       assertTrue(entryAllowed(queue));
     }
   }
+  @Test
+  void Q55CallbackFromAnotherPhysicalQueueAlsoRefusesCurrentQueueForgetAdmission() throws Exception {
+    try (var retired = new SqliteJobQueue(directory.resolve("retired.db"));
+        var current = new SqliteJobQueue(directory.resolve("current.db"))) {
+      retired.open(); current.open();
+      var callbacks = new java.util.concurrent.atomic.AtomicInteger();
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      try (var display = retired.changeStream().subscribe(delta -> {
+        try {
+          assertFalse(entryAllowed(current), "retired-queue display callbacks cannot reenter a different current queue");
+          assertTrue(tryFence(current).isEmpty()); callbacks.incrementAndGet();
+        } catch (Throwable assertion) { failure.compareAndSet(null, assertion); }
+      }); var walk = retired.subscribeRecordedWalks(key -> {
+        try {
+          assertFalse(entryAllowed(current), "retired-queue walk callbacks cannot reenter a different current queue");
+          assertTrue(tryFence(current).isEmpty()); callbacks.incrementAndGet();
+        } catch (Throwable assertion) { failure.compareAndSet(null, assertion); }
+      })) {
+        retired.enqueue(List.of(directory.resolve("retired-source.txt")));
+        retired.beginRecordedWalk("018f51aa-0000-7000-8000-000000000102", "b".repeat(64), true);
+        assertTrue(callbacks.get() >= 2); assertNull(failure.get());
+      }
+      assertTrue(entryAllowed(current));
+      try (var admitted = fence(current)) { assertNotNull(admitted); }
+    }
+  }
+
 }

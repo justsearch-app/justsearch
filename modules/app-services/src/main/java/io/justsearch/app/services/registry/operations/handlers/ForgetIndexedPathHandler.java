@@ -61,9 +61,18 @@ public final class ForgetIndexedPathHandler implements OperationHandler {
 
   static String exactPath(String path) {
     String quoted = HandlerJson.MAPPER.writeValueAsString(path);
+    var visible = new StringBuilder(quoted.length());
+    quoted.codePoints().forEach(code -> {
+      if (code != ' ' && (Character.isWhitespace(code) || Character.isSpaceChar(code)
+          || Character.isISOControl(code) || Character.getType(code) == Character.FORMAT)) {
+        for (char unit : Character.toChars(code)) {
+          visible.append("\\u").append(Integer.toHexString(unit | 0x10000).substring(1));
+        }
+      } else visible.appendCodePoint(code);
+    });
     int trailing = 0;
     for (int i = path.length(); i > 0 && Character.isWhitespace(path.charAt(i - 1)); i--) trailing++;
-    return quoted + (trailing == 0 ? "" : " (" + trailing + " trailing whitespace character(s))");
+    return visible + (trailing == 0 ? "" : " (" + trailing + " trailing whitespace character(s))");
   }
 
   @Override public OperationExecution executePrepared(OperationPreparation prepared,

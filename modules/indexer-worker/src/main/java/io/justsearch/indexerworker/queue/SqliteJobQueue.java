@@ -3261,7 +3261,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try (var row = query.executeQuery()) { return !row.next(); }
       }
     } catch (SQLException unavailable) {
-      throw new IllegalStateException("Forget queue absence could not be verified", unavailable);
+      throw SqliteServiceAvailability.failure("Forget queue absence could not be verified", unavailable);
     } finally { unlockAfterChanges(); }
   }
 

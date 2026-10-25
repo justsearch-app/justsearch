@@ -102,9 +102,13 @@ final class ForgetCoordinator implements ForgetService {
       return response(new ForgetOutcome(actual.operationKey(), actual.path(), actual.scope(),
           actual.status(), actual.removal(), actual.keepOut(), actual.reason(),
           "This forget is already complete. Withdrawal cannot reverse it. "
-              + (actual.keepOut() == ForgetOutcome.KeepOut.NOT_REQUIRED
-                  ? "This file has no permanent keep-out; a new deliberate add may restore it."
-                  : "To permit later indexing, remove the exact keep-out separately in Library. No indexed rows or original files are restored.")));
+              + switch (actual.keepOut()) {
+                case NOT_REQUIRED -> "This file has no permanent keep-out; a new deliberate add may restore it. ";
+                case INSTALLED -> "To permit later indexing, remove the exact keep-out separately in Library. ";
+                case RELEASED -> "Its exact keep-out has already been released. ";
+                case NOT_INSTALLED -> "This intent has no installed keep-out to withdraw. ";
+                case UNKNOWN -> "The current keep-out could not be confirmed. Review it in Library. ";
+              } + "No indexed rows or original files are restored."));
     }
     return result;
   }
