@@ -402,7 +402,7 @@ public final class CitationScorer implements Closeable {
       var acquisition = new SessionAcquisitionRequest(
           authority.urgency(), now + Math.min(authority.deadlineNanos() - now, localRemaining),
           authority.cancellationRequested(), authority.mayCreateGpuSession(),
-          authority.releaseCallerAtDeadline());
+          authority.releaseCallerAtDeadline(), authority.mayPrepareDeferredCpu());
       try (var lease = sessions.acquire(acquisition)) {
         // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
         // the recorder bound by the composition root (InferenceCompositionRoot).

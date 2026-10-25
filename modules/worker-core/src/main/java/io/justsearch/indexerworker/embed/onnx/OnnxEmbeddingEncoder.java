@@ -352,7 +352,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     // Bound each wait afresh while keeping cancellation and interruption authoritative.
     return new SessionAcquisitionRequest(request.urgency(),
         LocalSessionAcquisition.background().deadlineNanos(), request.cancellationRequested(),
-        request.mayCreateGpuSession(), false);
+        request.mayCreateGpuSession(), false, request.mayPrepareDeferredCpu());
   }
 
   public List<float[]> embedBatch(List<String> texts) throws OrtException {

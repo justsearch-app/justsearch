@@ -11,9 +11,12 @@ import java.util.function.BooleanSupplier;
  * Immutable scheduling authority for one native-session acquisition attempt.
  *
  * <p>{@code mayCreateGpuSession} is false for a query leg with a keyword fallback: such a leg must
- * not pay for creating or repairing a native session, so it uses a ready GPU/CPU session or reports
- * {@code LOADING} (Spec
- * D §4). {@code releaseCallerAtDeadline} asks the owner to return to the caller at the deadline
+ * not create or retry a GPU session. It uses a ready session or reports {@code LOADING} (Spec
+ * D §4), with one deliberate exception: explicitly deferred SPLADE/reranker CPU backups may
+ * prepare under the caller's original deadline/cancellation and the existing native-work bound.
+ * Lifecycle warmup clears {@code mayPrepareDeferredCpu}, so GPU release/failure alone cannot
+ * create a CPU backup. {@code releaseCallerAtDeadline} asks the owner to return to the caller at
+ * the deadline
  * even when a native run has not finished (Spec D §1.5).
  */
 public record SessionAcquisitionRequest(
@@ -21,7 +24,8 @@ public record SessionAcquisitionRequest(
     long deadlineNanos,
     BooleanSupplier cancellationRequested,
     boolean mayCreateGpuSession,
-    boolean releaseCallerAtDeadline) {
+    boolean releaseCallerAtDeadline,
+    boolean mayPrepareDeferredCpu) {
 
   /** Keeps signed {@link System#nanoTime()} subtraction unambiguous and rejects accidental hangs. */
   public static final Duration MAX_TIMEOUT = Duration.ofDays(365);
@@ -29,6 +33,20 @@ public record SessionAcquisitionRequest(
   public SessionAcquisitionRequest {
     Objects.requireNonNull(urgency, "urgency");
     Objects.requireNonNull(cancellationRequested, "cancellationRequested");
+  }
+
+  /** Ordinary acquisitions may demand a deliberately deferred CPU backup. */
+  public SessionAcquisitionRequest(
+      Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested,
+      boolean mayCreateGpuSession, boolean releaseCallerAtDeadline) {
+    this(urgency, deadlineNanos, cancellationRequested, mayCreateGpuSession,
+        releaseCallerAtDeadline, true);
+  }
+
+  /** Lifecycle serving warmup may create GPUs, but cannot turn into cold CPU-backup demand. */
+  public SessionAcquisitionRequest withoutDeferredCpuPreparation() {
+    return new SessionAcquisitionRequest(urgency, deadlineNanos, cancellationRequested,
+        mayCreateGpuSession, releaseCallerAtDeadline, false);
   }
 
   /** A request that may create sessions and waits for its native run, as before Spec D. */
