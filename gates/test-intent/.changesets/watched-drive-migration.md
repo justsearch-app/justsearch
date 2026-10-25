@@ -7,11 +7,13 @@ author-session: codex-drive-migration-builder-20261024
 
 # Watched-drive migration regression
 
-These expectations implement the orchestrator's settled D1-D9/A1/A2 brief under delegated autonomy:
+These expectations implement the orchestrator's settled D1-D9/A1/A3 brief under delegated autonomy:
 successful promotion, current content, exact acknowledgement, readable fenced status and automatic
 retry. Replace the disabled reproduction's refusal expectation with that outcome; keep its real
 loop mounts, identity checks and owned cleanup.
 The separate watcher-admission case preserves the existing final-fence handoff contract.
+A3 moves current-byte preparation ahead of generic drains without moving accepted receipts.
+Fixture cleanup owns boot-thread cancellation and physical drainage; no new product-wide quit API remains.
 Default ownership uses the index policy's null representation and the live watcher's `default`
 name interchangeably; named collections must still match. Replay must preserve a later admission's
 exact revision, and its projection-verification refusal must appear in status.
@@ -37,7 +39,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "canonicalise default ownership consistently in reconciliation's field comparison, the queue comparison and admission; keep exact-revision verification; and make a verification refusal set the visible refusal/fence status instead of only logging (D7).",
           "label": "agent choice"
         },
@@ -45,7 +47,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "D1: The drive leaves during a held cutover; a file under it is deleted while away; it returns with the same root identity. After cutover (with and without an Engine restart in between), the migration promotes; one writable runtime serves search and ingest; the deleted file's document is gone; every other document is present with its label.",
           "label": "agent choice"
         },
@@ -53,7 +55,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "D2: While away, without any companion DELETE: a file is recreated at the same path with new content; a file is modified (including a change that keeps size and mtime). After promotion, the index holds the current content; nothing current is removed.",
           "label": "agent choice"
         },
@@ -61,7 +63,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "D5: Concurrency: (a) admission blocked by the final fence during replay is applied after promotion; (b) an exact-revision receipt replaced during unfenced settlement wins over the older debt.",
           "label": "agent choice"
         },
@@ -69,7 +71,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "D7: When refusing, the Engine keeps a readable index, reports a visible fenced status naming the reason, and retries automatically when the drive and evidence return; existing operator recovery is unchanged. Indefinite refusal with evidence available is a failure.",
           "label": "agent choice"
         },
@@ -77,7 +79,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "D8: The integration cases skip (never pass) when loop/udisks prerequisites are missing, and leave no loop device or mount behind.",
           "label": "agent choice"
         },
@@ -85,7 +87,7 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
           "choice": "A1: when an incarnation ends because its root became unavailable (its volume left), record that as uncertainty scoped to that root, which only the fresh reconciliation preflight of that root (under the final fence, with the evidence rules above) can clear.",
           "label": "agent choice"
         },
@@ -93,16 +95,14 @@ exact revision, and its projection-verification refusal must appear in status.
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
-          "choice": "A2: after successful frozen-root identity/volume/ownership preflight, wake only exact admitted pending ROOT_UNAVAILABLE/RETRY_UNTIL_AVAILABLE revisions by changing retry_after; retain every other field, wait, receipt, and ownership/revision guard. Failed/stalled tests retain their body error while ordered shutdown joins real cutover producers and drains real periodic admissions within one caller deadline before closing the index owner.",
-          "label": "agent choice"
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A3 routine implementation: preserve persisted journal order and contents; prepare eligible exact/owned pending admissions with fresh current-byte proof under the actual writer fence and reserved queue transaction; defer insertion/DONE repair to ordered apply; repeat preparation while draining. Preserve original failures and drain only the fixture-owned boot threads/client executors/admissions within one fixture deadline; retain owners and backing files on incomplete cleanup. Production lifecycle semantics return to pre-A2."
         }
       ],
       "evidence": "gates/test-intent/evidence/watched-drive-migration.json",
       "newChecks": [
-        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#returnDuringBootMigrationPromotes",
-        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission",
-        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#producerQuiescenceHonorsSmallCallerDeadlineAndReportsIncompleteExit"
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#returnDuringBootMigrationPromotes"
       ]
     },
     {
@@ -112,19 +112,185 @@ exact revision, and its projection-verification refusal must appear in status.
       "change": "modified",
       "kind": "test-code",
       "class": "Adaptation",
-      "reproduction": "The shared real Engine fixture previously closed the index with a durable periodic admission blocked behind stalled cutover. Stop admission, interrupt/join real producers and close client producers, then require real admission drainage before the unchanged owner fence; retain the deliberate attempt-runner mock only while no physical attempt body has started. No existing assertion or ownership protection is relaxed.",
+      "reproduction": "A failed D1 has a durable periodic admission waiting behind cutover. Fixture cleanup must preserve the primary error, independently cancel owned groups, report incomplete physical drain and support retry without closing the live index owner.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
           "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
-          "delegationScope": "Complete only the existing D1-D9/A1/A2 watched-drive migration repair (returned-root retry and safe failed-test shutdown), followed by its narrow documentation and owed checks.",
-          "choice": "A2: after successful frozen-root identity/volume/ownership preflight, wake only exact admitted pending ROOT_UNAVAILABLE/RETRY_UNTIL_AVAILABLE revisions by changing retry_after; retain every other field, wait, receipt, and ownership/revision guard. Failed/stalled tests retain their body error while ordered shutdown joins real cutover producers and drains real periodic admissions within one caller deadline before closing the index owner.",
-          "label": "agent choice"
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A3 routine implementation: preserve persisted journal order and contents; prepare eligible exact/owned pending admissions with fresh current-byte proof under the actual writer fence and reserved queue transaction; defer insertion/DONE repair to ordered apply; repeat preparation while draining. Preserve original failures and drain only the fixture-owned boot threads/client executors/admissions within one fixture deadline; retain owners and backing files on incomplete cleanup. Production lifecycle semantics return to pre-A2."
         }
       ],
       "moved": "instrumentation",
-      "whatMoved": "The shared fixture shutdown harness now closes admission, interrupts and boundedly joins actual migration producers, stops the client producers, and requires real physical admission drainage before owner closure. The mock runner remains a mock with an explicit no-started-body precondition. Existing HTTP/reload/search assertions, data recovery and ownership fences remain unchanged."
+      "whatMoved": "The shared fixture captures its boot threads under their server start monitor, signals both migration and recorded groups independently, tracks one client-close future, and waits for real physical thread/executor/admission drain within a shared fixture budget. It retains stateful owners and backing files when incomplete. Existing HTTP/reload/search checks, data recovery and index ownership fence remain; production quiescence semantics are restored. HTTP stop and transport close now start independently once as tracked physical actions; their success and exit share the same monotonic budget, and failed cleanup retains private configuration and owners for retry."
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Adaptation",
+      "moved": "signature",
+      "whatMoved": "The retry-preservation control now binds the complete real journal and exact root receipt through A3 preparation. It still asserts only the intended retry_after changes, an advanced cursor observes it, invalid proof wakes nothing and all other row fields/receipts remain unchanged. The old signature is invoked only in an unchanged pre-A3 comparison. The baseline adapter exercises old refusal/backoff when neither preparatory nor wake API exists, retaining all real row/receipt/claim assertions and invalid-proof controls.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A3 routine implementation: preserve persisted journal order and contents; prepare eligible exact/owned pending admissions with fresh current-byte proof under the actual writer fence and reserved queue transaction; defer insertion/DONE repair to ordered apply; repeat preparation while draining. Preserve original failures and drain only the fixture-owned boot threads/client executors/admissions within one fixture deadline; retain owners and backing files on incomplete cleanup. Production lifecycle semantics return to pre-A2."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A3 H1-to-H2 preparation must pass through the production claim/extractor/writer/commit path, including identical metadata and pristine claims that first defer. Owned DONE H2-to-H3/debt handoff after restart, absent wake, independent/protected rows and broad-delete ordering retain their separate controls. The conditional write rejects stale frozen journal/full-row expectations before mutation and rolls SQL back when post-mutation fresh proof fails. The production writer re-probes uncommitted sources during issued extraction and pending commit. Parameterized display names include their existing method identity so stock evidence associates the same arguments and assertions with the requested check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A3 routine implementation: preserve persisted journal order and contents; prepare eligible exact/owned pending admissions with fresh current-byte proof under the actual writer fence and reserved queue transaction; defer insertion/DONE repair to ordered apply; repeat preparation while draining. Preserve original failures and drain only the fixture-owned boot threads/client executors/admissions within one fixture deadline; retain owners and backing files on incomplete cleanup. Production lifecycle semantics return to pre-A2."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-current-byte.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#unavailablePredecessorConvergesThroughTheProductionExtractor",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#staleFrozenExpectationsRefuseBeforeAnyConditionalMutation",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#failedPostMutationRootProofRollsBackSqlAndRetainsDebtForRetry",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#freshFileSuccessorCannotHandOffAcrossAnInterveningPathReceipt"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "Fixture-owned stalled migration and durable periodic sync must physically exit/drain while retaining original assertions. A zero, submillisecond or2500ms budget must report incomplete physical cleanup, retain stateful owners/files/a single close future and allow retry; cleanup errors remain suppressed onto the body error. This does not claim a product-wide quit fix.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A3 routine implementation: preserve persisted journal order and contents; prepare eligible exact/owned pending admissions with fresh current-byte proof under the actual writer fence and reserved queue transaction; defer insertion/DONE repair to ordered apply; repeat preparation while draining. Preserve original failures and drain only the fixture-owned boot threads/client executors/admissions within one fixture deadline; retain owners and backing files on incomplete cleanup. Production lifecycle semantics return to pre-A2."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-fixture.json",
+      "newChecks": [
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission",
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#fixtureBudgetReportsIncompleteExitAndSupportsRetry"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "Ordinary non-recorded scan batch attribution survives H1-to-H2-to-H3 preparation and unacknowledged commit/restart with exact debt handoff; another ordinary attribution confers no ownership. Real admission binding composes reconciliation with the actual loop file writer fence; uncooperative source changes remain detectable and fresh retries share the original promotion deadline. The stock repaired-behavior proof selects the pending succession assertion; the separate restart control and its intended ownership-refusal before are retained in tmp/round9/successor-final-before.xml and the final focused/full suite XML. Parameterized display names include their existing method identity so stock evidence associates the same arguments and assertions with the requested check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "Ordinary non-recorded scan batch attribution survives H1-to-H2-to-H3 preparation and unacknowledged commit/restart with exact debt handoff; another ordinary attribution confers no ownership. Real admission binding composes reconciliation with the actual loop file writer fence; uncooperative source changes remain detectable and fresh retries share the original promotion deadline."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-ordinary-scan.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#ordinaryScanPendingH2RepairsH3AndPreservesScanAttribution"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "The production extractor fixture binds the same mutation admission owner as DefaultWorkerAppServices; conditional reconciliation excludes a competing actual loop writer until the real transaction completes. This preserves the critical-section ordering contract. Parameterized display names include their existing method identity so stock evidence associates the same arguments and assertions with the requested check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "The production extractor fixture binds the same mutation admission owner as DefaultWorkerAppServices; conditional reconciliation excludes a competing actual loop writer until the real transaction completes. This preserves the critical-section ordering contract."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-writer-fence.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#reconciliationExcludesTheActualLoopWriterUntilConditionalAdmissionFinishes"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "With a real outstanding HTTP handler, zero, submillisecond and2500ms cleanup must start HTTP/transport cancellation independently, return within the shared allowance, retain physical owners/configuration/backing directories on incomplete exit, and permit successful retry after release. Existing ownership and body-error protections remain. The control stays in the shared-fixture consumer so the stock before runner transplants the new assertion without transplanting the repaired Fixture.close into the before tree.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "With a real outstanding HTTP handler, zero, submillisecond and2500ms cleanup must start HTTP/transport cancellation independently, return within the shared allowance, retain physical owners/configuration/backing directories on incomplete exit, and permit successful retry after release. Existing ownership and body-error protections remain."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-http-budget.json",
+      "newChecks": [
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#outstandingHttpCleanupSharesTheBudgetAndRetainsOwnersUntilRetry"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "A3 preparation may wake only eligible PENDING admissions. Proven absence never changes DONE, FAILED or issued row waits; their exact rows and receipts survive unchanged. The source absence does not widen preparation authority.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A3 preparation may wake only eligible PENDING admissions. Proven absence never changes DONE, FAILED or issued row waits; their exact rows and receipts survive unchanged. The source absence does not widen preparation authority."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-absent-state.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#absentPreparationPreservesDoneFailedAndIssuedWaits"
+      ],
+      "repaired": true
     }
   ]
 }

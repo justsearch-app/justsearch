@@ -46,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** Native runtime/producer, real Engine root/bootstrap and actual admin HTTP handler. Models stubbed. */
 @Timeout(60)
 final class RuntimeReloadProducersHttpIntegrationTest {
-  @TempDir Path directory;
+  @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) Path directory;
   private static final EngineContext CONTEXT = EngineProvenance.internal(
       "reload-producer-check", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
 
@@ -587,6 +587,23 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     final KnowledgeClient client;
     final Javalin http;
     final HttpClient transport = HttpClient.newHttpClient();
+    final java.util.List<Thread> migrationThreads;
+    final java.util.concurrent.atomic.AtomicBoolean liveStartObserved = new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.FutureTask<Void> clientClose;
+    Thread clientCloser;
+    java.util.concurrent.FutureTask<Void> httpClose;
+    Thread httpCloser;
+    java.util.concurrent.FutureTask<Void> transportClose;
+    Thread transportCloser;
+    boolean closed;
+    final ch.qos.logback.classic.Logger migrationLogger =
+        (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(KnowledgeServer.class);
+    final ch.qos.logback.core.AppenderBase<ch.qos.logback.classic.spi.ILoggingEvent> liveStarts =
+        new ch.qos.logback.core.AppenderBase<>() {
+          @Override protected void append(ch.qos.logback.classic.spi.ILoggingEvent event) {
+            if (event.getMessage().startsWith("Live Green start dispatched:")) liveStartObserved.set(true);
+          }
+        };
 
     Fixture() throws Exception { this(false); }
 
@@ -619,12 +636,16 @@ final class RuntimeReloadProducersHttpIntegrationTest {
             var result = new KnowledgeServer(executors, worker, new InProcessWorkerSignalBus(gauge),
                 io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, index,
                 encoders, configuration);
-            if (migrationHook != null) {
+            {
               try {
                 var install = KnowledgeServer.class.getDeclaredMethod("installMigrationBarrierForTests",
                     io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook.class);
                 install.setAccessible(true);
-                install.invoke(result, migrationHook);
+                io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook observed = transition -> {
+                  if (transition.point().equals("migration-before-live-green-open")) liveStartObserved.set(true);
+                  if (migrationHook != null) migrationHook.await(transition);
+                };
+                install.invoke(result, observed);
               } catch (ReflectiveOperationException failure) {
                 throw new IllegalStateException("Cannot install migration observation barrier", failure);
               }
@@ -640,6 +661,11 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       bootstrap.startInitial(ignored -> {});
       server = built.get();
       assertTrue(server.awaitIndexRecoveryModels(10_000));
+      synchronized (server) {
+        migrationThreads = java.util.stream.Stream.of((Thread) inherited(server, "migrationEnumeratorThread"),
+            (Thread) inherited(server, "migrationCutoverThread")).filter(java.util.Objects::nonNull).toList();
+      }
+      assertFalse(liveStartObserved.get(), "fixture boot must not dispatch a live migration starter");
       client = bootstrap.client();
       assertTrue(bootstrap.checkHealth());
       // Head publishes readiness after attaching a physically verified bootstrap to its API.
@@ -658,6 +684,10 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           mock(TimeSeriesController.class), mock(SessionPoliciesController.class), ctx -> {},
           ctx -> handler.invoke(api, ctx));
       http.start("127.0.0.1", 0);
+      // This existing log is emitted before the untracked live-start thread is dispatched.
+      liveStarts.setContext(migrationLogger.getLoggerContext());
+      liveStarts.start();
+      migrationLogger.addAppender(liveStarts);
     }
 
     io.justsearch.indexerworker.queue.SwitchBufferCapableQueue queue() throws Exception {
@@ -836,26 +866,94 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       }
     }
 
-    @Override public void close() throws Exception {
+    @Override public void close() throws Exception { close(java.time.Duration.ofSeconds(5)); }
+
+    synchronized void close(java.time.Duration allowance) throws Exception {
+      if (closed) return;
+      long deadline = System.nanoTime() + Math.max(0, allowance.toNanos());
+      var failures = new java.util.ArrayList<Throwable>();
+      boolean supported = !liveStartObserved.get()
+          && org.mockito.Mockito.mockingDetails(root.operationAttempts()).getInvocations().stream()
+              .noneMatch(invocation -> invocation.getMethod().getName().equals("start"));
+      if (!supported) failures.add(new AssertionError("Fixture cannot own live/recorded migration starters"));
       try {
         root.admission().beginClosing();
         root.admission().cancelInteractive("fixture closing");
-        root.quiesceProducers(java.time.Duration.ofSeconds(5));
-        // This fixture deliberately mocks the recorded-attempt runner: reconcile notifications
-        // run, but no recorded operation body is started by it. Drain the real client admissions.
-        assertTrue(org.mockito.Mockito.mockingDetails(root.operationAttempts()).getInvocations().stream()
-            .noneMatch(invocation -> invocation.getMethod().getName().equals("start")),
-            "a fixture with physical recorded attempts needs a real attempt runner");
-        client.close(); // Stop periodic sync and the owned call executors before draining references.
-        assertTrue(root.admission().awaitDrained(java.time.Duration.ofSeconds(5)),
-            "fixture live work must physically exit before index ownership closes");
-        http.stop();
-        transport.close();
-        bootstrap.close();
-        root.close();
-        root.processResources().close();
+      } catch (Exception | AssertionError failure) { failures.add(failure); }
+      // Signal both boot-owned groups even if the independent recorded drain fails.
+      for (Thread producer : migrationThreads) producer.interrupt();
+      try { root.quiesceProducers(java.time.Duration.ZERO); }
+      catch (Exception | AssertionError failure) { failures.add(failure); }
+      if (clientClose == null) {
+        clientClose = new java.util.concurrent.FutureTask<>(() -> { client.close(); return null; });
+        clientCloser = new Thread(clientClose, "fixture-client-close");
+        clientCloser.setDaemon(true);
+        clientCloser.start();
       }
-      finally {
+      // Start each independent cancellation before waiting for any physical group.
+      if (httpClose == null) {
+        httpClose = new java.util.concurrent.FutureTask<>(() -> { http.stop(); return null; });
+        httpCloser = new Thread(httpClose, "fixture-http-stop");
+        httpCloser.setDaemon(true);
+        httpCloser.start();
+      }
+      if (transportClose == null) {
+        transportClose = new java.util.concurrent.FutureTask<>(() -> { transport.close(); return null; });
+        transportCloser = new Thread(transportClose, "fixture-transport-close");
+        transportCloser.setDaemon(true);
+        transportCloser.start();
+      }
+      try {
+        long remaining = deadline - System.nanoTime();
+        if (remaining > 0) clientClose.get(remaining, TimeUnit.NANOSECONDS);
+        else if (clientClose.isDone()) clientClose.get();
+        for (Thread producer : migrationThreads) {
+          remaining = deadline - System.nanoTime();
+          if (producer.isAlive() && remaining > 0) TimeUnit.NANOSECONDS.timedJoin(producer, remaining);
+        }
+        remaining = deadline - System.nanoTime();
+        if (clientCloser.isAlive() && remaining > 0) TimeUnit.NANOSECONDS.timedJoin(clientCloser, remaining);
+        while (clientExecutorsLive() && (remaining = deadline - System.nanoTime()) > 0) {
+          TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(5)));
+        }
+        remaining = deadline - System.nanoTime();
+        root.admission().awaitDrained(java.time.Duration.ofNanos(Math.max(0, remaining)));
+      } catch (Exception | AssertionError failure) {
+        if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+        failures.add(failure);
+      }
+      for (var action : java.util.List.of(httpClose, transportClose)) {
+        try {
+          long remaining = deadline - System.nanoTime();
+          if (remaining > 0) action.get(remaining, TimeUnit.NANOSECONDS);
+          else if (action.isDone()) action.get();
+        } catch (Exception | AssertionError failure) {
+          if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+          failures.add(failure);
+        }
+      }
+      for (Thread closer : java.util.List.of(httpCloser, transportCloser)) {
+        long remaining = deadline - System.nanoTime();
+        try { if (closer.isAlive() && remaining > 0) TimeUnit.NANOSECONDS.timedJoin(closer, remaining); }
+        catch (InterruptedException failure) { Thread.currentThread().interrupt(); failures.add(failure); }
+      }
+      boolean drained = clientClose.state() == java.util.concurrent.Future.State.SUCCESS && !clientCloser.isAlive()
+          && httpClose.state() == java.util.concurrent.Future.State.SUCCESS && !httpCloser.isAlive()
+          && transportClose.state() == java.util.concurrent.Future.State.SUCCESS && !transportCloser.isAlive()
+          && migrationThreads.stream().noneMatch(Thread::isAlive) && !clientExecutorsLive()
+          && root.admission().activeWorkCount() == 0;
+      if (!drained) failures.add(new IllegalStateException("Fixture physical drain incomplete: admissions="
+          + root.admission().activeWorkCount() + ", migrations="
+          + migrationThreads.stream().filter(Thread::isAlive).map(Thread::getName).toList()
+          + ", clientExecutors=" + root.executors().snapshot()));
+      if (supported && drained && failures.isEmpty()) {
+        try {
+          bootstrap.close();
+          root.close();
+          root.processResources().close();
+          migrationLogger.detachAppender(liveStarts);
+          liveStarts.stop();
+          closed = true;
           if (previousDataDir == null) System.clearProperty(EnvRegistry.DATA_DIR.configKey());
           else System.setProperty(EnvRegistry.DATA_DIR.configKey(), previousDataDir);
           if (previousHome == null) System.clearProperty("user.home");
@@ -866,8 +964,21 @@ final class RuntimeReloadProducersHttpIntegrationTest {
             clear.setAccessible(true);
             clear.invoke(null);
           }
+        } catch (Exception | AssertionError failure) { failures.add(failure); }
+      }
+      if (!failures.isEmpty()) {
+        var incomplete = new Exception("Fixture cleanup incomplete; owners and backing directory retained");
+        failures.forEach(incomplete::addSuppressed);
+        throw incomplete;
       }
     }
+
+    private boolean clientExecutorsLive() {
+      return root.executors().snapshot().registrations().stream()
+          .anyMatch(registration -> (registration.spec().name().startsWith("engine-knowledge-")
+              || registration.spec().name().startsWith("knowledge-client-")) && registration.liveInstances() != 0);
+    }
+
   }
 
   private static void assertReloadSuccess(HttpResponse<String> response) {

@@ -34,6 +34,9 @@ public final class WatcherReplay implements AutoCloseable {
   // Empty string is a freshly confirmed absence, never an unspecified outcome.
   private final Map<String, String> outcomes = new LinkedHashMap<>();
   private boolean committed;
+  private String candidate;
+  private List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> journal;
+  private io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp receipt;
 
   public WatcherReplay(WatcherRootReconciliation debt, RunningRuntime target, JobQueue queue,
       WorkerIngestService publisher, IndexingPacing pacing,
@@ -88,12 +91,19 @@ public final class WatcherReplay implements AutoCloseable {
     }
   }
 
-  /** Wake exact admitted waits only after the complete root preflight has succeeded. */
-  public void wakeReturnedRootAdmissions(List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> admissions)
-      throws IOException {
-    requireIdentity();
-    queue.wakeReturnedRootAdmissions(Path.of(debt.root()), debt.collection(), admissions.stream()
-        .filter(admission -> covers(admission.path(), admission.collection())).toList());
+  /** Bind the complete frozen journal before preparing any blocking predecessor. */
+  public void prepare(String generation,
+      List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> frozen,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp rootReceipt) throws IOException {
+    candidate = generation;
+    journal = List.copyOf(frozen);
+    receipt = rootReceipt;
+    prepare();
+  }
+
+  /** Writers can defer a stale source during a drain; re-probe uncommitted roots each time. */
+  public void prepare() throws IOException {
+    if (!committed) reconcile(false);
   }
 
   public boolean covers(String path, String collection) {
@@ -118,36 +128,39 @@ public final class WatcherReplay implements AutoCloseable {
   }
 
   /** Apply at the receipt's accepted position, after preceding writers have drained. */
-  public void apply() throws IOException {
+  public void apply() throws IOException { reconcile(true); }
+
+  private void reconcile(boolean orderedApply) throws IOException {
     requireIdentity();
-    target.commitOps().maybeRefreshBlocking();
+    if (journal == null || !(queue instanceof io.justsearch.indexerworker.queue.SwitchBufferCapableQueue conditional)) {
+      throw new IOException("Watcher reconciliation has no frozen journal owner");
+    }
     for (var outcome : outcomes.entrySet()) {
       String path = outcome.getKey();
-      String source = observe(path); // A reappearing source is admitted, never deleted.
-      outcome.setValue(source);
-      if (source.isEmpty()) {
-        try {
-          java.util.function.Supplier<Boolean> remove = () -> {
-            try {
-              requireIdentity();
-              if (!observe(path).isEmpty()) throw new IOException("Source returned before deletion");
-              target.indexingCoordinator().deleteByIdAndChunks(path);
-              if (queue.deleteByExactPath(path) < 0) throw new IOException("Queue deletion failed");
-              requireIdentity();
-              return true;
-            } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
-          };
-          if (!(publisher == null ? remove.get() : publisher.underFileMutationFence(remove))) {
-            throw new IOException("Watcher reconciliation deletion did not apply");
-          }
-        } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
-      } else if (!matches(path, source) || !matchesQueueCollection(Path.of(path))) {
-        var entry = new JobQueue.EnqueueEntry(Path.of(path), Files.size(Path.of(path)), null, source)
-            .withinRoot(Path.of(debt.root()));
-        if (queue.enqueueEntriesWithExactCollection(List.of(entry), rootOwnerCollection(debt.collection())) != 1) {
-          throw new IOException("Watcher reconciliation file admission failed: " + path);
-        }
-      }
+      try {
+        java.util.function.Supplier<Boolean> transition = () -> {
+          try {
+            requireIdentity();
+            String source = observe(path);
+            target.commitOps().maybeRefreshBlocking();
+            var expected = conditional.watcherReconciliationRow(path);
+            var file = new io.justsearch.indexerworker.queue.WatcherReconciliationFile(candidate,
+                journal, receipt, path, source, source.isEmpty() ? 0 : Files.size(Path.of(path)),
+                orderedApply, matches(path, source), expected);
+            Runnable proof = () -> {
+              try {
+                if (!source.equals(observe(path))) throw new IOException("Watcher source changed during conditional admission");
+              } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            };
+            boolean applied = conditional.reconcileWatcherFile(file, proof,
+                () -> target.indexingCoordinator().deleteByIdAndChunks(path));
+            outcome.setValue(source);
+            return applied;
+          } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        };
+        boolean applied = publisher == null ? transition.get() : publisher.underFileMutationFence(transition);
+        if (orderedApply && !applied) throw new IOException("Watcher file has independent or issued ownership: " + path);
+      } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
     }
     requireIdentity();
   }
@@ -190,12 +203,6 @@ public final class WatcherReplay implements AutoCloseable {
     return source.equals(fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256))
         && Objects.equals(rootOwnerCollection(debt.collection()),
             rootOwnerCollection(fields.getDocumentFieldOrThrow(path, SchemaFields.COLLECTION)));
-  }
-
-  private boolean matchesQueueCollection(Path path) {
-    String collection = rootOwnerCollection(debt.collection());
-    return queue.matchesExpectedCollection(path, collection)
-        || collection == null && queue.matchesExpectedCollection(path, IngestCollectionPolicy.DEFAULT_COLLECTION);
   }
 
   private String observe(String path) throws IOException {

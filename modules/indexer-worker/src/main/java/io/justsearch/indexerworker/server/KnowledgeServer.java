@@ -8520,28 +8520,6 @@ public final class KnowledgeServer implements Closeable {
     return indexGenerationManager;
   }
 
-  /** Stop and physically join migration producers before admitted users and index owners drain. */
-  public void quiesceMigrationProducers(java.time.Duration timeout) throws IOException {
-    long deadline = System.nanoTime() + timeout.toNanos();
-    Thread enumerator = migrationEnumeratorThread;
-    Thread cutover = migrationCutoverThread;
-    if (enumerator != null) enumerator.interrupt();
-    if (cutover != null) cutover.interrupt();
-    for (Thread producer : new Thread[] {enumerator, cutover}) {
-      if (producer == null || !producer.isAlive()) continue;
-      long remaining = deadline - System.nanoTime();
-      if (remaining > 0) {
-        try {
-          TimeUnit.NANOSECONDS.timedJoin(producer, remaining);
-        } catch (InterruptedException interrupted) {
-          Thread.currentThread().interrupt();
-          throw new IOException("Interrupted draining migration producers", interrupted);
-        }
-      }
-      if (producer.isAlive()) throw new IOException("Migration producer drain incomplete: " + producer.getName());
-    }
-  }
-
   void releaseModelReadyLatchForTests() {
     modelReadyLatch.countDown();
   }

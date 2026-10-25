@@ -540,6 +540,77 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "outstandingHttpCleanupSharesTheBudgetAndRetainsOwnersUntilRetry({arguments})")
+  @org.junit.jupiter.params.provider.ValueSource(longs = {0, 500_000, 2_500_000_000L})
+  @Timeout(60)
+  void outstandingHttpCleanupSharesTheBudgetAndRetainsOwnersUntilRetry(long nanos) throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var exited = new CountDownLatch(1);
+    var host = new RuntimeReloadProducersHttpIntegrationTest();
+    host.directory = directory;
+    var f = host.new Fixture();
+    CompletableFuture<?> closing = null;
+    boolean withinBudget = false;
+    boolean ownersRetained = false;
+    boolean independentTransport = false;
+    Throwable bodyFailure = null;
+    try {
+      f.http.get("/fixture-stalled", context -> {
+        entered.countDown();
+        boolean interrupted = false;
+        try {
+          while (release.getCount() != 0) {
+            try { release.await(); }
+            catch (InterruptedException stop) { interrupted = true; }
+          }
+          context.result("released");
+        } finally {
+          exited.countDown();
+          if (interrupted) Thread.currentThread().interrupt();
+        }
+      });
+      f.transport.sendAsync(HttpRequest.newBuilder(
+          URI.create("http://127.0.0.1:" + f.http.port() + "/fixture-stalled")).GET().build(),
+          HttpResponse.BodyHandlers.ofString());
+      assertTrue(entered.await(5, TimeUnit.SECONDS), "the real HTTP handler must be outstanding");
+      closing = CompletableFuture.runAsync(() -> {
+        try { f.close(java.time.Duration.ofNanos(nanos)); }
+        catch (Exception expectedIncomplete) { /* owner retention is asserted below */ }
+      });
+      try { closing.get(nanos + TimeUnit.SECONDS.toNanos(1), TimeUnit.NANOSECONDS); withinBudget = true; }
+      catch (java.util.concurrent.TimeoutException exceeded) { /* release below also makes fail-before safe */ }
+      ownersRetained = !f.closed && !f.server.awaitClosed(0)
+          && Files.isDirectory(directory) && io.justsearch.configuration.resolved.ConfigStore.globalOrNull() != f.previous;
+      try {
+        Thread closer = (Thread) inherited(f, "transportCloser");
+        independentTransport = closer != null && closer.getState() != Thread.State.NEW;
+      } catch (NoSuchFieldException oldSynchronousCleanup) {
+        independentTransport = f.transport.isTerminated();
+      }
+      assertEquals(1, exited.getCount(), "the handler remains physically stalled even if cancellation closes its exchange");
+    } catch (Exception | AssertionError failure) {
+      bodyFailure = failure;
+      throw failure;
+    } finally {
+      release.countDown();
+      try {
+        assertTrue(exited.await(10, TimeUnit.SECONDS));
+        if (closing != null) closing.get(10, TimeUnit.SECONDS);
+        f.close(java.time.Duration.ofSeconds(10));
+      } catch (Exception | AssertionError cleanup) {
+        if (bodyFailure != null) bodyFailure.addSuppressed(cleanup);
+        else throw cleanup;
+      }
+    }
+    assertTrue(withinBudget, "HTTP/transport cleanup must return within the caller's shared allowance");
+    assertTrue(ownersRetained, "incomplete HTTP cleanup must retain stateful owners and private configuration");
+    assertTrue(independentTransport, "transport cancellation must start independently of blocked HTTP stop");
+    assertTrue(f.closed, "a released exchange must permit retry to physically drain and close owners");
+    assertFalse(Thread.getAllStackTraces().keySet().stream().anyMatch(thread -> thread.isAlive()
+        && (thread.getName().equals("fixture-http-stop") || thread.getName().equals("fixture-transport-close"))));
+  }
+
   @Test
   @Timeout(90)
   void stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission() throws Exception {
@@ -592,9 +663,10 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     }
   }
 
-  @Test
+  @org.junit.jupiter.params.ParameterizedTest(name = "fixtureBudgetReportsIncompleteExitAndSupportsRetry({arguments})")
+  @org.junit.jupiter.params.provider.ValueSource(longs = {0, 500_000, 2_500_000_000L})
   @Timeout(90)
-  void producerQuiescenceHonorsSmallCallerDeadlineAndReportsIncompleteExit() throws Exception {
+  void fixtureBudgetReportsIncompleteExitAndSupportsRetry(long nanos) throws Exception {
     Path root = Files.createDirectory(directory.resolve("deadline-root"));
     Files.writeString(root.resolve("seed.txt"), "deadlineseed");
     try (var old = fixture()) {
@@ -618,10 +690,20 @@ final class LinuxWatchedDriveReturnIntegrationTest {
       try {
         assertTrue(reached.await(30, TimeUnit.SECONDS));
         long start = System.nanoTime();
-        assertThrows(IllegalStateException.class,
-            () -> f.root.quiesceProducers(java.time.Duration.ofMillis(25)));
-        assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1),
-            "the caller's allowance must not become an additional ten-second join");
+        var original = new AssertionError("body failure during stalled fixture cleanup");
+        var observed = assertThrows(AssertionError.class, () -> {
+          try (AutoCloseable cleanup = () -> f.close(java.time.Duration.ofNanos(nanos))) {
+            throw original;
+          }
+        });
+        assertSame(original, observed, "the body's assertion must remain primary");
+        assertEquals(1, observed.getSuppressed().length, "retain the physical cleanup refusal as suppressed evidence");
+        assertTrue(Files.isDirectory(directory), "failed drain must retain fixture backing files");
+        assertTrue(System.nanoTime() - start < nanos + TimeUnit.SECONDS.toNanos(1),
+            "the fixture's allowance must not become an additional ten-second join");
+        assertFalse(f.closed, "incomplete physical drain must retain its owners for retry");
+        assertNotNull(f.clientClose, "one cleanup future is retained for retry");
+        assertFalse(f.server.awaitClosed(0), "the index owner must survive failed drainage");
       } finally { release.countDown(); }
     }
   }

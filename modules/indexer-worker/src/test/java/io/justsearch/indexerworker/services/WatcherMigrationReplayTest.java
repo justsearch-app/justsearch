@@ -506,6 +506,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
             path.equals(otherOwner) ? "another" : "notes"));
       }
       var admissions = f.queue.listSwitchBufferOpsStrict().stream()
+          .filter(op -> "UPSERT".equals(op.op()))
           .map(op -> io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload())).toList();
       // Replace only the queue admission: the accepted old receipt must not wake its successor.
       assertEquals(1, f.queue.enqueueEntriesWithExactCollection(List.of(JobQueue.EnqueueEntry.stat(replaced)), "notes"));
@@ -528,21 +529,42 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       f.queue.enqueue(List.of(cursor));
       assertEquals(cursor, f.queue.pollPending(1).getFirst().path());
       assertTrue(f.queue.pollPending(1).isEmpty(), "all unavailable admissions begin in future backoff");
+      f.debt();
       var before = retryRows();
       var receipts = f.queue.listSwitchBufferOpsStrict();
       var debt = f.debtValue();
       if (proof.equals("identity")) debt = new WatcherRootReconciliation(debt.root(), "unproven", "notes");
       if (proof.equals("membership")) f.roots = List.of();
       if (proof.equals("volume")) RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(true);
+      boolean oldReplayRefused = false;
       try {
-        try (var preflight = new WatcherReplay(debt, f.runtime, f.queue, null,
-            IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(), () -> false)) {
-          // Same source compiles on the pre-repair tree. Missing wake leaves the real job unclaimable.
-          try {
-            WatcherReplay.class.getMethod("wakeReturnedRootAdmissions", List.class).invoke(preflight, admissions);
-          } catch (NoSuchMethodException beforeRepair) { /* Observe the unchanged backoff below. */ }
+        try {
+          Class<?> implementation = Class.forName("io.justsearch.indexerworker.services.WatcherReplay");
+          Object instance = implementation.getConstructors()[0].newInstance(debt, f.runtime, f.queue, null,
+              IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(),
+              (java.util.function.BooleanSupplier) () -> false);
+          try (var preflight = (AutoCloseable) instance) {
+            try {
+              implementation.getMethod("prepare", String.class, List.class,
+                  io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp.class)
+                  .invoke(preflight, "green", receipts, receipts.getLast());
+            } catch (NoSuchMethodException beforeA3) {
+              try { implementation.getMethod("wakeReturnedRootAdmissions", List.class).invoke(preflight, admissions); }
+              catch (NoSuchMethodException beforeWake) { /* Old replay leaves the real admission delayed. */ }
+            }
+          }
+        } catch (ClassNotFoundException beforeReconciliation) {
+          // Exercise the old refusal path, then observe its unchanged durable backoff below.
+          assertTrue(KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(f.context()).isEmpty(),
+              "old replay must refuse unsupported root reconciliation");
+          oldReplayRefused = true;
+        } catch (java.lang.reflect.InvocationTargetException failure) {
+          if (failure.getCause() instanceof java.io.IOException refused) throw refused;
+          if (failure.getCause() instanceof Exception original) throw original;
+          if (failure.getCause() instanceof Error original) throw original;
+          throw new AssertionError(failure.getCause());
         }
-        assertEquals("valid", proof, "invalid proof must refuse before changing retry timing");
+        if (!oldReplayRefused) assertEquals("valid", proof, "invalid proof must refuse before changing retry timing");
       } catch (java.io.IOException refused) {
         assertNotEquals("valid", proof, refused.toString());
       } finally { RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(false); }

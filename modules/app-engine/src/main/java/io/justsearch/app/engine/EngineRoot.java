@@ -1534,16 +1534,10 @@ public final class EngineRoot implements WorkerHost {
    * producer deadline. Producers that exit in time are handed off as before.
    */
   public void quiesceProducers(java.time.Duration timeout) {
-    long deadline = System.nanoTime()
-        + (timeout == null ? java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(deadlineMs) : timeout.toNanos());
     try {
-      KnowledgeServer current = server;
-      if (current != null) current.quiesceMigrationProducers(java.time.Duration.ofNanos(
-          Math.max(0, deadline - System.nanoTime())));
-      recordedIngestion.stopProducers(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
-          Math.max(0, deadline - System.nanoTime())));
+      recordedIngestion.stopProducers(timeout == null ? deadlineMs : timeout.toMillis());
     } catch (IOException incomplete) {
-      throw new IllegalStateException("Engine producer drain is incomplete", incomplete);
+      throw new IllegalStateException("Recorded ingestion producer drain is incomplete", incomplete);
     }
   }
 

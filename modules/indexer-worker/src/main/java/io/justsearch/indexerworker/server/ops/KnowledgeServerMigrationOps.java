@@ -1132,8 +1132,8 @@ public final class KnowledgeServerMigrationOps {
       deleteOrder = replayDeleteOrder(context, ops, exactRead);
       supersededLegacyFiles = supersededLegacyFiles(context, ops);
       fileAuthorizingDeletes = exactRead ? fileRelatedBroadDeletes(context, ops, deleteOrder) : Set.of();
-      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes);
-    } catch (IOException | RuntimeException invalid) {
+
+    } catch (RuntimeException invalid) {
       context.log().warn("Buffered file/delete receipts cannot certify replay", invalid);
       return new ReplayOutcome(false, List.of());
     }
@@ -1155,10 +1155,10 @@ public final class KnowledgeServerMigrationOps {
             context.publisher(), context.indexingPacing(), context.migrationRoots(), admittedPaths,
             () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos()));
       }
-      var admittedUpserts = ops.stream().filter(op -> "UPSERT".equals(op.op()))
-          .map(op -> SwitchBufferUpsert.decode(op.payload())).toList();
-      for (var reconciliation : reconciliations.values()) {
-        reconciliation.wakeReturnedRootAdmissions(admittedUpserts);
+      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes,
+          deleteOrder, reconciliations);
+      for (var entry : reconciliations.entrySet()) {
+        entry.getValue().prepare(context.replayGeneration(), allOps, entry.getKey());
       }
     } catch (IOException | RuntimeException incomplete) {
       closeReconciliations(reconciliations, context.log());
@@ -1186,7 +1186,7 @@ public final class KnowledgeServerMigrationOps {
       // that a later DELETE_PREFIX removed.
       if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
         if (!enqueueBufferedUpserts(context, toEnqueue)
-            || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery)
+            || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)
                 || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false,
                     refusedSourceRecovery, reconciliations)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
@@ -1208,7 +1208,7 @@ public final class KnowledgeServerMigrationOps {
           try {
             if (reconciliation == null) throw new IOException("Watcher reconciliation has no fresh preflight");
             reconciliation.apply();
-            if (!awaitQueuedUpserts(context, refusedSourceRecovery)) {
+            if (!awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)) {
               throw new IOException("Watcher reconciliation writer has not drained");
             }
             reconciliation.commitAndVerify();
@@ -1617,7 +1617,7 @@ public final class KnowledgeServerMigrationOps {
                 // Enumeration may enqueue a file that the Green loop has already claimed. A
                 // subsequent direct DELETE_PREFIX must wait for that writer, not merely remove its
                 // queue row while it can still publish a late Lucene write.
-                if (exactRead && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
+                if (exactRead && !awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1671,7 +1671,7 @@ public final class KnowledgeServerMigrationOps {
                 // A removed file found present again was queued; a later direct delete must wait
                 // for its writer, as after a replayed SYNC_ROOT.
                 if (exactRead && replayed.requeued() > 0
-                    && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
+                    && !awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1705,7 +1705,7 @@ public final class KnowledgeServerMigrationOps {
 
     if (!toEnqueue.isEmpty()) {
       allApplied &= enqueueBufferedUpserts(context, toEnqueue)
-          && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery));
+          && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations));
     }
 
     // Refused recovery also judges file admissions by A's writer, whose batches A's reader sees
@@ -1830,12 +1830,14 @@ public final class KnowledgeServerMigrationOps {
 
   /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
   private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context,
-      boolean refusedSourceRecovery) {
+      boolean refusedSourceRecovery,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) {
     // All replay barriers consume the same SWITCHING budget. Returning early would re-enqueue
     // retained UPSERT versions on the next attempt, possibly resetting a claimed write.
     long deadline = context.deadlineNanos();
     try {
       while (true) {
+        for (var reconciliation : reconciliations.values()) reconciliation.prepare();
         JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
         // Refused-candidate recovery runs with its writer paused and proved idle, so pending rows
         // cannot move here; they stay durable queue work that surviving A's writer runs between
@@ -1853,7 +1855,7 @@ public final class KnowledgeServerMigrationOps {
         if (System.nanoTime() >= deadline) return false;
         Thread.sleep(50);
       }
-    } catch (RuntimeException unavailable) {
+    } catch (IOException | RuntimeException unavailable) {
       context.log().warn("Cannot certify buffered UPSERT settlement", unavailable);
       return false;
     } catch (InterruptedException interrupted) {
@@ -2356,7 +2358,8 @@ public final class KnowledgeServerMigrationOps {
 
   private static Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> replayFileSurvivorExclusions(
       DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps,
-      Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes) throws IOException {
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes, ReplayDeleteOrder deleteOrder,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) throws IOException {
     if (authorizingDeletes.isEmpty()) return Map.of();
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) {
@@ -2388,7 +2391,9 @@ public final class KnowledgeServerMigrationOps {
           throw new IOException("Broad replay found an uncertified projection survivor");
         }
         if (next > index && effect.file() != null && survivors.contains(effect)) {
-          if (!certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
+          if (laterWatcherReplay(effect.path(), effect.collection(),
+                  deleteOrder.positions().get(effect.op()), deleteOrder, reconciliations) == null
+              && !certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
             throw new IOException("Later file survivor lacks its exact accepted certificate");
           }
           files.add(effect.id());

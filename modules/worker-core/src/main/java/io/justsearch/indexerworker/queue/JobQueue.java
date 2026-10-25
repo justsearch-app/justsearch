@@ -473,14 +473,6 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Exact collection enqueue is unavailable");
   }
 
-  /**
-   * After fenced returned-root proof, change only retry timing for exact admitted pending
-   * ROOT_UNAVAILABLE / RETRY_UNTIL_AVAILABLE revisions in that root's ownership scope.
-   */
-  default int wakeReturnedRootAdmissions(Path root, String collection, List<SwitchBufferUpsert> admissions) {
-    throw new UnsupportedOperationException("Returned-root retry wake is unavailable");
-  }
-
   /** Automatic discovery keeps terminal failures and parser/I/O waits; explicit retries use normal admission. */
   default int enqueueMaintenanceScanEntries(List<EnqueueEntry> entries, String collection, String scanId) {
     return enqueueEntries(entries, collection, scanId);
