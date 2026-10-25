@@ -1,0 +1,175 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T17:33:21.204Z",
+  "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+  "tree": "a4cd49b379e097a1b68736add7396b1b5176ddec",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerIngestServiceCandidateReconciliationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7579
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineRootRetirementTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12442
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb2bac2d6279e0d38e95b4ecb228aef9583cebb07062959c9bc6aa76b88452f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rootRemovedFromWatcherRegistryDuringScanFailsClosed()",
+          "status": "passed"
+        },
+        {
+          "name": "forceReadmitsAnExistingServingPathToTheScopedCandidateJournal()",
+          "status": "passed"
+        },
+        {
+          "name": "callerDeadlineBetweenMigrationAdmissionsStopsTheRemainingSnapshot()",
+          "status": "passed"
+        },
+        {
+          "name": "sameRuntimePreGreenDeleteRefusesWhenServingRuntimeIsUnavailable()",
+          "status": "passed"
+        },
+        {
+          "name": "sameRuntimePreGreenJournalsBeforeExactlyOneServingEffectForEachDelete()",
+          "status": "passed"
+        },
+        {
+          "name": "finalFenceCannotBisectCandidateSnapshotAndAdmission()",
+          "status": "passed"
+        },
+        {
+          "name": "migratingRootUsesServingDiscoveryAndExactCandidateWatcherRoutes()",
+          "status": "passed"
+        },
+        {
+          "name": "rewatchThatCrossesMigrationStartInvalidatesReplay()",
+          "status": "passed"
+        },
+        {
+          "name": "callerDeadlineStopsMigrationDiscoveryAndKeepsCutoverFenced()",
+          "status": "passed"
+        },
+        {
+          "name": "unwatchThatCrossesMigrationStartInvalidatesReplay()",
+          "status": "passed"
+        },
+        {
+          "name": "migrationRefusesLongPathSnapshotsBeforeAnyAdmissionAndKeepsCutoverFenced()",
+          "status": "passed"
+        },
+        {
+          "name": "incompleteServingScanLatchesReplayUncertainty()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "candidateAdmissionRechecksExclusionsAfterDiscovery()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "candidateReconciliationUsesRootRelativeExclusionsForOrdinaryAndForcedScans()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e7e550c69e3756f4eac98cf95af7f613c119f502f7c124cb7103f322406d04da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedWatcherCannotReplaceReaddedRoot(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] direct",
+          "status": "passed"
+        },
+        {
+          "name": "[2] add",
+          "status": "passed"
+        },
+        {
+          "name": "[3] restored",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "[1] watched",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ingest",
+          "status": "passed"
+        },
+        {
+          "name": "[3] captured",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:75a89fe1a611e997d7779e7df9910d71ddcfe633e93d980a6ac8a66fb102c82e"
+}

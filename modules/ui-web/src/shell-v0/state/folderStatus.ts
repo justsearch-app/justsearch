@@ -245,6 +245,18 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
   const failedShown = failed > 0 ? failed : carried;
   const failedIsLastKnown = failed === 0 && carried > 0;
 
+  // Removal is durable intent, so a rebuild or availability overlay must not hide its retry.
+  if (walkError.startsWith('Removal incomplete.')) {
+    return {
+      state: 'failed',
+      glyph: 'error',
+      metaText: `${collection} · ${walkError}`,
+      inFlight,
+      failed: failedShown,
+      failedIsLastKnown,
+    };
+  }
+
   // During a global rebuild, every row is provisional: render busy + last-known, never a terminal
   // fact (595 honesty vocabulary). Highest precedence so a stale "✓ indexed" can't show mid-flux.
   // The failed chip is last-known here for the same reason the file count is (S2-1).
