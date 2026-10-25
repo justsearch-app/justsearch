@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -79,8 +80,10 @@ public final class ExtractionSandboxChild {
       return SandboxExtractionResponse.failed(
           request.requestId(), ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
     } catch (Exception e) {
+      boolean unavailable = e instanceof IngestionServiceUnavailableException;
       return SandboxExtractionResponse.failed(
-          request.requestId(), ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed", "PARSER_FAILED");
+          request.requestId(), ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed",
+          unavailable ? SandboxExtractionResponse.SERVICE_UNAVAILABLE : "PARSER_FAILED");
     }
   }
 

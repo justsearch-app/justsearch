@@ -419,9 +419,10 @@ public final class IndexGenerationManager {
         State observed = null;
         try { observed = readRecordedState(); }
         catch (IOException unreadable) {
-          if (hasRecordedFallbackEvidence()) {
+          // With multiple generations, .prev cannot prove whether a newer cutover committed.
+          if (hasRecordedFallbackEvidence() || retainedGenerationCount() > 1) {
             throw new IOException("index.generation_previous_unproven: current pointer is unavailable"
-                + " and recorded generation evidence forbids native fallback", unreadable);
+                + " and retained generation evidence forbids native fallback", unreadable);
           }
         }
         if (observed != null) cleanupAbandonedStateTemps();

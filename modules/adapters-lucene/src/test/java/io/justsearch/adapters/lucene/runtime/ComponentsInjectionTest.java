@@ -92,7 +92,7 @@ class ComponentsInjectionTest extends LuceneExecutorTestBase {
                 1_000L,
                 NrtMode.CONTINUOUS,
                 2_000L,
-                1_000L));
+                1_000L), null);
 
     // Tempdoc 406 Phase 4b: injection via builder.withPrebuiltComponentsForTests
     // (replaces the legacy LuceneLifecycleManager + LifecycleTestAccessor.setComponentsForTests

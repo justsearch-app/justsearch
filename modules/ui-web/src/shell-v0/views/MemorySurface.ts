@@ -33,6 +33,7 @@ import type { JfButton } from '../components/Button.js';
 
 interface MemoryItem {
   readonly id: string;
+  readonly revision: string;
   readonly kind: string;
   readonly content: string;
   readonly actor: string;
@@ -131,7 +132,8 @@ export class MemorySurface extends JfElement {
       // The API always emits a boolean lock state. Missing or malformed metadata cannot establish
       // presence or absence, even when the list itself looks valid.
       if (typeof j.locked !== 'boolean' || !Array.isArray(j.memories) || j.memories.some(m =>
-        !m || typeof m.id !== 'string' || typeof m.content !== 'string')) {
+        !m || typeof m.id !== 'string' || typeof m.content !== 'string'
+        || typeof m.revision !== 'string' || !/^"[0-9a-f]{64}"$/.test(m.revision))) {
         throw new Error('Invalid memory list');
       }
       this.memories = j.memories;
@@ -206,27 +208,7 @@ export class MemorySurface extends JfElement {
         cancelLabel: 'Cancel',
       });
       if (confirmed && visit === this.visitVersion && this.isConnected) {
-        // The store/API has no conditional forget. Re-read immediately before deleting so consent
-        // cannot knowingly apply to a replacement at the same id. A read/delete race remains.
-        const readable = await this.loadMemories();
-        if (visit !== this.visitVersion || !this.isConnected) return;
-        if (!readable) {
-          if (this.locked && !this.loadError) this.noteMutationFailure(423, 'forgotten');
-          else this.mutationError = 'Could not check this memory. Nothing was forgotten. Reload memories and try again.';
-          return;
-        }
-        const current = this.memories.find(m => m.id === memory.id);
-        if (!current) {
-          this.mutationError = '';
-          this.announcement = 'This item is no longer in memory. Nothing was forgotten by this request.';
-          return;
-        }
-        if ((['content', 'kind', 'actor', 'createdAt', 'sourceConversationId'] as const)
-          .some(field => current[field] !== memory[field])) {
-          this.mutationError = 'This memory changed while confirmation was open. Review the current item and choose Forget again.';
-          return;
-        }
-        await this.forget(memory.id);
+        await this.forget(memory.id, memory.revision);
       }
     } finally {
       if (visit === this.visitVersion) {
@@ -272,19 +254,29 @@ export class MemorySurface extends JfElement {
     await this.focusMemory(index, visit);
   }
 
-  private async forget(id: string): Promise<void> {
+  private async forget(id: string, revision: string): Promise<void> {
     const visit = this.visitVersion;
     this.mutationError = '';
     this.announcement = '';
     let lost = false;
     let failed = false;
+    let removed = false;
     try {
       const r = await authorizedFetch(`${this.base()}/api/memory/${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        headers: { 'If-Match': revision },
       }, { retry: false });
       if (visit !== this.visitVersion || !this.isConnected) return;
       failed = !r.ok;
-      if (failed) this.noteMutationFailure(r.status, 'forgotten');
+      if (r.status === 412) {
+        this.mutationError = 'The current item was kept; the earlier attempt may have completed.';
+      } else if (failed) this.noteMutationFailure(r.status, 'forgotten');
+      else {
+        const result = await r.json() as { removed?: boolean };
+        if (visit !== this.visitVersion || !this.isConnected) return;
+        if (typeof result.removed !== 'boolean') throw new Error('Invalid forget result');
+        removed = result.removed;
+      }
     } catch {
       if (visit !== this.visitVersion || !this.isConnected) return;
       lost = true;
@@ -300,8 +292,8 @@ export class MemorySurface extends JfElement {
         return;
       }
       this.reconcileForget();
-    } else if (readable && !failed && !this.memories.some(m => m.id === id)) {
-      this.announcement = 'Forgotten.';
+    } else if (!failed) {
+      this.announcement = removed ? 'Forgotten.' : 'This item was already gone. Nothing was forgotten by this request.';
     }
   }
 

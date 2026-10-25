@@ -85,7 +85,10 @@ public final class SpladeEncoder implements Closeable {
   }
 
   // Session management (delegated to SessionHandle — tempdoc 397 §14.9 PR 4).
+  private boolean cleanupComplete;
+  private boolean evidenceFlushed;
   private final SessionHandle sessions;
+  private final SpladeAssembly ownedAssembly;
   private final SpladeConfig config;
   private volatile boolean firstEncodeLogged;
 
@@ -139,19 +142,28 @@ public final class SpladeEncoder implements Closeable {
    *
    * @param sessions pre-configured session handle
    * @param shape model-intrinsic facts (input/output-name detection + max sequence length)
-   * @param tokenizer pre-loaded DJL HuggingFace tokenizer
+   * @param tokenizer pre-loaded DJL HuggingFace tokenizer, transferred to this standalone encoder
    * @param vocabulary pre-loaded WordPiece vocabulary
    * @param truncationEvidencePath evidence sidecar path; null = disabled
    * @param config SPLADE configuration (for activation flags, model path for evidence sidecar
    *     fingerprinting)
    */
-  public SpladeEncoder(
-      SessionHandle sessions,
-      SpladeShape shape,
-      HuggingFaceTokenizer tokenizer,
-      Vocabulary vocabulary,
-      Path truncationEvidencePath,
-      SpladeConfig config) {
+  public SpladeEncoder(SessionHandle sessions, SpladeShape shape, HuggingFaceTokenizer tokenizer, Vocabulary vocabulary, Path truncationEvidencePath, SpladeConfig config) {
+    this(new SpladeAssembly(sessions, shape, tokenizer, vocabulary, truncationEvidencePath), config, true);
+  }
+
+  /** Borrows the assembly; its surface retains tokenizer ownership. */
+  public SpladeEncoder(SpladeAssembly assembly, SpladeConfig config) {
+    this(assembly, config, false);
+  }
+
+  private SpladeEncoder(SpladeAssembly assembly, SpladeConfig config, boolean ownsAssembly) {
+    SessionHandle sessions = assembly.sessions();
+    var shape = assembly.shape();
+    var tokenizer = assembly.tokenizer();
+    var vocabulary = assembly.vocabulary();
+    var truncationEvidencePath = assembly.truncationEvidencePath();
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.sessions = sessions;
     this.config = config;
     this.tokenizer = tokenizer;
@@ -237,25 +249,35 @@ public final class SpladeEncoder implements Closeable {
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to load SPLADE tokenizer from " + tokenizerPath, e);
     }
-    Path vocabPath = config.modelPath().resolve("vocab.txt");
-    Vocabulary vocabulary;
     try {
-      vocabulary =
-          DefaultVocabulary.builder()
-              .addFromTextFile(vocabPath)
-              .optUnknownToken("[UNK]")
-              .build();
-    } catch (Exception e) {
-      tokenizer.close();
-      throw new IllegalStateException("Failed to load SPLADE vocabulary from " + vocabPath, e);
+      Path vocabPath = config.modelPath().resolve("vocab.txt");
+      Vocabulary vocabulary;
+      try {
+        vocabulary =
+            DefaultVocabulary.builder()
+                .addFromTextFile(vocabPath)
+                .optUnknownToken("[UNK]")
+                .build();
+      } catch (Exception e) {
+        throw new IllegalStateException("Failed to load SPLADE vocabulary from " + vocabPath, e);
+      }
+      Path evidencePath =
+          ConfigStore.globalOrNull() != null
+              ? (ConfigStore.global().get().ai().splade().evidencePath() != null
+                  ? ConfigStore.global().get().ai().splade().evidencePath().toAbsolutePath()
+                  : null)
+              : null;
+      return new SpladeAssembly(sessions, shape, tokenizer, vocabulary, evidencePath);
+    } catch (RuntimeException | Error failure) {
+      var partial = new SpladeAssembly(sessions, null, tokenizer, null, null);
+      if (sessions != null) throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      try { partial.close(); }
+      catch (RuntimeException | Error cleanup) {
+        if (failure != cleanup) failure.addSuppressed(cleanup);
+        throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      }
+      throw failure;
     }
-    Path evidencePath =
-        ConfigStore.globalOrNull() != null
-            ? (ConfigStore.global().get().ai().splade().evidencePath() != null
-                ? ConfigStore.global().get().ai().splade().evidencePath().toAbsolutePath()
-                : null)
-            : null;
-    return new SpladeAssembly(sessions, shape, tokenizer, vocabulary, evidencePath);
   }
 
   /**
@@ -1314,18 +1336,24 @@ public final class SpladeEncoder implements Closeable {
 
 
   @Override
-  public void close() {
-    if (!closed.compareAndSet(false, true)) {
+  public synchronized void close() {
+    if (cleanupComplete) {
       return; // Already closed — prevent double-close of ORT sessions.
     }
-    try {
-      truncationEvidence.write(truncationEvidencePath, config.modelPath());
-    } catch (UncheckedIOException e) {
-      log.warn("Failed to write SPLADE truncation evidence: {}", e.getMessage());
+    closed.set(true);
+    if (!evidenceFlushed) {
+      try {
+        truncationEvidence.write(truncationEvidencePath, config.modelPath());
+        evidenceFlushed = true;
+      } catch (UncheckedIOException e) {
+        log.warn("Failed to write SPLADE truncation evidence: {}", e.getMessage());
+      }
     }
     closePinnedOutput();
-    sessions.close();
-    tokenizer.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
+    cleanupComplete = true;
     log.info("SpladeEncoder closed");
   }
 

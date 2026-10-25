@@ -10,6 +10,7 @@ import io.justsearch.indexing.runtime.IndexOpenGuard;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.codecs.KnnVectorsFormat;
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.FieldInfo;
@@ -26,7 +28,11 @@ import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LiveIndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.MultiReader;
+import org.apache.lucene.index.NoMergePolicy;
+import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper;
 import org.apache.lucene.index.SoftDeletesRetentionMergePolicy;
 import org.apache.lucene.index.TieredMergePolicy;
@@ -37,7 +43,9 @@ import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.MMapDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +61,46 @@ final class ComponentsFactory {
   private static final Logger log = LoggerFactory.getLogger(ComponentsFactory.class);
 
   private ComponentsFactory() {}
+
+  /** Owns the disposable RAM writer lifecycle while borrowing the live indexing components. */
+  static void probeDocument(LiveIndexWriterConfig live, Document document, IndexReader liveReader)
+      throws IOException {
+    try (var directory = new ByteBuffersDirectory();
+        var canary = new IndexWriter(directory, probeConfig(live))) {
+      WritePathOps.probeDocument(canary, document);
+      if (!liveReader.leaves().isEmpty()) {
+        try (var reader = DirectoryReader.open(canary);
+            var combined = new MultiReader(new IndexReader[] {liveReader, reader}, false)) {
+          FieldInfos.getMergedFieldInfos(combined); // Lucene's own complete schema consistency check.
+        }
+      }
+    }
+  }
+
+  /** Lucene has no config copy API; parity tests guard every public live setting. */
+  private static IndexWriterConfig probeConfig(LiveIndexWriterConfig live) {
+    var config = new IndexWriterConfig(live.getAnalyzer())
+        .setIndexCreatedVersionMajor(live.getIndexCreatedVersionMajor())
+        .setSimilarity(live.getSimilarity())
+        .setCodec(live.getCodec())
+        .setMaxBufferedDocs(live.getMaxBufferedDocs())
+        .setRAMBufferSizeMB(live.getRAMBufferSizeMB())
+        .setRAMPerThreadHardLimitMB(live.getRAMPerThreadHardLimitMB())
+        .setUseCompoundFile(live.getUseCompoundFile())
+        .setReaderPooling(live.getReaderPooling())
+        .setInfoStream(live.getInfoStream())
+        .setMergedSegmentWarmer(live.getMergedSegmentWarmer())
+        .setLeafSorter(live.getLeafSorter())
+        .setCheckPendingFlushUpdate(live.isCheckPendingFlushOnUpdate())
+        .setSoftDeletesField(live.getSoftDeletesField())
+        .setParentField(live.getParentField())
+        .setIndexWriterEventListener(live.getIndexWriterEventListener())
+        .setMergePolicy(NoMergePolicy.INSTANCE)
+        .setMergeScheduler(new SerialMergeScheduler())
+        .setCommitOnClose(false);
+    if (live.getIndexSort() != null) config.setIndexSort(live.getIndexSort());
+    return config;
+  }
 
   /**
    * Builds the Lucene components for an index runtime.
@@ -349,10 +397,12 @@ final class ComponentsFactory {
             nrtOnDemandMaxStaleMs,
             reopenTargetMs,
             reopenHardMs,
-            runtimeConfiguration);
+            runtimeConfiguration, null);
       }
 
       w = new IndexWriter(dir, cfg);
+      var writerLockCreatedAt = (FileTime) Files.getAttribute(
+          ((FSDirectory) dir).getDirectory().resolve(IndexWriter.WRITE_LOCK_NAME), "creationTime");
       // A writer now exists, so this session CAN die mid-commit: invalidate the previous clean
       // shutdown. RuntimeSession.close() re-writes it if this writer closes cleanly. Deliberately
       // outside the integrity-tier block above — whether the next boot scans is a separate question
@@ -392,7 +442,7 @@ final class ComponentsFactory {
           nrtOnDemandMaxStaleMs,
           reopenTargetMs,
           reopenHardMs,
-          runtimeConfiguration);
+          runtimeConfiguration, writerLockCreatedAt);
     } catch (Exception e) {
       // Best-effort cleanup to avoid leaking file handles (especially on Windows).
       try {

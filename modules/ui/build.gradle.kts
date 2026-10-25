@@ -141,6 +141,8 @@ sourceSets.named("integrationTest").configure {
 
 // Keep the complete local suite and its hosted class shards on the same unit configuration.
 tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
+  // Full-suite discovery plus the settings-publication ArchUnit graph exceeds the 384m default.
+  maxHeapSize = "512m"
   // The launcher regression test reads these files outside the Java source sets.
   inputs.files(
     rootProject.file("packaging/headless/justsearch-headless.cmd"),

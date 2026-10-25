@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T14:32:18.647Z",
+  "revision": "c352c79168ecd21be9ee45381e4839a123d320ad",
+  "tree": "e9b654503d8223c455ced7bd32c0f484dc6f9b35",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/components/chat/ConversationHistory.delete.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-506920-1792852321465.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8225
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9531e6aeb2a6f3c9715929645c78042c9b29988eabd295473c871b1808951c7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deleting a conversation that has branches TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#asks about the branches, names them, and deletes them with it on consent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9531e6aeb2a6f3c9715929645c78042c9b29988eabd295473c871b1808951c7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deleting a conversation that has branches asks about the branches, names them, and deletes them with it on consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#discards the conversation and deletes it at the authority that owns its existence",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:758ca05f7bdf826cfb2b4e7af86b7783a7000f4eb869ce27419a6db7f90794c2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the row actions each change the state they name discards the conversation and deletes it at the authority that owns its existence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/ConversationHistory.delete.test.ts#classic delete displays the server refusal and keeps the conversation",
+      "file": "modules/ui-web/src/shell-v0/components/chat/ConversationHistory.delete.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:57d87b708be10ad6b9e68292e82c61df793cfb3568514d4f2210ee8cadbbd563",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "classic delete displays the server refusal and keeps the conversation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#TD1 TD7 does not invent a creation date for an incomplete deletion record",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9531e6aeb2a6f3c9715929645c78042c9b29988eabd295473c871b1808951c7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deleting a conversation that has branches TD1 TD7 does not invent a creation date for an incomplete deletion record",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c949c4dab",
+    "revision": "c949c4dabb94abb432c59578a2042a9b320f681f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/components/chat/ConversationHistory.delete.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-506920-1792852331164.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7326,
+        "output": "JSON report written to /home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-506920-1792852331164.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+        "classification": "assertion",
+        "detail": "deleting a conversation that has branches TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain '3 conversations'\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-80Y5kP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1406:21\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#asks about the branches, names them, and deletes them with it on consent",
+        "classification": "assertion",
+        "detail": "deleting a conversation that has branches asks about the branches, names them, and deletes them with it on consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain '2 conversations'\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-80Y5kP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1372:21\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#discards the conversation and deletes it at the authority that owns its existence",
+        "classification": "assertion",
+        "detail": "the row actions each change the state they name discards the conversation and deletes it at the authority that owns its existence:  AssertionError: expected null not to be null\n    at confirmDeletion (/home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-80Y5kP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts:213:22)\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-80Y5kP/modules/ui-web/src/s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/ConversationHistory.delete.test.ts#classic delete displays the server refusal and keeps the conversation",
+        "classification": "assertion",
+        "detail": "classic delete displays the server refusal and keeps the conversation:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-80Y5kP/modules/ui-web/src/shell-v0/components/chat/ConversationHistory.delete.test.ts:36:128\n    at Timeout.checkCallback (file:///home/elias/dev/justsearch/.claude/worktrees/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#TD1 TD7 does not invent a creation date for an incomplete deletion record",
+        "classification": "assertion",
+        "detail": "deleting a conversation that has branches TD1 TD7 does not invent a creation date for an incomplete deletion record:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-80Y5kP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1421:61\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-tree-delete/modules/ui-web/node_modules/@vi"
+      }
+    ]
+  },
+  "digest": "sha256:7746e1763d587d63590fa6e0b99d9b651d5d8f463403743a183e70b3ff336d99"
+}

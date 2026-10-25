@@ -9,6 +9,7 @@ import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.app.api.ApiErrorCode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +50,10 @@ public final class MemoryController {
   public void handleList(Context ctx) {
     try {
       List<Map<String, Object>> rows = new ArrayList<>();
-      for (MemoryRecord r : memoryStore.whatItKnows()) {
-        rows.add(toWire(r));
+      for (MemoryStore.VersionedMemory entry : memoryStore.versionedMemories()) {
+        Map<String, Object> row = toWire(entry.record());
+        row.put("revision", entry.revision());
+        rows.add(row);
       }
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("memories", rows);
@@ -109,8 +112,25 @@ public final class MemoryController {
   /** {@code DELETE /api/memory/{id}} — user control: forget one item. */
   public void handleForget(Context ctx) {
     try {
-      memoryStore.forget(ctx.pathParam("id"));
-      ctx.json(Map.of("ok", true));
+      String revision = ctx.header("If-Match");
+      if (revision == null) {
+        memoryStore.forget(ctx.pathParam("id"));
+        ctx.json(Map.of("ok", true));
+        return;
+      }
+      if (Collections.list(ctx.req().getHeaders("If-Match")).size() != 1
+          || !revision.matches("\"[0-9a-f]{64}\"")) {
+        ctx.status(400).json(Map.of("errorCode", ApiErrorCode.INVALID_REQUEST.name(),
+            "error", "If-Match must contain one memory revision"));
+        return;
+      }
+      MemoryStore.ForgetResult result = memoryStore.forgetIf(ctx.pathParam("id"), revision);
+      if (result.current() != null) {
+        ctx.status(412).json(Map.of("errorCode", ApiErrorCode.INVALID_STATE.name(),
+            "error", "The current item was kept; the earlier attempt may have completed"));
+        return;
+      }
+      ctx.json(Map.of("ok", true, "removed", result.removed()));
     } catch (KeyLockedException locked) {
       respondLocked(ctx);
     } catch (MemoriesUnavailableException e) {

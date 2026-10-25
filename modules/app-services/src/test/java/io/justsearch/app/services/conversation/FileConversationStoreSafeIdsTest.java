@@ -108,8 +108,13 @@ class FileConversationStoreSafeIdsTest {
       store.createSession(id, "free-chat");
       store.appendMessage(id, "free-chat", Map.of("id", "m", "role", "user", "content", "new"));
       assertEquals(2, store.loadHistory(id).size());
-      store.branchFrom(id, "m", id + "-branch");
-      assertEquals(2, store.loadHistory(id + "-branch").size());
+      if (id.startsWith(ConversationStore.THROWAWAY_SESSION_PREFIX)) {
+        assertThrows(IllegalArgumentException.class, () -> store.branchFrom(id, "m", id + "-branch"));
+        assertFalse(Files.exists(tmp.resolve(id + "-branch")));
+      } else {
+        store.branchFrom(id, "m", id + "-branch");
+        assertEquals(2, store.loadHistory(id + "-branch").size());
+      }
       store.setTitle(id, "title", "user");
       assertEquals("title", store.getSessionMeta(id).orElseThrow().title());
       store.deleteSession(id + "-branch");

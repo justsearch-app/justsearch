@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T12:00:41.880Z",
+  "revision": "1467373630721e98c46cf4a5a9d17224af94f034",
+  "tree": "35fdb90ee9d363cfc7afba1271db7ebd6199dcb9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nvk1x2o4/tmp/test-intent-vitest-216-1792929638870.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3009
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a inactive removal and late completion preserve a newer conversation draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD10a inactive removal and late completion preserve a newer conversation draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a cancel never invents or restores draft text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD10a cancel never invents or restores draft text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a refused never invents or restores draft text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD10a refused never invents or restores draft text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a empty never invents or restores draft text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD10a empty never invents or restores draft text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a a concurrent send elsewhere and its late failure cannot overwrite the next draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD10a a concurrent send elsewhere and its late failure cannot overwrite the next draft",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8d7960c0602060a917488677b444cf47a930440c8536ea246816be2f06562e6e"
+}

@@ -24,6 +24,7 @@ import io.opentelemetry.api.trace.Tracer;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -51,6 +52,7 @@ public final class JobBatchWriter {
   private static final Tracer TRACER = GlobalOpenTelemetry.getTracer("indexing");
 
   private final IndexingCoordinator indexingCoordinator;
+  private final WorkerIngestionAuthority ingestionAuthority;
   private final WorkerSignalBus signalBus;
   private final EmbeddingProviderLifecycle embeddingLifecycle;
   private final Supplier<SpladeEncoder> spladeEncoderSupplier;
@@ -68,10 +70,12 @@ public final class JobBatchWriter {
   private final BooleanSupplier chunkSpladeEnabledSupplier;
   private final Supplier<RunningRuntime> activeLexicalSource;
   private final FileMutationFence fileMutationFence;
+  private final BatchServiceFailures writeFailures = new BatchServiceFailures();
   private java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> fileExclusions =
       io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
 
   public JobBatchWriter(
+      WorkerIngestionAuthority ingestionAuthority,
       IndexingCoordinator indexingCoordinator,
       WorkerSignalBus signalBus,
       EmbeddingProviderLifecycle embeddingLifecycle,
@@ -88,6 +92,7 @@ public final class JobBatchWriter {
       BooleanSupplier chunkSpladeEnabledSupplier,
       Supplier<RunningRuntime> activeLexicalSource,
       FileMutationFence fileMutationFence) {
+    this.ingestionAuthority = ingestionAuthority;
     this.indexingCoordinator = indexingCoordinator;
     this.signalBus = signalBus;
     this.embeddingLifecycle = embeddingLifecycle;
@@ -108,6 +113,28 @@ public final class JobBatchWriter {
 
   void useFileExclusions(java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> exclusions) {
     fileExclusions = Objects.requireNonNull(exclusions, "exclusions");
+  }
+
+  void beginBatch() {
+    writeFailures.begin();
+  }
+
+  boolean deferredBatch() {
+    return writeFailures.deferredBatch();
+  }
+
+  long retryDelayMs() {
+    return writeFailures.retryDelayMs();
+  }
+
+  boolean pipelineSucceeded() { return writeFailures.succeeded(); }
+
+  long prepareRetry(BooleanSupplier canary) {
+    return writeFailures.prepareRetry(canary);
+  }
+
+  void finishBatch(long retryAtMs) {
+    writeFailures.finish(retryAtMs);
   }
 
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
@@ -215,6 +242,7 @@ public final class JobBatchWriter {
         indexedDelta.accept(chunksIndexed);
         log.debug("Indexed {} chunks for: {}", chunksIndexed, ex.filePath().getFileName());
       }
+      writeFailures.success();
       stageRecorder.record("write", System.currentTimeMillis() - writeStart, null);
 
       journal.enqueueTransition(
@@ -232,12 +260,14 @@ public final class JobBatchWriter {
 
     } catch (RuntimeException | Error e) {
       if (e instanceof VirtualMachineError fatal) throw fatal;
-      log.error("Failed to write: {}", ex.filePath(), e);
       // An observer failure after handoff cannot turn an already written effect into a retry
       // or release its live claim before the journal confirms the Lucene commit.
-      if (journal.ownsPendingCommit(ex.claim())) return;
+      if (journal.ownsPendingCommit(ex.claim())) {
+        writeFailures.noteFailure(e);
+        return;
+      }
       if (isDrainingWriteRejection(e)) {
-        journal.recordOutcomeSafely(
+        writeFailures.unavailable(e, systemic -> journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_UNAVAILABLE_DRAINING",
             () ->
@@ -252,24 +282,27 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy(), ex.provenance())));
+                        contentExtractor.extractionPolicy(), ex.provenance()),
+                    writeFailures.retryAtMs())));
       } else {
-        journal.recordOutcomeSafely(
-            ex.filePath(),
-            "WRITE_FAILED",
-            () ->
-                jobQueue.markClaimFailed(
-                    ex.claim(),
-                    journal.outcome(
-                        IngestionOutcomeClass.WRITE_FAILED,
-                        IngestionReasonCodes.WRITE_FAILED,
-                        IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                        failureDetail(e)),
-                    LedgerEntryFactory.forEnvelope(
-                        ex.envelope(),
-                        ex.collection(),
-                        ex.artifact(),
-                        contentExtractor.extractionPolicy(), ex.provenance())));
+        Consumer<Boolean> record = systemic -> {
+          var outcome = journal.outcome(
+              IngestionOutcomeClass.WRITE_FAILED,
+              IngestionReasonCodes.WRITE_FAILED,
+              systemic ? IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT
+                  : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+              failureDetail(e));
+          journal.recordOutcomeSafely(ex.filePath(), "WRITE_FAILED", () -> {
+            var entry = LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(),
+                ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance());
+            if (systemic) jobQueue.deferClaim(ex.claim(), outcome, entry, writeFailures.retryAtMs());
+            else jobQueue.markClaimFailed(ex.claim(), outcome, entry);
+          });
+        };
+        var presence = ingestionAuthority.presence(ex.filePath(), ex.claim().ingestionRoot());
+        if (presence == SourcePresence.Verdict.ABSENT
+            || presence == SourcePresence.Verdict.SOURCE_UNREADABLE) record.accept(false);
+        else writeFailures.failure(e, ex.filePath(), ex.sourceRealPath(), record);
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }
@@ -303,7 +336,7 @@ public final class JobBatchWriter {
   /**
    * Tempdoc 885 item 21c — the write path's failure reason is the exception's own text.
    *
-   * <p>{@code WRITE_FAILED} is {@code RETRY_WITH_BACKOFF}, so a row carrying the literal "Index
+   * <p>A per-file {@code WRITE_FAILED} uses {@code RETRY_WITH_BACKOFF}, so a row carrying the literal "Index
    * write failed" would retry for seven days and then reach {@code RETRY_EXHAUSTED} with nothing
    * recorded about WHY the write failed. The DEFER arm above keeps its literal on purpose:
    * "Runtime draining" IS the whole fact there, and its exception is a routing sentinel rather

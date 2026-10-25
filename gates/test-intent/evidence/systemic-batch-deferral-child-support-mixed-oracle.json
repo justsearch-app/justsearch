@@ -1,0 +1,168 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "adaptedScript": "tmp/builder/child-support-oracle/run-evidence.mjs",
+    "scriptDigest": "sha256:3ce1c8a6dd362012fbc9391db317af668990b686586e6da1a1fcc37238eebf47",
+    "note": "Executes real child-JVM/file-fault test once in actual ciUnitTest1 on candidate and exactf8 baseline. No exception injection or test seam. Original hosted failure/XML archived separately, never replaced with fabricated output."
+  },
+  "createdAt": "2026-10-25T19:27:39Z",
+  "revision": "6e2a420e824ca3242184627f9caca961d1bf2c3b",
+  "tree": "sha256:da373f04aad81daa666593585d3265467ec4b07be5cf03b1ada3b73e45ec308a",
+  "environment": {
+    "platform": "linux",
+    "node": "v24.22.0",
+    "launcherTemps": [
+      "tmp/builder/jvm/before",
+      "tmp/builder/jvm/after"
+    ],
+    "testTemps": "Machine init fixes test JVM temp to per-checkout module/build/tmp/test-jvm/ciUnitTest1; all owned, no /tmp products."
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:ciUnitTest1 --tests io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25T19:15:51Z",
+      "finishedUTC": "2026-10-25T19:16:18Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:ciUnitTest1 --tests io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/child-support-oracle/before-f8e16e3",
+      "exitCode": 1,
+      "startedUTC": "2026-10-25T19:17:19Z",
+      "finishedUTC": "2026-10-25T19:17:46Z"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:799494ef45971cb0ccc1dd40b865d0a25bf0ee207474ad2538898f39184c4e2b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realMissingChildJvmSupportJarIsCanaryDiagnosedAndRecoveredWithoutAttempts()",
+          "classname": "io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "revision": "f8e16e326bf30acc885eebcca0064c0e0d91aaff",
+    "overlays": [
+      {
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+        "sha256": "799494ef45971cb0ccc1dd40b865d0a25bf0ee207474ad2538898f39184c4e2b",
+        "disposition": "Unchanged candidate test/support overlay; no product overlay or fault/assertion adaptation"
+      },
+      {
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineTestFixture.java",
+        "sha256": "fdc54a710be39ff8870eb480553c0d923908adf09665f4ad4bc8499967585b12",
+        "disposition": "Unchanged candidate test/support overlay; no product overlay or fault/assertion adaptation"
+      },
+      {
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/extract/VerifierNoOpAgent.java",
+        "sha256": "7f27ce4dad906bbd3fed03a0b62bdb7f773dd93f16a4edd51b2031490375cd09",
+        "disposition": "Unchanged candidate test/support overlay; no product overlay or fault/assertion adaptation"
+      }
+    ],
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:ciUnitTest1 --tests io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/child-support-oracle/before-f8e16e3",
+        "exitCode": 1,
+        "startedUTC": "2026-10-25T19:17:19Z",
+        "finishedUTC": "2026-10-25T19:17:46Z"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+        "contentDigest": "sha256:799494ef45971cb0ccc1dd40b865d0a25bf0ee207474ad2538898f39184c4e2b",
+        "classification": "assertion",
+        "detail": "realMissingChildJvmSupportJarIsCanaryDiagnosedAndRecoveredWithoutAttempts(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (5 failures)&#10;&#9;org.opentest4j.AssertionFailedError: actual durable rows=[Row[path=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/child-support-oracle/before-f8e16e3/modules/indexer-wor"
+      }
+    ],
+    "cases": [
+      {
+        "name": "realMissingChildJvmSupportJarIsCanaryDiagnosedAndRecoveredWithoutAttempts()",
+        "classname": "io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest",
+        "status": "failed",
+        "failureType": "org.opentest4j.MultipleFailuresError",
+        "message": "org.opentest4j.MultipleFailuresError: Multiple Failures (5 failures)&#10;&#9;org.opentest4j.AssertionFailedError: actual durable rows=[Row[path=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/child-support-oracle/before-f8e16e3/modules/indexer-wor"
+      }
+    ]
+  },
+  "hostedOriginal": {
+    "path": "tmp/builder/child-support-oracle/hosted-before.xml",
+    "contentDigest": "sha256:07786df5d9129bd2313793dc58fe7dfe95214345f7713d92c10e92eb98dd17f2",
+    "originalSourceDigest": "sha256:599a73f9198deccd035ba8546c8ab03979346af8121cbd3a62758f0beabdf9b7",
+    "note": "Three exact-head original-oracle assertion failures at all-untyped overconstraint. All other assertions passed; both real exception orders, canary1, WARN1 and zero-attempt restoration are in immutable XML."
+  },
+  "interpretationProof": "tmp/builder/child-support-oracle/child-path-audit.json",
+  "counterexample": "tmp/builder/child-support-oracle/oracle-counterexample.json",
+  "actualObservations": {
+    "candidate": {
+      "rawXml": "tmp/builder/child-support-oracle/candidate.xml",
+      "rawXmlDigest": "sha256:9ee2782b6f2d826e7a3a7d0f31218a6a6934aee7187a997c7440e83e418db508",
+      "canaries": 1,
+      "outageAttempts": [
+        0,
+        0
+      ],
+      "outagePolicies": [
+        "DEFER_WITHOUT_ATTEMPT",
+        "DEFER_WITHOUT_ATTEMPT"
+      ],
+      "observedTypes": [
+        "SandboxExtractionException",
+        "SandboxExtractionException",
+        "SandboxExtractionException"
+      ],
+      "lifecycleWARNs": 1,
+      "elapsedAfterSupportRestorationMs": 2709,
+      "finalDONE": 2,
+      "finalAttempts": [
+        0,
+        0
+      ]
+    },
+    "historical": {
+      "rawXml": "tmp/builder/child-support-oracle/before.xml",
+      "rawXmlDigest": "sha256:bdb0471beffcfcef7ab78dbfe2528ccca6a7adc07c83de894f1aa4a571b62444",
+      "canaries": 0,
+      "outageAttempts": [
+        1,
+        1
+      ],
+      "outagePolicies": [
+        "RETRY_WITH_BACKOFF",
+        "RETRY_WITH_BACKOFF"
+      ],
+      "observedTypes": [
+        "SandboxExtractionException",
+        "SandboxExtractionException"
+      ],
+      "lifecycleWARNs": 3,
+      "elapsedAfterSupportRestorationMs": 99,
+      "finalDONE": 0,
+      "finalAttempts": [
+        1,
+        1
+      ]
+    }
+  },
+  "proofDigests": {
+    "child-path-audit.json": "sha256:2269062640764e8a466dbd721c8f6271c85510f39291d0240947dd757d02565b",
+    "oracle-counterexample.json": "sha256:d625cbf27cbef0ecaa6f25f659d87ed1fee10f4f0013116b236a799853623c3d",
+    "decision-conflict-search.txt": "sha256:406b53232670829547d83902f75ac794f30361c5e12122a873b7ef1261a20480"
+  },
+  "digest": "sha256:0df9b5fee3e44de57f921053f131bff9073e47824b7714d05011f209ed3b48fc"
+}
