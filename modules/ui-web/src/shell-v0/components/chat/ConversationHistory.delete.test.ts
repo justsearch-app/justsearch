@@ -13,9 +13,12 @@ afterEach(() => {
 });
 
 it('classic delete displays the server refusal and keeps the conversation', async () => {
-  vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init?: RequestInit) => new Response(
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => new Response(
     JSON.stringify(init?.method === 'DELETE'
-      ? { errorCode: 'STORE_LOCKED', error: 'Unlock chat history before deleting.' } : { sessions: [] }),
+      ? { errorCode: 'STORE_LOCKED', error: 'Unlock chat history before deleting.' }
+      : String(url).includes('childrenOf=') ? { childrenOf: 'conversation', locked: false,
+        sessions: [{ sessionId: 'conversation', busy: false, firstUserMessage: 'question' }] }
+        : String(url).includes('existsOnly=true') ? { exists: true } : { sessions: [{ sessionId: 'conversation', firstUserMessage: 'question' }] }),
     { status: init?.method === 'DELETE' ? 423 : 200 },
   )));
   const el = new ConversationHistory();
@@ -30,7 +33,7 @@ it('classic delete displays the server refusal and keeps the conversation', asyn
   try {
     el.shadowRoot?.querySelector<HTMLButtonElement>('.item-delete')?.click();
     for (let i = 0; i < 10; i++) { await Promise.resolve(); await el.updateComplete; }
-    await vi.waitFor(() => expect(seen).toContain('Unlock chat history before deleting.'));
+    await vi.waitFor(() => expect(seen.some(m => m.includes('Unlock chat history before deleting.') && m.includes('Remain:'))).toBe(true));
     await vi.waitFor(() => expect(el.conversations.map(c => c.id)).toContain('conversation'));
   } finally { document.removeEventListener(EPHEMERAL_TOAST_EVENT, listener); }
 });

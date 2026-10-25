@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T14:32:36.145Z",
+  "revision": "c352c79168ecd21be9ee45381e4839a123d320ad",
+  "tree": "7f9508d2301dfaac1719016cc2917da747175660",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-509051-1792852355445.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 699
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve removed focus ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 1 removals preserve removed focus ownership",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c608ebffde114e829e932e980c4ccb6891fc346a47c15bf852afb393211ad13a"
+}

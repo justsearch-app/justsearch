@@ -69,6 +69,10 @@ function stubFetch(): Router {
     wake = null;
   };
   fetchMock.mockImplementation(async (url: unknown, init: { signal?: AbortSignal }) => {
+    const childrenOf = new URL(String(url), 'http://engine.test').searchParams.get('childrenOf');
+    if (childrenOf !== null) return { ok: true, status: 200, json: async () => ({
+      childrenOf, locked: false, sessions: [{ sessionId: childrenOf, busy: false }],
+    }) };
     if (String(url).includes('/api/chat/dispatch')) {
       const signal = init?.signal ?? null;
       return {
@@ -193,6 +197,30 @@ async function ask(el: Mounted, draft: string): Promise<void> {
 async function settle(el: Mounted): Promise<void> {
   for (let turn = 0; turn < 6; turn += 1) await new Promise<void>((r) => setTimeout(r, 0));
   await el.updateComplete;
+}
+
+/** Complete the newly required confirmation through its composed native button. */
+async function confirmDeletion(el: Mounted, focusAtDelete?: HTMLElement): Promise<void> {
+  // Focus ownership is sampled when the removal lands, after consent. Make that timing explicit:
+  // happy-dom does not restore the deep invoker of a native dialog across shadow roots.
+  const reply = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => unknown;
+  if (focusAtDelete) fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+    if (init?.method === 'DELETE') focusAtDelete.focus();
+    return reply(url, init);
+  });
+  await settle(el);
+  const dialog = document.querySelector('jf-confirm-dialog') as Mounted | null;
+  expect(dialog).not.toBeNull();
+  await dialog!.updateComplete;
+  const button = dialog!.shadowRoot!.querySelector('jf-button.confirm') as Mounted;
+  await button.updateComplete;
+  const control = button.shadowRoot!.querySelector('jf-control') as Mounted;
+  await control.updateComplete;
+  control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click();
+  await settle(el);
+  // confirmAsync removes its transient after 200 ms; leave no pending cleanup at teardown.
+  await new Promise(resolve => setTimeout(resolve, 210));
+  fetchMock.mockImplementation(reply);
 }
 
 async function rowsOf(el: Mounted): Promise<Sv3SessionRow[]> {
@@ -685,7 +713,7 @@ describe('the row actions each change the state they name', () => {
 
     const older = (await rowsOf(el))[1] as Sv3SessionRow;
     actionOf(older, 'remove').click();
-    await settle(el);
+    await confirmDeletion(el);
 
     // Gone from the list...
     expect((await rowsOf(el)).map((r) => r.label)).toEqual(['second question']);
@@ -703,7 +731,7 @@ describe('the row actions each change the state they name', () => {
     const el = await mount();
     await ask(el, 'the only one');
     actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove').click();
-    await settle(el);
+    await confirmDeletion(el);
 
     expect(await rowsOf(el)).toHaveLength(0);
     // The transcript went with it — a window still rendering the turns of a conversation it just
@@ -772,8 +800,9 @@ describe('the row actions each change the state they name', () => {
       await threeConversations(el);
       expect((await rowsOf(el)).map((r) => r.label)).toEqual(['third', 'second', 'first']);
 
-      pressEnter(actionOf((await rowsOf(el))[1] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      const invoker = actionOf((await rowsOf(el))[1] as Sv3SessionRow, 'remove');
+      pressEnter(invoker);
+      await confirmDeletion(el, invoker);
 
       expect((await rowsOf(el)).map((r) => r.label)).toEqual(['third', 'first']);
       // The row BUTTON, so a repeat of the same key claims a conversation instead of deleting one.
@@ -787,7 +816,7 @@ describe('the row actions each change the state they name', () => {
       const el = await mount();
       await threeConversations(el);
       pressEnter(actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      await confirmDeletion(el);
       expect((await rowsOf(el)).map((r) => r.label)).toEqual(['second', 'first']);
 
       const landed = document.activeElement as Element | null;
@@ -807,22 +836,24 @@ describe('the row actions each change the state they name', () => {
     it('falls back to the PREDECESSOR when the last row in the list goes', async () => {
       const el = await mount();
       await threeConversations(el);
-      pressEnter(actionOf((await rowsOf(el))[2] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      const invoker = actionOf((await rowsOf(el))[2] as Sv3SessionRow, 'remove');
+      pressEnter(invoker);
+      await confirmDeletion(el, invoker);
 
       expect((await rowsOf(el)).map((r) => r.label)).toEqual(['third', 'second']);
       const focusedRow = focusedRowOf() as Sv3SessionRow;
       expect(focusedRow.label).toBe('second');
     });
 
-    it('falls back to the new-search control when the list empties, rather than dropping focus', async () => {
+    it('falls back to a neutral deletion announcement when the list empties', async () => {
       const el = await mount();
       await ask(el, 'the only one');
-      pressEnter(actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      const invoker = actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove');
+      pressEnter(invoker);
+      await confirmDeletion(el, invoker);
 
       expect(await rowsOf(el)).toHaveLength(0);
-      expect(focusedTestId(el)).toBe('sv3-sidebar-new');
+      expect(focusedTestId(el)).toBe('sv3-sidebar-announcer');
     });
 
     it('announces the deletion politely, and says WHICH conversation went', async () => {
@@ -831,7 +862,7 @@ describe('the row actions each change the state they name', () => {
       expect(await announcement(el)).toBe('');
 
       pressEnter(actionOf((await rowsOf(el))[1] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      await confirmDeletion(el);
       expect(await announcement(el)).toBe('second deleted');
 
       // The region is a LEAF holding text: a live region wrapped around controls re-announces its
@@ -862,9 +893,9 @@ describe('the row actions each change the state they name', () => {
       });
 
       pressEnter(actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      await confirmDeletion(el);
       pressEnter(actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove'));
-      await settle(el);
+      await confirmDeletion(el);
 
       expect((await rowsOf(el)).map((r) => r.label)).toEqual([]);
       // Said, cleared, said again. The region starts empty, so the first clear is a no-op; what
@@ -919,7 +950,7 @@ describe('the row actions each change the state they name', () => {
     const settled = (await rowsOf(el))[0] as Sv3SessionRow;
     expect(settled.live).toBe(false);
     actionOf(settled, 'remove').click();
-    await settle(el);
+    await confirmDeletion(el);
     expect(await rowsOf(el)).toHaveLength(0);
     expect(deleteCalls()).toHaveLength(1);
   });

@@ -118,10 +118,8 @@ public final class FileConversationStore implements ConversationStore {
   void checkDeletion(String sessionId) {
     StoreIds.requireValid(sessionId);
     if (isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
-    if (!sessionId.startsWith(THROWAWAY_SESSION_PREFIX)) {
-      List<String> children = findChildBranches(sessionId);
-      if (!children.isEmpty()) throw new BranchesPreventDeletionException(sessionId, children);
-    }
+    List<String> children = findChildBranches(sessionId);
+    if (!children.isEmpty()) throw new BranchesPreventDeletionException(sessionId, children);
   }
 
   @Override
@@ -430,6 +428,9 @@ public final class FileConversationStore implements ConversationStore {
     try (var ignoredWriting = conversationWork.start(parentSessionId); var ignoredDestination = conversationWork.start(newSessionId)) {
       StoreIds.requireValid(parentSessionId);
       StoreIds.requireValid(newSessionId);
+      if (parentSessionId.regionMatches(true, 0, THROWAWAY_SESSION_PREFIX, 0, THROWAWAY_SESSION_PREFIX.length())) {
+        throw new IllegalArgumentException("Cannot branch from an internal throwaway session");
+      }
       Objects.requireNonNull(parentSessionId, "parentSessionId");
       Objects.requireNonNull(branchPointMessageId, "branchPointMessageId");
       Objects.requireNonNull(newSessionId, "newSessionId");
@@ -763,7 +764,8 @@ public final class FileConversationStore implements ConversationStore {
       for (Path sessionDir : dirs) {
         if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
         Map<String, Object> meta = readMeta(sessionDir.getFileName().toString());
-        if (meta != null && parentSessionId.equals(meta.get("parentSessionId"))) {
+        if (meta != null && meta.get("parentSessionId") instanceof String savedParentId
+            && parentSessionId.equalsIgnoreCase(savedParentId)) {
           children.add(sessionDir.getFileName().toString());
         }
       }
