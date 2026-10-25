@@ -725,6 +725,7 @@ public final class InferenceCompositionRoot {
         null, null,
         null, querySelection.citation());
     CompositionHandles handles = new CompositionHandles();
+    try {
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
     requestedRoles.addAll(currentQuery.requestedRoles());
@@ -831,7 +832,11 @@ public final class InferenceCompositionRoot {
         InferenceSurface.ComponentObservation.composed(
             projection.withQueryFrom(currentQueryProjection).digest(), requestedRoles,
             presentRoles, Optional.of(querySelection)), handles.roles(),
-        handles.failures().get(EncoderRole.EMBEDDING));
+        handles.failures().get(EncoderRole.EMBEDDING), handles.failedAssemblies());
+    } catch (RuntimeException | Error failure) {
+      handles.closeAfterFailure(failure);
+      throw failure;
+    }
   }
 
   /** Pure pre-admission validation; the physical owner calls this before retirement. */
@@ -868,6 +873,7 @@ public final class InferenceCompositionRoot {
     Objects.requireNonNull(selection, "selection");
     ResolvedConfig cfg = projection.config();
     CompositionHandles handles = new CompositionHandles();
+    try {
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
     QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, null, null,
@@ -890,7 +896,11 @@ public final class InferenceCompositionRoot {
         new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles.sessions(),
         InferenceSurface.ComponentObservation.composed(projection.queryDigest(), requested,
             present, Optional.of(new QueryRoleSelection(rerankerComposition.attemptedRole(),
-                citationComposition.attemptedRole()))), handles.roles());
+                citationComposition.attemptedRole()))), handles.roles(), null, handles.failedAssemblies());
+    } catch (RuntimeException | Error failure) {
+      handles.closeAfterFailure(failure);
+      throw failure;
+    }
   }
 
   private static IndexCompositionPlan captureIndexPlan(
@@ -1038,10 +1048,12 @@ public final class InferenceCompositionRoot {
           rolePlan.metadataDirectory(), embedCfg.contextLength(),
           embedCfg.lateChunkingContextLength(), cfg.ai().capabilityContractStrict(),
           variant.modelFile());
+      handles.assemblies().put(EncoderRole.EMBEDDING, assembly);
       return Optional.of(assembly);
     } catch (Exception e) {
-      handles.failures().put(EncoderRole.EMBEDDING, e);
-      retireFailedHandle(sessions, e);
+      handles.failures().put(EncoderRole.EMBEDDING,
+          e instanceof io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure ? e.getCause() : e);
+      retireFailedHandle(sessions, e, EncoderRole.EMBEDDING, handles);
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
       // IllegalStateException under justsearch.models.capability_contract_strict, and that must
       // degrade this lane to Optional.empty() the same way a session-creation failure does, not
@@ -1082,9 +1094,10 @@ public final class InferenceCompositionRoot {
       NerAssembly assembly = io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
           sessions, rolePlan.metadataDirectory(), nerCfg.maxSequenceLength(),
           cfg.ai().capabilityContractStrict(), variant.modelFile());
+      handles.assemblies().put(EncoderRole.NER, assembly);
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedHandle(sessions, e);
+      retireFailedHandle(sessions, e, EncoderRole.NER, handles);
       log.error("NER composition failed — NER will be unavailable", e);
       return Optional.empty();
     }
@@ -1123,9 +1136,10 @@ public final class InferenceCompositionRoot {
           rolePlan.metadataDirectory(), bgeCfg.maxSequenceLength(), bgeCfg.gpuEnabled(),
           bgeCfg.gpuDeviceId(), bgeCfg.gpuMemLimitBytes());
       BgeM3Assembly assembly = BgeM3Encoder.buildAssembly(sessions, capturedConfig);
+      handles.assemblies().put(EncoderRole.BGE_M3, assembly);
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedHandle(sessions, e);
+      retireFailedHandle(sessions, e, EncoderRole.BGE_M3, handles);
       log.warn(
           "Failed to initialize BGE-M3 encoder, falling back to SPLADE: {}", e.getMessage());
       log.debug("Failed to initialize BGE-M3 encoder (stack trace)", e);
@@ -1168,9 +1182,10 @@ public final class InferenceCompositionRoot {
           spladeCfg.activation());
       SpladeAssembly assembly = SpladeEncoder.buildAssembly(sessions, capturedConfig,
           variant.modelFile());
+      handles.assemblies().put(EncoderRole.SPLADE, assembly);
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedHandle(sessions, e);
+      retireFailedHandle(sessions, e, EncoderRole.SPLADE, handles);
       log.warn("Failed to initialize SPLADE encoder (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize SPLADE encoder (stack trace)", e);
       return Optional.empty();
@@ -1283,9 +1298,10 @@ public final class InferenceCompositionRoot {
       sessions.setOrtRunRecorder(rerankerProfiler::recordOrtCall);
       RerankerAssembly assembly = CrossEncoderReranker.buildAssembly(sessions,
           attempted.tokenizer().path(), attempted.model().path(), rerankCfg.maxSequenceLength());
+      handles.assemblies().put(EncoderRole.RERANKER, assembly);
       return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
-      retireFailedHandle(sessions, e);
+      retireFailedHandle(sessions, e, EncoderRole.RERANKER, handles);
       log.warn("Failed to initialize search reranker (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize search reranker (stack trace)", e);
       return new QueryComposition(Optional.empty(), attempted);
@@ -1331,6 +1347,7 @@ public final class InferenceCompositionRoot {
       sessions.setOrtRunRecorder(citationProfiler::recordOrtCall);
       RerankerAssembly assembly = CitationScorer.buildAssembly(sessions,
           attempted.tokenizer().path(), attempted.model().path(), citationCfg.maxSequenceLength());
+      handles.assemblies().put(EncoderRole.CITATION, assembly);
       if (attempted.state() == QueryRoleSelection.State.SELECTED) {
         log.info("Citation scorer settings selected: model={}, sha256={}, tokenizerSha256={}",
             attempted.model().path(), attempted.model().sha256(),
@@ -1343,7 +1360,7 @@ public final class InferenceCompositionRoot {
       }
       return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
-      retireFailedHandle(sessions, e);
+      retireFailedHandle(sessions, e, EncoderRole.CITATION, handles);
       log.warn("Citation scorer init failed (non-fatal): {}", e.getMessage());
       log.debug("Citation scorer init failed (stack trace)", e);
       return new QueryComposition(Optional.empty(), attempted);
@@ -1361,25 +1378,61 @@ public final class InferenceCompositionRoot {
 
   private record CompositionHandles(
       List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles,
-      Map<EncoderRole, Throwable> failures) {
+      Map<EncoderRole, Throwable> failures, Map<EncoderRole, AutoCloseable> assemblies,
+      Map<EncoderRole, AutoCloseable> failedAssemblies) {
     private CompositionHandles() {
-      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class), new EnumMap<>(EncoderRole.class));
+      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class), new EnumMap<>(EncoderRole.class),
+          new EnumMap<>(EncoderRole.class), new EnumMap<>(EncoderRole.class));
     }
 
     private void add(EncoderRole role, SessionHandle handle) {
-      sessions.add(handle);
+      sessions.add(Objects.requireNonNull(handle, "handle"));
       roles.put(role, handle);
+    }
+
+    private void closeAfterFailure(Throwable failure) {
+      var surface = new InferenceSurface(Optional.empty(), Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), null, sessions,
+          InferenceSurface.ComponentObservation.unknown(), roles, null, assemblies);
+      try { surface.close(); }
+      catch (RuntimeException | Error cleanup) {
+        if (failure != cleanup) failure.addSuppressed(cleanup);
+        throw new FailedComposition(failure, surface);
+      }
     }
   }
 
-  private static void retireFailedHandle(SessionHandle sessions, Exception cause) {
-    if (sessions == null) return;
-    try {
-      sessions.close();
-    } catch (RuntimeException closeFailure) {
-      cause.addSuppressed(closeFailure);
+  /** An aborted composition whose native resources could not yet retire. */
+  static final class FailedComposition extends RuntimeException {
+    private final InferenceSurface surface;
+
+    private FailedComposition(Throwable cause, InferenceSurface surface) {
+      super("Aborted composition retains native ownership for retry", cause);
+      this.surface = surface;
     }
-    // The surface already owns the handle, including a refused close, for shutdown/recovery retry.
+
+    InferenceSurface surface() { return surface; }
+  }
+
+  private static void retireFailedHandle(SessionHandle sessions, Exception cause,
+      EncoderRole role, CompositionHandles handles) {
+    AutoCloseable partial = handles.assemblies().get(role);
+    if (cause instanceof io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure failure) partial = failure;
+    if (cause instanceof io.justsearch.reranker.AssemblyBuildFailure failure) partial = failure;
+    if (partial != null) {
+      handles.failedAssemblies().put(role, partial);
+      handles.assemblies().put(role, partial);
+    }
+    if (sessions != null) {
+      try { sessions.close(); }
+      catch (RuntimeException | Error closeFailure) { cause.addSuppressed(closeFailure); }
+      if (sessions.retirementStatus() == SessionHandle.RetirementStatus.RETIRED && partial != null) {
+        try { partial.close(); }
+        catch (Exception | Error closeFailure) { cause.addSuppressed(closeFailure); }
+      }
+    }
+    // Refused sessions and their partial assembly remain on the surface for the existing retry.
+    if (cause.getCause() instanceof Error fatal) throw fatal;
   }
 
   private static VariantSelection witnessedVariant(QueryRoleSelection.Role role,
