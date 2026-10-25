@@ -1,0 +1,4 @@
+TOKENIZER_MEMORY_FLOOR mode=during cycle=1 utc=2026-10-24T04:43:58.110886866Z memory=[VmRSS:	  567628 kB, VmSwap:	       0 kB]
+TOKENIZER_MEMORY_FLOOR mode=during cycle=2 utc=2026-10-24T04:44:47.286535118Z memory=[VmRSS:	  631836 kB, VmSwap:	       0 kB]
+TOKENIZER_MEMORY_FLOOR mode=during cycle=3 utc=2026-10-24T04:45:35.879020129Z memory=[VmRSS:	  669176 kB, VmSwap:	       0 kB]
+TOKENIZER_MEMORY_FLOOR mode=during cycle=4 utc=2026-10-24T04:46:25.325178882Z memory=[VmRSS:	  742172 kB, VmSwap:	       0 kB]
