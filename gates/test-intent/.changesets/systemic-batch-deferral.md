@@ -2322,3 +2322,14 @@ Fresh final-source comparison on exact29f2a76f849b7f1742dc5d4f23b2350a2392803a r
   "note": "Independent verification accepts all 40 entries and settled scenarios; retained module temp-fixture failures are covered by exact-source passing replays."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17460-bcbc-70b1-ac0c-1f9fac4973f3",
+  "verdict": "accept",
+  "digest": "sha256:dade5f38dd866d7c637ceb60a03b878260caf0aa04bffb8adc34092863d28ed7",
+  "note": "Independent local verification:43 entries accepted; exact37 local and actual shard17+20 discovery, historical32pass/5intended assertion failures,105 focused candidate checks,12 Engine cases on each tree and native-pointer controls passed. D22 preservation transferred by Git equivalence; its2 precondition failures/54skips retained. Hosted required lane completion remains unverified here and required before merge."
+}
+```
