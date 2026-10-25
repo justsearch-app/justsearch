@@ -53,3 +53,14 @@ Only the autonomy quote below is owner wording. The specific oracle and fixture 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1732f-b6b2-7b80-909e-f6a4081809d3",
+  "verdict": "accept",
+  "digest": "sha256:43e6c637a1552273a7c25ab5a18c61dbb414915e47fc04247dd9fed69d7aee62",
+  "note": "Verified e8be57b44bbe234647a0ca63ad7bcdebe5025e54 against explicit baseline 58216932223d79d2660f2c4064a4618bbc44ef73. Established existing span/document contract before diff review. Baseline false equality reproduced; other four real-model checks and six pure pooling cases pass. Candidate selected real GTE checks: 12 passed, no skips, original deadlines; model-free worker-core: 494 passed, 19 skipped; compile and PMD passed. Corrected raw-state oracle rejects document-pooling mutant by the intended numerical assertion. Independent interior Unicode/output-shape and null/mask probes pass on both. All native test JVMs guarded at 6144 MiB RSS+swap. Product source and model metadata unchanged. Independence is sessions/checkouts only; same family. No production fail-before claimed for this oracle correction."
+}
+```
