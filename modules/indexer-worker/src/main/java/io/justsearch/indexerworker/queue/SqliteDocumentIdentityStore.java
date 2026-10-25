@@ -24,6 +24,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
   private final long deletionGraceMs;
   private final ReentrantLock lock = new ReentrantLock();
   private Connection connection;
+  private boolean closed;
 
   /** Uses the default 30-day deletion grace (tempdoc 931 §C.6). */
   public SqliteDocumentIdentityStore(Path dbPath) {
@@ -55,7 +56,37 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
       }
       this.connection = conn;
     } catch (SQLException e) {
-      throw new IllegalStateException("Failed to open DocumentIdentityStore at " + dbPath, e);
+      throw SqliteServiceAvailability.failure("Failed to open DocumentIdentityStore at " + dbPath, e);
+    }
+  }
+
+  @Override
+  public void probe() {
+    lock.lock();
+    try {
+      Connection conn = openConnection();
+      boolean autoCommit = conn.getAutoCommit();
+      if (autoCommit) conn.setAutoCommit(false);
+      var savepoint = conn.setSavepoint();
+      try {
+        String hash = DocumentIdentityStore.pathHash("justsearch-ingestion-canary");
+        resolve(hash, System.currentTimeMillis());
+        if (lookup(hash).isEmpty()) throw new SQLException("Ingestion health round trip returned no row");
+      } finally {
+        try {
+          conn.rollback(savepoint);
+          conn.releaseSavepoint(savepoint);
+          if (autoCommit) conn.setAutoCommit(true);
+        } catch (SQLException cleanup) {
+          closed = true;
+          try { conn.close(); } catch (SQLException closeFailure) { cleanup.addSuppressed(closeFailure); }
+          throw cleanup;
+        }
+      }
+    } catch (SQLException e) {
+      throw SqliteServiceAvailability.failure("Ingestion health round trip failed", e);
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -66,7 +97,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
     try {
       String candidate = UUID.randomUUID().toString();
       try (PreparedStatement stmt =
-          connection.prepareStatement(
+          openConnection().prepareStatement(
               """
               INSERT INTO document_identity (path_hash, doc_uid, first_seen_at, last_seen_at)
               VALUES (?, ?, ?, ?)
@@ -105,7 +136,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
     requireHash(pathHash);
     lock.lock();
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "UPDATE document_identity SET deleted_at = ?"
                 + " WHERE path_hash = ? AND deleted_at IS NULL")) {
       stmt.setLong(1, nowMs);
@@ -120,7 +151,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
 
   private void remintLocked(String pathHash, String docUid, long nowMs) throws SQLException {
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "UPDATE document_identity SET doc_uid = ?, first_seen_at = ?, last_seen_at = ?,"
                 + " deleted_at = NULL WHERE path_hash = ?")) {
       stmt.setString(1, docUid);
@@ -133,7 +164,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
 
   private void clearDeletionMarkLocked(String pathHash) throws SQLException {
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "UPDATE document_identity SET deleted_at = NULL WHERE path_hash = ?")) {
       stmt.setString(1, pathHash);
       stmt.executeUpdate();
@@ -159,8 +190,8 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
     Objects.requireNonNull(identities, "identities");
     lock.lock();
     try {
-      boolean wasAutoCommit = connection.getAutoCommit();
-      connection.setAutoCommit(false);
+      boolean wasAutoCommit = openConnection().getAutoCommit();
+      openConnection().setAutoCommit(false);
       try {
         int inserted = 0;
         for (ImportedIdentity identity : identities) {
@@ -171,13 +202,13 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
             inserted++;
           }
         }
-        connection.commit();
+        openConnection().commit();
         return inserted;
       } catch (SQLException | RuntimeException e) {
-        connection.rollback();
+        openConnection().rollback();
         throw e;
       } finally {
-        connection.setAutoCommit(wasAutoCommit);
+        openConnection().setAutoCommit(wasAutoCommit);
       }
     } catch (SQLException e) {
       throw failure("importExistingBatch", "<active-index-snapshot>", e);
@@ -190,7 +221,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
   public long identityCount() {
     lock.lock();
     try (PreparedStatement stmt =
-            connection.prepareStatement("SELECT COUNT(*) FROM document_identity");
+            openConnection().prepareStatement("SELECT COUNT(*) FROM document_identity");
         ResultSet rs = stmt.executeQuery()) {
       return rs.next() ? rs.getLong(1) : 0L;
     } catch (SQLException e) {
@@ -205,7 +236,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
     requireGenerationId(generationId);
     lock.lock();
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "SELECT 1 FROM document_identity_import WHERE generation_id = ?")) {
       stmt.setString(1, generationId);
       try (ResultSet rs = stmt.executeQuery()) {
@@ -224,7 +255,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
     requireGenerationId(record.generationId());
     lock.lock();
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             """
             INSERT INTO document_identity_import
               (generation_id, imported_at, parents_seen, parents_imported, parents_skipped)
@@ -263,7 +294,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
       return new ImportOutcome(byUid.get(), false);
     }
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             """
             INSERT INTO document_identity (path_hash, doc_uid, first_seen_at, last_seen_at)
             VALUES (?, ?, ?, ?)
@@ -301,13 +332,13 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
             : RekeyResult.NOT_FOUND;
       }
 
-      boolean wasAutoCommit = connection.getAutoCommit();
-      connection.setAutoCommit(false);
+      boolean wasAutoCommit = openConnection().getAutoCommit();
+      openConnection().setAutoCommit(false);
       try {
         // Identity rows deliberately have no GC. A valid rename onto a historically-used path
         // therefore makes the moving source authoritative and replaces that stale destination.
         try (PreparedStatement delete =
-            connection.prepareStatement("DELETE FROM document_identity WHERE path_hash = ?")) {
+            openConnection().prepareStatement("DELETE FROM document_identity WHERE path_hash = ?")) {
           delete.setString(1, newPathHash);
           delete.executeUpdate();
         }
@@ -315,7 +346,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
         // source path carried (tempdoc 931 §C.6) — a rename observed after a confirmed deletion is
         // the document being found again, not a new one.
         try (PreparedStatement stmt =
-            connection.prepareStatement(
+            openConnection().prepareStatement(
                 "UPDATE document_identity SET path_hash = ?, last_seen_at = ?, deleted_at = NULL"
                     + " WHERE path_hash = ?")) {
           stmt.setString(1, newPathHash);
@@ -326,13 +357,13 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
                 "Document identity rekey did not update exactly one row for " + oldPathHash);
           }
         }
-        connection.commit();
+        openConnection().commit();
         return RekeyResult.MOVED;
       } catch (SQLException | RuntimeException e) {
-        connection.rollback();
+        openConnection().rollback();
         throw e;
       } finally {
-        connection.setAutoCommit(wasAutoCommit);
+        openConnection().setAutoCommit(wasAutoCommit);
       }
     } catch (SQLException e) {
       throw failure("rekey", oldPathHash, e);
@@ -356,7 +387,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
 
   private Optional<Identity> select(String pathHash) throws SQLException {
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "SELECT path_hash, doc_uid, first_seen_at, last_seen_at, deleted_at"
                 + " FROM document_identity WHERE path_hash = ?")) {
       stmt.setString(1, pathHash);
@@ -368,7 +399,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
 
   private Optional<Identity> selectByUid(String docUid) throws SQLException {
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "SELECT path_hash, doc_uid, first_seen_at, last_seen_at, deleted_at"
                 + " FROM document_identity WHERE doc_uid = ?")) {
       stmt.setString(1, docUid);
@@ -394,7 +425,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
 
   private void touch(String pathHash, long nowMs) throws SQLException {
     try (PreparedStatement stmt =
-        connection.prepareStatement(
+        openConnection().prepareStatement(
             "UPDATE document_identity SET last_seen_at = ? WHERE path_hash = ?")) {
       stmt.setLong(1, nowMs);
       stmt.setString(2, pathHash);
@@ -427,14 +458,19 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
   }
 
   private IllegalStateException failure(String operation, String pathHash, SQLException cause) {
-    return new IllegalStateException(
+    return SqliteServiceAvailability.failure(
         "DocumentIdentityStore." + operation + " failed for path hash " + pathHash, cause);
+  }
+
+  private Connection openConnection() throws SQLException {
+    return SqliteServiceAvailability.requireOpen(connection, closed);
   }
 
   @Override
   public void close() throws IOException {
     lock.lock();
     try {
+      closed = true;
       if (connection != null) {
         connection.close();
         connection = null;

@@ -13,6 +13,7 @@ import io.justsearch.app.api.runtime.child.StopMode;
 import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.telemetry.catalog.EmptyTags;
 import java.io.IOException;
 import java.io.InputStream;
@@ -74,6 +75,8 @@ import tools.jackson.databind.json.JsonMapper;
  * {@link TimeboxedContentExtractor.ExtractionTimeoutException} (PARSER_TIMEOUT), exactly as before.
  */
 public final class PersistentExtractionSandbox implements ExtractionSandbox {
+  private long lastRecycleLogNs;
+  private long unreportedRecycles;
   private static final Logger log = LoggerFactory.getLogger(PersistentExtractionSandbox.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
@@ -312,8 +315,11 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   public ExtractionArtifact extract(Path file)
       throws IOException, ContentExtractor.ExtractionException {
     Objects.requireNonNull(file, "file");
-    if (closed) {
-      throw new SandboxExtractionException("Sandbox is closed", null);
+    synchronized (this) {
+      if (closed) {
+        throw new IngestionServiceUnavailableException(
+            "Extraction sandbox is closed");
+      }
     }
     Slot slot;
     try {
@@ -324,6 +330,13 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
     try {
       return extractOnSlot(slot, file);
+    } catch (IOException | ContentExtractor.ExtractionException | RuntimeException failure) {
+      synchronized (this) {
+        if (closed) {
+          throw new SandboxServiceUnavailableException("Extraction sandbox is closing", failure);
+        }
+      }
+      throw failure;
     } finally {
       freeSlots.add(slot);
     }
@@ -336,10 +349,8 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       child = acquireChild(slot);
     } catch (IOException e) {
       // Failure to open the child is sandbox infrastructure failure, not failure to read the
-      // source file. Keep source-file IOException unchanged below so JobBatchExtractor can retain
-      // its IO_FAILED distinction, while an unavailable process boundary follows the durable
-      // SANDBOX_FAILED retry path.
-      throw new SandboxExtractionException("Failed to start sandbox child", e);
+      // source file. Keep source IO and child/parser failures document-specific below.
+      throw new SandboxServiceUnavailableException("Failed to start sandbox child", e);
     }
     child.requests++;
     // The tail is reported per FILE, so it must not carry the previous request's chatter.
@@ -364,8 +375,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     Future<byte[]> pending;
     try {
       pending = readers.submit(() -> SandboxFrames.read(child.stdout, maxResponseBytes));
+    } catch (java.util.concurrent.RejectedExecutionException refused) {
+      // A request is already on the pipe. Retire it before reporting shared reader unavailability.
+      discardChild(slot, child, REASON_PROTOCOL);
+      throw new SandboxServiceUnavailableException("Sandbox reader cannot accept work", refused);
     } catch (RuntimeException refused) {
-      // A request is already on the pipe. Reusing this slot could give its answer to the next file.
+      // Unknown child failures retain the per-document retry policy.
       throw discardAndClassify(slot, child, REASON_PROTOCOL, refused);
     } catch (Error fatal) {
       try {
@@ -416,6 +431,9 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
     try {
       return decode(responseBytes, requestId);
+    } catch (SandboxServiceUnavailableException unavailable) {
+      // A valid response about shared storage does not corrupt the protocol or retire its owner.
+      throw unavailable;
     } catch (SandboxExtractionException malformed) {
       throw discardAndClassify(slot, child, REASON_PROTOCOL, malformed);
     }
@@ -444,6 +462,9 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
             "Sandbox parser timed out", null);
       }
       if (response.status() == ExtractionStatus.FAILED) {
+        if (SandboxExtractionResponse.SERVICE_UNAVAILABLE.equals(response.reasonCode())) {
+          throw new SandboxServiceUnavailableException("Sandbox storage or service is unavailable", null);
+        }
         throw new ContentExtractor.ExtractionException("Sandbox parser failed");
       }
       return artifact.validateContentBoundsOnly(policy.maxExtractedChars());
@@ -498,7 +519,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (catalog != null) {
       catalog.sandboxRestartTotal.increment(ExtractionSandboxRestartTags.of(reason));
     }
-    log.warn("Extraction sandbox child recycled (reason={}, pid={})", reason, child.pid);
+    synchronized (this) {
+      unreportedRecycles++;
+      long now = System.nanoTime();
+      if (lastRecycleLogNs == 0 || now - lastRecycleLogNs >= 60_000_000_000L) {
+        log.warn("Extraction sandbox child recycled (reason={}, pid={}, since last report={})",
+            reason, child.pid, unreportedRecycles);
+        unreportedRecycles = 0;
+        lastRecycleLogNs = now;
+      }
+    }
   }
 
   /**
@@ -617,8 +647,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       current = null;
     }
     if (current == null) {
-      current = spawn();
-      slot.child = current;
+      // Serialize the final admission and publication with close's flag. A slot waiter must not
+      // spawn a new child after close has already enumerated the children it owns.
+      synchronized (this) {
+        if (closed) {
+          throw new IngestionServiceUnavailableException(
+              "Extraction sandbox is closed");
+        }
+        current = spawn();
+        slot.child = current;
+      }
     }
     return current;
   }
@@ -644,13 +682,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (catalog != null) {
       catalog.sandboxSpawnTotal.increment(EmptyTags.INSTANCE);
     }
-    log.info("Extraction sandbox child spawned (pid={})", handle.pid());
     return new Child(handle, maxStderrBytes);
   }
 
   @Override
   public void close() {
-    closed = true;
+    synchronized (this) { closed = true; }
     List<String> survivors = stopAllGracefully();
     shutdownAndCancelQueued(readers);
     try {

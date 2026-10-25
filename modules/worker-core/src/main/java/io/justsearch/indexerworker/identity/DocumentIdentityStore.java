@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.identity;
 
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -18,8 +19,9 @@ public interface DocumentIdentityStore {
    * Production indexing must never mint identity from a second authority.
    */
   DocumentIdentityStore UNAVAILABLE = new DocumentIdentityStore() {
-    private IllegalStateException unavailable() {
-      return new IllegalStateException("Document identity store is unavailable");
+    private IngestionServiceUnavailableException unavailable() {
+      return new IngestionServiceUnavailableException(
+          "Document identity store is unavailable");
     }
 
     @Override
@@ -122,6 +124,11 @@ public interface DocumentIdentityStore {
 
   /** Looks up an identity by path hash. */
   Optional<Identity> lookup(String pathHash);
+
+  /** Checks a normal-width identity write/read under the store lock, rolling back all effects. */
+  default void probe() {
+    throw new IngestionServiceUnavailableException("Identity health probe is unavailable");
+  }
 
   /** SHA-256 hex over the already-normalized absolute path. */
   static String pathHash(String normalizedPath) {

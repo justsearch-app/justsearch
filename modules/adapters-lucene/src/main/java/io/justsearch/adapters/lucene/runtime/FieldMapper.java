@@ -181,6 +181,30 @@ public final class FieldMapper {
     return doc;
   }
 
+  /** Representative inputs exercise every configured mapping in the disposable health index. */
+  Document ingestionCanaryDocument() {
+    Map<String, Object> fields = new HashMap<>();
+    for (FieldDef def : byId.values()) {
+      Object value = switch (def.type) {
+        case "text" -> "JustSearch ingestion canary";
+        case "keyword" -> def.multiValued ? List.of("canary", "probe") : "canary";
+        case "long" -> 1L;
+        case "boolean" -> true;
+        case "splade" -> Map.of("canary", 1.0f);
+        case "vector" -> {
+          // Dimension zero disables vectors in test catalogs; no valid Lucene vector exists.
+          if (def.vectorDim != null && def.vectorDim <= 0) yield null;
+          float[] vector = new float[def.vectorDim == null ? 1 : def.vectorDim];
+          vector[0] = 1.0f;
+          yield vector;
+        }
+        default -> null; // addFields also ignores catalog types it does not implement.
+      };
+      fields.put(def.id, value);
+    }
+    return toDocument(fields, null);
+  }
+
   /**
    * Vector fields in this write whose value cannot be indexed, mapped to the status field that
    * witnesses them (or the empty string when the catalog pairs none). Detection runs before the

@@ -1,0 +1,1577 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "adaptedScript": "tmp/builder/class-split/run-evidence.mjs",
+    "scriptDigest": "sha256:aff681b16a4c9ddc5f791a508c59aa885d80b3e024cc74211a048043de498855",
+    "note": "Runs exact local, historical and actual existing ciUnitTest1/2 tasks. Parent body/fixtures pinned to64; no product change. Child evidence explicitly binds inherited parent through sourceDependencies and both newChecks."
+  },
+  "createdAt": "2026-10-25T18:29:57Z",
+  "revision": "64e728e2d8d97430f34443dad40c8456c713e534",
+  "tree": "sha256:28df6c152359c352d6dd858d1f01b821a19df29953ea52889e82b1273399a4ae",
+  "environment": {
+    "platform": "linux",
+    "node": "v24.22.0",
+    "corpus": "tmp/builder/class-split/corpus, prepopulated read-only two-file sources reused by all phases",
+    "launcherTemps": [
+      "tmp/builder/jvm/before",
+      "tmp/builder/jvm/after"
+    ],
+    "testTemps": "Machine init fixed per-checkout module/build/tmp/test-jvm/task directory; no /tmp products"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest --tests io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --tests io.justsearch.indexerworker.loop.WriterAliasRetargetTest --tests io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest --tests io.justsearch.indexerworker.loop.WriterLegacyRetargetSourceTest --tests io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest :modules:worker-services:test --tests io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest --tests io.justsearch.indexerworker.loop.ReadOnlyStoreDeferralTest :modules:app-launcher:test --tests io.justsearch.app.launcher.UnreferencedCodeTest :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -DclassSplitCorpus=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/corpus -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25T18:01:58Z",
+      "finishedUTC": "2026-10-25T18:07:40Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest --tests io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -DclassSplitCorpus=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/corpus -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/before-29f2a76f8",
+      "exitCode": 1,
+      "startedUTC": "2026-10-25T18:09:10Z",
+      "finishedUTC": "2026-10-25T18:15:09Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:ciUnitTest1 --tests io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest --tests io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest --tests io.justsearch.indexerworker.IndexerWorkerGuardrailsTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -DclassSplitCorpus=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/corpus -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25T18:15:48Z",
+      "finishedUTC": "2026-10-25T18:20:22Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:ciUnitTest2 --tests io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest --tests io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -DclassSplitCorpus=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/corpus -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25T18:21:02Z",
+      "finishedUTC": "2026-10-25T18:27:36Z"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PATH_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "PATH_CONNECTION_LOST",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "PATH_READ_ONLY",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "PATH_SCHEMA_LOST",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "PATH_OPEN_FAILED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTION_EXECUTOR_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTION_SANDBOX_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTION_START_FAILED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTION_READER_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_CLOSING",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTION_SANDBOX_CLOSING",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_EMPTY",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_CLOSING",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_POLICY_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "EXTRACTOR_STRUCTURED_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3652e19885c64e60c1dc5d08230172ead73321e1b69df872d1a8ea3ca60bd4b",
+      "sourceDependencies": [
+        {
+          "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+          "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508"
+        }
+      ],
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WRITER_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_CLOSING",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_DEFERRED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_CONNECTION_LOST",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_DIRECTORY_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_DRAINING",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_BACKPRESSURE",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_READ_ONLY",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_DIRECTORY_LOST",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_OPEN_FAILED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "WRITER_OPEN_LOCKED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_UNWIRED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_CLOSED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_CONNECTION_LOST",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_READ_ONLY",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_SCHEMA_LOST",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_FILE_LOST",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_OPEN_FAILED",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_BUSY",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "IDENTITY_CORRUPT",
+          "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admission-query",
+          "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[2] presence-lookup",
+          "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[3] io-presence-lookup",
+          "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c98ec49a5ac80eba7a394c3be7b65d9a213d2fa175fbd8aed8b4244e00ecc9ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retargetedSourceParentStillCostsAFileAttemptWhileOldCanonicalFileExists()",
+          "classname": "io.justsearch.indexerworker.loop.WriterAliasRetargetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:22cb386c28af0306aa2f1947494d04792b5706862eb096e1e59bfedcd3620886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacy-source-stream-false",
+          "classname": "io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "legacy-source-stream-true",
+          "classname": "io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15a72f7eac9f593bd689ae6bb55a4b8641bb2b8eda327ddb6384754842e86a29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedCanonicalUnreadableSourceStillCostsOneAttemptAfterReadableRetarget()",
+          "classname": "io.justsearch.indexerworker.loop.WriterLegacyRetargetSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
+          "classname": "io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
+          "classname": "io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
+          "classname": "io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbb69ae5adf6b069329476dc0646bb484c13c3dac317a7f0db80781017dcfacc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] java.lang.NoClassDefFoundError: missing shared mapping",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[2] java.lang.AssertionError: broken health check",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[3] java.lang.ThreadDeath",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[4] java.lang.IllegalStateException: probe failed",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "vmProbeFailureIsNeverSwallowed()",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae0386442992d164a9fdaab4549fd94879120c3e40af123eec8f7e7b4c8911df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readOnlyStoreRemainsUncountedBeyondAmbiguousGrace()",
+          "classname": "io.justsearch.indexerworker.loop.ReadOnlyStoreDeferralTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/UnreferencedCodeTest.java",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/UnreferencedCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a0d531de7ff88355d5586711b5673c290a6ed1601fe576936cd1fc26f0989189",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "no_unreferenced_package_private_classes",
+          "classname": "io.justsearch.app.launcher.UnreferencedCodeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "no_unreferenced_package_private_fields",
+          "classname": "io.justsearch.app.launcher.UnreferencedCodeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "no_unreferenced_non_public_methods",
+          "classname": "io.justsearch.app.launcher.UnreferencedCodeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    }
+  ],
+  "shardChecks": {
+    "ciUnitTest1": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "PATH_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_CONNECTION_LOST",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_READ_ONLY",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_SCHEMA_LOST",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_OPEN_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_EXECUTOR_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_SANDBOX_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_START_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_READER_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_SANDBOX_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_REGISTRY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_REGISTRY_EMPTY",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_REGISTRY_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_POLICY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_STRUCTURED_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          }
+        ]
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:b3652e19885c64e60c1dc5d08230172ead73321e1b69df872d1a8ea3ca60bd4b",
+        "sourceDependencies": [
+          {
+            "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+            "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508"
+          }
+        ],
+        "executed": false,
+        "skipped": false,
+        "outcome": "not-found",
+        "cases": []
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/IndexerWorkerGuardrailsTest.java",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/IndexerWorkerGuardrailsTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:59e3d4a7dd03edc83e67bcaa3ba9d6cf0207c53336cd3dd4b04af73addaeabe8",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "indexerWorkerMustNotDependOnTestSupport",
+            "classname": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "indexerWorkerMustNotDoMemoryMappedIo",
+            "classname": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "plannerMustNotDependOnIoPrimitives",
+            "classname": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "responseBuilderMustNotDependOnEncoders",
+            "classname": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "embeddingAutoRescueMustGoThroughEmbeddingRecoveryOps",
+            "classname": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "forcedReindexTriggerMustNotBypassTheRescueSeam",
+            "classname": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          }
+        ]
+      }
+    ],
+    "ciUnitTest2": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508",
+        "executed": false,
+        "skipped": false,
+        "outcome": "not-found",
+        "cases": []
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:b3652e19885c64e60c1dc5d08230172ead73321e1b69df872d1a8ea3ca60bd4b",
+        "sourceDependencies": [
+          {
+            "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+            "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508"
+          }
+        ],
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "WRITER_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DEFERRED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_CONNECTION_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DIRECTORY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DRAINING",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_BACKPRESSURE",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_READ_ONLY",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DIRECTORY_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_OPEN_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_OPEN_LOCKED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_UNWIRED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_CONNECTION_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_READ_ONLY",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_SCHEMA_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_FILE_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_OPEN_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_BUSY",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_CORRUPT",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          }
+        ]
+      }
+    ]
+  },
+  "failBefore": {
+    "revision": "29f2a76f849b7f1742dc5d4f23b2350a2392803a",
+    "patches": [
+      {
+        "before": "29f2a76f849b7f1742dc5d4f23b2350a2392803a",
+        "sha256": "df991adb1ae046cc18207c5d9aea7ec66e96b40c5bcd65e13e8553be28ff8a7d",
+        "methods": [
+          {
+            "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java",
+            "originalSha256": "245406764de4d581ea2f2120e883e2fc52af244361b79ea9562156c1a3d9efbe",
+            "shim": "  public void probeIngestion() { throw new UnsupportedOperationException(\"unused compile-only fail-closed shim\"); }",
+            "shimmedSha256": "836675cf9648502d7b3214233cb5b959f952dce0db868f3dacf25462619560bf"
+          },
+          {
+            "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/identity/DocumentIdentityStore.java",
+            "originalSha256": "6be2af8cac856809d760d3f8e1fc90830bd266f89ce2b04530f2b9a9fd7a75df",
+            "shim": "  default void probe() { throw new UnsupportedOperationException(\"unused compile-only fail-closed shim\"); }",
+            "shimmedSha256": "497f496d3524859a3d367220cd9d4a9fdd7d5c24e293cff4367c2d39fee64e13"
+          },
+          {
+            "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/path/PathResolutionStore.java",
+            "originalSha256": "517d58eb9b127f50448561b854e3826dd589bf74c2dd11a5fecff4b343dde97f",
+            "shim": "  default void probe() { throw new UnsupportedOperationException(\"unused compile-only fail-closed shim\"); }",
+            "shimmedSha256": "a23dca0f601b2ac5e98db5d744463ffaafccb3643891690372e63d80679694d3"
+          },
+          {
+            "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/TimeboxedContentExtractor.java",
+            "originalSha256": "9faa7f577f6053d57e854c8dc08dc826d580285953bbcaace39c8d87cd86c04f",
+            "shim": "  public ExtractionArtifact probeArtifact(java.nio.file.Path source) { throw new UnsupportedOperationException(\"unused compile-only fail-closed shim\"); }",
+            "shimmedSha256": "4d316a2204caaf3d7736ae9c7937824f768f6d640f93d9e9fe8697859506ec50"
+          }
+        ],
+        "policy": "Only absent method declarations added, all fail closed by throwing; no old runtime code modified. Historical API had no declarations, so original call graph cannot reference them; exact old loop bytecode is audited after compilation."
+      }
+    ],
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest --tests io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -DclassSplitCorpus=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/corpus -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/fixed-temp.init.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/class-split/before-29f2a76f8",
+        "exitCode": 1,
+        "startedUTC": "2026-10-25T18:09:10Z",
+        "finishedUTC": "2026-10-25T18:15:09Z"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "contentDigest": "sha256:f1117b54b45853e7e741a87d0a6be121f732ae391d988b61d123e189816f4508",
+        "classification": "assertion",
+        "detail": "EXTRACTOR_REGISTRY_CLOSED: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: shared-service unavailability must never charge healthy source files: EXTRACTOR_REGISTRY_CLOSED[Row[state=FAILED, attempts=1, retry=0, policy=NONE], Row[state=FAILED, attempts=1, retry=0, policy=NONE]] ==> expected: <true> but was: <false> | EXTRACTOR_REGISTRY_EMPTY: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: shared-service unavailability must never charge healthy sou"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "contentDigest": "sha256:b3652e19885c64e60c1dc5d08230172ead73321e1b69df872d1a8ea3ca60bd4b",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ],
+    "cases": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "cases": [
+          {
+            "name": "PATH_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_CONNECTION_LOST",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_READ_ONLY",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_SCHEMA_LOST",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "PATH_OPEN_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_EXECUTOR_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_SANDBOX_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_START_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_READER_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTION_SANDBOX_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "EXTRACTOR_REGISTRY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: shared-service unavailability must never charge healthy source files: EXTRACTOR_REGISTRY_CLOSED[Row[state=FAILED, attempts=1, retry=0, policy=NONE], Row[state=FAILED, attempts=1, retry=0, policy=NONE]] ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "EXTRACTOR_REGISTRY_EMPTY",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: shared-service unavailability must never charge healthy source files: EXTRACTOR_REGISTRY_EMPTY[Row[state=FAILED, attempts=1, retry=0, policy=NONE], Row[state=FAILED, attempts=1, retry=0, policy=NONE]] ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "EXTRACTOR_REGISTRY_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: shared-service unavailability must never charge healthy source files: EXTRACTOR_REGISTRY_CLOSING[Row[state=PENDING, attempts=1, retry=1792952043006, policy=RETRY_WITH_BACKOFF], Row[state=PROCESSING, attempts=0, retry=0, policy=null]] ==> expected: <true> but was:"
+          },
+          {
+            "name": "EXTRACTOR_POLICY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: the service must refuse four real batches: EXTRACTOR_POLICY_CLOSED ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "EXTRACTOR_STRUCTURED_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: the service must refuse four real batches: EXTRACTOR_STRUCTURED_CLOSED ==> expected: <true> but was: <false>"
+          }
+        ]
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAndIdentityServiceAvailabilityTest.java",
+        "cases": [
+          {
+            "name": "WRITER_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_CLOSING",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DEFERRED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_CONNECTION_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DIRECTORY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DRAINING",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_BACKPRESSURE",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_READ_ONLY",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_DIRECTORY_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_OPEN_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "WRITER_OPEN_LOCKED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_UNWIRED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_CLOSED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_CONNECTION_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_READ_ONLY",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_SCHEMA_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_FILE_LOST",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_OPEN_FAILED",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_BUSY",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "IDENTITY_CORRUPT",
+            "classname": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          }
+        ]
+      }
+    ]
+  },
+  "matrixInvariants": {
+    "states": [
+      "WRITER_CLOSED",
+      "WRITER_CLOSING",
+      "WRITER_DEFERRED",
+      "WRITER_CONNECTION_LOST",
+      "WRITER_DIRECTORY_CLOSED",
+      "WRITER_DRAINING",
+      "WRITER_BACKPRESSURE",
+      "WRITER_READ_ONLY",
+      "WRITER_DIRECTORY_LOST",
+      "WRITER_OPEN_FAILED",
+      "WRITER_OPEN_LOCKED",
+      "IDENTITY_UNWIRED",
+      "IDENTITY_CLOSED",
+      "IDENTITY_CONNECTION_LOST",
+      "IDENTITY_READ_ONLY",
+      "IDENTITY_SCHEMA_LOST",
+      "IDENTITY_FILE_LOST",
+      "IDENTITY_OPEN_FAILED",
+      "IDENTITY_BUSY",
+      "IDENTITY_CORRUPT",
+      "PATH_CLOSED",
+      "PATH_CONNECTION_LOST",
+      "PATH_READ_ONLY",
+      "PATH_SCHEMA_LOST",
+      "PATH_OPEN_FAILED",
+      "EXTRACTOR_CLOSED",
+      "EXTRACTION_EXECUTOR_CLOSED",
+      "EXTRACTION_SANDBOX_CLOSED",
+      "EXTRACTION_START_FAILED",
+      "EXTRACTION_READER_CLOSED",
+      "EXTRACTOR_CLOSING",
+      "EXTRACTION_SANDBOX_CLOSING",
+      "EXTRACTOR_REGISTRY_CLOSED",
+      "EXTRACTOR_REGISTRY_EMPTY",
+      "EXTRACTOR_REGISTRY_CLOSING",
+      "EXTRACTOR_POLICY_CLOSED",
+      "EXTRACTOR_STRUCTURED_CLOSED"
+    ],
+    "parent17": [
+      "PATH_CLOSED",
+      "PATH_CONNECTION_LOST",
+      "PATH_READ_ONLY",
+      "PATH_SCHEMA_LOST",
+      "PATH_OPEN_FAILED",
+      "EXTRACTOR_CLOSED",
+      "EXTRACTION_EXECUTOR_CLOSED",
+      "EXTRACTION_SANDBOX_CLOSED",
+      "EXTRACTION_START_FAILED",
+      "EXTRACTION_READER_CLOSED",
+      "EXTRACTOR_CLOSING",
+      "EXTRACTION_SANDBOX_CLOSING",
+      "EXTRACTOR_REGISTRY_CLOSED",
+      "EXTRACTOR_REGISTRY_EMPTY",
+      "EXTRACTOR_REGISTRY_CLOSING",
+      "EXTRACTOR_POLICY_CLOSED",
+      "EXTRACTOR_STRUCTURED_CLOSED"
+    ],
+    "child20": [
+      "WRITER_CLOSED",
+      "WRITER_CLOSING",
+      "WRITER_DEFERRED",
+      "WRITER_CONNECTION_LOST",
+      "WRITER_DIRECTORY_CLOSED",
+      "WRITER_DRAINING",
+      "WRITER_BACKPRESSURE",
+      "WRITER_READ_ONLY",
+      "WRITER_DIRECTORY_LOST",
+      "WRITER_OPEN_FAILED",
+      "WRITER_OPEN_LOCKED",
+      "IDENTITY_UNWIRED",
+      "IDENTITY_CLOSED",
+      "IDENTITY_CONNECTION_LOST",
+      "IDENTITY_READ_ONLY",
+      "IDENTITY_SCHEMA_LOST",
+      "IDENTITY_FILE_LOST",
+      "IDENTITY_OPEN_FAILED",
+      "IDENTITY_BUSY",
+      "IDENTITY_CORRUPT"
+    ],
+    "semanticMethodAndEntireFixtureTailSha256": "e5b4757538767d9fa3cb026838d10df32c8a4e9d9af49b91a326a86173098bb5",
+    "semanticMethodAndFixtureBytesUnchanged": true,
+    "enumBytesUnchanged": true,
+    "assignments": [
+      {
+        "fqcn": "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest",
+        "hash": -1198787594,
+        "bucket": 0,
+        "override": false
+      },
+      {
+        "fqcn": "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest",
+        "hash": 91988839,
+        "bucket": 1,
+        "override": false
+      }
+    ],
+    "localForkPolicy": "Existing maxParallelForks=2 unchanged; no new parallel framework or Gradle matrix overlap. Every writable store/index/process scratch is per-invocation inherited TempDir. Supplied corpus existing two files and parent directory read-only; fixture only creates absent files and none are absent."
+  },
+  "actualDiscoveryAndTimings": {
+    "stateSets": {
+      "local": [
+        "PATH_CLOSED",
+        "PATH_CONNECTION_LOST",
+        "PATH_READ_ONLY",
+        "PATH_SCHEMA_LOST",
+        "PATH_OPEN_FAILED",
+        "EXTRACTOR_CLOSED",
+        "EXTRACTION_EXECUTOR_CLOSED",
+        "EXTRACTION_SANDBOX_CLOSED",
+        "EXTRACTION_START_FAILED",
+        "EXTRACTION_READER_CLOSED",
+        "EXTRACTOR_CLOSING",
+        "EXTRACTION_SANDBOX_CLOSING",
+        "EXTRACTOR_REGISTRY_CLOSED",
+        "EXTRACTOR_REGISTRY_EMPTY",
+        "EXTRACTOR_REGISTRY_CLOSING",
+        "EXTRACTOR_POLICY_CLOSED",
+        "EXTRACTOR_STRUCTURED_CLOSED",
+        "WRITER_CLOSED",
+        "WRITER_CLOSING",
+        "WRITER_DEFERRED",
+        "WRITER_CONNECTION_LOST",
+        "WRITER_DIRECTORY_CLOSED",
+        "WRITER_DRAINING",
+        "WRITER_BACKPRESSURE",
+        "WRITER_READ_ONLY",
+        "WRITER_DIRECTORY_LOST",
+        "WRITER_OPEN_FAILED",
+        "WRITER_OPEN_LOCKED",
+        "IDENTITY_UNWIRED",
+        "IDENTITY_CLOSED",
+        "IDENTITY_CONNECTION_LOST",
+        "IDENTITY_READ_ONLY",
+        "IDENTITY_SCHEMA_LOST",
+        "IDENTITY_FILE_LOST",
+        "IDENTITY_OPEN_FAILED",
+        "IDENTITY_BUSY",
+        "IDENTITY_CORRUPT"
+      ],
+      "before": [
+        "PATH_CLOSED",
+        "PATH_CONNECTION_LOST",
+        "PATH_READ_ONLY",
+        "PATH_SCHEMA_LOST",
+        "PATH_OPEN_FAILED",
+        "EXTRACTOR_CLOSED",
+        "EXTRACTION_EXECUTOR_CLOSED",
+        "EXTRACTION_SANDBOX_CLOSED",
+        "EXTRACTION_START_FAILED",
+        "EXTRACTION_READER_CLOSED",
+        "EXTRACTOR_CLOSING",
+        "EXTRACTION_SANDBOX_CLOSING",
+        "EXTRACTOR_REGISTRY_CLOSED",
+        "EXTRACTOR_REGISTRY_EMPTY",
+        "EXTRACTOR_REGISTRY_CLOSING",
+        "EXTRACTOR_POLICY_CLOSED",
+        "EXTRACTOR_STRUCTURED_CLOSED",
+        "WRITER_CLOSED",
+        "WRITER_CLOSING",
+        "WRITER_DEFERRED",
+        "WRITER_CONNECTION_LOST",
+        "WRITER_DIRECTORY_CLOSED",
+        "WRITER_DRAINING",
+        "WRITER_BACKPRESSURE",
+        "WRITER_READ_ONLY",
+        "WRITER_DIRECTORY_LOST",
+        "WRITER_OPEN_FAILED",
+        "WRITER_OPEN_LOCKED",
+        "IDENTITY_UNWIRED",
+        "IDENTITY_CLOSED",
+        "IDENTITY_CONNECTION_LOST",
+        "IDENTITY_READ_ONLY",
+        "IDENTITY_SCHEMA_LOST",
+        "IDENTITY_FILE_LOST",
+        "IDENTITY_OPEN_FAILED",
+        "IDENTITY_BUSY",
+        "IDENTITY_CORRUPT"
+      ],
+      "shard1": [
+        "PATH_CLOSED",
+        "PATH_CONNECTION_LOST",
+        "PATH_READ_ONLY",
+        "PATH_SCHEMA_LOST",
+        "PATH_OPEN_FAILED",
+        "EXTRACTOR_CLOSED",
+        "EXTRACTION_EXECUTOR_CLOSED",
+        "EXTRACTION_SANDBOX_CLOSED",
+        "EXTRACTION_START_FAILED",
+        "EXTRACTION_READER_CLOSED",
+        "EXTRACTOR_CLOSING",
+        "EXTRACTION_SANDBOX_CLOSING",
+        "EXTRACTOR_REGISTRY_CLOSED",
+        "EXTRACTOR_REGISTRY_EMPTY",
+        "EXTRACTOR_REGISTRY_CLOSING",
+        "EXTRACTOR_POLICY_CLOSED",
+        "EXTRACTOR_STRUCTURED_CLOSED"
+      ],
+      "shard2": [
+        "WRITER_CLOSED",
+        "WRITER_CLOSING",
+        "WRITER_DEFERRED",
+        "WRITER_CONNECTION_LOST",
+        "WRITER_DIRECTORY_CLOSED",
+        "WRITER_DRAINING",
+        "WRITER_BACKPRESSURE",
+        "WRITER_READ_ONLY",
+        "WRITER_DIRECTORY_LOST",
+        "WRITER_OPEN_FAILED",
+        "WRITER_OPEN_LOCKED",
+        "IDENTITY_UNWIRED",
+        "IDENTITY_CLOSED",
+        "IDENTITY_CONNECTION_LOST",
+        "IDENTITY_READ_ONLY",
+        "IDENTITY_SCHEMA_LOST",
+        "IDENTITY_FILE_LOST",
+        "IDENTITY_OPEN_FAILED",
+        "IDENTITY_BUSY",
+        "IDENTITY_CORRUPT"
+      ]
+    },
+    "disjointShardUnionEqualsLocal": true,
+    "counts": {
+      "local": 37,
+      "before": 37,
+      "shard1": 17,
+      "shard2": 20
+    },
+    "runtimeClasspathIdenticalAcrossLocalAndBothShards": true,
+    "superclassSupportOnClasspathWhileFilteredFromCI2Discovery": true,
+    "timings": {
+      "local": {
+        "suiteTimes": {
+          "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest": {
+            "tests": 20,
+            "seconds": 313.081
+          },
+          "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest": {
+            "tests": 17,
+            "seconds": 269.161
+          }
+        },
+        "commandWallSeconds": 342,
+        "slotWaitSeconds": 0,
+        "gradleBuildReport": "5m 41s"
+      },
+      "before": {
+        "suiteTimes": {
+          "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest": {
+            "tests": 20,
+            "seconds": 316.477
+          },
+          "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest": {
+            "tests": 17,
+            "seconds": 191.902
+          }
+        },
+        "commandWallSeconds": 359,
+        "slotWaitSeconds": 0,
+        "gradleBuildReport": "5m 58s"
+      },
+      "shard1": {
+        "suiteTimes": {
+          "io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest": {
+            "tests": 17,
+            "seconds": 269.39
+          }
+        },
+        "commandWallSeconds": 274,
+        "slotWaitSeconds": 0,
+        "gradleBuildReport": "4m 34s"
+      },
+      "shard2": {
+        "suiteTimes": {
+          "io.justsearch.indexerworker.loop.WriterAndIdentityServiceAvailabilityTest": {
+            "tests": 20,
+            "seconds": 314.617
+          }
+        },
+        "commandWallSeconds": 394,
+        "slotWaitSeconds": 76,
+        "gradleBuildReport": "5m 17s"
+      }
+    }
+  },
+  "compatibilityProof": {
+    "sourceAudit": "tmp/builder/class-split/historical-api-source-audit.json",
+    "sourceAuditDigest": "sha256:5cd872e3874e7abb22260a3c6b741b473ce70ecb149cac55b351b04945f546e3",
+    "loopBytecode": "tmp/builder/class-split/historical-loop-javap.txt",
+    "loopBytecodeDigest": "sha256:aa98ca0eb27e9d5921f00d76c2dfb618a184b9bccc22641b323a5cc38ba7fd7f",
+    "note": "Exact original loop/writer/extractor bytecode has no calls to any shim. All four shims throw if invoked; historical failures are only the original availability assertions, never a shim exception."
+  },
+  "retainedHistoricalEvidence": {
+    "files": [
+      {
+        "path": "gates/test-intent/evidence/systemic-batch-deferral-source-readability.json",
+        "contentDigest": "sha256:eb77d39b7f9f6ea2c434fb8bac310fad948533884d004fd2b77baf134258a722"
+      },
+      {
+        "path": "gates/test-intent/evidence/systemic-batch-deferral-outage-boundaries.json",
+        "contentDigest": "sha256:0920a56ca28153e641b223da8352419451a702cfd9e09aea6d219afd1d1677a2"
+      }
+    ],
+    "note": "These immutable records describe their original source snapshot; live matrix obligations moved out of entry15 and are now freshly source-bound above."
+  },
+  "setupFailure": {
+    "path": "tmp/builder/class-split/setup-attempt1/local.log",
+    "note": "Evidence-only init closure failed before matrix execution; preserved and not counted as a test pass. Same-source compileTestJava/pmdTest had already succeeded, so valid eligible outputs are reused."
+  },
+  "hostedBudgetDisposition": "No hosted completion or whole-lane budget claim: actual existing shard tasks were selected locally for these matrix classes. Hosted green within the unchanged25-minute budget remains required after commit; no CI/budget/timeout/heap/policy change.",
+  "treeProvenance": "SHA256 of tracked diff plus exact matrix-source digests, including newly added child.",
+  "digest": "sha256:3e8f972b14441d7e43482ab9aaf3a312cb9ed2f03892ed7f391b22adfc485321"
+}

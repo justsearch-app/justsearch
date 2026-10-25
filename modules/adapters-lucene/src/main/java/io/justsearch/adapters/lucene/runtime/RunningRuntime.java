@@ -44,6 +44,12 @@ public final class RunningRuntime implements LuceneRuntime {
     return !session.draining && !session.isClosing();
   }
 
+  /** Observes a terminal writer fault without probing or changing the index. */
+  public boolean hasTragicWriterException() {
+    LifecycleSnapshot snap = session.snapshot;
+    return snap != null && snap.writer() != null && snap.writer().getTragicException() != null;
+  }
+
   public IndexingCoordinator indexingCoordinator() {
     return session.indexingCoordinator;
   }
