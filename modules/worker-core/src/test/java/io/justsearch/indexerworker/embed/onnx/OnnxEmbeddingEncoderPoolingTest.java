@@ -125,6 +125,25 @@ class OnnxEmbeddingEncoderPoolingTest {
   // ---------------------------------------------------------------------------
 
   @Test
+  @DisplayName("whole-content span excludes specials for both CLS and MEAN document pooling")
+  void wholeContentSpanDiffersFromDocumentPooling() {
+    // CLS={10,0}, content mean={3,4}, zero-width special={0,20} are non-collinear.
+    float[][] hidden = {{10f, 0f}, {2f, 2f}, {4f, 6f}, {0f, 20f}};
+    long[] mask = {1, 1, 1, 1};
+    CharSpan[] spans = {
+      new CharSpan(0, 0), new CharSpan(0, 3), new CharSpan(3, 6), new CharSpan(5, 5)
+    };
+    var cls = newEncoder(PoolingStrategy.CLS);
+    var mean = newEncoder(PoolingStrategy.MEAN_POOL);
+
+    assertArrayEquals(new float[] {10f, 0f}, cls.pool(hidden, mask, 2));
+    // Document MEAN includes both unmasked specials: {16,28}/4 = {4,7}.
+    assertArrayEquals(new float[] {4f, 7f}, mean.pool(hidden, mask, 2), 1e-6f);
+    assertArrayEquals(new float[] {0.6f, 0.8f}, cls.poolSpan(hidden, mask, spans, 0, 6, 2), 1e-6f);
+    assertArrayEquals(new float[] {0.6f, 0.8f}, mean.poolSpan(hidden, mask, spans, 0, 6, 2), 1e-6f);
+  }
+
+  @Test
   @DisplayName("CLS branch returns a clone of row 0 (not the same array reference)")
   void pool_clsBranch_returnsRow0Clone() {
     OnnxEmbeddingEncoder encoder = newEncoder(PoolingStrategy.CLS);
