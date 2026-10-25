@@ -2,12 +2,12 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: codex-uiux-cutover-zf2oprbb
+author-session: codex-uiux-cutover-finishing-en2le4sy
 ---
 
 # Test-intent entries
 
-Every source below is an agent choice under the quoted delegation, never owner-agreed. Execution evidence is pending the required checks and resolution of the evidence runner checkout conflict. Explicitly requested new-file entries are included even where the gate would exempt them. Preservation checks within these files also run before and after; added behavior has assertion failures in the shared-clone before logs under tmp/wp1.5a/. No acceptance is authored here.
+Every source below is an agent choice under the quoted delegation, never owner-agreed. Execution evidence is produced by the sanctioned runner with the unchanged before-state `98e2d9bc56`. Explicitly requested new-file entries are included even where the gate would exempt them. Preservation checks within these files also run before and after; added behavior has official assertion fail-before evidence; original shared-clone logs remain under tmp/wp1.5a/. Supplemental official per-case evidence in `gates/test-intent/evidence/uiux-cutover-preservation.json` distinguishes unchanged before-state passes from additional repair assertions. No acceptance is authored here.
 
 ```json
 {
@@ -700,6 +700,78 @@ Every source below is an agent choice under the quoted delegation, never owner-a
           "choice": "W1 Surface identity: Search v3 keeps its id (`core.search-v3-surface` or as on main) and persisted keys; the old id `core.unified-chat-surface` and the retired `core.search-surface` and `core.agent-surface` become direct aliases to it (aliases do not chain).",
           "label": "agent choice"
         }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve the unchanged before-state obligations named by these checks: C5 A8 leaving Search does not clear another surface selection.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "C5 Real senders. On the exact candidate, every in-app sender reaches Search v3 with the right mode, text and files and waits for Send: palette search and fallback search button, palette Search/Chat aliases and \"Go to Search\", \"Find related to selection\" (W6, after selecting a Search v3 hit), Ctrl+Shift+A (W5), Browse Ask/Summarize, floating selection actions, \"Explain why this result\", plugin compose, backend/agent navigate-to-surface. Search hand-offs run the search.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "W6 \"Find related to selection\" works from a hit selected in Search v3: Search v3 publishes the selected hit (and a chosen result set) to the shared selection as the old window did.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "A8 (W6 evidence). Selection lifecycle: deselect, result replacement and leave/return clear or update the published selection; \"Find related\" never uses a stale hit.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-cutover-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts#C5 A8 leaving Search does not clear another surface selection"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve the unchanged before-state obligations named by these checks: C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched; C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "C4 Draft and preferences. W2 for drafts (both cases). Saved split pane, rail order and visibility, surface overrides and override targets, in the active and inactive profiles, keep the user's intent with the old id mapped to Search v3. Promoted aliases and saved navigation effects or macros naming the old id still navigate.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "A1 (finding 1, replaces W2 and C4's draft clause). The old window's draft is one shared, unscoped value. On the first Search v3 mount after upgrade with no incoming hand-off: if Search v3's composer draft is empty, the legacy text becomes it; if both hold text, Search v3's stays and the legacy value is left in storage untouched (limit: no recovery UI; before the flip Search v3 is a developer-only window, so ordinary users have no Search v3 draft). An incoming hand-off takes precedence and the legacy value stays for a later mount without one. The legacy value is removed only after the transfer is durably written, and a migration marker makes the disposition permanent: Send, Clear, New session, a later empty draft, reload and restart never bring it back. Checks: legacy only, both present, explicit arrival, two tabs, storage write failure, second restart.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-cutover-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft"
       ]
     }
   ]

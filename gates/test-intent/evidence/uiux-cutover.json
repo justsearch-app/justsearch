@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-24T13:36:42.350Z",
-  "revision": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
-  "tree": "11a46c9c9b6abb72537381a3bd33310b2b8c3459",
+  "createdAt": "2026-10-24T15:05:54.077Z",
+  "revision": "71e6b643698da2e31601dc0d63c5a3d677431773",
+  "tree": "182149ab71309f1931f4521c8d02add2ed5d9d47",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zf2oprbb/tmp/test-intent-vitest-3803588-1792848992450.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/en2le4sy/tmp/test-intent-vitest-7-1792854337764.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9896
+      "durationMs": 7208
     }
   ],
   "checks": [
@@ -1383,6 +1383,77 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:5afda3a146d32f5772200b9e070282c947a1f23c0f575dd4955b48569d1b9d4f"
+  "failBefore": {
+    "ref": "98e2d9bc56",
+    "revision": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/en2le4sy/tmp/test-intent-vitest-7-1792854346273.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7555,
+        "output": "JSON report written to /home/elias/.cache/am/en2le4sy/tmp/test-intent-vitest-7-1792854346273.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/windowCutover.test.ts",
+        "classification": "assertion",
+        "detail": "WP1.5a window cutover C1 promotes exactly one Search rail window and pairs it with Library:  AssertionError: expected { id: 'core.search-v3-surface', …(5) } to match object { audience: 'USER', …(2) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1 | WP1.5a window cutover C2 resolves core.unified-chat-surface directly to Search:  AssertionError: expecte"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts",
+        "classification": "assertion",
+        "detail": "C5 A8 publishes the chosen hit and chosen result set, and clears on deselect and leave:  AssertionError: expected { items: [], primaryIndex: +0, …(1) } to match object { …(2) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy. | C5 A8 a replacement result list and a changed query cannot leave a stale Find related hit:  AssertionError: "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:112:35\n    at file:///home/elias/dev/justsearch/.clau | native search summon shared destination SC4 navigates from a non-modal view"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts",
+        "classification": "assertion",
+        "detail": "C5 plugin compose captures its chosen passage before navigation clears selection:  AssertionError: expected null to deeply equal { kind: 'item', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts:44:36\n    at file:///home/elias/dev/justsearch/.claude/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/router/intentRouter.test.ts",
+        "classification": "assertion",
+        "detail": "IntentRouter — Query intents (548 S4-A) lowers a query to a search-surface navigation carrying the query in state:  AssertionError: expected { kind: 'navigate', …(2) } to deeply equal { kind: 'navigate', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/router/intentRouter.test.ts:237:38\n    at file:///home/elias/dev/ | IntentRouter — Answer intents (548 §4.5) parks the answer shape without an automa"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts",
+        "classification": "assertion",
+        "detail": "UserStateDocument — §11.3 Profiles V2 V1 legacy doc migrates forward into the default profile:  AssertionError: expected [ 'core.search-surface' ] to deeply equal [ 'core.search-v3-surface' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts:872:41\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/compose.test.ts",
+        "classification": "assertion",
+        "detail": "compose() core.ask with user prompt dispatches navigate-with-context:  AssertionError: expected 'core.unified-chat-surface' to be 'core.search-v3-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/utils/compose.test.ts:67:23\n    at file:///home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "classification": "assertion",
+        "detail": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace:  AssertionError: expected { …(4) } to deeply equal { …(3) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:138:17\n    at file:///home/elias/dev/justsearch/.claude | C4 A1 transfers the legacy draft durably once and never resurrects it after Clear:  AssertionError: expected '' to be 'le"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+        "classification": "assertion",
+        "detail": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner yields on the chat surface when the verdict warrants that surface a banner:  AssertionError: expected 'Service degraded' not to contain 'degraded'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:612:32\n    at runNextTicks (node:internal/process/task_queue"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts",
+        "classification": "assertion",
+        "detail": "shell actions — AI install palette reachability (727 F-1) 923 F-22 — registers one Search destination and no duplicate Go to Chat alias:  AssertionError: expected { kind: 'navigate', …(1) } to deeply equal { kind: 'navigate', …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts:114:66\n    at file:///home/eli"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+        "classification": "assertion",
+        "detail": "the surface is registered as the main Search window declares core.search-v3-surface as USER/RAIL:  AssertionError: expected 'DEVELOPER' to be 'USER' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts:615:26\n    at file:///home/elias/dev/justsearch/.cl"
+      }
+    ]
+  },
+  "digest": "sha256:ddde945ebdeca385224b88125b907e9abf9717ee44e9c733d75561760abe3e50"
 }
