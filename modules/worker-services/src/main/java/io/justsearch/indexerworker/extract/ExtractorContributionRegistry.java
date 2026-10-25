@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.extract;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.substrate.ContributionComposer;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -86,7 +87,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
    * @throws IllegalStateException on id collision or a {@code core.*} mint by a non-core contributor
    */
   public synchronized void install(ExtractorContribution contribution) {
-    if (closed) throw new IllegalStateException("Extractor registry is closed");
+    if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
     Objects.requireNonNull(contribution, "contribution");
     composer.install(
         new ContributionComposer.Installation<>(
@@ -100,7 +101,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
 
   /** Lifecycle substrate: revoke a contribution by id. Returns false if it was not installed. */
   public synchronized boolean uninstall(String id) {
-    if (closed) throw new IllegalStateException("Extractor registry is closed");
+    if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
     return composer.uninstall(id).wasInstalled();
   }
 
@@ -111,7 +112,10 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
 
   /** Dispatch substrate: the first installed contribution (install order) whose predicate matches. */
   private synchronized ContentExtractorProvider select(Path file) {
-    if (closed) throw new IllegalStateException("Extractor registry is closed");
+    if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
+    if (composer.values().isEmpty()) {
+      throw new IngestionServiceUnavailableException("Extractor registry has no providers");
+    }
     for (ExtractorContribution c : composer.values()) {
       if (c.handles().test(file)) {
         return c.provider();
@@ -122,19 +126,26 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
 
   @Override
   public ExtractionResult extract(Path file) throws IOException, ExtractionException {
-    return select(file).extract(file);
+    return extractArtifact(file).result();
   }
 
   public ExtractionArtifact extractArtifact(Path file) throws IOException, ExtractionException {
-    ContentExtractorProvider provider = select(file);
-    if (provider instanceof PolicyDrivenTikaExtractor policyDriven) {
-      return policyDriven.extractArtifact(file);
+    try {
+      ContentExtractorProvider provider = select(file);
+      if (provider instanceof PolicyDrivenTikaExtractor policyDriven) {
+        return policyDriven.extractArtifact(file);
+      }
+      String parserId = provider.getClass().getSimpleName();
+      if (parserId == null || parserId.isBlank()) {
+        parserId = provider.getClass().getName();
+      }
+      return ExtractionArtifact.full(provider.extract(file), parserId);
+    } catch (IOException | ExtractionException | RuntimeException failure) {
+      synchronized (this) {
+        if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed", failure);
+      }
+      throw failure;
     }
-    String parserId = provider.getClass().getSimpleName();
-    if (parserId == null || parserId.isBlank()) {
-      parserId = provider.getClass().getName();
-    }
-    return ExtractionArtifact.full(provider.extract(file), parserId);
   }
 
   @Override

@@ -29,6 +29,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionRetryLadder;
 import io.justsearch.indexerworker.util.PathNormalizer;
@@ -2369,8 +2370,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       return result;
     } catch (SQLException e) {
-      log.error("Failed to poll pending jobs", e);
-      return List.of();
+      throw SqliteServiceAvailability.failure("Failed to poll pending jobs", e);
     } finally {
       unlockAfterChanges();
     }
@@ -2457,7 +2457,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public boolean deferClaim(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    return finishClaim(claim, () -> deferWithOutcome(claim.path(), outcome, entry, claim),
+    return deferClaim(claim, outcome, entry, 0L);
+  }
+
+  @Override
+  public boolean deferClaim(IndexJob claim, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry,
+      long retryAtMs) {
+    return finishClaim(claim, () -> deferWithOutcome(claim.path(), outcome, entry, claim, retryAtMs),
         () -> recordSupersededOutcome(claim, outcome, entry, null));
   }
 
@@ -2897,11 +2903,35 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public void defer(Path path, IngestionOutcome outcome, JobQueue.IngestionLedgerEntry entry) {
-    deferWithOutcome(path, outcome, entry, null);
+    deferWithOutcome(path, outcome, entry, null, 0L);
+  }
+
+  @Override
+  public void extendServiceOutageDeferrals(long retryAtMs) {
+    lock.lock();
+    try {
+      ensureOpen();
+      // The policy distinguishes service grace/outages from the counted file retry ladders.
+      // The outcome class excludes other uncounted deferrals (stale sources/cloud placeholders).
+      try (var update = connection.prepareStatement("""
+          UPDATE jobs SET retry_after = ?
+          WHERE state = 'PENDING' AND retry_after < ?
+            AND last_retry_policy = 'DEFER_WITHOUT_ATTEMPT'
+            AND last_outcome_class IN ('WRITE_FAILED', 'WRITE_UNAVAILABLE_DRAINING')
+          """)) {
+        update.setLong(1, retryAtMs);
+        update.setLong(2, retryAtMs);
+        executeMutation(update::executeUpdate);
+      }
+    } catch (SQLException failure) {
+      throw new OutcomeWriteException("Could not extend service-outage deferrals", failure);
+    } finally {
+      unlockAfterChanges();
+    }
   }
 
   private void deferWithOutcome(Path path, IngestionOutcome outcome,
-      JobQueue.IngestionLedgerEntry entry, IndexJob claim) {
+      JobQueue.IngestionLedgerEntry entry, IndexJob claim, long retryAtMs) {
     lock.lock();
     try {
       ensureOpen();
@@ -2922,7 +2952,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     """;
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                   stmt.setLong(1, now);
-                  stmt.setLong(2, now + 1000L);
+                  stmt.setLong(2, retryAtMs > 0 ? retryAtMs : now + 1000L);
                   bindOutcomeOnly(stmt, 3, outcome, normalizedPath);
                   int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
@@ -4386,10 +4416,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private void ensureOpen() {
-    if (connectionFailure != null) throw new IllegalStateException(
+    if (connectionFailure != null) throw new IngestionServiceUnavailableException(
         "SqliteJobQueue connection cleanup remains unresolved", connectionFailure);
-    if (connection == null) {
-      throw new IllegalStateException("SqliteJobQueue is not open");
+    try { SqliteServiceAvailability.requireOpen(connection, false); }
+    catch (SQLException failure) {
+      throw new IngestionServiceUnavailableException("Cannot inspect queue connection", failure);
     }
   }
 

@@ -245,7 +245,7 @@ class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
       var extractor = mock(io.justsearch.indexerworker.extract.TimeboxedContentExtractor.class);
       var extractionPolicy = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults();
       org.mockito.Mockito.when(extractor.extractionPolicy()).thenReturn(extractionPolicy);
-      var writer = new JobBatchWriter(runtime.indexingCoordinator(),
+      var writer = new JobBatchWriter(new WorkerIngestionAuthority(),runtime.indexingCoordinator(),
           mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
           mock(EmbeddingProviderLifecycle.class), () -> null,
           mock(IngestionOutcomeJournal.class), queue, extractor,

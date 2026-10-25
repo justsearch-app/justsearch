@@ -17,7 +17,7 @@ public final class VduNativePublicationFixture {
         java.nio.file.Files.size(file),modified,true,modified);
     var job=new ExtractedJob(file,null,artifact,System.currentTimeMillis(),envelope,
         SourceContentHash.sha256(file),uid);
-    var writer=new JobBatchWriter(runtime.indexingCoordinator(),
+    var writer=new JobBatchWriter(new WorkerIngestionAuthority(),runtime.indexingCoordinator(),
         org.mockito.Mockito.mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
         org.mockito.Mockito.mock(EmbeddingProviderLifecycle.class),()->null,
         org.mockito.Mockito.mock(IngestionOutcomeJournal.class),queue,extractor,

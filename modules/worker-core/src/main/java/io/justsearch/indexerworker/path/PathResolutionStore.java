@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.path;
 
 import java.util.Optional;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 
 /**
  * Scoped reverse path-hash lookup store (ADR-0028, tempdoc 419 T5.1).
@@ -32,6 +33,8 @@ public interface PathResolutionStore {
    * wiring. Lookups always return empty; mutations are silent.
    */
   PathResolutionStore NOOP = new PathResolutionStore() {
+    @Override public void probe() {}
+
     @Override
     public void record(String pathHash, String normalizedPath, long nowMs) {}
 
@@ -71,6 +74,12 @@ public interface PathResolutionStore {
 
   /** Deletes rows where {@code removed_at} is non-null and older than {@code cutoffMs}. */
   int pruneOldRemoved(long cutoffMs);
+
+  /** Checks a write/read without retaining a synthetic path. */
+  default void probe() {
+    throw new IngestionServiceUnavailableException(
+        "Path resolution health probe is unavailable");
+  }
 
   /** Stored resolution row. {@code removedAtMs} is null while the file is still observed. */
   record Resolution(
