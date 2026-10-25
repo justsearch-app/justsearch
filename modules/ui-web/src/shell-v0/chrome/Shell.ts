@@ -412,6 +412,7 @@ export class Shell extends JfElement {
     isBookmarked: { state: true },
     // Tempdoc 738 — the surfaced Simple/Detailed toggle mirrors the uiMode authority for its active state.
     uiMode: { state: true },
+    initialNavigationPending: { state: true },
   };
 
   declare apiBase: string;
@@ -429,6 +430,8 @@ export class Shell extends JfElement {
   declare isBookmarked: boolean;
   /** Tempdoc 738 — app-wide Simple/Detailed mode, mirrored for the topbar toggle's active state. */
   declare uiMode: UiMode;
+  /** Draft cutover must wait for URL, native cold ingress and journal restore. */
+  private declare initialNavigationPending: boolean;
 
   private dragUnsubscribe: (() => void) | null = null;
   private userConfigUnsubscribe: (() => void) | null = null;
@@ -468,6 +471,7 @@ export class Shell extends JfElement {
    * `sourceTeardowns` (where it would never be reached).
    */
   private disconnected = false;
+  private sourceGeneration = 0;
   /** The previously-active surface, for "Go back" (`goBack`/`navigateBack`). Search Thread S5b —
    *  set directly by `setActiveSurface`'s own bookkeeping (the navigation toast that used to set
    *  this as a side effect is retired). */
@@ -607,6 +611,7 @@ export class Shell extends JfElement {
     this.apiBase = '';
     this.surfaces = [];
     this.activeId = null;
+    this.initialNavigationPending = true;
     this.dragActive = false;
     this.dragKind = null;
     this.userConfig = getUserConfig();
@@ -1509,6 +1514,9 @@ export class Shell extends JfElement {
     // storeId bindings resolve to live adapters at hydration time; fetch
     // schemas SECOND so the URLSource's boot-read finds them.
     this.disconnected = false;
+    this.initialNavigationPending = true;
+    const sourceGeneration = ++this.sourceGeneration;
+    const currentStartup = (): boolean => !this.disconnected && sourceGeneration === this.sourceGeneration;
     registerCoreStores();
     refreshPromotedAliases();
     this.addEventListener('suggestion-click', ((e: CustomEvent<{ id: string; addressKind: string }>) => {
@@ -1739,6 +1747,7 @@ export class Shell extends JfElement {
     let startingSources = false;
     const dispatch = (intent: Parameters<typeof router.dispatch>[0],
                       options?: Parameters<typeof router.dispatch>[1]): void => {
+      if (!currentStartup()) return;
       if (startingSources && (nativeRequestHandled || navigationHandled) && intent.transport === 'URL_BAR') return;
       void router.dispatch(intent, options);
     };
@@ -1756,8 +1765,10 @@ export class Shell extends JfElement {
       // earlier in this method, instead of opening its own EventSource.
       createBackendStreamSource({ multiplex: this.shellEventsMultiplex! }),
     ];
+    let settleNativeStartup!: () => void;
+    const nativeStartup = new Promise<void>(resolve => { settleNativeStartup = resolve; });
     this.sourceTeardowns.push(installSearchSummonBridge(async (request) => {
-      if (this.disconnected) return;
+      if (!currentStartup()) return;
       nativeRequestHandled = true;
       if (request.kind === 'deepLink') {
         const address = parseUrl(request.url);
@@ -1765,19 +1776,20 @@ export class Shell extends JfElement {
       } else {
         await this.summonSearch();
       }
-    }));
-    void fetchAndRegisterSurfaceSchemas(this.apiBase).then(() => {
+    }, settleNativeStartup));
+    void fetchAndRegisterSurfaceSchemas(this.apiBase).then(async () => {
       stopStartupRecoveryFocus();
       // Surface schemas arrived asynchronously. If we disconnected
       // before that resolved, skip source bootstrap entirely.
-      if (this.disconnected) return;
+      if (!currentStartup()) return;
       startingSources = true;
+      const sourceStartups: Promise<void>[] = [];
       for (const source of sources) {
         try {
           const teardown = source.start(dispatch);
           if (teardown instanceof Promise) {
-            void teardown.then((fn) => {
-              if (this.disconnected) {
+            sourceStartups.push(teardown.then((fn) => {
+              if (!currentStartup()) {
                 try {
                   fn();
                 } catch {
@@ -1786,7 +1798,9 @@ export class Shell extends JfElement {
               } else {
                 this.sourceTeardowns.push(fn);
               }
-            });
+            }).catch(err => {
+              console.warn(`[Shell] source ${source.ref} failed to start:`, err);
+            }));
           } else {
             this.sourceTeardowns.push(teardown);
           }
@@ -1795,6 +1809,8 @@ export class Shell extends JfElement {
         }
       }
       startingSources = false;
+      await Promise.all([...sourceStartups, nativeStartup]);
+      if (!currentStartup()) return;
       // Slice 489 T1/G2 (+G3) boot completion — if neither URLSource nor the
       // Tauri cold-launch path dispatched a navigate intent (i.e., the
       // chrome was opened without a `#justsearch://` hash and without a
@@ -1840,6 +1856,7 @@ export class Shell extends JfElement {
           );
         }
       }
+      this.initialNavigationPending = false;
     });
   }
 
@@ -2550,6 +2567,7 @@ export class Shell extends JfElement {
       </jf-rail>` : nothing}
       <div class="stage" role=${placementToLandmarkRole('STAGE')} aria-label="Main content">
         <jf-stage
+          .initialNavigationPending=${this.initialNavigationPending}
           .surface=${active ?? null}
           .secondarySurface=${secondary}
           .splitAxis=${splitAxis}
@@ -3013,6 +3031,7 @@ export class Stage extends JfElement {
     userConfig: { attribute: false },
     hostApi_: { attribute: false },
     aiAvailable: { type: Boolean, attribute: false },
+    initialNavigationPending: { type: Boolean, attribute: false },
     summonCoreSurface: { state: true },
   };
 
@@ -3023,6 +3042,7 @@ export class Stage extends JfElement {
   declare userConfig: RendererUserConfig | undefined;
   declare hostApi_: PluginHostApi | null;
   declare aiAvailable: boolean;
+  declare initialNavigationPending: boolean;
   private declare summonCoreSurface: { id: string; overrideId: string | undefined } | null;
 
   /** Target a single retained element; never broadcast to both search implementations. */
@@ -3094,6 +3114,7 @@ export class Stage extends JfElement {
     this.userConfig = undefined;
     this.hostApi_ = null;
     this.aiAvailable = true;
+    this.initialNavigationPending = false;
     this.summonCoreSurface = null;
   }
 
@@ -3296,6 +3317,9 @@ export class Stage extends JfElement {
           el.removeAttribute('api-base');
         }
         (el as unknown as { host_?: PluginHostApi }).host_ = this.hostApi_ ?? undefined;
+        if (surface.id === INTERACTION_SURFACE_ID) {
+          (el as HTMLElement & { initialNavigationPending: boolean }).initialNavigationPending = this.initialNavigationPending;
+        }
         const isAiSurface = surface.consumes?.conversationShapes && surface.consumes.conversationShapes.length > 0;
         if (isAiSurface) {
           el.setAttribute('data-ai-available', String(this.aiAvailable));

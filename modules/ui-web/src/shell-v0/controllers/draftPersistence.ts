@@ -22,6 +22,7 @@ const PREFIX = 'justsearch.draft.';
 interface Provider {
   readonly key: string;
   readonly get: () => string;
+  saved: string | null;
 }
 
 const providers = new Set<Provider>();
@@ -39,17 +40,22 @@ function readDraft(key: string): string | null {
   }
 }
 
-function writeDraft(key: string, value: string): void {
+function writeDraft(provider: Provider, value: string): void {
+  const next = value.trim() ? value : null;
   try {
-    if (value && value.trim().length > 0) localStorage.setItem(storageKey(key), value);
-    else localStorage.removeItem(storageKey(key));
+    // An unchanged snapshot cannot overwrite another tab's newer durable draft. In particular,
+    // a tab still waiting for cold ingress may have read empty before another tab transferred.
+    if (next === provider.saved && readDraft(provider.key) !== provider.saved) return;
+    if (next !== null) localStorage.setItem(storageKey(provider.key), next);
+    else localStorage.removeItem(storageKey(provider.key));
+    provider.saved = next;
   } catch {
     // quota exceeded / storage unavailable — non-fatal (draft simply won't survive reload).
   }
 }
 
 function flushAll(): void {
-  for (const p of providers) writeDraft(p.key, p.get());
+  for (const p of providers) writeDraft(p, p.get());
 }
 
 function ensureWired(): void {
@@ -76,7 +82,7 @@ export class DraftPersistence implements ReactiveController {
     set: (v: string) => void,
   ) {
     this.host = host;
-    this.provider = { key, get };
+    this.provider = { key, get, saved: null };
     this.set = set;
     host.addController(this);
   }
@@ -87,6 +93,7 @@ export class DraftPersistence implements ReactiveController {
     if (this.rehydrated) return; // reconnect of a retained instance — keep the live in-memory draft
     this.rehydrated = true;
     const saved = readDraft(this.provider.key);
+    this.provider.saved = saved;
     if (saved !== null) {
       this.set(saved);
       void this.host.updateComplete;
@@ -101,6 +108,14 @@ export class DraftPersistence implements ReactiveController {
   adoptLegacy(key: string): void {
     const marker = storageKey(`${key}.migrated-to.${this.provider.key}`);
     try {
+      // Ingress can settle after another tab saved the destination. Re-read before disposition
+      // so this mount adopts that durable text rather than retaining its earlier empty snapshot.
+      const saved = localStorage.getItem(storageKey(this.provider.key));
+      if (!this.provider.get().trim() && saved?.trim()) {
+        this.set(saved);
+        this.provider.saved = saved;
+        void this.host.updateComplete;
+      }
       if (localStorage.getItem(marker) !== null) return;
       const legacy = localStorage.getItem(storageKey(key));
       if (!legacy?.trim()) {
@@ -115,6 +130,7 @@ export class DraftPersistence implements ReactiveController {
       localStorage.setItem(storageKey(this.provider.key), legacy);
       localStorage.setItem(marker, 'transferred');
       this.set(legacy);
+      this.provider.saved = legacy;
       void this.host.updateComplete;
       localStorage.removeItem(storageKey(key));
     } catch {
@@ -124,7 +140,7 @@ export class DraftPersistence implements ReactiveController {
 
   hostDisconnected(): void {
     // Flush on hide too (belt-and-suspenders beyond visibilitychange/pagehide), then stop contributing.
-    writeDraft(this.provider.key, this.provider.get());
+    writeDraft(this.provider, this.provider.get());
     providers.delete(this.provider);
   }
 }

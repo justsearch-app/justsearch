@@ -792,6 +792,7 @@ export class SearchV3View extends JfElement {
     tier: { state: true },
     compacting: { state: true },
     conversations: { state: true },
+    initialNavigationPending: { type: Boolean, attribute: false },
   };
 
   declare composerState: Sv3ComposerState;
@@ -809,6 +810,10 @@ export class SearchV3View extends JfElement {
   declare theme: AppearanceMode;
   /** Set by the shell on every render of a mounted surface (`chrome/Shell.ts:2945-2949`). */
   declare apiBase: string;
+  /** Shell settles cold ingress before this mount may dispose of the legacy draft. */
+  declare initialNavigationPending: boolean;
+  private mountDraftPending = false;
+  private mountHasIncoming = false;
   /**
    * The window's session list — a PROJECTION and a per-render cache of the app-wide conversation
    * store plus the canonical thread record, not an authority of its own (Phase F6; the exact split
@@ -1061,6 +1066,7 @@ export class SearchV3View extends JfElement {
     // pre-paint script exists to avoid.
     this.theme = getAppearanceMode();
     this.apiBase = '';
+    this.initialNavigationPending = false;
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
     this.streaming = false;
@@ -1106,6 +1112,8 @@ export class SearchV3View extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.mountDraftPending = true;
+    this.mountHasIncoming = false;
     adoptSv3MorphSheet();
     this.restoreBoundaryPreferences();
     this.observeWindowBox();
@@ -1150,17 +1158,17 @@ export class SearchV3View extends JfElement {
       // the active-conversation pointer is app-wide and another window claiming it is that
       // window's business, which is exactly what `SearchV3View.record.test.ts`'s companion-load
       // case asserts. Following only restores keeps that line where it was.
-      if (change === 'restore') this.followStoreConversation(state.activeId);
+      if (change === 'restore') {
+        if (state.activeId !== null) this.mountHasIncoming = true;
+        this.followStoreConversation(state.activeId);
+      }
     });
     void loadConversations();
     window.addEventListener('sv3-handoff', this.receiveHandoff);
     if (!this.receiveHandoff()) {
       if (this.shapeId) this.prepareCompatibilityShape();
-      else {
-        this.draftPersistence.adoptLegacy('unified-chat.composer');
-        this.restoreLastViewed();
-      }
     }
+    this.settleMountDraft();
     this.inspectorUnsubscribe = subscribeInspector(state => {
       if (state.isOpen && state.selected?.path) {
         this.openPane({ docPath: state.selected.path, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT, anchor: null });
@@ -1456,6 +1464,7 @@ export class SearchV3View extends JfElement {
   }
 
   protected override updated(changed: Map<string, unknown>): void {
+    this.settleMountDraft();
     if (changed.has('apiBase')) {
       setSearchApiBase(this.apiBase || '');
       setConversationApiBase(this.apiBase || '');
@@ -1482,6 +1491,14 @@ export class SearchV3View extends JfElement {
   }
 
   /* ── The conversation record (tempdoc 822 Phase F6) ───────────────────────────────────────── */
+
+  private settleMountDraft(): void {
+    if (!this.isConnected || !this.mountDraftPending || this.initialNavigationPending) return;
+    this.mountDraftPending = false;
+    if (this.shapeId || this.mountHasIncoming) return;
+    this.draftPersistence.adoptLegacy('unified-chat.composer');
+    this.restoreLastViewed();
+  }
 
   /**
    * A3 (tempdoc 609 Phase 3) — restore the conversation THIS TAB was reading. The pointer is per-tab
@@ -3298,6 +3315,7 @@ export class SearchV3View extends JfElement {
     if (this.shapeId) return false;
     const incoming = takeSearchV3Handoff();
     if (incoming === null) return false;
+    this.mountHasIncoming = true;
     const { state, selection } = incoming;
     const shape = typeof state.forceShapeId === 'string' ? state.forceShapeId : (state.affordance === 'extract' || state.mode === 'structured' ? 'core.extract'
         : state.affordance === 'documents' || state.mode === 'ask' || Object.hasOwn(state, 'docIds') ? 'core.rag-ask' : null);

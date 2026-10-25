@@ -2,12 +2,12 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: codex-uiux-cutover-finishing-en2le4sy
+author-session: codex-uiux-cutover-cold-repair-bhz9se_e
 ---
 
 # Test-intent entries
 
-Every source below is an agent choice under the quoted delegation, never owner-agreed. Execution evidence is produced by the sanctioned runner with the unchanged before-state `98e2d9bc56`. Explicitly requested new-file entries are included even where the gate would exempt them. Preservation checks within these files also run before and after; added behavior has official assertion fail-before evidence; original shared-clone logs remain under tmp/wp1.5a/. Supplemental official per-case evidence in `gates/test-intent/evidence/uiux-cutover-preservation.json` distinguishes unchanged before-state passes from additional repair assertions. No acceptance is authored here.
+Every source below is an agent choice under the quoted delegation, never owner-agreed. Execution evidence is produced by the sanctioned runner with the unchanged before-state `98e2d9bc56`. Explicitly requested new-file entries are included even where the gate would exempt them. Preservation checks within these files also run before and after; added behavior has official assertion fail-before evidence; original shared-clone logs remain under tmp/wp1.5a/. Supplemental official per-case evidence in `gates/test-intent/evidence/uiux-cutover-preservation.json` distinguishes unchanged before-state passes from additional repair assertions. No acceptance is authored here. The added FC15 entries below use required baseline `19f1fc10239bf5e3b2d686beedfd8d090cbefe0b`; their repair and preservation evidence is separate from the historical original package. The existing acceptance record is retained as history for its original digest and does not accept the FC15 repair.
 
 ```json
 {
@@ -772,6 +772,71 @@ Every source below is an agent choice under the quoted delegation, never owner-a
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Cold Shell startup settles URL/native/journal ingress before legacy draft disposition; preserve exact legacy text through incoming edit/navigation/reload/restart, invalid scope, rapid arrivals, and disconnected lifecycle callbacks.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request; agent-adopted FC15 clarification 2026-10-25 in agreed/wp1.5.md",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "cold ingress and draft migration repair (agent-adopted 2026-10-25; C4/A1 clarification)\n\nA1 already requires incoming hand-off precedence and leaving legacy text for a later mount without ingress. Independent real browser counterexample at67944077cd: a cold old alias or answer task mounts before ingress hydration, migration consumes legacy, then edit/navigation overwrites the transferred copy. Expected class:\n\n| Case | Expected |\n|---|---|\n| Cold alias with query/files/mode/conversation or cold answer with supported forced shape | Establish whether mount has incoming work before disposition; prepare incoming task, send nothing, retain exact legacy key without transferred disposition |\n| Edit incoming text; leave/return; reload and full restart | Incoming edited text behaves normally; original legacy value remains recoverable under A1, never silently consumed/overwritten |\n| No ingress, empty successor | Existing durable one-time transfer; delete legacy only after destination persists; Send/Clear/New/reload never resurrect |\n| Successor already has text | Successor wins; legacy stays untouched; marker disposition remains durable |\n| Late/two rapid ingress, component first mount before router/restore settles | No eager transfer, duplicate send or scope drop; latest legitimate incoming task owns preparation |\n| Invalid task-defining ingress | Visible refusal/fallback with incoming text; legacy not silently transferred or deleted as a side effect |\n| Failed native destination persistence or unavailable storage; concurrent tabs; stale old-tab write | Never remove sole old copy; retry/disposition remains honest; completed migration never resurrects; ownership races do not erase independent draft |\n\nPreserve #947 live single/tree deletion safeguards, all C1-C9/A1-A9 contracts and existing interaction modes. No extra draft-history store/recovery UI, no permanent quarantine of ordinary no-ingress transfer, no arbitrary timeout to guess ingress completion. Unverified original variants remain gaps, not passes; actual boundary fault instrumentation may be labeled honestly and cannot be called a native quota failure.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-cold-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Search query' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid selection' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid mode' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold conversation address outranks the pointer without disposing of the old draft",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold incoming edits survive leave return reload and restart while legacy stays saved",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold native link is settled before ordinary boot can transfer legacy",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold queued native delivery waits for the initial drain before draft disposition",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold no-ingress transfer waits for native absence then remains one time after Clear",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold journal task is applied before legacy disposition",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold rapid arrivals before hydration preserve only the latest prepared scope",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold stale native startup cannot replace a newer task after Shell reconnects"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve A1 successor collisions and durable-write refusal recovery through actual Shell/Search mounts; concurrent mounts and a pending tab closing cannot erase another tab durable transfer.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request; agent-adopted FC15 clarification 2026-10-25 in agreed/wp1.5.md",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility.",
+          "choice": "cold ingress and draft migration repair (agent-adopted 2026-10-25; C4/A1 clarification)\n\nA1 already requires incoming hand-off precedence and leaving legacy text for a later mount without ingress. Independent real browser counterexample at67944077cd: a cold old alias or answer task mounts before ingress hydration, migration consumes legacy, then edit/navigation overwrites the transferred copy. Expected class:\n\n| Case | Expected |\n|---|---|\n| Cold alias with query/files/mode/conversation or cold answer with supported forced shape | Establish whether mount has incoming work before disposition; prepare incoming task, send nothing, retain exact legacy key without transferred disposition |\n| Edit incoming text; leave/return; reload and full restart | Incoming edited text behaves normally; original legacy value remains recoverable under A1, never silently consumed/overwritten |\n| No ingress, empty successor | Existing durable one-time transfer; delete legacy only after destination persists; Send/Clear/New/reload never resurrect |\n| Successor already has text | Successor wins; legacy stays untouched; marker disposition remains durable |\n| Late/two rapid ingress, component first mount before router/restore settles | No eager transfer, duplicate send or scope drop; latest legitimate incoming task owns preparation |\n| Invalid task-defining ingress | Visible refusal/fallback with incoming text; legacy not silently transferred or deleted as a side effect |\n| Failed native destination persistence or unavailable storage; concurrent tabs; stale old-tab write | Never remove sole old copy; retry/disposition remains honest; completed migration never resurrects; ownership races do not erase independent draft |\n\nPreserve #947 live single/tree deletion safeguards, all C1-C9/A1-A9 contracts and existing interaction modes. No extra draft-history store/recovery UI, no permanent quarantine of ordinary no-ingress transfer, no arbitrary timeout to guess ingress completion. Unverified original variants remain gaps, not passes; actual boundary fault instrumentation may be labeled honestly and cannot be called a native quota failure.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-cold-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring successor collision keeps its text and the exact old value after restart",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring destination write refusal keeps the old copy for a later clean mount",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring two pending Shell mounts retain the durable transfer when the last tab closes",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring a tab closing before its ingress settles cannot erase another tab transfer"
       ]
     }
   ]

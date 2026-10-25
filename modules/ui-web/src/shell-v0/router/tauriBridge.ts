@@ -26,8 +26,11 @@ import { setNativeSearchShortcutActive } from '../commands/KeybindingRegistry.js
 export type SearchSummon = { kind: 'focusSearch' } | { kind: 'deepLink'; url: string };
 
 /** Subscribe before draining; teardown also covers startup and partial subscription failures. */
-export function installSearchSummonBridge(summon: (request: SearchSummon) => Promise<void>): () => void {
-  if (!isTauriRuntime()) return () => {};
+export function installSearchSummonBridge(
+  summon: (request: SearchSummon) => Promise<void>,
+  startupSettled: () => void = () => {},
+): () => void {
+  if (!isTauriRuntime()) { startupSettled(); return () => {}; }
   let disposed = false;
   let draining = false;
   let requested = false;
@@ -69,7 +72,7 @@ export function installSearchSummonBridge(summon: (request: SearchSummon) => Pro
     void invoke('search_shortcut_status').then(updateStatus).catch(() => {});
     await drain();
   };
-  void start().catch(stop);
+  void start().catch(stop).finally(startupSettled);
   return stop;
 }
 
