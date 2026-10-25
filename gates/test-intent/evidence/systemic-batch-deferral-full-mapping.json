@@ -2,7 +2,9 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a5c5f81251de6c8ecd03fedbd968bcba9f41431c96804033523d3cc806efdcdb"
+    "adaptedScript": "tmp/builder/round22-evidence-refresh/run-evidence.mjs",
+    "scriptDigest": "sha256:70478e78d6fa0ea03f417997841cdb1e914abd6c1a3429ce7396357514c14b1a",
+    "note": "Execution-backed metadata refresh only for final VerifierReadOnlyWriterTest records. All unrelated historical records retained exactly; earlier producer remains in writerEvidenceRefresh.originalProducer."
   },
   "createdAt": "2026-10-23T22:32:24.594Z",
   "revision": "f3b67ba132c8611d62094ae1500f3856d3b6f543",
@@ -24,6 +26,13 @@
       "cwd": ".",
       "exitCode": 0,
       "durationMs": 1157223
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25T16:03:25Z",
+      "finishedUTC": "2026-10-25T16:03:58Z"
     }
   ],
   "checks": [
@@ -31,7 +40,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -40,13 +49,17 @@
           "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
           "status": "passed"
         }
-      ]
+      ],
+      "executionSource": "Fresh final-source candidate run: tmp/builder/round22-evidence-refresh/candidate.json",
+      "executionRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+      "executionStartedUTC": "2026-10-25T16:03:25Z",
+      "executionFinishedUTC": "2026-10-25T16:03:58Z"
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -55,13 +68,17 @@
           "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
           "status": "passed"
         }
-      ]
+      ],
+      "executionSource": "Fresh final-source candidate run: tmp/builder/round22-evidence-refresh/candidate.json",
+      "executionRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+      "executionStartedUTC": "2026-10-25T16:03:25Z",
+      "executionFinishedUTC": "2026-10-25T16:03:58Z"
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -70,7 +87,11 @@
           "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
           "status": "passed"
         }
-      ]
+      ],
+      "executionSource": "Fresh final-source candidate run: tmp/builder/round22-evidence-refresh/candidate.json",
+      "executionRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+      "executionStartedUTC": "2026-10-25T16:03:25Z",
+      "executionFinishedUTC": "2026-10-25T16:03:58Z"
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
@@ -976,13 +997,20 @@
         "cwd": "tmp/builder/before-29f315fb1",
         "exitCode": 1,
         "durationMs": 2289192
+      },
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest.actualDirectoryFailureRemainsFreeBeyondGrace --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/round22-evidence-refresh/before-29f315fb1",
+        "exitCode": 1,
+        "startedUTC": "2026-10-25T16:04:16Z",
+        "finishedUTC": "2026-10-25T16:04:57Z"
       }
     ],
     "sourceHashes": {
       "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java": "15b17604aef849ca87f44e98c8fffcb94100631cbf1738106e7f9b50fe3c9bf7",
       "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java": "0a6aba5bd6c25185846919e62a04901c4518cb7ce0e4bf81dcbf276c06e67af4",
       "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java": "16baf5d8b8228adea86dff38886ec202c9e866285f3ef07f9d05d999456689cd",
-      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java": "ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc"
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java": "4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12"
     },
     "checks": [
       {
@@ -1003,9 +1031,83 @@
       {
         "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
         "classification": "assertion",
-        "detail": "actualDirectoryFailureRemainsFreeBeyondGrace(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException> but was: <io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException>"
+        "detail": "actualDirectoryFailureRemainsFreeBeyondGrace(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException> but was: <io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException>",
+        "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
+        "executionSource": "Fresh exact29f315fb13 final-source assertion witness: tmp/builder/round22-evidence-refresh/before.json",
+        "executionRevision": "29f315fb13eb9f7e44aba55aaeb2108970b5ec03"
       }
     ]
   },
-  "digest": "sha256:cb3a71e7cfa462ae939c867f107fd2dcac2c9e536888d26558fc4f01bc9e9002"
+  "digest": "sha256:526bc10ca13133d5d34c1b906b4628b8de6579c70b0e5166dd35331ec2c0e91d",
+  "writerEvidenceRefresh": {
+    "createdAt": "2026-10-25T16:05:43Z",
+    "originalEvidence": "tmp/builder/round22-evidence-refresh/original/systemic-batch-deferral-full-mapping.json",
+    "originalEvidenceDigest": "sha256:cb3a71e7cfa462ae939c867f107fd2dcac2c9e536888d26558fc4f01bc9e9002",
+    "originalProducer": {
+      "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+      "scriptDigest": "sha256:a5c5f81251de6c8ecd03fedbd968bcba9f41431c96804033523d3cc806efdcdb"
+    },
+    "originalWriterRecords": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
+            "status": "passed"
+          }
+        ]
+      }
+    ],
+    "candidateSource": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+    "candidateContentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
+    "candidateRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+    "candidateWorkingTreeDigest": "sha256:068859ff6b7523ca4db26bd1569ca2c6a5b920a8ecfce12a537f111ebb281aa0",
+    "note": "Original top-level revision/tree/time describe retained historical execution; only the Writer records now point to the separately recorded fresh final-source run. No old failure or unrelated outcome promoted to a fresh pass.",
+    "originalWriterBefore": {
+      "checks": [
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
+          "classification": "assertion",
+          "detail": "actualDirectoryFailureRemainsFreeBeyondGrace(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException> but was: <io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException>"
+        }
+      ],
+      "sourceHash": "ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc"
+    }
+  }
 }

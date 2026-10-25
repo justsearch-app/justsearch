@@ -2,7 +2,9 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:fe8ccbc459059d137f99bd1b1c3e4066ec65f99cf67a8a4879f4cb6efc5613f6"
+    "adaptedScript": "tmp/builder/round22-evidence-refresh/run-evidence.mjs",
+    "scriptDigest": "sha256:70478e78d6fa0ea03f417997841cdb1e914abd6c1a3429ce7396357514c14b1a",
+    "note": "Execution-backed metadata refresh only for final VerifierReadOnlyWriterTest records. All unrelated historical records retained exactly; earlier producer remains in writerEvidenceRefresh.originalProducer."
   },
   "createdAt": "2026-10-24T12:51:05.912Z",
   "revision": "3e505f42c6f7140cc203e0564db8eec8d5f6c14f",
@@ -18,6 +20,13 @@
       "cwd": ".",
       "exitCode": 1,
       "durationMs": 2842833
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25T16:03:25Z",
+      "finishedUTC": "2026-10-25T16:03:58Z"
     }
   ],
   "checks": [
@@ -25,7 +34,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -34,13 +43,17 @@
           "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
           "status": "passed"
         }
-      ]
+      ],
+      "executionSource": "Fresh final-source candidate run: tmp/builder/round22-evidence-refresh/candidate.json",
+      "executionRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+      "executionStartedUTC": "2026-10-25T16:03:25Z",
+      "executionFinishedUTC": "2026-10-25T16:03:58Z"
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -49,13 +62,17 @@
           "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
           "status": "passed"
         }
-      ]
+      ],
+      "executionSource": "Fresh final-source candidate run: tmp/builder/round22-evidence-refresh/candidate.json",
+      "executionRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+      "executionStartedUTC": "2026-10-25T16:03:25Z",
+      "executionFinishedUTC": "2026-10-25T16:03:58Z"
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "contentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -64,7 +81,11 @@
           "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
           "status": "passed"
         }
-      ]
+      ],
+      "executionSource": "Fresh final-source candidate run: tmp/builder/round22-evidence-refresh/candidate.json",
+      "executionRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+      "executionStartedUTC": "2026-10-25T16:03:25Z",
+      "executionFinishedUTC": "2026-10-25T16:03:58Z"
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
@@ -1268,5 +1289,66 @@
       }
     ]
   },
-  "digest": "sha256:9f9122520a458a9b9bd8c4ccfc3a57a1393d6cdd0d5af3173598b0e4b65fc402"
+  "digest": "sha256:660379ac26d8a4e88ef5da573c001af9a84cac4da94b0b176da3d8c6b43e7cf2",
+  "writerEvidenceRefresh": {
+    "createdAt": "2026-10-25T16:05:43Z",
+    "originalEvidence": "tmp/builder/round22-evidence-refresh/original/systemic-batch-deferral-source-readability.json",
+    "originalEvidenceDigest": "sha256:9f9122520a458a9b9bd8c4ccfc3a57a1393d6cdd0d5af3173598b0e4b65fc402",
+    "originalProducer": {
+      "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+      "scriptDigest": "sha256:fe8ccbc459059d137f99bd1b1c3e4066ec65f99cf67a8a4879f4cb6efc5613f6"
+    },
+    "originalWriterRecords": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
+            "status": "passed"
+          }
+        ]
+      }
+    ],
+    "candidateSource": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+    "candidateContentDigest": "sha256:4200c0ae2b7e6ea95b4de5f5bcdb9da72fbf0f6fef9cfd2798a0288fdafc6c12",
+    "candidateRevision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+    "candidateWorkingTreeDigest": "sha256:068859ff6b7523ca4db26bd1569ca2c6a5b920a8ecfce12a537f111ebb281aa0",
+    "note": "Original top-level revision/tree/time describe retained historical execution; only the Writer records now point to the separately recorded fresh final-source run. No old failure or unrelated outcome promoted to a fresh pass."
+  }
 }
