@@ -78,13 +78,13 @@ final class EngineSandboxFailureWorkflowTest {
           } while (System.nanoTime() < deadline);
           assertTrue(!events.isEmpty(), "missing ledger event for " + path);
           for (Map<String, Object> event : events) {
-            assertEquals(routed.contains(path) ? "SANDBOX_FAILED" : "SUCCESS",
-                event.get("reasonCode"), path.toString());
             if (routed.contains(path)) {
-              assertEquals("RETRY_WITH_BACKOFF", event.get("retryPolicy"), path.toString());
+              assertEquals("DEFER_WITHOUT_ATTEMPT", event.get("retryPolicy"), path.toString());
             } else {
               assertEquals("SUCCESS_FULL", event.get("outcomeClass"), path.toString());
             }
+            assertEquals(routed.contains(path) ? "WRITE_FAILED" : "SUCCESS",
+                event.get("reasonCode"), path.toString());
           }
         }
         assertEquals(3, engine.status().getCore().getDocCount(), "only decoder documents enter the index");

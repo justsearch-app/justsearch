@@ -56,6 +56,7 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
    }catch(Exception failure){rescueErrors.add(failure);}
   },"owned-source-fifo-rescue");
   if(fifo)rescue.start();
+  var sharedFailure=new AtomicBoolean(true);
   var fault=new AtomicBoolean();var errors=new CopyOnWriteArrayList<Throwable>();var actualWrites=new CopyOnWriteArrayList<Throwable>();
   Analyzer analyzer=new Analyzer() {
    protected TokenStreamComponents createComponents(String field) {
@@ -64,11 +65,12 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
      final CharTermAttribute term=addAttribute(CharTermAttribute.class);
      public boolean incrementToken() throws java.io.IOException {
       if(!input.incrementToken())return false;
-      if(term.toString().contains("ownjavaioverifier") && fault.compareAndSet(false,true)) {
+      if(term.toString().contains("ownjavaioverifier")) {
+       if(fault.compareAndSet(false,true)) {
        if(mode.equals("persistent-byte-eio")){Files.delete(link);Files.createSymbolicLink(link,Path.of("/proc/self"));assertTrue(Files.isReadable(submitted));assertTrue(Files.isRegularFile(submitted));}
        if(mode.equals("captured-byte-eio")) {
         Path replacement=Files.createDirectory(temp.resolve("replacement"));
-        Files.writeString(replacement.resolve("mem"),"readable replacement");
+        Files.writeString(replacement.resolve("mem"),"ownjavaioverifier readable replacement");
         Files.delete(link);Files.createSymbolicLink(link,replacement);
         Files.delete(source);Files.createSymbolicLink(source,Path.of("/proc/self/mem"));
         assertTrue(Files.isReadable(submitted));assertTrue(Files.isReadable(source));
@@ -95,6 +97,7 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
          throw new java.io.IOException("writer failed after regular source became a FIFO");
         }
        }
+       }
        Path opened=mode.equals("captured-byte-eio")?source:submitted;
        try(var input=new java.io.FileInputStream(opened.toFile())) {
         int first=input.read();assertTrue(first>=0 || mode.equals("readable-empty"));assertTrue(readable,"an actually unreadable source must refuse java.io read");
@@ -102,7 +105,7 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
         errors.add(failure);throw failure;
        }
       }
-      if(fault.get())throw new java.io.IOException("untyped shared writer failure for all document and canary content");
+      if(fault.get() && sharedFailure.get())throw new java.io.IOException("untyped shared writer failure for all document and canary content");
       return true;
      }
     });
@@ -122,7 +125,7 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
     catch(java.lang.reflect.InvocationTargetException e){if(call.getMethod().getName().equals("indexSingle"))actualWrites.add(e.getCause());throw e.getCause();}
    });h.commitOps=runtime.commitOps();
    h.queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(submitted).withinRoot(temp),JobQueue.EnqueueEntry.stat(healthy).withinRoot(temp)));
-   h.loop=PipelineTestFixture.withExtractor(h,extractor);h.loop.start();h.awaitPolicy(12);h.stopLoopForOtherAssertions();finished.countDown();if(fifo)rescue.join(3_000);
+   h.loop=PipelineTestFixture.withExtractor(h,extractor);h.loop.start();h.awaitPolicy(12);if(readable || fifo)h.stopLoopForOtherAssertions();finished.countDown();if(fifo)rescue.join(3_000);
    var rows=h.rows();var own=rows.stream().filter(r->r.path().contains("a-link")).findFirst().orElseThrow();
    var peer=rows.stream().filter(r->r.path().endsWith("z-healthy.txt")).findFirst().orElseThrow();
    System.out.println("OWN mode="+mode+" sourceReadable="+Files.isReadable(source)+" submittedReadable="+Files.isReadable(submitted)+" javaIoFailures="+errors+" realWriteFailures="+actualWrites+" rows="+rows);
@@ -141,14 +144,31 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
     assertTrue(Files.isReadable(source));assertTrue(Files.isReadable(submitted));
     var still=assertThrows(java.io.IOException.class,()->{try(var stream=new java.io.FileInputStream((mode.equals("captured-byte-eio")?source:submitted).toFile())){stream.read();}});
     System.out.println("OWN persistent byte read still fails after classification: "+still);
-    assertEquals(1,own.attempts(),"source permission loss or disappearance always charges, including after retarget");
-    assertEquals("RETRY_WITH_BACKOFF",own.policy());
+    assertEquals(0,own.attempts(),"byte-only EIO with readable metadata defers during a shared outage");
+    assertEquals("DEFER_WITHOUT_ATTEMPT",own.policy());
    }
    assertEquals(0,peer.attempts(),"a genuinely unreadable source does not charge its healthy peer");
    assertEquals("DEFER_WITHOUT_ATTEMPT",peer.policy());
-   // This independent oracle deliberately checks both sides of a mixed source/service failure.
-   // Baseline charges this healthy peer; candidate must not.
-   // Peer outcome is recorded; only source policy is the preservation oracle here.
+   if(!readable && !fifo) {
+    sharedFailure.set(false);
+    var restored=h.rows().stream().filter(r->r.path().equals(own.path())).findFirst().orElseThrow();
+    assertTrue(restored.retry()>=own.retry(),"repair observation permits only forward movement of the observed saved deadline");
+    assertThrows(java.io.IOException.class,()->{try(var stream=new java.io.FileInputStream((mode.equals("captured-byte-eio")?source:submitted).toFile())){stream.read();}});
+    // Expire only this still-uncounted outage observation; zero matches leave live recovery untouched.
+    h.sql("UPDATE jobs SET retry_after=0 WHERE path='"+restored.path().replace("'","''")
+     +"' AND retry_after="+restored.retry()+" AND attempts=0 AND last_retry_policy='DEFER_WITHOUT_ATTEMPT' AND state='PENDING'");
+    h.awaitPathState("z-healthy.txt","DONE",8);
+    long end=System.nanoTime()+8_000_000_000L;
+    while(System.nanoTime()<end && h.rows().stream().noneMatch(r->r.path().equals(own.path()) && r.attempts()>0))Thread.sleep(20);
+    h.stopLoopForOtherAssertions();
+    var recovered=h.rows().stream().filter(r->r.path().equals(own.path())).findFirst().orElseThrow();
+    System.out.println("OWN shared repair with persistent byte EIO mode="+mode+" rows="+h.rows());
+    assertEquals("PENDING",recovered.state());assertEquals(1,recovered.attempts(),"after shared repair the remaining source fault uses the existing per-file policy");
+    assertEquals("RETRY_WITH_BACKOFF",recovered.policy());assertTrue(recovered.retry()>0);
+    var completed=h.rows().stream().filter(r->r.path().equals(peer.path())).findFirst().orElseThrow();
+    assertEquals("DONE",completed.state());assertEquals(0,completed.attempts());
+    assertThrows(java.io.IOException.class,()->{try(var stream=new java.io.FileInputStream((mode.equals("captured-byte-eio")?source:submitted).toFile())){stream.read();}});
+   }
   }finally{
    finished.countDown();
    if(fifo){rescue.join(3_000);assertFalse(rescue.isAlive(),"owned rescue must terminate");assertTrue(rescueErrors.isEmpty(),rescueErrors.toString());}

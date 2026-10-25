@@ -84,7 +84,8 @@ final class VerifierReadOnlyWriterTest extends LuceneExecutorTestBase {
     service.begin();
     service.success();
     service.failure(new IndexWriterUnavailableException("shared index storage unavailable"), deferred::add);
-    service.finish();
+    long delay = service.prepareRetry();
+    service.finish(System.currentTimeMillis() + delay);
     assertEquals(List.of(true), deferred,
         "a successful earlier write does not turn a proven storage outage into a document failure");
   }

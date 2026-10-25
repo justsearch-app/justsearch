@@ -1606,7 +1606,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java"
       ],
       "class": "New",
-      "behaviour": "Unavailable release-0.3.0 admission/presence lookups retain original per-file retry deadlines, including retry-until-available for the source-IO case, never infer deletion or discard debt, allow healthy queued peers to complete and report WAITING; repair resumes the same held row at its existing deadline. Persistent source byte EIO through submitted or captured identity charges one RETRY_WITH_BACKOFF attempt even during a shared writer outage; replacement of either path with a known FIFO must also retain a per-file retry without blocking healthy peers. Readable/empty-readable and regular replacement controls keep zero-attempt outage deferral. Existing authority, alias, canary, VM and finalization checks remain unchanged.",
+      "behaviour": "Unavailable release-0.3.0 admission/presence lookups retain original per-file deadlines, debt/no deletion, WAITING, healthy progress and repair; VM propagation is unchanged. Source classification first preserves normalized NIO submitted/captured failed-path matching, then uses only regular-file/readability metadata. Known FIFO/nonregular or metadata-unreadable paths take per-file policy immediately without rescue. Readable/empty and regular replacement controls remain uncounted during a shared outage. Residual: readable regular source metadata with byte-only EIO may defer uncounted during a simultaneous shared outage; after only the shared service is repaired, persistent byte failure uses existing per-file policy and the healthy peer completes. This withdraws only the new strict byte-probe promise, not U19 generally. This entry retains prior fail-before evidence only for unchanged admission checks; the round-22 residual New entry owns current source-policy execution evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1630,15 +1630,114 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "kind": "delegated-choice",
           "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
           "delegationLocation": "task t-20261020-c2e24a request",
-          "delegationScope": "Implement only the round-21 unavailable-admission-lookup and persistent byte-unreadability fixes, durable reproductions and named changeset/evidence; preserve authority, debt, existing tests and acceptance records.",
+          "delegationScope": "Round-21 admission guard retained; round-22 explicitly selected metadata-only failure classification and residual byte-EIO policy, preserving U17/U19, FIFO handling, authority and old acceptance records.",
           "label": "agent choice under orchestrator design",
-          "choice": "The orchestrator requires the extraction failure path to survive an unavailable second admission/presence lookup and retain the original baseline retry outcome. Guard both failure-only presence calls (direct classification and original IOException outcome construction) through one shared private helper; non-VM lookup failure selects SOURCE_UNREADABLE solely to retain the existing per-file failure callback. It cannot authorize absence/deletion and changes no successful admission, successful-extraction/freshness check, admission debt or schema. VM errors still propagate to existing finalizers. The source failure classifier retains normalized NIO claimed/captured path matching first, then uses one standard Files.newInputStream/read()/close per relevant path, at most one byte per stream. IOException/SecurityException means source access failed; EOF means a valid readable empty file. Before opening either path, Files.isRegularFile excludes a known FIFO/device so a writer failure cannot block the loop on its native open/read. This failure-only guard changes no admission or deletion authority. The final eight-case source class includes submitted/captured FIFO replacements after successful extraction, delayed owned O_RDWR rescue with bounded cleanup, and submitted/captured regular replacement controls; rescue must never be used on the corrected candidate. No metadata-only isReadable test, provenance classifier, full read, new option or canary expansion. Submitted and captured paths are checked; a transient java.io denial that clears before classification remains the accepted residual. The supplied native proc/self/mem EIO fault is retained and extended to captured-path failure with a readable replacement alias, readable-source and empty-readable controls, all with the real runtime/loop/SQLite/Tika. Its old generic unused mode branches are removed; SPDX/class/helper names and compile-visible StandardTokenizer are compatibility adaptations with the contiguous trigger unchanged. A healthy peer must remain at zero attempts and uncounted deferral. The admission reproduction adds presence failure alongside the real JDBC release-0.3.0 query fault; it covers a primary IOException that loses source access while the secondary presence lookup is unavailable, and asserts deadline/policy/status/no flood/no deletion/debt preservation and repairs the original bytes/lookup. Under the orchestrator’s final test-only disposition, it first asserts that repair preserves the observed persisted deadline, then uses the existing fixture database helper to make only that owned row due and observes its actual production processing to DONE within eight seconds. The original failure-path, attempts, policy, debt, no-deletion, public-status and healthy-peer assertions remain. JobQueueRetryLadderTest and UnreadableSourceRetryTest own the minute-scale wall-clock ladder; the unchanged archived full-run source also retains its longer wait. The shortened new test uses Timeout(30); no product scheduling or older test changes. The unchanged Release030AdmissionDebtTest true/false uncertainty variants are independently rerun, with its source hash fixed. These are delegated implementation choices under the explicit design, never owner-words."
+          "choice": "Retain both guarded failure-only presence lookups and all admission/deletion authority. Remove the non-atomic regular-file/open/read sequence from BatchServiceFailures only; use known-nonregular rejection plus Files.isReadable for submitted/captured paths, with SecurityException treated as unreadable. No async/thread/native/timeout mechanism or dependency. A readable regular path with byte-only EIO can remain uncounted while a shared outage persists; on shared repair the original per-file policy resumes if byte failure persists. Retain the same real /proc/self/mem read EIO and eight modes. In the two EIO cases, prove attempts0/DEFER during outage, repair only the shared fault, allow only forward movement of the observed saved deadline, then attempt one guarded SQL expiry matching exact escaped identity, observed retry_after, attempts=0, last_retry_policy=DEFER_WITHOUT_ATTEMPT and PENDING; zero matches are valid when the live loop already advanced or charged it, then observe actual per-file retry and healthy peer DONE with the byte fault still present. The captured replacement retains the original fault marker so recovery reaches the same real Java read rather than silently succeeding. Both FIFO cases still prohibit rescue; four readable controls remain unchanged. No completed independent race result is claimed. The admission reproduction adds presence failure alongside the real JDBC release-0.3.0 query fault; it covers a primary IOException that loses source access while the secondary presence lookup is unavailable, and asserts deadline/policy/status/no flood/no deletion/debt preservation and repairs the original bytes/lookup. Under the orchestrator’s final test-only disposition, it first asserts that repair preserves the observed persisted deadline, then uses the existing fixture database helper to make only that owned row due and observes its actual production processing to DONE within eight seconds. The original failure-path, attempts, policy, debt, no-deletion, public-status and healthy-peer assertions remain. JobQueueRetryLadderTest and UnreadableSourceRetryTest own the minute-scale wall-clock ladder; the unchanged archived full-run source also retains its longer wait. The shortened new test uses Timeout(30); no product scheduling or older test changes. The unchanged Release030AdmissionDebtTest true/false uncertainty variants are independently rerun, with its source hash fixed. These are delegated implementation choices under the explicit design, never owner-words."
         }
       ],
       "evidence": "gates/test-intent/evidence/systemic-batch-deferral-admission-byte-access.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The sole test-only call to BatchServiceFailures.finish() in provenSharedOutageRemainsFreeAfterSuccessfulPeer is replaced with prepareRetry() followed by finish(System.currentTimeMillis() + delay), exactly the removed convenience method body. The real production preparation/deadline API, default probe semantics, callback, successful peer, unavailable-writer fault and every assertion are unchanged. No other test source changes. The frozen whole-program reference rule is preserved without store or visibility changes.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Remove only the unused zero-argument BatchServiceFailures.finish convenience method and adapt its named test caller to the production preparation/deadline API; preserve U17/U19, all fault/assertion semantics and all acceptance records.",
+          "label": "agent choice under explicit orchestrator assignment",
+          "choice": "Inline the removed wrapper at its sole test call. This compatibility adaptation is a delegated implementation choice under the quoted grant, not owner-authored acceptance wording."
+        }
+      ]
+    },
+    {
+      "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java"
+      ],
+      "class": "Obsolete",
+      "behaviour": "Withdraw only the new round-21 expectation that readable regular submitted/captured paths with byte-only EIO must charge immediately during a simultaneous shared writer outage. Retain the real EIO fault, metadata assertions, all six controls, FIFO/no-rescue obligations and U19 generally.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Standing task-request delegation dated 2026-10-19, before PR opening: implement settled U17/O1–O7 shared writer/identity/sandbox/executor/registry/storage deferral and preserve U19; no schema, option or deletion on uncertainty. Round-22 source residual and sandbox oracle selected explicitly by the orchestrator.",
+          "label": "agent choice under pre-PR delegation and explicit orchestrator design",
+          "choice": "The orchestrator selects metadata-only classification to remove a new potentially blocking source read. The immediate-byte-EIO charge was a delegated agent promise, not owner-authored U19 wording; its simultaneous-outage residual is now explicit."
+        }
+      ],
+      "conflictSearch": "Searched docs/decisions for source unreadability, EIO, sandbox/shared unavailability and retry policy, and inspected BatchServiceFailures, JobBatchExtractor and actual sandbox startup/routing callers. No stronger owner source requires byte-only EIO charging during shared outage. Concrete withdrawn source: prior entry35 behavior/design and original PersistentByteIoSourceTest EIO branches; see tmp/builder/round22/conflict-search.txt. Same-PR documents are not the authority for this change."
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Eight real source-policy modes remain. In submitted/captured byte-only EIO cases with readable metadata, assert durable attempts0/DEFER_WITHOUT_ATTEMPT during shared writer outage; then repair only shared failure, keep real byte EIO present, observe that the owned saved deadline never moves backwards, then expire only a still-uncounted PENDING outage row with one SQL update guarded by exact escaped identity, observed deadline, attempts=0 and DEFER_WITHOUT_ATTEMPT; accept zero matches without rewinding live recovery, and observe existing per-file retry and healthy peer DONE. Both FIFO replacements charge immediately without rescue; readable, empty and regular controls remain uncounted. Existing 35s timeout, real faults and all other assertions retained.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Standing task-request delegation dated 2026-10-19, before PR opening: implement settled U17/O1–O7 shared writer/identity/sandbox/executor/registry/storage deferral and preserve U19; no schema, option or deletion on uncertainty. Round-22 source residual and sandbox oracle selected explicitly by the orchestrator.",
+          "label": "agent choice under pre-PR delegation and explicit orchestrator design",
+          "choice": "The cheaper design deliberately uses metadata only in failure finalization. This residual oracle and bounded owned-row recovery are delegated choices under the explicit round-22 design, not an Adaptation or owner-authored expectations."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-round22.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java"
+      ],
+      "class": "Obsolete",
+      "behaviour": "Withdraw SANDBOX_FAILED/RETRY_WITH_BACKOFF for the five routed identities when one configured child executable is globally absent. Retain every accepted count, content, fetch, normalized identity, family, decoder SUCCESS/SUCCESS_FULL, doccount3, polling, timeout and cleanup assertion.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Standing task-request delegation dated 2026-10-19, before PR opening: implement settled U17/O1–O7 shared writer/identity/sandbox/executor/registry/storage deferral and preserve U19; no schema, option or deletion on uncertainty. Round-22 source residual and sandbox oracle selected explicitly by the orchestrator.",
+          "label": "agent choice under pre-PR delegation and explicit orchestrator design",
+          "choice": "Shared sandbox startup unavailability is already in settled O1–O7 shared-service deferral. The old oracle applied per-file policy to a global service fault; changing it is an obsolete expectation, not a signature Adaptation and not a new product change inferred from CI output."
+        }
+      ],
+      "conflictSearch": "Searched docs/decisions including ADR-0048 (2026-09-02) and inspected actual PersistentExtractionSandbox/ExtractionSandboxFactory/TimeboxedContentExtractor/DefaultWorkerAppServices/JobBatchExtractor callers. ADR-0048 covers per-file parser crash/OOM/timeout and does not require charging globally absent executable startup. No stronger conflicting owner source found. Concrete obsolete source: EngineSandboxFailureWorkflowTest routed reason/policy assertions at df4, with hosted ci-sandbox-baseline/candidate XML retained as diagnostic evidence only. See tmp/builder/round22/conflict-search.txt; source authority is the quoted pre-PR task delegation, not a same-PR document."
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A globally absent configured child executable causes five routed identities to retain WRITE_FAILED/DEFER_WITHOUT_ATTEMPT shared-service outcomes while three in-process decoder identities retain SUCCESS/SUCCESS_FULL and searchable/fetchable content. Preserve accepted count, normalized identity, five routed families, doccount3, polling, timeout and cleanup. No product sandbox change.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Standing task-request delegation dated 2026-10-19, before PR opening: implement settled U17/O1–O7 shared writer/identity/sandbox/executor/registry/storage deferral and preserve U19; no schema, option or deletion on uncertainty. Round-22 source residual and sandbox oracle selected explicitly by the orchestrator.",
+          "label": "agent choice under pre-PR delegation and explicit orchestrator design",
+          "choice": "Align the old sandbox test oracle with already-settled shared-sandbox deferral. The same final test source must fail on exact bc1c1f72c8479a7e192acd2c9c033ba3b1ff1ea0 for its charged/per-file retry policy and pass on the candidate. This is a new expected oracle with D4 execution evidence, never an Adaptation or owner-authored acceptance."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-round22.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java"
       ],
       "repaired": true
     }
@@ -1930,6 +2029,16 @@ Round-21 bounded completion: the preserved byte-probe candidate reproduces both 
 Test-intent preflight was run against ad9767a097: its only error is stale independent acceptance; no source/evidence error remains. The malformed delegation locator was corrected to the supported task-request form. All existing acceptance bytes remain unchanged. .agents/preflight is absent.
 
 Round-21 final test-only disposition: both new test classes are retained. AdmissionLookupLivenessTest alone is shortened under the orchestrator’s explicit instruction. After repairing the fault and restoring source bytes, it asserts that the saved retry deadline is unchanged, makes only that owned row due through the existing fixture helper using its persisted normalized key, and waits up to eight seconds for actual original-row production DONE (Timeout30). Every original failure/status/attempt/policy/debt/no-deletion/healthy-peer assertion is byte-identical. Existing queue retry tests own minute-scale ladder timing. Final source SHA256:235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a: exact ad9767a097 executes 3 cases and fails all 3 on the original starvation/zero-deadline assertions (suite 15.549s); unchanged product executes 3 and passes all 3 (suite 4.018s),0 skips. CI-mode compileTestJava and pmdTest pass. All 2,153 product-source hashes match; no old repo test changed. No full suite was repeated. The [original frozen full run](../../../tmp/builder/round21b/full-result.json) and [immutable archived evidence](../../../tmp/builder/round21c/original-full-evidence.json) belong to longer source SHA256:96b5c88546523fcc0908f6edbae039e4a198c970b1cbb37aa33aabda91f0f3aa, not execution of the final shortened source. The first shortening and its passing results are separately archived; final code additionally uses the persisted key because Windows normalizes path case. [Final proportional evidence](../evidence/systemic-batch-deferral-admission-byte-access.json), [exact timings/assertions](../../../tmp/builder/round21c/verification-summary.json), [final test patch](../../../tmp/builder/round21c/test-only.patch). All old acceptance bytes remain identical; final stable-candidate full execution belongs to the final verifier.
+
+## Round twenty-two: metadata-only finalization and settled sandbox deferral
+
+The orchestrator withdraws only the new byte-probe promise from entry35. Normalized NIO submitted/captured failed-path matching remains first; the fallback uses regular-file/readability metadata and treats SecurityException as unreadable. It performs no source open/read. Both known FIFO replacements still take per-file policy without rescue. The explicit residual is that readable regular metadata with byte-only EIO can defer uncounted during simultaneous shared outage; after shared repair the remaining byte fault takes the existing per-file retry, and the healthy peer completes. No independent race result is claimed. Admission guards, authority/deletion, canaries, VM propagation, finalizers, pacing/status/logging and persistence remain unchanged.
+
+The sandbox oracle now follows already-settled shared startup unavailability: five process-routed identities use WRITE_FAILED/DEFER_WITHOUT_ATTEMPT when their globally configured executable is absent, while three in-process decoders retain SUCCESS/SUCCESS_FULL and every original content/count/fetch/normalized-identity/family/doccount assertion. The changed source and sandbox expectations are declared Obsolete/New under the earlier task delegation; the wrapper caller alone remains Adaptation entry36. These are delegated agent choices, not owner-authored expectations, and no same-PR document is cited as their authority. Conflict search covers docs/decisions and actual production callers; ADR-0048's per-file crash/OOM/timeout policy does not require charging a globally absent executable.
+
+Initial round-22 eight-case source test (archived before the synchronization correction) on the still-old df4 helper plus reviewed wrapper cleanup: two intended immediate-charge assertion failures and six control passes. Metadata-only candidate: all eight pass, including both real byte-EIO recovery paths and both FIFO cases without rescue. The identical final sandbox source fails on exact bc1c1f72 for RETRY_WITH_BACKOFF instead of DEFER_WITHOUT_ATTEMPT and passes on candidate. All named admission/alias/probe/VM/reference checks and touched compile/PMD checks pass in CI Error Prone mode. The initial sandbox evidence producer assumed the old baseline had BatchServiceFailures; it stopped before Gradle, was corrected to record the absent class, and the setup failure is retained. No full module invocation or independent acceptance is claimed. Old acceptance bytes remain unchanged. [Round-22 execution evidence](../evidence/systemic-batch-deferral-round22.json), [logs and manifests](../../../tmp/builder/round22/).
+
+Round-22 test synchronization correction: orchestrator review identified an unsafe test observation/update, not a reproduced product defect. The repaired live-loop test observes only forward movement of the saved deadline (>= its original outage observation), then attempts one expiry guarded by the exact escaped owned identity, currently observed retry_after, attempts=0, DEFER_WITHOUT_ATTEMPT and PENDING. If the loop already advanced or charged the row, zero matches leave recovery untouched. This validates a non-backwards repair observation and avoids rewinding a charged row; it does not promise that repair freezes a live scheduler deadline. The loop never restarts, byte EIO stays present, initial attempts0/DEFER, healthy peer DONE and final attempts1/RETRY_WITH_BACKOFF remain required, with all eight modes and Timeout35 unchanged. This is a test-oracle correction within the explicit delegated recovery choice, not an Adaptation or a relaxation of source/per-file policy. Original report/source/D4 bytes are archived under tmp/builder/round22/synchronization-before. Fresh exact-final-source proof uses one shared exact df4 before clone and the candidate; only this class plus indexer test compile/PMD are rerun. Sandbox and the other named narrow results are retained under identical source and product hashes, not claimed freshly executed. No production byte or other test file changed in this correction; old acceptance records remain byte-identical. The named D4 evidence and manifest distinguish both source snapshots.
 
 ## Acceptance records
 
