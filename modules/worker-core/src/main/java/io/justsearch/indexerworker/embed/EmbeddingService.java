@@ -7,6 +7,7 @@ import io.justsearch.aibackend.backend.BackendException;
 import io.justsearch.aibackend.local.LocalIntentTranslatorV2.EmbeddingRequest;
 import io.justsearch.aibackend.local.LocalIntentTranslatorV2.EmbeddingResult;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder;
 import io.justsearch.ort.GpuArbiter;
 import io.justsearch.ort.OrtCudaStatus;
 import java.io.Closeable;
@@ -510,7 +511,9 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
    * is unconditional and only checks backend availability/support.
    *
    * @return the doc vector plus one chunk vector per span, or {@code null} if this backend does not
-   *     support late chunking (non-ONNX) or {@code content} exceeds the model's context window
+   *     support late chunking (non-ONNX), the UTF-16 spans are invalid before or after prefixing,
+   *     a nonempty span array addresses malformed original or prefixed text, or {@code content}
+   *     exceeds the model's context window
    * @throws RuntimeException if the underlying ONNX inference call fails — callers should treat
    *     this like any other embedding failure (do not mark complete; let the doc retry/escalate)
    */
@@ -518,7 +521,7 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
     if (closed.get() || !available || backend == null) {
       return null;
     }
-    if (content == null || content.isBlank() || charSpans == null) {
+    if (!OnnxEmbeddingEncoder.isValidSpanInput(content, charSpans) || content.isBlank()) {
       return null;
     }
     if (!(backend
@@ -533,8 +536,13 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
       shiftedSpans[i] = new int[] {charSpans[i][0] + shift, charSpans[i][1] + shift};
     }
 
+    // Concatenation can form a surrogate pair across the prefix/content boundary.
+    if (!OnnxEmbeddingEncoder.isValidSpanInput(prefixed, shiftedSpans)) {
+      return null;
+    }
+
     try {
-      io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder.EmbedResult result =
+      OnnxEmbeddingEncoder.EmbedResult result =
           onnxBackend.encoder().embedWithSpans(prefixed, shiftedSpans);
       if (result == null) {
         return null;
