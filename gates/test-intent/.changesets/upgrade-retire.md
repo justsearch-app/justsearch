@@ -332,3 +332,16 @@ assembles bundleSidecarResources (jar, libraries, runtime, SSOT and native lifet
 code sources are inside that distribution. It does not replace the full unit suite.
 
 | RecoveryShutdownTest.closeDrainsMaintenanceWithoutInterruptingTheServingWriter | U6 interrupted replay; U14b preservation | Real boot, serving-writer commits in the maintenance executor, close joins without interruption, then old/update/delete search and unchanged generation after restart. Base fails the explicit interruption assertion. |
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17514-715f-72e0-b9ec-8525ba24fa25",
+  "verdict": "reject",
+  "digest": "sha256:39dbaf2614bf31501d56e0a6d48313c815d9a8b3c7d44e5fc4c55cfebb868701",
+  "note": "F1: unknown stored model identity authorizes cancellation. F2: retirement replay loses later forced-sync admissions after an older prefix delete. See verification-report.md in a125vcwh evidence."
+}
+```
