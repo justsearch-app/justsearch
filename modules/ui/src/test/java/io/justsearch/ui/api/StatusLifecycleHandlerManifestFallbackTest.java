@@ -57,7 +57,9 @@ class StatusLifecycleHandlerManifestFallbackTest {
 
   @AfterAll
   void verifyCoverageAndClose() {
-    try (var sharedComponents = components; var sharedPublisher = publisher) {
+    var sharedComponents = components;
+    var sharedPublisher = publisher;
+    try (sharedComponents; sharedPublisher) {
       assertEquals(1_296, combinations);
       assertEquals(216, normalizedReadyIndexes);
     }
