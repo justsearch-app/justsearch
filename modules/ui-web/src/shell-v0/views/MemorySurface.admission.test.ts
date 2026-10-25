@@ -7,7 +7,7 @@ import type { JfButton } from '../components/Button.js';
 import { confirmAsync } from '../components/ConfirmDialog.js';
 vi.mock('../components/ConfirmDialog.js', () => ({ confirmAsync: vi.fn() }));
 let surface: MemorySurface;
-const original = { id: 'replace', content: 'Content A', kind: 'fact', actor: 'primary', createdAt: '2026-10-23T00:00:00Z' };
+const original = { id: 'replace', revision: '"' + 'a'.repeat(64) + '"', content: 'Content A', kind: 'fact', actor: 'primary', createdAt: '2026-10-23T00:00:00Z' };
 async function settle() { for (let i = 0; i < 30; i++) await Promise.resolve(); await surface.updateComplete; }
 const forget = () => surface.shadowRoot!.querySelector<JfButton>('.list jf-button')!;
 beforeEach(() => { vi.useFakeTimers(); vi.mocked(confirmAsync).mockReset().mockResolvedValue(true); });
@@ -24,7 +24,7 @@ it('R1 never replays a consented DELETE after a retry-safe refusal replaced the 
         memories = [{ ...original, content: 'Content B' }];
         return new Response(JSON.stringify({ errorCode: 'ADMISSION_ENGINE_LIMIT', retrySafe: true }), { status: 429, headers: { 'Retry-After': '1' } });
       }
-      memories = []; return new Response('{}');
+      memories = []; return new Response('{"removed":true}');
     }
     return new Response(JSON.stringify({ memories, locked: false }));
   }));
@@ -37,7 +37,7 @@ it('R1 never replays a consented DELETE after a retry-safe refusal replaced the 
   expect(forget().label).toBe('Forget: Content B');
   expect(surface.mutationError).toContain('429');
   expect(surface.announcement).not.toContain('Forgotten');
-  // The refusal is retryable through fresh user consent and its pre-delete identity read.
+  // The refusal is retryable through fresh user consent and the newly listed revision.
   await forget().onActivate?.(); await settle();
   expect(attempts).toBe(2);
   expect(memories).toHaveLength(0);
