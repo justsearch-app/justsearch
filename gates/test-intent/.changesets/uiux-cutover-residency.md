@@ -11,6 +11,8 @@ NR15/RR15 choices are agent-adopted under the separately quoted delegation, not 
 
 Changed old expectations are explicit: the branch successful-terminal and two external-lock transcript fixtures are instrumentation corrections; the 11 context cases gain RR15 slot retirement/review requirements. They are not described as signature-only adaptations. The Structured error announcement case also explicitly reviews/discards unknown delivery before a fresh repeated submission; its done case remains preservation. No old branch/context/honesty/Structured announcement oracle was deleted. The two honesty fixtures are directly affected lock-preservation checks, not an unrelated expectation change. Storage faults are injected instance-method write failures, not native quota evidence. Two Storage realms are unit isolation, not browser tab/runtime proof. Real production UI-to-HTTP/controller/model proof and the full final gates belong to the fresh verifier.
 
+IR15 initial-lifecycle repair (builder initial-8): the additional file and entries below use their own genuine final producer against a47f7c47d25164c69a8f1e833bc59b316b1babb2. The original whole-feature producer/evidence and all existing tests are unchanged. The historical 1a026 acceptance record remains as recorded; it does not accept these new entries and is stale for the changed changeset. Official d5 acceptance in the separate uiux-cutover changeset is preserved. Fresh independent expected-value review and committed-candidate runtime verification remain required.
+
 ```json
 {
   "entries": [
@@ -394,6 +396,88 @@ Changed old expectations are explicit: the branch successful-terminal and two ex
       "evidence": "gates/test-intent/evidence/uiux-cutover-residency.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structuredOutcome.test.ts#XD2 announces Structured done exactly once politely without taking focus"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "IR15 repair: pagehide or hidden during initial context confirmation, including hide-return, captured A/newer B recovery and compatibility Ask/Structured, cannot later dispatch or clear the draft. Eight final public-behavior checks assert late dispatch before a47 and pass after.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request; agent-adopted IR15 in supplied wp1.5a-initial-lifecycle/scenarios-agreed.md, 2026-10-25T23:38:25Z",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
+          "choice": "IR15: Initial captured A may issue after input-only changes while preserving newer B and captured parameters. Explicit lifecycle or placement abandonment before issuance must latch through visible/connected/same-place return. Existing force ownership remains stricter. Preserve accepted streams and Stop semantics, raw/session recovery, bounds and whitelist; no persistent callback authority.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-initial-lifecycle.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide latches abandonment before a delayed initial Send can issue or clear",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide-return latches abandonment before a delayed initial Send can issue or clear",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden latches abandonment before a delayed initial Send can issue or clear",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden-return latches abandonment before a delayed initial Send can issue or clear",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide-return keeps both captured A and newer B through return and reload without sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden-return keeps both captured A and newer B through return and reload without sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask compatibility initial context wait honors latched hide and preserves schema/raw",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract compatibility initial context wait honors latched hide and preserves schema/raw"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "IR15 preservation: initial captured A/newer B, same-text/IME/empty assignments and future parameters; context failure/loss; placement ABA/New/handoff/discard/disconnect/removal; initial Retry/Edit fork abandonment and normal controls; already-issued Ask/model/Structured streams. Thirty checks pass before a47 and after. Controlled HTTP component tests only, not product/runtime acceptance.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request; agent-adopted IR15 in supplied wp1.5a-initial-lifecycle/scenarios-agreed.md, 2026-10-25T23:38:25Z",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
+          "choice": "IR15: Initial captured A may issue after input-only changes while preserving newer B and captured parameters. Explicit lifecycle or placement abandonment before issuance must latch through visible/connected/same-place return. Existing force ownership remains stricter. Preserve accepted streams and Stop semantics, raw/session recovery, bounds and whitelist; no persistent callback authority.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-initial-lifecycle.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#disconnect-return abandons a pending initial Send without a late dispatch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#navigation-ABA abandons a pending initial Send without a late dispatch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#search-placement-ABA abandons a pending initial Send without a late dispatch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#New abandons a pending initial Send without a late dispatch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#handoff abandons a pending initial Send without a late dispatch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#discard abandons a pending initial Send without a late dispatch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#unchanged preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#newer text preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#same-text assignment preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#edit-away-back preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#empty preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#IME preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#future parameters preserves initial captured A semantics when no placement is abandoned",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask keeps captured scope schema and effort while newer input changes future parameters",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract keeps captured scope schema and effort while newer input changes future parameters",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#failed response after hide preserves raw input and never invents dispatch or Stop",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#still pending after hide preserves raw input and never invents dispatch or Stop",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#confirmed removal abandons an initial context wait and retains the draft without Stop",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask already issued Send keeps its stream on hide and sends no Stop or replacement",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat already issued Send keeps its stream on hide and sends no Stop or replacement",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract already issued Send keeps its stream on hide and sends no Stop or replacement",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with unchanged while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with unchanged while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with pagehide-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with pagehide-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with hidden-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with hidden-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with navigation-ABA while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with discard while the fork waits cannot issue an abandoned task"
       ]
     }
   ]

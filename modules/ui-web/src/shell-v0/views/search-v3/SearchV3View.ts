@@ -454,6 +454,7 @@ interface HumanTask {
   epoch: number;
   ownsComposer: boolean;
   revoked: boolean;
+  abandoned: boolean;
   restored: boolean;
   context: ReturnType<typeof sv3FollowUpContext> | null;
   refusal: ChatRefusalDetail | null;
@@ -1050,7 +1051,7 @@ export class SearchV3View extends JfElement {
     if (payload.task !== null) {
       this.humanTask = {
         saved: payload.task, question: '', scope: null, scopeOwner: null, selection: null, composer: null,
-        version: undefined, epoch: this.humanEpoch, ownsComposer: false, revoked: true,
+        version: undefined, epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
         restored: true, context: null, refusal: null, retryAt: 0,
       };
     }
@@ -1064,9 +1065,14 @@ export class SearchV3View extends JfElement {
   };
 
   /** Revocation is latched before any callback can arrive. Leaving never sends Stop. */
-  private revokeHumanTask(): void {
+  private revokeHumanTask(abandonInitial = false): void {
     this.humanEpoch += 1;
-    if (this.humanTask !== null) this.humanTask.revoked = true;
+    if (this.humanTask !== null) {
+      this.humanTask.revoked = true;
+      // Input changes revoke force continuation, but an initial captured A may still send.
+      // Leaving its placement/lifecycle latches abandonment even after an ABA return.
+      this.humanTask.abandoned ||= abandonInitial;
+    }
     this.humanLoad?.abort();
     this.humanLoad = null;
     if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
@@ -1074,7 +1080,7 @@ export class SearchV3View extends JfElement {
     this.requestUpdate();
   }
 
-  private readonly leaveHumanTask = (): void => { this.revokeHumanTask(); this.saveRecovery(); };
+  private readonly leaveHumanTask = (): void => { this.revokeHumanTask(true); this.saveRecovery(); };
 
   private readonly hideHumanTask = (): void => {
     if (document.visibilityState === 'hidden') this.leaveHumanTask();
@@ -1111,7 +1117,7 @@ export class SearchV3View extends JfElement {
       question, scope: scope === null ? null : { paths: [...scope.paths] }, scopeOwner: scope,
       selection: selection === null ? null : structuredClone(selection), composer: this.composer,
       version: this.composer?.draftVersion, epoch: this.humanEpoch, ownsComposer,
-      revoked: false, restored: false, context: null, refusal: null, retryAt: 0,
+      revoked: false, abandoned: false, restored: false, context: null, refusal: null, retryAt: 0,
     };
     // Reserve before context waits or forks. A failed ACK never sacrifices live input or old bytes.
     if (!this.saveRecovery(task)) return null;
@@ -1134,7 +1140,7 @@ export class SearchV3View extends JfElement {
   }
 
   private discardHumanTask(): void {
-    this.revokeHumanTask();
+    this.revokeHumanTask(true);
     if (this.humanTask !== null) {
       const task = this.humanTask;
       this.retireHumanTask(task);
@@ -1523,7 +1529,7 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
-    this.revokeHumanTask();
+    this.revokeHumanTask(true);
     this.saveRecovery();
     document.removeEventListener('visibilitychange', this.hideHumanTask);
     window.removeEventListener('pagehide', this.leaveHumanTask);
@@ -3363,6 +3369,8 @@ export class SearchV3View extends JfElement {
    */
   private enterResults(leftDraft: string): void {
     if (!this.search.showing) {
+      this.revokeHumanTask(true);
+      this.saveRecovery();
       const leaving = this.sessions.activeId;
       if (leaving !== null) {
         this.placeDrafts.set(leaving, leftDraft);
@@ -3381,7 +3389,7 @@ export class SearchV3View extends JfElement {
 
   /** Back/Forward onto the bare address while this window has a result list. */
   private returnToResults(): void {
-    this.revokeHumanTask();
+    this.revokeHumanTask(true);
     this.saveRecovery();
     const leaving = this.sessions.activeId;
     if (leaving !== null) this.placeDrafts.set(leaving, this.currentDraft());
@@ -3411,7 +3419,7 @@ export class SearchV3View extends JfElement {
    * Leaving the hero is not leaving a place: its draft travels, as it always has.
    */
   private swapPlace(to: string, task?: HumanTask): void {
-    if (this.sessions.activeId !== to && task !== this.humanTask) { this.revokeHumanTask(); this.saveRecovery(); }
+    if (this.sessions.activeId !== to && task !== this.humanTask) { this.revokeHumanTask(true); this.saveRecovery(); }
     const leavingHandoff = this.preparedHandoff !== null;
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
@@ -3626,7 +3634,7 @@ export class SearchV3View extends JfElement {
     if (this.shapeId) return false;
     const incoming = takeSearchV3Handoff();
     if (incoming === null) return false;
-    this.revokeHumanTask();
+    this.revokeHumanTask(true);
     this.saveRecovery();
     this.mountHasIncoming = true;
     const { state, selection } = incoming;
@@ -3796,7 +3804,7 @@ export class SearchV3View extends JfElement {
         this.contextAskPending.delete(sessionId);
       }
     }
-    if (!this.isConnected || this.sessions.activeId !== sessionId || this.humanTask !== task) return;
+    if (!this.isConnected || this.sessions.activeId !== sessionId || this.humanTask !== task || task.abandoned) return;
     if (options.task && !this.humanOwned(task)) return;
     if (options.task && task.context !== null && JSON.stringify(context) !== JSON.stringify(task.context)) {
       task.revoked = true;
@@ -4850,7 +4858,7 @@ export class SearchV3View extends JfElement {
    * guarantee, so the fix is to not make the write at all.
    */
   private resetToHero(): void {
-    this.revokeHumanTask();
+    this.revokeHumanTask(true);
     this.saveRecovery();
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;

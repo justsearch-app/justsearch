@@ -1,0 +1,807 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T23:47:11.520Z",
+  "revision": "90d709997674ec17b4cb3a58a85a960cedbb31fc",
+  "tree": "b4b8dc05cd410c53d604cb4d9f411128768dc5e6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8dsqkl6r/tmp/test-intent-vitest-5-1792972019350.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4513
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide latches abandonment before a delayed initial Send can issue or clear",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation pagehide latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide-return latches abandonment before a delayed initial Send can issue or clear",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation pagehide-return latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden latches abandonment before a delayed initial Send can issue or clear",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation hidden latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden-return latches abandonment before a delayed initial Send can issue or clear",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation hidden-return latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide-return keeps both captured A and newer B through return and reload without sending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation pagehide-return keeps both captured A and newer B through return and reload without sending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden-return keeps both captured A and newer B through return and reload without sending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation hidden-return keeps both captured A and newer B through return and reload without sending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#disconnect-return abandons a pending initial Send without a late dispatch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation disconnect-return abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#navigation-ABA abandons a pending initial Send without a late dispatch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation navigation-ABA abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#search-placement-ABA abandons a pending initial Send without a late dispatch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation search-placement-ABA abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#New abandons a pending initial Send without a late dispatch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation New abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#handoff abandons a pending initial Send without a late dispatch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation handoff abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#discard abandons a pending initial Send without a late dispatch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation discard abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#unchanged preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation unchanged preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#newer text preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation newer text preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#same-text assignment preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation same-text assignment preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#edit-away-back preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation edit-away-back preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#empty preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation empty preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#IME preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation IME preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#future parameters preserves initial captured A semantics when no placement is abandoned",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation future parameters preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask compatibility initial context wait honors latched hide and preserves schema/raw",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.rag-ask compatibility initial context wait honors latched hide and preserves schema/raw",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract compatibility initial context wait honors latched hide and preserves schema/raw",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.extract compatibility initial context wait honors latched hide and preserves schema/raw",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask keeps captured scope schema and effort while newer input changes future parameters",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.rag-ask keeps captured scope schema and effort while newer input changes future parameters",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract keeps captured scope schema and effort while newer input changes future parameters",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.extract keeps captured scope schema and effort while newer input changes future parameters",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#failed response after hide preserves raw input and never invents dispatch or Stop",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation failed response after hide preserves raw input and never invents dispatch or Stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#still pending after hide preserves raw input and never invents dispatch or Stop",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation still pending after hide preserves raw input and never invents dispatch or Stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#confirmed removal abandons an initial context wait and retains the draft without Stop",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation confirmed removal abandons an initial context wait and retains the draft without Stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask already issued Send keeps its stream on hide and sends no Stop or replacement",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.rag-ask already issued Send keeps its stream on hide and sends no Stop or replacement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat already issued Send keeps its stream on hide and sends no Stop or replacement",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.free-chat already issued Send keeps its stream on hide and sends no Stop or replacement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract already issued Send keeps its stream on hide and sends no Stop or replacement",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation core.extract already issued Send keeps its stream on hide and sends no Stop or replacement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with unchanged while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.rag-ask retry with unchanged while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with unchanged while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with unchanged while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with pagehide-return while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.rag-ask retry with pagehide-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with pagehide-return while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with pagehide-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with hidden-return while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.rag-ask edit with hidden-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with hidden-return while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat retry with hidden-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with navigation-ABA while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.rag-ask retry with navigation-ABA while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with discard while the fork waits cannot issue an abandoned task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0736baba33c2b0e34370e12fbf19dbae0aad16125a8d870976b9c19f2fe10ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.rag-ask edit with discard while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a47f7c47d25164c69a8f1e833bc59b316b1babb2",
+    "revision": "a47f7c47d25164c69a8f1e833bc59b316b1babb2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8dsqkl6r/tmp/test-intent-vitest-5-1792972025671.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5199,
+        "output": "JSON report written to /home/elias/.cache/am/8dsqkl6r/tmp/test-intent-vitest-5-1792972025671.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide latches abandonment before a delayed initial Send can issue or clear",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation pagehide latches abandonment before a delayed initial Send can issue or clear:  AssertionError: abandoned initial question must not issue: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> ("
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide-return latches abandonment before a delayed initial Send can issue or clear",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation pagehide-return latches abandonment before a delayed initial Send can issue or clear:  AssertionError: abandoned initial question must not issue: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> ("
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden latches abandonment before a delayed initial Send can issue or clear",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation hidden latches abandonment before a delayed initial Send can issue or clear:  AssertionError: abandoned initial question must not issue: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> ("
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden-return latches abandonment before a delayed initial Send can issue or clear",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation hidden-return latches abandonment before a delayed initial Send can issue or clear:  AssertionError: abandoned initial question must not issue: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> ("
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#pagehide-return keeps both captured A and newer B through return and reload without sending",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation pagehide-return keeps both captured A and newer B through return and reload without sending:  AssertionError: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#hidden-return keeps both captured A and newer B through return and reload without sending",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation hidden-return keeps both captured A and newer B through return and reload without sending:  AssertionError: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#disconnect-return abandons a pending initial Send without a late dispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#navigation-ABA abandons a pending initial Send without a late dispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#search-placement-ABA abandons a pending initial Send without a late dispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#New abandons a pending initial Send without a late dispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#handoff abandons a pending initial Send without a late dispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#discard abandons a pending initial Send without a late dispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#unchanged preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#newer text preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#same-text assignment preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#edit-away-back preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#empty preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#IME preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#future parameters preserves initial captured A semantics when no placement is abandoned",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask compatibility initial context wait honors latched hide and preserves schema/raw",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation core.rag-ask compatibility initial context wait honors latched hide and preserves schema/raw:  AssertionError: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract compatibility initial context wait honors latched hide and preserves schema/raw",
+        "classification": "assertion",
+        "detail": "IR15 initial context confirmation core.extract compatibility initial context wait honors latched hide and preserves schema/raw:  AssertionError: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/test-intent-before-CsJ4Qm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8dsqkl6r/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask keeps captured scope schema and effort while newer input changes future parameters",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract keeps captured scope schema and effort while newer input changes future parameters",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#failed response after hide preserves raw input and never invents dispatch or Stop",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#still pending after hide preserves raw input and never invents dispatch or Stop",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#confirmed removal abandons an initial context wait and retains the draft without Stop",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask already issued Send keeps its stream on hide and sends no Stop or replacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat already issued Send keeps its stream on hide and sends no Stop or replacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract already issued Send keeps its stream on hide and sends no Stop or replacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with unchanged while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with unchanged while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with pagehide-return while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with pagehide-return while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with hidden-return while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with hidden-return while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with navigation-ABA while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with discard while the fork waits cannot issue an abandoned task",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:eaa30152b9ad4fbc3371027a16dd13bd37fd19b6c1acd6ba1d937113e5b74747"
+}
