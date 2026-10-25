@@ -2239,3 +2239,14 @@ Round-22 test synchronization correction: orchestrator review identified an unsa
   "note": "Persistent source EIO is deferred uncounted, and admission-read failures starve healthy peers with zero retry deadlines and one-second error loops."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-4ng2pg48",
+  "verdict": "accept",
+  "digest": "sha256:e9fa945918e3a3ea1a16460750326892c4a4d3d7406cd774839c037062e2fb40",
+  "note": "Independent verification accepts all 40 entries and settled scenarios; retained module temp-fixture failures are covered by exact-source passing replays."
+}
+```
