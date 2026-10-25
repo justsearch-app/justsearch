@@ -1985,7 +1985,6 @@ export class LibrarySurface extends JfElement {
         <jf-indexing-controls .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
       </div>
       ${this.renderReindexDecision()}
-      ${this.renderUnfinishedForgets()}
       ${this.bulkOutcome?.state === 'failed' && this.bulkOutcome.message ? html`
         <div class="action-message" role="alert">${this.bulkOutcome.message}</div>` : nothing}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
@@ -1995,6 +1994,7 @@ export class LibrarySurface extends JfElement {
           .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
         <p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>
       </div>` : nothing}
+      ${this.renderUnfinishedForgets()}
       ${this.roots.some(root => root.status === 'unavailable')
         ? html`<p>Some watched folders were last observed offline. Reindex cannot cover their files until they are available.</p>` : nothing}
       ${!this.isTauri

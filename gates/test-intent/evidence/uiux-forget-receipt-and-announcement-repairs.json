@@ -1,0 +1,195 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T22:46:53.525Z",
+  "revision": "3c127854fcb3f3d672c049861a723730de0503b7",
+  "tree": "8265e71889de2b26e4237f7d8be402bbedb4cbee",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2227610-1792968407898.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1424
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/domains/forget.test.ts",
+      "file": "modules/ui-web/src/api/domains/forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:916e7436202fc3492e3b08a986e265accb1744853fafdbc40d5318cb037c2858",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56.2 consent names the exact frozen target and preserves one key and every path byte",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation never approves, replays or reads a fictitious successful outcome",
+          "status": "passed"
+        },
+        {
+          "name": "S56 lost post-approval response observes the original key without another destructive POST",
+          "status": "passed"
+        },
+        {
+          "name": "S56 keeps typed INCOMPLETE separate from success",
+          "status": "passed"
+        },
+        {
+          "name": "S56 keeps typed UNKNOWN separate from success",
+          "status": "passed"
+        },
+        {
+          "name": "N56 malformed completion and an observation for another key remain unknown",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'error' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'error' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'lost-response' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'lost-response' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "S56 preparation refusal is truthful and does not become a success through an empty read",
+          "status": "passed"
+        },
+        {
+          "name": "RF55 Unix backslashes and trailing whitespace are not separators or wildcard prefixes",
+          "status": "passed"
+        },
+        {
+          "name": "S56 unfinished pagination is explicit and malformed or failed reads cannot become empty lists",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d7d96cbe3c5ea1ab3c307bb9eaa93d72198cf404ba9b257feab143d7367ff9ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3c127854fcb3f3d672c049861a723730de0503b7",
+    "revision": "3c127854fcb3f3d672c049861a723730de0503b7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2227610-1792968411650.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1563,
+        "output": "JSON report written to /tmp/test-intent-vitest-2227610-1792968411650.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/domains/forget.test.ts",
+        "classification": "assertion",
+        "detail": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' }):  AssertionError: expected 'COMPLETE' to be 'UNKNOWN' // Object.is equality\n    at /tmp/test-intent-before-eDV0gn/modules/ui-web/src/api/domains/forget.test.ts:134:26\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///tmp/test-intent-before-eDV0gn/modules/ui-web/ | N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' }):  AssertionE"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+        "classification": "assertion",
+        "detail": "submits Add once while waiting and announces its outcome:  AssertionError: expected 'Unfinished forgets could not be read.…' to contain 'Folder added'\n    at /tmp/test-intent-before-eDV0gn/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:110:72\n    at file:///tmp/test-intent-before-eDV0gn/modules/ui-web/node_modules/@vitest/runner/dist | exposes row removal progress, suppresses repeats and keeps the other row usable:  AssertionError: expected 'Unfinished forgets could not b"
+      }
+    ]
+  },
+  "digest": "sha256:8588a226ca11e41f8b1d79687ce355a066f87618b40b8ea7982e26004436e869"
+}

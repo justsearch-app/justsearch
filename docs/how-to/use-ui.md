@@ -159,6 +159,13 @@ If the index seems out of sync:
 A full-generation rebuild for an embedding mismatch is a separate operation; an incremental reindex
 does not replace that recovery.
 
+### Forgetting an Indexed File or Folder
+
+In Search v3, open a result's context menu and choose **Forget this file** or **Forget its folder**.
+Check the exact path before confirming. Review incomplete removals in Library's **Unfinished forgets**.
+See [Manage local data](manage-local-data.md) for keep-out rules, Retry/Withdraw, the outside-root file
+exception, and the original files, Memory, conversations, logs and other copies that remain.
+
 ### Summarizing and Asking Questions (AI)
 Click a result row to open its document preview. Results have no checkboxes. To build a selection
 in the live results card, use **Ctrl-click** (or Meta-click) to toggle files, or

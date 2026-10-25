@@ -111,6 +111,32 @@ it('N56 malformed completion and an observation for another key remain unknown',
   expect(result?.removal).toBe('UNKNOWN'); expect(result?.keepOut).toBe('UNKNOWN');
 });
 
+it.each([
+  { channel: 'success', target: { path: path.trimEnd() } },
+  { channel: 'success', target: { scope: 'FOLDER' as const } },
+  { channel: 'error', target: { path: path.trimEnd() } },
+  { channel: 'error', target: { scope: 'FOLDER' as const } },
+  { channel: 'lost-response', target: { path: path.trimEnd() } },
+  { channel: 'lost-response', target: { scope: 'FOLDER' as const } },
+])('N56 $channel receipt cannot retarget the frozen exact attempt ($target)', async ({ channel, target }) => {
+  const attempt = api.createForgetAttempt(path, 'FILE');
+  const receipt = outcome(attempt.key, target);
+  const requests = gateway(attempt, () => {
+    if (channel === 'lost-response') throw new Error('connection lost after accepted effect');
+    return channel === 'error'
+      ? json({ success: false, errorClass: 'HANDLER_FAILURE', errorDetails: { forget: receipt } })
+      : json({ success: true, structuredData: { forget: receipt } });
+  });
+  const dispatch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation((input, init) => String(input).includes('/indexing/forgets/')
+    ? Promise.resolve(json(receipt)) : dispatch(input, init));
+  const result = await api.executeForget('', attempt, async () => true);
+  expect(result?.status).toBe('UNKNOWN');
+  expect(result?.path).toBe(path); expect(result?.scope).toBe('FILE');
+  expect(result?.removal).toBe('UNKNOWN');
+  expect(requests).toHaveLength(2);
+});
+
 it('S56 preparation refusal is truthful and does not become a success through an empty read', async () => {
   const attempt = api.createForgetAttempt(path, 'FOLDER');
   fetchMock.mockResolvedValue(json({ success: false, errorClass: 'HANDLER_FAILURE',

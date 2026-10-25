@@ -1,0 +1,527 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T22:49:40.514Z",
+  "revision": "3c127854fcb3f3d672c049861a723730de0503b7",
+  "tree": "2aa0b6593c7233b1a7612fa18df4ed595e4b8d20",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2231045-1792968575578.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1465
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions RF55 keeps exact path objects out of the glob editor and retains their bytes on a glob save",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions RF55 removes a precise keep-out only through the witnessed save without editing glob text",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) S56.6 offers forget only to the host callback and leaves all ordinary verbs available",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) S56.9 keeps help and agent-history verbs absent even in a capable host",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) S56.9 keeps help and agent-history verbs absent even in a capable host",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) S56.9 keeps help and agent-history verbs absent even in a capable host",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f8e16e326bf30acc885eebcca0064c0e0d91aaff",
+    "revision": "f8e16e326bf30acc885eebcca0064c0e0d91aaff",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2231045-1792968578690.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1503,
+        "output": "JSON report written to /tmp/test-intent-vitest-2231045-1792968578690.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+        "classification": "assertion",
+        "detail": "Library retained-base exclusions RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs:  AssertionError: expected false to be true // Object.is equality\n    at /tmp/test-intent-before-gab9pn/modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts:62:36\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///tmp/test-intent-before-gab9p | Library retained-base exclusions RF55 keeps exact path objects out of "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+        "classification": "assertion",
+        "detail": "searchResultActions (577 Phase 8) S56.6 offers forget only to the host callback and leaves all ordinary verbs available:  AssertionError: expected [ 'search-result.open', …(2) ] to deeply equal [ 'search-result.open', …(4) ]\n    at /tmp/test-intent-before-gab9pn/modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts:72:48\n    at file:///tmp/test-intent-before-gab9pn/modules/ui-web/node_modules/@vitest/runner/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts#searchResultActions (577 Phase 8) S56.9 keeps help and agent-history verbs absent even in a capable host",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d6ad5e7bf6ff7234d5c0f0e5ee3788756b0432e71ddf9b9b68fbc8b89b7b80a6"
+}

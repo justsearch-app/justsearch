@@ -7,11 +7,13 @@ import { OperationClient, OperationError } from '../../shell-v0/operations/Opera
 
 export type ForgetScope = NonNullable<ForgetOutcome['scope']>;
 
-function outcomeFor(value: unknown, key: string): ForgetOutcome | null {
+function outcomeFor(value: unknown, key: string, target?: Pick<ForgetAttempt, 'path' | 'scope'>): ForgetOutcome | null {
   const parsed = forgetOutcomeSchema.safeParse(value);
   if (!parsed.success || parsed.data.operationKey !== key
       || parsed.data.status === 'COMPLETE' && (parsed.data.removal !== 'CONFIRMED'
-        || parsed.data.path === null || parsed.data.scope === null)) return null;
+        || parsed.data.path === null || parsed.data.scope === null)
+      || target !== undefined && (parsed.data.path !== null && parsed.data.path !== target.path
+        || parsed.data.scope !== null && parsed.data.scope !== target.scope)) return null;
   return parsed.data;
 }
 
@@ -56,7 +58,7 @@ export function createForgetAttempt(path: string, scope: ForgetScope): ForgetAtt
 export async function executeForget(base: string, attempt: ForgetAttempt,
   consent: (prompt: ForgetConsent) => Promise<boolean>): Promise<ForgetOutcome | null> {
   return invoke(base, 'core.forget-indexed-path', { path: attempt.path, scope: attempt.scope },
-    attempt.key, attempt.key, consent);
+    attempt.key, attempt.key, consent, attempt);
 }
 
 export async function decideForget(base: string, forgetKey: string, decision: 'retry' | 'withdraw',
@@ -66,7 +68,7 @@ export async function decideForget(base: string, forgetKey: string, decision: 'r
 
 async function invoke(base: string, operationId: string, args: Record<string, unknown>,
   invocationKey: string, originalKey: string,
-  consent: (prompt: ForgetConsent) => Promise<boolean>): Promise<ForgetOutcome | null> {
+  consent: (prompt: ForgetConsent) => Promise<boolean>, target?: Pick<ForgetAttempt, 'path' | 'scope'>): Promise<ForgetOutcome | null> {
   let cancelled = false;
   try {
     const result = await new OperationClient({ apiBase: base }).invokeWithConsent(operationId,
@@ -80,11 +82,11 @@ async function invoke(base: string, operationId: string, args: Record<string, un
           return { approved, allowAlways: false };
         },
       });
-    const parsed = outcomeFor(result.structuredData?.forget, originalKey);
+    const parsed = outcomeFor(result.structuredData?.forget, originalKey, target);
     if (parsed !== null) return parsed;
   } catch (error: unknown) {
     if (cancelled) return null;
-    const parsed = outcomeFor(error instanceof OperationError ? error.errorDetails?.forget : null, originalKey);
+    const parsed = outcomeFor(error instanceof OperationError ? error.errorDetails?.forget : null, originalKey, target);
     if (parsed !== null) return parsed;
     if (operationId === 'core.forget-indexed-path' && error instanceof OperationError
         && error.errorCode === 'FORGET_PREPARATION_REFUSED') {
@@ -95,7 +97,11 @@ async function invoke(base: string, operationId: string, args: Record<string, un
     }
   }
   // Includes lost/late transport and malformed receipts. A read cannot authorize another effect.
-  try { return await readForget(base, originalKey); }
+  try {
+    const observed = outcomeFor(await readForget(base, originalKey), originalKey, target);
+    if (observed === null) throw new Error('The observation differs from the frozen forget target');
+    return observed;
+  }
   catch {
     return { operationKey: originalKey, path: typeof args.path === 'string' ? args.path : null,
       scope: args.scope === 'FILE' || args.scope === 'FOLDER' ? args.scope : null,
