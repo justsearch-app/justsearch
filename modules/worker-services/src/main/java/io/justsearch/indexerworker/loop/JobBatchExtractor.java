@@ -403,7 +403,7 @@ public final class JobBatchExtractor {
                 entry, extractionFailures.retryAtMs());
             else jobQueue.markClaimFailed(claim, original, entry);
           });
-      var presence = ingestionAuthority.presence(filePath, claim.ingestionRoot());
+      var presence = failurePresence(claim);
       if (presence != SourcePresence.Verdict.ABSENT
           && presence != SourcePresence.Verdict.SOURCE_UNREADABLE
           && !BatchServiceFailures.sourceFailure(e, filePath, sourceRealPath)
@@ -481,8 +481,7 @@ public final class JobBatchExtractor {
    * reported not found (the next admission decides with its own confirmation).
    */
   private IngestionOutcome sourceAccessOutcome(JobQueue.IndexJob claim, IOException failure) {
-    SourcePresence.Verdict verdict =
-        ingestionAuthority.presence(claim.path(), claim.ingestionRoot());
+    SourcePresence.Verdict verdict = failurePresence(claim);
     if (verdict == SourcePresence.Verdict.ROOT_UNAVAILABLE
         || verdict == SourcePresence.Verdict.SOURCE_UNREADABLE) {
       return ingestionAuthority.notConfirmedAbsent(verdict, claim.path(), failure);
@@ -491,6 +490,16 @@ public final class JobBatchExtractor {
       return ingestionAuthority.sourceUnreadable(claim.path(), failure);
     }
     return null;
+  }
+
+  private SourcePresence.Verdict failurePresence(JobQueue.IndexJob claim) {
+    try {
+      return ingestionAuthority.presence(claim.path(), claim.ingestionRoot());
+    } catch (RuntimeException | Error lookupFailure) {
+      if (lookupFailure instanceof VirtualMachineError fatal) throw fatal;
+      // Failure classification keeps the original retry; uncertainty never authorizes deletion.
+      return SourcePresence.Verdict.SOURCE_UNREADABLE;
+    }
   }
 
   private static boolean openableForRead(Path source) {

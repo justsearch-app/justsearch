@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.FileSystemException;
@@ -73,8 +74,20 @@ final class BatchServiceFailures {
         }
       }
     }
-    return !Files.isReadable(source)
-        || (sourceRealPath != null && !Files.isReadable(sourceRealPath));
+    return unreadable(source) || (sourceRealPath != null && unreadable(sourceRealPath));
+  }
+
+  private static boolean unreadable(Path source) {
+    try {
+      // A path replaced with a FIFO/device must not block the failure-classification loop.
+      if (!Files.isRegularFile(source)) return true;
+      try (var input = Files.newInputStream(source)) {
+        input.read(); // A readable empty file is valid; inspect at most one byte.
+        return false;
+      }
+    } catch (IOException | SecurityException failure) {
+      return true;
+    }
   }
 
   void unavailable(Throwable failure, Consumer<Boolean> record) {
