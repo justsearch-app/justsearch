@@ -24,14 +24,19 @@ describe('conversation deletion refusals', () => {
   });
 
   it('reports the failed branch and the branches already deleted', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        errorCode: 'BRANCHES_PREVENT_DELETION', childSessionIds: ['first', 'second'],
-      }), { status: 409 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: 'Stop the running agent before deleting.', errorCode: 'CONVERSATION_BUSY',
-      }), { status: 409 })));
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const query = new URL(String(url), 'http://test').searchParams;
+      const parent = query.get('childrenOf');
+      if (parent !== null) return new Response(JSON.stringify({ childrenOf: parent, locked: false, sessions: [
+        { sessionId: parent, busy: false },
+        ...(parent === 'parent' ? ['first', 'second'].map(id => ({ sessionId: id, parentSessionId: parent, busy: false })) : []),
+      ] }));
+      if (init?.method === 'DELETE') return String(url).endsWith('/second')
+        ? new Response(JSON.stringify({ error: 'Stop the running agent before deleting.', errorCode: 'CONVERSATION_BUSY' }), { status: 409 })
+        : new Response(JSON.stringify({ ok: true }));
+      return new Response(JSON.stringify(query.get('existsOnly') === 'true'
+        ? { exists: !String(url).includes('/first/') } : { sessions: [] }));
+    }));
     expect(await deleteConversationWithCascade('parent', async () => true)).toMatchObject({
       ok: false, deletedIds: ['first'], failedId: 'second',
       error: expect.stringContaining('Stop the running agent'),

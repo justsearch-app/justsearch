@@ -423,82 +423,54 @@ describe('deleteConversationWithCascade (Slice 517 FIX-U1)', () => {
     expect(result.childIds).toEqual(['child-1', 'child-2']);
   });
 
-  it('409 with onChildsFound returning false leaves parent + children intact', async () => {
-    const calls = mockFetch(() =>
-      jsonResponse({
-        errorCode: 'BRANCHES_PREVENT_DELETION',
-        childSessionIds: ['child-X'],
-      }, 409),
-    );
+  it('a complete tree declined by the reader issues no delete', async () => {
+    const calls = mockFetch((url) => {
+      const parent = new URL(url, 'http://test').searchParams.get('childrenOf');
+      return jsonResponse({ childrenOf: parent, locked: false, sessions: [
+        { sessionId: parent, busy: false },
+        ...(parent === 'parent-X' ? [{ sessionId: 'child-X', parentSessionId: parent, busy: false }] : []),
+      ] });
+    });
     const onChildsFound = vi.fn().mockResolvedValue(false);
     const result = await deleteConversationWithCascade('parent-X', onChildsFound);
     expect(result.ok).toBe(false);
-    expect(result.childIds).toEqual(['child-X']);
-    expect(onChildsFound).toHaveBeenCalledWith(['child-X']);
-    // Only the original DELETE attempt — no cascade.
-    expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(1);
+    expect(result.cancelled).toBe(true);
+    expect(onChildsFound).toHaveBeenCalledWith(['child-X'], expect.any(Array));
+    expect(calls.filter(c => c.method === 'DELETE')).toHaveLength(0);
   });
 
-  it('409 with onChildsFound returning true cascades: children first, then parent', async () => {
-    // Sequence the fetch responses: first parent DELETE → 409 with one
-    // child id; child DELETE → 200; parent retry → 200.
-    let parentAttempt = 0;
+  it('a confirmed tree deletes children before the parent', async () => {
     const fetched: string[] = [];
-    globalThis.fetch = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
-      const u = url.toString();
-      const method = init?.method ?? 'GET';
-      fetched.push(`${method} ${u}`);
-      if (u.includes('/parent-1') && method === 'DELETE') {
-        parentAttempt++;
-        if (parentAttempt === 1) {
-          return Promise.resolve(jsonResponse({
-            errorCode: 'BRANCHES_PREVENT_DELETION',
-            childSessionIds: ['child-A'],
-          }, 409));
-        }
-        return Promise.resolve(jsonResponse({ ok: true }));
-      }
-      if (u.includes('/child-A') && method === 'DELETE') {
-        return Promise.resolve(jsonResponse({ ok: true }));
-      }
-      return Promise.resolve(jsonResponse({}, 404));
-    }) as typeof fetch;
-
+    mockFetch((url, method) => {
+      const parent = new URL(url, 'http://test').searchParams.get('childrenOf');
+      if (method === 'DELETE') { fetched.push(url); return jsonResponse({ ok: true }); }
+      return jsonResponse({ childrenOf: parent, locked: false, sessions: [
+        { sessionId: parent, busy: false },
+        ...(parent === 'parent-1' ? [{ sessionId: 'child-A', parentSessionId: parent, busy: false }] : []),
+      ] });
+    });
     const onChildsFound = vi.fn().mockResolvedValue(true);
     const result = await deleteConversationWithCascade('parent-1', onChildsFound);
-    expect(result).toEqual({ ok: true });
-    expect(onChildsFound).toHaveBeenCalledWith(['child-A']);
-    // Sequence: parent-1 (409) → child-A (200) → parent-1 (200).
-    expect(fetched).toEqual([
-      'DELETE /api/chat/conversations/parent-1',
-      'DELETE /api/chat/conversations/child-A',
-      'DELETE /api/chat/conversations/parent-1',
-    ]);
+    expect(result.ok).toBe(true);
+    expect(onChildsFound).toHaveBeenCalledWith(['child-A'], expect.any(Array));
+    expect(fetched).toEqual(['/api/chat/conversations/child-A', '/api/chat/conversations/parent-1']);
   });
 
   it('cascade aborts if a child delete fails — parent stays intact', async () => {
-    let parentAttempt = 0;
-    globalThis.fetch = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
-      const u = url.toString();
-      const method = init?.method ?? 'GET';
-      if (u.includes('/parent-2') && method === 'DELETE') {
-        parentAttempt++;
-        return Promise.resolve(jsonResponse({
-          errorCode: 'BRANCHES_PREVENT_DELETION',
-          childSessionIds: ['child-fail'],
-        }, 409));
-      }
-      if (u.includes('/child-fail') && method === 'DELETE') {
-        return Promise.resolve(jsonResponse({ error: 'network glitch' }, 500));
-      }
-      return Promise.resolve(jsonResponse({}, 404));
-    }) as typeof fetch;
-
-    const onChildsFound = vi.fn().mockResolvedValue(true);
-    const result = await deleteConversationWithCascade('parent-2', onChildsFound);
+    const fetched: string[] = [];
+    mockFetch((url, method) => {
+      const parent = new URL(url, 'http://test').searchParams.get('childrenOf');
+      if (method === 'DELETE') { fetched.push(url); return jsonResponse({ error: 'network glitch' }, 500); }
+      if (!parent) return jsonResponse(url.includes('existsOnly=true') ? { exists: true } : { sessions: [] });
+      return jsonResponse({ childrenOf: parent, locked: false, sessions: [
+        { sessionId: parent, busy: false },
+        ...(parent === 'parent-2' ? [{ sessionId: 'child-fail', parentSessionId: parent, busy: false }] : []),
+      ] });
+    });
+    const result = await deleteConversationWithCascade('parent-2', async () => true);
     expect(result.ok).toBe(false);
-    // parent was attempted exactly once — no retry after child failure.
-    expect(parentAttempt).toBe(1);
+    expect(fetched).toEqual(['/api/chat/conversations/child-fail']);
+    expect(result.remainingIds).toEqual(['parent-2', 'child-fail']);
   });
 });
 

@@ -13,8 +13,10 @@ import {
   loadConversations,
   deleteConversationWithCascade,
   type Conversation,
+  type DeleteCascadeResult,
 } from '../../state/conversationListStore.js';
-import { confirmAsync } from '../ConfirmDialog.js';
+import { confirmConversationTree, conversationDeleteOutcome } from './conversationDelete.js';
+import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
 import { emitEphemeralToast } from '../advisory/ephemeralToast.js';
 
 function relativeTime(ms: number): string {
@@ -200,51 +202,17 @@ export class ConversationHistory extends JfElement {
 
   private async onDelete(c: Conversation, e: Event): Promise<void> {
     e.stopPropagation();
-    const label = (c.title ?? c.firstUserMessage ?? 'this conversation').slice(0, 80);
-    const ok = await confirmAsync({
-      title: 'Delete conversation?',
-      message: `Permanently delete "${label}"? This cannot be undone.`,
-      variant: 'danger',
-      confirmLabel: 'Delete',
-    });
-    if (!ok) return;
-    // Slice 517 FIX-U1 — cascade-aware delete. If the backend reports the
-    // conversation has child branches (HTTP 409), surface a second
-    // confirm naming the branches (looked up from the loaded conversations
-    // array) and recursively delete them on consent.
-    const labels = new Map(this.conversations.map(row => [row.id, row.title ?? row.firstUserMessage ?? row.id]));
-    let declined = false;
-    const result = await deleteConversationWithCascade(c.id, async (childIds) => {
-      const childLabels = childIds.map((id) => {
-        const child = this.conversations.find((p) => p.id === id);
-        const childLabel = child
-          ? (child.title ?? child.firstUserMessage?.slice(0, 60) ?? 'Untitled')
-          : id;
-        return `• ${childLabel}`;
-      });
-      const message =
-        `"${label}" has ${childIds.length} child branch${childIds.length === 1 ? '' : 'es'}:\n`
-        + `${childLabels.join('\n')}\n\n`
-        + `Delete the conversation and ${childIds.length === 1 ? 'its branch' : 'all branches'} together?`;
-      const consented = await confirmAsync({
-        title: 'Delete conversation and branches?',
-        message,
-        variant: 'danger',
-        confirmLabel: `Delete all (${childIds.length + 1})`,
-      });
-      declined = !consented;
-      return consented;
-    });
-    if (!result.ok && !declined) {
-      const progress = result.deletedIds?.length
-        ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. Deleted: ${result.deletedIds.map(id => `“${labels.get(id) ?? id}”`).join(', ')}. ` : '';
-      const failedRow = this.conversations.find(row => row.id === result.failedId);
-      const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${failedRow?.title ?? failedRow?.firstUserMessage ?? result.failedId}”. ` : '';
-      emitEphemeralToast({ message: progress + failed + (result.error ?? 'Could not delete the conversation. Try again.'), severity: 'warning' });
-      if (result.deletedIds?.length || !['STORE_LOCKED', 'CONVERSATION_BUSY'].includes(result.errorCode ?? '')) {
-        await loadConversations();
+    let tree: DeleteTreeEntry[] = [];
+    const report = (result: DeleteCascadeResult) => {
+      if (!result.ok && !result.cancelled) {
+        emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
       }
-    }
+    };
+    const result = await deleteConversationWithCascade(c.id, (children, preview) => {
+      tree = preview;
+      return confirmConversationTree(children, preview);
+    }, report);
+    report(result);
   }
 
   private renderItem(c: Conversation): TemplateResult {
