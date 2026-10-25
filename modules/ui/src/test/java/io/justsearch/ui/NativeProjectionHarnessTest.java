@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -13,6 +15,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeServerConfig;
+import io.justsearch.app.services.worker.WorkerHost;
+import io.justsearch.core.component.TestEngineComponents;
+import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.ipc.SearchResponse;
+import io.justsearch.ipc.SearchResult;
+import io.justsearch.ipc.SearchTrace;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.core.harness.HarnessBarrierProtocol;
 import java.io.IOException;
@@ -321,6 +332,211 @@ final class NativeProjectionHarnessTest {
       writePriorCut(data, priorPid, "g-source", "g-building", invalidReceipt);
       assertThrows(IllegalArgumentException.class,
           () -> NativeProjectionHarness.fromEnvironment(data, selection()::get));
+    }
+  }
+
+  @Test
+  void vectorLoadingIsPendingThenRequiresAnActualVectorHitAndReleasesEachLease() throws Exception {
+    try (var query = new QueryFixture(data)) {
+      when(query.client.search(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.isNull()))
+          .thenThrow(loading()).thenReturn(response("expected", "multi_leg", "VECTOR"));
+      assertFalse(assertDoesNotThrow(() -> query.hit(true)), "loading must remain pending");
+      assertEquals(0, query.openLeases);
+      awaitQuery(query, true);
+      assertEquals(2, query.captures);
+      assertEquals(0, query.openLeases);
+      assertFalse(Files.exists(HarnessBarrierProtocol.reached(data,
+          NativeProjectionHarness.ACTION_FAMILY)), "query readiness alone cannot publish a marker");
+    }
+  }
+
+  @Test
+  void loadingFollowedByEveryNonmatchingFailurePropagatesTheExactFailure() throws Exception {
+    var failures = new ArrayList<RuntimeException>();
+    for (var status : KnowledgeClientException.Status.values()) {
+      if (status != KnowledgeClientException.Status.DEADLINE_EXCEEDED) {
+        failures.add(new KnowledgeClientException(status, loading().getMessage()));
+      }
+    }
+    for (String detail : List.of("SEMANTIC_BUDGET_EXCEEDED (cause: contended)",
+        "SEMANTIC_BUDGET_EXCEEDED (cause: stuck)", "deadline exceeded",
+        "SEMANTIC_BUDGET_EXCEEDED (cause: loading) ")) {
+      failures.add(new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED, detail));
+    }
+    failures.add(new IllegalStateException(loading().getMessage()));
+    for (RuntimeException expected : failures) {
+      try (var query = new QueryFixture(data)) {
+        when(query.client.search(org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.isNull())).thenThrow(loading()).thenThrow(expected);
+        assertFalse(query.hit(true));
+        assertSame(expected, assertThrows(RuntimeException.class, () -> query.hit(true)));
+        assertEquals(2, query.captures);
+        assertEquals(0, query.openLeases);
+      }
+    }
+  }
+
+  @Test
+  void textLoadingShapedFailureAndCaptureFailuresAreNeverSwallowed() throws Exception {
+    try (var query = new QueryFixture(data)) {
+      var expected = loading();
+      when(query.client.search(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.isNull())).thenThrow(expected);
+      assertSame(expected, assertThrows(KnowledgeClientException.class, () -> query.hit(false)));
+      assertEquals(0, query.openLeases);
+      setField(query.bootstrap, "clientVerified", false);
+      assertThrows(IllegalStateException.class, () -> query.hit(true));
+      assertEquals(1, query.captures);
+    }
+  }
+
+  @Test
+  void invalidSuccessAfterLoadingNeverProvidesPositiveVectorProof() throws Exception {
+    var invalid = List.of(SearchResponse.getDefaultInstance(),
+        SearchResponse.newBuilder().addResults(SearchResult.newBuilder().setId("expected")).build(),
+        response("wrong", "multi_leg", "VECTOR"), response("", "multi_leg", "VECTOR"),
+        response("expected", "", "VECTOR"), response("expected", "blocked", "VECTOR"),
+        response("expected", "empty_query", "VECTOR"), response("expected", "multi_leg", "TEXT"),
+        response("expected", "multi_leg", ""));
+    for (var result : invalid) {
+      try (var query = new QueryFixture(data)) {
+        when(query.client.search(org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.isNull())).thenThrow(loading()).thenReturn(result);
+        assertFalse(query.hit(true));
+        assertFalse(query.hit(true));
+        assertEquals(0, query.openLeases);
+      }
+    }
+  }
+
+  @Test
+  @org.junit.jupiter.api.Timeout(190)
+  void persistentVectorLoadingUsesTheOriginalWaitAndNeverWritesAnActionMarker() throws Exception {
+    try (var query = new QueryFixture(data)) {
+      when(query.client.search(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.isNull())).thenThrow(loading());
+      long started = System.nanoTime();
+      IOException failure = assertThrows(IOException.class, () -> awaitQuery(query, true));
+      assertEquals("Native proof timed out: vector query control", failure.getMessage());
+      assertTrue(System.nanoTime() - started >= TimeUnit.SECONDS.toNanos(180));
+      assertEquals(0, query.openLeases);
+      assertFalse(Files.exists(HarnessBarrierProtocol.reached(data,
+          NativeProjectionHarness.ACTION_FAMILY)));
+    }
+  }
+
+  @Test
+  void persistentVectorLoadingInterruptionExitsAfterReleasingItsLease() throws Exception {
+    try (var query = new QueryFixture(data)) {
+      var attempted = new CountDownLatch(1);
+      when(query.client.search(org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.eq(20), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.isNull())).thenAnswer(ignored -> {
+            attempted.countDown();
+            throw loading();
+          });
+      var failure = new AtomicReference<Throwable>();
+      Thread actor = new Thread(() -> {
+        try { awaitQuery(query, true); }
+        catch (Throwable thrown) { failure.set(thrown); }
+      }, "native-vector-loading-interrupt-control");
+      actor.start();
+      try {
+        assertTrue(attempted.await(2, TimeUnit.SECONDS));
+        actor.interrupt();
+        actor.join(2000);
+        assertFalse(actor.isAlive());
+        assertInstanceOf(InterruptedException.class, failure.get());
+        assertEquals(0, query.openLeases);
+      } finally {
+        actor.interrupt();
+        actor.join(2000);
+        assertFalse(actor.isAlive());
+      }
+    }
+  }
+
+  private static KnowledgeClientException loading() {
+    return new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+        "SEMANTIC_BUDGET_EXCEEDED (cause: loading)");
+  }
+
+  private static SearchResponse response(String id, String decision, String mode) {
+    return SearchResponse.newBuilder().addResults(SearchResult.newBuilder().setId(id))
+        .setSearchTrace(SearchTrace.newBuilder().setDecisionKind(decision).setEffectiveMode(mode)).build();
+  }
+
+  private static Object invoke(String name, Class<?>[] types, Object... arguments) throws Exception {
+    var method = NativeProjectionHarness.class.getDeclaredMethod(name, types);
+    method.setAccessible(true);
+    try { return method.invoke(null, arguments); }
+    catch (java.lang.reflect.InvocationTargetException wrapped) {
+      if (wrapped.getCause() instanceof Exception failure) throw failure;
+      if (wrapped.getCause() instanceof Error failure) throw failure;
+      throw new AssertionError(wrapped.getCause());
+    }
+  }
+
+  private static void awaitQuery(QueryFixture query, boolean vector) throws Exception {
+    invoke("await", new Class<?>[] {String.class, java.util.function.BooleanSupplier.class},
+        "vector query control", (java.util.function.BooleanSupplier) () -> {
+          try { return query.hit(vector); }
+          catch (RuntimeException failure) { throw failure; }
+          catch (Exception failure) { throw new AssertionError(failure); }
+        });
+  }
+
+  private static void setField(Object target, String name, Object value) throws Exception {
+    var field = KnowledgeServerBootstrap.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(target, value);
+  }
+
+  /** Real capture/ClientLease/withClient/close path, with only the physical search mocked. */
+  private static final class QueryFixture implements AutoCloseable {
+    private final TestEngineExecutors executors = new TestEngineExecutors();
+    private final KnowledgeClient client = mock(KnowledgeClient.class);
+    private final KnowledgeServerBootstrap bootstrap;
+    private int openLeases;
+    private int captures;
+
+    private QueryFixture(Path directory) throws Exception {
+      var components = TestEngineComponents.fourComponents();
+      var host = mock(WorkerHost.class);
+      when(host.captureServingView()).thenAnswer(ignored -> {
+        assertEquals(0, openLeases, "the previous actual lease must close before recapture");
+        openLeases++;
+        captures++;
+        return new WorkerHost.ServingLease() {
+          @Override public <T> T withClient(KnowledgeClient captured,
+              java.util.function.Function<KnowledgeClient, T> action) { return action.apply(captured); }
+          @Override public void close() { openLeases--; }
+        };
+      });
+      var config = new KnowledgeServerConfig(false, directory, directory, directory,
+          5000L, 2000L, 3, 2000L, 1000L, 300000L, 100, 0L, 0);
+      bootstrap = new KnowledgeServerBootstrap(executors, config, null, components,
+          components.handle("index"), host, new java.util.concurrent.locks.ReentrantReadWriteLock());
+      setField(bootstrap, "client", client);
+      setField(bootstrap, "clientVerified", true);
+    }
+
+    private boolean hit(boolean vector) throws Exception {
+      return (boolean) invoke("hasHit", new Class<?>[] {KnowledgeServerBootstrap.class,
+          io.justsearch.core.context.EngineContext.class, String.class, String.class, boolean.class},
+          bootstrap, null, "native-retained-file", "expected", vector);
+    }
+
+    @Override public void close() {
+      assertEquals(0, openLeases);
+      bootstrap.close();
+      executors.close();
     }
   }
 

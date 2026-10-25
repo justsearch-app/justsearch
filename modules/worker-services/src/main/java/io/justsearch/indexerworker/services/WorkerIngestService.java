@@ -251,6 +251,9 @@ public final class WorkerIngestService {
             signalBus,
             migrationSwitchingMaxDurationMs);
     this.statusOps.setMigrationReplayFailure(() -> watcherReplayFailure);
+    if (ingestLifecycle != null) {
+      this.statusOps.setWriterTragic(ingestLifecycle::hasTragicWriterException);
+    }
     this.statusOps.setOpenedRuntimePaths(
         searchLifecycle == null ? null : searchLifecycle.openedIndexPath(),
         ingestLifecycle == null ? null : ingestLifecycle.openedIndexPath());

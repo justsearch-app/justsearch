@@ -101,7 +101,7 @@ final class BulkWriteChunkDeclarationTest extends LuceneExecutorTestBase {
     when(jobQueue.ownsClaimForPublication(any())).thenReturn(true);
     var extractor = mock(TimeboxedContentExtractor.class);
     when(extractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
-    return new JobBatchWriter(
+    return new JobBatchWriter(new WorkerIngestionAuthority(),
         runtime.indexingCoordinator(),
         mock(WorkerSignalBus.class),
         mock(EmbeddingProviderLifecycle.class),

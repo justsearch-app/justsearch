@@ -1,0 +1,289 @@
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java
+index 7e41a13f2..7ccf654c2 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java
+@@ -736,6 +736,9 @@ public class IndexingLoop implements Closeable {
+ 
+         // Batch processing: extract all → batch embed → build+write
+         processBatch(jobs);
++        // Row deadlines alone do not throttle an outage while fresh backlog remains ready.
++        if ((writer.deferredBatch() || extractor.deferredBatch())
++            && !sleepBrieflyAfterError()) break;
+ 
+         // Time-based commit strategy (every 10s or when buffer is full)
+         long now = System.currentTimeMillis();
+@@ -930,6 +933,7 @@ public class IndexingLoop implements Closeable {
+   private void processBatch(List<JobQueue.IndexJob> jobs) {
+     Span batchSpan = Span.getInvalid();
+     boolean fatal = false;
++    writer.beginBatch();
+     try {
+       batchSpan = maybeSpan("indexing.batch");
+       batchSpan.setAttribute("batch.polled", (long) jobs.size());
+@@ -948,7 +952,10 @@ public class IndexingLoop implements Closeable {
+     } finally {
+       // A stopped/failed batch may not visit every polled claim. Written claims retain their
+       // existing commit owner; the remainder return only after synchronous batch execution exits.
+-      if (!fatal) journal.returnBatchClaims(jobs);
++      if (!fatal) {
++        writer.finishBatch();
++        journal.returnBatchClaims(jobs);
++      }
+       batchSpan.end();
+     }
+   }
+@@ -1013,7 +1020,7 @@ public class IndexingLoop implements Closeable {
+     // Liveness beat: batch embedding (Phase 2) can be long on GPU — signal we still own these.
+     heartbeat();
+ 
+-    // Phase 3: Build and write all docs
++    // Phase 3: Build and write all docs. Judge shared-service failures after visiting peers.
+     for (int i = 0; i < extracted.size(); i++) {
+       if (!running.get()) break;
+ 
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java
+index 9bf468007..c273e9b17 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java
+@@ -79,6 +79,7 @@ public final class JobBatchExtractor {
+   private final LongConsumer indexedDelta;
+ 
+   private boolean indexEmptyForBatch;
++  private final BatchServiceFailures identityFailures = new BatchServiceFailures();
+ 
+   public JobBatchExtractor(
+       WorkerIngestionAuthority ingestionAuthority,
+@@ -130,21 +131,30 @@ public final class JobBatchExtractor {
+     indexEmptyForBatch = indexKnownEmpty();
+ 
+     List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
+-    for (JobQueue.IndexJob job : jobs) {
+-      if (!running.get()) break;
++    identityFailures.begin();
++    try {
++      for (JobQueue.IndexJob job : jobs) {
++        if (!running.get()) break;
+ 
+-      ExtractedJob ex = extractJob(job);
+-      if (ex != null) {
+-        extracted.add(ex);
++        ExtractedJob ex = extractJob(job);
++        if (ex != null) {
++          extracted.add(ex);
++        }
++        // Tempdoc 885 item 3: extraction is the CPU-heaviest step in the batch, so it paces per
++        // file. The predecessor abandoned the rest of the batch on user activity; the duty cycle
++        // slows it instead, which is why arm (c) can still make progress under continuous search.
++        indexingPacing.pace();
+       }
+-      // Tempdoc 885 item 3: extraction is the CPU-heaviest step in the batch, so it paces per
+-      // file. The predecessor abandoned the rest of the batch on user activity; the duty cycle
+-      // slows it instead, which is why arm (c) can still make progress under continuous search.
+-      indexingPacing.pace();
++    } finally {
++      identityFailures.finish();
+     }
+     return extracted;
+   }
+ 
++  boolean deferredBatch() {
++    return identityFailures.deferredBatch();
++  }
++
+   /**
+    * Whether the index is known to hold no documents. Task t-20261013-ef3c41: {@code docCount()}
+    * answers 0 when the reader cannot be read, which made an unreadable index "empty" and skipped
+@@ -224,20 +234,23 @@ public final class JobBatchExtractor {
+                 .get()
+                 .resolve(envelope.pathHash(), envelope.observedAtMs())
+                 .docUid();
++        identityFailures.success();
+       } catch (RuntimeException identityError) {
+         log.error("Document identity persistence failed for: {}", filePath, identityError);
+         FileEnvelope admittedEnvelope = envelope;
+-        journal.recordOutcomeSafely(
+-            filePath,
+-            "WRITE_FAILED(document_identity)",
+-            () ->
+-                jobQueue.markClaimFailed(claim,
+-                    journal.outcome(
+-                        IngestionOutcomeClass.WRITE_FAILED,
+-                        IngestionReasonCodes.WRITE_FAILED,
+-                        IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+-                        failureDetail(identityError)),
+-                    ledgerEntry(filePath, admittedEnvelope, collection, null, provenance)));
++        identityFailures.failure(identityError, systemic -> {
++          IngestionOutcome outcome = journal.outcome(
++              IngestionOutcomeClass.WRITE_FAILED,
++              IngestionReasonCodes.WRITE_FAILED,
++              systemic ? IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT
++                  : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
++              failureDetail(identityError));
++          journal.recordOutcomeSafely(filePath, "WRITE_FAILED(document_identity)", () -> {
++            var entry = ledgerEntry(filePath, admittedEnvelope, collection, null, provenance);
++            if (systemic) jobQueue.deferClaim(claim, outcome, entry);
++            else jobQueue.markClaimFailed(claim, outcome, entry);
++          });
++        });
+         journal.recordFailedMetric(filePath, null);
+         batchStats.recordFailed();
+         return null;
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java
+index 829716b35..2cd30dca7 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java
+@@ -68,6 +68,7 @@ public final class JobBatchWriter {
+   private final BooleanSupplier chunkSpladeEnabledSupplier;
+   private final Supplier<RunningRuntime> activeLexicalSource;
+   private final FileMutationFence fileMutationFence;
++  private final BatchServiceFailures writeFailures = new BatchServiceFailures();
+   private java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> fileExclusions =
+       io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
+ 
+@@ -110,6 +111,18 @@ public final class JobBatchWriter {
+     fileExclusions = Objects.requireNonNull(exclusions, "exclusions");
+   }
+ 
++  void beginBatch() {
++    writeFailures.begin();
++  }
++
++  boolean deferredBatch() {
++    return writeFailures.deferredBatch();
++  }
++
++  void finishBatch() {
++    writeFailures.finish();
++  }
++
+   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
+   public void write(ExtractedJob ex, float[] precomputedEmbedding) {
+     Span writeSpan = maybeSpan("indexing.write");
+@@ -215,6 +228,7 @@ public final class JobBatchWriter {
+         indexedDelta.accept(chunksIndexed);
+         log.debug("Indexed {} chunks for: {}", chunksIndexed, ex.filePath().getFileName());
+       }
++      writeFailures.success();
+       stageRecorder.record("write", System.currentTimeMillis() - writeStart, null);
+ 
+       journal.enqueueTransition(
+@@ -237,6 +251,7 @@ public final class JobBatchWriter {
+       // or release its live claim before the journal confirms the Lucene commit.
+       if (journal.ownsPendingCommit(ex.claim())) return;
+       if (isDrainingWriteRejection(e)) {
++        writeFailures.unavailable();
+         journal.recordOutcomeSafely(
+             ex.filePath(),
+             "WRITE_UNAVAILABLE_DRAINING",
+@@ -254,22 +269,20 @@ public final class JobBatchWriter {
+                         ex.artifact(),
+                         contentExtractor.extractionPolicy(), ex.provenance())));
+       } else {
+-        journal.recordOutcomeSafely(
+-            ex.filePath(),
+-            "WRITE_FAILED",
+-            () ->
+-                jobQueue.markClaimFailed(
+-                    ex.claim(),
+-                    journal.outcome(
+-                        IngestionOutcomeClass.WRITE_FAILED,
+-                        IngestionReasonCodes.WRITE_FAILED,
+-                        IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+-                        failureDetail(e)),
+-                    LedgerEntryFactory.forEnvelope(
+-                        ex.envelope(),
+-                        ex.collection(),
+-                        ex.artifact(),
+-                        contentExtractor.extractionPolicy(), ex.provenance())));
++        writeFailures.failure(e, systemic -> {
++          var outcome = journal.outcome(
++              IngestionOutcomeClass.WRITE_FAILED,
++              IngestionReasonCodes.WRITE_FAILED,
++              systemic ? IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT
++                  : IngestionRetryPolicy.RETRY_WITH_BACKOFF,
++              failureDetail(e));
++          journal.recordOutcomeSafely(ex.filePath(), "WRITE_FAILED", () -> {
++            var entry = LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(),
++                ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance());
++            if (systemic) jobQueue.deferClaim(ex.claim(), outcome, entry);
++            else jobQueue.markClaimFailed(ex.claim(), outcome, entry);
++          });
++        });
+         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
+         batchStats.recordFailed();
+       }
+@@ -303,7 +316,7 @@ public final class JobBatchWriter {
+   /**
+    * Tempdoc 885 item 21c — the write path's failure reason is the exception's own text.
+    *
+-   * <p>{@code WRITE_FAILED} is {@code RETRY_WITH_BACKOFF}, so a row carrying the literal "Index
++   * <p>A per-file {@code WRITE_FAILED} uses {@code RETRY_WITH_BACKOFF}, so a row carrying the literal "Index
+    * write failed" would retry for seven days and then reach {@code RETRY_EXHAUSTED} with nothing
+    * recorded about WHY the write failed. The DEFER arm above keeps its literal on purpose:
+    * "Runtime draining" IS the whole fact there, and its exception is a routing sentinel rather
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BatchServiceFailures.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BatchServiceFailures.java
+new file mode 100644
+index 000000000..47d029015
+--- /dev/null
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BatchServiceFailures.java
+@@ -0,0 +1,60 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.loop;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.function.Consumer;
++
++/**
++ * Judges failures only after the batch has visited the service for every document.
++ * A successful peer proves an isolated failure; argument errors and nonfatal errors are
++ * document failures even without a successful peer. Otherwise a runtime failure of the
++ * shared service defers through the queue's existing fixed one-second retry window.
++ * Single-threaded, like the indexing loop. No failure history survives a batch or success.
++ */
++final class BatchServiceFailures {
++  private final List<Consumer<Boolean>> pending = new ArrayList<>();
++  private boolean active;
++  private boolean succeeded;
++  private boolean deferred;
++  private boolean unavailable;
++
++  void begin() {
++    pending.clear();
++    succeeded = false;
++    deferred = false;
++    unavailable = false;
++    active = true;
++  }
++
++  void success() {
++    succeeded = true;
++  }
++
++  void failure(Throwable failure, Consumer<Boolean> record) {
++    if (active && failure instanceof RuntimeException
++        && !(failure instanceof IllegalArgumentException)) {
++      pending.add(record);
++    } else {
++      record.accept(false);
++    }
++  }
++
++  void unavailable() {
++    unavailable = true;
++  }
++
++  boolean deferredBatch() {
++    return deferred || unavailable;
++  }
++
++  void finish() {
++    active = false;
++    deferred = !succeeded && !pending.isEmpty();
++    try {
++      for (var record : pending) record.accept(deferred);
++    } finally {
++      pending.clear();
++    }
++  }
++}

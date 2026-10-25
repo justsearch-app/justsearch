@@ -315,6 +315,28 @@ exact revision, and its projection-verification refusal must appear in status.
       "newChecks": [
         "modules/ui/src/integrationTest/java/io/justsearch/app/engine/OutstandingHttpFailureCleanupIntegrationTest.java#preEntryExchangeFailureKeepsItsIdentityAndClosesTheFixture"
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/NativeProjectionHarnessTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A4/R1-R6: exercise existing private hasHit/await with actual Bootstrap capture/ClientLease/withClient/close and a mocked physical search: exact typed VECTOR loading is pending, then only the expected hit with effective VECTOR succeeds; all nonmatching error identities and TEXT loading propagate unchanged; invalid responses remain pending; the original 180 second polling deadline and interruption release ownership and publish no action marker. Existing successor and exact cut/receipt controls are retained. The journal-loss skip branch is unchanged and inspected, not claimed runtime verified by these controls.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "drive-migration builder assignment 2026-10-25, user grant supplied verbatim",
+          "delegationScope": "Existing drive repair only; approved A4 installed native fixture correction and R1-R8 controls; no production model/query policy or budget change.",
+          "choice": "Use reflection to exercise unchanged private hasHit/await without creating production API; actual client leases retain and release a controlled physical serving view. Preserve all existing tests and installed native assertions. The exact loading-only search catch adapts fixture readiness; it does not establish a product defect or a baseline native pass.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-native-readiness.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/NativeProjectionHarnessTest.java#vectorLoadingIsPendingThenRequiresAnActualVectorHitAndReleasesEachLease"
+      ],
+      "repaired": true
     }
   ]
 }

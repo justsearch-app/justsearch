@@ -48,6 +48,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.lucene.search.Query;
@@ -110,6 +111,7 @@ final class IndexStatusOps {
 
   void setMigrationReplayFailure(Supplier<String> supplier) { migrationReplayFailure = supplier; }
 
+  private BooleanSupplier writerTragic = () -> false;
   private Path openedSearchPath;
   private Path openedIngestPath;
 
@@ -186,6 +188,10 @@ final class IndexStatusOps {
 
   void setEmbeddingCompatController(EmbeddingCompatibilityController controller) {
     this.embeddingCompatController = controller;
+  }
+
+  void setWriterTragic(BooleanSupplier writerTragic) {
+    this.writerTragic = writerTragic;
   }
 
   /** Bind the exact runtime directories before this service is published. */
@@ -361,9 +367,15 @@ final class IndexStatusOps {
     }
 
     boolean loopFailed = indexingLoop != null && indexingLoop.hasFailed();
+    long outagePauseUntilMs = indexingLoop == null ? 0L : indexingLoop.serviceOutagePausedUntilMs();
+    boolean tragicWriter = writerTragic.getAsBoolean();
     String state;
-    if (loopFailed) {
+    if (tragicWriter) {
+      state = "ERROR";
+    } else if (loopFailed) {
       state = IndexingLoop.LoopState.FAILED.name();
+    } else if (outagePauseUntilMs > 0) {
+      state = "WAITING";
     } else if (counts.processingCount() > 0 || counts.pendingReadyCount() > 0) {
       state = "INDEXING";
     } else if (queueDepth > 0) {
@@ -374,7 +386,7 @@ final class IndexStatusOps {
       state = "IDLE";
     }
 
-    boolean healthy = !loopFailed && (failures == null || failures.failedCount() == 0);
+    boolean healthy = !tragicWriter && !loopFailed && (failures == null || failures.failedCount() == 0);
 
     IndexGenerationManager.State stateSnapshot =
         indexGenerationManager == null ? null : indexGenerationManager.readStateBestEffort();
@@ -392,7 +404,7 @@ final class IndexStatusOps {
                 healthy,
                 state,
                 jobQueue.pendingBytes()))
-        .setFailure(buildFailure(failures))
+        .setFailure(buildFailure(failures, outagePauseUntilMs))
         .setMigration(
             buildMigration(
                 stateSnapshot, activeDocCount, buildingDocCount, counts, processingJobsCount))
@@ -616,7 +628,7 @@ final class IndexStatusOps {
     return out;
   }
 
-  private FailureStatus buildFailure(JobQueue.FailureSummary failures) {
+  private FailureStatus buildFailure(JobQueue.FailureSummary failures, long outagePauseUntilMs) {
     return FailureStatus.newBuilder()
         .setFailedCount(failures == null ? 0L : failures.failedCount())
         .setLastFailedPath(
@@ -632,9 +644,8 @@ final class IndexStatusOps {
                 ? 0L
                 : failures.lastFailedAtMs())
         .setNextRetryAtMs(
-            failures == null || failures.nextRetryAtMs() == null
-                ? 0L
-                : failures.nextRetryAtMs())
+            outagePauseUntilMs > 0 ? outagePauseUntilMs
+                : failures == null || failures.nextRetryAtMs() == null ? 0L : failures.nextRetryAtMs())
         .setSearchesZeroResultCount(metrics.getSearchesZeroResultCount())
         .putAllFailedByFileKind(metrics.getFailedByFileKind())
         .build();

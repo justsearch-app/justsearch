@@ -53,6 +53,12 @@ public final class IngestionOutcomeJournal {
   private final CounterMetric<IngestionOutcomeTags> outcomeWriteFailureCounter;
   private final BooleanSupplier detailedTracingSupplier;
   private final List<JobQueue.IngestionLedgerTransition> pendingMarkDone = new ArrayList<>();
+  private OutcomeWriteException batchReturnFailure;
+  private OutcomeWriteException commitWriteFailure;
+  private long lastCommitFailureLogNs;
+  private long unreportedCommitFailures;
+  private long lastReturnFailureLogNs;
+  private long unreportedReturnFailures;
   // A failed batch-exit return retries here before another poll; the queue remains claim authority.
   private final java.util.Set<JobQueue.IndexJob> pendingReturns =
       java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
@@ -96,13 +102,26 @@ public final class IngestionOutcomeJournal {
     try {
       jobQueue.returnUnfinishedClaims(List.copyOf(pendingReturns));
       pendingReturns.clear();
+      batchReturnFailure = null;
       return true;
     } catch (OutcomeWriteException failure) {
       outcomeWriteFailureCounter.increment(IngestionOutcomeTags.ofIndexingLoop());
-      log.warn("Could not return {} exited batch claims; retrying before the next poll", pendingReturns.size(), failure);
+      batchReturnFailure = failure;
+      unreportedReturnFailures++;
+      long now = System.nanoTime();
+      if (lastReturnFailureLogNs == 0 || now - lastReturnFailureLogNs >= 60_000_000_000L) {
+        log.warn("Could not return {} exited batch claims; {} failures since last report; retrying before the next poll",
+            pendingReturns.size(), unreportedReturnFailures, failure);
+        lastReturnFailureLogNs = now;
+        unreportedReturnFailures = 0;
+      }
       return false;
     }
   }
+
+  OutcomeWriteException batchReturnFailure() { return batchReturnFailure; }
+
+  OutcomeWriteException commitWriteFailure() { return commitWriteFailure; }
 
   /** Test-only accessor for the pending-transition queue (read-only snapshot). */
   List<JobQueue.IngestionLedgerTransition> pendingTransitionsForTest() {
@@ -134,6 +153,7 @@ public final class IngestionOutcomeJournal {
    */
   public void drainPending() {
     retryBatchReturns();
+    commitWriteFailure = null;
     if (pendingMarkDone.isEmpty()) return;
     Span markDoneSpan = maybeSpan("indexing.markDone");
     markDoneSpan.setAttribute("paths.count", (long) pendingMarkDone.size());
@@ -178,10 +198,7 @@ public final class IngestionOutcomeJournal {
       jobQueue.markDoneTransitions(group, outcome);
       return;
     } catch (OutcomeWriteException e) {
-      log.warn(
-          "Batch markDone for outcome {} rolled back, falling back to per-transition: {}",
-          outcome.outcomeClass(),
-          e.getMessage());
+      reportCommitFailure(e);
     }
     Iterator<JobQueue.IngestionLedgerTransition> it = group.iterator();
     while (it.hasNext()) {
@@ -189,12 +206,21 @@ public final class IngestionOutcomeJournal {
       try {
         jobQueue.markDoneTransitions(List.of(transition), outcome);
       } catch (OutcomeWriteException ex) {
-        log.warn(
-            "Per-path markDone after commit rolled back; will retry on next drain: {}",
-            transition.path(),
-            ex);
+        commitWriteFailure = ex;
+        reportCommitFailure(ex);
         it.remove(); // keep this transition in the caller's pendingMarkDone for retry
       }
+    }
+  }
+
+  private void reportCommitFailure(OutcomeWriteException failure) {
+    unreportedCommitFailures++;
+    long now = System.nanoTime();
+    if (lastCommitFailureLogNs == 0 || now - lastCommitFailureLogNs >= 60_000_000_000L) {
+      log.warn("Committed queue outcomes rolled back; {} failures since last report; retaining transitions for retry",
+          unreportedCommitFailures, failure);
+      lastCommitFailureLogNs = now;
+      unreportedCommitFailures = 0;
     }
   }
 
