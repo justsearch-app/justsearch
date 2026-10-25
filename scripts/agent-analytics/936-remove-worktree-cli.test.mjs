@@ -111,6 +111,12 @@ async function makeRepo(label) {
   await fsp.writeFile(path.join(repo, '.gitignore'), 'ignored/\nnode_modules\n', 'utf8');
   await fsp.writeFile(path.join(repo, 'tracked.txt'), 'base\n', 'utf8');
   git(repo, 'add', '.gitignore', 'tracked.txt');
+  if (process.platform !== 'win32') {
+    // Every admission/runtime/lock/registration regression also carries a committed native link.
+    await fsp.writeFile(path.join(root, 'gate-sentinel'), 'external gate sentinel\n');
+    await fsp.symlink('../gate-sentinel', path.join(repo, 'gate-link'));
+    git(repo, 'add', 'gate-link');
+  }
   git(repo, 'commit', '-m', 'fixture');
   return { root, repo, cli: await installProductionCli(repo) };
 }
@@ -332,6 +338,143 @@ try {
     assert.match(refused.output, /not covered by the archive manifest: after-archive\.txt/);
     assert.equal(fs.existsSync(partial), true);
   });
+
+  await check('an archive for another worktree cannot authorize actual removal', async () => {
+    const dest = addWorktree(primary, 'wrong-archive-target', 'codex/936-wrong-archive-target');
+    const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+    const refused = runCli(primary, dest, ['--archive-manifest', archiveManifest]);
+    assert.equal(refused.status, 1, refused.output);
+    assert.match(refused.output, /archive manifest .* is for .*not /);
+    assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+  });
+
+  // Durable boundary checks: each refusal runs the actual destructive CLI in an owned fixture.
+  for (const mutation of ['new-ignored', 'recreated-deletion', 'committed-after-archive', 'forged-blob']) {
+    await check(`retained archive refuses ${mutation} at actual removal`, async () => {
+      const dest = addWorktree(primary, mutation, `codex/936-${mutation}`);
+      if (mutation === 'recreated-deletion') fs.unlinkSync(path.join(dest, 'tracked.txt'));
+      else fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained draft\n');
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: mutation, policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      if (mutation === 'new-ignored') {
+        fs.mkdirSync(path.join(dest, 'ignored'));
+        fs.writeFileSync(path.join(dest, 'ignored', 'new.txt'), 'never retained\n');
+      } else if (mutation === 'recreated-deletion') {
+        fs.writeFileSync(path.join(dest, 'tracked.txt'), 'recreated, never retained\n');
+      } else if (mutation === 'committed-after-archive') {
+        fs.writeFileSync(path.join(dest, 'new-commit.txt'), 'newly committed, never retained\n');
+        git(dest, 'add', 'new-commit.txt');
+        git(dest, 'commit', '-m', 'new state after archive');
+      } else {
+        fs.writeFileSync(path.join(dest, 'draft.txt'), 'forged mapping, unretained\n');
+        saved.manifest.files.find((e) => e.path === 'draft.txt').blob = git(dest, 'hash-object', '-w', 'draft.txt').trim();
+        fs.writeFileSync(saved.manifestPath, JSON.stringify(saved.manifest));
+      }
+      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+      const refused = runCli(primary, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(refused.status, 1, refused.output);
+      assert.match(refused.output, /archive|retained/i);
+      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+      assert.equal(git(primary.repo, 'rev-parse', saved.stateRef).trim(), saved.stateCommit);
+    });
+  }
+
+  if (process.platform !== 'win32') {
+    if (process.getuid() !== 0) await check('real permission-denied inspection cannot authorize actual removal', async () => {
+      const dest = addWorktree(primary, 'permission-denied', 'codex/936-permission-denied');
+      fs.mkdirSync(path.join(dest, 'private'));
+      fs.writeFileSync(path.join(dest, 'private/draft.txt'), 'retained private draft\n');
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'permission-denied', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+      let refused;
+      fs.chmodSync(path.join(dest, 'private'), 0);
+      try { refused = runCli(primary, dest, ['--archive-manifest', saved.manifestPath]); }
+      finally { fs.chmodSync(path.join(dest, 'private'), 0o755); }
+      assert.equal(refused.status, 1, refused.output);
+      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+    });
+
+    await check('new valuable dangling links block removal while declared disposal and recorded discards remain allowed', async () => {
+      const fx = await makeRepo('ignored-policy');
+      fixtures.push(fx);
+      const policy = { ...DEFAULT_ARCHIVE_POLICY, ignoredPerFileCapBytes: 16,
+        valuableIgnored: ['ignored/*.patch'], disposableIgnored: ['ignored/disposable/**'] };
+      fs.mkdirSync(path.join(fx.repo, 'governance'));
+      fs.writeFileSync(path.join(fx.repo, 'governance/worktree-lifecycle.v1.json'), JSON.stringify({ archive: policy }));
+      const dest = addWorktree(fx, 'ignored-policy', 'codex/936-ignored-policy');
+      fs.mkdirSync(path.join(dest, 'ignored'));
+      fs.writeFileSync(path.join(dest, 'ignored/discard.bin'), 'X'.repeat(32));
+      const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: dest, resource: 'ignored-policy', policy, discardIgnored: ['ignored/discard.bin'] });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      fs.writeFileSync(path.join(dest, 'ignored/discard.bin'), 'smaller');
+      fs.mkdirSync(path.join(dest, 'ignored/disposable'));
+      fs.writeFileSync(path.join(dest, 'ignored/disposable/new.bin'), 'X'.repeat(32));
+      const outside = path.join(fx.root, 'outside-cache');
+      fs.mkdirSync(outside);
+      fs.writeFileSync(path.join(outside, 'sentinel'), 'must survive\n');
+      fs.symlinkSync(outside, path.join(dest, 'node_modules'), 'dir');
+      fs.symlinkSync('missing valuable destination'.repeat(2), path.join(dest, 'ignored/new.patch'));
+      const refused = runCli(fx, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(refused.status, 1, refused.output);
+      assert.match(refused.output, /ignored paths not covered.*ignored\/new.patch/);
+      assert.ok(fs.lstatSync(path.join(dest, 'ignored/new.patch')).isSymbolicLink());
+      fs.unlinkSync(path.join(dest, 'ignored/new.patch'));
+      const removed = runCli(fx, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(removed.status, 0, removed.output);
+      assert.equal(fs.existsSync(dest), false);
+      assert.equal(fs.readFileSync(path.join(outside, 'sentinel'), 'utf8'), 'must survive\n');
+    });
+
+    for (const mutation of ['dangling-retarget', 'relative-retarget', 'absolute-retarget', 'link-to-file', 'file-to-link', 'recreated-deletion-link']) {
+      await check(`actual removal refuses ${mutation} and preserves source/index/external targets`, async () => {
+        const dest = addWorktree(primary, mutation, `codex/936-${mutation}`);
+        git(dest, 'config', 'core.symlinks', 'true');
+        const targetA = path.join(primary.root, `${mutation}-a`);
+        const targetB = path.join(primary.root, `${mutation}-b`);
+        const payload = mutation === 'absolute-retarget' ? targetA : mutation === 'dangling-retarget' ? 'missing-a' : `../${mutation}-a`;
+        fs.writeFileSync(targetA, payload);
+        fs.writeFileSync(targetB, payload);
+        const entry = mutation === 'recreated-deletion-link' ? 'tracked.txt' : 'entry';
+        if (mutation === 'recreated-deletion-link') fs.unlinkSync(path.join(dest, entry));
+        else if (mutation === 'file-to-link') fs.writeFileSync(path.join(dest, entry), payload);
+        else fs.symlinkSync(payload, path.join(dest, entry));
+        const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: mutation, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        if (mutation !== 'recreated-deletion-link') fs.unlinkSync(path.join(dest, entry));
+        if (mutation === 'link-to-file') fs.writeFileSync(path.join(dest, entry), payload);
+        else fs.symlinkSync(mutation === 'dangling-retarget' ? 'missing-b' : mutation === 'absolute-retarget' ? targetB
+          : mutation === 'relative-retarget' ? `../${mutation}-b` : payload, path.join(dest, entry));
+        const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+        const refused = runCli(primary, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+        assert.equal(refused.status, 1, refused.output);
+        assert.match(refused.output, /does not verify/);
+        assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+        assert.equal(fs.readFileSync(targetA, 'utf8'), payload);
+        assert.equal(fs.readFileSync(targetB, 'utf8'), payload);
+      });
+    }
+
+    await check('unchanged retained link text permits external destination edits/deletion and actual removal', async () => {
+      const dest = addWorktree(primary, 'link-release', 'codex/936-link-release');
+      const outside = path.join(primary.root, 'release-external');
+      fs.writeFileSync(outside, 'destination before archive\n');
+      fs.symlinkSync(outside, path.join(dest, 'saved-link'));
+      fs.mkdirSync(path.join(dest, 'ignored'));
+      fs.symlinkSync('missing destination', path.join(dest, 'ignored', 'dangling'));
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'link-release', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      fs.writeFileSync(outside, 'destination after archive\n');
+      assert.equal(runCli(primary, dest, ['--dry-run', '--allow-ignored', '--archive-manifest', saved.manifestPath]).status, 0);
+      assert.equal(fs.readFileSync(outside, 'utf8'), 'destination after archive\n');
+      fs.unlinkSync(outside);
+      const removed = runCli(primary, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(removed.status, 0, removed.output);
+      assert.equal(fs.existsSync(dest), false);
+      assert.equal(fs.existsSync(outside), false);
+      assert.equal(git(primary.repo, 'show', `${saved.stateCommit}:saved-link`), outside);
+    });
+  }
 
   await check('an exact external path with spaces removes its captured codex branch, preserves guessed branch and junction target', () => {
     const result = runCli(primary, target, ['--allow-ignored', '--archive-manifest', archiveManifest, '--delete-branch']);

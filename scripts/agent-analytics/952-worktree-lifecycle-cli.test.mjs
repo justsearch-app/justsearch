@@ -744,6 +744,121 @@ try {
     assert.equal(refSha(resumeFx.checkout, 'refs/heads/worktree-r11'), head, 'an UNKNOWN receipt keeps the branch');
     assert.notEqual(cfg(resumeFx.checkout, 'branch.worktree-r11.justsearch-released'), null);
   });
+
+  if (process.platform !== 'win32') {
+    await check('fresh release retains native tracked/untracked/ignored links and restores exact representation', async () => {
+      const fx = await makeFixture('native-fresh');
+      git(fx.checkout, 'config', 'core.symlinks', 'true');
+      const dest = createWorktree(fx, 'native-fresh', 'native-session');
+      const external = path.join(fx.root, 'outside');
+      fs.mkdirSync(external);
+      fs.writeFileSync(path.join(external, 'sentinel'), 'external bytes\n');
+      fs.symlinkSync('old missing target', path.join(dest, 'tracked-link'));
+      git(dest, 'add', 'tracked-link');
+      git(dest, 'commit', '-m', 'tracked link');
+      fs.unlinkSync(path.join(dest, 'tracked-link'));
+      const links = new Map([
+        ['tracked-link', external], ['untracked-link', path.join(external, 'sentinel')],
+        ['ignored/dangling', 'missing target \t\n'],
+      ]);
+      for (const [name, target] of links) {
+        fs.mkdirSync(path.dirname(path.join(dest, name)), { recursive: true });
+        fs.symlinkSync(target, path.join(dest, name), name === 'tracked-link' ? 'dir' : 'file');
+      }
+      const result = runCli(fx, ['release', dest, '--no-fetch', '--session-id', 'native-session']);
+      assert.equal(result.status, 0, result.out);
+      assert.equal(fs.existsSync(dest), false);
+      assert.equal(fs.readFileSync(path.join(external, 'sentinel'), 'utf8'), 'external bytes\n');
+      const manifests = manifestFiles(fx, 'native-fresh');
+      assert.equal(manifests.length, 1);
+      const manifest = JSON.parse(fs.readFileSync(manifests[0], 'utf8'));
+      const archive = require(path.join(fx.checkout, 'scripts/dev/lib/worktree-archive.cjs'));
+      assert.equal(refSha(fx.checkout, manifest.stateRef), manifest.stateCommit);
+      assert.deepEqual(archive.verifyArchive({ mainRepoRoot: fx.checkout, manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+      const restored = path.join(fx.root, 'restored');
+      assert.equal(archive.restoreArchive({ mainRepoRoot: fx.checkout, stateCommit: manifest.stateCommit, destination: restored }).refused, undefined);
+      for (const [name, target] of links) {
+        assert.match(git(fx.checkout, 'ls-tree', manifest.stateCommit, '--', name), /^120000 blob /);
+        assert.deepEqual(fs.readlinkSync(path.join(restored, name), { encoding: 'buffer' }), Buffer.from(target));
+      }
+      assert.equal(archive.removeRestored({ mainRepoRoot: fx.checkout, path: restored }).removed, true);
+      assert.equal(fs.readFileSync(path.join(external, 'sentinel'), 'utf8'), 'external bytes\n');
+    });
+
+    for (const phase of ['archived', 'verified']) {
+      for (const mutation of ['unchanged', 'retarget', 'new-ignored', 'recreated-deletion', 'new-head', 'forged-mapping']) {
+        await check(`${phase}-phase resume ${mutation === 'unchanged' ? 'releases unchanged links' : `refuses ${mutation}`} using the retained archive`, async () => {
+          const name = `${phase}-${mutation}`;
+          const fx = await makeFixture(name);
+          git(fx.checkout, 'config', 'core.symlinks', 'true');
+          const dest = createWorktree(fx, name, 'resume-session');
+          const outside = path.join(fx.root, 'outside-a');
+          const outsideB = path.join(fx.root, 'outside-b');
+          // Equal destination and payload bytes make the unsafe old hash path falsely succeed.
+          fs.writeFileSync(outside, outside);
+          fs.writeFileSync(outsideB, outside);
+          fs.symlinkSync(outside, path.join(dest, 'saved-link'));
+          fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained draft\n');
+          if (mutation === 'recreated-deletion') fs.unlinkSync(path.join(dest, 'README.md'));
+          const stagedArchive = require(path.join(fx.checkout, 'scripts/dev/lib/worktree-archive.cjs'));
+          const saved = stagedArchive.archiveWorktree({ mainRepoRoot: fx.checkout, worktreePath: dest, resource: name, policy: stagedArchive.loadPolicy(fx.checkout) });
+          assert.equal(saved.refused, undefined, JSON.stringify(saved));
+          const state = saved.stateCommit;
+          if (mutation === 'unchanged') fs.writeFileSync(outside, 'external destination changed\n');
+          else if (mutation === 'retarget') {
+            fs.unlinkSync(path.join(dest, 'saved-link'));
+            fs.symlinkSync(outsideB, path.join(dest, 'saved-link'));
+          } else if (mutation === 'new-ignored') {
+            fs.mkdirSync(path.join(dest, 'ignored'));
+            fs.writeFileSync(path.join(dest, 'ignored/new.txt'), 'never retained\n');
+          } else if (mutation === 'recreated-deletion') fs.writeFileSync(path.join(dest, 'README.md'), 'recreated, never retained\n');
+          else if (mutation === 'new-head') commitIn(dest, 'new-commit.txt', 'unretained commit\n', 'commit after archive');
+          else {
+            fs.writeFileSync(path.join(dest, 'draft.txt'), 'unretained forged mapping\n');
+            saved.manifest.files.find((e) => e.path === 'draft.txt').blob = git(dest, 'hash-object', '-w', 'draft.txt').trim();
+            fs.writeFileSync(saved.manifestPath, JSON.stringify(saved.manifest));
+          }
+          const indexPath = git(dest, 'rev-parse', '--path-format=absolute', '--git-path', 'index').trim();
+          const beforeIndex = fs.readFileSync(indexPath);
+          const beforeStatus = git(dest, 'status', '--porcelain=v1', '--ignored', '-z');
+          const manifestBytes = fs.readFileSync(saved.manifestPath);
+          const register = require(path.join(fx.checkout, 'scripts/dev/lib/worktree-register.cjs'));
+          const record = {
+            ...register.buildFinalizationRecord({ resource: name, worktreePath: dest, branch: `worktree-${name}`, head: saved.head, phase,
+              by: { sessionId: 'crashed-session', pid: deadPid(), creationFileTimeUtc: null }, leaseDurationSec: 900, now: Date.now() - 3600 * 1000 }),
+            manifestPath: saved.manifestPath,
+          };
+          await register.writeFinalization({ mainRepoRoot: fx.checkout, record, env: { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: fx.stateRoot } });
+          const result = runCli(fx, ['release', dest, '--no-fetch', '--session-id', 'resume-session']);
+          assert.equal(result.status, mutation === 'unchanged' ? 0 : 3, result.out);
+          assert.doesNotMatch(result.stderr, new RegExp(`archived ${name}:`), 'resume never creates a second archive');
+          assert.deepEqual(manifestFiles(fx, name), [saved.manifestPath]);
+          assert.deepEqual(fs.readFileSync(saved.manifestPath), manifestBytes);
+          assert.equal(refSha(fx.checkout, saved.stateRef), state);
+          assert.equal(listRefs(fx.checkout, `refs/archive/${name}`).filter((r) => /\/state-/.test(r)).length, 1);
+          assert.equal(fs.readFileSync(outside, 'utf8'), mutation === 'unchanged' ? 'external destination changed\n' : outside);
+          assert.equal(fs.readFileSync(outsideB, 'utf8'), outside);
+          if (mutation === 'unchanged') {
+            assert.equal(fs.existsSync(dest), false);
+            assert.equal(readFinalization(fx, name), null);
+            assert.deepEqual(stagedArchive.verifyArchive({ mainRepoRoot: fx.checkout, manifest: saved.manifest }),
+              { ok: true, missing: [], mismatched: [], errors: [] });
+            assert.equal(stagedArchive.listArchives({ mainRepoRoot: fx.checkout }).find((row) => row.resource === name).bytes > 0, true);
+            const restored = path.join(fx.root, 'restored');
+            assert.equal(stagedArchive.restoreArchive({ mainRepoRoot: fx.checkout, stateCommit: state, destination: restored }).refused, undefined);
+            assert.equal(fs.readlinkSync(path.join(restored, 'saved-link')), outside);
+            assert.equal(fs.readFileSync(path.join(restored, 'draft.txt'), 'utf8'), 'retained draft\n');
+            assert.equal(stagedArchive.removeRestored({ mainRepoRoot: fx.checkout, path: restored }).removed, true);
+          } else {
+            assert.equal(fs.existsSync(dest), true);
+            assert.equal(git(dest, 'status', '--porcelain=v1', '--ignored', '-z'), beforeStatus);
+            assert.deepEqual(fs.readFileSync(indexPath), beforeIndex);
+            assert.notEqual(readFinalization(fx, name), null, 'refusal retains finalization evidence');
+          }
+        });
+      }
+    }
+  } else console.log('UNVERIFIED native Windows link lifecycle scenarios (requires native Windows symlink execution)');
   if (process.platform === 'linux') await check('Linux prepare/register/release preserves spaced paths and case-distinct worktrees', async () => {
     const fx = await makeFixture('Linux space Case');
     commitIn(fx.checkout, 'modules/ui-web/package.json', '{}\n', 'fixture npm working directory');

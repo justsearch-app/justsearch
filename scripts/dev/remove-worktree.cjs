@@ -905,7 +905,7 @@ function inspectArchiveManifest({ mainRepoRoot, manifestArg, target, needed }) {
   }
   // Loaded lazily: the archive library requires the governance policy file, which a dry-run on a
   // repository without it must not need.
-  const { verifyArchive } = require('./lib/worktree-archive.cjs');
+  const { verifyArchive, classifyIgnored, loadPolicy } = require('./lib/worktree-archive.cjs');
   const verify = verifyArchive({ mainRepoRoot, manifest });
   if (!verify.ok) {
     const detail = [
@@ -916,6 +916,13 @@ function inspectArchiveManifest({ mainRepoRoot, manifestArg, target, needed }) {
     return { blocker: `archive manifest does not verify (${detail}); re-run release so the archive matches the tree`, covered: null };
   }
   const covered = new Set((manifest.files || []).map((f) => String(f.path || '').replace(/\\/g, '/')));
+  // Reclassify at each admission, including the final one. --allow-ignored permits policy
+  // disposal, not newly-created valuable content absent from the retained archive.
+  const ignored = classifyIgnored({ worktreePath: target, policy: loadPolicy(mainRepoRoot) });
+  if (ignored.refused) return { blocker: `archive ignored-file inspection failed: ${ignored.message}`, covered: null };
+  const discarded = new Set((manifest.skipped || []).filter((e) => e.reason === 'oversized-discarded').map((e) => e.path));
+  const uncovered = [...ignored.archive, ...ignored.oversized].filter((e) => !covered.has(e.path) && !discarded.has(e.path));
+  if (uncovered.length) return { blocker: `ignored paths not covered by the archive manifest: ${uncovered.map((e) => e.path).join(', ')}`, covered: null };
   return { blocker: null, covered };
 }
 

@@ -227,6 +227,12 @@ function matchesDeclaredCache(caches, filePath) {
 
 /* ── classification ─────────────────────────────────────────────────────────────────────────── */
 
+/** A link's own payload size, including on platforms whose lstat size describes a reparse point. */
+function entrySize(file) {
+  const stat = fs.lstatSync(file);
+  return stat.isSymbolicLink() ? fs.readlinkSync(file, { encoding: 'buffer' }).length : stat.size;
+}
+
 /**
  * Split the worktree's ignored files into the four policy buckets (Amendment A).
  *
@@ -251,11 +257,12 @@ function classifyIgnored({ worktreePath, policy, git = defaultGit }) {
     if (!rel) continue;
     let size = 0;
     try {
-      size = fs.statSync(path.join(worktreePath, rel)).size;
-    } catch {
+      size = entrySize(path.join(worktreePath, rel));
+    } catch (err) {
       // Vanished between `ls-files` and here (a live build writing into `build/`). Nothing to
       // archive, nothing to refuse over.
-      continue;
+      if (err.code === 'ENOENT') continue;
+      return { refused: true, reason: 'inspect-failed', message: `Cannot inspect ${rel}: ${err.message}`, oversized: [] };
     }
     const entry = { path: rel, size };
     if (matchesDeclaredCache(active.declaredCaches, rel)) buckets.caches.push(entry);
@@ -303,6 +310,14 @@ function archiveWorktree({
 }) {
   const active = policy || loadPolicy(mainRepoRoot);
   const resourceId = worktreeResourceId(resource);
+  const stamp = compactTimestamp(now);
+  const manifestPath = path.join(mainRepoRoot, ...active.localDir.split('/'), resourceId, `${stamp}.json`);
+  try {
+    fs.lstatSync(manifestPath);
+    return { refused: true, reason: 'archive-collision', message: `Archive manifest already exists: ${manifestPath}`, oversized: [] };
+  } catch (err) {
+    if (err.code !== 'ENOENT') return { refused: true, reason: 'manifest-inspect-failed', message: err.message, oversized: [] };
+  }
   const classified = classifyIgnored({ worktreePath, policy: active, git });
   if (classified.refused) return classified;
 
@@ -355,7 +370,6 @@ function archiveWorktree({
 
   // (2) state commit through a temporary index in the common dir. Unique per process AND per call:
   // two archives running in one process must not share an index file.
-  const stamp = compactTimestamp(now);
   const unique = `${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   const indexFile = path.join(commonDir, `952-archive-index-${unique}`);
   const pathspecFile = path.join(commonDir, `952-archive-pathspec-${unique}`);
@@ -423,7 +437,7 @@ function archiveWorktree({
   let changed;
   let untracked;
   try {
-    git(['update-ref', stateRef, stateCommit], { cwd: mainRepoRoot });
+    git(['update-ref', stateRef, stateCommit, ''], { cwd: mainRepoRoot });
     changed = gitZ(git, ['diff-tree', '--no-commit-id', '-r', '--name-only', '-z', head, stateCommit], { cwd: mainRepoRoot });
     untracked = new Set(gitZ(git, ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: worktreePath }).map(normalizeRelPath));
   } catch (err) {
@@ -446,7 +460,7 @@ function archiveWorktree({
     const blob = blobs.get(rel) || null;
     let size = ignoredSizes.has(rel) ? ignoredSizes.get(rel) : null;
     if (size === null) {
-      try { size = fs.statSync(path.join(worktreePath, rel)).size; } catch { size = 0; }
+      try { size = entrySize(path.join(worktreePath, rel)); } catch { size = 0; }
     }
     let klass;
     if (ignoredSizes.has(rel)) klass = valuableSet.has(rel) ? 'ignored-valuable' : 'ignored';
@@ -476,10 +490,9 @@ function archiveWorktree({
     caches: { files: classified.caches.length, bytes: classified.caches.reduce((sum, e) => sum + e.size, 0) },
   };
 
-  const manifestPath = path.join(mainRepoRoot, ...active.localDir.split('/'), resourceId, `${stamp}.json`);
   try {
     fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
   } catch (err) {
     return { refused: true, reason: 'manifest-write-failed', message: String(err && err.message ? err.message : err), oversized: [] };
   }
@@ -509,43 +522,106 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
     return { ok: false, missing, mismatched, errors: ['manifest is not an object'] };
   }
   const worktreePath = manifest.worktreePath;
+  let live = false;
+  if (worktreePath) {
+    try {
+      const stat = fs.lstatSync(worktreePath);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('worktree is not a directory');
+      live = true;
+    } catch (err) {
+      if (err.code !== 'ENOENT') errors.push(`Cannot inspect worktree: ${err.message}`);
+    }
+  }
+  if (errors.length) return { ok: false, missing, mismatched, errors };
 
+  // Resolve identities together. A newer live HEAD is not covered by an old state tree, even
+  // when its working files are clean. The state commit's parent binds the historical head too.
   try {
-    const resolved = gitText(git, ['rev-parse', '--verify', '--quiet', `${manifest.stateRef}^{commit}`], { cwd: mainRepoRoot });
-    if (resolved !== manifest.stateCommit) {
-      errors.push(`stateRef ${manifest.stateRef} resolves to ${resolved || '<missing>'}, expected ${manifest.stateCommit}`);
+    const refs = [`${manifest.stateRef}^{commit}`, `${manifest.stateRef}^`, `${manifest.tipRef}^{commit}`];
+    if (live) refs.push('HEAD');
+    const [resolved, parent, tip, head] = gitText(git, ['rev-parse', '--revs-only', '--end-of-options', ...refs], {
+      cwd: live ? worktreePath : mainRepoRoot,
+    }).split('\n');
+    if (resolved !== manifest.stateCommit) errors.push(`stateRef ${manifest.stateRef} resolves to ${resolved}, expected ${manifest.stateCommit}`);
+    else if (parent !== manifest.head || tip !== manifest.head) errors.push('archive head does not match its retained state parent and tip');
+    else if (live && head !== manifest.head) errors.push('worktree HEAD changed since archive');
+  } catch (err) {
+    errors.push(`archive refs do not resolve: ${err && err.message ? err.message : err}`);
+  }
+  if (errors.length) return { ok: false, missing, mismatched, errors };
+
+  // The retained tree, not mutable JSON, owns blob identity and logical entry type. `-l` also
+  // checks blob availability (Git prints BAD for a missing object), in one bounded invocation.
+  const retained = new Map();
+  try {
+    for (const line of gitZ(git, ['ls-tree', '-r', '-l', '-z', manifest.stateCommit], { cwd: mainRepoRoot })) {
+      const match = /^(\d+) (\w+) ([0-9a-f]{40,64}) +([0-9]+|BAD|-)\t([\s\S]*)$/.exec(line);
+      if (!match) throw new Error('unreadable retained tree entry');
+      const [, mode, type, blob, size, name] = match;
+      retained.set(name, { mode, type, blob });
+      if (size === 'BAD') missing.push(name);
     }
   } catch (err) {
-    errors.push(`stateRef ${manifest.stateRef} does not resolve: ${err && err.message ? err.message : err}`);
+    errors.push(`retained tree lookup failed: ${err && err.message ? err.message : err}`);
+    return { ok: false, missing, mismatched, errors };
   }
 
-  // One process per question, not two per file: a manifest can list tens of thousands of entries,
-  // and a process per file on Windows turned one release into a 14-minute window for races.
-  const entries = (manifest.files || []).filter((entry) => entry && entry.blob);
-  const present = new Set();
-  if (entries.length > 0) {
-    try {
-      const lines = gitText(git, ['cat-file', '--batch-check'], {
-        cwd: mainRepoRoot, input: `${entries.map((entry) => entry.blob).join('\n')}\n`,
-      }).split('\n');
-      for (const line of lines) {
-        const [sha, type] = line.trim().split(' ');
-        if (type === 'blob') present.add(sha);
-      }
-    } catch (err) {
-      errors.push(`cat-file --batch-check failed: ${err && err.message ? err.message : err}`);
-      return { ok: false, missing, mismatched, errors };
-    }
-  }
   const toHash = [];
-  for (const entry of entries) {
-    if (!present.has(entry.blob)) {
-      missing.push(entry.path);
+  let materializedLinks;
+  for (const entry of manifest.files || []) {
+    const rel = entry?.path;
+    if (typeof rel !== 'string' || !rel || path.isAbsolute(rel)
+        || rel.split('/').some((part) => !part || part === '.' || part === '..')
+        || (process.platform === 'win32' && /[\\:]/.test(rel))) {
+      errors.push(`invalid archive path: ${String(rel)}`);
       continue;
     }
-    if (!worktreePath) continue;
-    if (!fs.existsSync(path.join(worktreePath, entry.path))) continue; // Deleted since archiving — the archive still holds it.
-    toHash.push(entry);
+    const saved = retained.get(rel);
+    if ((entry.blob && (saved?.type !== 'blob' || entry.blob !== saved.blob)) || (!entry.blob && saved)) {
+      errors.push(`manifest blob does not match retained tree: ${rel}`);
+      continue;
+    }
+    if (!live || missing.includes(rel)) continue;
+    let stat;
+    try {
+      // Inspect parents too: a directory replaced by a link must never redirect hashing into an
+      // external destination. ENOENT alone proves absence; access/inspection failures fail closed.
+      let parent = worktreePath;
+      for (const part of rel.split('/').slice(0, -1)) {
+        parent = path.join(parent, part);
+        const ancestor = fs.lstatSync(parent);
+        if (ancestor.isSymbolicLink() || !ancestor.isDirectory()) throw new Error('parent is not a directory');
+      }
+      stat = fs.lstatSync(path.join(worktreePath, rel));
+    } catch (err) {
+      if (err.code !== 'ENOENT') errors.push(`Cannot inspect ${rel}: ${err.message}`);
+      continue; // A genuinely removed entry is still preserved by the archive.
+    }
+    if (!saved) {
+      mismatched.push(rel); // An archived deletion was recreated with unretained state.
+      continue;
+    }
+    if (saved.mode === '120000') {
+      try {
+        let bytes;
+        if (stat.isSymbolicLink()) bytes = fs.readlinkSync(path.join(worktreePath, rel), { encoding: 'buffer' });
+        else if (stat.isFile()) {
+          // Git intentionally materializes 120000 entries as ordinary payload files when native
+          // links are disabled. `git add` applies file filters to those materializations too.
+          if (materializedLinks === undefined) materializedLinks = gitText(git,
+            ['config', '--type=bool', '--default=true', '--get', 'core.symlinks'], { cwd: worktreePath }) === 'false';
+          if (!materializedLinks) { mismatched.push(rel); continue; }
+          toHash.push(entry);
+          continue;
+        } else { mismatched.push(rel); continue; }
+        const hash = crypto.createHash(saved.blob.length === 64 ? 'sha256' : 'sha1')
+          .update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+        if (hash !== saved.blob) mismatched.push(rel);
+      } catch (err) {
+        errors.push(`Cannot inspect link ${rel}: ${err.message}`);
+      }
+    } else if (/^100[0-7]{3}$/.test(saved.mode) && stat.isFile() && !stat.isSymbolicLink()) toHash.push(entry);
+    else mismatched.push(rel);
   }
 
   // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the blob

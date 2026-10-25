@@ -138,7 +138,8 @@ function digestTree(root) {
       if (entry.name === '.git') continue;
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(abs);
-      else hash.update(path.relative(root, abs).replace(/\\/g, '/')).update('\0').update(fs.readFileSync(abs)).update('\0');
+      else hash.update(path.relative(root, abs).replace(/\\/g, '/')).update('\0')
+        .update(entry.isSymbolicLink() ? fs.readlinkSync(abs, { encoding: 'buffer' }) : fs.readFileSync(abs)).update('\0');
     }
   };
   walk(root);
@@ -347,6 +348,237 @@ try {
     assert.deepEqual(fallback.errors, []);
   });
 
+  // Durable link checks inspect the saved Git representation and restore, never target contents.
+  const linkProbe = await makeFixture('native-link-probe');
+  let nativeSymlinks = true;
+  try { fs.symlinkSync('missing', path.join(linkProbe.worktree, 'probe')); }
+  catch (err) {
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'ENOSYS'].includes(err.code)) throw err;
+    nativeSymlinks = false;
+    console.log(`UNVERIFIED native Windows symlinks: ${err.code}`);
+  }
+  if (nativeSymlinks) {
+    await check('unchanged dangling links and genuinely removed source links remain verifiable and restorable', async () => {
+      const f = await makeFixture('removed-link');
+      git(f.repo, 'config', 'core.symlinks', 'true');
+      const payload = 'missing destination \t\n';
+      fs.symlinkSync(payload, path.join(f.worktree, 'saved-link'));
+      const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+      fs.unlinkSync(path.join(f.worktree, 'saved-link'));
+      assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+      const destination = path.join(f.root, 'restore-removed-link');
+      assert.equal(restoreArchive({ mainRepoRoot: f.repo, stateCommit: saved.stateCommit, destination }).refused, undefined);
+      assert.equal(fs.readlinkSync(path.join(destination, 'saved-link')), payload);
+      assert.equal(removeRestored({ mainRepoRoot: f.repo, path: destination }).removed, true);
+    });
+
+    await check('tracked, untracked, ignored, directory and dangling links retain exact Git payloads and restore', async () => {
+      const f = await makeFixture('links');
+      git(f.repo, 'config', 'core.symlinks', 'true');
+      const external = write(f.root, 'outside/file', 'external target contents\n');
+      fs.symlinkSync(external, path.join(f.worktree, 'tracked-link'));
+      fs.symlinkSync(external, path.join(f.worktree, 'unchanged-link'));
+      git(f.worktree, 'add', 'tracked-link', 'unchanged-link');
+      git(f.worktree, 'commit', '-qm', 'committed links');
+      fs.unlinkSync(path.join(f.worktree, 'tracked-link'));
+      const payloads = new Map([
+        ['tracked-link', '../outside/file'],
+        ['directory-link', path.dirname(external)],
+        ['missing link ü', 'missing destination \t\n'],
+        ['tmp/keep.patch', external],
+        ['tmp/dangling', 'missing ignored destination'],
+      ]);
+      if (process.platform !== 'win32') {
+        payloads.set('line\nbreak', 'nonexistent\ntrailing \t');
+        payloads.set('raw-link', Buffer.from([0x6d, 0x69, 0x73, 0x73, 0xff, 0x20, 0x09]));
+      }
+      for (const [name, target] of payloads) {
+        fs.mkdirSync(path.dirname(path.join(f.worktree, name)), { recursive: true });
+        fs.symlinkSync(target, path.join(f.worktree, name), name === 'directory-link' ? 'dir' : 'file');
+      }
+      const indexPath = git(f.worktree, 'rev-parse', '--path-format=absolute', '--git-path', 'index');
+      const beforeIndex = fs.readFileSync(indexPath);
+      const before = digestTree(f.worktree);
+      const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      assert.equal(digestTree(f.worktree), before);
+      assert.deepEqual(fs.readFileSync(indexPath), beforeIndex);
+      assert.ok(!saved.manifest.files.some((e) => e.path === 'unchanged-link'), 'unchanged committed link needs no changed-file entry');
+      for (const [name, target] of payloads) {
+        const entry = saved.manifest.files.find((e) => e.path === name);
+        assert.ok(entry, `manifest retains ${name}`);
+        assert.equal(entry.size, Buffer.byteLength(target), `size is link text for ${name}`);
+        assert.match(git(f.repo, 'ls-tree', saved.stateCommit, '--', name), /^120000 blob /);
+        const stored = spawnSync('git', ['cat-file', 'blob', entry.blob], { cwd: f.repo });
+        assert.equal(stored.status, 0);
+        assert.deepEqual(stored.stdout, Buffer.from(target));
+      }
+      assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+      fs.writeFileSync(external, 'destination changed independently\n');
+      fs.unlinkSync(external);
+      assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+      const destination = path.join(f.root, 'restored');
+      assert.equal(restoreArchive({ mainRepoRoot: f.repo, stateCommit: saved.stateCommit, destination }).refused, undefined);
+      for (const [name, target] of payloads) {
+        assert.ok(fs.lstatSync(path.join(destination, name)).isSymbolicLink());
+        assert.deepEqual(fs.readlinkSync(path.join(destination, name), { encoding: 'buffer' }), Buffer.from(target));
+      }
+      assert.equal(removeRestored({ mainRepoRoot: f.repo, path: destination }).removed, true);
+      assert.equal(digestTree(f.worktree), before);
+      assert.deepEqual(fs.readFileSync(indexPath), beforeIndex);
+      assert.equal(fs.existsSync(external), false, 'restore/removal never recreates an external target');
+    });
+
+    await check('ignored symlink caps and cache/disposable/valuable policy use the link entry including dangling links', async () => {
+      const f = await makeFixture('link-policy');
+      write(f.worktree, '.gitignore', 'tmp/\nnode_modules\n');
+      const target = write(f.root, 'large-target', 'X'.repeat(CAP * 10));
+      const links = new Map([
+        ['tmp/small', '../large-target'], ['tmp/dangling', 'missing'],
+        ['tmp/over', 'x'.repeat(CAP + 1)], ['tmp/valuable.patch', 'x'.repeat(CAP + 2)],
+        ['tmp/run/eval-results/link', 'missing'], ['node_modules', target],
+      ]);
+      for (const [name, payload] of links) {
+        fs.mkdirSync(path.dirname(path.join(f.worktree, name)), { recursive: true });
+        fs.symlinkSync(payload, path.join(f.worktree, name));
+      }
+      const classified = classifyIgnored({ worktreePath: f.worktree, policy: POLICY });
+      assert.deepEqual(classified.oversized.map((e) => e.path), ['tmp/over']);
+      assert.deepEqual(classified.caches.map((e) => e.path), ['node_modules']);
+      assert.deepEqual(classified.disposable.map((e) => e.path), ['tmp/run/eval-results/link']);
+      assert.deepEqual(classified.archive.map((e) => e.path).sort(), ['tmp/dangling', 'tmp/small', 'tmp/valuable.patch']);
+      for (const entry of Object.values(classified).flat()) assert.equal(entry.size, Buffer.byteLength(links.get(entry.path)));
+      assert.equal(archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY }).reason, 'oversized-ignored');
+    });
+
+    for (const mutation of ['dangling-retarget', 'relative-retarget', 'absolute-retarget', 'link-to-file', 'file-to-link']) {
+      await check(`verifyArchive refuses ${mutation} even when dereferenced or blob bytes are equal`, async () => {
+        const f = await makeFixture(mutation);
+        git(f.repo, 'config', 'core.symlinks', 'true');
+        const absA = path.join(f.root, 'target-a');
+        const absB = path.join(f.root, 'target-b');
+        const name = 'entry';
+        const original = mutation === 'absolute-retarget' ? absA : mutation === 'dangling-retarget' ? 'missing-a' : '../target-a';
+        fs.writeFileSync(absA, original);
+        fs.writeFileSync(absB, original);
+        if (mutation === 'file-to-link') write(f.worktree, name, original);
+        else fs.symlinkSync(original, path.join(f.worktree, name));
+        const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        fs.unlinkSync(path.join(f.worktree, name));
+        if (mutation === 'link-to-file') write(f.worktree, name, original);
+        else fs.symlinkSync(mutation === 'absolute-retarget' ? absB : mutation === 'relative-retarget' ? '../target-b'
+          : mutation === 'dangling-retarget' ? 'missing-b' : original, path.join(f.worktree, name));
+        const result = verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest });
+        assert.equal(result.ok, false, JSON.stringify(result));
+        assert.deepEqual(result.mismatched, [name]);
+        assert.equal(fs.readFileSync(absA, 'utf8'), original);
+        assert.equal(fs.readFileSync(absB, 'utf8'), original);
+      });
+    }
+  }
+
+  await check('core.symlinks=false preserves canonical 120000 materialized Git files with Git filters', async () => {
+    const f = await makeFixture('materialized');
+    git(f.repo, 'config', 'core.symlinks', 'false');
+    write(f.worktree, 'materialized.link', 'old target');
+    const blob = git(f.worktree, 'hash-object', '-w', '--no-filters', 'materialized.link');
+    git(f.worktree, 'update-index', '--add', '--cacheinfo', `120000,${blob},materialized.link`);
+    git(f.worktree, 'commit', '-qm', 'materialized Git symlink');
+    const payload = 'missing destination \t\r\n';
+    write(f.worktree, 'materialized.link', payload);
+    write(f.worktree, '.gitattributes', '*.link text eol=lf\n');
+    const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    assert.match(git(f.repo, 'ls-tree', saved.stateCommit, '--', 'materialized.link'), /^120000 blob /);
+    assert.equal(defaultGit(['show', `${saved.stateCommit}:materialized.link`], { cwd: f.repo }), payload.replace('\r\n', '\n'));
+    assert.equal(fs.readFileSync(path.join(f.worktree, 'materialized.link'), 'utf8'), payload, 'archive leaves source bytes intact');
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+    const destination = path.join(f.root, 'restore-materialized');
+    assert.equal(restoreArchive({ mainRepoRoot: f.repo, stateCommit: saved.stateCommit, destination }).refused, undefined);
+    assert.equal(fs.lstatSync(path.join(destination, 'materialized.link')).isSymbolicLink(), false);
+    assert.equal(fs.readFileSync(path.join(destination, 'materialized.link'), 'utf8'), payload.replace('\r\n', '\n'));
+    assert.equal(removeRestored({ mainRepoRoot: f.repo, path: destination }).removed, true);
+  });
+
+  await check('ordinary filtered CRLF files, unusual names and named hash-error fallback remain supported', async () => {
+    const f = await makeFixture('filtered');
+    write(f.worktree, '.gitattributes', '*.txt text eol=lf\n');
+    write(f.worktree, 'spaces ü.txt', 'line one\r\nline two\r\n');
+    if (process.platform !== 'win32') write(f.worktree, 'line\nbreak.txt', 'newline name\r\n');
+    const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+    assert.equal(defaultGit(['show', `${saved.stateCommit}:spaces ü.txt`], { cwd: f.repo }), 'line one\nline two\n');
+    const failingGit = (args, options) => {
+      if (args[0] === 'hash-object' && (args[1] === '--stdin-paths' || args.at(-1) === 'spaces ü.txt')) throw new Error('fixture read failure');
+      return defaultGit(args, options);
+    };
+    const failed = verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest, git: failingGit });
+    assert.equal(failed.ok, false);
+    assert.equal(failed.errors.length, 1, JSON.stringify(failed));
+    assert.match(failed.errors[0], /hash-object failed for spaces ü\.txt: fixture read failure/);
+  });
+
+  await check('real inspection failures refuse while genuinely missing entries remain valid', async () => {
+    const f = await makeFixture('inspection');
+    write(f.worktree, 'nested/draft.txt', 'retained draft\n');
+    const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    fs.renameSync(path.join(f.worktree, 'nested'), path.join(f.root, 'held-nested'));
+    write(f.worktree, 'nested', 'directory replaced by a file');
+    const blocked = verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest });
+    assert.equal(blocked.ok, false, JSON.stringify(blocked));
+    assert.match(blocked.errors.join('\n'), /Cannot inspect nested\/draft.txt/);
+    fs.unlinkSync(path.join(f.worktree, 'nested'));
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+    git(f.repo, 'worktree', 'remove', '--force', f.worktree);
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] }, 'object-only verification survives removal');
+  });
+
+  await check('genuinely removed regular entries and object-only retained archives remain verifiable and restorable', async () => {
+    const f = await makeFixture('removed-regular');
+    write(f.worktree, 'draft.txt', 'retained, then removed\n');
+    const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    fs.unlinkSync(path.join(f.worktree, 'draft.txt'));
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+    git(f.repo, 'worktree', 'remove', '--force', f.worktree);
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
+    const destination = path.join(f.root, 'restore-removed-file');
+    assert.equal(restoreArchive({ mainRepoRoot: f.repo, stateCommit: saved.stateCommit, destination }).refused, undefined);
+    assert.equal(fs.readFileSync(path.join(destination, 'draft.txt'), 'utf8'), 'retained, then removed\n');
+    assert.equal(removeRestored({ mainRepoRoot: f.repo, path: destination }).removed, true);
+  });
+
+  if (process.platform !== 'win32' && process.getuid() !== 0) await check('EACCES is an inspection error, never evidence that an archived entry disappeared', async () => {
+    const f = await makeFixture('eacces');
+    write(f.worktree, 'private/draft.txt', 'retained private draft\n');
+    const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    fs.chmodSync(path.join(f.worktree, 'private'), 0);
+    try {
+      assert.throws(() => fs.lstatSync(path.join(f.worktree, 'private/draft.txt')), { code: 'EACCES' });
+      const blocked = verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest });
+      assert.equal(blocked.ok, false, JSON.stringify(blocked));
+      assert.match(blocked.errors.join('\n'), /Cannot inspect private\/draft.txt:.*EACCES/);
+    } finally { fs.chmodSync(path.join(f.worktree, 'private'), 0o755); }
+  });
+
+  await check('a missing retained blob refuses even when the worktree still has its bytes', async () => {
+    const f = await makeFixture('missing-blob');
+    write(f.worktree, 'draft.txt', 'unique retained blob for removal\n');
+    const saved = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    const blob = saved.manifest.files.find((e) => e.path === 'draft.txt').blob;
+    fs.unlinkSync(path.join(f.repo, '.git', 'objects', blob.slice(0, 2), blob.slice(2)));
+    const blocked = verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest });
+    assert.equal(blocked.ok, false, JSON.stringify(blocked));
+    assert.deepEqual(blocked.missing, ['draft.txt']);
+  });
+
   /* ── 3. restore ────────────────────────────────────────────────────────────────────────── */
 
   await check('restoreArchive materializes the archived state, including the ignored-valuable file', async () => {
@@ -410,6 +642,44 @@ try {
   });
 
   /* ── 5. glob matcher ───────────────────────────────────────────────────────────────────── */
+
+  await check('a timestamp collision preserves the first manifest and retained state', async () => {
+    const f = await makeFixture('collision');
+    write(f.worktree, 'draft.txt', 'first retained version\n');
+    const opts = { mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY, now: Date.parse('2026-09-10T12:00:00Z') };
+    const first = archiveWorktree(opts);
+    assert.equal(first.refused, undefined, JSON.stringify(first));
+    const manifestBytes = fs.readFileSync(first.manifestPath);
+    write(f.worktree, 'draft.txt', 'second version must not replace evidence\n');
+    const before = digestTree(f.worktree);
+    const second = archiveWorktree(opts);
+    assert.equal(second.refused, true, JSON.stringify(second));
+    assert.deepEqual(fs.readFileSync(first.manifestPath), manifestBytes);
+    assert.equal(git(f.repo, 'rev-parse', first.stateRef), first.stateCommit);
+    assert.equal(git(f.repo, 'show', `${first.stateRef}:draft.txt`), 'first retained version');
+    assert.equal(digestTree(f.worktree), before);
+
+    // A leftover manifest without its ref is still evidence, never a writable slot.
+    git(f.repo, 'update-ref', '-d', first.stateRef);
+    const manifestOnly = archiveWorktree(opts);
+    assert.equal(manifestOnly.refused, true, JSON.stringify(manifestOnly));
+    assert.deepEqual(fs.readFileSync(first.manifestPath), manifestBytes);
+  });
+
+  await check('an existing state ref cannot be overwritten when its manifest is missing', async () => {
+    const f = await makeFixture('state-ref-collision');
+    write(f.worktree, 'draft.txt', 'first retained version\n');
+    const opts = { mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY, now: Date.parse('2026-09-10T12:00:00Z') };
+    const first = archiveWorktree(opts);
+    assert.equal(first.refused, undefined, JSON.stringify(first));
+    fs.unlinkSync(first.manifestPath);
+    write(f.worktree, 'draft.txt', 'later version\n');
+    const second = archiveWorktree(opts);
+    assert.equal(second.refused, true, JSON.stringify(second));
+    assert.equal(git(f.repo, 'rev-parse', first.stateRef), first.stateCommit);
+    assert.equal(git(f.repo, 'show', `${first.stateRef}:draft.txt`), 'first retained version');
+    assert.equal(fs.existsSync(first.manifestPath), false, 'refusal creates no replacement manifest');
+  });
 
   await check('glob matcher: ** spans segments, * stays inside one, no wildcard is exact', async () => {
     // `**` in the middle may match zero segments — `tmp/**/eval-results/**` covers both shapes the
