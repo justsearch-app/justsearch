@@ -1,0 +1,2010 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "adaptedScript": "tmp/builder/round21c/run-evidence.mjs",
+    "scriptDigest": "sha256:45c13f0ad90eed279bc4cf18035b7d5250ac457153b626f9df9fee5963e7a4ea",
+    "note": "Proportional test-only execution producer; runs exact shortened admission source before/after via slot-wrapped Gradle. Original full run remains a separate immutable snapshot."
+  },
+  "createdAt": "2026-10-25T14:15:03.100Z",
+  "revision": "ad9767a097cadd36a9bd30aa3772b1a8a7d00844",
+  "tree": "e4d937ddf5d47e31328d14dbd4e9525ab7af325a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.22.0",
+    "jvmTemp": "tmp/builder/jvm/after",
+    "corpus": "tmp/builder/fixtures/outage-backlog"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests io.justsearch.adapters.lucene.runtime.IngestionProbeAnalysisTest --tests io.justsearch.adapters.lucene.runtime.IngestionProbeIsolationTest --tests io.justsearch.adapters.lucene.runtime.ComponentsInjectionTest :modules:worker-services:compileJava :modules:worker-services:compileTestJava :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:worker-services:test :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:test :modules:indexer-worker:isolatedExtractionChecks --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21b/full.gradle",
+      "cwd": ".",
+      "exitCode": 1,
+      "startedUTC": "2026-10-25 13:08:33 UTC",
+      "finishedUTC": "2026-10-25 14:01:28 UTC"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdTest :modules:indexer-worker:round21CompletionChecks --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21c/narrow.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25 14:14:54 UTC",
+      "finishedUTC": "2026-10-25 14:15:03 UTC"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#realUnwritableIndexDoesNotChargeHealthySourceFiles",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#provenSharedOutageRemainsFreeAfterSuccessfulPeer",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java#actualDirectoryFailureRemainsFreeBeyondGrace",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4d85b7cae6bed5d1b850edcf85fe9bd35fd17d90516a407828b6e30bd6fbc00f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closedLuceneRuntimeDefersBeyondGraceAndRecoversThroughTheRunningLoop()",
+          "status": "passed"
+        },
+        {
+          "name": "stopDuringCappedOutagePauseWakesWithoutInterruptingOrChargingRows()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:846a74e24bdce617d824f8bf37b88797a6ed08201178034c896040b58e6e431f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthyBatchCannotRenewFreeGraceForPoison()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedSystemicFaultsStayBoundedWithoutChargingAttempts()",
+          "status": "passed"
+        },
+        {
+          "name": "writerOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly()",
+          "status": "passed"
+        },
+        {
+          "name": "isolatedWriterFailureUsesLadderAndDoesNotStarveLaterFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "documentArgumentFailureUsesLadderEvenWithoutSuccessfulPeers()",
+          "status": "passed"
+        },
+        {
+          "name": "isolatedIdentityFailureUsesLadderAndDoesNotStarveLaterFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(1: 1, false, java.lang.IllegalStateException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(2: 1, false, java.lang.NullPointerException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(3: 3, false, java.lang.IllegalStateException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(4: 3, false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: document IO)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(5: 3, false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: missing_uid_field)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(6: 3, true, java.lang.IllegalStateException: poison identity)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(1: false, java.lang.IllegalStateException: shared writer unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(2: false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: draining)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(3: true, java.lang.IllegalStateException: identity store unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "provenOutageBacksOffCapsLogsAndResets(false)",
+          "status": "passed"
+        },
+        {
+          "name": "provenOutageBacksOffCapsLogsAndResets(true)",
+          "status": "passed"
+        },
+        {
+          "name": "identityOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc9ba0030ad9918ae26af5de375a8a2c18e8f5eda39499c14119b1ef879c3e40",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableIdentityReceiverNeverChargesTheBatch()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueRetryLadderTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueRetryLadderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:706cb3673c22f9dd1eb7a3ea036b7d0edcf8a8d9983d59db7fef7aa674062bde",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the per-outcome observer is notified with the outcome class name",
+          "status": "passed"
+        },
+        {
+          "name": "past the 7-day bound the job becomes RETRY_EXHAUSTED, and a rescan resets it",
+          "status": "passed"
+        },
+        {
+          "name": "the queue meters count admissions and claims",
+          "status": "passed"
+        },
+        {
+          "name": "a parser failure is terminal on the first attempt",
+          "status": "passed"
+        },
+        {
+          "name": "three IO_FAILED outcomes stay PENDING with retry_after set, past the attempts cap",
+          "status": "passed"
+        },
+        {
+          "name": "the backoff ladder runs 1 min, 10 min, 1 h, 6 h, 24 h — not a 17-minute cap",
+          "status": "passed"
+        },
+        {
+          "name": "the untyped markFailed path still honours the attempts cap",
+          "status": "passed"
+        },
+        {
+          "name": "an exhausted row counts as failed in BOTH count projections",
+          "status": "passed"
+        },
+        {
+          "name": "error_message carries the exception text, not a fixed literal",
+          "status": "passed"
+        },
+        {
+          "name": "listFailedJobs reports each row's real terminal state, not a blanket FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "a retry reports the state it actually replaced, not a hardcoded FAILED",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:52e26f6f1326f03405036a0db4aff50e1ffc4ff88516ac5bf3d80c6af9b1680b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backOffIsCountedAndGrowsRatherThanRetryingEverySecond()",
+          "status": "passed"
+        },
+        {
+          "name": "anUnreadableSourceIsNeverExhaustedAndKeepsGrowingPastTheWindow()",
+          "status": "passed"
+        },
+        {
+          "name": "theFailedFilesSurfaceListsItAsIndexedSourceUnreadableAcrossARestart()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java#outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3c70b740dd05923f90b0607c5be7904b1f90dcb0659a400f8320f07d688572eb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(writer)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(identity)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(draining)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(mixed)",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UpgradeStatusRestartTest.java#reopenedQueueReportsWaitingAndDueWorkThenProcessingAndCompletion",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/UpgradeStatusRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:092691c22a4e28e6589e4eabd929856f02e24b0afb920c02701bdded9d5f6a33",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reopenedQueueReportsWaitingAndDueWorkThenProcessingAndCompletion()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java#readOnlyStoreRemainsUncountedBeyondAmbiguousGrace",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae0386442992d164a9fdaab4549fd94879120c3e40af123eec8f7e7b4c8911df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readOnlyStoreRemainsUncountedBeyondAmbiguousGrace()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc8c8256f3b78aa154c3fc0949d2412d5cfcb7eb95e5409ac6827c5ce7747f97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java#extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc8c8256f3b78aa154c3fc0949d2412d5cfcb7eb95e5409ac6827c5ce7747f97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:10502557a673c9bf0b25846c54c640a90d64cbed9787e942e8fcf50864cd54ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WRITER_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_DEFERRED",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_CONNECTION_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_DIRECTORY_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_DRAINING",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_BACKPRESSURE",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_READ_ONLY",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_DIRECTORY_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_OPEN_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "WRITER_OPEN_LOCKED",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_UNWIRED",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_CONNECTION_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_READ_ONLY",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_SCHEMA_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_FILE_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_OPEN_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_BUSY",
+          "status": "passed"
+        },
+        {
+          "name": "IDENTITY_CORRUPT",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_CONNECTION_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_READ_ONLY",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_SCHEMA_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_OPEN_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_EXECUTOR_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_SANDBOX_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_START_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_READER_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_SANDBOX_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_EMPTY",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_POLICY_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_STRUCTURED_CLOSED",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#publicStatusDuringActualEarlyOutagePauseWithFreshLaterBacklog",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aba41f48f6097f9120056fc0a38d96fa250499050e83a2f0ff97ed01cd061baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "publicStatusDuringActualEarlyOutagePauseWithFreshLaterBacklog()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#persistentJobsReadonlyAfterFourthBatchRetainsOutagePacingAndBoundedLogs",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aba41f48f6097f9120056fc0a38d96fa250499050e83a2f0ff97ed01cd061baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "persistentJobsReadonlyAfterFourthBatchRetainsOutagePacingAndBoundedLogs()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#readonlyQueuePollUsesGrowingServicePauseAndRecoversWithoutCharging",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aba41f48f6097f9120056fc0a38d96fa250499050e83a2f0ff97ed01cd061baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readonlyQueuePollUsesGrowingServicePauseAndRecoversWithoutCharging()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#readonlyCommittedQueueOutcomesKeepOwnersAndUseGrowingPause",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aba41f48f6097f9120056fc0a38d96fa250499050e83a2f0ff97ed01cd061baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readonlyCommittedQueueOutcomesKeepOwnersAndUseGrowingPause()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aab2208df791adaea461de93f9acc607aff2e0043846bc910bad7e08a9219b45",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "untypedInfrastructureFailureIsProvenByTheSameExtractionCanary()",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(mixed)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(one)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(all)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(readonly)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(lost-directory)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(readonly-child)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(lost-directory-child)",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b86d97813ce2fb59a2e0beed17dd8204aaa4f048c851c44719da01f812a23fd3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "documentPathProvenance(symlink-canonical-source)",
+          "status": "passed"
+        },
+        {
+          "name": "documentPathProvenance(source-companion-under-temp)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownSharedProtocolFailureUsesCanaryAndSummarizesLogs()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7ea1538f79baa83b6042f29de2c9ec5315b76bfb2ebd81a29a76c483f296985",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeIdentityRowLimitMustNotChargeHealthyFilesEvenWhenExtractionCanaryPasses()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b8ee7d25150860624d01cdd7a5ae110b45ca005a71461378f3b8652f22fa7a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "singletonPoisonCannotRenewItsFreeGraceByInterleavingHealthyBatches()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:599a73f9198deccd035ba8546c8ab03979346af8121cbd3a62758f0beabdf9b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realMissingChildJvmSupportJarIsCanaryDiagnosedAndRecoveredWithoutAttempts()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03f823ce3bd9591e97d4524569114e82b6358ad581b14563e78923e2a57d3aa4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] plain",
+          "status": "passed"
+        },
+        {
+          "name": "[2] outside-path",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f2d57580333f0b7451fb6c1b4676a577ca436f3f60d130e016566eefc8988222",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "documentValueLimitIsChargedWhenNormalCanaryRoundTripPasses()",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSharedParserOutputCannotProvePipelineHealth()",
+          "status": "passed"
+        },
+        {
+          "name": "interleavedTerminalPoison(false)",
+          "status": "passed"
+        },
+        {
+          "name": "interleavedTerminalPoison(true)",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProjectionWriterCannotHideBehindHealthyDestination()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeAnalysisTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f2c276b9856e6fa227cbdbdaeb1f9f80bdcbaadae5b356645f12b629b971fa3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] title",
+          "status": "passed"
+        },
+        {
+          "name": "[2] content",
+          "status": "passed"
+        },
+        {
+          "name": "[3] content_preview",
+          "status": "passed"
+        },
+        {
+          "name": "[4] vdu_enrichment",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java#closedSharedAnalyzerCannotBeProvenHealthyByDirectoryOnlyCanary",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73b8bf5ff086f8092f4d27d645a72902394573a1de18283c481428d0a0eb5d1f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closedSharedAnalyzerCannotBeProvenHealthyByDirectoryOnlyCanary()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java#companionIsDeferredDuringOutageAndChargedInFirstRecoveredBatch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73b8bf5ff086f8092f4d27d645a72902394573a1de18283c481428d0a0eb5d1f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "companionIsDeferredDuringOutageAndChargedInFirstRecoveredBatch()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9fa358f09252545bd0454be9f208f6b20903e43f1eb9afef945f534088ca5a70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "brokenSharedTokenPositionsMustFailPipelineCanary()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:51390e5a4892ccf68dcc61d4894198cdfdcaf6329a499b5b2ae0e5f004041139",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthyProbeLeavesRealIndexUntouchedAndAnalyzerUsable()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3ece1ec681492784e255cee92f15e6cfb1b88db27201ece52c3efc5fa11035d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sharedInvalidNormMustFailPipelineCanary()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4037e3eea168d511865d2c1a5d90a3a898a823b5f9b1fff31f9d78a032f2959d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disposableConfigMatchesEveryLiveSettingExceptMergeAndCommitBehavior()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerTerminalWriterBindingTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerTerminalWriterBindingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a0f77541f25e49344f58b48a7721cb17a5684d8e0ad0be8645cf083175355124",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "runningRuntimeIsBoundBeforeAppServicesConstruction(Path)",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusOpsLoopFailureTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusOpsLoopFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:669463ba3fdf158f98a951687d17dc1542e465c30f60cd2e1529bd7ad4f983d0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedWorkWithDocumentFailuresKeepsNonfatalIndexingDisposition()",
+          "status": "passed"
+        },
+        {
+          "name": "fatalLoopOverridesBothQueuedWorkAndOrdinaryDocumentFailures()",
+          "status": "passed"
+        },
+        {
+          "name": "ordinaryDocumentFailureKeepsErrorDisposition()",
+          "status": "passed"
+        },
+        {
+          "name": "deferredOrIntentionallyStoppedLoopIsNotFatal()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusOpsWaitingTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusOpsWaitingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:24b57596c2936e4d607eb00335ce2f9e8cbf623a7a519c9a619b1a0b9ea2497d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retryOnlyBacklogWaitsUntilReadyThenProcessingAndWaitsAgain()",
+          "status": "passed"
+        },
+        {
+          "name": "terminalFailuresAndFatalLoopNeverPretendToProcess()",
+          "status": "passed"
+        },
+        {
+          "name": "completedQueueRowsAreNotDocumentsWhenNoReaderExists()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15b17604aef849ca87f44e98c8fffcb94100631cbf1738106e7f9b50fe3c9bf7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "textOnlyCanaryMustExerciseSharedDocValuesWriteService()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0a6aba5bd6c25185846919e62a04901c4518cb7ce0e4bf81dcbf276c06e67af4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vanishedCanonicalSourceKeepsFilePolicyDuringWriterOutage()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/adapters/lucene/runtime/IngestionProbeFieldCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:16baf5d8b8228adea86dff38886ec202c9e866285f3ef07f9d05d999456689cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualCanaryCoversEveryMapperFieldFamilyIncludingVectors()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java#lostLiveNativeWriteLockMustNotPassHealthProof",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:77f0bc6f261e3a9222a41ec27a62346135bda4f783e0e2a3837b5f72fddaed7d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lostLiveNativeWriteLockMustNotPassHealthProof()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java#replacementLockCannotImpersonateTheHeldNativeLock",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:77f0bc6f261e3a9222a41ec27a62346135bda4f783e0e2a3837b5f72fddaed7d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "replacementLockCannotImpersonateTheHeldNativeLock()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java#repeatedProbeLeavesLiveDocumentsAndSharedAnalyzerUsable",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:77f0bc6f261e3a9222a41ec27a62346135bda4f783e0e2a3837b5f72fddaed7d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedProbeLeavesLiveDocumentsAndSharedAnalyzerUsable()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ComponentsInjectionTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ComponentsInjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:82259bc09df26973331c56ae4fedecee853707dd815bca82fff4503ee99dd53d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "usesInjectedComponentsWithoutDisk()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java#incompatibleStoredTextSchemaMustNotChargeEveryHealthySource",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ec345b442bf0a4bbba7f242d69433efa851722d28f9fd34602d3f832ac2a4c10",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "incompatibleStoredTextSchemaMustNotChargeEveryHealthySource()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java#ordinaryStoredSchemaStillPassesWithoutPublishingPendingWork",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ec345b442bf0a4bbba7f242d69433efa851722d28f9fd34602d3f832ac2a4c10",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryStoredSchemaStillPassesWithoutPublishingPendingWork()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java#canonicalSourceVanishingDuringRealWriteStillCostsAFileAttemptDuringOutage",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:222b05247158d1f90f82202729b033389d055a82f7175d204653d0f31de5f8a7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalSourceVanishingDuringRealWriteStillCostsAFileAttemptDuringOutage()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkWriteChunkDeclarationTest.java#bulkWritesNeedNoPerDocumentRefreshOrParentRewrite",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkWriteChunkDeclarationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a38f190d3a734209e9b1ceacd2bad77a1a79c2478088ee43ee9f6a1e20118623",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bulkWritesNeedNoPerDocumentRefreshOrParentRewrite()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduRevisionRaceTest.java#nativeBatchWriterReplacementInvalidatesPendingVdu",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduRevisionRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:afaedb48ba44affd3d91928a4bb05bbf2767f6f4f50b2e4dff3437592af518c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeBatchWriterReplacementInvalidatesPendingVdu()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX2PolicySavedAfterExtractionPreventsPublication",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5acfe0f07f9d89dd2fa9ac4e3b9ee5ba213d225a03eda562ab555af6ede02c74",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EX2PolicySavedAfterExtractionPreventsPublication()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aSyncRemovesAFileWhoseFirstRowsArePublishedAfterItsScan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e3439d14fe45c4d7a344868d4d204100e3431d8a16953c84cbdb60c6d895bf8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSyncRemovesAFileWhoseFirstRowsArePublishedAfterItsScan()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cf892f0bdb86af7dc9f068cf510d3194e422645cdb86696588202819aded2d9a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c98ec49a5ac80eba7a394c3be7b65d9a213d2fa175fbd8aed8b4244e00ecc9ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retargetedSourceParentStillCostsAFileAttemptWhileOldCanonicalFileExists()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:222b05247158d1f90f82202729b033389d055a82f7175d204653d0f31de5f8a7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalSourceVanishingDuringRealWriteStillCostsAFileAttemptDuringOutage()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:22cb386c28af0306aa2f1947494d04792b5706862eb096e1e59bfedcd3620886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacy-source-stream-false",
+          "status": "passed"
+        },
+        {
+          "name": "legacy-source-stream-true",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15a72f7eac9f593bd689ae6bb55a4b8641bb2b8eda327ddb6384754842e86a29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedCanonicalUnreadableSourceStillCostsOneAttemptAfterReadableRetarget()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19079d8f6cc2ba1968960bb10962f2ac1136720ec2d80d07993b99c80f06fb5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedSharedMappingAndItsCanaryMustNotStrandClaimedRows()",
+          "status": "passed"
+        },
+        {
+          "name": "vmProbeFailureStillReturnsClaimsAndPropagates()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbb69ae5adf6b069329476dc0646bb484c13c3dac317a7f0db80781017dcfacc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] java.lang.NoClassDefFoundError: missing shared mapping",
+          "status": "passed"
+        },
+        {
+          "name": "[2] java.lang.AssertionError: broken health check",
+          "status": "passed"
+        },
+        {
+          "name": "[3] java.lang.ThreadDeath",
+          "status": "passed"
+        },
+        {
+          "name": "[4] java.lang.IllegalStateException: probe failed",
+          "status": "passed"
+        },
+        {
+          "name": "vmProbeFailureIsNeverSwallowed()",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopErrorResilienceTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopErrorResilienceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2274bda47e99aecaeec14a76dadfada9c6f204930c64c712cd8543faaab5f8e7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoverable Error in a batch: loop survives, keeps indexing, reaches IDLE",
+          "status": "passed"
+        },
+        {
+          "name": "intentionalQuiescenceAndCloseAreNotFatalFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "fatal VirtualMachineError: loop stops AND isRunning() reports false (honest liveness)",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admission-query",
+          "status": "passed"
+        },
+        {
+          "name": "[2] presence-lookup",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io-presence-lookup",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "tmp/builder/round21c/after-final-junit/"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e685fcabae01be135d6b9c612e7e70ba5e7d0361c9a1f004f158540026a06a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "own-javaio-persistent-byte-eio",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-captured-byte-eio",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-readable",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-readable-empty",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-submitted-fifo",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-captured-fifo",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-submitted-regular",
+          "status": "passed"
+        },
+        {
+          "name": "own-javaio-captured-regular",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f66023d6dc655674809c553c26bee149a599550cfa1d1d82c1154784e295541",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [2] false",
+          "status": "passed"
+        }
+      ],
+      "executionSource": "original frozen full-run snapshot, unchanged source"
+    }
+  ],
+  "failBefore": {
+    "revision": "ad9767a097cadd36a9bd30aa3772b1a8a7d00844",
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:round21CompletionChecks --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --tests io.justsearch.indexerworker.server.Release030AdmissionDebtTest.uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete* --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21b/narrow.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/before-ad9767a097",
+        "exitCode": 1,
+        "startedUTC": "2026-10-25 13:03:11 UTC",
+        "finishedUTC": "2026-10-25 13:04:14 UTC"
+      },
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:round21CompletionChecks --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21c/narrow.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/before-ad9767a097",
+        "exitCode": 1,
+        "startedUTC": "2026-10-25 14:12:59 UTC",
+        "finishedUTC": "2026-10-25 14:14:54 UTC"
+      }
+    ],
+    "sourceHashes": {
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java": "235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a",
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java": "9e685fcabae01be135d6b9c612e7e70ba5e7d0361c9a1f004f158540026a06a9",
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java": "8f66023d6dc655674809c553c26bee149a599550cfa1d1d82c1154784e295541"
+    },
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+        "classification": "assertion",
+        "detail": "[1] admission-query: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org.opentest4j.AssertionFailedError: lookup uncertainty retains baseline per-file handling ==> expected: <1> but was: <0>&#10;&#9;org.opentest4j.AssertionFailedError: expected: <RETRY_WITH_BACKOFF> but was: <null>&#10;&#9;o | [2] presence-lookup: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org."
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+        "classification": "assertion",
+        "detail": "own-javaio-persistent-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: source permission loss or disappearance always charges, including after retarget ==> expected: <1> but was: <0> | own-javaio-captured-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: source permission loss or disappearance always charges, including after retarget ==> expected: <1> but was: <0> | own-javaio-submitted-fifo: org.opentest4j.MultipleFailuresError "
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete",
+        "classification": "assertion",
+        "detail": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [1] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: uncertain admission is attempted ==> expected: <true> but was: <false> | uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [2] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: uncertain admission is attempted ==> expected: <true> but was: <false>"
+      }
+    ],
+    "retainedPriorProof": {
+      "revision": "ad9767a097cadd36a9bd30aa3772b1a8a7d00844",
+      "runs": [
+        {
+          "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest\" --tests \"io.justsearch.indexerworker.loop.PersistentByteIoSourceTest\" --tests \"io.justsearch.indexerworker.server.Release030AdmissionDebtTest.uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete*\" --tests \"io.justsearch.indexerworker.loop.WriterUnreadableAliasTest\" --tests \"io.justsearch.indexerworker.loop.WriterAliasRetargetTest\" --tests \"io.justsearch.indexerworker.loop.WriterVanishedAliasTest\" --tests \"io.justsearch.indexerworker.loop.VanishedCanonicalSourceTest\" --tests \"io.justsearch.indexerworker.loop.SystemicBatchDeferralTest\" --tests \"io.justsearch.indexerworker.queue.JobQueueRetryLadderTest\" --tests \"io.justsearch.indexerworker.queue.UnreadableSourceRetryTest\" --tests \"io.justsearch.indexerworker.loop.SharedMappingLinkageTest\" :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.IndexingLoopErrorResilienceTest\" --tests \"io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest\" --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/isolation.gradle",
+          "cwd": "tmp/builder/before-ad9767a097",
+          "exitCode": 1,
+          "durationMs": 253928
+        },
+        {
+          "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest\" --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/isolation.gradle",
+          "cwd": "tmp/builder/before-ad9767a097",
+          "exitCode": 1,
+          "durationMs": 71090
+        }
+      ],
+      "sourceHashes": {
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java": "96b5c88546523fcc0908f6edbae039e4a198c970b1cbb37aa33aabda91f0f3aa",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java": "94999f7313f23dc64dffa68ed2aec3a1a9eee2e0e53d9fbec20beabbdd8a361c",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java": "8f66023d6dc655674809c553c26bee149a599550cfa1d1d82c1154784e295541"
+      },
+      "checks": [
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+          "classification": "assertion",
+          "detail": "[1] admission-query: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org.opentest4j.AssertionFailedError: lookup uncertainty retains baseline per-file handling ==> expected: <1> but was: <0>&#10;&#9;org.opentest4j.AssertionFailedError: expected: <RETRY_WITH_BACKOFF> but was: <null>&#10;&#9;o | [2] presence-lookup: org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org."
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+          "classification": "assertion",
+          "detail": "own-javaio-persistent-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: source permission loss or disappearance always charges, including after retarget ==> expected: <1> but was: <0> | own-javaio-captured-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: source permission loss or disappearance always charges, including after retarget ==> expected: <1> but was: <0>"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete",
+          "classification": "assertion",
+          "detail": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [1] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: uncertain admission is attempted ==> expected: <true> but was: <false> | uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [2] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: uncertain admission is attempted ==> expected: <true> but was: <false>"
+        }
+      ],
+      "preservation": [
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueRetryLadderTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopErrorResilienceTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        },
+        {
+          "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+          "classification": "passed",
+          "detail": "the check passes on the before-state, so it does not show a repair"
+        }
+      ]
+    },
+    "fifoRegression": {
+      "beforeProductHashes": {
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BatchServiceFailures.java": "99f24de7fef3d92cc48dd39500fcba300b75b55c6c3d8900d8d4537ff6a6ac6d",
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java": "f81e8ee9c401fd7fc045c33513a510074bf1cd69195c066c77c642e35e0d5fb1",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java": "96b5c88546523fcc0908f6edbae039e4a198c970b1cbb37aa33aabda91f0f3aa",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java": "94999f7313f23dc64dffa68ed2aec3a1a9eee2e0e53d9fbec20beabbdd8a361c"
+      },
+      "beforeRun": {
+        "startedUTC": "2026-10-25 13:02:13 UTC",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral",
+        "command": [
+          "js-gradle-slot",
+          "./gradlew",
+          ":modules:indexer-worker:round21CompletionChecks",
+          "--tests",
+          "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "--max-workers=1",
+          "--no-parallel",
+          "-PskipErrorProneTests=false",
+          "-PtestParallelism=1",
+          "-PskipWebBuild=true",
+          "--console=plain",
+          "--continue",
+          "-I",
+          "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle",
+          "-I",
+          "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21b/narrow.gradle"
+        ],
+        "inputHashes": {
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileEnvelope.java": "ed8e8e4493f1142f02c7e470dad2cb9220b02fec605b00944a0375f64f88770a",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java": "84836f8b64f0d7b3dbd7dc21a6765a981c5ea649893f8fe0e4d3bae85a3cd7bb",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/EmbeddingProviderLifecycle.java": "b9b93acd8132e21c82c577068a64b9361270424a156f568c147df4ce83247b39",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java": "7aa499b659c9ab233a3c3e4ec245b02e636bb72bc9c2efb7525d1a6e25fb36ba",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeTags.java": "9f3bf94ccaadcab75d925a42e5e99c437284e97090f4a2a5d56cf355fd50e848",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ExtractionOutcome.java": "69fffe3a63f041c874c933f9168f65e0cf4074c873ba46fb5da294b5dd0db669",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java": "35426e12b60f9f7078a9f9282f387a5a485576b846a019b7d0e99fa1b4a08ebd",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BackfillScheduler.java": "ef555ff5278f5a4d2568265cdbb26112ae580f9e3bff887998a25cb457dc28db",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileMutationFence.java": "94c88fa11e2f0abfd058fc9c29223a512b2506410db373d25d31663c93e00d3a",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ExtractedJob.java": "be488206fb465ed2705ccd1dd0f51aa9eed586939cd1e16bcebacfd1355ea2c1",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileFreshnessSnapshot.java": "fa9db2214d078c32b6dca921f36a987977d74fc114e9aef941d76274e9b12a34",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BackoffPolicy.java": "8521303293f6ac7eafee68e47028711fd23b30f36f8b07ee6e5b5d68d75cd4b2",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingPipelineMetricCatalog.java": "314b0872381488e09c390b4ca4c3c4f4a6d11bb0efeb998404dda2468862b38a",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileFreshness.java": "98df6fe422e4f73e6b5dba93778eb216f49481a4e013d5086477eeb481fb729e",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeMetricCatalog.java": "88ece408b91b6e1f844a66ae636f343562f9b4a457f4b05f945929f9513e5de0",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/LedgerEntryFactory.java": "1460402aceb8dcfc1291a94669e7b2ecd2b774c227f6b0fb62fe1b544b1f3a79",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthority.java": "f47854f3c99f817cef7f7321ed2ddae43a9d5a5f6973dc0fe09f0fdbb44cc2b0",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/PipelineStageTags.java": "4f3269409c1caf98c8e525a76ad81dcbe96dc27e907e5944241d0f786ad0aaa4",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSnapshotResolver.java": "1a434c2355a05275c06e03b792ccb915ca73551257bcc07a9ac5ae2644d24a10",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BatchServiceFailures.java": "99f24de7fef3d92cc48dd39500fcba300b75b55c6c3d8900d8d4537ff6a6ac6d",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionSuccessClassifier.java": "f08c0a265d5eddfce47b83be9d370ebb2b4a0cdaf5254b2bd2ace517f316891e",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceAdmission.java": "5612452a7ce9ae775f95775f2e4a4797aba4a8ccce141aa3f0fdb447cb210ba9",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java": "bfcc5ab2b7a1bdd2a9dbe0800f8d16503428a9b8b325bcb038a76a5619c27ce3",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java": "e976f30092f81c19f020e8b43f48056de3a64754ba520c6e7dc9649da0fed264",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceAdmissionAction.java": "0cbb0203b9cccc90e405f899daaa1ed6c8eb16d4c9a353d38f3ea0a44d6414dd",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java": "7bf499c420ddceac79e64d325687034a5315b9b117b8a775c2bd4a4e64030daa",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java": "f81e8ee9c401fd7fc045c33513a510074bf1cd69195c066c77c642e35e0d5fb1",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoopOptions.java": "eb2aaf00764f4039a52af26cb837a395cd87c7995ea62e33a246eb30a3573742",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/PipelineCanary.java": "6a28bcd351f9e56fc995223e947a5a03f789b0f6a3f91a0717407aa4e1696be0",
+          "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/AdmissionPolicy.java": "0d4238a0c79964672beb4a4213c49930f21934e7c7e772902c0ed4ef20e271a6",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java": "846a74e24bdce617d824f8bf37b88797a6ed08201178034c896040b58e6e431f",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java": "599a73f9198deccd035ba8546c8ab03979346af8121cbd3a62758f0beabdf9b7",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java": "0a6aba5bd6c25185846919e62a04901c4518cb7ce0e4bf81dcbf276c06e67af4",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java": "10502557a673c9bf0b25846c54c640a90d64cbed9787e942e8fcf50864cd54ce",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OriginBoundaryAdmissionTest.java": "f6817eeb8d0f7831f3e9d4b5e1a2ea1f4905c49ebbb0de41f8a9714d2008dcb4",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java": "aba41f48f6097f9120056fc0a38d96fa250499050e83a2f0ff97ed01cd061baa",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java": "22cb386c28af0306aa2f1947494d04792b5706862eb096e1e59bfedcd3620886",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java": "ca1b45c97af5f21882d3a2fb07c120512df17f15744c09fe1272a17b5fe83ffc",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java": "dc8c8256f3b78aa154c3fc0949d2412d5cfcb7eb95e5409ac6827c5ce7747f97",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java": "3c70b740dd05923f90b0607c5be7904b1f90dcb0659a400f8320f07d688572eb",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java": "dc9ba0030ad9918ae26af5de375a8a2c18e8f5eda39499c14119b1ef879c3e40",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java": "5acfe0f07f9d89dd2fa9ac4e3b9ee5ba213d225a03eda562ab555af6ede02c74",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java": "96b5c88546523fcc0908f6edbae039e4a198c970b1cbb37aa33aabda91f0f3aa",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LegacyIngestionBoundaryTest.java": "e3f2f8cd92744b8632d436b3328b1548eaec7509ce80794858b951f85da96f5e",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java": "e3ece1ec681492784e255cee92f15e6cfb1b88db27201ece52c3efc5fa11035d",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java": "d7ea1538f79baa83b6042f29de2c9ec5315b76bfb2ebd81a29a76c483f296985",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java": "84d5b97d009d12a825f3bdb39e6af4e19dfa1f237211349f9d1ab416c8490cda",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java": "9fa358f09252545bd0454be9f208f6b20903e43f1eb9afef945f534088ca5a70",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java": "397b3c235968518b158ac0fbc44c461a97e9d7c97b02fcc525b75f30612eff24",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java": "15b17604aef849ca87f44e98c8fffcb94100631cbf1738106e7f9b50fe3c9bf7",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java": "222b05247158d1f90f82202729b033389d055a82f7175d204653d0f31de5f8a7",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java": "4d85b7cae6bed5d1b850edcf85fe9bd35fd17d90516a407828b6e30bd6fbc00f",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java": "77f0bc6f261e3a9222a41ec27a62346135bda4f783e0e2a3837b5f72fddaed7d",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UpgradeUnscopedDebtReadmissionTest.java": "98c888633a7c0e5bd50540fc3675be8f75479de34705efc2d6f0c7bd7a4d9fcc",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java": "cf892f0bdb86af7dc9f068cf510d3194e422645cdb86696588202819aded2d9a",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java": "0b8ee7d25150860624d01cdd7a5ae110b45ca005a71461378f3b8652f22fa7a4",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java": "9e685fcabae01be135d6b9c612e7e70ba5e7d0361c9a1f004f158540026a06a9",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java": "19079d8f6cc2ba1968960bb10962f2ac1136720ec2d80d07993b99c80f06fb5a",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java": "03f823ce3bd9591e97d4524569114e82b6358ad581b14563e78923e2a57d3aa4",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java": "aab2208df791adaea461de93f9acc607aff2e0043846bc910bad7e08a9219b45",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java": "15a72f7eac9f593bd689ae6bb55a4b8641bb2b8eda327ddb6384754842e86a29",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java": "f2d57580333f0b7451fb6c1b4676a577ca436f3f60d130e016566eefc8988222",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java": "c98ec49a5ac80eba7a394c3be7b65d9a213d2fa175fbd8aed8b4244e00ecc9ae",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java": "ec345b442bf0a4bbba7f242d69433efa851722d28f9fd34602d3f832ac2a4c10",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java": "73b8bf5ff086f8092f4d27d645a72902394573a1de18283c481428d0a0eb5d1f",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java": "b86d97813ce2fb59a2e0beed17dd8204aaa4f048c851c44719da01f812a23fd3",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ConditionalDeleteReplayRoutesTest.java": "7a87de1b02f26921b6371b5ae0296b8818bb38dfd308c581d3dca4469fecd6a5",
+          "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java": "8f66023d6dc655674809c553c26bee149a599550cfa1d1d82c1154784e295541"
+        },
+        "pid": 921630,
+        "exitCode": 1,
+        "finishedUTC": "2026-10-25 13:02:35 UTC",
+        "inputsStable": true,
+        "suites": {
+          "indexer-worker:round21CompletionChecks": {
+            "tests": 8,
+            "skips": 0,
+            "failures": 2,
+            "cases": [
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-persistent-byte-eio",
+                "skipped": false,
+                "failed": false,
+                "detail": null
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-captured-byte-eio",
+                "skipped": false,
+                "failed": false,
+                "detail": null
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-readable",
+                "skipped": false,
+                "failed": false,
+                "detail": null
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-readable-empty",
+                "skipped": false,
+                "failed": false,
+                "detail": null
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-submitted-fifo",
+                "skipped": false,
+                "failed": true,
+                "detail": "org.opentest4j.MultipleFailuresError: Multiple Failures (3 failures)\n\torg.opentest4j.AssertionFailedError: failure classification blocked until the owned FIFO rescue supplied a writer ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: a replaced nonregular source uses a per-file retry ==> expected: <1> but was: <0>\n\torg.opentest4j.AssertionFailedError: expected: <RETRY_WITH_BACKOFF> but was: <DEFER_WITHOUT_ATTEMPT>"
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-captured-fifo",
+                "skipped": false,
+                "failed": true,
+                "detail": "org.opentest4j.MultipleFailuresError: Multiple Failures (3 failures)\n\torg.opentest4j.AssertionFailedError: failure classification blocked until the owned FIFO rescue supplied a writer ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: a replaced nonregular source uses a per-file retry ==> expected: <1> but was: <0>\n\torg.opentest4j.AssertionFailedError: expected: <RETRY_WITH_BACKOFF> but was: <DEFER_WITHOUT_ATTEMPT>"
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-submitted-regular",
+                "skipped": false,
+                "failed": false,
+                "detail": null
+              },
+              {
+                "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+                "name": "own-javaio-captured-regular",
+                "skipped": false,
+                "failed": false,
+                "detail": null
+              }
+            ]
+          }
+        }
+      },
+      "note": "The byte-probe candidate before the regular-file guard blocks on submitted/captured FIFO until the owned delayed rescue; exact HEAD baseline fails per-file policy but does not block."
+    }
+  },
+  "narrowCandidate": {
+    "command": "js-gradle-slot ./gradlew :modules:indexer-worker:round21CompletionChecks --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --tests io.justsearch.indexerworker.server.Release030AdmissionDebtTest.uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete* --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21b/narrow.gradle",
+    "exitCode": 0,
+    "suites": {
+      "indexer-worker:round21CompletionChecks": {
+        "tests": 13,
+        "skips": 0,
+        "failures": 0,
+        "cases": [
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-persistent-byte-eio",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-captured-byte-eio",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-readable",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-readable-empty",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-submitted-fifo",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-captured-fifo",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-submitted-regular",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "name": "own-javaio-captured-regular",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "name": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [1] true",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "name": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [2] false",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+            "name": "[1] admission-query",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+            "name": "[2] presence-lookup",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          },
+          {
+            "class": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+            "name": "[3] io-presence-lookup",
+            "skipped": false,
+            "failed": false,
+            "detail": null
+          }
+        ]
+      }
+    },
+    "note": "Original 13-case run belongs to the longer source; shortened 3-case run is recorded in shortenedAdmissionRecheck."
+  },
+  "fullSuiteSummary": {
+    "worker-services:test": {
+      "tests": 2042,
+      "skips": 18,
+      "failures": 1
+    },
+    "indexer-worker:test": {
+      "tests": 1679,
+      "skips": 29,
+      "failures": 0
+    },
+    "indexer-worker:isolatedExtractionChecks": {
+      "tests": 8,
+      "skips": 0,
+      "failures": 0
+    },
+    "adapters-lucene:test": {
+      "tests": 6,
+      "skips": 0,
+      "failures": 0
+    }
+  },
+  "frozenManifest": {
+    "path": "tmp/builder/round21b/frozen-inputs.json",
+    "sha256": "e180725c4420f1ca00b585cd6073d3c08c6e6ca25892571458833681baa608c5",
+    "allInputsStable": true
+  },
+  "priorInterruptedRuns": [
+    "tmp/builder/round21/attempt1-stop.json",
+    "tmp/builder/round21a/orchestrator-cancel.json"
+  ],
+  "digest": "sha256:11ee08dd516b6b0fd70cedba155482546439f32b0f1ec6e12106b38ddb1191b1",
+  "originalFrozenFullRun": {
+    "archive": {
+      "result": "tmp/builder/round21b/full-result.json",
+      "junit": "tmp/builder/round21b/full-junit/",
+      "evidence": "tmp/builder/round21c/original-full-evidence.json",
+      "sourceHashes": {
+        "AdmissionLookupLivenessTest.java": "96b5c88546523fcc0908f6edbae039e4a198c970b1cbb37aa33aabda91f0f3aa",
+        "PersistentByteIoSourceTest.java": "9e685fcabae01be135d6b9c612e7e70ba5e7d0361c9a1f004f158540026a06a9"
+      }
+    },
+    "evidenceSha256": "586ce66de0a7cf9d37c0b50c1f30530affbca43959737b1e8cd5438de753730b",
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests io.justsearch.adapters.lucene.runtime.IngestionProbeAnalysisTest --tests io.justsearch.adapters.lucene.runtime.IngestionProbeIsolationTest --tests io.justsearch.adapters.lucene.runtime.ComponentsInjectionTest :modules:worker-services:compileJava :modules:worker-services:compileTestJava :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:worker-services:test :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:test :modules:indexer-worker:isolatedExtractionChecks --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21b/full.gradle",
+        "cwd": ".",
+        "exitCode": 1,
+        "startedUTC": "2026-10-25 13:08:33 UTC",
+        "finishedUTC": "2026-10-25 14:01:28 UTC"
+      }
+    ],
+    "fullSuiteSummary": {
+      "worker-services:test": {
+        "tests": 2042,
+        "skips": 18,
+        "failures": 1
+      },
+      "indexer-worker:test": {
+        "tests": 1679,
+        "skips": 29,
+        "failures": 0
+      },
+      "indexer-worker:isolatedExtractionChecks": {
+        "tests": 8,
+        "skips": 0,
+        "failures": 0
+      },
+      "adapters-lucene:test": {
+        "tests": 6,
+        "skips": 0,
+        "failures": 0
+      }
+    },
+    "admissionCheck": {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:96b5c88546523fcc0908f6edbae039e4a198c970b1cbb37aa33aabda91f0f3aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admission-query",
+          "status": "passed"
+        },
+        {
+          "name": "[2] presence-lookup",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io-presence-lookup",
+          "status": "passed"
+        }
+      ]
+    },
+    "note": "Executed the original longer source. These full-suite counts are NOT execution of the shortened admission source. Retained unchanged cases remain valid under source/product hashes."
+  },
+  "shortenedAdmissionRecheck": {
+    "before": {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:round21CompletionChecks --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21c/narrow.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/before-ad9767a097",
+      "exitCode": 1,
+      "startedUTC": "2026-10-25 14:12:59 UTC",
+      "finishedUTC": "2026-10-25 14:14:54 UTC"
+    },
+    "after": {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdTest :modules:indexer-worker:round21CompletionChecks --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --max-workers=1 --no-parallel -PskipErrorProneTests=false -PtestParallelism=1 -PskipWebBuild=true --console=plain --continue -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21/fixed-temp.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/builder/round21c/narrow.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral",
+      "exitCode": 0,
+      "startedUTC": "2026-10-25 14:14:54 UTC",
+      "finishedUTC": "2026-10-25 14:15:03 UTC"
+    },
+    "sourceSha256": "235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a",
+    "beforeCases": [
+      {
+        "name": "[1] admission-query",
+        "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+        "status": "failed",
+        "failureType": "org.opentest4j.MultipleFailuresError",
+        "message": "org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org.opentest4j.AssertionFailedError: lookup uncertainty retains baseline per-file handling ==> expected: <1> but was: <0>&#10;&#9;org.opentest4j.AssertionFailedError: expected: <RETRY_WITH_BACKOFF> but was: <null>&#10;&#9;o"
+      },
+      {
+        "name": "[2] presence-lookup",
+        "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+        "status": "failed",
+        "failureType": "org.opentest4j.MultipleFailuresError",
+        "message": "org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org.opentest4j.AssertionFailedError: lookup uncertainty retains baseline per-file handling ==> expected: <1> but was: <0>&#10;&#9;org.opentest4j.AssertionFailedError: expected: <RETRY_WITH_BACKOFF> but was: <null>&#10;&#9;o"
+      },
+      {
+        "name": "[3] io-presence-lookup",
+        "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+        "status": "failed",
+        "failureType": "org.opentest4j.MultipleFailuresError",
+        "message": "org.opentest4j.MultipleFailuresError: Multiple Failures (9 failures)&#10;&#9;org.opentest4j.AssertionFailedError: lookup uncertainty retains baseline per-file handling ==> expected: <1> but was: <0>&#10;&#9;org.opentest4j.AssertionFailedError: expected: <RETRY_UNTIL_AVAILABLE> but was: <null>&#10;&#"
+      }
+    ],
+    "afterCases": [
+      {
+        "name": "[1] admission-query",
+        "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+        "status": "passed",
+        "failureType": null,
+        "message": null
+      },
+      {
+        "name": "[2] presence-lookup",
+        "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+        "status": "passed",
+        "failureType": null,
+        "message": null
+      },
+      {
+        "name": "[3] io-presence-lookup",
+        "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+        "status": "passed",
+        "failureType": null,
+        "message": null
+      }
+    ],
+    "productionUnchanged": true,
+    "productManifest": "tmp/builder/round21c/product-before-hashes.json",
+    "fullSuitesRepeated": false,
+    "note": "Repair must preserve observed persisted deadline; only that owned row is then made due. All original failure/status/debt/no-deletion/peer and DONE recovery assertions remain; queue retry tests own real minute-scale waiting."
+  }
+}

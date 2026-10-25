@@ -9,14 +9,20 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.TelemetryEvents;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +49,7 @@ public final class IndexingCoordinator {
 
   private final RuntimeSession session;
   private final Supplier<WritePathOps> writeOps;
+  private final FileTime writerLockCreatedAt;
 
   /**
    * Single serialization primitive for all mutating ops. Reentrant so same-thread nested calls
@@ -51,30 +58,88 @@ public final class IndexingCoordinator {
   private final ReentrantLock dispatchLock = new ReentrantLock();
 
   IndexingCoordinator(RuntimeSession session, Supplier<WritePathOps> writeOps) {
+    this(session, writeOps, null);
+  }
+
+  IndexingCoordinator(RuntimeSession session, Supplier<WritePathOps> writeOps,
+      FileTime writerLockCreatedAt) {
     this.session = session;
     this.writeOps = writeOps;
+    this.writerLockCreatedAt = writerLockCreatedAt;
   }
 
   /**
    * Tempdoc 406 observability — acquires the writeBarrier readLock and emits the
    * blocked-time as an {@code onWriteBarrierContention} event when telemetry is
-   * wired. Negligible overhead when telemetry is null (one volatile read +
-   * branch); two {@code System.nanoTime()} calls when wired.
+   * wired. Closing/open state is checked under the session monitor after acquiring the barrier;
+   * timing is collected only when telemetry is wired.
    */
   private void acquireReadLockTimed() {
     LuceneRuntimeTypes.TelemetryEvents events = session.telemetryEvents;
-    if (events == null) {
-      session.writeBarrier.readLock().lock();
-      return;
-    }
-    long start = System.nanoTime();
+    long start = events == null ? 0L : System.nanoTime();
     session.writeBarrier.readLock().lock();
-    events.onWriteBarrierContention(System.nanoTime() - start);
+    try {
+      synchronized (session) {
+        if (session.draining) {
+          throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DRAINING,
+              "runtime_draining", null);
+        }
+        LifecycleSnapshot snapshot = session.snapshot;
+        if (session.isClosing() || snapshot == null || snapshot.writer() == null
+            || !snapshot.writer().isOpen()) {
+          throw new IndexWriterUnavailableException(
+              "IndexWriter not available (runtime not started or closed)");
+        }
+      }
+      if (events != null) events.onWriteBarrierContention(System.nanoTime() - start);
+    } catch (RuntimeException | Error failure) {
+      releaseWriteBarrierAndReport();
+      throw failure;
+    }
   }
 
   // ==========================================================================
   // Tempdoc 402: write-op dispatch
   // ==========================================================================
+
+  /** Proves mapped-document indexing in disposable RAM, plus the live writer and Directory health. */
+  public void probeIngestion() {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try {
+        var snapshot = session.snapshot;
+        var tragic = snapshot.writer().getTragicException();
+        if (tragic != null) throw new IndexWriterUnavailableException("IndexWriter failed", tragic);
+        if (snapshot.directory() instanceof FSDirectory directory
+            && !Objects.equals(writerLockCreatedAt, Files.getAttribute(
+                directory.getDirectory().resolve(IndexWriter.WRITE_LOCK_NAME), "creationTime"))) {
+          throw new IndexWriterUnavailableException("Index writer lock was replaced");
+        }
+        new SearcherBridge(session).withSearcherNoRefresh(searcher -> {
+          ComponentsFactory.probeDocument(snapshot.writer().getConfig(),
+              session.fieldMapper.ingestionCanaryDocument(), searcher.getIndexReader());
+          return null;
+        });
+        String name = null;
+        try {
+          try (var output = snapshot.directory().createTempOutput(
+              "justsearch-ingestion-canary", "probe", org.apache.lucene.store.IOContext.DEFAULT)) {
+            name = output.getName();
+            output.writeByte((byte) 1);
+          }
+        } finally {
+          if (name != null) snapshot.directory().deleteFile(name);
+        }
+      } finally {
+        dispatchLock.unlock();
+      }
+    } catch (org.apache.lucene.store.AlreadyClosedException | IOException failure) {
+      throw new IndexWriterUnavailableException("Index write path unavailable", failure);
+    } finally {
+      releaseWriteBarrierAndReport();
+    }
+  }
 
   /**
    * Synchronous op dispatch serialized against concurrent callers via {@link #dispatchLock}.

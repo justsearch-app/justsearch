@@ -545,7 +545,8 @@ final class RuntimeSession implements AutoCloseable {
     // IndexingCoordinator depends on writePathOps (set above) + commitOps. Created
     // after writePathOps is assigned so the supplier reference is safe.
     final WritePathOps writePathRef = this.writePathOps;
-    this.indexingCoordinator = new IndexingCoordinator(this, () -> writePathRef);
+    this.indexingCoordinator =
+        new IndexingCoordinator(this, () -> writePathRef, components.writerLockCreatedAt());
 
     this.pruneOps = new PruneOps(this, indexingCoordinator, commitOps);
 
@@ -744,8 +745,7 @@ final class RuntimeSession implements AutoCloseable {
           nrtHardMaxStaleMs,
           chunkCompleteness);
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to open Lucene components", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to open Lucene components");
     }
   }
 

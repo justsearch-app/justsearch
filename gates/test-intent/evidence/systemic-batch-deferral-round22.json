@@ -1,0 +1,511 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "adaptedScript": "tmp/builder/round22/run-evidence.mjs",
+    "scriptDigest": "sha256:469a2afcde6bbdbb31014f56457fda617a41b777b182bd973121d7e4543d4a16",
+    "note": "Same adapted execution producer runs fresh exact-df4 and candidate source synchronization checks. Sandbox and other narrow records are retained unchanged under exact source/product hashes; original evidence and runner are archived in synchronization-before."
+  },
+  "createdAt": "2026-10-25T15:51:43Z",
+  "revision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+  "tree": "sha256:068859ff6b7523ca4db26bd1569ca2c6a5b920a8ecfce12a537f111ebb281aa0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.22.0",
+    "launcherJvmTemps": [
+      "tmp/builder/jvm/before",
+      "tmp/builder/jvm/after"
+    ],
+    "testJvmTemps": "Machine /home/elias/.gradle/init.d/50-agent-tmp.gradle appends java.io.tmpdir=<checkout>/modules/<module>/build/tmp/test-jvm/test; fixed per checkout/module and reused, overrides supplied test property. No /tmp products.",
+    "fixtures": "JUnit-owned tiny corpus only; no large fixture/model copy"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 1,
+      "signal": null,
+      "startedUTC": "2026-10-25T15:38:11Z",
+      "finishedUTC": "2026-10-25T15:39:29Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --tests io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest --tests io.justsearch.indexerworker.loop.WriterAliasRetargetTest --tests io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest --tests io.justsearch.indexerworker.loop.WriterLegacyRetargetSourceTest :modules:worker-services:test --tests io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest --tests io.justsearch.indexerworker.loop.ReadOnlyStoreDeferralTest :modules:app-launcher:test --tests io.justsearch.app.launcher.UnreferencedCodeTest :modules:worker-services:compileJava :modules:worker-services:compileTestJava :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "signal": null,
+      "startedUTC": "2026-10-25T15:39:44Z",
+      "finishedUTC": "2026-10-25T15:40:12Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:app-engine:test --tests io.justsearch.app.engine.EngineSandboxFailureWorkflowTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/round22/before-sandbox",
+      "exitCode": 1,
+      "signal": null,
+      "startedUTC": "2026-10-25T15:41:24Z",
+      "finishedUTC": "2026-10-25T15:41:53Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:app-engine:test --tests io.justsearch.app.engine.EngineSandboxFailureWorkflowTest :modules:app-engine:compileJava :modules:app-engine:compileTestJava :modules:app-engine:pmdMain :modules:app-engine:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "signal": null,
+      "startedUTC": "2026-10-25T15:42:22Z",
+      "finishedUTC": "2026-10-25T15:42:56Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/round22/before-df4",
+      "exitCode": 1,
+      "signal": null,
+      "startedUTC": "2026-10-25T15:49:43Z",
+      "finishedUTC": "2026-10-25T15:50:18Z"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/after -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+      "exitCode": 0,
+      "signal": null,
+      "startedUTC": "2026-10-25T15:50:59Z",
+      "finishedUTC": "2026-10-25T15:51:11Z"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admission-query",
+          "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[2] presence-lookup",
+          "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[3] io-presence-lookup",
+          "classname": "io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c98ec49a5ac80eba7a394c3be7b65d9a213d2fa175fbd8aed8b4244e00ecc9ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retargetedSourceParentStillCostsAFileAttemptWhileOldCanonicalFileExists()",
+          "classname": "io.justsearch.indexerworker.loop.WriterAliasRetargetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:22cb386c28af0306aa2f1947494d04792b5706862eb096e1e59bfedcd3620886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacy-source-stream-false",
+          "classname": "io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "legacy-source-stream-true",
+          "classname": "io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15a72f7eac9f593bd689ae6bb55a4b8641bb2b8eda327ddb6384754842e86a29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedCanonicalUnreadableSourceStillCostsOneAttemptAfterReadableRetarget()",
+          "classname": "io.justsearch.indexerworker.loop.WriterLegacyRetargetSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbb69ae5adf6b069329476dc0646bb484c13c3dac317a7f0db80781017dcfacc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] java.lang.NoClassDefFoundError: missing shared mapping",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[2] java.lang.AssertionError: broken health check",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[3] java.lang.ThreadDeath",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "[4] java.lang.IllegalStateException: probe failed",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "vmProbeFailureIsNeverSwallowed()",
+          "classname": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae0386442992d164a9fdaab4549fd94879120c3e40af123eec8f7e7b4c8911df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readOnlyStoreRemainsUncountedBeyondAmbiguousGrace()",
+          "classname": "io.justsearch.indexerworker.loop.ReadOnlyStoreDeferralTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/UnreferencedCodeTest.java",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/UnreferencedCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a0d531de7ff88355d5586711b5673c290a6ed1601fe576936cd1fc26f0989189",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "no_unreferenced_package_private_classes",
+          "classname": "io.justsearch.app.launcher.UnreferencedCodeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "no_unreferenced_package_private_fields",
+          "classname": "io.justsearch.app.launcher.UnreferencedCodeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "no_unreferenced_non_public_methods",
+          "classname": "io.justsearch.app.launcher.UnreferencedCodeTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:907c8af60bcee2eaaf1bd0245dc921430c2449f059cdc38e0a15f1476854b2d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "brokenChildConfinesFiveFamiliesWhileThreeDecoderFormatsBecomeSearchable()",
+          "classname": "io.justsearch.app.engine.EngineSandboxFailureWorkflowTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a3ca8011cb084d73392a7e10cb289608d0c40fdf8a5a63593479adfe7c24ce0a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "own-javaio-persistent-byte-eio",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-captured-byte-eio",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-readable",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-readable-empty",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-submitted-fifo",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-captured-fifo",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-submitted-regular",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        },
+        {
+          "name": "own-javaio-captured-regular",
+          "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "note": "Fresh final source synchronization comparison: exact df4 production with only final named test overlaid; two immediate-charge assertions fail and six controls pass. Unchanged sandbox comparison retained on exact bc1c1f72.",
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair",
+        "exitCode": 1,
+        "signal": null,
+        "startedUTC": "2026-10-25T15:38:11Z",
+        "finishedUTC": "2026-10-25T15:39:29Z"
+      },
+      {
+        "command": "js-gradle-slot ./gradlew :modules:app-engine:test --tests io.justsearch.app.engine.EngineSandboxFailureWorkflowTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/round22/before-sandbox",
+        "exitCode": 1,
+        "signal": null,
+        "startedUTC": "2026-10-25T15:41:24Z",
+        "finishedUTC": "2026-10-25T15:41:53Z"
+      },
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.PersistentByteIoSourceTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/jvm/before -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/ci-finish-removal/fixed-temp.init.gradle",
+        "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/round22/before-df4",
+        "exitCode": 1,
+        "signal": null,
+        "startedUTC": "2026-10-25T15:49:43Z",
+        "finishedUTC": "2026-10-25T15:50:18Z"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java",
+        "revision": "bc1c1f72c8479a7e192acd2c9c033ba3b1ff1ea0",
+        "contentDigest": "sha256:907c8af60bcee2eaaf1bd0245dc921430c2449f059cdc38e0a15f1476854b2d9",
+        "classification": "assertion",
+        "detail": "brokenChildConfinesFiveFamiliesWhileThreeDecoderFormatsBecomeSearchable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: /home/elias/dev/justsearch/.claude/worktrees/upgrade-deferral/tmp/orchestrator/ci-repair/tmp/builder/round22/before-sandbox/modules/app-engine/build/tmp/test-jvm/test/junit-2376243966824225477/corpus/routed.pdf ==> expected: <DEFER_WITHOUT_ATTEMPT> but was: <RETR"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+        "revision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+        "contentDigest": "sha256:a3ca8011cb084d73392a7e10cb289608d0c40fdf8a5a63593479adfe7c24ce0a",
+        "classification": "assertion",
+        "detail": "own-javaio-persistent-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: byte-only EIO with readable metadata defers during a shared outage ==> expected: <0> but was: <1> | own-javaio-captured-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: byte-only EIO with readable metadata defers during a shared outage ==> expected: <0> but was: <1>"
+      }
+    ]
+  },
+  "digest": "sha256:d7ce47cf8eb8a4de1e2e44fe91415c9dcd4c07580d0419cc1ed4582cb8a4f2ea",
+  "retention": {
+    "originalEvidence": "tmp/builder/round22/synchronization-before/source/gates/test-intent/evidence/systemic-batch-deferral-round22.json",
+    "originalEvidenceDigest": "sha256:eab54094758dc3f698e3034db43f753f93c13dc090e87e1e621d8636e72c979e",
+    "priorSourceSnapshot": {
+      "note": "Historical source cases below belong to the pre-correction test digest; neither is promoted to final-source execution.",
+      "after": {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+        "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+        "runner": "gradle",
+        "contentDigest": "sha256:e7de38ac0ccfd24a239d218e586b9ac01198636ddbe79a7dd8813e0343759bf0",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "own-javaio-persistent-byte-eio",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-captured-byte-eio",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-readable",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-readable-empty",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-submitted-fifo",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-captured-fifo",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-submitted-regular",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          },
+          {
+            "name": "own-javaio-captured-regular",
+            "classname": "io.justsearch.indexerworker.loop.PersistentByteIoSourceTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null
+          }
+        ]
+      },
+      "before": {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+        "revision": "df4abafcf80e3372c05509bcbcbece0129cef70b",
+        "contentDigest": "sha256:e7de38ac0ccfd24a239d218e586b9ac01198636ddbe79a7dd8813e0343759bf0",
+        "classification": "assertion",
+        "detail": "own-javaio-persistent-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: byte-only EIO with readable metadata defers during a shared outage ==> expected: <0> but was: <1> | own-javaio-captured-byte-eio: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: byte-only EIO with readable metadata defers during a shared outage ==> expected: <0> but was: <1>"
+      }
+    },
+    "retainedChecks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+        "contentDigest": "sha256:235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+        "contentDigest": "sha256:c98ec49a5ac80eba7a394c3be7b65d9a213d2fa175fbd8aed8b4244e00ecc9ae"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+        "contentDigest": "sha256:22cb386c28af0306aa2f1947494d04792b5706862eb096e1e59bfedcd3620886"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+        "contentDigest": "sha256:15a72f7eac9f593bd689ae6bb55a4b8641bb2b8eda327ddb6384754842e86a29"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java",
+        "contentDigest": "sha256:cbb69ae5adf6b069329476dc0646bb484c13c3dac317a7f0db80781017dcfacc"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ReadOnlyStoreDeferralTest.java",
+        "contentDigest": "sha256:ae0386442992d164a9fdaab4549fd94879120c3e40af123eec8f7e7b4c8911df"
+      },
+      {
+        "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/UnreferencedCodeTest.java",
+        "contentDigest": "sha256:a0d531de7ff88355d5586711b5673c290a6ed1601fe576936cd1fc26f0989189"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSandboxFailureWorkflowTest.java",
+        "contentDigest": "sha256:907c8af60bcee2eaaf1bd0245dc921430c2449f059cdc38e0a15f1476854b2d9"
+      }
+    ],
+    "scope": "Product and all other test bytes match completed round22. Only final PersistentByteIoSourceTest and indexer compileTestJava/pmdTest ran in this continuation."
+  }
+}
