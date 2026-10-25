@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T14:32:44.753Z",
+  "revision": "c352c79168ecd21be9ee45381e4839a123d320ad",
+  "tree": "82786f3de7fc3678886b63045b9dcd4cd6b2e73f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/chat/conversationDelete.caseParent.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-509551-1792852362422.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 578
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts#F2 renders every validated tree member when saved parent casing differs",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad55d6ada2c868ca935c7a27e3a0cc46521d3b41b2c8d4f602cb3f14e6da9b0a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 renders every validated tree member when saved parent casing differs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c352c79168",
+    "revision": "c352c79168ecd21be9ee45381e4839a123d320ad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/chat/conversationDelete.caseParent.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-509551-1792852364020.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 570,
+        "output": "JSON report written to /home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-509551-1792852364020.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts#F2 renders every validated tree member when saved parent casing differs",
+        "classification": "assertion",
+        "detail": "F2 renders every validated tree member when saved parent casing differs:  AssertionError: expected 'Permanently delete 4 conversations an…' to contain 'child'\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-MS1hGE/modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts:21:55\n    at processTicksAndRejections (node:internal/process/tas"
+      }
+    ]
+  },
+  "digest": "sha256:3dcdb568a42bda48a57973b6d75067376994a8ce689cf4236e69c8e22c07547a"
+}

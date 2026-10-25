@@ -1,0 +1,13 @@
+allprojects {
+  tasks.withType(Test).configureEach {
+    if (project.path == ':modules:indexer-worker') {
+      systemProperty 'justsearch.ort.optimized_cache_dir', rootProject.file('tmp/ort-optimized-cache').absolutePath
+      systemProperty 'justsearch.models.dir', rootProject.file('models').absolutePath
+      def mode = System.getProperty('tokenizer.memory.mode', 'after')
+      systemProperty 'tokenizer.memory.mode', mode
+      systemProperty 'tokenizer.memory.output', rootProject.file("tmp/memory-${mode}-floors.log").absolutePath
+      jvmArgs '-XX:TrimNativeHeapInterval=30000'
+      maxParallelForks = 1
+    }
+  }
+}

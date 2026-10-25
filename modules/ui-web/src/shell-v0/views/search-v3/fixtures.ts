@@ -442,21 +442,6 @@ export const BRANCH_RERUN_BUSY =
 
 /** Delete's two new words: the cascade prompt, and the refusal when the store declined. */
 export const DELETE_FAILED = 'That conversation could not be deleted';
-export const deleteCascadeTitle = 'Delete this conversation and its branches?';
-/**
- * It promises exactly ONE level, because that is exactly what the cascade does.
- * `deleteConversationWithCascade` recurses into each child WITHOUT the consent callback, so a child
- * that has children of its own answers `409`, the cascade ABORTS, and the parent is left standing
- * (the reader then gets `DELETE_FAILED`). Wording it as "those branches too" would promise a
- * three-level delete this act refuses to perform — and the refusal is the honest behaviour, so the
- * copy is what has to match it.
- */
-export const deleteCascadeMessage = (label: string, branches: readonly string[]): string =>
-  `"${label}" has ${branches.length} branch${branches.length === 1 ? '' : 'es'} forked from it:\n`
-  + `${branches.map((b) => `• ${b}`).join('\n')}\n\n`
-  + `Deleting it deletes ${branches.length === 1 ? 'that branch' : 'those direct branches'} too. `
-  + `A branch that has been forked again is not deleted — nothing is removed and this will say so.`;
-export const deleteCascadeConfirm = (branches: number): string => `Delete all (${branches + 1})`;
 
 /**
  * The citation pane's own words (tempdoc 822 Phase F8). The region is named for WHAT IT HOLDS — a

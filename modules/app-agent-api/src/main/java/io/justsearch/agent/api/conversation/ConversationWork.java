@@ -61,6 +61,11 @@ public final class ConversationWork {
     else active.computeIfPresent(id, (key, count) -> count - 1);
   }
 
+  /** Observation for delete confirmation; each DELETE still takes its own admission lease. */
+  public synchronized boolean isBusy(String id) {
+    return active.containsKey(id) || deleting.contains(id);
+  }
+
   public synchronized Lease delete(String id) {
     Objects.requireNonNull(id, "id");
     if (active.containsKey(id) || !deleting.add(id)) {
