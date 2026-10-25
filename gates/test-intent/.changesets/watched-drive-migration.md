@@ -326,7 +326,7 @@ exact revision, and its projection-verification refusal must appear in status.
         {
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
-          "delegationLocation": "drive-migration builder assignment 2026-10-25, user grant supplied verbatim",
+          "delegationLocation": "task drive-migration request",
           "delegationScope": "Existing drive repair only; approved A4 installed native fixture correction and R1-R8 controls; no production model/query policy or budget change.",
           "choice": "Use reflection to exercise unchanged private hasHit/await without creating production API; actual client leases retain and release a controlled physical serving view. Preserve all existing tests and installed native assertions. The exact loading-only search catch adapts fixture readiness; it does not establish a product defect or a baseline native pass.",
           "label": "agent choice"
@@ -337,6 +337,27 @@ exact revision, and its projection-verification refusal must appear in status.
         "modules/ui/src/test/java/io/justsearch/ui/NativeProjectionHarnessTest.java#vectorLoadingIsPendingThenRequiresAnActualVectorHitAndReleasesEachLease"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "A5 fixture plumbing only: create a unique absolute scratch root beneath the existing JUnit TempDir, pass it as one java.io.tmpdir argument to this persistent child, and discover/damage only its contained snapshot directory. The original parent-temp discovery failed before outage injection on pristine c8: expected one child snapshot folder, found zero, with effective parent private Gradle tmp and child /tmp. Preserve every original input, assertion, grace, retry, attempt, canary, recovery, timeout and selection. The method has two source rows and no separate unrelated-row assertion. Add partial-constructor cleanup that preserves its primary error and independently closes initialized loop/timebox/child/provider/executor/queue resources; baseline lacked this guard. Ordinary fault cleanup still restores permissions/directory before closure. Current fixture is also transplanted to pristine c8 production for preservation, not product fail-before.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration request",
+          "delegationScope": "Conditional approved A5/T1-T6 extraction fixture correction after pristine-main constructor failures and effective JVM temp mismatch are established; no production or global profile policy changes.",
+          "choice": "Use the fixture-owned child scratch root and matching contained discovery; retain persistent-child outage/recovery semantics and all original oracles. Guard constructor initialization and independently close initialized owners with cleanup failures suppressed onto the original error. Record old c8 failure as invalid fixture evidence and corrected c8 execution as preservation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-extraction-fixture.json"
     }
   ]
 }
