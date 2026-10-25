@@ -79,13 +79,13 @@ final class Release030ReplayRetentionTest {
   @CsvSource({"migrating,false,false", "switching,false,false", "migrating,true,false", "switching,true,false", "migrating,false,true"})
   void completedLegacyEffectIsSettledThroughNativeReplay(String fixture, boolean restart, boolean retention,
       @TempDir Path temporary) throws Exception {
-    Path root = Release030Fixture.unpack(fixture, temporary);
+    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
     Path file = Files.writeString(root.resolve("native-receipt.txt"), "settlednativecobalt");
     rawAdmission(root, file, "PENDING");
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models) {
         String revision;
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
@@ -128,13 +128,13 @@ final class Release030ReplayRetentionTest {
   @Test
   void routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes(@TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack("switching", temporary);
+    Path root = Release030Fixture.unpackNativeMigration("switching", temporary);
     Path file = root.resolve("retained-debt.txt"), ordinary = root.resolve("ordinary-retention.txt");
     rawAdmission(root, file, "RETRY_EXHAUSTED");
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models) {
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
           stopMonitor(server);
@@ -263,13 +263,13 @@ final class Release030ReplayRetentionTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean retention, @TempDir Path temporary) throws Exception {
-    Path root = Release030Fixture.unpack("migrating", temporary);
+    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
     Path file = Files.writeString(root.resolve("unchanged-native.txt"), "unchangednativecobalt");
     rawAdmission(root, file, "PENDING");
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models) {
         String revision;
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {

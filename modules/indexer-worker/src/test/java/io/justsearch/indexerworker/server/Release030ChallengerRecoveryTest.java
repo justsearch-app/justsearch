@@ -151,7 +151,7 @@ final class Release030ChallengerRecoveryTest {
   @ValueSource(strings = {"migrating", "switching"})
   void interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String fixture, @TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack(fixture, temporary);
+    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
     // Add C1's stated input: an independently queued explicit path in the v13 database.
     Path pending = Files.writeString(root.resolve("native-pending.txt"), "nativequeuedcopper");
     sql(root, "INSERT INTO jobs(path,state,attempts,last_updated) VALUES ('" + key(pending)
@@ -160,7 +160,7 @@ final class Release030ChallengerRecoveryTest {
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         Release030ExactFileRecoveryTest.activateNative(server);
         var resumed = server.appServices().ingestService().resumeMigration(

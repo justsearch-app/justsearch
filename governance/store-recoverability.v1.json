@@ -749,7 +749,7 @@
       "atomicityNote": "The release-0.3.0 checkpoint uses AtomicFileWrites.replaceStrict: force the completed sibling temporary file with FileChannel.force(true), then ATOMIC_MOVE with REPLACE_EXISTING. Unsupported atomic replacement fails rather than falling back to a non-atomic move. Capture finishes before any v13 queue DDL; preparation is saved only after the transactional boundary/retry repair. This promises process-crash restart continuity, not parent-directory durability across physical power loss; checkpoint deletion does not force the directory either.",
       "corruptionPolicy": "FAIL_OR_REBUILD_DERIVED_QUEUE",
       "reconciliation": "RUN_EXISTING_SQLITE_MIGRATIONS_OR_REBUILD",
-      "reconciliationNote": "Preserve the checkpoint as part of jobs-db across in-place upgrade and restart. Capture it before v13 migration; after the lossless queue migration, idempotently backfill ingestion boundaries and selectively repair legacy retry debt before claims, then bind preparation to that database. Resume pending roots with their own volume/membership evidence and persisted cooldowns; unavailable roots retain debt and indexed content, while exact-file legacy admissions stay bounded to their recorded paths. During native migration, boundary preparation and explicit-file settlement can run before directory recovery resumes at IDLE. Delete the checkpoint only after preparation, completed/conclusively removed roots, no unfinished legacy exact-file admissions reported by the queue and no quarantined root keys; otherwise resume after a kill. The existing RUN_EXISTING_SQLITE_MIGRATIONS_OR_REBUILD owner identity and SQLite schema-version authority are unchanged: the format=1 marker is a queue-recovery subformat, not a new store/version promise.",
+      "reconciliationNote": "Preserve the checkpoint as part of jobs-db across in-place upgrade and restart. Capture it before v13 migration; after the lossless queue migration, idempotently backfill ingestion boundaries and selectively repair legacy retry debt before claims, then bind preparation to that database. Resume pending roots with their own volume/membership evidence and persisted cooldowns; unavailable roots retain debt and indexed content, while exact-file legacy admissions stay bounded to their recorded paths. During native migration, boundary preparation and explicit-file settlement can run before directory recovery resumes at IDLE. Delete the checkpoint only after preparation, completed/conclusively removed roots, no unfinished legacy exact-file admissions reported by the queue and no quarantined root keys; otherwise resume after a kill. The existing RUN_EXISTING_SQLITE_MIGRATIONS_OR_REBUILD owner identity and SQLite schema-version authority are unchanged: the format=1 marker is a queue-recovery subformat, not a new store/version promise. Interrupted compatible release builds checkpoint exact A/B identities and differing source paths before A/IDLE publication. The sidecar retains the build, exact-file authority and reconciliation/replay completion obligations through queue preparation, acknowledgement, physical retirement and normalization of both generation pointers. Uncertain paths and partial SYNC_ROOT walks retain B. Pending upgrade-root walks are inserted idempotently into B's existing ordered switch buffer before mutation admission opens; retire|roots-journaled is published only after that transaction. An exact receipt walk token is written through Release030RecoveryState.save after durable file admissions/prune and before waiting for the writer, preventing re-enumeration from resetting DONE work. Root completion is written through Release030RecoveryState.save before exact receipt acknowledgement, so scheduled recovery cannot replay an older walk over a newer delete after restart. Only after committed, verified replay and normalized state.json.prev can retirement fields be cleared; ordinary root recovery then resumes.",
       "status": "READY",
       "implementationSources": [
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
@@ -764,7 +764,8 @@
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueMigrationOps.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueSwitchBufferOps.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/Release030RecoveryState.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/Release030MigrationRetirement.java"
       ],
       "tests": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
@@ -781,7 +782,16 @@
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CorruptRecoveryValueTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ConfiguredHeadlessRecoveryTest.java"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ConfiguredHeadlessRecoveryTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java"
       ],
       "fixtures": [
         "modules/indexer-worker/src/test/resources/upgrade-030/small.zip"
@@ -812,7 +822,10 @@
         1
       ],
       "versionAuthority": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java",
-      "versionSource": { "file": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java", "symbol": "STATE_FORMAT_VERSION" },
+      "versionSource": {
+        "file": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java",
+        "symbol": "STATE_FORMAT_VERSION"
+      },
       "futureVersionRefusalTest": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java",
       "writeMode": "GENERATION_SWAP",
       "atomicity": "ATOMIC_REPLACE",
@@ -833,7 +846,8 @@
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java",
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/RecordedGenerationStartTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "reconciliationNote": "For positively certified compatible interrupted 0.3.0 builds, the queue sidecar checkpoints source reconciliation before publishing A/IDLE with previous=B. Exact predecessor retirement follows committed replay. Both state.json and state.json.prev are normalized before clearing the sidecar retirement obligation; restoring the backup cannot revive B."
     },
     {
       "id": "index-migration-progress",
@@ -1522,16 +1536,22 @@
       "atomicity": "SINGLE_WRITE",
       "corruptionPolicy": "CONSERVATIVE_REBUILD_OR_CLEAR",
       "reconciliation": "CONSUME_MARKER_AND_TRIGGER_IDEMPOTENT_RECOVERY",
+      "reconciliationNote": "Compatible release-0.3.0 retirement deletes only the exact retired B generation's sibling clean-shutdown and rebuild-pending markers after committed source reconciliation and physical B retirement, before clearing its durable recovery obligation. A's markers are preserved. Failed marker deletion keeps the retirement checkpoint for retry.",
       "status": "READY",
       "implementationSources": [
         "modules/ipc-common/src/main/java/io/justsearch/ipc/WorkerFatalReasonMarker.java",
         "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/RuntimeSession.java",
         "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/CleanShutdownMarker.java",
-        "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexRecoveryMarker.java"
+        "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexRecoveryMarker.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/Release030MigrationRetirement.java"
       ],
       "tests": [
         "modules/ipc-common/src/test/java/io/justsearch/ipc/WorkerFatalReasonMarkerTest.java",
-        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IndexRecoveryMarkerTest.java"
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IndexRecoveryMarkerTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java"
       ],
       "fixtures": []
     },

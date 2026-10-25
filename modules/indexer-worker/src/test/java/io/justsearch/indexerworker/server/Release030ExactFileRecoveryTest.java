@@ -94,13 +94,13 @@ final class Release030ExactFileRecoveryTest {
   @ValueSource(strings = {"migrating", "switching"})
   void nativeInterruptedMigrationCompletesWithoutStateEdits(String fixture, @TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack(fixture, temporary);
+    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
     Path file = Files.writeString(root.resolve("native-explicit.txt"), "nativecobaltqueued");
     sql(root, "INSERT INTO jobs(path,state,attempts,last_updated) VALUES ('" + key(file) + "','PENDING',0,0)");
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         activateNative(server);
         var resumed = server.appServices().ingestService().resumeMigration(
@@ -124,7 +124,7 @@ final class Release030ExactFileRecoveryTest {
   @Test
   void nativeCutoverKeepsUnavailableExactOldContentUntilItReturns(@TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack("migrating", temporary);
+    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
     Path file = root.resolve("explicit.txt");
     Path held = Files.move(file, root.resolve("held-explicit.txt"));
     // The authentic interrupted Green has no commit containing this exact source yet.
@@ -132,7 +132,7 @@ final class Release030ExactFileRecoveryTest {
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         assertTrue(search(server, "copper").contains(key(file)), "old exact content starts searchable");
         activateNative(server);

@@ -1936,6 +1936,54 @@ public final class IndexGenerationManager {
     }
   }
 
+  /** Caller has checkpointed source reconciliation before cancelling this exact release build. */
+  public void validateReleaseRetirementOwner(String generation) throws IOException {
+    Path exact = resolveGenerationPathStrict(generation);
+    requireRetirementSentinel(exact.resolve(GENERATION_SENTINEL), generation, exact);
+    manifestForOwnedPath(exact);
+  }
+
+  /** Caller has checkpointed source reconciliation before cancelling this exact release build. */
+  public State cancelCompatibleReleaseBuild(String active, String building) throws IOException {
+    try (var ignored = stateControl()) {
+      requireSafeGenerationId(active, "release serving generation");
+      requireSafeGenerationId(building, "release building generation");
+      if (active.equals(building)) throw new IOException("Release generations must be distinct");
+      State current = strictBootLayout(readRecordedState()).state();
+      if (!active.equals(current.active_generation())) throw new IOException("Release source changed");
+      if (MigrationState.IDLE.name().equals(current.migration_state())
+          && current.building_generation() == null
+          && (current.previous_generation() == null || building.equals(current.previous_generation()))) {
+        return current;
+      }
+      if (!building.equals(current.building_generation())
+          || !(MigrationState.MIGRATING.name().equals(current.migration_state())
+              || MigrationState.SWITCHING.name().equals(current.migration_state()))) {
+        throw new IOException("Release build changed before cancellation");
+      }
+      requireRetirementSentinel(resolveGenerationPathReadOnly(active).resolve(GENERATION_SENTINEL),
+          active, resolveGenerationPathReadOnly(active));
+      manifestForOwnedPath(resolveGenerationPathReadOnly(active));
+      State next = new State(STATE_FORMAT_VERSION, active, null, building, MigrationState.IDLE.name(),
+          false, null, null, System.currentTimeMillis(), current.auto_rebuild_key(),
+          current.auto_rebuild_count(), current.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
+    }
+  }
+
+  /** Both boot authorities must forget B before its recovery checkpoint can be cleared. */
+  public void normalizeRetiredReleaseBuild(String active, String retired) throws IOException {
+    try (var ignored = stateControl()) {
+      State current = requireExactIdleRetirementState(active);
+      if (current.previous_generation() != null) throw new IOException("Release build still owns capacity");
+      if (Files.exists(resolveGenerationPathReadOnly(retired))) throw new IOException("Release build remains");
+      writeState(current);
+      io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+          statePrevPath, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(current));
+    }
+  }
+
   private State requireExactIdleRetirementState(String expectedActive) throws IOException {
     State state = strictBootLayout(readRecordedState()).state();
     if (!expectedActive.equals(state.active_generation())

@@ -635,7 +635,7 @@ final class SyncDirectoryOps {
               admissionMode, recoveryAdmission);
       filesAdded = walk.filesAdded();
       // A recovery checkpoint cannot certify a tree whose unreadable entries were skipped.
-      pruneIncomplete |= upgradeRecovery && walk.walkIncomplete();
+      pruneIncomplete |= walk.walkIncomplete();
 
       if (cancelled.getAsBoolean()) {
         return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Cancelled");

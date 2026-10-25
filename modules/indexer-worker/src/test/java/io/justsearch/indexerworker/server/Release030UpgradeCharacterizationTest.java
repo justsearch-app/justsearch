@@ -240,7 +240,9 @@ final class Release030UpgradeCharacterizationTest {
   static final class ReleasedModelIdentities implements AutoCloseable {
     private final java.util.List<Runnable> restorers = new java.util.ArrayList<>();
 
-    ReleasedModelIdentities(Path root) throws Exception {
+    ReleasedModelIdentities(Path root) throws Exception { this(root, false); }
+
+    ReleasedModelIdentities(Path root, boolean nativeAnalyzerMismatch) throws Exception {
       var json = new tools.jackson.databind.ObjectMapper();
       var state = json.readTree(root.resolve("data/index/default/state.json").toFile());
       Path generation = root.resolve("data/index/default/indices").resolve(state.get("active_generation").asText());
@@ -261,6 +263,12 @@ final class Release030UpgradeCharacterizationTest {
         var current = (tools.jackson.databind.node.ObjectNode) json.readTree(
             String.valueOf(new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
                 ConfigStore.global().get(), identities).build().get("index_fingerprint_inputs")));
+        if (nativeAnalyzerMismatch) {
+          assertEquals("b".repeat(64), inputs.path("analyzer_fp").asText(), "the native fixture has its stated mismatch");
+          org.junit.jupiter.api.Assertions.assertNotEquals(inputs.get("analyzer_fp"), current.get("analyzer_fp"));
+          ((tools.jackson.databind.node.ObjectNode) inputs).remove("analyzer_fp");
+          current.remove("analyzer_fp");
+        }
         ((tools.jackson.databind.node.ObjectNode) inputs).remove("fields");
         current.remove("fields");
         assertEquals(inputs, current, "Only the field projection may differ; a model/config change would mask #739");

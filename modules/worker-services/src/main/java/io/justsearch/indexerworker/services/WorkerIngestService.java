@@ -2421,12 +2421,23 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      var binding = rootWatcherRegistry.subscription(parsedRoot(rootPath));
-      if (binding == null && admissionMode == SyncDirectoryOps.AdmissionMode.DEFAULT) {
-        return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
+      Supplier<SyncDirectoryResponse> sync = () -> {
+        var binding = rootWatcherRegistry.subscription(parsedRoot(rootPath));
+        if (binding == null && admissionMode == SyncDirectoryOps.AdmissionMode.DEFAULT) {
+          return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
+        }
+        return syncOps.execute(rootPath, force, provenance, ctx::cancelled,
+            binding == null ? null : binding.collection(), admissionMode);
+      };
+      String retirement = jobQueue instanceof SwitchBufferCapableQueue queue
+          ? queue.release030RetirementGeneration() : null;
+      if (!finalCutoverReplay && retirement != null) {
+        return withFileMutationFence(() -> {
+          switchBufferOps.journalSyncRootForGeneration(retirement, rootPath, force, provenance);
+          return sync.get();
+        });
       }
-      return syncOps.execute(rootPath, force, provenance, ctx::cancelled,
-          binding == null ? null : binding.collection(), admissionMode);
+      return sync.get();
     }
   }
 

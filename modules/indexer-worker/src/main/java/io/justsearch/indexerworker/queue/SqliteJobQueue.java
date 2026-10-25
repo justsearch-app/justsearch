@@ -759,11 +759,110 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private boolean requiresRelease030Boundary;
   private boolean release030ExplicitFilesPrepared = true;
   private final Set<Path> release030ExactFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private final Set<Path> release030RetirementFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private volatile String release030RetirementGeneration;
+  private Map<Path, String> release030RetirementCollections = Map.of();
+
+  /** Startup only: root recovery is older than every newly acknowledged mutation. */
+  public void journalRelease030Roots(String generation, List<Path> roots) throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      inTransaction(() -> {
+        for (Path root : roots) {
+          String key = Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX + PathNormalizer.normalizeKey(root);
+          try (var query = connection.prepareStatement(
+              "SELECT op, payload FROM switch_buffer WHERE generation=? AND key=?")) {
+            query.setString(1, generation); query.setString(2, key);
+            try (var row = query.executeQuery()) {
+              if (row.next()) {
+                if (!"SYNC_ROOT".equals(row.getString(1))
+                    || !Path.of(SwitchBufferSyncRoot.decode(row.getString(2)).rootPath()).equals(root))
+                  throw new SQLException("Release root receipt has conflicting ownership");
+                continue; // A kill before sidecar publication must not renew accepted_order.
+              }
+            }
+          }
+          if (!switchBufferOps.putForGenerationInTransaction(connection, generation, key, "SYNC_ROOT",
+              new SwitchBufferSyncRoot(PathNormalizer.normalizeKey(root), false, null).encode()))
+            throw new SQLException("Release root recovery could not be journaled");
+        }
+        return null;
+      });
+    } finally { unlockAfterChanges(); }
+  }
+
+  public boolean hasUnfinishedFileJob(String path) {
+    lock.lock();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE path=? AND state IN ('PENDING','PROCESSING')")) {
+        query.setString(1, path);
+        try (var row = query.executeQuery()) { return row.next(); }
+      }
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Release file retry cannot be confirmed", unreadable);
+    } finally { lock.unlock(); }
+  }
+
+  public String release030RetirementCollection(Path path) {
+    lock.lock();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement("SELECT collection FROM jobs WHERE path=?")) {
+        query.setString(1, PathNormalizer.normalizeKey(path));
+        try (var row = query.executeQuery()) {
+          if (row.next() && row.getString(1) != null) return row.getString(1);
+        }
+      }
+      String collection = release030RetirementCollections.get(path);
+      return collection == null || collection.isBlank() ? null : collection;
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Release file collection cannot be confirmed", unreadable);
+    } finally { lock.unlock(); }
+  }
+
+  @Override
+  public String release030RetirementGeneration() { return release030RetirementGeneration; }
+
+  public void retainRelease030Retirement(String generation, java.util.Collection<Path> exactFiles, Map<Path, String> collections) {
+    release030RetirementCollections = Map.copyOf(collections);
+    release030RetirementFiles.addAll(exactFiles);
+    release030RetirementGeneration = generation;
+  }
+
+  public void finishRelease030Retirement() {
+    release030RetirementGeneration = null;
+    release030RetirementFiles.clear();
+    release030RetirementCollections = Map.of();
+  }
 
   private final Set<Path> release030IndependentDebt = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+  public boolean isRelease030RetirementFile(Path file) {
+    return file != null && release030RetirementFiles.contains(file.toAbsolutePath().normalize());
+  }
+
+  /** A historical index path cannot grant authority to a newer unowned admission. */
+  public boolean hasUnownedModernAdmission(Path file) {
+    lockTimed();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE path=? AND ingestion_root IS NULL "
+              + "AND (unit_revision IS NULL OR unit_revision NOT LIKE 'release030/%')")) {
+        query.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = query.executeQuery()) { return row.next(); }
+      }
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Release exact-file admission cannot be confirmed", unreadable);
+    } finally { lock.unlock(); }
+  }
+
   @Override
   public boolean isRelease030ExactFile(Path file) {
+    if (isRelease030RetirementFile(file)) return !hasUnownedModernAdmission(file);
     if (file == null || (release030ExplicitFilesPrepared
         && !release030ExactFiles.contains(file.toAbsolutePath().normalize()))) return false;
     lockTimed();

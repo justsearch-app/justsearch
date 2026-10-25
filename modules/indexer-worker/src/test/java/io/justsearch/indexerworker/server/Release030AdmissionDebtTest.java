@@ -259,7 +259,7 @@ final class Release030AdmissionDebtTest {
   @ValueSource(strings = {"migrating", "switching"})
   void neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String fixture, @TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack(fixture, temporary);
+    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
     Path missing = root.resolve("missing-exhausted.txt");
     exhausted(root, missing);
     // The native archives drained this file to DONE before capture. This scenario concerns
@@ -268,7 +268,7 @@ final class Release030AdmissionDebtTest {
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         Release030ExactFileRecoveryTest.activateNative(server);
         resume(server);
@@ -288,13 +288,13 @@ final class Release030AdmissionDebtTest {
   @ValueSource(booleans = {false, true})
   void actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean returnsWhileFailed, @TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack("switching", temporary);
+    Path root = Release030Fixture.unpackNativeMigration("switching", temporary);
     Path missing = root.resolve("missing-exhausted.txt");
     exhausted(root, missing);
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models) {
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
           stopMonitor(server);
@@ -340,14 +340,14 @@ final class Release030AdmissionDebtTest {
 
   @Test
   void indexedExhaustedExactContentIsNotDiscardedAtCutover(@TempDir Path temporary) throws Exception {
-    Path root = Release030Fixture.unpack("migrating", temporary);
+    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
     Path file = root.resolve("explicit.txt"), held = root.resolve("held-explicit.txt");
     sql(root, "UPDATE jobs SET state='RETRY_EXHAUSTED',attempts=6 WHERE path='" + key(file) + "'");
     Files.move(file, held);
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         Release030ExactFileRecoveryTest.activateNative(server);
         resume(server);

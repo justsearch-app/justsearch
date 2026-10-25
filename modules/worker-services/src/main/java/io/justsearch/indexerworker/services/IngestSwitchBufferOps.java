@@ -86,6 +86,9 @@ final class IngestSwitchBufferOps {
       IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
       if (state == null) return null;
       String phase = state.migration_state();
+      if ("IDLE".equalsIgnoreCase(phase) && jobQueue instanceof SwitchBufferCapableQueue recovery) {
+        return recovery.release030RetirementGeneration();
+      }
       if (!"MIGRATING".equalsIgnoreCase(phase)
           && !"SWITCHING".equalsIgnoreCase(phase)
           && !"AWAITING_ACCEPTANCE".equalsIgnoreCase(phase)) return null;
@@ -184,6 +187,16 @@ final class IngestSwitchBufferOps {
   }
 
   // ==================== Per-endpoint buffer methods ====================
+
+  void journalSyncRootForGeneration(String generation, String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance) {
+    String root = resolveNormalizedPathPrefix(rootPath);
+    if (!(jobQueue instanceof SwitchBufferCapableQueue queue)
+        || !queue.putSyncRootForGeneration(generation, switchBufferSyncRootKey(root),
+            new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(root, force, provenance))) {
+      throw switchBufferUnavailable();
+    }
+  }
 
   SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(
       SwitchBufferCapableQueue sbq, String rootPath, boolean force,

@@ -19,6 +19,9 @@ public final class Release030RecoveryState {
   private static final Logger log = LoggerFactory.getLogger(Release030RecoveryState.class);
   private static final String ROOT = "root|";
   private static final String QUARANTINED = "quarantined-root|";
+  public static final String RETIREMENT_ROOT_KEY_PREFIX = "release030-root:";
+  private static final String RETIRE = "retire|";
+  private static final String RETIRE_PATH = "retire-path|";
   private final Path file;
   private final Properties state;
 
@@ -95,7 +98,8 @@ public final class Release030RecoveryState {
     boolean uncertain = "true".equals(state.getProperty("uncertain"));
     var quarantine = new Properties();
     for (String key : state.stringPropertyNames()) {
-      if (key.startsWith(QUARANTINED)) quarantine.setProperty(key, state.getProperty(key));
+      if (key.startsWith(QUARANTINED) || key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH))
+        quarantine.setProperty(key, state.getProperty(key));
     }
     state.clear();
     state.putAll(quarantine);
@@ -148,10 +152,93 @@ public final class Release030RecoveryState {
   }
 
   public boolean finish() throws IOException {
-    if (!prepared() || !pendingRoots().isEmpty()
+    if (retiringBuild() || !prepared() || !pendingRoots().isEmpty()
         || state.stringPropertyNames().stream().anyMatch(key -> key.startsWith(QUARANTINED))) return false;
     Files.deleteIfExists(file);
     return true;
+  }
+
+  public boolean retiringBuild() { return state.containsKey(RETIRE + "active"); }
+  public String retiringActive() { return state.getProperty(RETIRE + "active"); }
+  public String retiringBuilding() { return state.getProperty(RETIRE + "building"); }
+  public boolean rootsJournaled() { return "true".equals(state.getProperty(RETIRE + "roots-journaled")); }
+
+  public void markRootsJournaled() throws IOException {
+    state.setProperty(RETIRE + "roots-journaled", "true");
+    save();
+  }
+
+  /** Publish completed root walks before acknowledging their ordered journal versions. */
+  public void completeRetirementRoots() throws IOException {
+    for (Path root : pendingRoots()) state.setProperty(ROOT + PathNormalizer.normalizeKey(root), "done");
+    save();
+  }
+
+  public boolean replayComplete() { return "true".equals(state.getProperty(RETIRE + "replayed")); }
+  public boolean differencesComplete() { return "true".equals(state.getProperty(RETIRE + "differences")); }
+
+  public boolean rootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) {
+    return "true".equals(state.getProperty(rootWalkKey(op)));
+  }
+
+  /** The exact walk has committed its prune and durably admitted its files, before their writer runs. */
+  public void markRootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
+    state.setProperty(rootWalkKey(op), "true");
+    save();
+  }
+
+  private static String rootWalkKey(SwitchBufferCapableQueue.SwitchBufferOp op) {
+    try {
+      String identity = op.generation() + "\u0000" + op.key() + "\u0000" + op.revision() + "\u0000" + op.lastUpdatedMs();
+      byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+          .digest(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      return RETIRE + "walk|" + java.util.HexFormat.of().formatHex(digest);
+    } catch (java.security.NoSuchAlgorithmException unavailable) {
+      throw new IllegalStateException("SHA-256 unavailable", unavailable);
+    }
+  }
+
+  public void markDifferencesComplete() throws IOException {
+    state.setProperty(RETIRE + "differences", "true");
+    save();
+  }
+
+  /** Written before changing state.json; all A/B differences remain obligations until commit. */
+  public void beginRetirement(String active, String building, java.util.Map<Path, String> paths)
+      throws IOException {
+    if (retiringBuild()) throw new IOException("Release retirement already checkpointed");
+    state.setProperty(RETIRE + "active", active);
+    state.setProperty(RETIRE + "building", building);
+    for (var entry : paths.entrySet()) state.setProperty(
+        RETIRE_PATH + PathNormalizer.normalizeKey(entry.getKey()), entry.getValue());
+    save();
+  }
+
+  public java.util.Map<Path, String> retirementPaths() throws IOException {
+    var paths = new java.util.LinkedHashMap<Path, String>();
+    try {
+      for (String key : state.stringPropertyNames().stream().sorted().toList()) {
+        if (!key.startsWith(RETIRE_PATH)) continue;
+        Path path = Path.of(key.substring(RETIRE_PATH.length()));
+        if (!path.isAbsolute()) throw new IOException("Invalid release retirement path");
+        paths.put(path, state.getProperty(key));
+      }
+    } catch (java.nio.file.InvalidPathException invalid) {
+      throw new IOException("Invalid release retirement path", invalid);
+    }
+    return java.util.Map.copyOf(paths);
+  }
+
+  public void markReplayComplete() throws IOException {
+    state.setProperty(RETIRE + "replayed", "true");
+    save();
+  }
+
+  public void finishRetirement() throws IOException {
+    for (String key : List.copyOf(state.stringPropertyNames())) {
+      if (key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH)) state.remove(key);
+    }
+    save();
   }
 
   private void save() throws IOException {

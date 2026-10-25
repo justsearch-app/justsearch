@@ -39,6 +39,9 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
+  /** Exact candidate whose retained release-recovery journal still orders new admissions. */
+  default String release030RetirementGeneration() { return null; }
+
   /**
    * Inserts or replaces an operation in the durable switch buffer.
    *
