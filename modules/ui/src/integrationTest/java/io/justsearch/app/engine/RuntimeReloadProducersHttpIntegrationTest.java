@@ -837,10 +837,25 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     }
 
     @Override public void close() throws Exception {
-      try { http.stop(); transport.close(); bootstrap.close(); }
+      try {
+        root.admission().beginClosing();
+        root.admission().cancelInteractive("fixture closing");
+        root.quiesceProducers(java.time.Duration.ofSeconds(5));
+        // This fixture deliberately mocks the recorded-attempt runner: reconcile notifications
+        // run, but no recorded operation body is started by it. Drain the real client admissions.
+        assertTrue(org.mockito.Mockito.mockingDetails(root.operationAttempts()).getInvocations().stream()
+            .noneMatch(invocation -> invocation.getMethod().getName().equals("start")),
+            "a fixture with physical recorded attempts needs a real attempt runner");
+        client.close(); // Stop periodic sync and the owned call executors before draining references.
+        assertTrue(root.admission().awaitDrained(java.time.Duration.ofSeconds(5)),
+            "fixture live work must physically exit before index ownership closes");
+        http.stop();
+        transport.close();
+        bootstrap.close();
+        root.close();
+        root.processResources().close();
+      }
       finally {
-        try { root.close(); root.processResources().close(); }
-        finally {
           if (previousDataDir == null) System.clearProperty(EnvRegistry.DATA_DIR.configKey());
           else System.setProperty(EnvRegistry.DATA_DIR.configKey(), previousDataDir);
           if (previousHome == null) System.clearProperty("user.home");
@@ -851,7 +866,6 @@ final class RuntimeReloadProducersHttpIntegrationTest {
             clear.setAccessible(true);
             clear.invoke(null);
           }
-        }
       }
     }
   }

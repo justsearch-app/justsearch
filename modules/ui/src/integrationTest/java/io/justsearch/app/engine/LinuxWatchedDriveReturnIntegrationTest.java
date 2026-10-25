@@ -23,7 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Real Engine, search, queue and physical Linux watchers on disposable udisks loop filesystems. */
 final class LinuxWatchedDriveReturnIntegrationTest {
-  @TempDir Path directory;
+  @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) Path directory;
   private static final EngineContext CONTEXT = EngineProvenance.internal(
       "watched-drive-return", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
 
@@ -425,6 +425,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
       };
       var surviving = fixture(hook);
       CompletableFuture<Void> closing = null;
+      Throwable primaryFailure = null;
       try {
         try {
           assertTrue(reached.await(30, TimeUnit.SECONDS), "real migration must reach " + point);
@@ -475,9 +476,17 @@ final class LinuxWatchedDriveReturnIntegrationTest {
             assertPromotedDrive(surviving, root);
           }
         } finally { release.countDown(); }
+      } catch (Exception | Error failure) {
+        primaryFailure = failure;
+        throw failure;
       } finally {
-        if (closing == null) surviving.close();
-        else closing.get(60, TimeUnit.SECONDS);
+        try {
+          if (closing == null) surviving.close();
+          else closing.get(60, TimeUnit.SECONDS);
+        } catch (Exception | Error cleanup) {
+          if (primaryFailure == null) throw cleanup;
+          primaryFailure.addSuppressed(cleanup);
+        }
       }
       if (restart) {
         try (var restarted = fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.NO_HOOK)) {
@@ -529,6 +538,107 @@ final class LinuxWatchedDriveReturnIntegrationTest {
             late.toString(), io.justsearch.indexing.SchemaFields.COLLECTION));
       } finally { release.countDown(); }
     }
+  }
+
+  @Test
+  @Timeout(90)
+  void stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("shutdown-root"));
+    Files.writeString(root.resolve("seed.txt"), "shutdownseed");
+    try (var old = fixture()) {
+      old.client.addWatchedRoot("default", root, CONTEXT);
+      old.awaitCount("shutdownseed", 1);
+    }
+    stampForeignFingerprint();
+    var reached = new CountDownLatch(1);
+    var stalled = new CountDownLatch(1);
+    var f = fixture(transition -> {
+      if (transition.point().equals("migration-green-drained")) {
+        reached.countDown();
+        stalled.await(); // The real cutover must be interrupted before admission can drain.
+      }
+    });
+    CompletableFuture<?> periodic = null;
+    Thread cutover = (Thread) inherited(f.server, "migrationCutoverThread");
+    boolean completedClose = false;
+    try {
+      assertTrue(reached.await(30, TimeUnit.SECONDS));
+      periodic = CompletableFuture.runAsync(() -> f.client.syncDirectory(root.toString(), false,
+          EngineProvenance.internal("periodic-root-sync", EngineContext.Survival.DURABLE,
+              EngineContext.Urgency.BACKGROUND)));
+      Thread blocked = awaitMutationBlockedThread();
+      assertTrue(f.root.admission().activeWorkCount() > 0);
+      var original = new AssertionError("original stalled D1 body assertion");
+      long start = System.nanoTime();
+      var observed = assertThrows(AssertionError.class, () -> {
+        try (f) { throw original; }
+      });
+      assertSame(original, observed);
+      assertEquals(0, observed.getSuppressed().length, "ordered cleanup must not add an owner-fence failure");
+      completedClose = true;
+      assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(10));
+      assertEquals(0, f.root.admission().activeWorkCount(), "durable physical references must drain");
+      assertFalse(cutover.isAlive(), "the cutover must physically exit");
+      assertFalse(blocked.isAlive(), "the owned periodic worker must physically exit");
+      assertTrue(periodic.isDone(), "the caller must be released too");
+    } finally {
+      stalled.countDown();
+      // Also make fail-before runs safe without relying on the repaired shutdown method.
+      if (cutover != null && cutover.isAlive()) {
+        cutover.interrupt(); cutover.join(5_000);
+      }
+      if (periodic != null) periodic.get(10, TimeUnit.SECONDS);
+      if (!completedClose) f.close();
+    }
+  }
+
+  @Test
+  @Timeout(90)
+  void producerQuiescenceHonorsSmallCallerDeadlineAndReportsIncompleteExit() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("deadline-root"));
+    Files.writeString(root.resolve("seed.txt"), "deadlineseed");
+    try (var old = fixture()) {
+      old.client.addWatchedRoot("default", root, CONTEXT);
+      old.awaitCount("deadlineseed", 1);
+    }
+    stampForeignFingerprint();
+    var reached = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    try (var f = fixture(transition -> {
+      if (transition.point().equals("migration-green-drained")) {
+        reached.countDown();
+        boolean interrupted = false;
+        while (release.getCount() != 0) {
+          try { release.await(); }
+          catch (InterruptedException stop) { interrupted = true; }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
+      }
+    })) {
+      try {
+        assertTrue(reached.await(30, TimeUnit.SECONDS));
+        long start = System.nanoTime();
+        assertThrows(IllegalStateException.class,
+            () -> f.root.quiesceProducers(java.time.Duration.ofMillis(25)));
+        assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1),
+            "the caller's allowance must not become an additional ten-second join");
+      } finally { release.countDown(); }
+    }
+  }
+
+  private static Thread awaitMutationBlockedThread() throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    do {
+      for (var entry : Thread.getAllStackTraces().entrySet()) {
+        if (entry.getKey().getName().startsWith("engine-call-background")
+            && java.util.Arrays.stream(entry.getValue()).anyMatch(frame ->
+                frame.getClassName().endsWith("WorkerMutationAdmission") && frame.getMethodName().equals("enter"))) {
+          return entry.getKey();
+        }
+      }
+      Thread.sleep(10);
+    } while (System.nanoTime() < deadline);
+    throw new AssertionError("the real durable sync must wait on the held migration fence");
   }
 
   private static void assertRootScopedUnavailableFailure(Fixture f, Path root) throws Exception {

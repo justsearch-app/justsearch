@@ -1155,6 +1155,11 @@ public final class KnowledgeServerMigrationOps {
             context.publisher(), context.indexingPacing(), context.migrationRoots(), admittedPaths,
             () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos()));
       }
+      var admittedUpserts = ops.stream().filter(op -> "UPSERT".equals(op.op()))
+          .map(op -> SwitchBufferUpsert.decode(op.payload())).toList();
+      for (var reconciliation : reconciliations.values()) {
+        reconciliation.wakeReturnedRootAdmissions(admittedUpserts);
+      }
     } catch (IOException | RuntimeException incomplete) {
       closeReconciliations(reconciliations, context.log());
       context.log().warn("Watcher reconciliation preflight keeps cutover fenced: {}", incomplete.getMessage());

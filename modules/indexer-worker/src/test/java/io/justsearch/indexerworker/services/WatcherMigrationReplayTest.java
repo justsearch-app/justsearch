@@ -486,6 +486,94 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"valid", "identity", "volume", "membership"})
+  void returnedRootWakesOnlyExactUnavailableAdmissionsWithoutChangingTheirEvidence(String proof)
+      throws Exception {
+    try (var f = new Fixture()) {
+      f.writing.set(false);
+      f.writeResult.get(5, TimeUnit.SECONDS);
+      Path intended = f.file("a-intended.txt", "current");
+      Path replaced = f.file("b-replaced.txt", "replacement");
+      Path other = Files.writeString(Files.createDirectory(temporary.resolve("other-root"))
+          .resolve("other.txt"), "other root");
+      Path otherOwner = f.file("c-other-owner.txt", "other owner");
+      Path otherFailure = f.file("d-other-failure.txt", "other failure");
+      Path otherPolicy = f.file("e-other-policy.txt", "other policy");
+      Path otherState = f.file("f-other-state.txt", "other state");
+      for (Path path : List.of(intended, replaced, other, otherOwner, otherFailure, otherPolicy, otherState)) {
+        assertTrue(f.queue.enqueueAndBufferFileForGeneration("green", JobQueue.EnqueueEntry.stat(path),
+            path.equals(otherOwner) ? "another" : "notes"));
+      }
+      var admissions = f.queue.listSwitchBufferOpsStrict().stream()
+          .map(op -> io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload())).toList();
+      // Replace only the queue admission: the accepted old receipt must not wake its successor.
+      assertEquals(1, f.queue.enqueueEntriesWithExactCollection(List.of(JobQueue.EnqueueEntry.stat(replaced)), "notes"));
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temporary.resolve("queue.db"));
+           var statement = connection.createStatement()) {
+        statement.executeUpdate("UPDATE jobs SET state='PENDING', attempts=2, retry_after=4000000000000,"
+            + " last_updated=0, last_outcome_class='IO_FAILED', last_reason_code='ROOT_UNAVAILABLE',"
+            + " last_retry_policy='RETRY_UNTIL_AVAILABLE'");
+        try (var update = connection.prepareStatement("UPDATE jobs SET last_reason_code='IO_FAILED' WHERE path=?")) {
+          update.setString(1, otherFailure.toString()); update.executeUpdate();
+        }
+        try (var update = connection.prepareStatement("UPDATE jobs SET last_retry_policy='RETRY_WITH_BACKOFF' WHERE path=?")) {
+          update.setString(1, otherPolicy.toString()); update.executeUpdate();
+        }
+        try (var update = connection.prepareStatement("UPDATE jobs SET state='FAILED' WHERE path=?")) {
+          update.setString(1, otherState.toString()); update.executeUpdate();
+        }
+      }
+      Path cursor = temporary.resolve("cursor");
+      f.queue.enqueue(List.of(cursor));
+      assertEquals(cursor, f.queue.pollPending(1).getFirst().path());
+      assertTrue(f.queue.pollPending(1).isEmpty(), "all unavailable admissions begin in future backoff");
+      var before = retryRows();
+      var receipts = f.queue.listSwitchBufferOpsStrict();
+      var debt = f.debtValue();
+      if (proof.equals("identity")) debt = new WatcherRootReconciliation(debt.root(), "unproven", "notes");
+      if (proof.equals("membership")) f.roots = List.of();
+      if (proof.equals("volume")) RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(true);
+      try {
+        try (var preflight = new WatcherReplay(debt, f.runtime, f.queue, null,
+            IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(), () -> false)) {
+          // Same source compiles on the pre-repair tree. Missing wake leaves the real job unclaimable.
+          try {
+            WatcherReplay.class.getMethod("wakeReturnedRootAdmissions", List.class).invoke(preflight, admissions);
+          } catch (NoSuchMethodException beforeRepair) { /* Observe the unchanged backoff below. */ }
+        }
+        assertEquals("valid", proof, "invalid proof must refuse before changing retry timing");
+      } catch (java.io.IOException refused) {
+        assertNotEquals("valid", proof, refused.toString());
+      } finally { RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(false); }
+      var expected = new java.util.LinkedHashMap<>(before);
+      if (proof.equals("valid")) {
+        var intendedRow = new java.util.LinkedHashMap<>(expected.get(intended.toString()));
+        intendedRow.put("retry_after", null);
+        expected.put(intended.toString(), intendedRow);
+      }
+      assertEquals(expected, retryRows(), "only the exact proven admission's retry_after may change");
+      assertEquals(receipts, f.queue.listSwitchBufferOpsStrict(), "retry wake preserves every exact receipt");
+      var claimed = f.queue.pollPending(8);
+      assertEquals(proof.equals("valid") ? List.of(intended) : List.of(),
+          claimed.stream().map(job -> job.path()).toList(), "the advanced claim cursor must see the returned-root wake");
+    }
+  }
+
+  private Map<String, Map<String, Object>> retryRows() throws Exception {
+    var rows = new java.util.LinkedHashMap<String, Map<String, Object>>();
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temporary.resolve("queue.db"));
+         var query = connection.createStatement(); var result = query.executeQuery("SELECT * FROM jobs ORDER BY path")) {
+      var metadata = result.getMetaData();
+      while (result.next()) {
+        var row = new java.util.LinkedHashMap<String, Object>();
+        for (int i = 1; i <= metadata.getColumnCount(); i++) row.put(metadata.getColumnName(i), result.getObject(i));
+        rows.put(result.getString("path"), row);
+      }
+    }
+    return rows;
+  }
+
   private final class Fixture implements AutoCloseable {
     final Path root;
     final SqliteJobQueue queue;

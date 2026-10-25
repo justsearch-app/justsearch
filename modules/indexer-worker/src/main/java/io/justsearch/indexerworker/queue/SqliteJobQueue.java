@@ -1828,6 +1828,48 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public int wakeReturnedRootAdmissions(Path root, String collection, List<SwitchBufferUpsert> admissions) {
+    Objects.requireNonNull(root, "root");
+    if (!root.isAbsolute() || !root.normalize().equals(root)) {
+      throw new IllegalArgumentException("Returned root must be canonical");
+    }
+    boolean defaultOwner = collection == null || collection.isBlank()
+        || IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection);
+    lock.lock();
+    try {
+      ensureOpen();
+      return inTransaction(() -> {
+        int changed = 0;
+        try (var update = connection.prepareStatement(
+            "UPDATE jobs SET retry_after=NULL WHERE path=? AND unit_revision=?"
+                + " AND state='PENDING' AND last_reason_code='ROOT_UNAVAILABLE'"
+                + " AND last_retry_policy='RETRY_UNTIL_AVAILABLE' AND retry_after IS NOT NULL"
+                + (defaultOwner ? " AND (collection IS NULL OR TRIM(collection)='' OR collection='default')"
+                    : " AND collection=?"))) {
+          for (var admission : admissions) {
+            Path path = Path.of(admission.path());
+            boolean admittedDefault = admission.collection() == null || admission.collection().isBlank()
+                || IngestCollectionPolicy.DEFAULT_COLLECTION.equals(admission.collection());
+            if (admission.unitRevision() == null || !path.normalize().equals(path)
+                || path.equals(root) || !path.startsWith(root)
+                || !(defaultOwner ? admittedDefault : collection.equals(admission.collection()))) continue;
+            update.setString(1, admission.path());
+            update.setString(2, admission.unitRevision());
+            if (!defaultOwner) update.setString(3, collection);
+            changed += update.executeUpdate();
+          }
+        }
+        return changed;
+      });
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Returned-root retry wake failed", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public int enqueueRefusalCleanupAdmission(
       JobQueue.EnqueueEntry entry, String collection, String admission) {
     if (entry == null || !isAdmissionRevision(admission)) return 0;

@@ -88,6 +88,14 @@ public final class WatcherReplay implements AutoCloseable {
     }
   }
 
+  /** Wake exact admitted waits only after the complete root preflight has succeeded. */
+  public void wakeReturnedRootAdmissions(List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> admissions)
+      throws IOException {
+    requireIdentity();
+    queue.wakeReturnedRootAdmissions(Path.of(debt.root()), debt.collection(), admissions.stream()
+        .filter(admission -> covers(admission.path(), admission.collection())).toList());
+  }
+
   public boolean covers(String path, String collection) {
     return outcomes.containsKey(path)
         && Objects.equals(rootOwnerCollection(collection), rootOwnerCollection(debt.collection()));
