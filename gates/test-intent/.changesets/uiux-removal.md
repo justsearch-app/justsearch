@@ -233,3 +233,16 @@ WP3.5 scenarios are agent-adopted under delegated design choice. They are not ow
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-8ve7myn3",
+  "verdict": "accept",
+  "digest": "sha256:8cd89b689e2756e55b98d97b6326d6525cdd0f4418cb746d44f710bfd3eae08d",
+  "note": "Delegated WP3.5 intent reviewed; 17 repair cases pass with intended before failures; 29 preservation cases pass both."
+}
+```
