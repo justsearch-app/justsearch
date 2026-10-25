@@ -1,0 +1,247 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-24T14:32:33.590Z",
+  "revision": "c352c79168ecd21be9ee45381e4839a123d320ad",
+  "tree": "632f52a0df17b7d71b2875ca7b8541af4c4058c0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-508376-1792852341094.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5729
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve composer focus ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 1 removals preserve composer focus ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve survivor focus ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 1 removals preserve survivor focus ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve composer focus ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 30 removals preserve composer focus ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve removed focus ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 30 removals preserve removed focus ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve survivor focus ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 30 removals preserve survivor focus ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals leave the keyboard on a neutral target when no row survives",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 1 removals leave the keyboard on a neutral target when no row survives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals leave the keyboard on a neutral target when no row survives",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 30 removals leave the keyboard on a neutral target when no row survives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 any row removal preserves focus in a surviving shelf",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 any row removal preserves focus in a surviving shelf",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 any row removal moves focus only when the removed row held it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 any row removal moves focus only when the removed row held it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#falls back to a neutral deletion announcement when the list empties",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:758ca05f7bdf826cfb2b4e7af86b7783a7000f4eb869ce27419a6db7f90794c2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the row actions each change the state they name the keyboard lands somewhere safe after a discard falls back to a neutral deletion announcement when the list empties",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c352c79168",
+    "revision": "c352c79168ecd21be9ee45381e4839a123d320ad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-508376-1792852347900.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5551,
+        "output": "JSON report written to /home/elias/.cache/am/9lzasi9m/tmp/test-intent-vitest-508376-1792852347900.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve composer focus ownership",
+        "classification": "assertion",
+        "detail": "F1 1 removals preserve composer focus ownership:  AssertionError: expected <button type=\"button\" …(2)>…(3)</button> to be <textarea></textarea> // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:42:29\n    at processTicksAndRejections ("
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals preserve survivor focus ownership",
+        "classification": "assertion",
+        "detail": "F1 1 removals preserve survivor focus ownership:  AssertionError: expected <button type=\"button\" …(2)>…(3)</button> to be <button type=\"button\" …(2)>…(3)</button> // Object.is equality\n\nIf it should pass with deep equality, replace \"toBe\" with \"toStrictEqual\"\n\nExpected: <button type=\"button\" …(2)>…(3)</button>\nReceived: serializes to the same strin"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve composer focus ownership",
+        "classification": "assertion",
+        "detail": "F1 30 removals preserve composer focus ownership:  AssertionError: expected <button type=\"button\" …(2)>…(2)</button> to be <textarea></textarea> // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:42:29\n    at file:///home/elias/dev/just"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve removed focus ownership",
+        "classification": "assertion",
+        "detail": "F1 30 removals preserve removed focus ownership:  AssertionError: expected 'sv3-session-row-remove' to be 'sv3-session-row-button' // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:41:78\n    at file:///home/elias/dev/justsearch/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals preserve survivor focus ownership",
+        "classification": "assertion",
+        "detail": "F1 30 removals preserve survivor focus ownership:  AssertionError: expected <body>…(2)</body> to be <button type=\"button\" …(2)>…(3)</button> // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:42:29\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 1 removals leave the keyboard on a neutral target when no row survives",
+        "classification": "assertion",
+        "detail": "F1 1 removals leave the keyboard on a neutral target when no row survives:  AssertionError: expected 'sv3-sidebar-new' to be 'sv3-sidebar-announcer' // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:58:49\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 30 removals leave the keyboard on a neutral target when no row survives",
+        "classification": "assertion",
+        "detail": "F1 30 removals leave the keyboard on a neutral target when no row survives:  AssertionError: expected 'sv3-sidebar-new' to be 'sv3-sidebar-announcer' // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:58:49\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 any row removal preserves focus in a surviving shelf",
+        "classification": "assertion",
+        "detail": "F1 any row removal preserves focus in a surviving shelf:  AssertionError: expected <body>…(1)</body> to be <button type=\"button\" …(4)>…(1)</button> // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:68:31\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts#F1 any row removal moves focus only when the removed row held it",
+        "classification": "assertion",
+        "detail": "F1 any row removal moves focus only when the removed row held it:  AssertionError: expected <button type=\"button\" …(4)>…(1)</button> to be <button type=\"button\" …(2)>…(3)</button> // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts:73:31\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#falls back to a neutral deletion announcement when the list empties",
+        "classification": "assertion",
+        "detail": "the row actions each change the state they name the keyboard lands somewhere safe after a discard falls back to a neutral deletion announcement when the list empties:  AssertionError: expected 'sv3-sidebar-new' to be 'sv3-sidebar-announcer' // Object.is equality\n    at /home/elias/.cache/am/9lzasi9m/tmp/test-intent-before-7mSID8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts:856:33\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      }
+    ]
+  },
+  "digest": "sha256:0e5c91d2c09b25bfdf3c8bdff0f9e4db217365bd760de8c43e03e66d25c5228b"
+}

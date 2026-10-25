@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T15:53:10.790Z",
+  "revision": "700e816185b935d36f9ab3bac3f8e926734e4cdf",
+  "tree": "2884743ac066009b9ebaaee7f6fa72b155a41229",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationDeleteReconnect.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/87xk3ngx/tmp/test-intent-vitest-71171-1792770789268.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1521
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts#TD7 status changes cause no conversation reads without an unconfirmed delete",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50c26ae10d5adfc99c988bbaadd5ee60a5d2d1614bab35fbe0f5c566e7ceff53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD7 status changes cause no conversation reads without an unconfirmed delete",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0db64220e042d88cff8a56c04fd2ebc62f28f6976c06227b8204f589a3d3115f"
+}
