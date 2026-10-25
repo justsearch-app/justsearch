@@ -449,6 +449,46 @@ function parseNulList(raw) {
   return String(raw || '').split('\0').filter(Boolean);
 }
 
+// Negative proofs only: resolving a protected alias never admits a target through that alias.
+function assertPhysicalProtections({ repoRoot, admission }) {
+  if (process.platform !== 'win32' || !admission.exists) return;
+  const { abs, facts, entries } = admission;
+  const identity = fs.lstatSync(abs, { bigint: true });
+  if (!identity.isDirectory() || identity.isSymbolicLink()) fail(`refusing: ${abs} is a non-directory, symlink or junction alias`);
+  const real = fs.realpathSync.native(abs);
+  if (!samePath(real, abs)) fail(`refusing: ${abs} resolves through an alias to ${real}`);
+  if (identity.ino <= 0n) fail('refusing: target physical identity is ambiguous');
+  const isSameDirectory = (protectedPath) => {
+    const canonical = fs.realpathSync.native(protectedPath);
+    const stat = fs.statSync(canonical, { bigint: true });
+    if (!stat.isDirectory() || stat.ino <= 0n) fail(`refusing: protected directory identity is ambiguous: ${protectedPath}`);
+    return samePath(real, canonical) || (identity.dev === stat.dev && identity.ino === stat.ino);
+  };
+  const isPhysicallyWithin = (protectedPath) => {
+    let current = fs.realpathSync.native(protectedPath);
+    if (isWithin(current, real)) return true;
+    // Compare ancestor file IDs too: an extended/short namespace spelling must not hide cwd.
+    for (;;) {
+      const stat = fs.statSync(current, { bigint: true });
+      if (!stat.isDirectory() || stat.ino <= 0n) fail(`refusing: protected directory identity is ambiguous: ${protectedPath}`);
+      if (identity.dev === stat.dev && identity.ino === stat.ino) return true;
+      const parent = path.dirname(current);
+      if (samePath(parent, current)) return false;
+      current = parent;
+    }
+  };
+  if (isSameDirectory(facts.mainWorktree)) fail(`refusing: ${abs} is the repository's main worktree`);
+  if (isSameDirectory(repoRoot)) fail(`refusing: ${abs} is the checkout that owns this running script`);
+  if (isPhysicallyWithin(process.cwd())) fail(`refusing: the current process directory is at or inside ${abs}`);
+  for (const candidate of entries) {
+    if (!candidate.path || samePath(candidate.path, abs)) continue;
+    // Git's explicitly prunable entries need not exist. Inspect their existing parent directly,
+    // rather than falling back after a failed realpath of a live entry.
+    const protectedPath = candidate.prunable !== null ? path.dirname(candidate.path) : candidate.path;
+    if (isPhysicallyWithin(protectedPath)) fail(`refusing: ${abs} contains registered worktree(s): ${candidate.path}`);
+  }
+}
+
 function inspectGitAdmission({ repoRoot, target, allowIgnored }) {
   const abs = path.resolve(target);
   const entries = listRegisteredWorktrees(repoRoot);
@@ -471,15 +511,18 @@ function inspectGitAdmission({ repoRoot, target, allowIgnored }) {
     fail(`refusing: ${abs} contains registered worktree(s): ${nested.map((candidate) => candidate.path).join(', ')}`);
   }
 
-  if (!fs.existsSync(abs)) {
+  let rootStat;
+  try { rootStat = fs.lstatSync(abs); }
+  catch (err) {
+    if (err.code !== 'ENOENT') throw err;
     if (entry.prunable === null) fail(`refusing: registered target ${abs} is missing but Git has not classified it as prunable`);
     return { abs, entry, entries, facts, exists: false, changes: [], ignored: [], blockers: [] };
   }
-  const rootStat = fs.lstatSync(abs);
   if (rootStat.isSymbolicLink()) fail(`refusing: ${abs} is a symlink or junction alias`);
   if (!rootStat.isDirectory()) fail(`refusing: ${abs} is not a directory`);
   const real = fs.realpathSync.native(abs);
   if (!samePath(real, abs)) fail(`refusing: ${abs} resolves through an alias to ${real}`);
+  assertPhysicalProtections({ repoRoot, admission: { abs, facts, entries, exists: true } });
 
   const targetGitDir = requireGit(
     repoRoot,
@@ -528,7 +571,7 @@ function inspectGitAdmission({ repoRoot, target, allowIgnored }) {
   const blockers = [];
   if (changes.length) blockers.push(`tracked, staged, or untracked changes: ${changes.join(', ')}`);
   if (ignored.length && !allowIgnored) blockers.push('ignored paths are present; pass --allow-ignored to remove them');
-  return { abs, entry, entries, facts, exists: true, changes, ignored, blockers };
+  return { abs, entry, entries, facts, gitDir: targetGitDir, exists: true, changes, ignored, blockers };
 }
 
 function referenceRelation(raw, target) {
@@ -900,12 +943,12 @@ function inspectArchiveManifest({ mainRepoRoot, manifestArg, target, needed }) {
   if (!manifest || typeof manifest !== 'object' || typeof manifest.worktreePath !== 'string') {
     return { blocker: `archive manifest ${manifestPath} has no worktreePath`, covered: null };
   }
-  if (!samePath(manifest.worktreePath, target)) {
-    return { blocker: `archive manifest ${manifestPath} is for ${manifest.worktreePath}, not ${target}`, covered: null };
-  }
   // Loaded lazily: the archive library requires the governance policy file, which a dry-run on a
   // repository without it must not need.
-  const { verifyArchive, classifyIgnored, loadPolicy } = require('./lib/worktree-archive.cjs');
+  const { verifyArchive, classifyIgnored, loadPolicy, bindManifestToWorktree } = require('./lib/worktree-archive.cjs');
+  let identity;
+  try { ({ manifest, identity } = bindManifestToWorktree(manifest, target)); }
+  catch (err) { return { blocker: `archive manifest ${manifestPath} target proof failed: ${err.message}`, covered: null }; }
   const verify = verifyArchive({ mainRepoRoot, manifest });
   if (!verify.ok) {
     const detail = [
@@ -923,7 +966,7 @@ function inspectArchiveManifest({ mainRepoRoot, manifestArg, target, needed }) {
   const discarded = new Set((manifest.skipped || []).filter((e) => e.reason === 'oversized-discarded').map((e) => e.path));
   const uncovered = [...ignored.archive, ...ignored.oversized].filter((e) => !covered.has(e.path) && !discarded.has(e.path));
   if (uncovered.length) return { blocker: `ignored paths not covered by the archive manifest: ${uncovered.map((e) => e.path).join(', ')}`, covered: null };
-  return { blocker: null, covered };
+  return { blocker: null, covered, identity };
 }
 
 /** The path of one `git status --porcelain=v1 -z` entry (`XY path`; a rename's old path is bare). */
@@ -956,6 +999,7 @@ function applyArchiveCoverage(admission, gate) {
 function assertStableAdmission(before, after) {
   if (!samePath(before.abs, after.abs)
       || before.entry.head !== after.entry.head
+      || (before.gitDir && after.gitDir ? !samePath(before.gitDir, after.gitDir) : before.gitDir !== after.gitDir)
       || before.entry.branchRef !== after.entry.branchRef
       || before.entry.detached !== after.entry.detached) {
     fail('refusing: worktree membership, branch, or HEAD changed during safety checks');
@@ -996,6 +1040,7 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
   const options = parseArgs(argv);
   const mainRepoRoot = resolveMainRepoRoot(repoRoot);
   const admission = inspectGitAdmission({ repoRoot, target: options.target, allowIgnored: options.allowIgnored });
+  let firstExceptionIdentity = null;
   // Tempdoc 952 Amendment A: ignored files leave only through a verified archive. A bare
   // `--allow-ignored` used to delete them with the tree; it now needs the manifest that
   // worktree-lifecycle.cjs release wrote, and that manifest must still match the tree.
@@ -1003,7 +1048,9 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
     const wantsIgnored = adm.ignored.length && options.allowIgnored;
     if (!wantsIgnored && !options.archiveManifestArg) return; // classic path: dirty state blocks
     const needed = wantsIgnored ? 'ignored paths are present' : 'an archive manifest was given';
-    applyArchiveCoverage(adm, inspectArchiveManifest({ mainRepoRoot, manifestArg: options.archiveManifestArg, target: adm.abs, needed }));
+    const gate = inspectArchiveManifest({ mainRepoRoot, manifestArg: options.archiveManifestArg, target: adm.abs, needed });
+    if (!firstExceptionIdentity && gate.identity) firstExceptionIdentity = gate.identity;
+    applyArchiveCoverage(adm, gate);
   };
   archiveGate(admission);
   printAdmission(admission, options);
@@ -1077,11 +1124,37 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
   if (finalAdmission.blockers.length) fail(`refusing after final admission: ${finalAdmission.blockers.join('; ')}`);
 
   const capturedBranch = admission.entry.branchRef?.replace(/^refs\/heads\//, '') || null;
-  if (fs.existsSync(admission.abs)) {
+  let remainingRoot;
+  try { remainingRoot = fs.lstatSync(admission.abs); }
+  catch (err) { if (err.code !== 'ENOENT') throw err; }
+  if (remainingRoot) {
+    // Verification performs Git/hash/ignored work after the admission snapshot. Recheck current
+    // Git facts, then physical negatives and the sticky first exception immediately before unlink.
+    const [gitDir, commonDir, top, head] = requireGit(repoRoot,
+      ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel', '--verify', 'HEAD'],
+      'last target Git identity proof', { cwd: admission.abs }).trim().split('\n');
+    const branch = gitQuery(repoRoot, ['symbolic-ref', '--quiet', 'HEAD'], { cwd: admission.abs });
+    if (!gitDir || !commonDir || !top || !samePath(gitDir, admission.gitDir)
+        || !samePath(commonDir, admission.facts.commonDir) || !samePath(top, admission.abs)
+        || (branch.status !== 0 && branch.status !== 1) || head !== admission.entry.head
+        || (branch.status === 0 ? branch.stdout.trim() : null) !== admission.entry.branchRef) {
+      fail('refusing: worktree branch or HEAD changed during archive verification');
+    }
+    assertPhysicalProtections({ repoRoot, admission: finalAdmission });
+    if (firstExceptionIdentity) {
+      const { strictDirectoryIdentity } = require('./lib/worktree-archive.cjs');
+      for (const spelling of [firstExceptionIdentity.recordedPath, admission.abs]) {
+        const current = strictDirectoryIdentity(spelling);
+        if (!samePath(current.real, firstExceptionIdentity.real) || current.dev !== firstExceptionIdentity.dev || current.ino !== firstExceptionIdentity.ino) {
+          fail('refusing: first archive exception worktree identity changed during verification');
+        }
+      }
+    }
     removeJunctions(admission.abs);
     if (!deleteTree(admission.abs)) fail(`failed to delete ${admission.abs}`);
     console.error(`[remove-worktree] deleted ${admission.abs}`);
   } else {
+    if (firstExceptionIdentity) fail('refusing: first archive exception worktree disappeared during verification');
     console.error(`[remove-worktree] ${admission.abs} already gone; removing only its registration.`);
   }
 

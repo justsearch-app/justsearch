@@ -190,7 +190,8 @@ async function stageCli(checkout, patchPolicy) {
 }
 
 async function makeFixture(label, { patchPolicy = null } = {}) {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), `wt-lifecycle-952-${label}-`));
+  const createdRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `wt-lifecycle-952-${label}-`));
+  const root = process.platform === 'win32' ? fs.realpathSync.native(createdRoot) : createdRoot;
   const origin = path.join(root, 'origin.git');
   const checkout = path.join(root, 'checkout');
   const stateRoot = path.join(root, 'state');
@@ -231,7 +232,7 @@ async function makeFixture(label, { patchPolicy = null } = {}) {
   return fixture;
 }
 
-function runCli(fixture, args, { env = {}, cwd = fixture.checkout } = {}) {
+function runCli(fixture, args, { env = {}, cwd = fixture.checkout, cli = fixture.cli, nodeArgs = [] } = {}) {
   const childEnv = { ...process.env };
   for (const key of ['CLAUDE_CODE_SESSION_ID', 'JUSTSEARCH_AGENT_SESSION_ID', 'CODEX_HOME', 'CODEX_SESSION_ID', 'JUSTSEARCH_TEST_GH_PRS']) {
     delete childEnv[key];
@@ -241,7 +242,7 @@ function runCli(fixture, args, { env = {}, cwd = fixture.checkout } = {}) {
     JUSTSEARCH_GH_BIN: process.execPath,
     GIT_OPTIONAL_LOCKS: '0',
   }, env);
-  const result = spawnSync(process.execPath, [fixture.cli, ...args], {
+  const result = spawnSync(process.execPath, [...nodeArgs, cli, ...args], {
     cwd,
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
@@ -256,8 +257,23 @@ function createWorktree(fixture, name, sessionId, extra = []) {
   const result = runCli(fixture, ['create', name, '--session-id', sessionId, ...extra]);
   assert.equal(result.status, 0, result.out);
   const dest = path.join(fixture.sanctioned, name);
-  assert.equal(result.stdout.trim(), dest, result.out);
-  return dest;
+  const member = entryFor(fixture.checkout, dest);
+  assert.ok(member, 'capture canonical Git membership before removal');
+  const expected = path.resolve(member.path);
+  assert.equal(process.platform === 'win32' ? result.stdout.trim().toLowerCase() : result.stdout.trim(),
+    process.platform === 'win32' ? expected.toLowerCase() : expected, result.out);
+  return expected;
+}
+
+function shortSpelling(directory) {
+  const result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `for %I in ("${directory}") do @echo %~sI`], { encoding: 'utf8' });
+  const short = result.stdout?.trim();
+  if (result.status !== 0 || !short || path.resolve(short).toLowerCase() === path.resolve(directory).toLowerCase()) return null;
+  const original = fs.statSync(directory, { bigint: true });
+  const alias = fs.statSync(short, { bigint: true });
+  assert.equal(alias.dev, original.dev);
+  assert.equal(alias.ino, original.ino);
+  return short;
 }
 
 function commitIn(dir, file, content, message) {
@@ -414,6 +430,22 @@ try {
     assert.equal(cfg(base.checkout, 'branch.main.justsearch-resource'), null);
     assert.equal(branchConfigDump(base.checkout), beforeConfig);
   });
+
+  if (process.platform === 'win32') {
+    const fx = await makeFixture('main-alias');
+    const shortMain = shortSpelling(fx.checkout);
+    if (!shortMain) console.log('UNVERIFIED S17 main registration: native 8.3 spelling unavailable');
+    else for (const input of [fx.checkout, shortMain]) for (const scriptRoot of [fx.checkout, shortMain]) for (const cwd of [fx.checkout, shortMain]) {
+      await check(`main registration refuses native input/script/cwd spellings ${input === shortMain}/${scriptRoot === shortMain}/${cwd === shortMain}`, () => {
+        const before = branchConfigDump(fx.checkout);
+        const result = runCli(fx, ['register', input, '--session-id', 'alias-main'], { cwd,
+          cli: path.join(scriptRoot, 'scripts/dev/worktree-lifecycle.cjs'), nodeArgs: ['--preserve-symlinks-main'] });
+        assert.equal(result.status, 1, result.out);
+        assert.match(result.stderr, /the main checkout is never a lifecycle resource/);
+        assert.equal(branchConfigDump(fx.checkout), before);
+      });
+    }
+  } else console.log('UNVERIFIED S17 native Windows main registration aliases: Linux host');
 
   await check('status reports ACTIVE from fresh owner activity, SUSPECT when it goes stale, and UNMANAGED off the sanctioned root', () => {
     const stray = path.join(base.root, 'stray-worktree');
@@ -751,6 +783,83 @@ try {
     assert.equal(refSha(resumeFx.checkout, 'refs/heads/worktree-r11'), head, 'an UNKNOWN receipt keeps the branch');
     assert.notEqual(cfg(resumeFx.checkout, 'branch.worktree-r11.justsearch-released'), null);
   });
+
+  if (process.platform === 'win32') for (const phase of ['archived', 'verified']) for (const replacement of [false, true]) {
+    const fx = await makeFixture(`legacy-short-${phase}-${replacement}`);
+    git(fx.checkout, 'config', 'core.symlinks', 'true');
+    const resource = `legacy-${phase}${replacement ? '-replacement' : ''}`;
+    const dest = createWorktree(fx, resource, 'legacy-owner');
+    const short = shortSpelling(dest);
+    if (!short) { console.log(`UNVERIFIED S17 ${phase} legacy 8.3 manifest: spelling unavailable`); continue; }
+    await check(`${phase} legacy resume ${replacement ? 'quarantines late root replacement without removed advancement' : 'accepts short-spelled archive without rewriting it'}`, async () => {
+      fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained legacy bytes\n');
+      const outside = path.join(fx.root, 'external-witness');
+      fs.writeFileSync(outside, 'external legacy witness\n');
+      if (nativeSymlinks) fs.symlinkSync(outside, path.join(dest, 'native-link'));
+      const archive = require(path.join(fx.checkout, 'scripts/dev/lib/worktree-archive.cjs'));
+      const register = require(path.join(fx.checkout, 'scripts/dev/lib/worktree-register.cjs'));
+      const saved = archive.archiveWorktree({ mainRepoRoot: fx.checkout, worktreePath: short, resource, policy: archive.loadPolicy(fx.checkout) });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      assert.equal(saved.manifest.worktreePath, short.replace(/\\/g, '/'));
+      const bytes = fs.readFileSync(saved.manifestPath);
+      const record = { ...register.buildFinalizationRecord({ resource, worktreePath: short, branch: `worktree-${resource}`, head: saved.head, phase,
+        by: { sessionId: 'old-claimant', pid: deadPid(), creationFileTimeUtc: null }, now: Date.now() - 3600_000, leaseDurationSec: 900 }), manifestPath: saved.manifestPath };
+      await register.writeFinalization({ mainRepoRoot: fx.checkout, record, env: { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: fx.stateRoot } });
+      const probe = path.join(fx.root, 'replacement-proof.json');
+      if (replacement) {
+        const file = path.join(fx.checkout, 'scripts/dev/lib/worktree-archive.cjs');
+        fs.renameSync(file, path.join(path.dirname(file), 'worktree-archive.production.cjs'));
+        fs.writeFileSync(file, `const p = require('./worktree-archive.production.cjs');
+const fs = require('node:fs'); let pass = 0, replaced = false;
+module.exports = { ...p, verifyArchive(args) {
+  const current = ++pass;
+  return p.verifyArchive({ ...args, git(argv, options) {
+    const out = p.defaultGit(argv, options);
+    if (current === 2 && argv[0] === 'hash-object' && !replaced) {
+      replaced = true;
+      const target = ${JSON.stringify(dest)};
+      const before = fs.lstatSync(target, { bigint: true }).ino.toString();
+      fs.renameSync(target, target + '-previous');
+      fs.cpSync(target + '-previous', target, { recursive: true, dereference: false, verbatimSymlinks: true });
+      const manifest = JSON.parse(fs.readFileSync(${JSON.stringify(saved.manifestPath)}, 'utf8'));
+      manifest.worktreePath = target;
+      fs.writeFileSync(${JSON.stringify(saved.manifestPath)}, JSON.stringify(manifest));
+      fs.writeFileSync(${JSON.stringify(probe)}, JSON.stringify({ before, after: fs.lstatSync(target, { bigint: true }).ino.toString() }));
+    }
+    return out;
+  }});
+}};\n`);
+      }
+      assert.ok(entryFor(fx.checkout, dest), 'canonical target is admitted before removal');
+      const result = runCli(fx, ['release', dest, '--no-fetch', '--session-id', 'legacy-owner']);
+      if (replacement) {
+        assert.ok(fs.existsSync(probe), 'late final hash replacement actually executed');
+        const ids = JSON.parse(fs.readFileSync(probe, 'utf8'));
+        assert.notEqual(ids.before, ids.after);
+        assert.equal(result.status, 3, result.out);
+        assert.equal(readFinalization(fx, resource).phase, 'verified', 'no removed/retired advancement on refusal');
+        assert.equal(fs.readFileSync(path.join(dest, 'draft.txt'), 'utf8'), 'retained legacy bytes\n');
+        assert.equal(refSha(fx.checkout, saved.stateRef), saved.stateCommit);
+        assert.equal(manifestFiles(fx, resource).length, 1);
+        return;
+      }
+      assert.equal(result.status, 0, result.out);
+      assert.equal(fs.existsSync(dest), false);
+      assert.equal(readFinalization(fx, resource), null);
+      assert.deepEqual(fs.readFileSync(saved.manifestPath), bytes);
+      assert.equal(refSha(fx.checkout, saved.stateRef), saved.stateCommit);
+      assert.equal(manifestFiles(fx, resource).length, 1);
+      const restored = path.join(fx.root, 'restore-legacy');
+      assert.equal(archive.restoreArchive({ mainRepoRoot: fx.checkout, stateCommit: saved.stateCommit, destination: restored }).refused, undefined);
+      assert.equal(fs.readFileSync(path.join(restored, 'draft.txt'), 'utf8'), 'retained legacy bytes\n');
+      if (nativeSymlinks) {
+        assert.ok(fs.lstatSync(path.join(restored, 'native-link')).isSymbolicLink());
+        assert.equal(fs.readFileSync(path.join(restored, 'native-link'), 'utf8'), 'external legacy witness\n');
+      }
+      assert.equal(archive.removeRestored({ mainRepoRoot: fx.checkout, path: restored }).removed, true);
+      assert.equal(fs.readFileSync(outside, 'utf8'), 'external legacy witness\n');
+    });
+  }
 
   if (nativeSymlinks) {
     await check('fresh release retains native tracked/untracked/ignored links and restores exact representation', async () => {

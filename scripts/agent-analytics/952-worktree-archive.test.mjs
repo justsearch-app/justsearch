@@ -34,6 +34,8 @@ const require = createRequire(import.meta.url);
 const {
   archiveWorktree,
   classifyIgnored,
+  strictDirectoryIdentity,
+  bindManifestToWorktree,
   compareNativeLinks,
   defaultGit,
   listArchives,
@@ -172,6 +174,42 @@ function canonicalLinkEntries(worktree, names) {
 }
 
 try {
+  await check('strict directory proof retains bigint identity and refuses missing, non-directory, changed or denied roots', async () => {
+    const f = await makeFixture('directory-proof');
+    const root = fs.realpathSync.native(f.root);
+    const first = strictDirectoryIdentity(root);
+    assert.equal(typeof first.dev, 'bigint');
+    assert.equal(typeof first.ino, 'bigint');
+    assert.ok(first.ino > 0n);
+    assert.deepEqual(strictDirectoryIdentity(root), first);
+    assert.throws(() => strictDirectoryIdentity(path.join(root, 'missing')), /ENOENT/);
+    write(root, 'plain-file', 'not a directory');
+    assert.throws(() => strictDirectoryIdentity(path.join(root, 'plain-file')), /non-directory/);
+    assert.throws(() => strictDirectoryIdentity('relative'), /not absolute/);
+    const manifest = { worktreePath: root, files: [] };
+    assert.equal(bindManifestToWorktree(manifest, root).manifest, manifest, 'lexical fast path preserves existing format');
+    const child = path.join(root, 'identity');
+    fs.mkdirSync(child);
+    const prior = strictDirectoryIdentity(child);
+    fs.renameSync(child, path.join(root, 'old-identity'));
+    fs.mkdirSync(child);
+    assert.notEqual(strictDirectoryIdentity(child).ino, prior.ino, 'old root remains owned; replacement cannot reuse its inode');
+    const original = fs.lstatSync;
+    try {
+      fs.lstatSync = (name, options) => {
+        if (name === child) throw Object.assign(new Error('injected inspection EIO'), { code: 'EIO' });
+        return original(name, options);
+      };
+      assert.throws(() => strictDirectoryIdentity(child), /inspection EIO/);
+    } finally { fs.lstatSync = original; }
+    if (process.platform !== 'win32' && process.getuid() !== 0) {
+      fs.mkdirSync(path.join(child, 'below'));
+      fs.chmodSync(child, 0);
+      try { assert.throws(() => strictDirectoryIdentity(path.join(child, 'below')), /EACCES/); }
+      finally { fs.chmodSync(child, 0o755); }
+    }
+  });
+
   /* ── 1. classification, refusal, discard, exclusion, byte-identical source ──────────────── */
 
   await check('oversized ignored file refuses the archive and names the path', async () => {
@@ -379,6 +417,16 @@ try {
     console.log(`UNVERIFIED native Windows symlinks: ${err.code}`);
   }
   if (nativeSymlinks) {
+    await check('strict directory proof refuses root and ancestor link traversal', async () => {
+      const f = await makeFixture('directory-link-proof');
+      const root = fs.realpathSync.native(f.root);
+      fs.mkdirSync(path.join(root, 'actual'));
+      fs.mkdirSync(path.join(root, 'actual', 'child'));
+      fs.symlinkSync(path.join(root, 'actual'), path.join(root, 'alias'), process.platform === 'win32' ? 'junction' : 'dir');
+      assert.throws(() => strictDirectoryIdentity(path.join(root, 'alias')), /symlink or junction/);
+      assert.throws(() => strictDirectoryIdentity(path.join(root, 'alias', 'child')), /symlink or junction/);
+      if (process.platform === 'win32') assert.throws(() => bindManifestToWorktree({ worktreePath: path.join(root, 'alias') }, path.join(root, 'actual')), /symlink or junction/);
+    });
     await check('Git native-link comparison uses a cold scoped index, two calls and actual payload/type differences', async () => {
       const f = await makeFixture('native-diff');
       git(f.repo, 'config', 'core.symlinks', 'true');

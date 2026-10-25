@@ -48,6 +48,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 
 const { resolveMainRepoRoot } = require('./agent-spawn-sweep.cjs');
+const { samePath } = require('../../lib/path-identity.cjs');
 
 const POLICY_REL = ['governance', 'worktree-lifecycle.v1.json'];
 
@@ -503,6 +504,40 @@ function archiveWorktree({
 
 /* ── verification ───────────────────────────────────────────────────────────────────────────── */
 
+/** Existing directory only; no junction/symlink component or nearest-ancestor/error fallback. */
+function strictDirectoryIdentity(directory) {
+  if (typeof directory !== 'string' || !path.isAbsolute(directory)) throw new Error('directory spelling is not absolute');
+  const parsed = path.parse(directory);
+  const parts = directory.slice(parsed.root.length).split(process.platform === 'win32' ? /[\\/]+/ : /\/+/).filter(Boolean);
+  if (parts.some((part) => part === '.' || part === '..')) throw new Error('directory spelling contains dot components');
+  let current = parsed.root;
+  let stat;
+  for (const part of ['', ...parts]) {
+    current = part ? path.join(current, part) : current;
+    stat = fs.lstatSync(current, { bigint: true });
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`directory traverses a non-directory, symlink or junction: ${current}`);
+  }
+  const real = fs.realpathSync.native(directory);
+  const resolved = fs.lstatSync(real, { bigint: true });
+  if (!resolved.isDirectory() || resolved.isSymbolicLink() || typeof stat.dev !== 'bigint'
+      || typeof stat.ino !== 'bigint' || stat.ino <= 0n || stat.dev !== resolved.dev || stat.ino !== resolved.ino) {
+    throw new Error('directory identity is ambiguous or changed during inspection');
+  }
+  return { real, dev: stat.dev, ino: stat.ino };
+}
+
+/** The exception binds verification to an already admitted target, never to the old alias. */
+function bindManifestToWorktree(manifest, target) {
+  if (samePath(manifest.worktreePath, target)) return { manifest, identity: null };
+  if (process.platform !== 'win32') throw new Error(`archive manifest is for ${manifest.worktreePath}, not ${target}`);
+  const recorded = strictDirectoryIdentity(manifest.worktreePath);
+  const admitted = strictDirectoryIdentity(target);
+  if (!samePath(recorded.real, admitted.real) || recorded.dev !== admitted.dev || recorded.ino !== admitted.ino) {
+    throw new Error(`archive manifest is for a different physical worktree: ${manifest.worktreePath}`);
+  }
+  return { manifest: { ...manifest, worktreePath: target }, identity: { ...admitted, recordedPath: manifest.worktreePath } };
+}
+
 /** Git owns native Windows link spelling (drive separators and extended prefixes included). */
 function compareNativeLinks({ worktreePath, entries, git = defaultGit }) {
   const mismatched = [];
@@ -811,6 +846,8 @@ module.exports = {
   resolveMainRepoRoot,
   classifyIgnored,
   archiveWorktree,
+  strictDirectoryIdentity,
+  bindManifestToWorktree,
   compareNativeLinks,
   verifyArchive,
   restoreArchive,

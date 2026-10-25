@@ -155,6 +155,7 @@ function resolveWorktreePath(main, given) {
   const entries = register.listWorktrees({ repoRoot: main });
   const entry = entries.find((e) => samePath(e.path, abs));
   if (!entry) fail(`${abs} is not a registered worktree of ${main}`);
+  if (entry.isMain) fail('the main checkout is never a lifecycle resource (branch-safety.md rules 3-4)');
   return entry;
 }
 
@@ -318,6 +319,8 @@ async function finalize({ main, policy, entry, markers, sessionId, discardIgnore
   // Phase: verified
   if (record.phase === 'archived') {
     if (!manifest) return { done: false, quarantined: true, receipt, reason: 'archived phase recorded but no manifest found; re-run after inspecting the finalization record' };
+    try { manifest = archive.bindManifestToWorktree(manifest, entry.path).manifest; }
+    catch (err) { return { done: false, quarantined: true, receipt, reason: `archive target proof failed: ${err.message}` }; }
     const verify = archive.verifyArchive({ mainRepoRoot: main, manifest });
     if (!verify.ok) {
       return { done: false, quarantined: true, receipt, reason: `archive verification failed: missing=${verify.missing.length} mismatched=${verify.mismatched.length} errors=${(verify.errors || []).length}; the tree changed after archiving or an object is missing${(verify.errors || []).length ? ` (first error: ${String(verify.errors[0]).slice(0, 300)})` : ''}` };
