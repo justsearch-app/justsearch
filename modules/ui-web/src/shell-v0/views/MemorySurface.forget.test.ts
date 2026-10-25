@@ -9,8 +9,8 @@ import { confirmAsync } from '../components/ConfirmDialog.js';
 
 vi.mock('../components/ConfirmDialog.js', () => ({ confirmAsync: vi.fn() }));
 
-const fact = { id: 'm/1', kind: 'fact', content: 'My preferred language is German' };
-const other = { id: 'm2', kind: 'fact', content: 'A second memory' };
+const fact = { id: 'm/1', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'My preferred language is German' };
+const other = { id: 'm2', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'A second memory' };
 const response = (memories = [fact, other], locked = false) =>
   new Response(JSON.stringify({ memories, locked }));
 
@@ -77,7 +77,7 @@ it('guards repeated activation during confirmation and deletion (S53.3)', async 
   const consent = deferred<boolean>();
   const deletion = deferred<Response>();
   vi.mocked(confirmAsync).mockReturnValue(consent.promise);
-  const fetch = vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockReturnValueOnce(deletion.promise)
+  const fetch = vi.fn().mockResolvedValueOnce(response()).mockReturnValueOnce(deletion.promise)
     .mockResolvedValue(response([other]));
   vi.stubGlobal('fetch', fetch);
   const el = await mount();
@@ -92,7 +92,7 @@ it('guards repeated activation during confirmation and deletion (S53.3)', async 
   void button.onActivate?.();
   await settle(el);
   const deletes = fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE').length;
-  deletion.resolve(new Response('{}'));
+  deletion.resolve(new Response('{"removed":true}'));
   await first;
   await settle(el);
   expect(confirmations).toBe(1);
@@ -102,8 +102,8 @@ it('guards repeated activation during confirmation and deletion (S53.3)', async 
 });
 
 it('announces confirmed removal and focuses the next useful control (S53.3, S53.7)', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response())
-    .mockResolvedValueOnce(new Response('{}')).mockResolvedValue(response([other])));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response())
+    .mockResolvedValueOnce(new Response('{"removed":true}')).mockResolvedValue(response([other])));
   const el = await mount();
   forget(el).focus();
   await forget(el).onActivate?.();
@@ -113,8 +113,8 @@ it('announces confirmed removal and focuses the next useful control (S53.3, S53.
 });
 
 it('focuses the teaching input after forgetting the last memory (S53.3)', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response([fact])).mockResolvedValueOnce(response([fact]))
-    .mockResolvedValueOnce(new Response('{}')).mockResolvedValue(response([])));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response([fact]))
+    .mockResolvedValueOnce(new Response('{"removed":true}')).mockResolvedValue(response([])));
   const el = await mount();
   forget(el).focus();
   await forget(el).onActivate?.();
@@ -123,7 +123,7 @@ it('focuses the teaching input after forgetting the last memory (S53.3)', async 
 });
 
 it('reconciles a lost delete response with a confirmed absence (S53.3 amendment)', async () => {
-  const fetch = vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
+  const fetch = vi.fn().mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
     .mockResolvedValue(response([other]));
   vi.stubGlobal('fetch', fetch);
   const el = await mount();
@@ -136,7 +136,7 @@ it('reconciles a lost delete response with a confirmed absence (S53.3 amendment)
 });
 
 it('reconciles a lost delete response with a still-present memory (S53.3 amendment)', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
     .mockResolvedValue(response()));
   const el = await mount();
   await forget(el).onActivate?.();
@@ -147,7 +147,7 @@ it('reconciles a lost delete response with a still-present memory (S53.3 amendme
 });
 
 it('leaves an unknown outcome when reconciliation fails and offers a fresh read (S53.3 amendment, S53.4)', async () => {
-  const fetch = vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
+  const fetch = vi.fn().mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
     .mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue(response([other]));
   vi.stubGlobal('fetch', fetch);
   const el = await mount();
@@ -166,7 +166,7 @@ it('leaves an unknown outcome when reconciliation fails and offers a fresh read 
 });
 
 it('cannot infer absence from a locked reconciliation (S53.3 amendment, S53.4)', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
     .mockResolvedValue(response([], true)));
   const el = await mount();
   await forget(el).onActivate?.();
@@ -177,7 +177,7 @@ it('cannot infer absence from a locked reconciliation (S53.3 amendment, S53.4)',
 });
 
 it('cannot infer absence from a malformed reconciliation (S53.3 amendment, S53.4)', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockRejectedValueOnce(new TypeError('lost response'))
     .mockResolvedValue(new Response('{"locked":false}')));
   const el = await mount();
   await forget(el).onActivate?.();
@@ -188,7 +188,7 @@ it('cannot infer absence from a malformed reconciliation (S53.3 amendment, S53.4
 });
 
 it('keeps a refused deletion retryable by keyboard after refreshing the list (S53.3, S53.7)', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response())
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response())
     .mockResolvedValueOnce(new Response('{}', { status: 500 })).mockResolvedValue(response()));
   const el = await mount();
   forget(el).focus();
@@ -217,7 +217,7 @@ it('does not send a delete when confirmation belongs to a previous visit (S53.3)
 
 it('does not let a delayed deletion change a newer visit (S53.3 amendment, S53.4)', async () => {
   const deletion = deferred<Response>();
-  const fetch = vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response()).mockReturnValueOnce(deletion.promise)
+  const fetch = vi.fn().mockResolvedValueOnce(response()).mockReturnValueOnce(deletion.promise)
     .mockResolvedValue(response([other]));
   vi.stubGlobal('fetch', fetch);
   const el = await mount();
@@ -251,7 +251,7 @@ it('keeps Forget guarded when an earlier visit finishes Remember (S53.3, N53.2)'
   await settle(el);
   el.rememberDraft = 'newer visit draft';
   const first = forget(el).onActivate?.();
-  save.resolve(new Response('{}'));
+  save.resolve(new Response('{"removed":true}'));
   await settle(el);
   const second = forget(el).onActivate?.();
   const confirmations = vi.mocked(confirmAsync).mock.calls.length;
