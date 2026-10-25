@@ -474,6 +474,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private final Path dbPath;
   private final ReentrantLock lock = new ReentrantLock();
+  private static final ThreadLocal<Integer> FORGET_CALLBACK_DEPTH = ThreadLocal.withInitial(() -> 0);
   private final int maxAttempts;
   private Connection connection;
   private Throwable connectionFailure;
@@ -3155,7 +3156,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     Runnable delivery = null;
     try {
       if (lock.getHoldCount() == 1 && changeStream != null) {
-        try { changeStream.drainCommitted(); }
+        try { deliverOutsideForgetEntry(changeStream::drainCommitted); }
         catch (RuntimeException | Error deliveryFailure) {
           if (connectionFailure == null) throw deliveryFailure;
           if (connectionFailure != deliveryFailure) connectionFailure.addSuppressed(deliveryFailure);
@@ -3177,8 +3178,61 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try {
         if (lock.getHoldCount() == 1 && walkChanges != null) delivery = walkChanges.takeDelivery();
       } finally { lock.unlock(); }
-      if (delivery != null) delivery.run();
+      if (delivery != null) deliverOutsideForgetEntry(delivery);
     }
+  }
+
+  private static void deliverOutsideForgetEntry(Runnable delivery) {
+    int previous = FORGET_CALLBACK_DEPTH.get();
+    FORGET_CALLBACK_DEPTH.set(previous + 1);
+    try { delivery.run(); }
+    finally {
+      if (previous == 0) FORGET_CALLBACK_DEPTH.remove();
+      else FORGET_CALLBACK_DEPTH.set(previous);
+    }
+  }
+
+  @Override public boolean forgetEntryAllowed() {
+    return !lock.isHeldByCurrentThread() && FORGET_CALLBACK_DEPTH.get() == 0;
+  }
+
+  @Override public java.util.Optional<JobQueue.ForgetQueueFence> tryForgetQueueFence() {
+    if (!forgetEntryAllowed() || !lock.tryLock()) return java.util.Optional.empty();
+    boolean retained = false;
+    try {
+      ensureOpen();
+      Thread holder = Thread.currentThread();
+      JobQueue.ForgetQueueFence fence = new JobQueue.ForgetQueueFence() {
+        private boolean closed;
+        @Override public void close() {
+          if (Thread.currentThread() != holder) {
+            throw new IllegalStateException("Forget queue fence must leave on its owning thread");
+          }
+          if (closed) return;
+          closed = true;
+          unlockAfterChanges();
+        }
+      };
+      retained = true;
+      return java.util.Optional.of(fence);
+    } finally { if (!retained) lock.unlock(); }
+  }
+
+  @Override public boolean forgetJobsAbsent(String path, boolean folder) {
+    lock.lock();
+    try {
+      ensureOpen();
+      String key = folder ? PathNormalizer.normalizePathPrefix(path) : PathNormalizer.normalizePath(path);
+      if (key == null || key.isBlank()) throw new IllegalArgumentException("Forget requires an exact nonempty path");
+      String predicate = folder ? "path >= ? AND path < ?" : "path = ?";
+      try (var query = connection.prepareStatement("SELECT 1 FROM jobs WHERE " + predicate + " LIMIT 1")) {
+        query.setString(1, key);
+        if (folder) query.setString(2, upperBoundExclusive(key));
+        try (var row = query.executeQuery()) { return !row.next(); }
+      }
+    } catch (SQLException unavailable) {
+      throw new IllegalStateException("Forget queue absence could not be verified", unavailable);
+    } finally { unlockAfterChanges(); }
   }
 
   private <T> T inTransaction(SqlWork<T> work) throws SQLException {

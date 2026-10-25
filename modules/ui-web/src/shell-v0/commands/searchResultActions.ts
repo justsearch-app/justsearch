@@ -9,8 +9,8 @@
  * Two-layer cut (570 §18.3): these are SIMPLE, non-destructive actions riding
  * the existing platform capabilities (`openLocalFile` / `revealLocalPath`) and
  * shell seams (clipboard, inspector selection). Destructive or agent-tier
- * result actions would traverse the operation/`evaluateIntent`/Journal seam —
- * none exist yet; that layer is deliberately deferred (recorded in tempdoc 577).
+ * result actions traverse the operation/`evaluateIntent`/Journal seam through an explicitly
+ * capable host. A card without that host callback never offers forget.
  *
  * Registered once at shell boot (idempotent), context `'search-result-row'`
  * — the same context string `SearchSurface.handleRowContextMenu` passes, so
@@ -25,10 +25,18 @@ export const SEARCH_RESULT_CONTEXT = 'search-result-row';
 
 interface HitLike {
   path?: string;
+  collection?: string;
+  forget?: (scope: 'FILE' | 'FOLDER') => void;
 }
 
 const hasPath = (payload: unknown): boolean =>
   typeof (payload as HitLike)?.path === 'string' && ((payload as HitLike).path ?? '') !== '';
+
+const canForget = (payload: unknown): boolean => {
+  const hit = payload as HitLike;
+  return hasPath(payload) && typeof hit.forget === 'function'
+    && !['justsearch-help', 'agent-history'].includes(hit.collection?.toLowerCase() ?? '');
+};
 
 let registered = false;
 
@@ -69,6 +77,21 @@ export function registerSearchResultActions(): void {
     enabled: hasPath,
     handler: (payload) => void copyToClipboard((payload as HitLike).path ?? ''),
   });
+  for (const [scope, label, priority] of [
+    ['FILE', 'Forget this file', 40], ['FOLDER', 'Forget its folder', 50],
+  ] as const) {
+    registerContextAction({
+      id: `search-result.forget-${scope.toLowerCase()}`,
+      context: SEARCH_RESULT_CONTEXT,
+      label,
+      icon: 'trash-2',
+      priority,
+      source: 'core',
+      provenance: CORE_PROVENANCE,
+      enabled: canForget,
+      handler: (payload) => { (payload as HitLike).forget?.(scope); },
+    });
+  }
 }
 
 /** Test-only: allow re-registration after a registry reset. */

@@ -40,6 +40,8 @@ const OUTPUT_DIR = join(REPO_ROOT, 'modules', 'ui-web', 'src', 'api', 'generated
  * the rest of the surfaces here (each entry browser-gated when it lands).
  */
 const TARGETS = [
+  { schema: 'SSOT/schemas/forget-outcome.v1.json', outFile: 'forget-outcome.ts', rootName: 'ForgetOutcome' },
+  { schema: 'SSOT/schemas/forget-page.v1.json', outFile: 'forget-page.ts', rootName: 'ForgetPage' },
   {
     schema: 'SSOT/schemas/knowledge-search-response.v1.json',
     outFile: 'knowledge-search-response.ts',

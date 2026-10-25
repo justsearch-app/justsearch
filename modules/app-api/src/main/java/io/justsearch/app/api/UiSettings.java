@@ -38,7 +38,7 @@ public final class UiSettings {
   // - excludePatterns: glob patterns to exclude from indexing/search
   private String mode = "simple";
   private boolean trustLoopNudgeSeen = false;
-  private List<String> excludePatterns = new ArrayList<>();
+  private List<Object> excludePatterns = new ArrayList<>();
 
   // Tempdoc 737 Phase 1 — RuntimeSpec desired-state bit: does the user want the chat engine on?
   // Nullable by design: {@code null} means "never explicitly persisted" (distinct from an explicit
@@ -204,28 +204,34 @@ public final class UiSettings {
     this.apiPort = apiPort;
   }
 
-  public List<String> getExcludePatterns() {
+  public List<Object> getExcludePatterns() {
     if (excludePatterns == null) {
       excludePatterns = new ArrayList<>();
     }
     return excludePatterns;
   }
 
-  public void setExcludePatterns(List<String> excludePatterns) {
+  public void setExcludePatterns(List<?> excludePatterns) {
     if (excludePatterns == null || excludePatterns.isEmpty()) {
       this.excludePatterns = new ArrayList<>();
       return;
     }
 
     // Clean + dedupe (preserve insertion order) and cap to avoid abusive payloads.
-    LinkedHashSet<String> cleaned = new LinkedHashSet<>();
-    for (String p : excludePatterns) {
+    LinkedHashSet<Object> cleaned = new LinkedHashSet<>();
+    boolean hasLiterals = excludePatterns.stream().anyMatch(p -> p != null && !(p instanceof String));
+    for (Object p : excludePatterns) {
       if (p == null) continue;
-      String s = p.trim();
-      if (s.isBlank()) continue;
-      cleaned.add(s);
-      if (cleaned.size() >= 512) break;
+      if (p instanceof String text) {
+        String s = text.trim();
+        if (!s.isBlank()) cleaned.add(s);
+      } else {
+        cleaned.add(io.justsearch.configuration.excludes.LiteralExclusion.fromEntry(p));
+      }
+      if (!hasLiterals && cleaned.size() >= 512) break;
     }
+    if (hasLiterals) io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(
+        new ArrayList<>(cleaned));
     this.excludePatterns = new ArrayList<>(cleaned);
   }
 

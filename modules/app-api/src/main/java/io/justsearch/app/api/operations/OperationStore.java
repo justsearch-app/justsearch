@@ -132,6 +132,51 @@ public interface OperationStore extends AutoCloseable {
     return false;
   }
 
+  /** FORGET's nonterminal settings step; the exact armed progress and marker commit together. */
+  default boolean armForgetSettingsRevision(long id, long expectedRevision, ForgetProgress progress) {
+    throw new UnsupportedOperationException("Forget settings projection is unavailable");
+  }
+
+  /** Resolve only that settings step before releasing the fixed owner's logical reservation. */
+  default boolean settleForgetSettingsRevision(long id, ForgetProgress progress) {
+    throw new UnsupportedOperationException("Forget settings projection is unavailable");
+  }
+
+  /** Owner checkpoint preserves an already-recorded withdrawal across concurrent segment progress. */
+  default boolean checkpointForget(long id, ForgetProgress progress) {
+    throw new UnsupportedOperationException("Forget checkpoints are unavailable");
+  }
+
+  /** Monotonic private intent bit; terminal rows are returned unchanged and emit no new event. */
+  default java.util.Optional<OperationRecord> requestForgetWithdrawal(String key) {
+    throw new UnsupportedOperationException("Forget withdrawal is unavailable");
+  }
+
+  record ForgetAuthoritySnapshot(long acceptanceSequence, java.util.List<OperationRecord> records,
+      boolean complete) {
+    public ForgetAuthoritySnapshot {
+      if (acceptanceSequence < 0) throw new IllegalArgumentException("Negative acceptance sequence");
+      records = java.util.List.copyOf(records);
+    }
+  }
+
+  /** Monotonic sqlite_sequence plus one consistent bounded open-producer snapshot. */
+  default ForgetAuthoritySnapshot captureForgetAuthority() {
+    throw new UnsupportedOperationException("Forget producer observation is unavailable");
+  }
+
+  /** Completion is durable on return; the runner publishes this once after all physical locks. */
+  interface DeferredForgetCompletion {
+    java.util.Optional<OperationRecord> record();
+    void publish();
+  }
+
+  /** A changed acceptance sequence refuses completion. Null is permitted only with permanent policy. */
+  default DeferredForgetCompletion finishForget(long id, Long expectedAcceptanceSequence,
+      OperationState terminalState, OperationReceipt receipt) {
+    throw new UnsupportedOperationException("Conditional forget completion is unavailable");
+  }
+
   /** A reconciler has revalidated a recoverable open attempt before scheduling its next body. */
   boolean resume(long id);
 

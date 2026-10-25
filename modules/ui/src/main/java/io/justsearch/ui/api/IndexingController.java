@@ -40,6 +40,7 @@ public class IndexingController {
   private final ExcludesService excludesService;
   private final Path userHome; // nullable — null means "not available"
   private final Telemetry telemetry;
+  private final Supplier<io.justsearch.app.api.operations.ForgetService> forgetService;
   private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
 
   public IndexingController(
@@ -47,10 +48,69 @@ public class IndexingController {
       ExcludesService excludesService,
       Path userHome,
       Telemetry telemetry) {
+    this(indexingServiceSupplier, excludesService, userHome, telemetry,
+        io.justsearch.app.api.operations.ForgetService::unavailable);
+  }
+
+  public IndexingController(Supplier<IndexingService> indexingServiceSupplier,
+      ExcludesService excludesService, Path userHome, Telemetry telemetry,
+      Supplier<io.justsearch.app.api.operations.ForgetService> forgetService) {
     this.indexingServiceSupplier = indexingServiceSupplier;
     this.excludesService = excludesService;
     this.userHome = userHome;
     this.telemetry = telemetry;
+    this.forgetService = java.util.Objects.requireNonNull(forgetService, "forgetService");
+  }
+
+  /** Read-only UI recovery; a missing/failed owner is never projected as an empty intent list. */
+  public void handleUnfinishedForgets(Context ctx) {
+    if (!forgetReadAllowed(ctx)) return;
+    try {
+      var owner = forgetService.get();
+      if (!owner.hasOwner()) throw new IllegalStateException("Forget is unavailable in this host");
+      long after = Long.parseLong(ctx.queryParam("afterId") == null ? "0" : ctx.queryParam("afterId"));
+      int limit = Integer.parseInt(ctx.queryParam("limit") == null ? "100" : ctx.queryParam("limit"));
+      ctx.json(owner.unfinished(after, limit, RequestEngineContext.get(ctx)));
+    } catch (IllegalArgumentException invalid) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "Invalid unfinished forget page", telemetry, ApiErrorHandler.routeOf(ctx)));
+    } catch (Exception unavailable) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, unavailable, telemetry)) return;
+      ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
+          "Unfinished forget intents could not be read", telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
+  }
+
+  public void handleObserveForget(Context ctx) {
+    if (!forgetReadAllowed(ctx)) return;
+    try {
+      String key = ctx.pathParam("operationKey");
+      io.justsearch.app.api.operations.OperationKeys.timestampMillis(key);
+      var owner = forgetService.get();
+      if (!owner.hasOwner()) throw new IllegalStateException("Forget is unavailable in this host");
+      ctx.json(owner.observe(key, RequestEngineContext.get(ctx)).orElseGet(() ->
+          new io.justsearch.app.api.operations.ForgetOutcome(key, null, null,
+              io.justsearch.app.api.operations.ForgetOutcome.Status.UNKNOWN,
+              io.justsearch.app.api.operations.ForgetOutcome.Removal.UNKNOWN,
+              io.justsearch.app.api.operations.ForgetOutcome.KeepOut.UNKNOWN,
+              io.justsearch.app.api.operations.ForgetOutcome.Reason.OUTCOME_UNCONFIRMED,
+              "The forget outcome could not be established. No completed removal is being claimed.")));
+    } catch (IllegalArgumentException invalid) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "Invalid forget key", telemetry, ApiErrorHandler.routeOf(ctx)));
+    } catch (Exception unavailable) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, unavailable, telemetry)) return;
+      ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
+          "The forget outcome could not be read", telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
+  }
+
+  private boolean forgetReadAllowed(Context ctx) {
+    if (RequestEngineContext.get(ctx).clientKind()
+        == io.justsearch.core.context.EngineContext.ClientKind.WEBVIEW) return true;
+    ctx.status(403).json(ApiErrorHandler.toResponse(ApiErrorCode.TRUST_DENIED,
+        "Indexed-path forget is available only to the webview", telemetry, ApiErrorHandler.routeOf(ctx)));
+    return false;
   }
 
   private IndexingService indexingService() {

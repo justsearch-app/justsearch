@@ -102,6 +102,7 @@ final class LauncherEnvironment implements AutoCloseable {
                 io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
                 io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
                 io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
+                io.justsearch.agent.api.registry.OperationKind.FORGET,
                 io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN));
         return new HeadAssembly(operations, attempts,
             resources.executors(), telemetry, configManager, null,

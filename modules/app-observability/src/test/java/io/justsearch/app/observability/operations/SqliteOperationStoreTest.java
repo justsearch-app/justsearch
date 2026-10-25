@@ -31,13 +31,33 @@ class SqliteOperationStoreTest {
   }
 
   @Test
+  void RF55V5SemanticMigrationAdvancesVersionAndPreservesExistingRowsAndSequence() throws Exception {
+    Path path = temp.resolve("v5.db");
+    try (var store = new SqliteOperationStore(path, CLOCK, step -> {});
+        Connection db = connect(path); Statement statement = db.createStatement()) {
+      statement.execute("INSERT INTO operations(operation_key,kind,survival,urgency,state,identity_json,accepted_at,updated_at) "
+          + "VALUES ('v5-preserved','operation','interactive','foreground','ACCEPTED','{}',1,1)");
+      statement.execute("UPDATE sqlite_sequence SET seq=73 WHERE name='operations'");
+      // v5 and v6 have the same columns; v6 adds the closed kind/recovery interpretation.
+      statement.execute("PRAGMA user_version=5");
+    }
+    try (var reopened = new SqliteOperationStore(path, CLOCK, step -> {});
+        Connection db = connect(path); Statement statement = db.createStatement()) {
+      assertEquals(6, scalar(statement, "PRAGMA user_version"), "v5 must actually cross the semantic barrier");
+      assertEquals(73, scalar(statement, "SELECT seq FROM sqlite_sequence WHERE name='operations'"));
+      assertEquals(1, scalar(statement, "SELECT count(*) FROM operations WHERE operation_key='v5-preserved' AND state='ACCEPTED'"));
+      assertTrue(reopened.recovery().isEmpty());
+    }
+  }
+
+  @Test
   void freshStoreHasIndependentVersionAndSingletonFenceAndReopens() throws Exception {
     Path path = temp.resolve("operations.db");
     try (var store = new SqliteOperationStore(path, CLOCK, step -> {});
         Connection db = connect(path);
         Statement statement = db.createStatement()) {
       assertTrue(store.recovery().isEmpty());
-      assertEquals(5, scalar(statement, "PRAGMA user_version"));
+      assertEquals(6, scalar(statement, "PRAGMA user_version"));
       assertEquals(0, scalar(statement, "SELECT history_since_ms FROM operations_meta"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM operations_meta"));
       try (ResultSet result = statement.executeQuery("PRAGMA table_info(operations)")) {
@@ -112,7 +132,7 @@ class SqliteOperationStoreTest {
         Connection db = connect(path); Statement statement = db.createStatement()) {
       assertEquals(CLOCK.millis() + 300_001,
           scalar(statement, "SELECT history_since_ms FROM operations_meta"));
-      assertEquals(5, scalar(statement, "PRAGMA user_version"));
+      assertEquals(6, scalar(statement, "PRAGMA user_version"));
       Path preserved = reopened.recovery().orElseThrow().preservedDirectory();
       assertArrayEquals(corrupt, Files.readAllBytes(preserved.resolve("operations.db")));
       assertEquals("original WAL", Files.readString(preserved.resolve("operations.db-wal")));

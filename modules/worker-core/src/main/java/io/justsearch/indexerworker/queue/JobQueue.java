@@ -1141,6 +1141,22 @@ public interface JobQueue extends Closeable {
     return 0;
   }
 
+  /** FORGET must refuse queue-owner/callback reentry before acquiring any outer owner. */
+  default boolean forgetEntryAllowed() { return false; }
+
+  interface ForgetQueueFence extends AutoCloseable {
+    /** Close on the acquiring thread, after ALL outer physical owners, delivering existing feeds. */
+    @Override void close();
+  }
+
+  /** Nonblocking acquisition after the file fence. No new feed buffer or dispatcher. */
+  default java.util.Optional<ForgetQueueFence> tryForgetQueueFence() { return java.util.Optional.empty(); }
+
+  /** Exact/prefix absence over all saved jobs; unknown inspection throws rather than inventing zero. */
+  default boolean forgetJobsAbsent(String path, boolean folder) {
+    throw new UnsupportedOperationException("Forget queue inspection is unavailable");
+  }
+
   /**
    * Counts jobs whose path starts with the given prefix, broken down by sub-state. Backs the
    * per-folder indexing-status projection (tempdoc 599 §9.2): the Head folds the in-flight

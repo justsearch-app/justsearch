@@ -194,7 +194,7 @@ final class OperationHistoryPendingTest {
     assertEquals(4, scalar("PRAGMA user_version"));
     assertEquals(0, scalar("SELECT count(*) FROM pragma_table_info('operations') WHERE name='history_pending'"));
     try (var store = open()) {
-      assertEquals(5, scalar("PRAGMA user_version")); assertTrue(store.pendingHistoryProjection(256).isEmpty());
+      assertEquals(6, scalar("PRAGMA user_version")); assertTrue(store.pendingHistoryProjection(256).isEmpty());
       assertEquals(prior, store.recentHistory(200).getFirst().key(), "Existing history remains readable without retroactive ledger replay");
       var row = store.find(key).orElseThrow(); store.finish(row.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null));
       assertEquals(key, store.pendingHistoryProjection(1).getFirst().key());

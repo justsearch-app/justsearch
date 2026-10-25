@@ -138,7 +138,7 @@ class SqliteOperationStoreStartupContentionTest {
     try (var reopened = new SqliteOperationStore(path, CLOCK, step -> {});
         Connection db = connect(path); Statement statement = db.createStatement()) {
       assertTrue(reopened.recovery().isEmpty());
-      assertEquals(5, scalar(statement, "PRAGMA user_version"));
+      assertEquals(6, scalar(statement, "PRAGMA user_version"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM operations_meta"));
     }
     assertNoCorruptSiblings(temp, path);
@@ -176,7 +176,7 @@ class SqliteOperationStoreStartupContentionTest {
     assertTrue(sawWalSidecar.get(), "the failed WAL transaction should leave a sidecar to preserve");
     assertNoCorruptSiblings(temp, path);
     try (Connection db = connect(path); Statement statement = db.createStatement()) {
-      assertEquals(5, scalar(statement, "PRAGMA user_version"));
+      assertEquals(6, scalar(statement, "PRAGMA user_version"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM operations_meta"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM sqlite_master WHERE name = 'operations'"));
     }

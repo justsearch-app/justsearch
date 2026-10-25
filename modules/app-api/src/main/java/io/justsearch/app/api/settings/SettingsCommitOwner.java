@@ -125,6 +125,50 @@ public interface SettingsCommitOwner {
     return false;
   }
 
+  /** Runner-issued nonterminal SQL transitions, separate from ordinary settings completion. */
+  interface ForgetControl {
+    void arm(SettingsWitness expected, io.justsearch.app.api.operations.ForgetProgress progress);
+    void settled(io.justsearch.app.api.operations.ForgetProgress progress);
+  }
+
+  interface PreparedForgetProjection {
+    /** No notifications; caller holds runtime/generation/configuration admission ownership. */
+    void publish();
+    /** Release the logical settings reservation and notify after all physical locks are gone. */
+    void afterOwnersReleased();
+    /** Classify exact file evidence; release only a conclusively uncommitted preparation. */
+    void abandonUncommitted();
+  }
+
+  /** Fresh complete witnessed merge, prepared before acquiring physical runtime/generation owners. */
+  default PreparedForgetProjection prepareForgetProjection(OperationRecord row,
+      OperationStore.Preparation accepted, ForgetControl control) {
+    throw new UnsupportedOperationException("Forget settings projection is unavailable");
+  }
+
+  /** Resolve an armed settings step only. Empty retains unknown authority and its reservation. */
+  default Optional<io.justsearch.app.api.operations.ForgetProgress> reconcileForgetProjection(
+      OperationRecord row, OperationStore.Preparation accepted) {
+    return Optional.empty();
+  }
+
+  /** Called only after that step's checkpoint and marker clearing committed atomically. */
+  default void releaseForgetProjection(long id) {
+    throw new UnsupportedOperationException("Forget settings projection is unavailable");
+  }
+
+  enum ForgetPolicy { NO_KEEP_OUT, NOT_INSTALLED, INSTALLED, SUPERSEDED, UNKNOWN }
+
+  /** Pure preparation-time check; publication must repeat authoritative checks under owner scope. */
+  default void preflightForget(io.justsearch.app.api.operations.ForgetPlan plan) {
+    throw new UnsupportedOperationException("Forget policy authority is unavailable");
+  }
+
+  /** Lock-free with respect to the settings mutex; caller holds configuration publication. */
+  default ForgetPolicy forgetPolicy(OperationRecord row, OperationStore.Preparation accepted) {
+    return ForgetPolicy.UNKNOWN;
+  }
+
   /** Build the fixed reset candidate only after reservation and durable SQL arming. */
   void applyReset(Reservation reservation, AttemptControl control);
 

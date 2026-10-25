@@ -1,0 +1,40 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "type" : "object",
+  "properties" : {
+    "explanation" : {
+      "type" : "string"
+    },
+    "keepOut" : {
+      "type" : "string",
+      "enum" : [ "INSTALLED", "NOT_REQUIRED", "NOT_INSTALLED", "RELEASED", "UNKNOWN" ]
+    },
+    "operationKey" : {
+      "type" : [ "string", "null" ]
+    },
+    "path" : {
+      "type" : [ "string", "null" ]
+    },
+    "reason" : {
+      "type" : "string",
+      "enum" : [ "NONE", "INDEX_UNAVAILABLE", "REBUILD_ACTIVE", "SETTINGS_UNAVAILABLE", "POLICY_OVERRIDDEN", "OLD_WORK", "AUTHORITY_CHANGED", "REMOVAL_FAILED", "OUTCOME_UNCONFIRMED", "SCOPE_CHANGED", "ENTRY_REMOVED", "WITHDRAWN", "WITHDRAWAL_PENDING" ]
+    },
+    "removal" : {
+      "type" : "string",
+      "enum" : [ "CONFIRMED", "UNCONFIRMED", "UNKNOWN" ]
+    },
+    "scope" : {
+      "anyOf" : [ {
+        "type" : "null"
+      }, {
+        "type" : "string",
+        "enum" : [ "FILE", "FOLDER" ]
+      } ]
+    },
+    "status" : {
+      "type" : "string",
+      "enum" : [ "COMPLETE", "INCOMPLETE", "REFUSED", "UNKNOWN", "SUPERSEDED", "WITHDRAWN" ]
+    }
+  },
+  "required" : [ "explanation", "keepOut", "operationKey", "path", "reason", "removal", "scope", "status" ]
+}

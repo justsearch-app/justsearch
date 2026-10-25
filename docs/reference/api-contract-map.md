@@ -1083,6 +1083,25 @@ operation-invocation error body it replaced: `{"success": false, "message": "...
 
 ### Indexing Excludes API
 
+`core.forget-indexed-path` is a consented, UI-only operation with `{path, scope: "FILE" | "FOLDER"}`.
+Its accepted private preparation freezes the exact normalized absolute target and trusted root/source
+classification. Every permitted folder and every watched file installs a typed literal keep-out;
+an outside-root file has no permanent keep-out and a new deliberate add may restore it after completion.
+It removes indexed content and queued work, never original files, retained answers, logs or backups.
+Watched roots and their containing folders, bundled help, agent history and non-authoritative or
+changing index/settings state refuse before operational admission. An admitted partial effect remains
+unfinished with separate removal and keep-out observations; no removal counts are returned.
+
+`GET /api/indexing/forgets?afterId=0&limit=100` returns the bounded `forget-page.v1.json` UI projection.
+Follow `nextId` while `complete` is false; an unreadable authority returns an error, never an empty list.
+`GET /api/indexing/forgets/{operationKey}` returns `forget-outcome.v1.json`, including an explicit unknown
+observation when the outcome cannot be established. These reads do not execute or replay an effect.
+Both routes require webview attribution and are reference-client contracts in the indexing cohort.
+`core.retry-forget` and `core.withdraw-forget` take only `{forgetKey}` and cannot retarget the original intent.
+Withdrawal releases only that activation's exact still-installed keep-out after its bounded segment
+cannot delete further. An unresolved withdrawal blocks further destructive retry. Prior removal may
+already have happened; completed receipts remain complete and no rows are restored.
+
 **Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java` (`handleApplyExcludes`)
 
 `POST /api/indexing/excludes/apply` walks watched roots and deletes already-indexed documents matching the configured exclude patterns (from `ui.excludePatterns` setting).

@@ -1607,6 +1607,144 @@ public final class WorkerIngestService {
     }
   }
 
+  /** Trusted index/control metadata, never the result hit's collection label or a disk stat. */
+  public void validateForgetTarget(Path target,
+      io.justsearch.configuration.excludes.LiteralExclusion.Scope scope) {
+    var supplier = resolvedConfigSupplier;
+    var current = supplier == null ? null : supplier.get();
+    if (current == null || ingestLifecycle == null) {
+      throw WorkerServiceException.unavailable("The indexed target cannot be verified");
+    }
+    Path path = target.toAbsolutePath().normalize();
+    var internal = new java.util.ArrayList<Path>();
+    internal.add(current.paths().dataDir().resolve("agent-history").toAbsolutePath().normalize());
+    var help = current.collections().bundledHelp();
+    if (help != null) internal.add(help.path().toAbsolutePath().normalize());
+    for (var collection : current.collections().items()) {
+      if (io.justsearch.configuration.InternalCollections.isReserved(collection.name())) {
+        for (Path protectedRoot : collection.roots()) internal.add(protectedRoot.toAbsolutePath().normalize());
+      }
+    }
+    for (Path protectedRoot : internal) {
+      if (path.startsWith(protectedRoot)
+          || scope == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER
+              && protectedRoot.startsWith(path)) {
+        throw WorkerServiceException.invalidArgument("Help and agent-history content is managed by its own data controls");
+      }
+    }
+    String key = PathNormalizer.normalizeKey(path);
+    var membership = new org.apache.lucene.search.BooleanQuery.Builder();
+    if (scope == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FILE) {
+      membership.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          io.justsearch.indexing.SchemaFields.DOC_ID, key)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+      membership.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          io.justsearch.indexing.SchemaFields.PARENT_DOC_ID, key)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+    } else {
+      membership.add(new org.apache.lucene.search.PrefixQuery(new org.apache.lucene.index.Term(
+          io.justsearch.indexing.SchemaFields.PATH,
+          io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(key))),
+          org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+      membership.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          io.justsearch.indexing.SchemaFields.PATH, key)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+    }
+    var reserved = new org.apache.lucene.search.BooleanQuery.Builder();
+    for (String collection : io.justsearch.configuration.InternalCollections.RESERVED) {
+      reserved.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          io.justsearch.indexing.SchemaFields.COLLECTION, collection)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+    }
+    try {
+      ingestLifecycle.commitOps().maybeRefreshBlocking();
+      if (ingestLifecycle.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(membership.build(), org.apache.lucene.search.BooleanClause.Occur.FILTER)
+          .add(reserved.build(), org.apache.lucene.search.BooleanClause.Occur.FILTER).build()) > 0) {
+        throw WorkerServiceException.invalidArgument("Help and agent-history content cannot be forgotten here");
+      }
+    } catch (java.io.IOException unreadable) {
+      throw WorkerServiceException.unavailable("The indexed target's ownership could not be verified");
+    }
+  }
+
+  public boolean ownsForgetQueue(JobQueue expected) { return expected != null && jobQueue == expected; }
+
+  /** Must be checked before entering Head roots or server physical ownership. */
+  public boolean forgetEntryAllowed() {
+    return jobQueue.forgetEntryAllowed() && indexingLoop != null
+        && !indexingLoop.fileMutationFence().isHeldByCurrentThread();
+  }
+
+  /** TRY both inner owners: never wait behind a writer/callback while holding runtime/config. */
+  public java.util.Optional<ForgetMutation> tryBeginForgetMutation() {
+    if (!forgetEntryAllowed() || mutationAdmission == null
+        || ingestLifecycle != searchLifecycle
+        || !(ingestLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime runtime)
+        || !runtime.isAcceptingWrites()) return java.util.Optional.empty();
+    var file = indexingLoop.fileMutationFence();
+    if (!file.tryLock()) return java.util.Optional.empty();
+    boolean retained = false;
+    try {
+      var queue = jobQueue.tryForgetQueueFence();
+      if (queue.isEmpty()) return java.util.Optional.empty();
+      retained = true;
+      return java.util.Optional.of(new ForgetMutation(file, queue.orElseThrow(), runtime));
+    } finally { if (!retained) file.unlock(); }
+  }
+
+  public final class ForgetMutation {
+    private final io.justsearch.indexerworker.loop.FileMutationFence file;
+    private final JobQueue.ForgetQueueFence queue;
+    private final io.justsearch.adapters.lucene.runtime.RunningRuntime runtime;
+    private final Thread holder = Thread.currentThread();
+    private boolean fileReleased;
+    private boolean queueReleased;
+    private ForgetMutation(io.justsearch.indexerworker.loop.FileMutationFence file,
+        JobQueue.ForgetQueueFence queue, io.justsearch.adapters.lucene.runtime.RunningRuntime runtime) {
+      this.file = file; this.queue = queue; this.runtime = runtime;
+    }
+
+    /** Existing exact/prefix delete/claim invalidation, then strict queue/index absence proof. */
+    public boolean removeAndVerify(io.justsearch.app.api.operations.ForgetPlan plan) {
+      requireHolder();
+      if (fileReleased || queueReleased) throw new IllegalStateException("Forget mutation owners are released");
+      String key = PathNormalizer.normalizeKey(Path.of(plan.path()));
+      boolean folder = plan.scope() == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER;
+      if (folder) runtime.indexingCoordinator().deleteByPathPrefix(key);
+      else runtime.indexingCoordinator().deleteByIdAndChunks(key);
+      int removed = folder ? jobQueue.deleteByPathPrefix(key) : jobQueue.deleteByExactPath(key);
+      if (removed < 0) throw new IllegalStateException("Forget queue removal did not complete");
+      runtime.commitOps().commitAndTrack(folder ? CommitReason.GRPC_DELETE_BY_PATH : CommitReason.GRPC_DELETE_BY_ID);
+      runtime.commitOps().maybeRefreshBlocking();
+      try {
+        int remaining = folder
+            ? runtime.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(key, List.of(), List.of())
+            : runtime.indexCountOps().countByIdAndChunksStrict(key);
+        return remaining == 0 && jobQueue.forgetJobsAbsent(key, folder);
+      } catch (java.io.IOException unknown) {
+        throw new java.io.UncheckedIOException("Forget index absence could not be verified", unknown);
+      }
+    }
+
+    /** Release file before unwinding configuration/generation/runtime/root; retain queue throughout. */
+    public void releaseFile() {
+      requireHolder();
+      if (fileReleased) return;
+      fileReleased = true;
+      file.unlock();
+    }
+
+    /** Guaranteed caller finally AFTER all outer owners. Existing queue deliveries run here. */
+    public void afterOwnersReleased() {
+      requireHolder();
+      if (!fileReleased) throw new IllegalStateException("Release the file and outer owners before queue delivery");
+      if (queueReleased) return;
+      queueReleased = true;
+      queue.close();
+    }
+
+    private void requireHolder() {
+      if (Thread.currentThread() != holder) throw new IllegalStateException("Forget mutation is synchronous and thread-owned");
+    }
+  }
+
   public BatchResponse submitBatch(BatchRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       List<String> filePaths = request.getFilePathsList();
@@ -3249,18 +3387,26 @@ public final class WorkerIngestService {
             io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(oldPath);
         String newPathHash =
             io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(newPath);
-        var identityRekey =
-            documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
-
-        // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
-        boolean settled = withFileMutationFence(() -> moveRowsUnderFence(oldPath, newPath));
+        // Policy, identity and Lucene publication share the deletion fence. A keep-out installed
+        // after the optimistic check above must prevent BOTH indexed authorities from moving.
+        boolean settled = withFileMutationFence(() -> {
+          // The physical file operation can finish after its caller's bounded index update
+          // returns. Never let that surviving old call recreate a path after a later forget.
+          if (ctx.cancelled() || ctx != CallContext.none()
+              && System.nanoTime() - ctx.deadlineNanos() >= 0) return false;
+          if (isUserExcluded(destination, destination)) return false;
+          var identityRekey = documentIdentityStore.rekey(
+              oldPathHash, newPathHash, System.currentTimeMillis());
+          boolean rowsSettled = moveRowsUnderFence(oldPath, newPath);
+          return identityRekey
+              != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
+              || rowsSettled;
+        });
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or
         // boot reconciliation converges from the store-authoritative uid without ever re-minting.
-        if (identityRekey
-                != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
-            || settled) {
+        if (settled) {
           updatedCount++;
         } else {
           failedPaths.add(mapping.getOldPath());

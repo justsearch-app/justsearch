@@ -329,6 +329,11 @@ import {
 import { confirmConversationTree, conversationDeleteOutcome } from '../../components/chat/conversationDelete.js';
 import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
 import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
+import { createForgetAttempt, executeForget, forgetContainsPath, forgetObservationText,
+  forgetParentFolder, readUnfinishedForgets } from '../../../api/domains/forget.js';
+import { confirmForget } from '../../components/searchResults/forgetConsent.js';
+import type { CardForgetDetail } from '../../components/searchResults/ResultsCard.js';
+import { describeExactPath } from '../../../api/exclusionPolicy.js';
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
   BRANCH_FAILED,
@@ -763,6 +768,9 @@ export class SearchV3View extends JfElement {
     composerState: { type: String, reflect: true, attribute: COMPOSER_STATE_ATTR },
     theme: { type: String, reflect: true },
     apiBase: { type: String, attribute: 'api-base' },
+    forgetAvailable: { state: true },
+    forgetBusy: { state: true },
+    forgetNotice: { state: true },
     sessions: { state: true },
     aiSnapshot: { state: true },
     streaming: { state: true },
@@ -803,6 +811,13 @@ export class SearchV3View extends JfElement {
   declare theme: AppearanceMode;
   /** Set by the shell on every render of a mounted surface (`chrome/Shell.ts:2945-2949`). */
   declare apiBase: string;
+  private declare forgetAvailable: boolean;
+  private declare forgetBusy: boolean;
+  private declare forgetNotice: string;
+  private forgetPlacement = 0;
+  private forgetConsent: AbortController | null = null;
+  private forgetCapabilityRead: AbortController | null = null;
+  private forgetCapabilityBase: string | null = null;
   /**
    * The window's session list — a PROJECTION and a per-render cache of the app-wide conversation
    * store plus the canonical thread record, not an authority of its own (Phase F6; the exact split
@@ -1050,6 +1065,9 @@ export class SearchV3View extends JfElement {
     // pre-paint script exists to avoid.
     this.theme = getAppearanceMode();
     this.apiBase = '';
+    this.forgetAvailable = false;
+    this.forgetBusy = false;
+    this.forgetNotice = '';
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
     this.streaming = false;
@@ -1095,6 +1113,7 @@ export class SearchV3View extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    void this.loadForgetCapability();
     adoptSv3MorphSheet();
     this.restoreBoundaryPreferences();
     this.observeWindowBox();
@@ -1218,6 +1237,10 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.leaveForgetPlacement();
+    this.forgetCapabilityRead?.abort();
+    this.forgetCapabilityRead = null;
+    this.forgetAvailable = false;
     // BEFORE `super`, which is what tears the shadow tree's controllers down: the reassurance has to
     // read the draft while the composer still holds it (tempdoc 609 §R T1.4 — instance retention
     // keeps the draft, and this is what makes that invisible guarantee legible, once per session).
@@ -1415,6 +1438,8 @@ export class SearchV3View extends JfElement {
    * reason.
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
+    const previousSessions = changed.get('sessions') as Sv3SessionList | undefined;
+    if (previousSessions && previousSessions.activeId !== this.sessions.activeId) this.leaveForgetPlacement();
     if (changed.has('sessions')) { this.syncActiveAsk(); this.upgradeOpenPaneAnchor(); }
     this.syncForkReads();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
@@ -1430,6 +1455,10 @@ export class SearchV3View extends JfElement {
     if (changed.has('apiBase')) {
       setSearchApiBase(this.apiBase || '');
       setConversationApiBase(this.apiBase || '');
+      if (this.forgetCapabilityBase !== this.apiBase) {
+        this.leaveForgetPlacement();
+        void this.loadForgetCapability();
+      }
     }
     if (changed.has('sidebarWidthPx')) this.applySidebarWidth(this.sidebarWidthPx);
     if (changed.has('paneWidthPx')) this.applyPaneWidth(this.paneWidthPx);
@@ -3002,6 +3031,7 @@ export class SearchV3View extends JfElement {
    */
   private enterResults(leftDraft: string): void {
     if (!this.search.showing) {
+      this.leaveForgetPlacement();
       const leaving = this.sessions.activeId;
       if (leaving !== null) {
         this.placeDrafts.set(leaving, leftDraft);
@@ -3020,6 +3050,7 @@ export class SearchV3View extends JfElement {
 
   /** Back/Forward onto the bare address while this window has a result list. */
   private returnToResults(): void {
+    this.leaveForgetPlacement();
     const leaving = this.sessions.activeId;
     if (leaving !== null) this.placeDrafts.set(leaving, this.currentDraft());
     this.renamingId = null;
@@ -3053,6 +3084,7 @@ export class SearchV3View extends JfElement {
     this.handoffNotice = ''; this.handoffBlocked = false;
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
     if (from === to) return;
+    this.leaveForgetPlacement();
     if (from !== null) this.placeDrafts.set(from, this.currentDraft());
     if (from === RESULTS_PLACE) this.resultsTier = this.tier;
     this.search.hide();
@@ -3105,6 +3137,75 @@ export class SearchV3View extends JfElement {
     this.search.select(detail.ids);
     if (this.tier === 'structured' && this.search.showing && this.search.prepareFromSelection() === null) {
       this.search.clearScope();
+    }
+  }
+
+  private leaveForgetPlacement(): void {
+    this.forgetPlacement++;
+    this.forgetConsent?.abort();
+    this.forgetConsent = null;
+    this.forgetNotice = '';
+  }
+
+  private async loadForgetCapability(): Promise<void> {
+    this.forgetCapabilityRead?.abort();
+    const read = new AbortController();
+    this.forgetCapabilityRead = read;
+    const base = this.apiBase;
+    this.forgetCapabilityBase = base;
+    this.forgetAvailable = false;
+    try {
+      await readUnfinishedForgets(base, 0, read.signal, 1);
+      if (this.isConnected && !read.signal.aborted && this.apiBase === base) this.forgetAvailable = true;
+    } catch { /* A host must prove that it handles the action before any card offers it. */ }
+  }
+
+  private async onCardForget(event: Event): Promise<void> {
+    const detail = (event as CustomEvent<CardForgetDetail>).detail;
+    if (!detail || !this.forgetAvailable || this.forgetBusy || !this.search.showing) return;
+    const hit = this.search.snapshot?.results.find(row => row.id === detail.id && row.path === detail.path);
+    if (!hit) return;
+    const path = detail.scope === 'FILE' ? detail.path : forgetParentFolder(detail.path);
+    if (path === null) {
+      this.forgetNotice = 'Use Library root controls for a filesystem root.';
+      return;
+    }
+    const placement = this.forgetPlacement;
+    const session = this.sessions.activeId;
+    const base = this.apiBase;
+    const current = () => this.isConnected && this.forgetPlacement === placement
+      && this.sessions.activeId === session && this.apiBase === base && this.search.showing;
+    const consent = new AbortController();
+    this.forgetConsent = consent;
+    this.forgetBusy = true;
+    this.forgetNotice = 'Preparing the exact forget target…';
+    try {
+      const attempt = createForgetAttempt(path, detail.scope);
+      const outcome = await executeForget(base, attempt, async prompt =>
+        current() && !consent.signal.aborted && await confirmForget(prompt, consent.signal) && current());
+      if (!current()) {
+        if (outcome?.status === 'COMPLETE') this.search.rerun();
+        return;
+      }
+      if (outcome === null) {
+        this.forgetNotice = 'Forget cancelled before approval.';
+        if (detail.invoker?.isConnected) detail.invoker.focus();
+        else this.composer?.focusField();
+        return;
+      }
+      this.forgetNotice = `${describeExactPath(path)}: ${forgetObservationText(outcome)}`;
+      if (outcome.status === 'COMPLETE' && outcome.path !== null && outcome.scope !== null) {
+        const cleared = this.search.reconcileForgotten(outcome.path, outcome.scope);
+        if (cleared && this.tier === 'ask') this.tier = 'search';
+        if (this.paneDocPath !== null && forgetContainsPath(outcome.path, outcome.scope, this.paneDocPath)) this.closePane();
+        const focused = deepActiveElement();
+        if (focused === document.body || focused === detail.invoker || detail.invoker?.contains(focused)) this.composer?.focusField();
+      }
+    } catch {
+      if (current()) this.forgetNotice = 'The forget outcome could not be confirmed. Review unfinished forgets in Library.';
+    } finally {
+      if (this.forgetConsent === consent) this.forgetConsent = null;
+      this.forgetBusy = false;
     }
   }
 
@@ -4385,6 +4486,7 @@ export class SearchV3View extends JfElement {
    * guarantee, so the fix is to not make the write at all.
    */
   private resetToHero(): void {
+    this.leaveForgetPlacement();
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.abortAsk();
@@ -4570,6 +4672,7 @@ export class SearchV3View extends JfElement {
         @sv3-results-clear-selection=${() => this.search.select([])}
         @card-open=${this.onCardOpen}
         @card-selection=${this.onCardSelection}
+        @card-forget=${this.onCardForget}
         @card-facet-toggle=${this.onCardFacetToggle}
         @card-scope-file=${this.onCardScopeFile}
         @sv3-composer-stop=${this.onComposerStop}
@@ -4595,9 +4698,14 @@ export class SearchV3View extends JfElement {
         </div>` : nothing}
         ${this.renderBranchOrigin()}
         <div class="column">
+        ${this.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
+          <span style="white-space:pre-wrap;overflow-wrap:anywhere">${this.forgetNotice}</span>
+          <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
+        </div>` : nothing}
         <jf-sv3-main
           state=${this.composerState}
           .view=${results}
+          .forgetAvailable=${this.forgetAvailable && !this.forgetBusy}
           .turns=${turns}
           .turnScopes=${this.search.scopesByTurn}
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}

@@ -1335,6 +1335,7 @@ export class Sv3Main extends JfElement {
   static properties = {
     state: { type: String, reflect: true },
     view: { attribute: false },
+    forgetAvailable: { type: Boolean, attribute: false },
     turns: { attribute: false },
     turnScopes: { attribute: false },
     structuredNotes: { attribute: false },
@@ -1376,6 +1377,7 @@ export class Sv3Main extends JfElement {
   declare state: Sv3ComposerState;
   /** Search mode's result list (WP1.1); `idle` whenever the window is not showing it. */
   declare view: Sv3ResultsView;
+  declare forgetAvailable: boolean;
   /** The ACTIVE session's turns, oldest first. Handed down; the region holds no session list. */
   declare turns: readonly Sv3Turn[];
   declare modelAnswerUnavailableReason: string;
@@ -1636,6 +1638,7 @@ export class Sv3Main extends JfElement {
     super();
     this.state = COMPOSER_STATE_DEFAULT;
     this.view = SV3_RESULTS_IDLE;
+    this.forgetAvailable = false;
     this.turns = [];
     this.modelAnswerUnavailableReason = '';
     this.modelAnswerBusy = false;
@@ -1878,7 +1881,7 @@ export class Sv3Main extends JfElement {
     // Same scroller, same occlusion padding: its last row clears the floating composer (S1.12).
     if (this.resultsArmRendered) {
       return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller">
-        <jf-sv3-results .view=${view}></jf-sv3-results>
+        <jf-sv3-results .view=${view} .forgetAvailable=${this.forgetAvailable}></jf-sv3-results>
       </div>`;
     }
     // THE LOCK COMES FIRST, and it replaces the transcript rather than covering it (inventory E4):

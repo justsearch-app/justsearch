@@ -74,6 +74,19 @@ public final class WireSchemaConfig {
     builder.forFields().withRequiredCheck(WireSchemaConfig::isRequiredOnWire);
     // A String field that carries an enum's published ids states the closed set (see WireEnumIds).
     builder.forFields().withInstanceAttributeOverride(WireSchemaConfig::injectWireEnumIds);
+    builder.forFields().withInstanceAttributeOverride((node, field, context) -> {
+      if (field.getDeclaringType().getErasedType()
+              == io.justsearch.configuration.excludes.LiteralExclusion.Literal.class
+          && field.getRawMember().getName().equals("version")) node.put("const", 1);
+      if (field.getDeclaringType().getErasedType() == io.justsearch.app.api.settings.UiSettingsV2.class
+          && field.getRawMember().getName().equals("excludePatterns") && field.isFakeContainerItemScope()) {
+        // Java cannot express List<String | LiteralExclusion>; the wire retains both exact arms.
+        ArrayNode arms = node.putArray("anyOf");
+        arms.addObject().put("type", "string");
+        arms.add(context.createDefinitionReference(context.getTypeContext().resolve(
+            io.justsearch.configuration.excludes.LiteralExclusion.class)));
+      }
+    });
     return new SchemaGenerator(builder.build());
   }
 

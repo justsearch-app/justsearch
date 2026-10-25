@@ -96,14 +96,15 @@
       ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "JSON envelope v5 around UiSettings object and optional committed query-role selection",
-      "currentVersion": 5,
+      "format": "JSON envelope v6 around UiSettings, mixed legacy-glob/exact-path exclusion policy and optional committed query-role selection",
+      "currentVersion": 6,
       "readableLegacyVersions": [
         0,
         1,
         2,
         3,
-        4
+        4,
+        5
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
       "versionSource": {
@@ -116,7 +117,7 @@
       "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
       "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite. Writable legacy loads first retain byte-identical settings.v<old>.bak.json once per version. Backup I/O failures or non-regular destinations log a WARN with the path and cause, then migration continues without quarantining valid settings.",
       "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1",
-      "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v5 and reads v0-v4; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
+      "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v6 and reads v0-v5 unchanged; typed exact-path objects require v6. Precise paths remain in saved exclusion entries. currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
@@ -2074,9 +2075,9 @@
       ],
       "recoverability": "MIXED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "SQLite WAL schema v5",
-      "currentVersion": 5,
-      "readableLegacyVersions": [1, 2, 3, 4],
+      "format": "SQLite WAL schema v6; FORGET recovery ownership and nonterminal settings projection, unchanged table layout",
+      "currentVersion": 6,
+      "readableLegacyVersions": [1, 2, 3, 4, 5],
       "versionAuthority": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java",
       "versionSource": { "file": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationSchema.java", "symbol": "VERSION" },
       "futureVersionRefusalTest": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",

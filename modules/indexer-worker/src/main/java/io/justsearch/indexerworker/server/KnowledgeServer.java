@@ -10218,6 +10218,48 @@ public final class KnowledgeServer implements Closeable {
     return startupConfiguration.collections().bundledHelp();
   }
 
+  /**
+   * Narrow same-thread Engine callback. No RPC/task hop or observer is permitted inside it.
+   * Caller holds stable root bindings; this scope orders runtime → mutation → generation → config.
+   */
+  public <T> T withForgetAuthority(java.util.function.Function<
+      io.justsearch.indexerworker.services.WorkerIngestService, T> action) {
+    if (!forgetEntryAllowed()) throw new IllegalStateException("Forget cannot enter from a queue owner or callback");
+    runtimeSwapLock.lock();
+    try {
+      if (!running || closeStarted || encoderRecoveryReservation != null || rebuildBrakeExhausted
+          || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
+          || indexGenerationManager == null || activeIndexPath == null || buildingIndexPath != null
+          || ingestLifecycle != searchLifecycle || !(ingestLifecycle instanceof RunningRuntime writer)
+          || !writer.isAcceptingWrites() || !(appServices instanceof DefaultWorkerAppServices services)
+          || !services.recordedWriterReady() || !services.ingestService().ownsForgetQueue(jobQueue)) {
+        throw new IllegalStateException("Forget is unavailable while the serving index is not writable or is changing");
+      }
+      try (var mutation = services.mutationAdmission().enter(services.mutationOwnerToken());
+          var generation = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
+        publicationLock.writeLock().lock();
+        try {
+          return action.apply(services.ingestService());
+        } finally { publicationLock.writeLock().unlock(); }
+      } catch (IOException unavailable) {
+        throw new IllegalStateException("Forget requires an authoritative idle index with no candidate", unavailable);
+      }
+    } finally { runtimeSwapLock.unlock(); }
+  }
+
+  /** Lock-free pre-entry guard; a caller repeats binding checks under the runtime owner. */
+  public boolean forgetEntryAllowed() {
+    WorkerAppServices current = appServices;
+    return current != null && current.ingestService().ownsForgetQueue(jobQueue)
+        && current.ingestService().forgetEntryAllowed();
+  }
+
+  /** Also protects settings-only withdrawal and observation when the serving writer is offline. */
+  public boolean forgetQueueEntryAllowed() {
+    JobQueue current = jobQueue;
+    return current == null || current.forgetEntryAllowed();
+  }
+
   private List<ResolvedConfig.FileSource> loadMigrationRoots(ResolvedConfig rc) throws IOException {
     return KnowledgeServerMigrationOps.loadMigrationRoots(
         dataDir, rc.collections(), JSON);

@@ -167,7 +167,9 @@ public final class ReadDocumentTool implements OperationHandler {
     if (path == null || path.isBlank()) {
       return OperationResult.failure("A document path is required");
     }
-    path = path.strip();
+    // An absolute indexed id is opaque: Unix permits trailing spaces and backslashes in names.
+    // Relative human input keeps the existing whitespace convenience before root resolution.
+    if (!AgentToolPaths.looksAbsolute(path)) path = path.strip();
 
     // Same resolve-then-validate shape as SearchTool's path_prefix (SearchTool.java:222-236), with
     // the same degrade-open semantics: no roots configured / roots unavailable ⇒ do not reject.

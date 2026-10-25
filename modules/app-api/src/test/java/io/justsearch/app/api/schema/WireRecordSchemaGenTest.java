@@ -190,6 +190,18 @@ final class WireRecordSchemaGenTest {
     captureOrVerify(OperationOutcomeView.class, "operation-outcome-view.v1.json");
   }
 
+  @Test
+  @DisplayName("ForgetOutcome")
+  void forgetOutcome() throws IOException {
+    captureOrVerify(io.justsearch.app.api.operations.ForgetOutcome.class, "forget-outcome.v1.json");
+  }
+
+  @Test
+  @DisplayName("ForgetPage")
+  void forgetPage() throws IOException {
+    captureOrVerify(io.justsearch.app.api.operations.ForgetPage.class, "forget-page.v1.json");
+  }
+
   private static void captureOrVerify(Class<?> type, String fileName) throws IOException {
     JsonNode current = schemaGenerator.generateSchema(type);
     // tempdoc 696: force LF so Windows System.lineSeparator() doesn't churn committed files

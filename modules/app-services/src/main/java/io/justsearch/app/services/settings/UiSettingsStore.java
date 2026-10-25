@@ -61,7 +61,7 @@ public final class UiSettingsStore {
 
   private static final Logger log = LoggerFactory.getLogger(UiSettingsStore.class);
 
-  public static final int CURRENT_SCHEMA_VERSION = 5;
+  public static final int CURRENT_SCHEMA_VERSION = 6;
 
   /**
    * Versions this build can still read and migrate forward. {@code 0} is the unversioned legacy
@@ -69,7 +69,7 @@ public final class UiSettingsStore {
    * fatal by {@link StoreFormatVersions#requireReadable}, so every schema bump must extend this
    * list or every existing install fails to start.
    */
-  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4};
+  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4, 5};
 
   /**
    * The pre-883 shipped default for {@code contextLength}. Tempdoc 883 made the context window a
@@ -173,6 +173,24 @@ public final class UiSettingsStore {
     }
   }
 
+  /** The parsed settings and byte witness come from the same read, never an inferred revision. */
+  public record ExactSnapshot(Snapshot snapshot, String fileWitness) {}
+
+  public ExactSnapshot inspectExact() {
+    if (!mode.isWritable()) throw new IllegalStateException("Exact settings authority is read-only");
+    if (Files.notExists(settingsFile)) {
+      Snapshot absent = inspect(); // Preserve quarantine/unknown-accessibility restrictions.
+      if (!Files.notExists(settingsFile)) throw new IllegalStateException("Settings changed during inspection");
+      return new ExactSnapshot(absent, "absent");
+    }
+    try {
+      byte[] bytes = Files.readAllBytes(settingsFile);
+      return new ExactSnapshot(parseOrThrow(bytes), HexFormat.of().formatHex(sha256().digest(bytes)));
+    } catch (IOException failure) {
+      throw new UncheckedIOException("Cannot inspect exact settings witness", failure);
+    }
+  }
+
   /** Reads without quarantine/default recovery, for commitment classification by the apply owner. */
   public Snapshot inspect() {
     if (mode == PersistenceMode.IN_MEMORY) {
@@ -263,8 +281,14 @@ public final class UiSettingsStore {
   }
 
   private synchronized Snapshot parseOrThrow() {
+    try { return parseOrThrow(Files.readAllBytes(settingsFile)); }
+    catch (IOException failure) {
+      throw new CorruptDurableStoreException("ui-settings", "cannot read " + settingsFile, failure);
+    }
+  }
+
+  private synchronized Snapshot parseOrThrow(byte[] original) {
     try {
-      byte[] original = Files.readAllBytes(settingsFile);
       JsonNode root = MAPPER.readTree(original);
       if (root == null || !root.isObject()) {
         throw new CorruptDurableStoreException("ui-settings", "expected a JSON object");
@@ -291,6 +315,14 @@ public final class UiSettingsStore {
               CURRENT_SCHEMA_VERSION,
               0,
               READABLE_LEGACY_VERSIONS);
+      JsonNode policy = (envelope ? root.path("settings") : root).get("excludePatterns");
+      if (resolvedVersion < 6 && policy != null && policy.isArray()) {
+        for (JsonNode entry : policy) {
+          if (!entry.isTextual() && !entry.isNull()) {
+            throw new CorruptDurableStoreException("ui-settings", "legacy schema cannot carry exact-path policy");
+          }
+        }
+      }
       UiSettings settings =
           !envelope
               ? MAPPER.treeToValue(root, UiSettings.class)
@@ -433,6 +465,7 @@ public final class UiSettingsStore {
     public UiSettings settings() { return copy(settings); }
     public SettingsWitness witness() { return witness; }
     public QueryRoleSelection queryRoles() { return queryRoles; }
+    public String fileWitness() { return HexFormat.of().formatHex(sha256().digest(bytes)); }
   }
 
   public PreparedSettings prepare(UiSettings settings, SettingsWitness witness) {

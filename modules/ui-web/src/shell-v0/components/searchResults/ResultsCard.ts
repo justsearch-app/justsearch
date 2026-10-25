@@ -103,6 +103,13 @@ export interface CardSelectionDetail {
   primaryIndex: number;
 }
 
+export interface CardForgetDetail {
+  readonly id: string;
+  readonly path: string;
+  readonly scope: 'FILE' | 'FOLDER';
+  readonly invoker: HTMLElement | null;
+}
+
 /**
  * Search Thread S4-final — the identity of a COMMITTED (frozen) search, carried by `variant`
  * `'snapshot'` | `'excerpt'`: who ran it, what they typed, and the funnel counts at the moment it
@@ -155,6 +162,7 @@ export class ResultsCard extends JfElement {
     facetSelections: { attribute: false },
     selectedIds: { attribute: false },
     askAvailability: { attribute: false },
+    forgetAvailable: { type: Boolean, attribute: false },
     copyText: { attribute: false },
     variant: { type: String },
     selectionMode: { type: String, attribute: 'selection-mode' },
@@ -173,6 +181,8 @@ export class ResultsCard extends JfElement {
   declare selectedIds: ReadonlySet<string>;
   /** null hides the Ask AI control (hosts that cannot escalate). */
   declare askAvailability: Availability | null;
+  /** True only for a host that handles card-forget through the durable operation boundary. */
+  declare forgetAvailable: boolean;
   /** Host clipboard seam (plugin hosts route host.ui.copyToClipboard); defaults to the shared util. */
   declare copyText: (text: string) => Promise<unknown>;
   /** 'live' — the active search. 'snapshot' — a committed frozen record (full render, collapsible
@@ -211,6 +221,7 @@ export class ResultsCard extends JfElement {
     this.facetSelections = {};
     this.selectedIds = new Set<string>();
     this.askAvailability = null;
+    this.forgetAvailable = false;
     this.variant = 'live';
     this.selectionMode = 'replace';
     this.refinedStampVisible = false;
@@ -331,7 +342,7 @@ export class ResultsCard extends JfElement {
     if (!explicit) this.emitCard('card-open', { id: hit.id });
   }
 
-  private async openResultMenu(hit: CardHit, anchor: { x: number; y: number }): Promise<void> {
+  private async openResultMenu(hit: CardHit, anchor: { x: number; y: number }, invoker: HTMLElement | null = null): Promise<void> {
     const addressable = { kind: 'search-result' as const, id: hit.id, payload: hit };
     const explicit = this.selectionMode === 'explicit';
     const chosen = this.selectedIds.has(hit.id);
@@ -355,7 +366,9 @@ export class ResultsCard extends JfElement {
       ],
       anchor,
       context: 'search-result-row',
-      payload: hit,
+      payload: this.forgetAvailable ? { ...hit,
+        forget: (scope: 'FILE' | 'FOLDER') => this.emitCard<CardForgetDetail>('card-forget',
+          { id: hit.id, path: hit.path, scope, invoker }) } : hit,
       addressable,
     });
     if (result === 'ask-about-this') {
@@ -540,11 +553,22 @@ export class ResultsCard extends JfElement {
         data-kind=${view.kind}
         data-addressable-kind="search-result"
         data-addressable-id=${hit.id}
+        tabindex=${isLive && this.forgetAvailable ? 0 : nothing}
         @click=${(e: MouseEvent) => this.handleRowClick(hit, e)}
         @contextmenu=${(e: MouseEvent) => {
           if (!isLive) return;
           e.preventDefault();
-          void this.openResultMenu(hit, { x: e.clientX, y: e.clientY });
+          const row = e.currentTarget as HTMLElement;
+          const rect = row.getBoundingClientRect();
+          void this.openResultMenu(hit, e.clientX || e.clientY ? { x: e.clientX, y: e.clientY }
+            : { x: rect.left, y: rect.bottom }, row);
+        }}
+        @keydown=${(e: KeyboardEvent) => {
+          if (!isLive || !this.forgetAvailable || !(e.key === 'ContextMenu' || e.key === 'F10' && e.shiftKey)) return;
+          e.preventDefault(); e.stopPropagation();
+          const row = e.currentTarget as HTMLElement;
+          const rect = row.getBoundingClientRect();
+          void this.openResultMenu(hit, { x: rect.left, y: rect.bottom }, row);
         }}
       >
         <div class="title">
