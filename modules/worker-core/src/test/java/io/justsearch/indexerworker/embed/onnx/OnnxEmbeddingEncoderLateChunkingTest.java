@@ -9,7 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import ai.onnxruntime.OnnxTensor;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import java.nio.file.Path;
+import java.util.HashMap;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +31,7 @@ final class OnnxEmbeddingEncoderLateChunkingTest {
 
   private static final int MAX_SEQ_LEN = 512;
   private static Path modelDir;
+  private static EmbeddingAssembly assembly;
   private static OnnxEmbeddingEncoder encoder;
 
   @BeforeAll
@@ -47,7 +51,7 @@ final class OnnxEmbeddingEncoderLateChunkingTest {
             "embed-late-chunking-test", modelDir);
     // lateChunkingMaxSeqLen=0 falls back to MAX_SEQ_LEN — these tests exercise embedWithSpans'
     // limit-check semantics at the base maxSeqLen boundary, not the raised Phase-2 ceiling.
-    EmbeddingAssembly assembly =
+    assembly =
         OnnxEmbeddingEncoder.buildAssembly(sessions, modelDir, MAX_SEQ_LEN, 0, false);
     encoder = new OnnxEmbeddingEncoder(assembly.sessions(), assembly.shape(), assembly.tokenizer());
   }
@@ -88,20 +92,69 @@ final class OnnxEmbeddingEncoderLateChunkingTest {
   }
 
   @Test
-  @DisplayName("single span covering the whole doc matches an isolated embed() within epsilon")
-  void singleSpanCoveringWholeDocMatchesIsolatedEmbed() throws Exception {
+  @DisplayName("whole-content span matches normalized content-token mean from raw ORT output")
+  void singleSpanCoveringWholeDocMatchesRawOrtContentMean() throws Exception {
     String text = "Machine learning models encode text into dense vector representations.";
 
-    var isolated = encoder.embed(text);
+    var encoding = assembly.tokenizer().encode(text);
+    var offsets = encoding.getCharTokenSpans();
+    long[] mask = encoding.getAttentionMask();
+    var sessions = assembly.sessions();
+    // Read the real model output directly. Document pooling may use CLS or include specials;
+    // the span reference independently averages only content tokens with intersecting offsets.
+    float[] expected;
+    try (var ids = OnnxTensor.createTensor(sessions.environment(), new long[][] {encoding.getIds()});
+        var attention = OnnxTensor.createTensor(sessions.environment(), new long[][] {mask});
+        var types = assembly.shape().needsTokenTypeIds()
+            ? OnnxTensor.createTensor(sessions.environment(), new long[][] {encoding.getTypeIds()})
+            : null;
+        var lease = sessions.acquireCpu(LocalSessionAcquisition.background())) {
+      var inputs = new HashMap<String, OnnxTensor>();
+      inputs.put("input_ids", ids);
+      inputs.put("attention_mask", attention);
+      if (types != null) {
+        inputs.put("token_type_ids", types);
+      }
+      try (var result = lease.run(inputs)) {
+        float[][] hidden = ((float[][][]) result.get(0).getValue())[0];
+        assertEquals(mask.length, hidden.length);
+        assertEquals(mask.length, offsets.length);
+        double[] mean = new double[hidden[0].length];
+        int count = 0;
+        for (int token = 0; token < offsets.length; token++) {
+          var offset = offsets[token];
+          if (mask[token] == 1 && offset != null && offset.getEnd() > offset.getStart()
+              && offset.getEnd() > 0 && offset.getStart() < text.length()) {
+            count++;
+            for (int d = 0; d < mean.length; d++) {
+              mean[d] += hidden[token][d];
+            }
+          }
+        }
+        assertTrue(count > 0, "reference must select content tokens");
+        assertTrue(count < hidden.length, "fixture must exclude special tokens");
+        double normSquared = 0;
+        for (int d = 0; d < mean.length; d++) {
+          mean[d] /= count;
+          normSquared += mean[d] * mean[d];
+        }
+        assertTrue(normSquared > 0, "reference mean must be nonzero");
+        double norm = Math.sqrt(normSquared);
+        expected = new float[mean.length];
+        for (int d = 0; d < mean.length; d++) {
+          expected[d] = (float) (mean[d] / norm);
+        }
+      }
+    }
     var withSpans = encoder.embedWithSpans(text, new int[][] {{0, text.length()}});
 
     assertNotNull(withSpans);
     assertEquals(1, withSpans.chunkVectors().size());
     assertArrayEquals(
-        isolated.vector(),
+        expected,
         withSpans.chunkVectors().get(0),
         1e-4f,
-        "a single span covering the entire doc should pool the same tokens as an isolated embed");
+        "whole-content span must match the normalized mean of raw ORT content-token states");
   }
 
   @Test
