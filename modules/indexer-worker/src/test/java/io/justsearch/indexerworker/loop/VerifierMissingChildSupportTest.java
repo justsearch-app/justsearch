@@ -65,7 +65,8 @@ final class VerifierMissingChildSupportTest {
      assertAll(
       ()->h.assertFree(outage),
       ()->assertTrue(probes.get()>0,"the real shared child failure must run the built-in canary"),
-      ()->assertTrue(failures.stream().allMatch(t->t instanceof SandboxExtractionException && !t.getClass().getSimpleName().equals("SandboxServiceUnavailableException")),"real untaged child failure must reach the canary rule"),
+      ()->assertTrue(failures.stream().allMatch(t->t instanceof SandboxExtractionException),"every observed child failure must remain a sandbox extraction failure"),
+      ()->assertTrue(failures.stream().anyMatch(t->t instanceof SandboxExtractionException && !t.getClass().getSimpleName().equals("SandboxServiceUnavailableException")),"at least one real untyped child failure must exercise the canary rule"),
       ()->assertTrue(outage.stream().allMatch(r->r.retry()<=System.currentTimeMillis()+8_000),"bounded durable deadline"),
       ()->assertTrue(recycled<=1,"I2: no repeated lifecycle WARN per failed document/canary; actual="+recycled),
       ()->assertTrue(h.rows().stream().allMatch(r->r.state().equals("DONE") && r.attempts()==0),"prompt zero-attempt recovery through production parser child"));

@@ -732,7 +732,6 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineTestFixture.java",
@@ -741,7 +740,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/extract/VerifierNoOpAgent.java"
       ],
       "class": "New",
-      "behaviour": "Round-ten O8/O9/K1–K5: D9 real unknown child/protocol outages summarize logs and recover at zero attempts; a native identity capacity failure stays free despite passing real extraction; interleaved poison is charged immediately, follows its ladder or terminal FAILED policy; canonical source aliases always remain per-file; source-specific companions and actual document analyzer IO below temp are charged when the pipeline is healthy, and may defer during a proven outage (clarified K2); normal canary operations prove a real document-only SQLite value limit and roll back synthetic identity/path rows.",
+      "behaviour": "Round-ten O8/O9/K1–K5: D9 real unknown child/protocol outages summarize logs and recover at zero attempts; a native identity capacity failure stays free despite passing real extraction; interleaved poison is charged immediately, follows its ladder or terminal FAILED policy; canonical source aliases always remain per-file; source-specific companions and actual document analyzer IO below temp are charged when the pipeline is healthy, and may defer during a proven outage (clarified K2); normal canary operations prove a real document-only SQLite value limit and roll back synthetic identity/path rows. The missing-child-support oracle now has its own current Obsolete/New declarations and fresh source-bound evidence below; every other obligation and historical record in this entry remains unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -775,7 +774,6 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java"
       ],
@@ -1804,6 +1802,46 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java"
+      ],
+      "class": "Obsolete",
+      "behaviour": "Withdraw only the all-untyped constraint on every collected failure during actual missing child-support JAR outage. Fast child registration/startup refusal may be typed SandboxServiceUnavailableException while a later process write/read/EOF exit is plain SandboxExtractionException, in either order. No shared outage, canary, deadline/log, real fault or recovery obligation is withdrawn.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Settled U17/U19/O8 shared service availability, real canary for untyped failures and bounded zero-attempt recovery; explicit test-only child-support oracle correction. Product, faults/timeouts and all other assertions remain frozen.",
+          "label": "agent choice under explicit orchestrator design",
+          "choice": "The original allMatch rejected any valid typed startup signal even when actual untyped child exits and canary1 proved O8, and both rows remained uncounted and recovered. Hosted exact-head XML has three retries with only this assertion failing; it is an overconstraint, not a reproduced product failure."
+        }
+      ],
+      "conflictSearch": "Inspected PersistentExtractionSandbox acquireChild/spawn/write/read/discardAndClassify, DefaultChildControl.start/register, ManagedChild.fromProcess and actual typed/untagged JobBatchExtractor/BatchServiceFailures handling; searched docs/decisions for shared sandbox availability/canary semantics. Registration IOException wraps as startup-unavailable; post-acquisition broken pipe/EOF/non-OOM exit is a plain sandbox exception. No adopted source requires every observation to be untyped. This current oracle change is sourced by delegated settled pipeline intent, not by same-PR text or output alone."
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Actual missing support JAR produces only SandboxExtractionException-family failures and at least one genuine untyped/plain failure (not SandboxServiceUnavailableException); existing probes>0 independently proves O8 canary execution. Additional typed startup-unavailable signals are allowed in either order, but typed-only or empty observations cannot pass. Retain actual JAR deletion/restoration, all fixture/timing code, h.assertFree, bounded durable deadline, lifecycle WARN cap, live real-child repair and final DONE/attempts0 assertions.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Settled U17/U19/O8 shared service availability, real canary for untyped failures and bounded zero-attempt recovery; explicit test-only child-support oracle correction. Product, faults/timeouts and all other assertions remain frozen.",
+          "label": "agent choice under explicit orchestrator design",
+          "choice": "Use allMatch for the original sandbox family and anyMatch for a genuine untyped sandbox failure, retaining the existing simple-name typed exclusion so identical final source also compiles where the typed subclass did not exist. This is an oracle outcome correction, not Adaptation, product repair, exception injection, a seam, new option, thread or timing change. Real candidate execution and exactf8e16e3 original-defect failure are recorded; hosted original mixed-order failures stay immutable."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-child-support-mixed-oracle.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -2111,6 +2149,12 @@ The orchestrator selects a class/discovery/shard Adaptation only. Parent SharedS
 Existing class hashes assign parent−1198787594 to bucket0/ciUnitTest1 and child91988839 to bucket1/ciUnitTest2 with no overrides. Actual local XML reports17+20 unique states, all37 passing with0skips/duplicates. Actual ciUnitTest1 XML reports the parent17 once (269.390s) and the existing six architecture guardrails passing; actual ciUnitTest2 XML reports the child20 once (314.617s). Their disjoint union exactly equals local37. Runtime classpaths are identical and include superclass/support classes even when discovery excludes them. Existing maxParallelForks2 is unchanged; every writable resource is invocation-owned and the external test corpus is one prepopulated read-only two-file folder reused by all phases. Matrix Gradle calls run serially; no new concurrency framework is introduced. These are local measurements, not a claim that whole local runtime shrinks or that a hosted lane is green within its existing25-minute budget.
 
 Fresh final-source comparison on exact29f2a76f849b7f1742dc5d4f23b2350a2392803a reports32 preservation passes and five original registry/policy/structured assertion failures. The three registry failures charge a file; closed policy/structured providers instead violate the four-real-batch refusal assertion. Only four separately hashed absent probe API declarations are added in that owned before copy, all throw-only/fail-closed. Original loop/writer/extractor bytecode contains no call to any shim, and no fault/assertion is altered. The initial untracked evidence init script failed before matrix execution due to a configuration-cache closure reference; that failure is retained and never relabelled. Its exact-source compilation/PMD results remain valid. The corrected local run also passes the19 named admission/alias/probe/VM/read-only/Writer/reference checks. Parent fixture/method and source-consumer audits are retained. Entry15 keeps every remaining obligation and immutable historical D4; current matrix obligations move to the repaired-parent and preservation-child declarations. Child evidence binds parent source through both newChecks and explicit sourceDependencies. All old acceptance bytes remain unchanged; no independent acceptance is claimed. [Fresh D4](../evidence/systemic-batch-deferral-matrix-class-split.json), [raw XML/logs/hashes](../../../tmp/builder/class-split/).
+
+## Missing child-support mixed availability oracle
+
+The final child-support test now requires every observed failure to remain in the SandboxExtractionException family, at least one real untyped/plain failure, and the existing probes>0 canary oracle. Typed startup availability signals may coexist in either order; typed-only or empty observations still fail. All actual fault/fixture/timeouts, zero-attempt deferral, deadline/log cap and actual restoration/recovery assertions are unchanged. Code inspection and hosted stacks establish both paths: early exited-child identity capture can refuse registration and wrap as typed startup-unavailable; a child returned before exit can fail write/read/EOF and classify as plain sandbox exit. Immutable hosted original XML shows both orders in three retries, each failing only the old all-untyped assertion, with canary1/WARN1 and recovery at zero attempts. This is an Obsolete/New oracle correction under settled delegated pipeline intent, not Adaptation or a product repair.
+
+Fresh final-source actual ciUnitTest1:1 case passes,0skips, real missing-JAR child exits, canary1/WARN1, both rows deferred at attempts0 then DONE/attempts0 after support restoration (2709ms). Current local observations were plain exits; both mixed orders are proven by the actual hosted original observations and independent predicate checks, not claimed freshly forced on the candidate. Exactf8e16e326bf30acc885eebcca0064c0e0d91aaff with identical final test and unchanged fixture/agent support overlays compiles and runs1 case, failing the original shared-outage defect: both rows attempts1/RETRY_WITH_BACKOFF, canary0, minute-scale deadlines, WARN3 and no zero-attempt DONE. No product overlay/API shim or fault/assertion adaptation was needed. Entry14 retains every other obligation and its immutable historical D4; only this file's current obligation moves below. Matrix split and entries41–43 are untouched. Original source/D4/hosted XML, child-path audit, cheap typed-only rejection counterexample, exact commands/logs/XML and provenance are retained under tmp/builder/child-support-oracle. No source hash is transplanted; no independent acceptance is claimed. [Fresh D4](../evidence/systemic-batch-deferral-child-support-mixed-oracle.json).
 
 ## Acceptance records
 
