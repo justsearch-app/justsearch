@@ -38,7 +38,8 @@ public final class ConversationDeletion {
     StoreIds.requireValid(id);
     synchronized (keys) {
       if (conversations.isLocked() || runs.isLocked()) throw new KeyLockedException();
-      return conversations.getSessionMeta(id).isPresent()
+      return conversations.pendingDeletions().containsKey(id)
+          || conversations.getSessionMeta(id).isPresent()
           || !runs.listRunIdsByConversation(id).isEmpty();
     }
   }

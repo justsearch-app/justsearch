@@ -26,13 +26,9 @@ import java.util.Optional;
 public interface ConversationStore {
 
   /**
-   * Slice 516 FIX-T4 — prefix for internal throwaway sessions (currently the
-   * one-shot LLM call used for auto-title generation). The FE producer
-   * (TS: {@code ConversationListStore.generateConversationTitle}) MUST use
-   * this exact spelling; the Java consumer
-   * ({@code FileConversationStore.deleteSession}) references this constant
-   * to bypass the {@link BranchesPreventDeletionException} check. Renaming
-   * here requires updating the TS side in lockstep.
+   * Prefix identifying internal throwaway sessions. They cannot be branch parents. Any saved
+   * children from an older Engine still prevent deletion, preserving their inherited history;
+   * sessions without children can be cleaned up normally.
    */
   String THROWAWAY_SESSION_PREFIX = "_title_";
 

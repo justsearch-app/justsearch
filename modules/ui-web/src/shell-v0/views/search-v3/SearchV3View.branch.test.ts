@@ -273,6 +273,10 @@ function stubFetch(): void {
       if (record !== undefined) record.contextFloor = String(sent.floorMessageId ?? '');
       return { ok: true, status: 200, json: () => Promise.resolve({ ok: true }) };
     }
+    if (href.includes('/history?existsOnly=true') && backend.deletes.length > 0) {
+      const id = decodeURIComponent(href.split('/conversations/')[1]?.split('/')[0] ?? '');
+      return { ok: true, status: 200, json: async () => ({ exists: backend.conversations.some(c => c.sessionId === id) }) };
+    }
     if (href.includes('/api/chat/conversations') && href.endsWith('/history')) {
       const id = idIn('/history');
       backend.historyReads.push(id);
@@ -316,6 +320,12 @@ function stubFetch(): void {
     }
     if (href.includes('/api/chat/conversations')) {
       const query = new URL(href, 'http://engine.test').searchParams;
+      const childrenOf = query.get('childrenOf');
+      if (childrenOf !== null) return { ok: true, status: 200, json: async () => ({
+        childrenOf, locked: backend.historyLocked === true,
+        sessions: backend.conversations.filter(c => c.sessionId === childrenOf || c.parentSessionId === childrenOf)
+          .map(c => ({ ...c, busy: false })),
+      }) };
       const parent = query.get('parentSessionId');
       const point = query.get('branchPointMessageId');
       const rows = parent === null ? backend.conversations.slice(0, backend.recentLimit)
@@ -557,6 +567,7 @@ async function answerConfirm(el: Mounted, accept: boolean): Promise<string> {
   const message = dialog.shadowRoot?.textContent ?? '';
   await press(dialog.shadowRoot?.querySelector(accept ? '.confirm' : '.cancel'));
   await settle(el);
+  await new Promise(resolve => setTimeout(resolve, 210));
   return message;
 }
 
@@ -1358,18 +1369,20 @@ describe('deleting a conversation that has branches', () => {
     const message = await answerConfirm(el, true);
     // It NAMES what will go, by the label the reader knows the branch by rather than by its id —
     // the whole value of the second question is that it can be answered without guessing.
-    expect(message).toContain('has 1 branch forked from it');
-    expect(message).toContain('• branched');
-    expect(message).toContain('"why did the renewal fail?"');
+    expect(message).toContain('2 conversations');
+    expect(message).toContain('branched');
+    expect(message).toContain('uc-branch-branch-1');
+    expect(message).toContain('messages');
+    expect(message).toContain('why did the renewal fail?');
     // Children first, then the parent retried — the store function's own order, exercised.
-    expect(backend.deletes).toEqual(['uc-branch', 'uc-branch-branch-1', 'uc-branch']);
+    expect(backend.deletes).toEqual(['uc-branch-branch-1', 'uc-branch']);
     expect(backend.conversations).toEqual([]);
     // Only NOW do the rows go — parent and children together, because the store says both are gone.
     expect(el.sessions.sessions.map((s) => s.id)).not.toContain('uc-branch');
     expect(el.sessions.sessions.map((s) => s.id)).not.toContain('uc-branch-branch-1');
   });
 
-  it('promises ONE level, because a branch that was forked again is not deleted', async () => {
+  it('TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree', async () => {
     twoTurnConversation();
     const el = await mount();
     await openConversation(el);
@@ -1390,18 +1403,26 @@ describe('deleting a conversation that has branches', () => {
     await discardConversation(el, 'why did the renewal fail?');
     const message = await answerConfirm(el, true);
 
-    // THE COPY MATCHES THE BEHAVIOUR. "Deletes those branches too" would promise a depth this act
-    // refuses to perform, and the reader would be told a deletion happened that did not.
-    expect(message).toContain('A branch that has been forked again is not deleted');
-    // And it really does not: the child's own delete is refused, the cascade aborts, the parent is
-    // retried nowhere, and everything is still on the store.
-    expect(seen).toContain(DELETE_FAILED);
-    expect(backend.conversations.map((c) => c.sessionId)).toEqual([
-      'uc-branch',
-      'uc-branch-branch-1',
-      'uc-grandchild',
-    ]);
-    expect(el.sessions.sessions.map((s) => s.id)).toContain('uc-branch');
+    expect(message).toContain('3 conversations');
+    expect(message).toContain('forked again');
+    expect(message).toContain('uc-grandchild');
+    expect(backend.deletes).toEqual(['uc-grandchild', 'uc-branch-branch-1', 'uc-branch']);
+    expect(backend.conversations).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+
+  it('TD1 TD7 does not invent a creation date for an incomplete deletion record', async () => {
+    twoTurnConversation();
+    backend.conversations[0]!.createdAtMs = 0;
+    const el = await mount();
+    await openConversation(el);
+    await discardConversation(el, 'why did the renewal fail?');
+
+    expect(document.querySelector('jf-confirm-dialog')).not.toBeNull();
+    const message = await answerConfirm(el, false);
+    expect(message).toContain('Creation time unknown');
+    expect(message).not.toContain(new Date(0).toLocaleString());
+    expect(backend.deletes).toEqual([]);
   });
 
   it('leaves everything when the reader declines, and says nothing', async () => {
@@ -1416,7 +1437,7 @@ describe('deleting a conversation that has branches', () => {
 
     // Nothing was deleted, and the reader is NOT told an act failed — they were asked and said no.
     // Only the parent's own refused DELETE was ever issued.
-    expect(backend.deletes).toEqual(['uc-branch']);
+    expect(backend.deletes).toEqual([]);
     expect(backend.conversations.map((c) => c.sessionId)).toEqual([
       'uc-branch',
       'uc-branch-branch-1',
@@ -1446,7 +1467,7 @@ describe('deleting a conversation that has branches', () => {
     const seen = toasts();
     await discardConversation(el, 'why did the renewal fail?');
     await answerConfirm(el, true);
-    expect(seen.some(message => message.includes('1 branch deleted.')
+    expect(seen.some(message => message.includes('Deleted:')
       && message.includes('second branch') && message.includes('Stop the running agent.'))).toBe(true);
     expect(backend.conversations.map(c => c.sessionId)).toEqual(['uc-branch', 'child-two']);
   });
@@ -1464,8 +1485,8 @@ describe('deleting a conversation that has branches', () => {
     await openConversation(el);
     const seen = toasts();
     await discardConversation(el, 'why did the renewal fail?');
-    expect(document.querySelector('jf-confirm-dialog')).toBeNull();
-    expect(seen).toContain('Stop the running Ask in the other window.');
+    await answerConfirm(el, true);
+    expect(seen.some(m => m.includes('Stop the running Ask in the other window.'))).toBe(true);
     expect(el.sessions.sessions.map(s => s.id)).toContain('uc-branch');
   });
 
@@ -1480,8 +1501,8 @@ describe('deleting a conversation that has branches', () => {
 
     // A plain refusal is NOT the declined case and must not borrow its silence — the reader pressed
     // delete, nothing was deleted, and only one of those two facts is on screen without this.
-    expect(document.querySelector('jf-confirm-dialog')).toBeNull();
-    expect(seen).toContain(DELETE_FAILED);
+    await answerConfirm(el, true);
+    expect(seen.some(m => m.includes(DELETE_FAILED))).toBe(true);
     expect(backend.deletes).toEqual(['uc-branch']);
     expect(el.sessions.sessions.map((s) => s.id)).toContain('uc-branch');
   });
@@ -1544,7 +1565,7 @@ describe('CD3 confirmed conversation deletion', () => {
     expect(el.sessions.activeId).toBeNull();
     expect(sessionStorage.getItem('justsearch.lastViewedConversation.v1')).toBeNull();
     expect(turnsIn(await region(el, 'jf-sv3-main'))).toHaveLength(0);
-    expect(seen.some(m => m.includes('1 branch deleted.') && m.includes('first branch') && m.includes('second branch') && m.includes('Permission denied.'))).toBe(true);
+    expect(seen.some(m => m.includes('Deleted:') && m.includes('first branch') && m.includes('second branch') && m.includes('Permission denied.'))).toBe(true);
   });
 
   it('forgets a cached open conversation when a refreshed list confirms its deletion', async () => {

@@ -424,19 +424,44 @@ final class FileConversationStoreTest {
   }
 
   @Test
-  @DisplayName("Slice 516 FIX-T4: deleteSession bypasses the branches check for THROWAWAY_SESSION_PREFIX")
-  void deleteThrowawaySessionBypassesBranchesCheck(@TempDir Path tmp) {
+  void throwawayParentWithExistingChildCannotLoseInheritedHistory(@TempDir Path tmp) throws Exception {
     var store = new FileConversationStore(tmp);
-    // Set up a parent with a child branch so the bypass actually matters —
-    // were a non-throwaway session forged here, the deletion would 409.
+    store.createSession("_title_x", "core.free-chat");
+    store.appendMessage("_title_x", "core.free-chat", Map.of("id", "q", "role", "user", "content", "question"));
+    store.appendMessage("_title_x", "core.free-chat", Map.of("id", "a", "role", "assistant", "content", "answer"));
+    // A child saved by an older Engine must stay readable after branching is forbidden.
+    Files.createDirectory(tmp.resolve("uc-child"));
+    Files.writeString(tmp.resolve("uc-child/meta.json"),
+        "{\"parentSessionId\":\"_title_x\",\"branchPointMessageId\":\"a\",\"shapeId\":\"core.free-chat\"}");
+    var inherited = store.loadHistory("uc-child");
+    assertEquals(2, inherited.size());
+    assertThrows(BranchesPreventDeletionException.class, () -> store.deleteSession("_title_x"));
+    assertEquals(inherited, store.loadHistory("uc-child"));
+    assertEquals(2, store.loadHistory("_title_x").size());
+  }
+
+  @Test
+  void throwawayParentCannotAcquireNewBranches(@TempDir Path tmp) {
+    var store = new FileConversationStore(tmp);
+    store.createSession("_title_x", "core.free-chat");
+    store.appendMessage("_title_x", "core.free-chat", Map.of("id", "a", "role", "assistant", "content", "answer"));
+    for (String point : List.of("a", ConversationStore.EMPTY_PREFIX_SENTINEL)) {
+      assertThrows(IllegalArgumentException.class, () -> store.branchFrom("_title_x", point, "uc-child"));
+      assertFalse(Files.exists(tmp.resolve("uc-child")));
+    }
+  }
+
+  @Test
+  @DisplayName("TN4: throwaway cleanup succeeds without children while parents with children are protected")
+  void deleteThrowawaySessionWithoutChildren(@TempDir Path tmp) {
+    var store = new FileConversationStore(tmp);
+    // A different conversation has a dependent child and must stay protected.
     store.createSession("parent", "core.free-chat");
     store.appendMessage("parent", "core.free-chat", userMsg("hi"));
     var history = store.loadHistory("parent");
     String branchPoint = (String) history.get(0).get("id");
     store.branchFrom("parent", branchPoint, "child");
-    // Throwaway session with matching prefix; its meta points at parent as
-    // if it were a branch, but the bypass should still permit deletion
-    // since the prefix says "internal cleanup."
+    // This throwaway has no children; internal auto-title cleanup still succeeds.
     store.createSession(ConversationStore.THROWAWAY_SESSION_PREFIX + "auto-1", "core.free-chat");
     store.appendMessage(
         ConversationStore.THROWAWAY_SESSION_PREFIX + "auto-1",
