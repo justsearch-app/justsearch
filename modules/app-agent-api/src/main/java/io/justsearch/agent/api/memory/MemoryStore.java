@@ -26,6 +26,25 @@ public interface MemoryStore {
   /** User control — forget one item by id. No-op if absent. */
   void forget(String id);
 
+  /** An atomic read of records and their conditional-delete validators. */
+  default List<VersionedMemory> versionedMemories() {
+    return whatItKnows().stream().map(record -> new VersionedMemory(record, null)).toList();
+  }
+
+  /**
+   * Compare and delete atomically. Implementations without revision support refuse conditional
+   * writes; they must never silently fall back to an unconditional delete.
+   */
+  default ForgetResult forgetIf(String id, String revision) {
+    throw new UnsupportedOperationException("Conditional forget is not supported");
+  }
+
+  /** A null revision means this store does not support conditional writes. */
+  record VersionedMemory(MemoryRecord record, String revision) {}
+
+  /** A current record means the precondition failed; otherwise removed distinguishes absence. */
+  record ForgetResult(boolean removed, MemoryRecord current) {}
+
   /** User control — forget everything. */
   void clear();
 

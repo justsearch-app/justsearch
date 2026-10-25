@@ -305,6 +305,107 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
             + " an index that never recorded one");
   }
 
+  /** Real-model measurement only; no assertion on the pre-existing brake mismatch. */
+  @Test
+  @Timeout(600)
+  @org.junit.jupiter.api.condition.EnabledIfSystemProperty(
+      named = "tokenizer.memory.mode", matches = "during|after")
+  void repeatedBootCloseNativeTokenizerFloor(@TempDir Path tempDir) throws Exception {
+    String mode = System.getProperty("tokenizer.memory.mode");
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    try {
+      for (int cycle = 1; cycle <= 4; cycle++) {
+        var layout = WorkerBootFixture.layout(tempDir.resolve("cycle-" + cycle));
+        WorkerBootFixture.seed(layout.activePath(), null, 1);
+        WorkerBootFixture.seedInFlightGreen(layout, FOREIGN_SHAPE, 1);
+        String target = WorkerBootFixture.currentFingerprint();
+        for (int attempt = 0; attempt <= IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS; attempt++) {
+          layout.genManager().recordAutoRebuildAttempt(target);
+        }
+        WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+        try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+            var initializing = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+          var created = new java.util.concurrent.CountDownLatch(1);
+          var proceed = new java.util.concurrent.CountDownLatch(1);
+          var actual = mode.equals("during")
+              ? org.mockito.Mockito.spy(new KnowledgeServer(executors, WorkerBootFixture.workerConfig(layout.dataDir())))
+              : new KnowledgeServer(executors, WorkerBootFixture.workerConfig(layout.dataDir()));
+          if (mode.equals("during")) {
+            org.mockito.Mockito.doAnswer(start -> {
+              Runnable initializer = start.getArgument(0);
+              actual.deferredModelInit = java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try (var factory = org.mockito.Mockito.mockStatic(
+                    io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder.class,
+                    org.mockito.Mockito.CALLS_REAL_METHODS)) {
+                  factory.when(() -> io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder.buildAssembly(
+                      org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                      org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                      org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any()))
+                      .thenAnswer(call -> {
+                        Object assembly = call.callRealMethod();
+                        created.countDown();
+                        assertTrue(proceed.await(90, java.util.concurrent.TimeUnit.SECONDS));
+                        return assembly;
+                      });
+                  initializer.run();
+                }
+              }, initializing);
+              return null;
+            }).when(actual).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
+          }
+          try {
+            actual.start();
+            if (mode.equals("after")) {
+              actual.deferredModelInit.get(90, java.util.concurrent.TimeUnit.SECONDS);
+              var indexOwner = (EncoderSet) QueryPrewarmFixture.field(actual, "initialEncoderSet");
+              var queryOwner = (QueryRoleSet) QueryPrewarmFixture.field(actual, "initialQueryRoleSet");
+              assertNotNull(indexOwner, "real initialization must publish the index owner");
+              assertNotNull(queryOwner, "real initialization must publish the query owner");
+              var indexModels = indexOwner.surfaceForOwner();
+              var queryModels = queryOwner.surfaceForOwner();
+              assertTrue(indexModels.embedding().isPresent() && indexModels.ner().isPresent()
+                  && indexModels.splade().isPresent() && queryModels.reranker().isPresent()
+                  && queryModels.citation().isPresent(), "all five real tokenizer roles must be loaded");
+              actual.close();
+            } else {
+              assertTrue(created.await(90, java.util.concurrent.TimeUnit.SECONDS),
+                  "real embedding assembly must reach tokenizer creation");
+              var closing = java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try { actual.close(); }
+                catch (Exception failure) { throw new java.util.concurrent.CompletionException(failure); }
+              });
+              try {
+                ((java.util.concurrent.CompletableFuture<?>) QueryPrewarmFixture.field(actual, "closeStartedSignal"))
+                    .get(10, java.util.concurrent.TimeUnit.SECONDS);
+              } finally { proceed.countDown(); }
+              closing.get(90, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            assertTrue(actual.awaitClosed(0));
+          } finally {
+            proceed.countDown();
+            actual.close();
+          }
+        }
+        System.gc();
+        Thread.sleep(35_000);
+        var memory = Files.readAllLines(Path.of("/proc/self/status")).stream()
+            .filter(line -> line.startsWith("VmRSS:") || line.startsWith("VmSwap:"))
+            .toList();
+        String row = "TOKENIZER_MEMORY_FLOOR mode=" + mode + " cycle=" + cycle
+            + " utc=" + java.time.Instant.now() + " memory=" + memory + "\n";
+        Path output = Path.of(System.getProperty("tokenizer.memory.output",
+            Path.of("tmp", "memory-" + mode + "-floors.log").toAbsolutePath().toString()));
+        Files.createDirectories(output.getParent());
+        Files.writeString(output, row, java.nio.file.StandardOpenOption.CREATE,
+            java.nio.file.StandardOpenOption.APPEND);
+        org.slf4j.LoggerFactory.getLogger(BrakeExhaustedWorkerServesReadOnlyTest.class)
+            .info("{}", row.stripTrailing());
+      }
+    } finally {
+      io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous);
+    }
+  }
+
   /** Exactly what the brake's ERROR message tells an operator to do: drop the three fields. */
   private static void clearAutoRebuildFieldsByHand(Path indexBase) throws Exception {
     Path statePath = indexBase.resolve("state.json");
