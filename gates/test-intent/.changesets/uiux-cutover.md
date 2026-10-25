@@ -779,3 +779,14 @@ Every source below is an agent choice under the quoted delegation, never owner-a
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "6ma6q1yy",
+  "verdict": "accept",
+  "digest": "sha256:7f5c50c98f9b1d2787988a60e32f1916abcd6373d873e2ab54cef311813cf0e4",
+  "note": "Expectation changes match delegated C1-C9/A1-A9 scope; independent declared digest and default-link before/after reruns inspected. This accepts test intent only. Product verdict is fail: real cold incoming alias/answer overwrites the migrated legacy draft after edit/navigation (C4/A1); see candidate-cold-draft-repro and after-edit-navigation evidence. Native focus and unexercised live variants remain limits."
+}
+```
