@@ -2061,3 +2061,14 @@ Round-20 verification: exact HEAD b1d1a8a624 fails both new check files with the
   "note": "Reject: transient java.io source failures defer uncounted, and a nonfatal canary error strands PROCESSING claims."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16e84-f2d4-75f1-bf3c-4ead2cb6497a",
+  "verdict": "reject",
+  "digest": "sha256:5b12eb0cda01ccdfbdce31aeed5cb067865205f686433e317a53a4890686e516",
+  "note": "Persistent source EIO is deferred uncounted, and admission-read failures starve healthy peers with zero retry deadlines and one-second error loops."
+}
+```
