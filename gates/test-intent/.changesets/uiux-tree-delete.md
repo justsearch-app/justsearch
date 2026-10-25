@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: 01a16851-2fb9-75c1-bc0b-81091fc6bb24
+author-session: 01a172e9-8bc9-7022-be84-dd3330861516
 ---
 
 # Test-intent entries
@@ -724,12 +724,71 @@ Agent choices adopted under the user's quoted delegation; never owner words. All
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts#F2 renders every validated tree member when saved parent casing differs"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Durable TD10a regression checks: active single/three-level removal, disconnected screen, lost response and partial cascade, reload during deletion, reconnect/duplicate reports, and a send waiting on context preserve the current draft while retiring only the deleted transcript. All seven checks fail by erased-text assertions on e8c52c8a3a.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "TD10a",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement; agreed WP1.4b scenarios, TD10a clarification, 2026-10-25",
+          "delegationScope": "The remaining UI/UX work; WP1.4b TD8–TD10 and agent-adopted TD10a draft ownership during asynchronous removal.",
+          "choice": "Server-confirmed deletion closes only the deleted transcript and retires its restore pointer. Current unsent text, caret and composer focus survive single and three-level deletion, partial or lost outcomes, reconnect, duplicate reports and reload under existing durable-draft semantics. Completion must not overwrite newer conversation/tab/screen state, resurrect a deleted conversation, send the draft, or restore cleared/sent text.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-draft.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a 1-level active removal keeps the draft typed before completion",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a 3-level active removal keeps the draft typed before completion",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a removal while the screen is disconnected preserves the retained draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a a lost response closes the confirmed transcript without erasing the draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a reload during removal keeps the draft when authoritative deletion arrives",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a reconnect and duplicate reports preserve the current draft without continuing deletion",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a a follow-up waiting on context cannot resurrect the removed conversation or send its draft"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Durable TD10a preservation checks: inactive removal/newer conversation, cancellation, server refusal, empty composer and a concurrent send elsewhere with a late failure. No invented/restored text or unintended send. Pass before and after.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "scenario": "TD10a",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement; agreed WP1.4b scenarios, TD10a clarification, 2026-10-25",
+          "delegationScope": "The remaining UI/UX work; WP1.4b TD8–TD10 and agent-adopted TD10a draft ownership during asynchronous removal.",
+          "choice": "Server-confirmed deletion closes only the deleted transcript and retires its restore pointer. Current unsent text, caret and composer focus survive single and three-level deletion, partial or lost outcomes, reconnect, duplicate reports and reload under existing durable-draft semantics. Completion must not overwrite newer conversation/tab/screen state, resurrect a deleted conversation, send the draft, or restore cleared/sent text.",
+          "label": "agent choice, adopted under the user's delegation"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-tree-delete-draft-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a inactive removal and late completion preserve a newer conversation draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a cancel never invents or restores draft text",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a refused never invents or restores draft text",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a empty never invents or restores draft text",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts#TD10a a concurrent send elsewhere and its late failure cannot overwrite the next draft"
+      ]
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+The record below is historical and stale after the TD10a repair and added checks. It is retained append-only; the new candidate requires fresh independent acceptance. The author does not accept this work.
 
 ```json
 {

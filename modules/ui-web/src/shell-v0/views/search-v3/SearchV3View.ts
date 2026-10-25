@@ -1515,6 +1515,7 @@ export class SearchV3View extends JfElement {
       // CLAIM, which would push a history entry for a move the browser already made and truncate
       // the forward tail with it. See {@link resetToHero}.
       this.resetToHero();
+      this.composer?.clearDraft();
       // The pointer still follows: the tab is on the hero now, so a reload must not resurrect the
       // conversation the reader just left. This one is a browser-local write with no emission, so
       // it cannot reach the projector.
@@ -4359,13 +4360,16 @@ export class SearchV3View extends JfElement {
    */
   private startFreshSession(): void {
     this.resetToHero();
+    this.composer?.clearDraft();
     // New conversation means "do not restore the one I just left" (tempdoc 609 Phase 3).
     setActiveConversation(null);
     clearLastViewedConversation();
   }
 
   /**
-   * The hero teardown with NO claim — tempdoc 864 PR C, and the split matters more than it looks.
+   * The hero teardown without clearing the composer's unsent draft or making a claim.
+   * Explicit New/navigation callers clear the draft; confirmed deletion only retires the transcript.
+   * Tempdoc 864 PR C — the claim split matters more than it looks.
    *
    * {@link startFreshSession} is the reader STARTING a new session, so it claims: it writes the
    * app-wide pointer, which the URL projects as a navigation and therefore as a history entry.
@@ -4403,7 +4407,6 @@ export class SearchV3View extends JfElement {
     this.resultsTier = 'search';
     if (this.tierFollowsPlace) this.tier = SV3_TIER_DEFAULT;
     this.tierFollowsPlace = false;
-    this.composer?.clearDraft();
     void this.setComposerState('hero');
   }
 
