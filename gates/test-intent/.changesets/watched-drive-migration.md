@@ -124,7 +124,7 @@ exact revision, and its projection-verification refusal must appear in status.
         }
       ],
       "moved": "instrumentation",
-      "whatMoved": "The shared fixture captures its boot threads under their server start monitor, signals both migration and recorded groups independently, tracks one client-close future, and waits for real physical thread/executor/admission drain within a shared fixture budget. It retains stateful owners and backing files when incomplete. Existing HTTP/reload/search checks, data recovery and index ownership fence remain; production quiescence semantics are restored. HTTP stop and transport close now start independently once as tracked physical actions; their success and exit share the same monotonic budget, and failed cleanup retains private configuration and owners for retry."
+      "whatMoved": "The shared fixture captures its boot threads under their server start monitor, signals both migration and recorded groups independently, tracks one client-close future, and waits for real physical thread/executor/admission drain within a shared fixture budget. It retains stateful owners and backing files when incomplete. Existing HTTP/reload/search checks, data recovery and index ownership fence remain; production quiescence semantics are restored. HTTP stop and transport close now start independently once as tracked physical actions; their success and exit share the same monotonic budget, and failed cleanup retains private configuration and owners for retry. PMD-only normalization uses already imported List/Duration/mockingDetails names, without changing shutdown ordering, guards or waits."
     },
     {
       "items": [
@@ -291,6 +291,30 @@ exact revision, and its projection-verification refusal must appear in status.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#absentPreparationPreservesDoneFailedAndIssuedWaits"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/OutstandingHttpFailureCleanupIntegrationTest.java"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A real closed-client exchange refusal before handler entry must retain its original Exception/Error identity, suppress a later close-future failure, and physically retire the fixture and restore private globals. The before adapter executes snapshot d97 original finally when the test cleanup helper is absent; its impossible exit wait must cause the masking assertion failure, not a missing-method error.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Work autonomously; ask me only what its section 10 lists.",
+          "delegationLocation": "task drive-migration user turn 2026-10-25 takeover: autonomous completion of this existing repair",
+          "delegationScope": "Complete only the existing D1-D9/A1 watched-drive repair under reviewed A3: conditional current-byte preparation/ordered reconciliation and fixture-only physical shutdown, followed by required checks. No product lifecycle expansion.",
+          "label": "agent choice",
+          "choice": "A real closed-client exchange refusal before handler entry must retain its original Exception/Error identity, suppress a later close-future failure, and physically retire the fixture and restore private globals. The before adapter executes snapshot d97 original finally when the test cleanup helper is absent; its impossible exit wait must cause the masking assertion failure, not a missing-method error."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/watched-drive-pre-entry-cleanup.json",
+      "newChecks": [
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/OutstandingHttpFailureCleanupIntegrationTest.java#preEntryExchangeFailureKeepsItsIdentityAndClosesTheFixture"
+      ]
     }
   ]
 }

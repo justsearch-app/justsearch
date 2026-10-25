@@ -589,19 +589,11 @@ final class LinuxWatchedDriveReturnIntegrationTest {
         independentTransport = f.transport.isTerminated();
       }
       assertEquals(1, exited.getCount(), "the handler remains physically stalled even if cancellation closes its exchange");
-    } catch (Exception | AssertionError failure) {
+    } catch (Exception | Error failure) {
       bodyFailure = failure;
       throw failure;
     } finally {
-      release.countDown();
-      try {
-        assertTrue(exited.await(10, TimeUnit.SECONDS));
-        if (closing != null) closing.get(10, TimeUnit.SECONDS);
-        f.close(java.time.Duration.ofSeconds(10));
-      } catch (Exception | AssertionError cleanup) {
-        if (bodyFailure != null) bodyFailure.addSuppressed(cleanup);
-        else throw cleanup;
-      }
+      finishOutstandingHttpExchange(f, entered, release, exited, closing, bodyFailure);
     }
     assertTrue(withinBudget, "HTTP/transport cleanup must return within the caller's shared allowance");
     assertTrue(ownersRetained, "incomplete HTTP cleanup must retain stateful owners and private configuration");
@@ -609,6 +601,36 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     assertTrue(f.closed, "a released exchange must permit retry to physically drain and close owners");
     assertFalse(Thread.getAllStackTraces().keySet().stream().anyMatch(thread -> thread.isAlive()
         && (thread.getName().equals("fixture-http-stop") || thread.getName().equals("fixture-transport-close"))));
+  }
+
+  /** Only the outstanding-exchange control owns these signals and this fixture. */
+  static void finishOutstandingHttpExchange(Fixture fixture, CountDownLatch entered,
+      CountDownLatch release, CountDownLatch exited, CompletableFuture<?> closing,
+      Throwable bodyFailure) throws Exception {
+    Throwable first = bodyFailure;
+    release.countDown();
+    try {
+      if (entered.getCount() == 0) assertTrue(exited.await(10, TimeUnit.SECONDS));
+    } catch (Exception | Error cleanup) {
+      if (first == null) first = cleanup;
+      else first.addSuppressed(cleanup);
+    }
+    try {
+      if (closing != null) closing.get(10, TimeUnit.SECONDS);
+    } catch (Exception | Error cleanup) {
+      if (first == null) first = cleanup;
+      else first.addSuppressed(cleanup);
+    } finally {
+      try { fixture.close(java.time.Duration.ofSeconds(10)); }
+      catch (Exception | Error cleanup) {
+        if (first == null) first = cleanup;
+        else first.addSuppressed(cleanup);
+      }
+    }
+    if (bodyFailure == null && first != null) {
+      if (first instanceof Exception exception) throw exception;
+      throw (Error) first;
+    }
   }
 
   @Test
@@ -692,7 +714,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
         long start = System.nanoTime();
         var original = new AssertionError("body failure during stalled fixture cleanup");
         var observed = assertThrows(AssertionError.class, () -> {
-          try (AutoCloseable cleanup = () -> f.close(java.time.Duration.ofNanos(nanos))) {
+          try (AutoCloseable _ = () -> f.close(java.time.Duration.ofNanos(nanos))) {
             throw original;
           }
         });

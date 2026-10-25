@@ -587,7 +587,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     final KnowledgeClient client;
     final Javalin http;
     final HttpClient transport = HttpClient.newHttpClient();
-    final java.util.List<Thread> migrationThreads;
+    final List<Thread> migrationThreads;
     final java.util.concurrent.atomic.AtomicBoolean liveStartObserved = new java.util.concurrent.atomic.AtomicBoolean();
     java.util.concurrent.FutureTask<Void> clientClose;
     Thread clientCloser;
@@ -866,14 +866,14 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       }
     }
 
-    @Override public void close() throws Exception { close(java.time.Duration.ofSeconds(5)); }
+    @Override public void close() throws Exception { close(Duration.ofSeconds(5)); }
 
-    synchronized void close(java.time.Duration allowance) throws Exception {
+    synchronized void close(Duration allowance) throws Exception {
       if (closed) return;
       long deadline = System.nanoTime() + Math.max(0, allowance.toNanos());
       var failures = new java.util.ArrayList<Throwable>();
       boolean supported = !liveStartObserved.get()
-          && org.mockito.Mockito.mockingDetails(root.operationAttempts()).getInvocations().stream()
+          && mockingDetails(root.operationAttempts()).getInvocations().stream()
               .noneMatch(invocation -> invocation.getMethod().getName().equals("start"));
       if (!supported) failures.add(new AssertionError("Fixture cannot own live/recorded migration starters"));
       try {
@@ -882,7 +882,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       } catch (Exception | AssertionError failure) { failures.add(failure); }
       // Signal both boot-owned groups even if the independent recorded drain fails.
       for (Thread producer : migrationThreads) producer.interrupt();
-      try { root.quiesceProducers(java.time.Duration.ZERO); }
+      try { root.quiesceProducers(Duration.ZERO); }
       catch (Exception | AssertionError failure) { failures.add(failure); }
       if (clientClose == null) {
         clientClose = new java.util.concurrent.FutureTask<>(() -> { client.close(); return null; });
@@ -917,12 +917,12 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(5)));
         }
         remaining = deadline - System.nanoTime();
-        root.admission().awaitDrained(java.time.Duration.ofNanos(Math.max(0, remaining)));
+        root.admission().awaitDrained(Duration.ofNanos(Math.max(0, remaining)));
       } catch (Exception | AssertionError failure) {
         if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
         failures.add(failure);
       }
-      for (var action : java.util.List.of(httpClose, transportClose)) {
+      for (var action : List.of(httpClose, transportClose)) {
         try {
           long remaining = deadline - System.nanoTime();
           if (remaining > 0) action.get(remaining, TimeUnit.NANOSECONDS);
@@ -932,7 +932,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           failures.add(failure);
         }
       }
-      for (Thread closer : java.util.List.of(httpCloser, transportCloser)) {
+      for (Thread closer : List.of(httpCloser, transportCloser)) {
         long remaining = deadline - System.nanoTime();
         try { if (closer.isAlive() && remaining > 0) TimeUnit.NANOSECONDS.timedJoin(closer, remaining); }
         catch (InterruptedException failure) { Thread.currentThread().interrupt(); failures.add(failure); }
