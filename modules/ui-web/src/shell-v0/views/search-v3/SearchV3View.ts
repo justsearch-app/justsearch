@@ -261,7 +261,10 @@ import {
   setLastViewedConversation,
 } from '../../controllers/lastViewedConversation.js';
 // Tempdoc 609 §R — the shared reload-durable draft controller (T2.1) and its one-shot leave hint (T1.4).
+import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
+import { requestLoadAnyway, retryWording, type ChatRefusalDetail } from '../../state/chatResidency.js';
+import { isSv3Recovery, type Sv3Recovery, type Sv3RecoveryTask, type RecoveryShape } from './sv3-recovery.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
 import { discoverLiveAgentRun, type LiveRunRow } from '../../controllers/liveRuns.js';
@@ -439,6 +442,23 @@ const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
   messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
   locked: history.locked,
 });
+
+interface HumanTask {
+  saved: Sv3RecoveryTask;
+  question: string;
+  scope: Sv3AskScope | null;
+  scopeOwner: Sv3AskScope | null;
+  selection: SelectionPayload | null;
+  composer: Sv3Composer | null;
+  version: number | undefined;
+  epoch: number;
+  ownsComposer: boolean;
+  revoked: boolean;
+  restored: boolean;
+  context: ReturnType<typeof sv3FollowUpContext> | null;
+  refusal: ChatRefusalDetail | null;
+  retryAt: number;
+}
 
 export class SearchV3View extends JfElement {
   static styles = [
@@ -961,6 +981,254 @@ export class SearchV3View extends JfElement {
   private contextWrites = new Map<string, Promise<void>>();
   private contextNotices = new Map<string, string>();
   /** A refused send outlives context recovery: the reader may have typed a different draft. */
+  private humanTask: HumanTask | null = null;
+  private humanEpoch = 0;
+  private recoveryOpened = false;
+  private recoveryDrafts: Sv3Recovery['drafts'] = [];
+  private recoveryError = '';
+  private humanLoad: AbortController | null = null;
+  private humanRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private assigningHumanDraft = false;
+
+  private humanPlace(): string | null { return this.search.showing ? RESULTS_PLACE : this.sessions.activeId; }
+
+  private recoveryText(text: string, selection = this.humanTask?.selection ?? this.preparedHandoff?.selection): string {
+    // Explain's sender embeds this backend-owned block in its prepared draft. Keep only the
+    // instructions in the extra copy; the live request keeps the exact trace and needs reselection.
+    return selection?.kind === 'search-trace' && typeof selection.summary === 'string' && selection.summary
+      ? text.replaceAll(`\n\nRanking trace:\n${selection.summary}`, '') : text;
+  }
+
+  private recoveryPayload(task = this.humanTask): Sv3Recovery {
+    const place = this.humanPlace();
+    const drafts = [{ place, text: this.recoveryText(this.currentDraft(), task?.selection ?? this.preparedHandoff?.selection) }];
+    // A composer submission can create a conversation. New input then belongs to that target;
+    // a saved-turn action instead leaves its unrelated composer at the original place.
+    const origin = task?.saved.record === null ? task.saved.target ?? task.saved.place : task?.saved.place;
+    if (origin !== undefined && origin !== place) {
+      const text = this.placeDrafts.get(origin ?? '')
+        ?? this.recoveryDrafts.find(d => d.place === origin)?.text ?? '';
+      if (text !== '') drafts.push({ place: origin, text: this.recoveryText(text, task?.selection) });
+    }
+    for (const draft of this.recoveryDrafts) {
+      if (draft.text && !drafts.some(d => d.place === draft.place && d.text === draft.text)) drafts.push(draft);
+    }
+    return { task: task?.saved ?? null, drafts };
+  }
+
+  private saveRecovery(task = this.humanTask): boolean {
+    if (!this.recoveryOpened) return false;
+    const payload = this.recoveryPayload(task);
+    if (!this.draftPersistence.saveSessionAttachment(payload)) return false;
+    this.recoveryDrafts = payload.drafts.slice(1);
+    return true;
+  }
+
+  private openRecovery(): void {
+    if (this.recoveryOpened) return;
+    this.recoveryOpened = true;
+    const supported = ['core.rag-ask', 'core.free-chat', 'core.extract', 'core.summarize'];
+    const owner = this.shapeId && supported.includes(this.shapeId) ? this.shapeId : 'main';
+    const payload = this.draftPersistence.openSessionAttachment(`search-v3.${owner}`, isSv3Recovery,
+      () => this.recoveryPayload(), () => {
+        this.recoveryError = 'Recovery could not be saved safely. Keep or copy your text before leaving. No new question will be sent.';
+        this.requestUpdate();
+      });
+    if (!isSv3Recovery(payload)) return;
+    this.recoveryDrafts = payload.drafts.slice(1);
+    for (const draft of payload.drafts) {
+      if (draft.place !== null && draft.place !== this.humanPlace()) this.placeDrafts.set(draft.place, draft.text);
+    }
+    // Incoming work wins. A different nonempty raw draft may have been saved AFTER a failed
+    // attachment write: keep it in the composer and expose the extra session copy for review.
+    const current = payload.drafts[0];
+    if (current !== undefined && current.place === this.humanPlace()) {
+      if (!this.mountHasIncoming && !this.currentDraft()) this.writeDraft(current.text);
+      else if (current.text && current.text !== this.currentDraft()
+        && !this.recoveryDrafts.some(d => d.place === current.place && d.text === current.text)) this.recoveryDrafts.push(current);
+    } else if (current?.text && !this.recoveryDrafts.some(d => d.place === current.place && d.text === current.text)) this.recoveryDrafts.push(current);
+    if (payload.task !== null) {
+      this.humanTask = {
+        saved: payload.task, question: '', scope: null, scopeOwner: null, selection: null, composer: null,
+        version: undefined, epoch: this.humanEpoch, ownsComposer: false, revoked: true,
+        restored: true, context: null, refusal: null, retryAt: 0,
+      };
+    }
+    this.requestUpdate();
+  }
+
+  private readonly onHumanAssignment = (): void => {
+    if (this.assigningHumanDraft || (this.humanTask === null && this.recoveryDrafts.length === 0)) return;
+    if (this.humanTask !== null) this.revokeHumanTask();
+    this.saveRecovery();
+  };
+
+  /** Revocation is latched before any callback can arrive. Leaving never sends Stop. */
+  private revokeHumanTask(): void {
+    this.humanEpoch += 1;
+    if (this.humanTask !== null) this.humanTask.revoked = true;
+    this.humanLoad?.abort();
+    this.humanLoad = null;
+    if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
+    this.humanRetryTimer = null;
+    this.requestUpdate();
+  }
+
+  private readonly leaveHumanTask = (): void => { this.revokeHumanTask(); this.saveRecovery(); };
+
+  private readonly hideHumanTask = (): void => {
+    if (document.visibilityState === 'hidden') this.leaveHumanTask();
+  };
+
+  private humanOwned(task: HumanTask): boolean {
+    return this.isConnected && this.humanTask === task && !task.revoked && !task.restored
+      && this.humanEpoch === task.epoch && this.sessions.activeId === task.saved.target
+      && this.composer === task.composer && this.composer?.draftVersion === task.version;
+  }
+
+  private humanUnavailable(shape: RecoveryShape, continuation = false): string {
+    if (this.historyLocked) return reasonFor('conversations.locked').wording;
+    const availability = projectAvailability(shape === 'core.rag-ask' ? 'documents' : 'extract', this.aiSnapshot, true, continuation);
+    return availability.kind === 'unavailable' ? availability.reason : '';
+  }
+
+  private reserveHumanTask(question: string, scope: Sv3AskScope | null, schema: string | undefined,
+    shape: RecoveryShape, selection: SelectionPayload | null, ownsComposer: boolean,
+    record: string | null = null, authored?: string): HumanTask | null {
+    if (this.humanTask !== null) {
+      this.recoveryError = 'Review the retained question, then explicitly discard it before starting another submission.';
+      this.requestUpdate(); return null;
+    }
+    if (this.recoveryDrafts.some(d => d.text && (d.place !== this.humanPlace() || d.text !== this.currentDraft()))) {
+      this.recoveryError = 'Review the extra recovered draft and discard its recovery copy before a new submission.';
+      this.requestUpdate(); return null;
+    }
+    const task: HumanTask = {
+      saved: { id: crypto.randomUUID(), place: this.humanPlace(), target: this.sessions.activeId,
+        raw: this.recoveryText(authored ?? (ownsComposer ? this.currentDraft() : record === null ? question : ''), selection), schema: schema ?? null,
+        shape, scope: [...(scope?.paths ?? [])], record, needsReselection: selection !== null,
+        effort: this.effort, delivery: 'unaccepted' },
+      question, scope: scope === null ? null : { paths: [...scope.paths] }, scopeOwner: scope,
+      selection: selection === null ? null : structuredClone(selection), composer: this.composer,
+      version: this.composer?.draftVersion, epoch: this.humanEpoch, ownsComposer,
+      revoked: false, restored: false, context: null, refusal: null, retryAt: 0,
+    };
+    // Reserve before context waits or forks. A failed ACK never sacrifices live input or old bytes.
+    if (!this.saveRecovery(task)) return null;
+    this.humanTask = task;
+    this.recoveryError = '';
+    this.requestUpdate();
+    return task;
+  }
+
+  private retireHumanTask(task: HumanTask): void {
+    if (this.humanTask !== task) return;
+    // Preserve companion drafts in the bounded attachment, even after acceptance/discard.
+    const payload = this.recoveryPayload(task);
+    payload.task = null;
+    if (!this.draftPersistence.saveSessionAttachment(payload)) { task.revoked = true; return; }
+    this.recoveryDrafts = payload.drafts.slice(1);
+    this.humanTask = null;
+    this.recoveryError = '';
+    this.requestUpdate();
+  }
+
+  private discardHumanTask(): void {
+    this.revokeHumanTask();
+    if (this.humanTask !== null) {
+      const task = this.humanTask;
+      this.retireHumanTask(task);
+      if (this.humanTask === null) {
+        if (task.saved.place !== null) this.refusedQuestions.delete(task.saved.place);
+        if (task.saved.target !== null) this.refusedQuestions.delete(task.saved.target);
+      }
+    }
+  }
+
+  private discardRecoveryDraft(place: string | null, text: string): void {
+    const previous = this.recoveryDrafts;
+    this.recoveryDrafts = previous.filter(d => d.place !== place || d.text !== text);
+    if (!this.saveRecovery()) this.recoveryDrafts = previous;
+    else this.recoveryError = '';
+    this.requestUpdate();
+  }
+
+  private async continueHumanTask(force: boolean): Promise<void> {
+    const task = this.humanTask;
+    if (task === null || this.humanLoad !== null || this.streaming || !this.humanOwned(task)
+      || task.saved.delivery !== 'unaccepted' || task.refusal === null
+      || (force ? task.refusal.forceAllowed !== true : Date.now() < task.retryAt)) return;
+    const operation = new AbortController();
+    this.humanLoad = operation;
+    this.requestUpdate();
+    try {
+      if (force) {
+        const result = await requestLoadAnyway(this.apiBase,
+          (input, init) => authorizedFetch(input, { ...init, signal: operation.signal }, { retry: false }));
+        if (!this.humanOwned(task) || operation.signal.aborted) return;
+        if (!result.ok) {
+          task.refusal = result.refusal;
+          task.retryAt = Date.now() + (result.refusal?.retryAfterMs ?? 0);
+          this.scheduleHumanRetry(task);
+          this.recoveryError = result.refusal?.message ?? 'Chat could not be loaded. The question is retained.';
+          return;
+        }
+      }
+      if (!this.humanOwned(task) || operation.signal.aborted) return;
+      const reason = this.humanUnavailable(task.saved.shape, force);
+      const session = task.saved.target === null ? null : sessionById(this.sessions, task.saved.target);
+      const context = task.saved.shape === SV3_MODEL_SHAPE_ID || session === null ? []
+        : session.history === null && task.saved.place === null && session.turns.length === 0 ? []
+        : session.history === null ? null : sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
+      if (reason || (task.saved.target !== null && this.contextWrites.has(task.saved.target))
+        || JSON.stringify(context) !== JSON.stringify(task.context)) {
+        task.revoked = true;
+        this.recoveryError = reason || 'Saved context changed. Review the retained question before a new submission.';
+        return;
+      }
+      await this.runAsk(task.question, task.scope, task.saved.schema ?? undefined,
+        task.saved.shape === SV3_MODEL_SHAPE_ID, { task, continuation: force });
+    } catch {
+      if (!operation.signal.aborted) this.recoveryError = 'Chat could not be loaded. The question is retained.';
+    } finally {
+      if (this.humanLoad === operation) this.humanLoad = null;
+      this.requestUpdate();
+    }
+  }
+
+  private scheduleHumanRetry(task: HumanTask): void {
+    if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
+    // A timer only refreshes the affordance. It never issues a request.
+    this.humanRetryTimer = setTimeout(() => { this.humanRetryTimer = null; this.requestUpdate(); }, Math.min(2147483647, Math.max(0, task.retryAt - Date.now())));
+  }
+
+  private recoveryNotice(): TemplateResult | typeof nothing {
+    const task = this.humanTask;
+    const companions = this.recoveryDrafts.filter(d => d.text && (d.place !== this.humanPlace() || d.text !== this.currentDraft()));
+    if (task === null && !this.recoveryError && companions.length === 0 && this.aiSnapshot?.chatUnloadedReason == null) return nothing;
+    const eligible = task !== null && this.humanOwned(task) && task.saved.delivery === 'unaccepted' && task.refusal !== null;
+    return html`<div class="notice" role="status" data-testid="sv3-residency-notice">
+      ${task === null ? nothing : html`<p>${task.saved.delivery === 'unknown'
+        ? 'Delivery unknown—check the saved conversation before making a new submission.'
+        : task.saved.delivery === 'unaccepted' ? 'Question not sent.' : 'Review the retained question before a new submission.'}</p>
+        <pre>${task.saved.raw || (task.saved.record ? 'Saved question: ' + task.saved.record : '')}</pre>
+        <p>${task.refusal?.message ?? ''} ${task.refusal ? retryWording(task.refusal) : ''}</p>
+        ${task.saved.needsReselection || task.restored ? html`<p>Review the original mode, schema and files. Reselect any passage before sending. Restored copies never send automatically.</p>` : nothing}
+        ${eligible ? html`<button type="button" data-testid="sv3-residency-retry" ?disabled=${this.humanLoad !== null || this.streaming || Date.now() < task.retryAt}
+          @click=${() => { void this.continueHumanTask(false); }}>Retry</button>
+          ${task.refusal?.forceAllowed === true ? html`<button type="button" data-testid="sv3-residency-force" ?disabled=${this.humanLoad !== null || this.streaming}
+            @click=${() => { void this.continueHumanTask(true); }}>Load anyway</button>` : nothing}` : nothing}
+        ${this.humanLoad !== null ? html`<button type="button" data-testid="sv3-residency-stop" @click=${() => { this.revokeHumanTask(); this.saveRecovery(); }}>Stop waiting</button>` : nothing}
+        <button type="button" data-testid="sv3-residency-discard" ?disabled=${this.streaming}
+          @click=${this.discardHumanTask}>Discard retained task; allow a new submission</button>`}
+      ${companions.map(draft => html`<p>Recovered draft (${draft.place ?? 'new conversation'}):</p><pre>${draft.text}</pre>
+        <button type="button" @click=${() => this.discardRecoveryDraft(draft.place, draft.text)}>Discard this extra recovery copy</button>`)}
+      ${task !== null || companions.length > 0 ? html`<p>Extra recovery copies last only for this tab session. They are not permanent history and may be lost when the tab or app closes. Your current draft uses normal draft saving.</p>` : nothing}
+      ${this.recoveryError ? html`<p role="alert">${this.recoveryError}</p>` : nothing}
+      ${task === null && this.aiSnapshot?.chatUnloadedReason ? html`<p>${reasonFor(this.aiSnapshot.chatUnloadedReason).wording}</p>` : nothing}
+    </div>`;
+  }
+
   private refusedQuestions = new Map<string, string>();
   private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private contextRetryDelay = 1000;
@@ -1169,6 +1437,8 @@ export class SearchV3View extends JfElement {
       if (this.shapeId) this.prepareCompatibilityShape();
     }
     this.settleMountDraft();
+    document.addEventListener('visibilitychange', this.hideHumanTask);
+    window.addEventListener('pagehide', this.leaveHumanTask);
     this.inspectorUnsubscribe = subscribeInspector(state => {
       if (state.isOpen && state.selected?.path) {
         this.openPane({ docPath: state.selected.path, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT, anchor: null });
@@ -1253,6 +1523,10 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.revokeHumanTask();
+    this.saveRecovery();
+    document.removeEventListener('visibilitychange', this.hideHumanTask);
+    window.removeEventListener('pagehide', this.leaveHumanTask);
     // BEFORE `super`, which is what tears the shadow tree's controllers down: the reassurance has to
     // read the draft while the composer still holds it (tempdoc 609 §R T1.4 — instance retention
     // keeps the draft, and this is what makes that invisible guarantee legible, once per session).
@@ -1495,9 +1769,11 @@ export class SearchV3View extends JfElement {
   private settleMountDraft(): void {
     if (!this.isConnected || !this.mountDraftPending || this.initialNavigationPending) return;
     this.mountDraftPending = false;
-    if (this.shapeId || this.mountHasIncoming) return;
-    this.draftPersistence.adoptLegacy('unified-chat.composer');
-    this.restoreLastViewed();
+    if (!this.shapeId && !this.mountHasIncoming) {
+      this.draftPersistence.adoptLegacy('unified-chat.composer');
+      this.restoreLastViewed();
+    }
+    this.openRecovery();
   }
 
   /**
@@ -1857,6 +2133,7 @@ export class SearchV3View extends JfElement {
       this.openContextInspector();
       return Promise.resolve();
     }
+    this.revokeHumanTask();
     const turn = detail.turnId === undefined ? null : sv3TurnContextFor(this.turnContexts(), detail.turnId);
     const previous = this.contextWrites.get(session.id) ?? Promise.resolve();
     const pending = previous.then(() => this.writeContext(session.id, detail, turn)).finally(() => {
@@ -2117,11 +2394,32 @@ export class SearchV3View extends JfElement {
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
     const tier: Sv3ComposerTier | 'model' = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
+    const summary = turn?.shapeId === 'core.summarize';
+    const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
+    let humanTask: HumanTask | undefined;
+    if (detail.action !== 'branch' && tier !== 'delegate') {
+      const shape: RecoveryShape = summary ? 'core.summarize' : tier === 'structured' ? 'core.extract' : tier === 'model' ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID;
+      const reason = this.humanUnavailable(shape);
+      if (reason) { emitEphemeralToast({ message: reason, severity: 'warning' }); return; }
+      if (lineage.forkKey === null || text === '' || (detail.action === 'edit' && !lineage.canEdit)) return;
+      const inputs = summary ? this.summaryInputs.get(detail.turnId) : this.structuredInputs.get(detail.turnId);
+      // Missing schema/passage already has an explicit review path below, with no dispatch.
+      if ((!summary && tier !== 'structured') || inputs !== undefined) {
+        const task = this.reserveHumanTask(text,
+          summary ? this.summaryInputs.get(detail.turnId)?.scope ?? null
+            : tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.scope ?? null : this.search.scopeOfTurn(detail.turnId),
+          tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.schema : undefined,
+          shape, summary ? this.summaryInputs.get(detail.turnId)?.selection ?? null : null,
+          false, lineage.forkKey, detail.action === 'edit' ? detail.text : undefined);
+        if (task === null) return;
+        humanTask = task;
+      }
+    }
     if (turn?.shapeId === 'core.summarize' && detail.action !== 'branch') {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn.question;
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
       const inputs = this.summaryInputs.get(turn.id);
-      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask')) return;
+      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask', null, humanTask)) return;
       this.tier = 'ask';
       this.preparedHandoff = { shapeId: 'core.summarize', selection: inputs?.selection ?? null };
       if (inputs === undefined) {
@@ -2132,7 +2430,7 @@ export class SearchV3View extends JfElement {
         this.writeDraft(text);
         this.requestUpdate();
       } else {
-        await this.runAsk(text, inputs.scope);
+        await this.runAsk(text, inputs.scope, undefined, false, { task: humanTask, turnAction: true });
       }
       return;
     }
@@ -2140,14 +2438,14 @@ export class SearchV3View extends JfElement {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
       const inputs = this.structuredInputs.get(detail.turnId);
-      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier)) return;
+      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier, null, humanTask)) return;
       this.tier = 'structured';
       this.tierFollowsPlace = false;
       if (inputs === undefined) {
         this.writeDraft(text);
         this.requestUpdate();
       } else {
-        await this.runAsk(text, inputs.scope, inputs.schema);
+        await this.runAsk(text, inputs.scope, inputs.schema, false, { task: humanTask, turnAction: true });
       }
       return;
     }
@@ -2171,6 +2469,7 @@ export class SearchV3View extends JfElement {
           question,
           tier,
           this.search.scopeOfTurn(detail.turnId),
+          humanTask,
         );
         return;
       }
@@ -2184,6 +2483,7 @@ export class SearchV3View extends JfElement {
           text,
           tier,
           this.search.scopeOfTurn(detail.turnId),
+          humanTask,
         );
         return;
       }
@@ -2199,8 +2499,8 @@ export class SearchV3View extends JfElement {
    * and no other run in flight on the one shared controller.
    */
   private canRerun(tier: Sv3ComposerTier | 'model'): boolean {
-    if (tier !== 'delegate' && tier !== 'model') return true;
-    const unavailable = tier === 'model' ? this.modelAnswerUnavailableReason : this.delegateUnavailableReason;
+    const unavailable = tier === 'delegate' ? this.delegateUnavailableReason
+      : this.humanUnavailable(tier === 'model' ? SV3_MODEL_SHAPE_ID : tier === 'structured' ? 'core.extract' : SV3_ASK_SHAPE_ID);
     if (unavailable !== '') {
       emitEphemeralToast({ message: unavailable, severity: 'warning' });
       return false;
@@ -2230,6 +2530,7 @@ export class SearchV3View extends JfElement {
     resend: string | null,
     tier: Sv3ComposerTier | 'model',
     scope: Sv3AskScope | null = null,
+    task?: HumanTask,
   ): Promise<boolean> {
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
     // (`:1485`): it is what makes the new session surface as a recent one with a name.
@@ -2239,7 +2540,8 @@ export class SearchV3View extends JfElement {
       emitEphemeralToast({ message: BRANCH_FAILED, severity: 'warning' });
       return false;
     }
-    await this.openBranch(branched);
+    if (task !== undefined && !this.humanOwned(task)) return false;
+    await this.openBranch(branched, task);
     if (resend === null) return true;
     // The same ORDER for both tiers: the branch is claimed first, so the re-run lands in it.
     // An ask re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this
@@ -2255,11 +2557,8 @@ export class SearchV3View extends JfElement {
       }
       this.delegate(resend);
     } else {
-      if (tier === 'model' && !this.canRerun(tier)) {
-        this.writeDraft(resend);
-        return true;
-      }
-      await this.runAsk(resend, scope, undefined, tier === 'model');
+      if (!this.canRerun(tier)) return true;
+      await this.runAsk(resend, scope, undefined, tier === 'model', { task, turnAction: true });
     }
     return true;
   }
@@ -2272,14 +2571,19 @@ export class SearchV3View extends JfElement {
    * Re-listing updates recents and invalidates complete fork reads, including older versions
    * outside the sidebar window. The fork reads finish independently of opening or sending.
    */
-  private async openBranch(id: string): Promise<void> {
+  private async openBranch(id: string, task?: HumanTask): Promise<void> {
     const prevId = this.sessions.activeId;
-    this.swapPlace(id);
+    this.swapPlace(id, task);
     const now = Date.now();
     this.sessions = mergeStoreConversations(this.sessions, [
       { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
     ]);
     this.sessions = focusSession(this.sessions, id, now);
+    if (task !== undefined) {
+      task.saved.target = id;
+      task.version = this.composer?.draftVersion;
+      this.saveRecovery(task);
+    }
     this.claimConversation(id);
     this.recordNotice = false;
     // The same rule `onSessionSelect` applies: an edit in another row is DROPPED rather than
@@ -3077,6 +3381,8 @@ export class SearchV3View extends JfElement {
 
   /** Back/Forward onto the bare address while this window has a result list. */
   private returnToResults(): void {
+    this.revokeHumanTask();
+    this.saveRecovery();
     const leaving = this.sessions.activeId;
     if (leaving !== null) this.placeDrafts.set(leaving, this.currentDraft());
     this.renamingId = null;
@@ -3104,7 +3410,8 @@ export class SearchV3View extends JfElement {
    * no longer on screen, and Enter continues the conversation rather than searching away from it.
    * Leaving the hero is not leaving a place: its draft travels, as it always has.
    */
-  private swapPlace(to: string): void {
+  private swapPlace(to: string, task?: HumanTask): void {
+    if (this.sessions.activeId !== to && task !== this.humanTask) { this.revokeHumanTask(); this.saveRecovery(); }
     const leavingHandoff = this.preparedHandoff !== null;
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
@@ -3115,7 +3422,10 @@ export class SearchV3View extends JfElement {
     this.search.hide();
     this.askInConversation();
     const composer = this.composer;
-    if ((from !== null || this.placeDrafts.has(to)) && composer !== null) composer.draft = this.placeDrafts.get(to) ?? '';
+    if ((from !== null || this.placeDrafts.has(to)) && composer !== null) {
+      this.assigningHumanDraft = task !== undefined;
+      try { composer.draft = this.placeDrafts.get(to) ?? ''; } finally { this.assigningHumanDraft = false; }
+    }
     if (leavingHandoff || this.placeScopes.has(to)) {
       this.search.clearScope();
       this.search.prepare(this.placeScopes.get(to) ?? null);
@@ -3159,6 +3469,7 @@ export class SearchV3View extends JfElement {
   private onCardSelection(event: Event): void {
     const detail = (event as CustomEvent<CardSelectionDetail>).detail;
     if (detail === undefined) return;
+    this.revokeHumanTask();
     this.search.select(detail.ids);
     if (this.tier === 'structured' && this.search.showing && this.search.prepareFromSelection() === null) {
       this.search.clearScope();
@@ -3188,10 +3499,6 @@ export class SearchV3View extends JfElement {
   }
 
   private onResultsAsk(): void {
-    if (this.askUnavailableReason !== '') {
-      this.refuseAsk();
-      return;
-    }
     this.prepareAsk(this.search.prepareFromSelection());
   }
 
@@ -3201,14 +3508,18 @@ export class SearchV3View extends JfElement {
    * existing reason when chat cannot run, keeping the query and the choice (S1.4).
    */
   private prepareAsk(scope: Sv3AskScope | null): void {
-    if (this.askUnavailableReason !== '') {
-      this.refuseAsk();
+    const unavailable = this.humanUnavailable(SV3_ASK_SHAPE_ID);
+    if (unavailable !== '') {
+      emitEphemeralToast({ message: unavailable, severity: 'warning' });
       return;
     }
     if (scope === null) {
       emitEphemeralToast({ message: SV3_RESULT_NO_DOCUMENT, severity: 'warning' });
       return;
     }
+    this.revokeHumanTask();
+    if (this.preparedHandoff !== null) this.preparedHandoff = { shapeId: SV3_ASK_SHAPE_ID, selection: null };
+    this.handoffNotice = ''; this.handoffBlocked = false;
     this.search.prepare(scope);
     this.tier = 'ask';
     this.tierFollowsPlace = false;
@@ -3220,7 +3531,7 @@ export class SearchV3View extends JfElement {
     const id = this.sessions.activeId;
     if (id !== null && this.contextWrites.has(id)) return this.contextNotice(id);
     if (this.historyLocked) return reasonFor('conversations.locked').wording;
-    return this.delegateUnavailableReason;
+    return this.humanUnavailable(SV3_MODEL_SHAPE_ID);
   }
 
   private onModelAnswer(event: Event): void {
@@ -3235,12 +3546,8 @@ export class SearchV3View extends JfElement {
       emitEphemeralToast({ message: reason, severity: 'warning' });
       return;
     }
-    void this.runAsk(turn.question, null, undefined, true);
+    void this.runAsk(turn.question, null, undefined, true, { turnAction: true, record: turn.id });
     void this.focusComposer();
-  }
-
-  private refuseAsk(): void {
-    emitEphemeralToast({ message: this.askUnavailableReason, severity: 'warning' });
   }
 
   /**
@@ -3255,8 +3562,10 @@ export class SearchV3View extends JfElement {
 
   /** The composer's availability, projected from the ONE observed-state authority. */
   private get askUnavailableReason(): string {
-    const availability = projectAvailability('documents', this.aiSnapshot);
-    return availability.kind === 'unavailable' ? availability.reason : '';
+    if (this.preparedHandoff?.shapeId === 'core.summarize') return this.humanUnavailable('core.summarize');
+    const modelOnly = this.preparedHandoff?.shapeId === SV3_MODEL_SHAPE_ID || (this.preparedHandoff === null
+      && (this.shapeId === SV3_MODEL_SHAPE_ID || this.activeSession?.turns.at(-1)?.shapeId === SV3_MODEL_SHAPE_ID));
+    return this.humanUnavailable(modelOnly ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID);
   }
 
   /**
@@ -3271,6 +3580,8 @@ export class SearchV3View extends JfElement {
    * §S4 remainder note in `docs/tempdocs/852-sv3-promotion.md` for what breaks if `agent` ever
    * grows a gate of its own.
    */
+  private get structuredUnavailableReason(): string { return this.humanUnavailable('core.extract'); }
+
   private get delegateUnavailableReason(): string {
     const availability = projectAvailability('agent', this.aiSnapshot);
     return availability.kind === 'unavailable' ? availability.reason : '';
@@ -3315,6 +3626,8 @@ export class SearchV3View extends JfElement {
     if (this.shapeId) return false;
     const incoming = takeSearchV3Handoff();
     if (incoming === null) return false;
+    this.revokeHumanTask();
+    this.saveRecovery();
     this.mountHasIncoming = true;
     const { state, selection } = incoming;
     const shape = typeof state.forceShapeId === 'string' ? state.forceShapeId : (state.affordance === 'extract' || state.mode === 'structured' ? 'core.extract'
@@ -3431,12 +3744,23 @@ export class SearchV3View extends JfElement {
    * busy send before it leaves, and the model action checks its own gate. This method
    * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
-  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false): Promise<void> {
+  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
+    options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
     if (question === '' || this.streaming) return;
-    if (modelAnswer && this.modelAnswerUnavailableReason !== '') return;
-    const handoff = modelAnswer ? null : this.preparedHandoff;
-    const shapeId = modelAnswer ? SV3_MODEL_SHAPE_ID : schema !== undefined ? 'core.extract' : handoff?.shapeId ?? SV3_ASK_SHAPE_ID;
+    const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
+      : modelAnswer ? null : this.preparedHandoff;
+    modelAnswer = modelAnswer || handoff?.shapeId === SV3_MODEL_SHAPE_ID
+      || (schema === undefined && handoff === null && (this.shapeId === SV3_MODEL_SHAPE_ID || this.activeSession?.turns.at(-1)?.shapeId === SV3_MODEL_SHAPE_ID));
+    const shapeId: RecoveryShape = modelAnswer ? SV3_MODEL_SHAPE_ID : schema !== undefined ? 'core.extract' : (handoff?.shapeId as RecoveryShape | null) ?? SV3_ASK_SHAPE_ID;
+    const unavailable = this.humanUnavailable(shapeId, options.continuation);
+    if (unavailable !== '') { emitEphemeralToast({ message: unavailable, severity: 'warning' }); return; }
+    if (schema !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(schema);
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object');
+      } catch { this.structuredError = 'Enter a JSON schema object.'; this.requestUpdate(); return; }
+    }
     // Keep the actual trace visible in the durable user turn even if its instructions were edited.
     if (shapeId === 'core.summarize' && handoff?.selection?.kind === 'search-trace') {
       const trace = handoff.selection.summary;
@@ -3448,8 +3772,12 @@ export class SearchV3View extends JfElement {
       return;
     }
     this.structuredError = '';
-    const composer = this.composer;
-    const draftRevision = composer?.draftRevision;
+    const task = options.task ?? this.reserveHumanTask(question, modelAnswer ? null : scope, schema, shapeId,
+      modelAnswer ? null : handoff?.selection ?? null, options.turnAction !== true, options.record ?? null, options.authored);
+    if (task === null || this.humanTask !== task) return;
+    if (options.task && !this.humanOwned(task)) return;
+    const composer = task.composer;
+    const draftVersion = task.version;
     const sessionId = this.sessions.activeId;
     if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
     let context: ReturnType<typeof sv3FollowUpContext> = [];
@@ -3468,12 +3796,26 @@ export class SearchV3View extends JfElement {
         this.contextAskPending.delete(sessionId);
       }
     }
+    if (!this.isConnected || this.sessions.activeId !== sessionId || this.humanTask !== task) return;
+    if (options.task && !this.humanOwned(task)) return;
+    if (options.task && task.context !== null && JSON.stringify(context) !== JSON.stringify(task.context)) {
+      task.revoked = true;
+      this.recoveryError = 'Saved context changed. Review the retained question before a new submission.';
+      this.requestUpdate();
+      return;
+    }
+    if (this.humanUnavailable(shapeId, options.continuation) !== '') { this.requestUpdate(); return; }
+    task.context = context.map(m => ({ ...m }));
+    task.saved.target = sessionId ?? createConversationId();
+    task.saved.delivery = 'unknown';
+    task.refusal = null;
+    if (!this.saveRecovery(task)) return;
     if (!modelAnswer) {
       this.preparedHandoff = null;
       this.handoffNotice = ''; this.handoffBlocked = false;
     }
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId, handoff?.selection?.kind);
+    this.sessions = submitInSession(this.sessions, task.question, Date.now(), modelAnswer ? 'model' : 'ask', task.saved.target!, shapeId, task.selection?.kind);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
@@ -3483,9 +3825,15 @@ export class SearchV3View extends JfElement {
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
     if (!modelAnswer) this.placeScopes.delete(ref.sessionId);
     this.claimConversation(ref.sessionId);
+    if (sessionId === null && task.ownsComposer) this.recoveryDrafts = this.recoveryDrafts.filter(d => d.place !== null);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (!modelAnswer && schema === undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
-    const sentDraftRevision = composer?.draftRevision;
+    if (task.ownsComposer && schema === undefined && this.composer === composer && composer?.draftVersion === draftVersion) {
+      this.assigningHumanDraft = true;
+      try { composer?.clearDraft(); } finally { this.assigningHumanDraft = false; }
+      task.version = composer?.draftVersion;
+    }
+    this.saveRecovery(task);
+    const sentDraftVersion = composer?.draftVersion;
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -3504,6 +3852,8 @@ export class SearchV3View extends JfElement {
     const stop = (): void => {
       if (stopAsked) return;
       stopAsked = true;
+      this.revokeHumanTask();
+      this.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
       if (ask === undefined) return;
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
@@ -3581,17 +3931,17 @@ export class SearchV3View extends JfElement {
         apiBase: this.apiBase,
         schema,
         shapeId,
-        selection: handoff?.selection,
-        question,
+        selection: task.selection,
+        question: task.question,
         conversationId: ref.sessionId,
         modelAnswer,
         // The rung AS OF THIS SEND (tempdoc 822 Phase F10). Read here rather than inside the ask
         // client, so the one place a question is dispatched is also the one place its parameters
         // are decided — and a rung changed mid-stream cannot rewrite a request already in flight.
-        effort: this.effort,
+        effort: task.saved.effort,
         // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
         // never an empty list standing in for a choice, which would mean the whole index.
-        ...(scope !== null ? { docIds: scope.paths } : {}),
+        ...(task.scope !== null ? { docIds: task.scope.paths } : {}),
         context,
         turnId: dispatchId,
         signal: abort.signal,
@@ -3617,8 +3967,12 @@ export class SearchV3View extends JfElement {
           this.sessions = setTurnRewrite(this.sessions, ref, standalone);
         },
         onDone: (usage) => {
-          if (schema !== undefined && this.search.pendingScope === scope) this.search.clearScope();
-          if (schema !== undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
+          if (schema !== undefined && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
+          if (schema !== undefined && task.ownsComposer && this.composer === composer && composer?.draftVersion === draftVersion) {
+            this.assigningHumanDraft = true;
+            try { composer?.clearDraft(); } finally { this.assigningHumanDraft = false; }
+          }
+          this.retireHumanTask(task);
           // Tempdoc 610 §E.4 — the occupancy this turn reported, recorded on the CONVERSATION that
           // spent it (a terminal that reported none leaves the previous reading standing rather than
           // replacing it with a zero the backend never sent).
@@ -3637,27 +3991,44 @@ export class SearchV3View extends JfElement {
         },
         // The lock's refusal is worded by the ONE reason vocabulary, not re-phrased here.
         onRefused: () => {
+          task.saved.delivery = 'unaccepted';
+          task.revoked = true;
+          this.saveRecovery(task);
           settle('refused', reasonFor('conversations.locked').wording);
           // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
           this.noteRefusedWhileLocked();
         },
         onHalted: () => {
+          this.retireHumanTask(task);
           settle('halted');
           // Saved as stopped: the record gives the turn its store ids (so it can be retried,
           // edited or branched) and the list its conversation, as after a finished answer.
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
         },
-        onLeft: () => settle('left'),
-        onFailed: (message, code) => {
+        onLeft: () => { task.revoked = true; this.saveRecovery(task); settle('left'); },
+        onFailed: (message, code, refusal) => {
+          if (refusal !== null && refusal !== undefined) {
+            task.saved.delivery = 'unaccepted';
+            task.refusal = refusal;
+            task.retryAt = Date.now() + (refusal.retryAfterMs ?? 0);
+            this.scheduleHumanRetry(task);
+            this.saveRecovery(task);
+            settle('left');
+            return;
+          }
+          if (code === 'NO_CONTENT') this.retireHumanTask(task);
+          else { task.saved.delivery = 'unknown'; task.revoked = true; this.saveRecovery(task); }
           const noEvidence = shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
-          if (handoff !== null && this.sessions.activeId === ref.sessionId && this.composer === composer && composer?.draftRevision === sentDraftRevision) {
+          if (handoff !== null && this.sessions.activeId === ref.sessionId && task.ownsComposer && this.composer === composer && composer?.draftVersion === sentDraftVersion) {
             this.preparedHandoff = handoff;
             this.search.prepare(scope);
-            this.writeDraft(question);
+            this.assigningHumanDraft = true;
+            try { this.writeDraft(task.saved.raw); } finally { this.assigningHumanDraft = false; }
+            this.saveRecovery(task);
           }
         },
       },
@@ -3670,6 +4041,7 @@ export class SearchV3View extends JfElement {
    * has already left.
    */
   private onEffortChange(event: Event): void {
+    this.revokeHumanTask();
     const effort = (event as CustomEvent<Sv3EffortChange>).detail?.effort;
     if (!isSv3Effort(effort)) return;
     this.effort = effort;
@@ -3681,6 +4053,7 @@ export class SearchV3View extends JfElement {
    * through to `runAsk` and silently ask when the reader chose to delegate.
    */
   private onTierChange(event: Event): void {
+    this.revokeHumanTask();
     const tier = (event as CustomEvent<Sv3TierChange>).detail?.tier;
     if (!isSv3Tier(tier)) return;
     if (this.preparedHandoff !== null) this.search.clearScope();
@@ -4477,6 +4850,8 @@ export class SearchV3View extends JfElement {
    * guarantee, so the fix is to not make the write at all.
    */
   private resetToHero(): void {
+    this.revokeHumanTask();
+    this.saveRecovery();
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.abortAsk();
@@ -4507,6 +4882,7 @@ export class SearchV3View extends JfElement {
    * by which one is actually running — the composer says the reader pressed Stop and nothing more.
    */
   private onComposerStop(): void {
+    if (this.humanLoad !== null && !this.streaming) { this.revokeHumanTask(); this.saveRecovery(); return; }
     if (this.streaming) {
       this.askStop?.();
       return;
@@ -4591,7 +4967,7 @@ export class SearchV3View extends JfElement {
     const ai = this.aiSnapshot;
     const indexing = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
       ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
-    const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
+    const results = this.search.view(projectAvailability('documents', this.aiSnapshot, true));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
     const visibleRun = !this.search.showing && (this.run?.sessionId === this.sessions.activeId || this.sessions.activeId === null && this.preparedHandoff === null) ? run : null;
@@ -4650,17 +5026,20 @@ export class SearchV3View extends JfElement {
       <div
         class="column"
         data-testid="sv3-column"
+        @sv3-composer-assignment=${this.onHumanAssignment}
         @sv3-composer-state-request=${this.onStateRequest}
         @sv3-schema-change=${(event: CustomEvent<{ text: string }>) => {
+          this.revokeHumanTask();
           this.schemaDraft = event.detail.text;
+          this.saveRecovery();
           this.requestUpdate();
         }}
         @sv3-composer-submit=${this.onComposerSubmit}
         @sv3-composer-draft=${this.onComposerDraft}
-        @sv3-composer-scope-clear=${() => { this.search.clearScope(); this.preparedHandoff = null; this.handoffNotice = ''; this.handoffBlocked = false; this.requestUpdate(); }}
+        @sv3-composer-scope-clear=${() => { this.revokeHumanTask(); this.search.clearScope(); this.preparedHandoff = null; this.handoffNotice = ''; this.handoffBlocked = false; this.requestUpdate(); }}
         @sv3-results-filter-remove=${this.onResultsFilterRemove}
         @sv3-results-ask=${this.onResultsAsk}
-        @sv3-results-clear-selection=${() => this.search.select([])}
+        @sv3-results-clear-selection=${() => { this.revokeHumanTask(); this.search.select([]); }}
         @card-open=${this.onCardOpen}
         @card-selection=${this.onCardSelection}
         @card-facet-toggle=${this.onCardFacetToggle}
@@ -4728,6 +5107,7 @@ export class SearchV3View extends JfElement {
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           data-testid="sv3-context-bar-host"
         ></jf-sv3-context-bar>
+        ${this.recoveryNotice()}
         <jf-sv3-composer
           state=${this.composerState}
           slot-kind=${slot.kind}
@@ -4736,6 +5116,7 @@ export class SearchV3View extends JfElement {
           ?steerable=${this.steerableRun !== null}
           unavailable-reason=${this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason}
           delegate-unavailable-reason=${this.delegateUnavailableReason}
+          structured-unavailable-reason=${this.structuredUnavailableReason}
           .degradation=${this.degradation}
           ?detailed=${isAdvancedMode()}
           .corpus=${projectSv3Corpus(this.aiSnapshot)}

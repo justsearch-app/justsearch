@@ -26,6 +26,7 @@ interface Provider {
 }
 
 const providers = new Set<Provider>();
+const attachmentFlushes = new Set<() => void>();
 let wired = false;
 
 function storageKey(key: string): string {
@@ -55,6 +56,7 @@ function writeDraft(provider: Provider, value: string): void {
 }
 
 function flushAll(): void {
+  for (const flush of attachmentFlushes) flush();
   for (const p of providers) writeDraft(p, p.get());
 }
 
@@ -74,6 +76,13 @@ export class DraftPersistence implements ReactiveController {
   private readonly provider: Provider;
   private readonly set: (v: string) => void;
   private rehydrated = false;
+  private attachment: {
+    key: string; expected: string | null; safe: boolean;
+    validate: (value: unknown) => boolean; get: () => unknown; failed: () => void;
+  } | null = null;
+  private readonly flushAttachment = (): void => {
+    if (this.attachment !== null) this.saveSessionAttachment(this.attachment.get());
+  };
 
   constructor(
     host: ReactiveControllerHost,
@@ -90,6 +99,7 @@ export class DraftPersistence implements ReactiveController {
   hostConnected(): void {
     ensureWired();
     providers.add(this.provider);
+    attachmentFlushes.add(this.flushAttachment);
     if (this.rehydrated) return; // reconnect of a retained instance — keep the live in-memory draft
     this.rehydrated = true;
     const saved = readDraft(this.provider.key);
@@ -97,6 +107,54 @@ export class DraftPersistence implements ReactiveController {
     if (saved !== null) {
       this.set(saved);
       void this.host.updateComplete;
+    }
+  }
+
+  /** Opt-in, fixed-owner recovery for a surviving tab session. The raw local draft stays a string. */
+  openSessionAttachment(
+    owner: string,
+    validate: (value: unknown) => boolean,
+    get: () => unknown,
+    failed: () => void,
+  ): unknown {
+    if (this.attachment !== null) return null;
+    const key = `justsearch.draft.attachment.v1.${owner}`;
+    const attachment = { key, expected: null as string | null, safe: true, validate, get, failed };
+    this.attachment = attachment;
+    try {
+      attachment.expected = sessionStorage.getItem(key);
+      if (attachment.expected === null) return null;
+      if (new TextEncoder().encode(attachment.expected).length > 262144) throw new Error('oversize');
+      const data: unknown = JSON.parse(attachment.expected);
+      if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new Error('invalid');
+      const row = data as Record<string, unknown>;
+      if (Object.keys(row).sort().join(',') !== 'incarnation,payload,version' || row.version !== 1
+        || typeof row.incarnation !== 'string' || row.incarnation.length > 128 || !validate(row.payload)) throw new Error('invalid');
+      return row.payload;
+    } catch {
+      attachment.safe = false;
+      failed();
+      return null;
+    }
+  }
+
+  /** ACK before issuance/clear. Compare bytes rejects stale overlapping mounts; never delete on failure. */
+  saveSessionAttachment(payload: unknown): boolean {
+    const a = this.attachment;
+    if (a === null || !a.safe) return false;
+    try {
+      if (!a.validate(payload)) throw new Error('invalid');
+      // Each ACK advances the opaque incarnation, even when the inputs return to identical text.
+      // Otherwise an overlapping stale writer could miss an intervening write (an ABA collision).
+      const bytes = JSON.stringify({ version: 1, incarnation: crypto.randomUUID(), payload });
+      if (new TextEncoder().encode(bytes).length > 262144 || sessionStorage.getItem(a.key) !== a.expected) throw new Error('stale or oversize');
+      sessionStorage.setItem(a.key, bytes);
+      if (sessionStorage.getItem(a.key) !== bytes) throw new Error('not acknowledged');
+      a.expected = bytes;
+      return true;
+    } catch {
+      a.failed();
+      return false;
     }
   }
 
@@ -140,8 +198,10 @@ export class DraftPersistence implements ReactiveController {
 
   hostDisconnected(): void {
     // Flush on hide too (belt-and-suspenders beyond visibilitychange/pagehide), then stop contributing.
+    this.flushAttachment();
     writeDraft(this.provider, this.provider.get());
     providers.delete(this.provider);
+    attachmentFlushes.delete(this.flushAttachment);
   }
 }
 
@@ -151,4 +211,5 @@ export function __draftStorageKey(key: string): string {
 }
 export function __resetDraftProvidersForTest(): void {
   providers.clear();
+  attachmentFlushes.clear();
 }

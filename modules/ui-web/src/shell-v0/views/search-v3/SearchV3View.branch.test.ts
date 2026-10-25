@@ -205,6 +205,7 @@ function stubFetch(): void {
       // The re-sent turn REACHES A TERMINAL rather than streaming forever, so the assertions below
       // read a settled transcript — a perpetually-streaming turn would suppress the window-wide
       // controls and quietly weaken every case that follows a re-send.
+      stream.emit('done', {});
       stream.end();
       const signal = init.signal ?? null;
       return {
