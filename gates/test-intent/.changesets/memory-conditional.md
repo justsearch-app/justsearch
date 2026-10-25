@@ -10,7 +10,7 @@ author-session: memory-forget-builder
 The orchestrator chose these adaptations under the owner's delegation to finish, re-verify and ship
 the existing memory-forget F1-F6 fix. Every existing protection, including replaced/vanished-row
 data-loss protection, remains required; the delegation does not authorize weakening or dropping it.
-The default evidence runner uses linked dependencies; its before-tree is an isolated shared clone.
+The default evidence runner uses linked dependencies; its before-tree is a detached Git worktree sharing repository metadata.
 
 ```json
 {
