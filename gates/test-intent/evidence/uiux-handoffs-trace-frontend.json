@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-23T15:14:09.213Z",
+  "revision": "f05b44c2ae9417046aca0fbc8a68a377c035a73c",
+  "tree": "afe30e3b88b1eba5295b1ca033c2932112dfc30f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/azt482ih/tmp/test-intent-vitest-3922800-1792768446614.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 692
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain carries the hit document as trace provenance",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:01a957a8990940a690d349740ff65322004749f24473bd3e0203be3332985c64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 Explain carries the hit document as trace provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain keeps the exact model trace in the prepared text",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:01a957a8990940a690d349740ff65322004749f24473bd3e0203be3332985c64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 Explain keeps the exact model trace in the prepared text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain without a document identity visibly keeps a trace-only record",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:01a957a8990940a690d349740ff65322004749f24473bd3e0203be3332985c64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 Explain without a document identity visibly keeps a trace-only record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain links the document path when the result identity is a chunk",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:01a957a8990940a690d349740ff65322004749f24473bd3e0203be3332985c64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 Explain links the document path when the result identity is a chunk",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 an unmerged chunk without a document path stays visibly trace-only",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:01a957a8990940a690d349740ff65322004749f24473bd3e0203be3332985c64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO5 an unmerged chunk without a document path stays visibly trace-only",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "12bb2beb3",
+    "revision": "12bb2beb38ee54fb0eaa8b483feff4a41b06d8d3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/azt482ih/tmp/test-intent-vitest-3922800-1792768448388.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 665,
+        "output": "JSON report written to /home/elias/.cache/am/azt482ih/tmp/test-intent-vitest-3922800-1792768448388.json\n\nWP1.3b evidence: adding --cache=false --maxWorkers=2 to Vitest\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain carries the hit document as trace provenance",
+        "classification": "assertion",
+        "detail": "HO5 Explain carries the hit document as trace provenance:  AssertionError: expected { kind: 'search-trace', …(2) } to deeply equal { kind: 'search-trace', …(3) }\n    at /home/elias/.cache/am/azt482ih/tmp/test-intent-before-GmMuMJ/modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts:21:34\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain keeps the exact model trace in the prepared text",
+        "classification": "assertion",
+        "detail": "HO5 Explain keeps the exact model trace in the prepared text:  AssertionError: expected 'Explain why this result (\"orchard.md\"…' to be 'Explain why this result (\"orchard.md\"…' // Object.is equality\n    at /home/elias/.cache/am/azt482ih/tmp/test-intent-before-GmMuMJ/modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts:25:23\n    at f"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain without a document identity visibly keeps a trace-only record",
+        "classification": "assertion",
+        "detail": "HO5 Explain without a document identity visibly keeps a trace-only record:  AssertionError: expected 'Explain why this result (\"orchard.md\"…' to contain 'No document link is available for thi…'\n    at /home/elias/.cache/am/azt482ih/tmp/test-intent-before-GmMuMJ/modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts:29:23\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 Explain links the document path when the result identity is a chunk",
+        "classification": "assertion",
+        "detail": "HO5 Explain links the document path when the result identity is a chunk:  AssertionError: expected { kind: 'search-trace', …(2) } to match object { docId: 'docs/orchard.md' }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-handoffs/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:1"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts#HO5 an unmerged chunk without a document path stays visibly trace-only",
+        "classification": "assertion",
+        "detail": "HO5 an unmerged chunk without a document path stays visibly trace-only:  AssertionError: expected 'Explain why this result (\"orchard.md\"…' to contain 'No document link is available for thi…'\n    at /home/elias/.cache/am/azt482ih/tmp/test-intent-before-GmMuMJ/modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.handoff.test.ts:39:23\n    at file:///home/elias"
+      }
+    ]
+  },
+  "digest": "sha256:8eddacf0a7e3d04af1ab9be1a7c734d460cd127fab3e0ccf5baa1aefec2dad55"
+}

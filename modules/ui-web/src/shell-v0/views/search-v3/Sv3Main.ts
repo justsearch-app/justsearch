@@ -149,6 +149,7 @@ import {
 import {
   projectSv3AnswerFrame,
   sv3AnswerFrame,
+  sv3ExplainsRankingTrace,
   sv3ReceiptTail,
   sv3SourcesTrigger,
   sv3SourcesTriggerCount,
@@ -2153,7 +2154,7 @@ export class Sv3Main extends JfElement {
    * rather than a pencil that would fork the wrong conversation or 404.
    */
   private question(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.question === '') return nothing;
+    if (turn.question === '') return sv3ExplainsRankingTrace(turn) ? this.scopeLine(turn) : nothing;
     if (this.editingTurnId === turn.id) return this.questionEditor(turn);
     const canEdit = sv3LineageFor(this.turnLineage, turn.id)?.canEdit === true;
     return html`<div class="ask">
@@ -2181,7 +2182,10 @@ export class Sv3Main extends JfElement {
   /** WP1.1 S1.6 — the files this question was limited to, said under it; nothing when unlimited. */
   private scopeLine(turn: Sv3Turn): TemplateResult | typeof nothing {
     const scope = this.turnScopes?.get(turn.id) ?? null;
-    if (scope === null) return nothing;
+    if (scope === null) {
+      if (sv3ExplainsRankingTrace(turn)) return html`<p class="ask-scope">Explain. After reload, start Explain from the result again to retry or edit.</p>`;
+      return turn.shapeId === 'core.summarize' ? html`<p class="ask-scope">Summarize. Retry/Edit requires the original files or passage; after reload, choose them again before sending.</p>` : nothing;
+    }
     return html`<p class="ask-scope" data-testid="sv3-turn-scope">Limited to ${sv3ScopeLabel(scope)}</p>`;
   }
 
@@ -2222,7 +2226,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${turn.kind === 'model' ? 'This answer does not search your files.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
       </p>
       <div class="ask-edit-acts">
         <jf-control
@@ -2633,7 +2637,9 @@ export class Sv3Main extends JfElement {
       data-testid="sv3-turn-sources"
       aria-expanded=${expanded ? 'true' : 'false'}
       aria-controls=${expanded
-        ? `${citeLegendId(turn.id)} ${sourcesBodyId(turn.id)}`
+        ? sv3ExplainsRankingTrace(turn)
+          ? sourcesBodyId(turn.id)
+          : `${citeLegendId(turn.id)} ${sourcesBodyId(turn.id)}`
         : nothing}
       aria-label=${`${trigger}: ${count}`}
       @click=${() => this.toggleSources(turn.id)}
@@ -2792,17 +2798,19 @@ export class Sv3Main extends JfElement {
     // reader who is looking at sources is exactly the reader who needs the key. It sits BEFORE the
     // panel and carries its own id, which the trigger's `aria-controls` names first: the disclosure
     // reveals two elements, so naming one of them left the key outside the announced relationship.
-    return html`<p
+    const resultBeingExplained = sv3ExplainsRankingTrace(turn);
+    return html`${resultBeingExplained ? nothing : html`<p
       class="cite-legend"
       id=${citeLegendId(turn.id)}
       data-testid="sv3-cite-legend"
-    >${CITE_LEGEND}</p>
+    >${CITE_LEGEND}</p>`}
     <jf-citations-panel
       class="sv3-citations"
       id=${sourcesBodyId(turn.id)}
       data-testid="sv3-turn-citations"
       data-turn-id=${turn.id}
       .externalDisclosure=${true}
+      .resultBeingExplained=${resultBeingExplained}
       .sourcesExpanded=${true}
       .citations=${[...turn.evidence.matches]}
       .sources=${[...turn.evidence.sources]}

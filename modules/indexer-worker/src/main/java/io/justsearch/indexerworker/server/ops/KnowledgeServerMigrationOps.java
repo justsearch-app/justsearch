@@ -20,6 +20,7 @@ import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.queue.SwitchBufferDelete;
@@ -291,7 +292,10 @@ public final class KnowledgeServerMigrationOps {
           continue;
         }
 
-        long depth = context.jobQueue().queueDepth();
+        JobQueue.JobStateCounts independent = !context.liveCutover().recorded()
+            && context.jobQueue() instanceof SqliteJobQueue sqlite ? sqlite.nativeCutoverCountsStrict() : null;
+        long depth = independent == null ? context.jobQueue().queueDepth()
+            : independent.pendingCount() + independent.processingCount();
         if (ms == IndexGenerationManager.MigrationState.MIGRATING) {
           if (depth > context.migrationSwitchingQueueDepthThreshold()) {
             Thread.sleep(1_000);
@@ -327,7 +331,7 @@ public final class KnowledgeServerMigrationOps {
 
         boolean drained = depth == 0;
         if (!drained) {
-          JobQueue.JobStateCounts counts = context.jobQueue().jobStateCounts();
+          JobQueue.JobStateCounts counts = independent == null ? context.jobQueue().jobStateCounts() : independent;
           drained = counts.processingCount() == 0 && counts.pendingReadyCount() == 0;
           if (drained && counts.pendingBackoffCount() > 0) {
             context.log().info(
@@ -348,7 +352,10 @@ public final class KnowledgeServerMigrationOps {
             && !hasWatcherReconciliationDebt(context.jobQueue())) {
           long failedJobs;
           try {
-            failedJobs = context.jobQueue().failureSummary().failedCount();
+            // U12: terminal pre-boundary rows are retained, but cannot veto this cutover.
+            // Newly admitted migration work has a boundary and still counts against the limit.
+            failedJobs = Math.max(0L, (independent == null ? context.jobQueue().failureSummary().failedCount()
+                : independent.failedCount()) - context.jobQueue().unownedFailureCount());
           } catch (Exception e) {
             context.log().warn(
                 "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
@@ -1120,8 +1127,10 @@ public final class KnowledgeServerMigrationOps {
     Set<SwitchBufferCapableQueue.SwitchBufferOp> fileAuthorizingDeletes;
     Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> fileSurvivorExclusions;
     ReplayDeleteOrder deleteOrder;
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededLegacyFiles;
     try {
       deleteOrder = replayDeleteOrder(context, ops, exactRead);
+      supersededLegacyFiles = supersededLegacyFiles(context, ops);
       fileAuthorizingDeletes = exactRead ? fileRelatedBroadDeletes(context, ops, deleteOrder) : Set.of();
       fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes);
     } catch (IOException | RuntimeException invalid) {
@@ -1160,6 +1169,7 @@ public final class KnowledgeServerMigrationOps {
     AtomicReference<RuntimeException> pruneCutFailure = new AtomicReference<>();
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
+      if (supersededLegacyFiles.contains(op)) continue;
       if (op.op() == null || op.payload() == null) {
         allApplied = false;
         continue;
@@ -1826,7 +1836,15 @@ public final class KnowledgeServerMigrationOps {
         // cannot move here; they stay durable queue work that surviving A's writer runs between
         // attempts. Only a claimed row could still publish a late write.
         if (refusedSourceRecovery) return counts.processingCount() == 0;
-        if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
+        long pending = counts.pendingCount();
+        if (context.replayGeneration() != null
+            && !IndexGenerationManager.isRecordedGenerationIdentity(context.replayGeneration())
+            && context.jobQueue() instanceof SqliteJobQueue queue) {
+          pending = queue.nativeCutoverCountsStrict().pendingCount();
+        }
+        // Keep the full in-flight barrier: no direct delete may overtake a writing debt job.
+        // Only original never-indexed exhausted work waiting in the queue is independent.
+        if (counts.processingCount() == 0 && pending == 0) return true;
         if (System.nanoTime() >= deadline) return false;
         Thread.sleep(50);
       }
@@ -1837,6 +1855,34 @@ public final class KnowledgeServerMigrationOps {
       Thread.currentThread().interrupt();
       return false;
     }
+  }
+
+  /** Older unscoped work must not renew the revision of a later accepted file admission. */
+  private static Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededLegacyFiles(
+      DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+    Set<String> laterAccepted = new java.util.HashSet<>();
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = new java.util.HashSet<>();
+    for (var op : ops.reversed()) {
+      if (context.approvedGapVersions().contains(op)) continue;
+      boolean legacy = op.generation() == null || op.generation().isBlank();
+      if ("UPSERT".equalsIgnoreCase(op.op())) {
+        var upsert = SwitchBufferUpsert.decode(op.payload());
+        if (upsert.sourceSha256() != null && !legacy
+            && op.generation().equals(context.replayGeneration())
+            && op.key().equals("path:" + upsert.path())
+            && Path.of(upsert.path()).normalize().toString().equals(upsert.path())) {
+          laterAccepted.add(upsert.path());
+        } else if (upsert.sourceSha256() == null && legacy
+            && laterAccepted.contains(upsert.path())) {
+          superseded.add(op);
+        }
+      } else if (legacy && "DELETE".equalsIgnoreCase(op.op())) {
+        var deletion = SwitchBufferDelete.decode(op.payload());
+        if (deletion.origin() == SwitchBufferDelete.Origin.LEGACY
+            && laterAccepted.contains(deletion.path())) superseded.add(op);
+      }
+    }
+    return superseded;
   }
 
   private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,
@@ -1852,10 +1898,40 @@ public final class KnowledgeServerMigrationOps {
           // The caller waits for that row and verifies Green's indexed source witness.
           continue;
         }
+        // Keep an admitted unfinished row before inspecting its target: it can finish while
+        // replay reads the index, and must not become a fresh admission in that interval.
+        if ((op.generation() == null || op.generation().isBlank())
+            && (context.replayGeneration() == null
+                || !IndexGenerationManager.isRecordedGenerationIdentity(context.replayGeneration()))
+            && context.jobQueue() instanceof SqliteJobQueue original
+            && original.hasRelease030ReplayAdmission(Path.of(upsert.path()))) continue;
+        var fields = context.ingestLifecycle() == null ? null : context.ingestLifecycle().documentFieldOps();
+        if (fields != null && context.jobQueue() instanceof SwitchBufferCapableQueue receipts) {
+          String file = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(Path.of(upsert.path()));
+          String indexed = fields.getDocumentFieldOrThrow(file, SchemaFields.SOURCE_SHA256);
+          // An applied receipt (original or later admission) settles this historical effect.
+          // DONE alone is insufficient: Green must hold the same file, collection and bytes.
+          var work = receipts.sourceFileWork(file, indexed);
+          if (work == SwitchBufferCapableQueue.SourceFileWork.POLICY
+              && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(file) == 0) continue;
+          String collection = upsert.collection() == null || upsert.collection().isBlank() ? null : upsert.collection();
+          String indexedCollection = fields.getDocumentFieldOrThrow(file, SchemaFields.COLLECTION);
+          boolean sameCollection = Objects.equals(collection, indexedCollection);
+          boolean settled = work == SwitchBufferCapableQueue.SourceFileWork.COMMITTED;
+          if (context.jobQueue() instanceof SqliteJobQueue sqlite) {
+            settled = sqlite.matchesAppliedFileProjection(file, indexed,
+                fields.getDocumentFieldOrThrow(file, SchemaFields.MODIFIED_AT), indexedCollection);
+            // A raw 0.3.0 path carries no collection. Preserve the completed admission's
+            // collection, proved against Green above, rather than inventing a new one.
+            sameCollection = !op.payload().stripLeading().startsWith("{") || sameCollection;
+          }
+          if (settled && file.equals(fields.getDocumentFieldOrThrow(file, SchemaFields.DOC_ID))
+              && file.equals(fields.getDocumentFieldOrThrow(file, SchemaFields.PATH)) && sameCollection) continue;
+        }
         int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
         enqueued += accepted;
         if (accepted != 1) complete = false;
-      } catch (RuntimeException unavailable) {
+      } catch (IOException | java.sql.SQLException | RuntimeException unavailable) {
         complete = false;
         context.log().warn("Buffered UPSERT enqueue failed; retaining replay versions", unavailable);
       }

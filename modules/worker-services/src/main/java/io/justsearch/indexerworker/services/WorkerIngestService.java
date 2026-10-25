@@ -215,6 +215,7 @@ public final class WorkerIngestService {
     this.rootVolumes = RootVolumeLedger.under(indexBasePath);
     this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity,
         folder -> rootWatcherRegistry.declaresRootCovering(folder));
+    if (jobQueue != null) this.rootWitness.useRelease030ExactFiles(jobQueue::isRelease030ExactFile);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -265,6 +266,7 @@ public final class WorkerIngestService {
         confirmedDeletionMarker);
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
+    this.syncOps.setUserExclusions(this::isUserExcluded);
     this.syncOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
@@ -288,6 +290,7 @@ public final class WorkerIngestService {
   public PathPrefixScope prefixScope(String prefix) {
     Path root = Path.of(prefix).toAbsolutePath().normalize();
     var declarations = new java.util.HashSet<>(rootWatcherRegistry.current().declaredRoots());
+    declarations.addAll(configuredRecoveryRoots);
     try {
       if (declaredRootsDirectory == null) declarations.addAll(exclusionRoots.get());
       else declarations.addAll(io.justsearch.configuration.persistence.WatchedRootsFormat
@@ -904,7 +907,8 @@ public final class WorkerIngestService {
           continue;
         }
         SyncDirectoryResponse result = io.justsearch.configuration.PlatformPaths.isLinux()
-            ? syncOps.execute(root.toString(), false, null, () -> false, subscription.collection())
+            ? syncOps.execute(root.toString(), false, null, () -> false, subscription.collection(),
+                SyncDirectoryOps.AdmissionMode.MAINTENANCE)
             : syncDirectory(SyncDirectoryRequest.newBuilder()
                 .setRootPath(root.toString()).setForce(false).build(), CallContext.none());
         if (!result.getError().isBlank() || result.getSkipped()
@@ -1102,6 +1106,7 @@ public final class WorkerIngestService {
         roots.add(root.toAbsolutePath().normalize());
       }
     }
+    configuredRecoveryRoots = List.copyOf(roots);
     List<Path> awaiting;
     try {
       awaiting = rootVolumes.awaitSeedingUnlessRecorded(roots);
@@ -1164,6 +1169,27 @@ public final class WorkerIngestService {
       return false;
     }
     return rootWitness.provenOnRecordedVolume(root);
+  }
+
+  /** Resume a checkpointed root using bounded admissions, retaining unrelated retry deadlines. */
+  public SyncDirectoryResponse recoverRelease030Root(Path root, String collection,
+      java.util.function.BooleanSupplier cancelled) {
+    try (var ignoredMutation = mutationLease()) {
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      // Any removal after this authority decision must invalidate the ensuing sync.
+      long mark = registry.removalMark();
+      SyncDirectoryResponse refused = refuseSyncOfRootOnAnotherVolume(root.toString());
+      if (refused != null) return refused;
+      if (!rootWitness.admits(root) || !canApplyWatcherReceipts()) {
+        return syncDirectoryErrorResponse("Upgrade recovery waits for its writable root");
+      }
+      var binding = rootWatcherRegistry.subscription(root);
+      return syncOps.execute(root.toString(), true, null, cancelled,
+          binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY,
+          admission -> registry.admitRecovery(root, mark,
+              () -> exclusionRoots.get().stream().anyMatch(path -> path.toAbsolutePath().normalize()
+                  .equals(root.toAbsolutePath().normalize())) || configuredRecoveryRoots.contains(root), admission));
+    }
   }
 
   /**
@@ -1237,7 +1263,7 @@ public final class WorkerIngestService {
         if (event == null) return;
         // Re-enumerate all present files, as startup does. The loop still skips unchanged stamps.
         var result = syncOps.execute(root.toString(), true, null, () -> false,
-            subscription.collection());
+            subscription.collection(), SyncDirectoryOps.AdmissionMode.MAINTENANCE);
         if (!result.getError().isBlank() || result.getSkipped()
             || result.getDeleteDetectionUnverified()) return;
       }
@@ -1604,6 +1630,7 @@ public final class WorkerIngestService {
   }
 
   private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
+  private volatile java.util.Collection<Path> configuredRecoveryRoots = List.of();
   private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
 
   /**
@@ -2391,24 +2418,29 @@ public final class WorkerIngestService {
     JobQueue.EnqueueProvenance provenance =
         ctx.engineContext().clientKind() == io.justsearch.core.context.EngineContext.ClientKind.INTERNAL
             && "SYSTEM_INTERNAL".equals(ctx.provenance().transport()) ? null : ctx.provenance();
-    return syncDirectoryCommon(request, ctx, provenance, false);
+    return syncDirectoryCommon(request, ctx, provenance, false, provenance == null
+        && ctx.engineContext().survival() == io.justsearch.core.context.EngineContext.Survival.DURABLE
+        && ctx.engineContext().urgency() == io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
+        ? SyncDirectoryOps.AdmissionMode.MAINTENANCE : SyncDirectoryOps.AdmissionMode.DEFAULT);
   }
 
   /** Replays a durable sync with its persisted descriptive attribution. */
   public SyncDirectoryResponse syncDirectoryForReplay(
       SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
-    return syncDirectoryCommon(request, CallContext.none(), provenance, false);
+    return syncDirectoryCommon(request, CallContext.none(), provenance, false,
+        SyncDirectoryOps.AdmissionMode.DEFAULT);
   }
 
   /** The final cutover fence owns SWITCHING and replays this version directly onto Green. */
   public SyncDirectoryResponse syncDirectoryForFinalCutoverReplay(
       SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance) {
-    return syncDirectoryCommon(request, CallContext.none(), provenance, true);
+    return syncDirectoryCommon(request, CallContext.none(), provenance, true,
+        SyncDirectoryOps.AdmissionMode.DEFAULT);
   }
 
   private SyncDirectoryResponse syncDirectoryCommon(
       SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance,
-      boolean finalCutoverReplay) {
+      boolean finalCutoverReplay, SyncDirectoryOps.AdmissionMode admissionMode) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       boolean force = request.getForce();
@@ -2451,10 +2483,12 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      Path root = parsedRoot(rootPath);
-      var binding = rootWatcherRegistry.subscription(root);
+      var binding = rootWatcherRegistry.subscription(parsedRoot(rootPath));
+      if (binding == null && admissionMode == SyncDirectoryOps.AdmissionMode.DEFAULT) {
+        return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
+      }
       return syncOps.execute(rootPath, force, provenance, ctx::cancelled,
-          binding == null ? null : binding.collection());
+          binding == null ? null : binding.collection(), admissionMode);
     }
   }
 
@@ -2783,7 +2817,7 @@ public final class WorkerIngestService {
     Path prefix = Path.of(pathPrefix).toAbsolutePath().normalize();
     Path best = null;
     for (Path candidate = prefix; candidate != null; candidate = candidate.getParent()) {
-      if (rootWatcherRegistry.subscription(candidate) != null) {
+      if (rootWatcherRegistry.subscription(candidate) != null || rootWatcherRegistry.awaitsVolume(candidate)) {
         best = candidate;
         break;
       }

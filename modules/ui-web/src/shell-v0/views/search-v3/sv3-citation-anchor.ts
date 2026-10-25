@@ -26,6 +26,7 @@ import {
 // `CitationsPanel.ts` take, because a second key function here would silently never agree with them.
 import { sourceKey } from '../../state/selectedSource.js';
 import type { Sv3Turn } from './sv3-sessions.js';
+import { sv3ExplainsRankingTrace } from './sv3-honesty.js';
 
 /** The source is not part of this turn's retrieval set (or the turn is gone). */
 export const SV3_SOURCE_INDEX_ABSENT = -1;
@@ -109,6 +110,8 @@ export function sv3CitationHeader(
   sourceIndex: number,
   anchor: DocumentCitationAnchor | null,
 ): CitationHeader | null {
+  // The linked hit is the subject of a trace explanation, not retrieved/cited document content.
+  if (sv3ExplainsRankingTrace(turn)) return null;
   const evidence = turn?.evidence ?? null;
   const citation =
     evidence !== null && sourceIndex !== SV3_SOURCE_INDEX_ABSENT

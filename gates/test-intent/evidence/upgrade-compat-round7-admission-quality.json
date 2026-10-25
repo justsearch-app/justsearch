@@ -1,0 +1,148 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3ef02c853cf58a88e9308f02e5385587c6ed34ce728c100ebacbcbbc063b5ba6"
+  },
+  "createdAt": "2026-10-23T21:22:22.095Z",
+  "revision": "d5754883198202a323d541efe508740a9e8e7ce0",
+  "tree": "1b2e670b09b6114c9de3c981c0d7db9a1fbe6c28",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm/after",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:worker-services:compileJava :modules:worker-services:compileTestJava :modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:ciUnitTestReviewAdmissionPresent :modules:indexer-worker:ciUnitTestReviewAdmissionAbsent -PskipWebBuild=true -PskipErrorProneTests=false --console=plain --no-configuration-cache --no-parallel --max-workers=1 --continue --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round7-tmp.gradle --init-script /home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/round7-review-admission.gradle -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-compat/tmp/builder/jvm/after",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1519089
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f66023d6dc655674809c553c26bee149a599550cfa1d1d82c1154784e295541",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority(boolean, Path) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority(boolean, Path) [2] false",
+          "status": "passed"
+        },
+        {
+          "name": "corruptRootKeyIsQuarantinedWhileOtherRootsRecover(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "indexedExhaustedExactContentIsNotDiscardedAtCutover(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "replacementModernDatabaseCannotBorrowV13AdmissionIdentity(boolean, Path) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "replacementModernDatabaseCannotBorrowV13AdmissionIdentity(boolean, Path) [2] false",
+          "status": "passed"
+        },
+        {
+          "name": "newExplicitAdmissionCannotBorrowLegacyAuthority(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "uncertainAdmissionRevisionCannotAuthorizeAnAbsentFileDelete(boolean, Path) [2] false",
+          "status": "passed"
+        },
+        {
+          "name": "reenqueueRevokesThePreviousLegacyAdmissionImmediately(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [2] switching",
+          "status": "passed"
+        },
+        {
+          "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f66023d6dc655674809c553c26bee149a599550cfa1d1d82c1154784e295541",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority(boolean, Path) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority(boolean, Path) [2] false",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7245bedaf",
+    "revision": "7245bedafabcdf87ccef70a29c005070a2ae5bff",
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java"
+    ],
+    "patches": [
+      "tmp/builder/round7-volume-lookup-seam.patch"
+    ],
+    "executionContext": "Re-executed real Gradle checks on the existing cached before checkout. The lookup seam and current test fixtures are overlaid; no authority fix is present. The original explicit volume annotation has identical bytecode to its qualification-only PMD correction.",
+    "runs": [
+      {
+        "command": "bash tmp/builder/rerun-round7-review-interrupted-before.sh",
+        "cwd": ".",
+        "exitCode": 1,
+        "durationMs": 2377904,
+        "output": "\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+        "classification": "assertion",
+        "detail": "replacementModernDatabaseCannotBorrowV13AdmissionIdentity(boolean, Path) [1] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: X4: a stale checkpoint cannot create a boundary for a non-legacy admission ==> expected: <1> but was: <0> | replacementModernDatabaseCannotBorrowV13AdmissionIdentity(boolean, Path) [2] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: X4: a stale checkpoint cannot create a boundary for a non-legacy admission ==> "
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#deliberateModernExactAdmissionWorksWithoutBorrowingLegacyAuthority",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:47794d008ee28b180391ed1942b3887e50e259c815d727dd486a59a74a0f06a0"
+}

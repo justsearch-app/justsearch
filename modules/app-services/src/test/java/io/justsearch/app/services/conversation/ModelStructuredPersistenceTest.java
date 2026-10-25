@@ -21,7 +21,9 @@ import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.app.api.OnlineAiService;
+import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.services.conversation.spi.RAGContext;
+import io.justsearch.app.services.conversation.spi.SelectionContextInjector;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -59,7 +61,8 @@ final class ModelStructuredPersistenceTest {
             Audience.USER, Provenance.core("v1"), ExecutionMode.SUBSTRATE_DRIVEN, IterationMode.ONE_SHOT,
             PersistenceMode.EPHEMERAL, List.of(), List.of(injector.id()), List.of(), SingleHopController.ID, List.of(), true);
         var engine = new ConversationEngine(ConversationShapeCatalog.of("core", List.of(shape)), List.of(),
-            PromptContributorRegistry.of(List.of()), ContextInjectorRegistry.of(List.of(injector)),
+            PromptContributorRegistry.of(List.of()), ContextInjectorRegistry.of(List.of(injector,
+                new SelectionContextInjector(mock(DocumentService.class), () -> ai))),
             StreamConsumerRegistry.of(List.of()), IterationControllerRegistry.of(List.of()), () -> ai, store);
         var events = new ArrayList<SseEvent>();
         engine.run(shape.id(), Map.of("conversationId", "mixed", "prompt", "question " + count, "question", "question " + count),

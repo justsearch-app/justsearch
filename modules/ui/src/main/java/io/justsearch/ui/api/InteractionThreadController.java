@@ -416,6 +416,10 @@ public final class InteractionThreadController {
     if (shapeId instanceof String s && !s.isBlank()) {
       attributes.put("shapeId", shapeId);
     }
+    // Optional input identity: old records omit it, and older readers ignore this attribute.
+    if (msg.get("selectionKind") instanceof String selectionKind && !selectionKind.isBlank()) {
+      attributes.put("selectionKind", selectionKind);
+    }
     // The follow-up's rewritten question (the "Interpreted as" note), on the turn's outcome row —
     // an answer or an error alike — so a reloaded turn shows the note the live turn showed.
     Object standaloneQuestion = msg.get("standaloneQuestion");

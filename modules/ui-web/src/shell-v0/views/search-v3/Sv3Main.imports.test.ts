@@ -772,3 +772,23 @@ describe('the window does not re-use a shipped token NAME for a different meanin
     expect(bridgeFor(MAIN, 'jf-tool-call-card').get('--accent')).toBe('var(--info-foreground)');
   });
 });
+
+it('HO5 source preview text clears AA in both themes and every card state', () => {
+  // Explain has no document quotation: its visible preview is the no-excerpt text. Read the
+  // actual component ink and its four existing card surfaces, including the selected state.
+  const preview = componentSource('CitationsPanel.ts').match(/^\s*\.source \.preview\s*\{([^}]+)\}/m)?.[1] ?? '';
+  const ink = preview.match(/\bcolor:\s*([^;]+);/)?.[1];
+  expect(ink, 'the source preview must declare readable text').toBeDefined();
+  const cards = [
+    'var(--surface-2)', 'var(--surface-3)',
+    'var(--cp-selected-region, var(--surface-2))', 'var(--cp-selected, var(--surface-3))',
+  ];
+  for (const theme of ['light', 'dark'] as const) {
+    const scope = themeScope(theme, bridgeFor(MAIN, '\\.sv3-citations'));
+    for (const card of cards) {
+      const bg = surface([card], scope);
+      const ratio = contrastRatio(composite(color(ink!, scope), bg), bg);
+      expect(ratio, `${theme} source preview on ${card}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(WCAG_AA);
+    }
+  }
+});

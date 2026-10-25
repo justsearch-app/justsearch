@@ -19,6 +19,26 @@ final class RootWatcherRegistryTest {
   @TempDir Path tempDir;
 
   @Test
+  void removalBlocksLaterRecoveryThroughHandoverUntilAnExplicitAdd() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("recovery-removal"));
+    var registry = new RootWatcherRegistry();
+    assertTrue(registry.watch(root.toString(), "docs").watching());
+    long beforeRemoval = registry.removalMark();
+    assertTrue(registry.unwatch(root.toString()));
+    assertEquals(0, registry.admitRecovery(root, registry.removalMark(), () -> true, () -> 1),
+        "X5: stale Head membership cannot undo an earlier removal");
+    var next = new RootWatcherRegistry();
+    registry.handOverTo(next, (owner, path, collection) -> owner.watch(path.toString(), collection));
+    assertEquals(0, next.admitRecovery(root, next.removalMark(), () -> true, () -> 1),
+        "a producer handover must retain the removal");
+    assertEquals(0, registry.admitRecovery(root, registry.removalMark(), () -> true, () -> 1));
+    assertTrue(next.watch(root.toString(), "docs").watching(), "a deliberate add restores authority");
+    assertEquals(1, next.admitRecovery(root, next.removalMark(), () -> true, () -> 1));
+    assertEquals(0, registry.admitRecovery(root, beforeRemoval, () -> true, () -> 1),
+        "an old in-flight call still cannot cross the removal and re-add");
+  }
+
+  @Test
   void watchAcceptsValidDirectoryAndIsIdempotent() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("watched"));
     RootWatcherRegistry registry = new RootWatcherRegistry();

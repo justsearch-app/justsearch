@@ -62,6 +62,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
 
   // --- Session management (delegated to SessionHandle — tempdoc 397 §7.4 / §14.5 W1) ---
   private final SessionHandle sessions;
+  private final EmbeddingAssembly ownedAssembly;
 
   // --- Tokenizer ---
   private final HuggingFaceTokenizer tokenizer;
@@ -107,10 +108,22 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    *
    * @param sessions pre-configured session handle
    * @param shape model-intrinsic facts (max sequence length + pooling + token_type_ids)
-   * @param tokenizer pre-loaded DJL HuggingFace tokenizer
+   * @param tokenizer pre-loaded DJL HuggingFace tokenizer, transferred to this standalone encoder
    */
-  public OnnxEmbeddingEncoder(
-      SessionHandle sessions, EmbeddingShape shape, HuggingFaceTokenizer tokenizer) {
+  public OnnxEmbeddingEncoder(SessionHandle sessions, EmbeddingShape shape, HuggingFaceTokenizer tokenizer) {
+    this(new EmbeddingAssembly(sessions, shape, tokenizer, null), true);
+  }
+
+  /** Borrows the assembly; its surface retains tokenizer ownership. */
+  public OnnxEmbeddingEncoder(EmbeddingAssembly assembly) {
+    this(assembly, false);
+  }
+
+  private OnnxEmbeddingEncoder(EmbeddingAssembly assembly, boolean ownsAssembly) {
+    SessionHandle sessions = assembly.sessions();
+    var shape = assembly.shape();
+    var tokenizer = assembly.tokenizer();
+    this.ownedAssembly = ownsAssembly ? assembly : null;
     this.sessions = sessions;
     this.maxSeqLen = shape.maxSequenceLength();
     this.lateChunkingMaxSeqLen =
@@ -203,27 +216,38 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       throw new UncheckedIOException(
           "Failed to load embedding tokenizer from " + tokenizerPath, e);
     }
-    // Tempdoc 710 Wave 2 Move 1: capabilities resolved ONCE here (the composition choke point),
-    // not parsed by this encoder — detectPoolingStrategy's own file read is retired.
-    io.justsearch.ort.ModelCapabilities capabilities =
-        io.justsearch.ort.ModelCapabilityResolver.resolve(
-            "embedding",
-            modelDir,
-            manifest,
-            io.justsearch.ort.CapabilityRequirements.EMBEDDING,
-            capabilityContractStrict,
-            exactModelFile);
-    PoolingStrategy poolingStrategy = toPoolingStrategy(capabilities.poolingMode());
-    return new EmbeddingAssembly(
-        sessions,
-        new EmbeddingShape(
-            maxSeqLen,
-            needsTokenTypeIds,
-            poolingStrategy,
-            lateChunkingMaxSeqLen,
-            capabilities.embeddingDimension()),
-        tokenizer,
-        capabilities);
+    try {
+      // Tempdoc 710 Wave 2 Move 1: capabilities resolved ONCE here (the composition choke point),
+      // not parsed by this encoder — detectPoolingStrategy's own file read is retired.
+      io.justsearch.ort.ModelCapabilities capabilities =
+          io.justsearch.ort.ModelCapabilityResolver.resolve(
+              "embedding",
+              modelDir,
+              manifest,
+              io.justsearch.ort.CapabilityRequirements.EMBEDDING,
+              capabilityContractStrict,
+              exactModelFile);
+      PoolingStrategy poolingStrategy = toPoolingStrategy(capabilities.poolingMode());
+      return new EmbeddingAssembly(
+          sessions,
+          new EmbeddingShape(
+              maxSeqLen,
+              needsTokenTypeIds,
+              poolingStrategy,
+              lateChunkingMaxSeqLen,
+              capabilities.embeddingDimension()),
+          tokenizer,
+          capabilities);
+    } catch (RuntimeException | Error failure) {
+      var partial = new EmbeddingAssembly(sessions, null, tokenizer, null);
+      if (sessions != null) throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      try { partial.close(); }
+      catch (RuntimeException | Error cleanup) {
+        if (failure != cleanup) failure.addSuppressed(cleanup);
+        throw new io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure(failure, partial);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -1236,10 +1260,17 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     return LongBuffer.wrap(flat);
   }
 
+  /** Whether close has finished, so a containing service can retain an incomplete owner. */
+  public boolean isCloseComplete() {
+    return ownedAssembly != null ? ownedAssembly.tokenizerClosed()
+        : sessions == null || sessions.retirementStatus() == SessionHandle.RetirementStatus.RETIRED;
+  }
+
   @Override
   public void close() {
-    sessions.close();
-    tokenizer.close();
+    if (ownedAssembly != null) {
+      if (!ownedAssembly.tryClose()) return;
+    } else sessions.close();
     log.info("OnnxEmbeddingEncoder closed");
   }
 

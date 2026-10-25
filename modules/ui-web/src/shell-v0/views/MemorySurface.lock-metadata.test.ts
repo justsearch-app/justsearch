@@ -6,7 +6,7 @@ import './MemorySurface.js';
 import type { MemorySurface } from './MemorySurface.js';
 import type { JfButton } from '../components/Button.js';
 vi.mock('../components/ConfirmDialog.js', () => ({ confirmAsync: vi.fn(async () => true) }));
-const fact = { id: 'lock-metadata', kind: 'fact', content: 'Retain this fact until absence is confirmed' };
+const fact = { id: 'lock-metadata', revision: '"' + 'a'.repeat(64) + '"', kind: 'fact', content: 'Retain this fact until absence is confirmed' };
 const readable = () => new Response(JSON.stringify({ memories: [fact], locked: false }));
 const malformed = (locked: unknown, memories: unknown = []) => new Response(JSON.stringify({ memories, locked }));
 const invalidLocks = ['true', 'false', null, 0, 1, [], {}, undefined];
@@ -28,7 +28,7 @@ const reload = (el: MemorySurface) => el.shadowRoot!.querySelector<JfButton>('jf
 const text = (el: MemorySurface) => el.shadowRoot!.textContent ?? '';
 afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals(); });
 it.each(invalidLocks.map(locked => ({ locked })))('does not confirm lost-response absence with invalid locked=$locked', async ({ locked }) => {
-  vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(readable).mockImplementationOnce(readable)
+  vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(readable)
     .mockRejectedValueOnce(new TypeError('lost response')).mockImplementation(() => malformed(locked)));
   const el = await mount(); await forget(el)!.onActivate?.(); await settle(el);
   expect(text(el)).toContain('outcome is unknown');
@@ -45,16 +45,19 @@ it.each(invalidLocks.map(locked => ({ locked })))('does not trust initial presen
   expect(text(el)).not.toContain(fact.content);
   expect(el.shadowRoot!.querySelector<HTMLInputElement>('input.draft')!.disabled).toBe(true);
 });
-it.each(invalidLocks.map(locked => ({ locked })))('does not send DELETE after a consent read with invalid locked=$locked', async ({ locked }) => {
+it.each(invalidLocks.map(locked => ({ locked })))('does not send DELETE after a reload with invalid locked=$locked', async ({ locked }) => {
   const fetch = vi.fn().mockImplementationOnce(readable).mockImplementation(() => malformed(locked, [fact]));
   vi.stubGlobal('fetch', fetch);
-  const el = await mount(); await forget(el)!.onActivate?.(); await settle(el);
+  const el = await mount();
+  const staleButton = forget(el)!;
+  await (el as unknown as { reloadMemories(): Promise<void> }).reloadMemories();
+  await staleButton.onActivate?.(); await settle(el);
   expect(fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
   expect(el.loadError).toContain('Could not read');
   expect(el.announcement).toBe('');
 });
 it.each([[], [fact]].map(memories => ({ memories })))('keeps manual reconciliation unknown for malformed lock metadata and memories=$memories', async ({ memories }) => {
-  const fetch = vi.fn().mockImplementationOnce(readable).mockImplementationOnce(readable)
+  const fetch = vi.fn().mockImplementationOnce(readable)
     .mockRejectedValueOnce(new TypeError('lost response')).mockResolvedValueOnce(new Response('{}', { status: 503 }))
     .mockImplementationOnce(() => malformed('true', memories)).mockImplementation(readable);
   vi.stubGlobal('fetch', fetch);

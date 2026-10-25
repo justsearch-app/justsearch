@@ -1309,11 +1309,14 @@ final class IndexStatusOps {
    * would read it as an index holding nothing to migrate.
    */
   private java.util.OptionalLong docCountOrUnknown() {
-    if (ingestCountOps == null) {
+    // Deferred opens have no writer count; their reader still establishes whether content exists.
+    // Keep the existing writer count source once a writer is present, including during migration.
+    IndexCountOps counts = ingestCountOps != null ? ingestCountOps : searchCountOps;
+    if (counts == null) {
       return java.util.OptionalLong.empty();
     }
     try {
-      return java.util.OptionalLong.of(ingestCountOps.docCountOrThrow());
+      return java.util.OptionalLong.of(counts.docCountOrThrow());
     } catch (IOException | RuntimeException e) {
       log.debug("Failed to read the document count: {}", e.getMessage());
       return java.util.OptionalLong.empty();
@@ -1398,14 +1401,11 @@ final class IndexStatusOps {
           stored, ud.get(IndexFingerprint.COMMIT_META_INPUTS_KEY), docCount)) {
         return "BLOCKED_LEGACY";
       }
-      return ParityDiagnostics.diff(ud, expected, docCount).isEmpty()
-          ? "COMPATIBLE"
-          : "BLOCKED_MISMATCH";
     }
-    // A STALE fingerprint on an index holding nothing is the same non-event as an absent one: the
-    // next commit rewrites the whole user-data map. Through the guard's own predicate, so the two
-    // surfaces cannot disagree about an empty index in one direction after agreeing in the other.
-    return ParityDiagnostics.holdsNothingToMigrate(docCount) ? "COMPATIBLE" : "BLOCKED_MISMATCH";
+    // The guard also proves explicitly compatible additions from the recorded inputs. A raw
+    // digest comparison here would tell users to rebuild the very release index it opens writable.
+    return ParityDiagnostics.requiresRebuild(ParityDiagnostics.diff(ud, expected, docCount))
+        ? "BLOCKED_MISMATCH" : "COMPATIBLE";
   }
 
   /**
