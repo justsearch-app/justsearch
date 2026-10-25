@@ -69,6 +69,12 @@ public final class WritePathOps {
     this.bridge = bridge;
   }
 
+  /** Indexes and flushes the mapped document in the factory-owned disposable writer. */
+  static void probeDocument(IndexWriter canary, Document document) throws IOException {
+    canary.addDocument(document);
+    canary.flush();
+  }
+
   /**
    * Core single-document write. Caller is responsible for guards and queue-depth accounting.
    *
@@ -80,8 +86,8 @@ public final class WritePathOps {
     try {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
-      if (w == null) {
-        throw new IllegalStateException(
+      if (w == null || !w.isOpen()) {
+        throw new IndexWriterUnavailableException(
             "IndexWriter not available (runtime not started or closed)");
       }
       String idValue = asString(fields.get(idField));
@@ -106,8 +112,16 @@ public final class WritePathOps {
       } else {
         w.updateDocument(new Term(idField, idValue), luceneDoc);
       }
+    } catch (org.apache.lucene.store.AlreadyClosedException closed) {
+      LifecycleSnapshot current = session.snapshot;
+      if (current == null || current.writer() == null || !current.writer().isOpen()
+          || java.util.Arrays.stream(closed.getStackTrace()).anyMatch(frame ->
+              frame.getClassName().startsWith("org.apache.lucene.store."))) {
+        throw new IndexWriterUnavailableException("Index storage closed during write", closed);
+      }
+      throw closed;
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(classifyIOException(e), "Failed to add document", e);
+      throw indexingFailure(e, "Failed to add document");
     }
   }
 
@@ -119,8 +133,8 @@ public final class WritePathOps {
     try {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
-      if (w == null) {
-        throw new IllegalStateException(
+      if (w == null || !w.isOpen()) {
+        throw new IndexWriterUnavailableException(
             "IndexWriter not available (runtime not started or closed)");
       }
       if (!hardDeletes.isEmpty()) {
@@ -137,9 +151,26 @@ public final class WritePathOps {
             work.doc(),
             new NumericDocValuesField(session.softDeleteField, 1));
       }
+    } catch (org.apache.lucene.store.AlreadyClosedException closed) {
+      LifecycleSnapshot current = session.snapshot;
+      if (current == null || current.writer() == null || !current.writer().isOpen()
+          || java.util.Arrays.stream(closed.getStackTrace()).anyMatch(frame ->
+              frame.getClassName().startsWith("org.apache.lucene.store."))) {
+        throw new IndexWriterUnavailableException("Index storage closed during write", closed);
+      }
+      throw closed;
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(classifyIOException(e), "Failed to apply batch", e);
+      throw indexingFailure(e, "Failed to apply batch");
     }
+  }
+
+  private RuntimeException indexingFailure(IOException failure, String message) {
+    LifecycleSnapshot snapshot = session.snapshot;
+    if (snapshot != null && snapshot.writer() != null
+        && snapshot.writer().getTragicException() != null) {
+      return new IndexWriterUnavailableException(message, failure);
+    }
+    return IndexRuntimeIOException.fromIndexOperation(failure, message);
   }
 
   void appendSoftDeleteMaintenanceFields(Document doc, Map<String, Object> fields) {
@@ -162,15 +193,15 @@ public final class WritePathOps {
     try {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
-      if (w == null) {
-        throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+      if (w == null || !w.isOpen()) {
+        throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteDocuments(new Term(idField, id));
       session.pendingDocs.incrementAndGet();
       TelemetryEvents te = session.telemetryEvents;
       if (te != null) te.onHardDelete();
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(classifyIOException(e), "Failed to delete document", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete document");
     }
   }
 
@@ -202,8 +233,7 @@ public final class WritePathOps {
       TelemetryEvents te = session.telemetryEvents;
       if (te != null) te.onHardDelete();
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to delete document and chunks", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete document and chunks");
     }
   }
 
@@ -231,8 +261,7 @@ public final class WritePathOps {
       if (te != null) te.onHardDelete();
       log.debug("deleteChunksForParentDocId: submitted delete for chunks of {}", parentDocId);
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to delete chunks for parent", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete chunks for parent");
     }
   }
 
@@ -258,8 +287,8 @@ public final class WritePathOps {
               new PrefixQuery(new Term(SchemaFields.PATH, normalized)), excludedSubtrees), fileIds, List.of());
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
-      if (w == null) {
-        throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+      if (w == null || !w.isOpen()) {
+        throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteDocuments(query);
       // Tempdoc 809 finding 3: publish the bulk-deletion signal AFTER the delete is submitted, so
@@ -267,8 +296,7 @@ public final class WritePathOps {
       session.bulkDeleteEpoch.incrementAndGet();
       log.info("deleteByPathPrefix: deletion submitted for path prefix: {}", normalized);
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to delete by path prefix", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete by path prefix");
     }
   }
 
@@ -293,8 +321,8 @@ public final class WritePathOps {
     }
     LifecycleSnapshot snap = session.snapshot;
     IndexWriter w = snap != null ? snap.writer() : null;
-    if (w == null) {
-      throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+    if (w == null || !w.isOpen()) {
+      throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
     }
     Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
         new TermQuery(new Term(SchemaFields.COLLECTION, collection)), fileIds, List.of());
@@ -320,8 +348,7 @@ public final class WritePathOps {
           matched);
       return matched;
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to delete by collection", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete by collection");
     }
   }
 
@@ -620,8 +647,8 @@ public final class WritePathOps {
       if (rmwEvents != null) rmwEvents.onVectorFieldDropped(droppedVectors.count());
     }
     LifecycleSnapshot rmwSnap = session.snapshot;
-    if (rmwSnap == null || rmwSnap.writer() == null) {
-      throw new IllegalStateException("IndexWriter not available during read-modify-write");
+    if (rmwSnap == null || rmwSnap.writer() == null || !rmwSnap.writer().isOpen()) {
+      throw new IndexWriterUnavailableException("IndexWriter not available during read-modify-write");
     }
     rmwSnap.writer().updateDocument(new Term(idField, docId), newDoc);
     // Account per completed mutation, including the applied prefix of a batch that later fails.
@@ -984,12 +1011,12 @@ public final class WritePathOps {
     // construction has an open writer. Snapshot null means the runtime was closed.
     // Also reject writes during drain with IllegalStateException.
     if (session.draining) {
-      throw new IllegalStateException(
-          "Runtime is draining; retry on the new instance via the supplier holder");
+      throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DRAINING,
+          "Runtime is draining", null);
     }
     LifecycleSnapshot snap = session.snapshot;
     if (snap == null || snap.writer() == null) {
-      throw new IllegalStateException("Index is not writable (writer unavailable)");
+      throw new IndexWriterUnavailableException("Index is not writable (writer unavailable)");
     }
   }
 
@@ -1022,7 +1049,7 @@ public final class WritePathOps {
           readModifyWrite(searcher, docId, updates, new ParentSliceCache(), expectedFields));
     } catch (IOException e) {
       log.error("Failed to update document {}", docId, e);
-      throw new IndexRuntimeIOException(classifyIOException(e), "Failed to update document", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document");
     }
   }
 
@@ -1050,8 +1077,7 @@ public final class WritePathOps {
       return result;
     } catch (IOException e) {
       log.error("Failed to batch-update {} documents", batchUpdates.size(), e);
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to batch update documents", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to batch update documents");
     }
   }
 
@@ -1116,7 +1142,7 @@ public final class WritePathOps {
         return new LuceneRuntimeTypes.BatchUpdateResult(updated, updates.size() - updated);
       });
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(classifyIOException(e), "Failed conditional batch update", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update");
     }
   }
 
@@ -1133,8 +1159,7 @@ public final class WritePathOps {
       return bridge.withSearcherNoRefresh(searcher -> updateDocumentPaths(searcher, oldPath, newPath));
     } catch (IOException e) {
       log.error("Failed to update document paths {} -> {}", oldPath, newPath, e);
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to update document paths", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document paths");
     }
   }
 
@@ -1158,8 +1183,8 @@ public final class WritePathOps {
     guardWritable();
     LifecycleSnapshot snap = session.snapshot;
     IndexWriter w = snap != null ? snap.writer() : null;
-    if (w == null) {
-      throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+    if (w == null || !w.isOpen()) {
+      throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
     }
     try {
       w.forceMergeDeletes(true);
@@ -1171,7 +1196,7 @@ public final class WritePathOps {
           expungeDeletesOnly,
           expungeDeletesOnly ? 0 : Math.max(1, maxSegments));
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(classifyIOException(e), "Failed to settle index", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to settle index");
     }
   }
 
@@ -1180,15 +1205,14 @@ public final class WritePathOps {
     try {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
-      if (w == null) {
-        throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+      if (w == null || !w.isOpen()) {
+        throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteAll();
       session.bulkDeleteEpoch.incrementAndGet(); // tempdoc 809 finding 3 — see deleteByPathPrefix
       log.info("deleteAll: all documents deleted from index");
     } catch (IOException e) {
-      throw new IndexRuntimeIOException(
-          classifyIOException(e), "Failed to delete all documents", e);
+      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to delete all documents");
     }
   }
 

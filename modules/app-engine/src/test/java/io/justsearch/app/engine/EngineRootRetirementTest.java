@@ -350,6 +350,7 @@ final class EngineRootRetirementTest {
     // Mockito copies its fields so journal reads and spied admissions use the same connection.
     var queue = spy(openedQueue);
     var runtime = mock(RunningRuntime.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    when(runtime.isAcceptingWrites()).thenReturn(true);
     when(runtime.readPathOps()).thenReturn(null);
     when(runtime.pruneOps()).thenReturn(null);
     var service = spy(new WorkerIngestService(queue, null, null, pacing, layout.basePath(),

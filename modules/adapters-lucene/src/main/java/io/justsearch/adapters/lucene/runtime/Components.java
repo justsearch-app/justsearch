@@ -3,6 +3,7 @@ package io.justsearch.adapters.lucene.runtime;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.index.IndexWriter;
@@ -31,4 +32,5 @@ record Components(
     long nrtOnDemandMaxStaleMs,
     long reopenTargetMs,
     long reopenHardMs,
-    IndexRuntimeConfiguration runtimeConfiguration) {}
+    IndexRuntimeConfiguration runtimeConfiguration,
+    FileTime writerLockCreatedAt) {}

@@ -11,7 +11,7 @@ import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
  * the boundary contract that {@code JobBatchExtractor} classifies on, so it must not be nested
  * inside whichever implementation happens to throw it.
  */
-public final class SandboxExtractionException extends ContentExtractor.ExtractionException {
+public class SandboxExtractionException extends ContentExtractor.ExtractionException {
   public SandboxExtractionException(String message, Throwable cause) {
     super(message + " [" + IngestionReasonCodes.SANDBOX_FAILED + "]", cause);
   }

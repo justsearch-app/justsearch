@@ -25,6 +25,7 @@ import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor.ExtractionTimeoutException;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
@@ -51,6 +52,7 @@ import io.opentelemetry.context.Scope;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -121,6 +123,7 @@ public class IndexingLoop implements Closeable {
   /** Tempdoc 885 item 3: the duty-cycle policy that replaced the breath-hold pause. */
   private final IndexingPacing indexingPacing;
   private final TimeboxedContentExtractor contentExtractor;
+  private final PipelineCanary canary;
   // Tempdoc 516 Slice 4c: embeddingProvider / embeddingServiceForLifecycle / embeddingEvents
   // / embeddingCompatController are now owned by EmbeddingProviderLifecycle. The lifecycle's
   // own field declarations preserve the trust + JMM semantics (volatile + the lifecycle lock).
@@ -130,6 +133,10 @@ public class IndexingLoop implements Closeable {
   private final IndexingPipelineMetricCatalog pipelineCatalog;
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
   private final AtomicBoolean running = new AtomicBoolean(false);
+  // Wake cooperative stop without interrupting an owner of Lucene NIO channels.
+  private final Object stopMonitor = new Object();
+  private volatile long serviceOutagePausedUntilMs;
+  private final BatchServiceFailures queueFailures = new BatchServiceFailures();
   private final WorkerIngestionAuthority ingestionAuthority = new WorkerIngestionAuthority();
   // Tempdoc 410 review fix #1: counts outcome-aware queue write failures (rollback). Persistent
   // increments here mean recoverStuckJobs is bearing more load than usual; surface the signal
@@ -151,7 +158,7 @@ public class IndexingLoop implements Closeable {
   private volatile boolean detailedTracing;
 
   // 312 Phase 4: when true, inline embedding is enabled during migration rebuilds.
-  private volatile java.util.function.BooleanSupplier migrationActiveSupplier = () -> false;
+  private volatile BooleanSupplier migrationActiveSupplier = () -> false;
 
   // Tempdoc 400 LR2-d.2: supplies the current commit user-data map for
   // attaching commit.* identity attributes to indexing.batch spans. Default
@@ -373,6 +380,12 @@ public class IndexingLoop implements Closeable {
     this.contentExtractor = contentExtractor != null
         ? contentExtractor
         : ExtractionSandboxFactory.inProcessStructured(ocrRegistration, timeboxRegistration, extractionCatalog);
+    this.canary = new PipelineCanary(this.contentExtractor,
+        () -> this.documentIdentityStore, () -> this.pathResolutionStore.probe(), () -> {
+          indexingCoordinator.probeIngestion();
+          RunningRuntime source = activeLexicalSource.get();
+          if (source != null) source.indexingCoordinator().probeIngestion();
+        });
     this.pipelineCatalog = pipelineCatalog;
     this.outcomeWriteFailureCounter =
         ingestionOutcomeCatalog == null
@@ -426,6 +439,7 @@ public class IndexingLoop implements Closeable {
             (long delta) -> indexedSinceCommit += delta);
     this.writer =
         new JobBatchWriter(
+            ingestionAuthority,
             indexingCoordinator,
             signalBus,
             embeddingLifecycle,
@@ -465,6 +479,7 @@ public class IndexingLoop implements Closeable {
             this::recordStageMs,
             () -> detailedTracing,
             (long delta) -> indexedSinceCommit += delta);
+
     // Tempdoc 516 Slice 4d (W6): construct the scheduler. Encoder/service suppliers read
     // IndexingLoop's volatile fields so the async-load swap-on-the-fly semantics persist.
     this.backfillScheduler =
@@ -710,12 +725,13 @@ public class IndexingLoop implements Closeable {
         }
 
         if (!journal.retryBatchReturns()) {
-          if (!sleepBrieflyAfterError()) break;
+          if (!pauseAfterQueueFailure(journal.batchReturnFailure())) break;
           continue;
         }
 
         // Poll for pending jobs
         List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
+        if (journal.commitWriteFailure() == null) queueFailures.success();
 
         if (jobs.isEmpty()) {
           if (jobQueue.pollPendingBudgetExhausted()) continue;
@@ -728,6 +744,10 @@ public class IndexingLoop implements Closeable {
           }
 
           finishIdleCommit();
+          if (journal.commitWriteFailure() != null) {
+            if (!pauseAfterQueueFailure(journal.commitWriteFailure())) break;
+            continue;
+          }
 
           // Tempdoc 516 Slice 4d (W6): BackfillScheduler owns the per-cycle backfill
           // orchestration (combined enrichment tight loop + per-stage fallback + disambiguation
@@ -758,7 +778,22 @@ public class IndexingLoop implements Closeable {
         transitionToRunning();
 
         // Batch processing: extract all → batch embed → build+write
-        processBatch(jobs);
+        long retryAtMs = processBatch(jobs);
+        // Row deadlines alone do not throttle an outage while fresh backlog remains ready.
+        if (writer.deferredBatch() || extractor.deferredBatch()) {
+          // Earlier batches may have shorter deadlines than this growing service pause.
+          try {
+            jobQueue.extendServiceOutageDeferrals(retryAtMs);
+          } catch (RuntimeException extendFailure) {
+            // A queue that rejects this update rejected the deferrals too; still pause in full.
+            long nowNs = System.nanoTime();
+            if (lastExtendFailureLogNs == 0L || nowNs - lastExtendFailureLogNs >= 60_000_000_000L) {
+              lastExtendFailureLogNs = nowNs;
+              log.warn("Could not extend service-outage deferrals; pausing anyway", extendFailure);
+            }
+          }
+          if (!pauseForServiceOutage(retryAtMs)) break;
+        }
 
         // Time-based commit strategy (every 10s or when buffer is full)
         long now = System.currentTimeMillis();
@@ -793,6 +828,11 @@ public class IndexingLoop implements Closeable {
           }
         }
 
+        if (journal.commitWriteFailure() != null) {
+          if (!pauseAfterQueueFailure(journal.commitWriteFailure())) break;
+          continue;
+        }
+
         // Tempdoc 516 Slice 4d (W6): time-gated interleaved SPLADE/BGE-M3 backfill is owned
         // by the scheduler (tempdoc 278 item 4a). Limits primary-indexing overhead (~13%).
         backfillScheduler.runInterleavedSplade(now);
@@ -815,6 +855,8 @@ public class IndexingLoop implements Closeable {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
+      } catch (IngestionServiceUnavailableException | OutcomeWriteException unavailable) {
+        if (!pauseAfterQueueFailure(unavailable)) break;
       } catch (Exception e) {
         log.error("Unexpected error in indexing loop", e);
         if (!sleepBrieflyAfterError()) {
@@ -914,15 +956,57 @@ public class IndexingLoop implements Closeable {
 
   /**
    * Back-off after a recovered error to avoid a tight failure loop (tempdoc 588; shared by the
-   * Exception and Error recovery paths). Returns {@code false} if interrupted (caller should break).
+   * Exception and Error recovery paths). Returns {@code false} if stopped or interrupted.
    */
   private boolean sleepBrieflyAfterError() {
+    return sleepAfterError(ERROR_BACKOFF_MS);
+  }
+
+  /** Actual cooperative outage pause, independent of how much fresh work is still ready. */
+  public long serviceOutagePausedUntilMs() {
+    long deadline = serviceOutagePausedUntilMs;
+    return running.get() && deadline > System.currentTimeMillis() ? deadline : 0L;
+  }
+
+  private boolean pauseAfterQueueFailure(Throwable failure) {
+    queueFailures.begin();
+    queueFailures.unavailable(failure, ignored -> {});
+    long delay = queueFailures.prepareRetry(Math.max(writer.retryDelayMs(), extractor.retryDelayMs()));
+    long deadline = System.currentTimeMillis() + delay;
+    queueFailures.finish(deadline);
+    return pauseForServiceOutage(deadline);
+  }
+
+  private boolean pauseForServiceOutage(long deadline) {
+    serviceOutagePausedUntilMs = deadline;
     try {
-      Thread.sleep(ERROR_BACKOFF_MS);
-      return true;
+      return sleepAfterError(Math.max(0, deadline - System.currentTimeMillis()));
+    } finally {
+      serviceOutagePausedUntilMs = 0L;
+    }
+  }
+
+  private boolean sleepAfterError(long delayMs) {
+    try {
+      synchronized (stopMonitor) {
+        long remainingNs = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(delayMs);
+        long deadline = System.nanoTime() + remainingNs;
+        while (running.get() && remainingNs > 0) {
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(stopMonitor, remainingNs);
+          remainingNs = deadline - System.nanoTime();
+        }
+        return running.get();
+      }
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       return false;
+    }
+  }
+
+  private void requestStop() {
+    synchronized (stopMonitor) {
+      running.set(false);
+      stopMonitor.notifyAll();
     }
   }
 
@@ -940,6 +1024,7 @@ public class IndexingLoop implements Closeable {
   private static final long HEARTBEAT_INTERVAL_MS = LivenessWindows.HEARTBEAT_INTERVAL_MS;
 
   private long lastHeartbeatMs = 0L;
+  private long lastExtendFailureLogNs = 0L;
 
   /** Beat now: signal this loop still owns its PROCESSING rows (best-effort, never throws). */
   private void heartbeat() {
@@ -954,9 +1039,12 @@ public class IndexingLoop implements Closeable {
     }
   }
 
-  private void processBatch(List<JobQueue.IndexJob> jobs) {
+  private long processBatch(List<JobQueue.IndexJob> jobs) {
+    long retryAtMs = 0;
     Span batchSpan = Span.getInvalid();
     boolean fatal = false;
+    writer.beginBatch();
+    canary.beginBatch();
     try {
       batchSpan = maybeSpan("indexing.batch");
       batchSpan.setAttribute("batch.polled", (long) jobs.size());
@@ -975,16 +1063,35 @@ public class IndexingLoop implements Closeable {
     } finally {
       // A stopped/failed batch may not visit every polled claim. Written claims retain their
       // existing commit owner; the remainder return only after synchronous batch execution exits.
-      if (!fatal) journal.returnBatchClaims(jobs);
+      if (!fatal) {
+        try {
+          boolean peerSucceeded = writer.pipelineSucceeded();
+          if (peerSucceeded) extractor.pipelineSucceeded();
+          BooleanSupplier healthy = () -> peerSucceeded || canary.getAsBoolean();
+          long delayMs = Math.max(writer.prepareRetry(healthy), extractor.prepareRetry(healthy));
+          retryAtMs = System.currentTimeMillis() + delayMs;
+        } finally {
+          try {
+            writer.finishBatch(retryAtMs);
+          } finally {
+            try {
+              extractor.finishBatch(retryAtMs);
+            } finally {
+              journal.returnBatchClaims(jobs);
+            }
+          }
+        }
+      }
       batchSpan.end();
     }
+    return retryAtMs;
   }
 
   private void processBatchInner(List<JobQueue.IndexJob> jobs, Span batchSpan) {
     // Phase 1: Extract all — pre-checks and Tika extraction per job.
     // Slice 4a.3 (W5.2): JobBatchExtractor owns the per-job loop, the indexEmptyForBatch
     // cache, and the per-outcome ledger/batchStats bookkeeping.
-    List<ExtractedJob> extracted = extractor.extractAll(jobs);
+    List<ExtractedJob> extracted = extractor.extractForBatch(jobs);
 
     if (extracted.isEmpty()) {
       batchSpan.setAttribute("batch.extracted", 0L);
@@ -1040,7 +1147,7 @@ public class IndexingLoop implements Closeable {
     // Liveness beat: batch embedding (Phase 2) can be long on GPU — signal we still own these.
     heartbeat();
 
-    // Phase 3: Build and write all docs
+    // Phase 3: Build and write all docs. Judge shared-service failures after visiting peers.
     for (int i = 0; i < extracted.size(); i++) {
       if (!running.get()) break;
 
@@ -1234,7 +1341,7 @@ public class IndexingLoop implements Closeable {
     if (!isRunning()) {
       return true;
     }
-    running.set(false);
+    requestStop();
     Thread thread = loopThread;
     if (thread != null) {
       try {
@@ -1333,7 +1440,7 @@ public class IndexingLoop implements Closeable {
   private void closeOwnedResources(boolean closeNer) throws IOException {
     log.info("Stopping IndexingLoop...");
     synchronized (probePublicationMonitor) {
-      running.set(false);
+      requestStop();
       activationGate.countDown();
       // A late gate release cannot re-publish this loop's probe after close clears it.
       signalBus.setPendingIngestProbe(null);
@@ -1359,6 +1466,7 @@ public class IndexingLoop implements Closeable {
     // Retain all later component resources if OCR still owns a task or child. The enclosing
     // service/server keeps this extractor reachable and can retry close after actual exit.
     if (contentExtractor != null) {
+      try { canary.close(); } catch (IOException cleanup) { log.warn("Could not remove extraction canary", cleanup); }
       try { contentExtractor.close(); }
       catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
     }
@@ -1403,11 +1511,11 @@ public class IndexingLoop implements Closeable {
     // DO NOT call loopThread.interrupt() — Lucene uses NIO channels internally, and
     // Thread.interrupt() causes ClosedByInterruptException which permanently closes
     // the IndexWriter. Instead, rely on the loop's natural running-flag check (every
-    // iteration, including idle sleeps of 100ms-1s).
+    // iteration, including idle sleeps of 100ms-1s), and wake its outage pause cooperatively.
     // The loop thread may complete its current iteration (up to one batch) before it
     // observes running=false and exits. This is safe because the externalCleanup
     // callback calls deleteAll() which wipes the index unconditionally.
-    running.set(false);
+    requestStop();
     if (loopThread != null) {
       loopThread.join(10_000);
       if (loopThread.isAlive()) {
