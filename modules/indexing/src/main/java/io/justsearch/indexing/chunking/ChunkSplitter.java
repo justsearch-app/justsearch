@@ -97,7 +97,7 @@ public final class ChunkSplitter {
    * shape, so a silent algorithm change would otherwise leave an index whose chunks no longer match
    * what the runtime would produce, with nothing to detect it.
    */
-  public static final String ALGORITHM_VERSION = "v1";
+  public static final String ALGORITHM_VERSION = "v2";
 
   /**
    * Content length at or above which a document is split into chunk documents at all. It lives
@@ -293,6 +293,10 @@ public final class ChunkSplitter {
         }
       }
 
+      if (bisectsSurrogatePair(remaining, endPos)) {
+        endPos++;
+      }
+
       // Extract chunk
       String chunk = remaining.substring(0, endPos).trim();
       if (!chunk.isEmpty()) {
@@ -316,6 +320,10 @@ public final class ChunkSplitter {
         }
       }
 
+      if (bisectsSurrogatePair(remaining, advance)) {
+        // Keep overlap where possible; a one-unit budget still advances a whole code point.
+        advance = advance > 1 ? advance - 1 : Character.charCount(remaining.codePointAt(0));
+      }
       if (advance >= remaining.length()) {
         break;
       }
@@ -735,6 +743,13 @@ public final class ChunkSplitter {
     return Math.min(targetEnd, text.length());
   }
 
+  /** Whether a UTF-16 offset separates an existing high/low surrogate pair. */
+  public static boolean bisectsSurrogatePair(String text, int offset) {
+    return offset > 0 && offset < text.length()
+        && Character.isHighSurrogate(text.charAt(offset - 1))
+        && Character.isLowSurrogate(text.charAt(offset));
+  }
+
   /**
    * Represents a chunk with its metadata.
    */
@@ -819,6 +834,10 @@ public final class ChunkSplitter {
         endPos = (boundary > position && boundary <= text.length()) ? boundary : targetEnd;
       }
 
+      if (bisectsSurrogatePair(text, endPos)) {
+        endPos++;
+      }
+
       String rawChunk = text.substring(position, endPos);
       String chunkContent = rawChunk.strip();
       if (!chunkContent.isEmpty()) {
@@ -857,7 +876,13 @@ public final class ChunkSplitter {
         }
       }
 
-      position = position + advance;
+      int nextPosition = position + advance;
+      if (bisectsSurrogatePair(text, nextPosition)) {
+        nextPosition = nextPosition > position + 1
+            ? nextPosition - 1
+            : position + Character.charCount(text.codePointAt(position));
+      }
+      position = nextPosition;
     }
 
     return chunks;

@@ -56,6 +56,34 @@ final class PreOpenSchemaMismatchBootTest {
     return new IndexGenerationManager(layout.indexBase()).initializeOrLoad().state();
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "chunkAlgorithmUpgradeUsesExistingBootRecoveryPolicies({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"BLUE_GREEN_MIGRATE", "FAIL_CLOSED", "REBUILD_BACKUP_FIRST"})
+  void chunkAlgorithmUpgradeUsesExistingBootRecoveryPolicies(String policy, @TempDir Path tempDir)
+      throws Exception {
+    var layout = WorkerBootFixture.layout(tempDir);
+    WorkerBootFixture.seedChunkAlgorithm(layout.activePath(), "v1", 3);
+    WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), policy);
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    if (policy.equals("FAIL_CLOSED")) {
+      assertThrows(IOException.class, server::start);
+      assertEquals(3, docCount(layout.activePath()), "refusal keeps the source generation");
+    } else {
+      server.start();
+      assertNotNull(server.appServices());
+      if (policy.equals("BLUE_GREEN_MIGRATE")) {
+        assertEquals(IndexGenerationManager.MigrationState.MIGRATING.name(), stateAfterBoot(layout).migration_state());
+        assertNotNull(stateAfterBoot(layout).building_generation());
+        assertEquals(3, docCount(layout.activePath()), "Blue remains intact during rebuild");
+      } else {
+        Path backup = soleSiblingWithSuffix(layout.activePath(), ".bak-");
+        assertNotNull(backup);
+        assertEquals(3, docCount(backup));
+        assertEquals(0, docCount(layout.activePath()));
+      }
+    }
+  }
+
   /** (a) The headline case: segments present, shape changed, production policy. */
   @Test
   void aChangedShapeOnAnIndexWithSegmentsStartsTheMigrationAtBoot(@TempDir Path tempDir)
