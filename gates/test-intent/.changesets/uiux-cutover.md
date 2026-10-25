@@ -855,3 +855,14 @@ Every source below is an agent choice under the quoted delegation, never owner-a
   "note": "Expectation changes match delegated C1-C9/A1-A9 scope; independent declared digest and default-link before/after reruns inspected. This accepts test intent only. Product verdict is fail: real cold incoming alias/answer overwrites the migrated legacy draft after edit/navigation (C4/A1); see candidate-cold-draft-repro and after-edit-navigation evidence. Native focus and unexercised live variants remain limits."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cutover-residency-independent-cv7",
+  "verdict": "accept",
+  "digest": "sha256:d5b557735c2cff877e10e28e17613dd8582e6c70ab80207e2ce481d96a8eca62",
+  "note": "Expected-value review only against C1-C9/A1-A9/FC15; product verdict fails initial-context lifecycle revocation. Runtime and final gates remain unverified."
+}
+```

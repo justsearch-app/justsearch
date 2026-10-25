@@ -401,3 +401,14 @@ Changed old expectations are explicit: the branch successful-terminal and two ex
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cutover-residency-independent-cv7",
+  "verdict": "accept",
+  "digest": "sha256:1a026155ebfe5c43c1c9a2760fba958d4d4c9b5bf60d1678918fca6b2fc7d3f6",
+  "note": "Expected-value review only against NR15/RR15, including explicit reviewed slot retirement; product verdict fails initial-context lifecycle revocation. Existing unit expectations do not cover that adversarial combination; runtime and final gates remain unverified."
+}
+```
