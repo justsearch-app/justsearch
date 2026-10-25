@@ -1,0 +1,65 @@
+{
+  "kind": "executed-preservation-receipt",
+  "check": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WatcherReloadRetryTest.java",
+  "baseline": "1e5742df917a6b4a2b0c1cfb90429914d8c593d3",
+  "candidate": "f65a294e739afca385220938a3c0c0e37eb6a727",
+  "sourceDigest": "ee403061d70a7423ac9af2820b07e3fd7a853e6afd7efd5a9ca7c9589be0677c",
+  "originalSourceDigest": "7f672325a4b2e3c5b9193cbaa0e1290a7a23ebf5dfe6445901481480c8ea886d",
+  "change": "Exactly two immutable-configuration stubs; no changed assertion, input, mutation or fault.",
+  "producer": "tmp/builder/round9-collect-watcher-preservation.py",
+  "producerDigest": "86d8021a96aa9dd571fccafbfde445e235799a2fc13faff80bc802d03fcad2ce",
+  "runs": [
+    {
+      "phase": "before",
+      "command": "bash tmp/builder/round9-watcher-before-run.sh",
+      "exitCode": 0,
+      "logDigest": "38365b275c1cdeb6b4b8f4cabaea59d9f85b48746df35682463171352572302f",
+      "suites": [
+        {
+          "mode": "Present",
+          "xml": "tmp/builder/before-1e5742df9/modules/indexer-worker/build/test-results/ciUnitTestRound9WatcherPreservationPresent/TEST-io.justsearch.indexerworker.server.WatcherReloadRetryTest.xml",
+          "xmlDigest": "678f06770e875833599d19f70e5c95c739610f0f1e322e5e1a669eb85bd4ede9",
+          "tests": 1,
+          "passed": 1,
+          "failures": 0,
+          "skipped": 0
+        },
+        {
+          "mode": "Absent",
+          "xml": "tmp/builder/before-1e5742df9/modules/indexer-worker/build/test-results/ciUnitTestRound9WatcherPreservationAbsent/TEST-io.justsearch.indexerworker.server.WatcherReloadRetryTest.xml",
+          "xmlDigest": "6f06a3280bdb809998e655e3924b8a8191a7ad27201ed15b357ef456f39d6244",
+          "tests": 1,
+          "passed": 1,
+          "failures": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "command": "bash tmp/builder/round9-watcher-after-run.sh",
+      "exitCode": 0,
+      "logDigest": "3d6c134f9bf9eadd69555d60d0a76cd4cfb89adb532e5fb1bacd2f4cd281fc7e",
+      "suites": [
+        {
+          "mode": "Present",
+          "xml": "modules/indexer-worker/build/test-results/ciUnitTestRound9WatcherPreservationPresent/TEST-io.justsearch.indexerworker.server.WatcherReloadRetryTest.xml",
+          "xmlDigest": "016f4df6de2f0af83ad8c1c8e51b448e4cb1ce1f8ec56441e6b31169db1a5987",
+          "tests": 1,
+          "passed": 1,
+          "failures": 0,
+          "skipped": 0
+        },
+        {
+          "mode": "Absent",
+          "xml": "modules/indexer-worker/build/test-results/ciUnitTestRound9WatcherPreservationAbsent/TEST-io.justsearch.indexerworker.server.WatcherReloadRetryTest.xml",
+          "xmlDigest": "d05805c5975a99c9131e87b414dc34d5ac9908516bb7f240f0c1e169e29c8639",
+          "tests": 1,
+          "passed": 1,
+          "failures": 0,
+          "skipped": 0
+        }
+      ]
+    }
+  ]
+}

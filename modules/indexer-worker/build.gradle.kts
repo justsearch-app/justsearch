@@ -1,3 +1,7 @@
+import org.gradle.api.attributes.Category
+import org.gradle.api.attributes.LibraryElements
+import org.gradle.api.attributes.Usage
+
 // Lane F stage A item A13 — this module is a LIBRARY, not an application. The `application`
 // plugin, `mainClass`, `applicationName`, `applicationDefaultJvmArgs`, the `distributions` block,
 // the assemble->installDist wiring, the installDist build-stamp and the `runWorkerStandalone`
@@ -9,7 +13,34 @@ plugins {
   id("conventions.jvm-base")
 }
 
+// Only the child Engine sees the UI runtime; the indexer's test classpath stays unchanged.
+val release030HeadlessRuntime = configurations.create("release030HeadlessRuntime") {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+  attributes {
+    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class.java, Usage.JAVA_RUNTIME))
+    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category::class.java, Category.LIBRARY))
+    attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE,
+        objects.named(LibraryElements::class.java, LibraryElements.JAR))
+  }
+}
+
+abstract class Release030HeadlessRuntimeArguments : org.gradle.process.CommandLineArgumentProvider {
+  @get:org.gradle.api.tasks.Classpath
+  abstract val runtimeClasspath: org.gradle.api.file.ConfigurableFileCollection
+  override fun asArguments() =
+      listOf("-Djustsearch.test.headless.classpath=${runtimeClasspath.asPath}")
+}
+
+tasks.withType<Test>().configureEach {
+  dependsOn(release030HeadlessRuntime)
+  val runtimeArguments = objects.newInstance<Release030HeadlessRuntimeArguments>()
+  runtimeArguments.runtimeClasspath.from(release030HeadlessRuntime)
+  jvmArgumentProviders.add(runtimeArguments)
+}
+
 dependencies {
+  add(release030HeadlessRuntime.name, project(":modules:ui"))
   testImplementation(project(":modules:app-services"))
   testImplementation(testFixtures(project(":modules:adapters-lucene")))
   testImplementation(testFixtures(project(":modules:core")))

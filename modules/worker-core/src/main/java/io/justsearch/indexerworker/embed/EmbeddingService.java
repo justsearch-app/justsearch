@@ -58,6 +58,7 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   private final String documentPrefix;
   private final String queryPrefix;
   private final AtomicBoolean initialized = new AtomicBoolean(false);
+  private boolean cleanupComplete;
   private final AtomicBoolean closed = new AtomicBoolean(false);
 
   private volatile AiBackend backend;
@@ -758,20 +759,27 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   }
 
   @Override
-  public void close() {
-    if (closed.compareAndSet(false, true)) {
+  public synchronized void close() {
+    if (!cleanupComplete) {
+      closed.set(true);
       log.info("Closing EmbeddingService...");
+      boolean backendClosed = true;
       if (backend != null) {
         try {
           backend.close();
         } catch (BackendException e) {
           log.warn("Error closing embedding backend: {}", e.getMessage());
+          backendClosed = false;
         }
-        backend = null;
+        if (backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+            && !onnx.encoder().isCloseComplete()) backendClosed = false;
       }
-      // Clear embedding cache to release memory
+      // Clear after downstream cleanup so admitted work cannot refill the completed cache.
       embeddingCache.clear();
       available = false;
+      if (!backendClosed) return;
+      backend = null;
+      cleanupComplete = true;
       log.info("EmbeddingService closed.");
     }
   }

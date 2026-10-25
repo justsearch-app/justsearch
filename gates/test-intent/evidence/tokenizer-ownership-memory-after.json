@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:075ff5907dafabee30bbc935ea75b957121e790764db11b7a678e579d7307ad5"
+  },
+  "createdAt": "2026-10-24T04:42:03.351Z",
+  "revision": "9e62d16d4df5a6e5ec662fa788e3e895a7797f9d",
+  "tree": "53434e2f3e24c45b62e948600dfc73b2e96f045d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "tmp/mem-guard.sh tmp/evidence-after-guard.log -- js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.BrakeExhaustedWorkerServesReadOnlyTest.repeatedBootCloseNativeTokenizerFloor\" --rerun -PskipWebBuild=true --console=plain --init-script tmp/memory.gradle -Dtokenizer.memory.mode=after --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 337492
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/BrakeExhaustedWorkerServesReadOnlyTest.java#repeatedBootCloseNativeTokenizerFloor",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/BrakeExhaustedWorkerServesReadOnlyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19c67ce74c2f847e77d2ff77036d6430a1f9f73cdcbd489d9cdef7605eb819be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedBootCloseNativeTokenizerFloor(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:804989313a321c246a681ce746fcc3590cddeadcd404fd6ad42b2dcefef7cd86"
+}

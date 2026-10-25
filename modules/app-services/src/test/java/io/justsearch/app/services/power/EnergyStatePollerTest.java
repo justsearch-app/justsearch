@@ -4,6 +4,8 @@ package io.justsearch.app.services.power;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import io.justsearch.app.util.EnergyState;
 import io.justsearch.core.execution.TestEngineExecutors;
@@ -130,17 +132,22 @@ final class EnergyStatePollerTest {
   @Tag("load-sensitive")
   @DisplayName("start() polls immediately, is idempotent, and is restartable after close()")
   void startPollsImmediatelyAndRestarts() throws InterruptedException {
-    GpuSchedulingGauge gauge = new GpuSchedulingGauge();
+    GpuSchedulingGauge gauge = spy(new GpuSchedulingGauge());
     CountDownLatch firstRun = new CountDownLatch(1);
     AtomicReference<CountDownLatch> latch = new AtomicReference<>(firstRun);
+    doAnswer(
+            invocation -> {
+              invocation.callRealMethod();
+              // The probe returning is too early: wait until the gauge has been written.
+              latch.get().countDown();
+              return null;
+            })
+        .when(gauge)
+        .setEnergyReduced(true);
 
     EnergyStatePoller poller =
         new EnergyStatePoller(
-            processExecutors, gauge,
-            () -> {
-              latch.get().countDown();
-              return reduced();
-            });
+            processExecutors, gauge, EnergyStatePollerTest::reduced);
     try {
       poller.start();
       poller.start(); // idempotent: must not stack a second scheduled poll

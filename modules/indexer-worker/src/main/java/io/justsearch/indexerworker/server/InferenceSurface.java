@@ -34,6 +34,8 @@ import java.util.TreeMap;
  * <p>{@link #handles()} collects every live {@link SessionHandle}; {@link #close()} attempts to
  * retire all of them before propagating an aggregate failure. Refused handles remain available
  * for a later retry, and {@link #retirementStatus()} exposes their aggregate disposition.
+ * Assemblies release their tokenizers only after every handle has retired; metadata copies and
+ * partitions retain the same assembly close state.
  *
  * <p>Sparse-model selection (bge-m3 vs splade) means at most one of {@link #splade()} and
  * {@link #bgeM3()} is populated: BGE-M3 wins when {@code cfg.ai().sparseModel() == "bge-m3"} and
@@ -49,6 +51,7 @@ import java.util.TreeMap;
  * @param handles every {@link SessionHandle} the surface owns; iterated for shutdown
  * @param componentObservation config digest and requested/missing-role composition evidence
  * @param handleRoles native handles by role, including handles whose assembly failed
+ * @param failedAssemblies partial assembly owners retained when factory cleanup could not finish
  */
 public record InferenceSurface(
     Optional<EmbeddingAssembly> embedding,
@@ -61,8 +64,21 @@ public record InferenceSurface(
     List<SessionHandle> handles,
     ComponentObservation componentObservation,
     Map<EncoderRole, SessionHandle> handleRoles,
-    Throwable embeddingFailure)
+    Throwable embeddingFailure,
+    Map<EncoderRole, AutoCloseable> failedAssemblies)
     implements AutoCloseable {
+
+  /** Surfaces with no partially built assemblies. */
+  public InferenceSurface(
+      Optional<EmbeddingAssembly> embedding, Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker, Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade, Optional<BgeM3Assembly> bgeM3,
+      PolicySnapshot policies, List<SessionHandle> handles,
+      ComponentObservation componentObservation, Map<EncoderRole, SessionHandle> handleRoles,
+      Throwable embeddingFailure) {
+    this(embedding, ner, reranker, citation, splade, bgeM3, policies, handles,
+        componentObservation, handleRoles, embeddingFailure, Map.of());
+  }
 
   /** Existing surfaces without a captured load failure. */
   public InferenceSurface(
@@ -101,6 +117,7 @@ public record InferenceSurface(
     handles = List.copyOf(handles);
     Objects.requireNonNull(componentObservation, "componentObservation");
     handleRoles = Map.copyOf(handleRoles);
+    failedAssemblies = Map.copyOf(failedAssemblies);
   }
 
   /** Compatibility constructor for callers that only have successful assembly role evidence. */
@@ -146,7 +163,7 @@ public record InferenceSurface(
     missing.addAll(unavailable);
     return new InferenceSurface(embedding, ner, reranker, citation, splade, bgeM3, policies,
         handles, new ComponentObservation(componentObservation.configurationDigest(),
-            requested, missing, componentObservation.querySelection()), handleRoles, embeddingFailure);
+            requested, missing, componentObservation.querySelection()), handleRoles, embeddingFailure, failedAssemblies);
   }
 
   /** Transfers the two independently replaceable query roles away from index-role lifetime. */
@@ -197,10 +214,20 @@ public record InferenceSurface(
     return new Partition(
         new InferenceSurface(embedding, ner, Optional.empty(), Optional.empty(), splade, bgeM3,
             policyFor(indexRoles), indexHandles,
-            observationFor(indexRoles, projection.indexDigest(), false), handlesFor(indexRoles), embeddingFailure),
+            observationFor(indexRoles, projection.indexDigest(), false), handlesFor(indexRoles), embeddingFailure,
+            failedAssembliesFor(indexRoles)),
         new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
             Optional.empty(), Optional.empty(), policyFor(queryRoles), queryHandles,
-            observationFor(queryRoles, projection.queryDigest(), true), handlesFor(queryRoles)));
+            observationFor(queryRoles, projection.queryDigest(), true), handlesFor(queryRoles), null,
+            failedAssembliesFor(queryRoles)));
+  }
+
+  private Map<EncoderRole, AutoCloseable> failedAssembliesFor(Set<EncoderRole> roles) {
+    Map<EncoderRole, AutoCloseable> selected = new EnumMap<>(EncoderRole.class);
+    failedAssemblies.forEach((role, assembly) -> {
+      if (roles.contains(role)) selected.put(role, assembly);
+    });
+    return selected;
   }
 
   private Map<EncoderRole, SessionHandle> handlesFor(Set<EncoderRole> roles) {
@@ -308,14 +335,40 @@ public record InferenceSurface(
     return aggregate;
   }
 
+  /** Includes tokenizer cleanup when a failed, unpublished surface is retained for retry. */
+  boolean tokenizersClosed() {
+    return embedding.map(EmbeddingAssembly::tokenizerClosed).orElse(true)
+        && ner.map(NerAssembly::tokenizerClosed).orElse(true)
+        && reranker.map(RerankerAssembly::tokenizerClosed).orElse(true)
+        && citation.map(RerankerAssembly::tokenizerClosed).orElse(true)
+        && splade.map(SpladeAssembly::tokenizerClosed).orElse(true)
+        && bgeM3.map(BgeM3Assembly::tokenizerClosed).orElse(true)
+        && failedAssemblies.values().stream().allMatch(InferenceSurface::tokenizerClosed);
+  }
+
+  private static boolean tokenizerClosed(AutoCloseable owner) {
+    if (owner instanceof io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure failure) return failure.tokenizerClosed();
+    if (owner instanceof io.justsearch.reranker.AssemblyBuildFailure failure) return failure.tokenizerClosed();
+    if (owner instanceof EmbeddingAssembly assembly) return assembly.tokenizerClosed();
+    if (owner instanceof NerAssembly assembly) return assembly.tokenizerClosed();
+    if (owner instanceof RerankerAssembly assembly) return assembly.tokenizerClosed();
+    if (owner instanceof SpladeAssembly assembly) return assembly.tokenizerClosed();
+    if (owner instanceof BgeM3Assembly assembly) return assembly.tokenizerClosed();
+    throw new IllegalArgumentException("Unknown assembly owner " + owner.getClass());
+  }
+
   @Override
   public void close() {
     IllegalStateException aggregateFailure = null;
+    Error fatalFailure = null;
     for (SessionHandle handle : handles) {
       try {
         handle.close();
       } catch (RuntimeException failure) {
         aggregateFailure = addFailure(aggregateFailure, failure);
+      } catch (Error failure) {
+        if (fatalFailure == null) fatalFailure = failure;
+        else if (fatalFailure != failure) fatalFailure.addSuppressed(failure);
       }
       SessionHandle.RetirementStatus status = handle.retirementStatus();
       if (status != SessionHandle.RetirementStatus.RETIRED) {
@@ -325,13 +378,41 @@ public record InferenceSurface(
                 new IllegalStateException("Native session handle has not retired: " + status));
       }
     }
+    if (fatalFailure != null) {
+      if (aggregateFailure != null) fatalFailure.addSuppressed(aggregateFailure);
+      throw fatalFailure;
+    }
     if (aggregateFailure != null) {
       throw aggregateFailure;
     }
+    List<AutoCloseable> assemblies = new ArrayList<>();
+    embedding.ifPresent(assemblies::add);
+    ner.ifPresent(assemblies::add);
+    reranker.ifPresent(assemblies::add);
+    citation.ifPresent(assemblies::add);
+    splade.ifPresent(assemblies::add);
+    bgeM3.ifPresent(assemblies::add);
+    assemblies.addAll(failedAssemblies.values());
+    for (AutoCloseable assembly : assemblies) {
+      try {
+        assembly.close();
+      } catch (Exception failure) {
+        aggregateFailure = addFailure(aggregateFailure,
+            new IllegalStateException("Assembly tokenizer retirement failed", failure));
+      } catch (Error failure) {
+        if (fatalFailure == null) fatalFailure = failure;
+        else if (fatalFailure != failure) fatalFailure.addSuppressed(failure);
+      }
+    }
+    if (fatalFailure != null) {
+      if (aggregateFailure != null) fatalFailure.addSuppressed(aggregateFailure);
+      throw fatalFailure;
+    }
+    if (aggregateFailure != null) throw aggregateFailure;
   }
 
   private static IllegalStateException addFailure(
-      IllegalStateException aggregateFailure, RuntimeException failure) {
+      IllegalStateException aggregateFailure, Throwable failure) {
     IllegalStateException aggregate = aggregateFailure;
     if (aggregate == null) {
       aggregate = new IllegalStateException("Inference surface retirement was not quiescent");

@@ -42,15 +42,18 @@ final class WorkerIngestionAuthority {
 
   SourceAdmission admit(io.justsearch.indexerworker.queue.JobQueue.IndexJob job) throws IOException {
     if (job.ingestionRoot() == null) {
-      // Pre-boundary queue and switch-buffer records cannot distinguish explicit files from
-      // directory discoveries. Retire this admission before any source read; a fresh scan,
-      // witnessed event or explicit-file request can admit it again with its actual boundary.
+      // Ordinary historical/main admissions retain policy retirement. Only original upgrade
+      // debt, or unowned rows quarantined while invalidating an upgrade checkpoint, can still
+      // acquire scope from recovery. Keep their content, with the existing seven-day retry bound.
+      String revision = job.unitRevision();
+      boolean recovery = revision != null && (revision.startsWith("release030/")
+          || revision.startsWith("release030-unscoped/"));
       return SourceAdmission.terminal(
-          SourceAdmissionAction.SKIP_DONE,
+          recovery ? SourceAdmissionAction.RETRYABLE_FAILURE : SourceAdmissionAction.SKIP_DONE,
           outcome(
-              IngestionOutcomeClass.SKIPPED_POLICY,
+              recovery ? IngestionOutcomeClass.IO_FAILED : IngestionOutcomeClass.SKIPPED_POLICY,
               IngestionReasonCodes.MISSING_INGESTION_BOUNDARY,
-              IngestionRetryPolicy.NONE,
+              recovery ? IngestionRetryPolicy.RETRY_WITH_BACKOFF : IngestionRetryPolicy.NONE,
               "Missing ingestion policy boundary; fresh admission required"));
     }
     return admit(job.path(), job.ingestionRoot());
@@ -108,14 +111,18 @@ final class WorkerIngestionAuthority {
     // (refined decision 2): admission records nothing for a root; only the person's add does.
     Path normalizedFile = filePath.toAbsolutePath().normalize();
     Path answering = SourcePresence.vouchingFolder(normalizedFile, root);
-    boolean admitted = SourcePresence.answersAsRoot(normalizedFile, root)
-        ? rootCheck.admits(answering)
-        : rootCheck.admitsFile(answering);
+    boolean rooted = SourcePresence.answersAsRoot(normalizedFile, root);
+    boolean exactRecovery = !rooted && rootCheck.isRelease030ExactFile(normalizedFile);
+    boolean admitted = exactRecovery || (rooted ? rootCheck.admits(answering) : rootCheck.admitsFile(answering));
     if (!admitted) {
       return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
     }
 
     if (!freshness.regularFile()) {
+      if (exactRecovery) {
+        return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+            sourceUnreadable(filePath, null));
+      }
       // Task t-20261013-ef3c41 (S9): a file replaced by a folder or a link (dangling or not) is no
       // longer the indexed source. Its old text is retired instead of staying searchable forever;
       // the walks never follow links, so nothing is indexed in its place.
