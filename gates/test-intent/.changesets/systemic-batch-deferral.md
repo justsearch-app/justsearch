@@ -2377,3 +2377,14 @@ Fresh final-source actual ciUnitTest1:1 case passes,0skips, real missing-JAR chi
   "note": "Independent local verification:43 entries accepted; exact37 local and actual shard17+20 discovery, historical32pass/5intended assertion failures,105 focused candidate checks,12 Engine cases on each tree and native-pointer controls passed. D22 preservation transferred by Git equivalence; its2 precondition failures/54skips retained. Hosted required lane completion remains unverified here and required before merge."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17491-f6ef-7c51-a9c7-98ff6b8dbd73",
+  "verdict": "accept",
+  "digest": "sha256:bde35ac7898150d79e55bca585a5ee8705f4d2302d9e604c4f04d7b590655ec2",
+  "note": "Independent verification accepts45 entries. Fresh identical O8 test fails original charging/canary defect on f8 and passes candidate/f59;9 oracle counterchecks pass. Other D23 inputs match Git; selected evidence transferred with scope. Final hosted lanes remain required before merge."
+}
+```
