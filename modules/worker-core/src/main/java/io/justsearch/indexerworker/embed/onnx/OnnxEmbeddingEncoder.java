@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.nio.LongBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1005,15 +1006,23 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * this primitive only touches it once the token count is confirmed small.
    *
    * @param content the full document text
-   * @param charSpans {@code [startCharInclusive, endCharExclusive)} ranges into {@code content}
+   * @param charSpans Java UTF-16 {@code [startCharInclusive, endCharExclusive)} ranges into {@code content}
    *     (e.g. from {@code CHUNK_START_CHAR}/{@code CHUNK_END_CHAR}); one output vector per span.
-   *     An empty array embeds the whole doc in one pass and returns zero chunk vectors (tempdoc
-   *     691 Phase 2 VECTOR-only mode).
+   *     A zero-width row uses the exact empty-substring fallback. An empty array embeds the whole
+   *     doc in one pass and returns zero chunk vectors without requiring well-formed UTF-16
+   *     (tempdoc 691 Phase 2 VECTOR-only mode). Nonempty arrays require well-formed content.
    * @return the doc vector plus one chunk vector per span, or {@code null} if {@code content}
    *     exceeds {@link #lateChunkingMaxSeqLen} tokens
+   * @throws IllegalArgumentException if content or spans are null, a row is not a pair of
+   *     ordered UTF-16 bounds within content, an endpoint splits a valid surrogate pair, or a
+   *     nonempty span array requests coordinates in malformed UTF-16 content
    * @throws OrtException if ONNX inference fails
    */
   public EmbedResult embedWithSpans(String content, int[][] charSpans) throws OrtException {
+    if (!isValidSpanInput(content, charSpans)) {
+      throw new IllegalArgumentException(
+          "Spans require well-formed UTF-16 content and ranges that do not split surrogate pairs");
+    }
     var acquisition = LocalSessionAcquisition.background();
     Encoding encoding = tokenizer.encode(content);
     long[] ids = encoding.getIds();
@@ -1027,7 +1036,12 @@ public final class OnnxEmbeddingEncoder implements Closeable {
 
     long[] mask = encoding.getAttentionMask();
     long[] typeIds = encoding.getTypeIds();
-    CharSpan[] tokSpans = encoding.getCharTokenSpans();
+    // VECTOR-only callers request no coordinates, including for historically admitted malformed
+    // text. Preserve their document inference path without materializing native token offsets.
+    CharSpan[] tokSpans = charSpans.length == 0 ? new CharSpan[0] : encoding.getCharTokenSpans();
+    if (charSpans.length > 0) {
+      toUtf16Offsets(content, tokSpans);
+    }
 
     float[][] hidden = runHidden(ids, mask, typeIds, ids.length, acquisition);
     int dim = hidden[0].length;
@@ -1054,8 +1068,73 @@ public final class OnnxEmbeddingEncoder implements Closeable {
   }
 
   /**
+   * Validates Java UTF-16 span bounds without modifying the caller's rows. Requested coordinates
+   * require well-formed text; an empty array retains the existing VECTOR-only text policy.
+   */
+  public static boolean isValidSpanInput(String content, int[][] charSpans) {
+    if (content == null || charSpans == null) {
+      return false;
+    }
+    for (int[] span : charSpans) {
+      if (span == null || span.length != 2 || span[0] < 0 || span[1] < span[0]
+          || span[1] > content.length()
+          || splitsSurrogatePair(content, span[0]) || splitsSurrogatePair(content, span[1])) {
+        return false;
+      }
+    }
+    if (charSpans.length > 0) {
+      for (int i = 0; i < content.length(); i++) {
+        char c = content.charAt(i);
+        if (Character.isHighSurrogate(c)) {
+          if (++i == content.length() || !Character.isLowSurrogate(content.charAt(i))) {
+            return false;
+          }
+        } else if (Character.isLowSurrogate(c)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private static boolean splitsSurrogatePair(String content, int offset) {
+    return offset > 0 && offset < content.length()
+        && Character.isHighSurrogate(content.charAt(offset - 1))
+        && Character.isLowSurrogate(content.charAt(offset));
+  }
+
+  // DJL 0.36's native offsets count Unicode code points; our callers use Java UTF-16.
+  // Sort only the admitted tokens' endpoints, then advance through content once. This stays
+  // O(tokens) in memory even for whitespace-heavy text, and supports overlapping token offsets.
+  private static void toUtf16Offsets(String content, CharSpan[] spans) {
+    int[] offsets = new int[spans.length * 2];
+    for (int i = 0; i < spans.length; i++) {
+      if (spans[i] != null) {
+        offsets[2 * i] = spans[i].getStart();
+        offsets[2 * i + 1] = spans[i].getEnd();
+      }
+    }
+    Arrays.sort(offsets);
+    int[] utf16 = new int[offsets.length];
+    int codePointOffset = 0;
+    int charOffset = 0;
+    for (int i = 0; i < offsets.length; i++) {
+      charOffset = content.offsetByCodePoints(charOffset, offsets[i] - codePointOffset);
+      codePointOffset = offsets[i];
+      utf16[i] = charOffset;
+    }
+    for (int i = 0; i < spans.length; i++) {
+      if (spans[i] != null) {
+        spans[i] = new CharSpan(
+            utf16[Arrays.binarySearch(offsets, spans[i].getStart())],
+            utf16[Arrays.binarySearch(offsets, spans[i].getEnd())]);
+      }
+    }
+  }
+
+  /**
    * Masked-mean pooling restricted to the tokens whose char span intersects {@code [startChar,
-   * endChar)} — {@link #pool}'s formula, scoped to one chunk's token subset. Tokens with a null or
+   * endChar)} in the same coordinate system — {@link #pool}'s formula, scoped to one chunk's token subset. Tokens with a null or
    * zero-width char span (CLS/SEP/PAD and other special tokens — the DJL/tokenizers-rust JNI
    * binding reports these as a {@code (0, 0)} sentinel rather than a real offset) are excluded, as
    * are masked-out (padding) tokens.
@@ -1065,6 +1144,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
   // package-private for tests (tempdoc 691 Wave 0)
   float[] poolSpan(
       float[][] hidden, long[] mask, CharSpan[] tokSpans, int startChar, int endChar, int dim) {
+    if (startChar >= endChar) {
+      return null;
+    }
     float[] pooled = new float[dim];
     float count = 0.0f;
     int len = Math.min(hidden.length, tokSpans.length);

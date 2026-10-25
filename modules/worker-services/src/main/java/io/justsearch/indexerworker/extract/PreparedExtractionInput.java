@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -244,12 +246,19 @@ final class PreparedExtractionInput implements AutoCloseable {
   /** One lazy private directory per extractor; individual snapshots are deleted promptly. */
   static class Factory implements AutoCloseable {
     private Path directory;
+    private boolean closed;
+
+    private synchronized void ensureOpen() {
+      if (closed) throw new IngestionServiceUnavailableException(
+          "Extraction input factory is closed");
+    }
 
     InputStream openSource(Path source) throws IOException {
       return Files.newInputStream(source);
     }
 
     synchronized Path createSnapshot(Path source) throws IOException {
+      ensureOpen();
       if (directory == null) {
         directory = Files.createTempDirectory("justsearch-parse-input-");
         // Standalone legacy extractors need not be closed; retain a process-exit backstop.
@@ -262,6 +271,7 @@ final class PreparedExtractionInput implements AutoCloseable {
 
     PreparedExtractionInput prepare(Path source, TikaExtractionPolicy policy)
         throws IOException, ContentExtractor.ExtractionException {
+      ensureOpen();
       if (source.getFileName() == null) throw new IOException("Extraction input has no filename");
       List<byte[]> chunks = new ArrayList<>();
       Path snapshot = null;
@@ -322,6 +332,7 @@ final class PreparedExtractionInput implements AutoCloseable {
 
     @Override
     public synchronized void close() throws IOException {
+      closed = true;
       if (directory != null) {
         Files.deleteIfExists(directory);
         directory = null;
