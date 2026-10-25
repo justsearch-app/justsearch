@@ -34,6 +34,7 @@ const require = createRequire(import.meta.url);
 const {
   archiveWorktree,
   classifyIgnored,
+  compareNativeLinks,
   defaultGit,
   listArchives,
   loadPolicy,
@@ -149,6 +150,26 @@ function digestTree(root) {
 const treeOf = (repo, commit) => git(repo, 'ls-tree', '-r', '--name-only', commit).split('\n').filter(Boolean);
 const archiveRefs = (repo, resource) => git(repo, 'for-each-ref', '--format=%(refname)', `refs/archive/${resource}/`).split('\n').filter(Boolean);
 const strayIndexFiles = (repo) => fs.readdirSync(path.join(repo, '.git')).filter((n) => n.startsWith('952-archive-'));
+
+// Independent Windows oracle: let Git stage the actual native entries in an owned, fresh index.
+// This deliberately does not call archive/verification code or rewrite Node's readlink spelling.
+function canonicalLinkEntries(worktree, names) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), '952-link-oracle-'));
+  try {
+    const env = { GIT_INDEX_FILE: path.join(dir, 'index') };
+    const spec = path.join(dir, 'paths');
+    fs.writeFileSync(spec, names.map((name) => `:(literal)${name}\0`).join(''));
+    defaultGit(['-c', 'core.symlinks=true', '-c', 'core.splitIndex=false', 'add', '--force',
+      `--pathspec-from-file=${spec}`, '--pathspec-file-nul'], { cwd: worktree, env });
+    return new Map(defaultGit(['ls-files', '--stage', '-z'], { cwd: worktree, env }).split('\0').filter(Boolean).map((line) => {
+      const match = /^120000 ([0-9a-f]{40,64}) 0\t([\s\S]+)$/.exec(line);
+      assert.ok(match, `native oracle entry must be 120000: ${line}`);
+      const stored = spawnSync('git', ['cat-file', 'blob', match[1]], { cwd: worktree });
+      assert.equal(stored.status, 0);
+      return [match[2], { blob: match[1], bytes: stored.stdout }];
+    }));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 
 try {
   /* ── 1. classification, refusal, discard, exclusion, byte-identical source ──────────────── */
@@ -326,10 +347,10 @@ try {
 
   await check('verifyArchive spends a fixed number of git processes, not two per archived file', async () => {
     const f = await makeFixture('verify-batch');
-    for (let i = 0; i < 40; i += 1) write(f.worktree, `notes/n${i}.md`, `note ${i}\n`);
+    for (let i = 0; i < 256; i += 1) write(f.worktree, `notes/n${i}.md`, `note ${i}\n`);
     const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
     assert.equal(result.refused, undefined, JSON.stringify(result));
-    assert.ok(result.manifest.files.length >= 40, `manifest lists ${result.manifest.files.length} files`);
+    assert.ok(result.manifest.files.length >= 256, `manifest lists ${result.manifest.files.length} files`);
 
     let calls = 0;
     const counting = (args, options) => { calls += 1; return defaultGit(args, options); };
@@ -358,6 +379,86 @@ try {
     console.log(`UNVERIFIED native Windows symlinks: ${err.code}`);
   }
   if (nativeSymlinks) {
+    await check('Git native-link comparison uses a cold scoped index, two calls and actual payload/type differences', async () => {
+      const f = await makeFixture('native-diff');
+      git(f.repo, 'config', 'core.symlinks', 'true');
+      fs.mkdirSync(path.join(f.worktree, 'links'));
+      write(f.root, 'target-a', 'equal external bytes\n');
+      write(f.root, 'target-b', 'equal external bytes\n');
+      const names = Array.from({ length: 256 }, (_, i) => `links/n${i}`);
+      names.push(process.platform === 'win32' ? 'links/space ü' : 'links/space ü\t\n');
+      const payload = '../../target-a';
+      for (const name of names) fs.symlinkSync(payload, path.join(f.worktree, name));
+      git(f.worktree, 'add', 'links');
+      const entries = defaultGit(['ls-files', '--stage', '-z'], { cwd: f.worktree }).split('\0').flatMap((line) => {
+        const match = /^120000 ([0-9a-f]{40,64}) 0\t([\s\S]+)$/.exec(line);
+        return match ? [{ path: match[2], blob: match[1] }] : [];
+      });
+      assert.equal(entries.length, names.length);
+      const indexPath = git(f.worktree, 'rev-parse', '--path-format=absolute', '--git-path', 'index');
+      const beforeIndex = fs.readFileSync(indexPath);
+      const beforeRefs = git(f.repo, 'show-ref');
+      // Neither unrelated dirty entries nor caller stat-cache settings may decide link equality.
+      write(f.worktree, 'a.txt', 'unrelated regular edit\n');
+      git(f.repo, 'config', 'core.ignorestat', 'true');
+      git(f.repo, 'config', 'core.fsmonitor', 'true');
+      git(f.repo, 'config', 'core.splitIndex', 'true');
+      let calls = 0;
+      const tempDirs = new Set();
+      const inspectingGit = (args, options) => {
+        calls += 1;
+        tempDirs.add(path.dirname(options.env.GIT_INDEX_FILE));
+        assert.notEqual(options.env.GIT_INDEX_FILE, indexPath);
+        if (args.includes('diff-files')) {
+          const debug = defaultGit(['-c', 'core.fsmonitor=false', 'ls-files', '--debug'], options);
+          assert.equal([...debug.matchAll(/flags: ([0-9a-f]+)/g)].length, entries.length);
+          assert.ok([...debug.matchAll(/flags: ([0-9a-f]+)/g)].every((m) => m[1] === '0'));
+          assert.equal((debug.match(/mtime: 0:0/g) || []).length, entries.length);
+        }
+        return defaultGit(args, options);
+      };
+      assert.deepEqual(compareNativeLinks({ worktreePath: f.worktree, entries, git: inspectingGit }), { mismatched: [], errors: [] });
+      assert.equal(calls, 2, 'native comparison is two Git calls for the whole batch');
+      assert.ok([...tempDirs].every((dir) => !fs.existsSync(dir)), 'owned index directory cleaned after success');
+      fs.unlinkSync(path.join(f.worktree, 'links/n7'));
+      fs.symlinkSync('../../target-b', path.join(f.worktree, 'links/n7'));
+      fs.unlinkSync(path.join(f.worktree, 'links/n9'));
+      write(f.worktree, 'links/n9', payload);
+      fs.unlinkSync(path.join(f.worktree, 'links/n13'));
+      fs.symlinkSync(`${payload} \t`, path.join(f.worktree, 'links/n13'));
+      const changed = compareNativeLinks({ worktreePath: f.worktree, entries });
+      assert.deepEqual(changed.errors, []);
+      assert.deepEqual(changed.mismatched.sort(), ['links/n13', 'links/n7', 'links/n9']);
+      assert.deepEqual(fs.readFileSync(indexPath), beforeIndex);
+      assert.equal(git(f.repo, 'show-ref'), beforeRefs);
+      assert.equal(fs.readFileSync(path.join(f.root, 'target-a'), 'utf8'), 'equal external bytes\n');
+      assert.equal(fs.readFileSync(path.join(f.root, 'target-b'), 'utf8'), 'equal external bytes\n');
+    });
+
+    for (const failure of ['update-index', 'diff-files', 'invalid-output']) {
+      await check(`Git native-link ${failure} failure refuses and cleans its owned temporary index`, async () => {
+        const f = await makeFixture(`native-${failure}`);
+        fs.symlinkSync('missing destination', path.join(f.worktree, 'link'));
+        git(f.worktree, 'add', 'link');
+        const blob = git(f.worktree, 'rev-parse', ':link');
+        const indexPath = git(f.worktree, 'rev-parse', '--path-format=absolute', '--git-path', 'index');
+        const beforeIndex = fs.readFileSync(indexPath);
+        let tempDir;
+        const failingGit = (args, options) => {
+          tempDir = path.dirname(options.env.GIT_INDEX_FILE);
+          const out = defaultGit(args, options);
+          if (args.includes(failure)) throw new Error(`injected ${failure} failure`);
+          return failure === 'invalid-output' && args.includes('diff-files') ? 'unexpected\0' : out;
+        };
+        const result = compareNativeLinks({ worktreePath: f.worktree, entries: [{ path: 'link', blob }], git: failingGit });
+        assert.equal(result.errors.length, 1, JSON.stringify(result));
+        assert.match(result.errors[0], /native link comparison failed/);
+        assert.equal(fs.existsSync(tempDir), false);
+        assert.deepEqual(fs.readFileSync(indexPath), beforeIndex);
+        assert.equal(fs.readlinkSync(path.join(f.worktree, 'link')), 'missing destination');
+      });
+    }
+
     await check('unchanged dangling links and genuinely removed source links remain verifiable and restorable', async () => {
       const f = await makeFixture('removed-link');
       git(f.repo, 'config', 'core.symlinks', 'true');
@@ -390,14 +491,26 @@ try {
         ['tmp/keep.patch', external],
         ['tmp/dangling', 'missing ignored destination'],
       ]);
+      if (process.platform === 'win32') {
+        payloads.set('extended-link', path.toNamespacedPath(external));
+        payloads.set('absolute-dangling', path.join(f.root, 'missing absolute ü target'));
+        payloads.set('relative-directory', path.relative(f.worktree, path.dirname(external)));
+        console.log('UNVERIFIED native UNC link targets: no owned local-share fixture');
+      }
       if (process.platform !== 'win32') {
         payloads.set('line\nbreak', 'nonexistent\ntrailing \t');
         payloads.set('raw-link', Buffer.from([0x6d, 0x69, 0x73, 0x73, 0xff, 0x20, 0x09]));
       }
       for (const [name, target] of payloads) {
         fs.mkdirSync(path.dirname(path.join(f.worktree, name)), { recursive: true });
-        fs.symlinkSync(target, path.join(f.worktree, name), name === 'directory-link' ? 'dir' : 'file');
+        try { fs.symlinkSync(target, path.join(f.worktree, name), ['directory-link', 'relative-directory'].includes(name) ? 'dir' : 'file'); }
+        catch (err) {
+          if (process.platform !== 'win32' || name !== 'extended-link') throw err;
+          payloads.delete(name);
+          console.log(`UNVERIFIED extended-prefix native link creation: ${err.code}`);
+        }
       }
+      const canonical = process.platform === 'win32' ? canonicalLinkEntries(f.worktree, [...payloads.keys()]) : null;
       const indexPath = git(f.worktree, 'rev-parse', '--path-format=absolute', '--git-path', 'index');
       const beforeIndex = fs.readFileSync(indexPath);
       const before = digestTree(f.worktree);
@@ -409,11 +522,13 @@ try {
       for (const [name, target] of payloads) {
         const entry = saved.manifest.files.find((e) => e.path === name);
         assert.ok(entry, `manifest retains ${name}`);
-        assert.equal(entry.size, Buffer.byteLength(target), `size is link text for ${name}`);
+        assert.equal(entry.size, canonical ? fs.readlinkSync(path.join(f.worktree, name), { encoding: 'buffer' }).length
+          : Buffer.byteLength(target), `size is link text for ${name}`);
         assert.match(git(f.repo, 'ls-tree', saved.stateCommit, '--', name), /^120000 blob /);
         const stored = spawnSync('git', ['cat-file', 'blob', entry.blob], { cwd: f.repo });
         assert.equal(stored.status, 0);
-        assert.deepEqual(stored.stdout, Buffer.from(target));
+        assert.deepEqual(stored.stdout, canonical ? canonical.get(name).bytes : Buffer.from(target));
+        if (canonical) assert.equal(entry.blob, canonical.get(name).blob);
       }
       assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
       fs.writeFileSync(external, 'destination changed independently\n');
@@ -421,9 +536,21 @@ try {
       assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: saved.manifest }), { ok: true, missing: [], mismatched: [], errors: [] });
       const destination = path.join(f.root, 'restored');
       assert.equal(restoreArchive({ mainRepoRoot: f.repo, stateCommit: saved.stateCommit, destination }).refused, undefined);
+      const restoredCanonical = canonical ? canonicalLinkEntries(destination, [...payloads.keys()]) : null;
       for (const [name, target] of payloads) {
         assert.ok(fs.lstatSync(path.join(destination, name)).isSymbolicLink());
-        assert.deepEqual(fs.readlinkSync(path.join(destination, name), { encoding: 'buffer' }), Buffer.from(target));
+        if (canonical) assert.deepEqual(restoredCanonical.get(name), canonical.get(name));
+        else assert.deepEqual(fs.readlinkSync(path.join(destination, name), { encoding: 'buffer' }), Buffer.from(target));
+      }
+      if (canonical) {
+        fs.writeFileSync(external, 'native pointer witness\n');
+        for (const name of ['tracked-link', 'tmp/keep.patch', ...(payloads.has('extended-link') ? ['extended-link'] : [])]) {
+          assert.equal(fs.readFileSync(path.join(destination, name), 'utf8'), 'native pointer witness\n');
+        }
+        for (const name of ['directory-link', 'relative-directory']) {
+          assert.equal(fs.readFileSync(path.join(destination, name, 'file'), 'utf8'), 'native pointer witness\n');
+        }
+        fs.unlinkSync(external);
       }
       assert.equal(removeRestored({ mainRepoRoot: f.repo, path: destination }).removed, true);
       assert.equal(digestTree(f.worktree), before);

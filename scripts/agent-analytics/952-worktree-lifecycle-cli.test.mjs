@@ -328,6 +328,13 @@ try {
   // ── 1-4: create, register, hold, status (no destructive step in this fixture) ──────────────
   const base = await makeFixture('base');
   const stagedRegister = require(path.join(base.checkout, 'scripts', 'dev', 'lib', 'worktree-register.cjs'));
+  let nativeSymlinks = true;
+  try { fs.symlinkSync('missing capability probe', path.join(base.root, 'native-link-probe')); }
+  catch (err) {
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'ENOSYS'].includes(err.code)) throw err;
+    nativeSymlinks = false;
+    console.log(`UNVERIFIED native Windows link lifecycle scenarios: ${err.code}`);
+  }
 
   await check('create registers a worktree at origin/main with markers and prints its path', () => {
     const dest = createWorktree(base, 'c1', 'session-c1');
@@ -745,7 +752,7 @@ try {
     assert.notEqual(cfg(resumeFx.checkout, 'branch.worktree-r11.justsearch-released'), null);
   });
 
-  if (process.platform !== 'win32') {
+  if (nativeSymlinks) {
     await check('fresh release retains native tracked/untracked/ignored links and restores exact representation', async () => {
       const fx = await makeFixture('native-fresh');
       git(fx.checkout, 'config', 'core.symlinks', 'true');
@@ -765,6 +772,12 @@ try {
         fs.mkdirSync(path.dirname(path.join(dest, name)), { recursive: true });
         fs.symlinkSync(target, path.join(dest, name), name === 'tracked-link' ? 'dir' : 'file');
       }
+      const canonical = new Map();
+      if (process.platform === 'win32') for (const name of links.keys()) {
+        // Independent Git setup oracle, before release; the source index is then snapshotted by archival checks.
+        git(dest, 'add', '--force', '--', name);
+        canonical.set(name, git(dest, 'rev-parse', `:${name}`).trim());
+      }
       const result = runCli(fx, ['release', dest, '--no-fetch', '--session-id', 'native-session']);
       assert.equal(result.status, 0, result.out);
       assert.equal(fs.existsSync(dest), false);
@@ -779,8 +792,14 @@ try {
       assert.equal(archive.restoreArchive({ mainRepoRoot: fx.checkout, stateCommit: manifest.stateCommit, destination: restored }).refused, undefined);
       for (const [name, target] of links) {
         assert.match(git(fx.checkout, 'ls-tree', manifest.stateCommit, '--', name), /^120000 blob /);
-        assert.deepEqual(fs.readlinkSync(path.join(restored, name), { encoding: 'buffer' }), Buffer.from(target));
+        assert.ok(fs.lstatSync(path.join(restored, name)).isSymbolicLink());
+        if (process.platform === 'win32') {
+          git(restored, 'add', '--force', '--', name);
+          assert.equal(git(restored, 'rev-parse', `:${name}`).trim(), canonical.get(name));
+        } else assert.deepEqual(fs.readlinkSync(path.join(restored, name), { encoding: 'buffer' }), Buffer.from(target));
       }
+      assert.equal(fs.readFileSync(path.join(restored, 'tracked-link/sentinel'), 'utf8'), 'external bytes\n');
+      assert.equal(fs.readFileSync(path.join(restored, 'untracked-link'), 'utf8'), 'external bytes\n');
       assert.equal(archive.removeRestored({ mainRepoRoot: fx.checkout, path: restored }).removed, true);
       assert.equal(fs.readFileSync(path.join(external, 'sentinel'), 'utf8'), 'external bytes\n');
     });
@@ -798,6 +817,11 @@ try {
           fs.writeFileSync(outside, outside);
           fs.writeFileSync(outsideB, outside);
           fs.symlinkSync(outside, path.join(dest, 'saved-link'));
+          let canonicalLink;
+          if (process.platform === 'win32') {
+            git(dest, 'add', '--', 'saved-link');
+            canonicalLink = git(dest, 'rev-parse', ':saved-link').trim();
+          }
           fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained draft\n');
           if (mutation === 'recreated-deletion') fs.unlinkSync(path.join(dest, 'README.md'));
           const stagedArchive = require(path.join(fx.checkout, 'scripts/dev/lib/worktree-archive.cjs'));
@@ -846,7 +870,12 @@ try {
             assert.equal(stagedArchive.listArchives({ mainRepoRoot: fx.checkout }).find((row) => row.resource === name).bytes > 0, true);
             const restored = path.join(fx.root, 'restored');
             assert.equal(stagedArchive.restoreArchive({ mainRepoRoot: fx.checkout, stateCommit: state, destination: restored }).refused, undefined);
-            assert.equal(fs.readlinkSync(path.join(restored, 'saved-link')), outside);
+            assert.ok(fs.lstatSync(path.join(restored, 'saved-link')).isSymbolicLink());
+            if (process.platform === 'win32') {
+              git(restored, 'add', '--', 'saved-link');
+              assert.equal(git(restored, 'rev-parse', ':saved-link').trim(), canonicalLink);
+            } else assert.equal(fs.readlinkSync(path.join(restored, 'saved-link')), outside);
+            assert.equal(fs.readFileSync(path.join(restored, 'saved-link'), 'utf8'), 'external destination changed\n');
             assert.equal(fs.readFileSync(path.join(restored, 'draft.txt'), 'utf8'), 'retained draft\n');
             assert.equal(stagedArchive.removeRestored({ mainRepoRoot: fx.checkout, path: restored }).removed, true);
           } else {

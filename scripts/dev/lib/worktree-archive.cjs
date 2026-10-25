@@ -44,6 +44,7 @@ const { worktreeResourceId } = require('./worktree-resource-id.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 
 const { resolveMainRepoRoot } = require('./agent-spawn-sweep.cjs');
@@ -502,6 +503,40 @@ function archiveWorktree({
 
 /* ── verification ───────────────────────────────────────────────────────────────────────────── */
 
+/** Git owns native Windows link spelling (drive separators and extended prefixes included). */
+function compareNativeLinks({ worktreePath, entries, git = defaultGit }) {
+  const mismatched = [];
+  const errors = [];
+  const paths = new Set(entries.map((entry) => entry.path));
+  let tempDir;
+  try {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), '952-verify-links-'));
+    const options = { cwd: worktreePath, env: { GIT_INDEX_FILE: path.join(tempDir, 'index') } };
+    const config = ['-c', 'core.symlinks=true', '-c', 'core.ignorestat=false',
+      '-c', 'core.fsmonitor=false', '-c', 'core.splitIndex=false'];
+    // A new index has no reused stat data, assume-valid, skip-worktree or fsmonitor flags.
+    git([...config, 'update-index', '-z', '--index-info'], {
+      ...options, input: entries.map((entry) => `120000 ${entry.blob}\t${entry.path}\0`).join(''),
+    });
+    // Name-only diff trusts stat differences and falsely reports cold-index entries as dirty.
+    // Numstat computes the actual link-content diff without following destinations or filters.
+    for (const line of gitZ(git, [...config, 'diff-files', '--numstat', '-z', '--no-renames',
+      '--no-ext-diff', '--no-textconv', '--ignore-submodules', '--'], options)) {
+      const match = /^(?:\d+|-)\t(?:\d+|-)\t([\s\S]+)$/.exec(line);
+      if (!match || !paths.has(match[1])) throw new Error('unexpected native link diff entry');
+      mismatched.push(match[1]);
+    }
+  } catch (err) {
+    errors.push(`native link comparison failed: ${err.message}`);
+  } finally {
+    if (tempDir) {
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); }
+      catch (err) { errors.push(`native link index cleanup failed (${tempDir}): ${err.message}`); }
+    }
+  }
+  return { mismatched, errors };
+}
+
 /**
  * Prove an archive is still both COMPLETE (every blob is in the object store, the state ref still
  * resolves to the state commit) and CURRENT (each still-present working file hashes to the blob
@@ -567,6 +602,7 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
   }
 
   const toHash = [];
+  const nativeLinks = [];
   let materializedLinks;
   for (const entry of manifest.files || []) {
     const rel = entry?.path;
@@ -604,7 +640,10 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
     if (saved.mode === '120000') {
       try {
         let bytes;
-        if (stat.isSymbolicLink()) bytes = fs.readlinkSync(path.join(worktreePath, rel), { encoding: 'buffer' });
+        if (stat.isSymbolicLink()) {
+          if (process.platform === 'win32') { nativeLinks.push(entry); continue; }
+          bytes = fs.readlinkSync(path.join(worktreePath, rel), { encoding: 'buffer' });
+        }
         else if (stat.isFile()) {
           // Git intentionally materializes 120000 entries as ordinary payload files when native
           // links are disabled. `git add` applies file filters to those materializations too.
@@ -622,6 +661,12 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
       }
     } else if (/^100[0-7]{3}$/.test(saved.mode) && stat.isFile() && !stat.isSymbolicLink()) toHash.push(entry);
     else mismatched.push(rel);
+  }
+
+  if (nativeLinks.length) {
+    const compared = compareNativeLinks({ worktreePath, entries: nativeLinks, git });
+    mismatched.push(...compared.mismatched);
+    errors.push(...compared.errors);
   }
 
   // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the blob
@@ -766,6 +811,7 @@ module.exports = {
   resolveMainRepoRoot,
   classifyIgnored,
   archiveWorktree,
+  compareNativeLinks,
   verifyArchive,
   restoreArchive,
   removeRestored,

@@ -111,14 +111,20 @@ async function makeRepo(label) {
   await fsp.writeFile(path.join(repo, '.gitignore'), 'ignored/\nnode_modules\n', 'utf8');
   await fsp.writeFile(path.join(repo, 'tracked.txt'), 'base\n', 'utf8');
   git(repo, 'add', '.gitignore', 'tracked.txt');
-  if (process.platform !== 'win32') {
+  let nativeSymlinks = true;
+  try {
     // Every admission/runtime/lock/registration regression also carries a committed native link.
     await fsp.writeFile(path.join(root, 'gate-sentinel'), 'external gate sentinel\n');
     await fsp.symlink('../gate-sentinel', path.join(repo, 'gate-link'));
+    git(repo, 'config', 'core.symlinks', 'true');
     git(repo, 'add', 'gate-link');
+  } catch (err) {
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'ENOSYS'].includes(err.code)) throw err;
+    nativeSymlinks = false;
+    console.log(`UNVERIFIED native Windows link removal scenarios: ${err.code}`);
   }
   git(repo, 'commit', '-m', 'fixture');
-  return { root, repo, cli: await installProductionCli(repo) };
+  return { root, repo, cli: await installProductionCli(repo), nativeSymlinks };
 }
 
 async function mutateInstalledCli(cli, mutate) {
@@ -379,8 +385,27 @@ try {
     });
   }
 
-  if (process.platform !== 'win32') {
-    if (process.getuid() !== 0) await check('real permission-denied inspection cannot authorize actual removal', async () => {
+  if (primary.nativeSymlinks) {
+    if (process.platform === 'win32') await check('junction removal follows Git representation and preserves its external witness', async () => {
+      const dest = addWorktree(primary, 'native-junction', 'codex/936-native-junction');
+      const outside = path.join(primary.root, 'native-junction-target');
+      fs.mkdirSync(outside);
+      fs.writeFileSync(path.join(outside, 'sentinel'), 'external junction witness\n');
+      fs.symlinkSync(outside, path.join(dest, 'junction'), 'junction');
+      const staged = spawnSync('git', ['add', '--force', '--', 'junction'], { cwd: dest, encoding: 'utf8' });
+      const representation = staged.status === 0 ? git(dest, 'ls-files', '--stage', '--', 'junction') : '';
+      const nativeGitLink = /^120000 [0-9a-f]{40,64} 0\tjunction\s*$/.test(representation);
+      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'native-junction', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+      const args = saved.refused ? [] : ['--archive-manifest', saved.manifestPath];
+      const removed = runCli(primary, dest, args);
+      assert.equal(removed.status, nativeGitLink && !saved.refused ? 0 : 1, removed.output);
+      if (!nativeGitLink || saved.refused) assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+      assert.equal(fs.readFileSync(path.join(outside, 'sentinel'), 'utf8'), 'external junction witness\n');
+    });
+
+    if (process.platform !== 'win32' && process.getuid() !== 0) await check('real permission-denied inspection cannot authorize actual removal', async () => {
       const dest = addWorktree(primary, 'permission-denied', 'codex/936-permission-denied');
       fs.mkdirSync(path.join(dest, 'private'));
       fs.writeFileSync(path.join(dest, 'private/draft.txt'), 'retained private draft\n');
@@ -460,6 +485,11 @@ try {
       const outside = path.join(primary.root, 'release-external');
       fs.writeFileSync(outside, 'destination before archive\n');
       fs.symlinkSync(outside, path.join(dest, 'saved-link'));
+      let canonicalLink;
+      if (process.platform === 'win32') {
+        git(dest, 'add', '--', 'saved-link');
+        canonicalLink = git(dest, 'rev-parse', ':saved-link').trim();
+      }
       fs.mkdirSync(path.join(dest, 'ignored'));
       fs.symlinkSync('missing destination', path.join(dest, 'ignored', 'dangling'));
       const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'link-release', policy: DEFAULT_ARCHIVE_POLICY });
@@ -472,7 +502,10 @@ try {
       assert.equal(removed.status, 0, removed.output);
       assert.equal(fs.existsSync(dest), false);
       assert.equal(fs.existsSync(outside), false);
-      assert.equal(git(primary.repo, 'show', `${saved.stateCommit}:saved-link`), outside);
+      if (process.platform === 'win32') {
+        assert.match(git(primary.repo, 'ls-tree', saved.stateCommit, '--', 'saved-link'), /^120000 blob /);
+        assert.equal(git(primary.repo, 'rev-parse', `${saved.stateCommit}:saved-link`).trim(), canonicalLink);
+      } else assert.equal(git(primary.repo, 'show', `${saved.stateCommit}:saved-link`), outside);
     });
   }
 
