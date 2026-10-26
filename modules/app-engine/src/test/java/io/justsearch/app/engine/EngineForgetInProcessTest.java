@@ -244,6 +244,238 @@ final class EngineForgetInProcessTest {
     }
   }
 
+  @Test
+  @Timeout(240)
+  void R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor() throws Exception {
+    nativeMigrationOfPresentFile(false);
+  }
+
+  @Test
+  @Timeout(240)
+  void R2CompletedWatchedFileForgetSurvivesLaterNativeMigrationAndSuccessorBoot() throws Exception {
+    nativeMigrationOfPresentFile(true);
+  }
+
+  private void nativeMigrationOfPresentFile(boolean forgotten) throws Exception {
+    Path watched = Files.createDirectory(directory.resolve(forgotten ? "native-forget" : "native-control"));
+    Path exact = Files.writeString(watched.resolve("report.txt"), "present native migration target bytes");
+    Path sibling = Files.writeString(watched.resolve("report.txt.bak"), "eligible native migration sibling bytes");
+    Path data = directory.resolve(forgotten ? "native-forget-process" : "native-control-process");
+    String exactHash = SourceContentHash.sha256(exact);
+    String siblingHash = SourceContentHash.sha256(sibling);
+    String completedForget = null;
+    String installedLiteral = null;
+    String successor;
+    try (var f = new Fixture(data, List.of(watched))) {
+      f.seed(exact, "indexed private parent with two proper chunks");
+      if (forgotten) {
+        var response = f.forget(exact, "FILE");
+        assertTrue(response.success(), "SETUP: actual accepted Forget must succeed");
+        var outcome = JSON.valueToTree(response.structuredData().get("forget"));
+        assertEquals("COMPLETE", outcome.path("status").asString());
+        assertEquals("CONFIRMED", outcome.path("removal").asString());
+        assertEquals("INSTALLED", outcome.path("keepOut").asString());
+        completedForget = outcome.path("operationKey").asString();
+        var entries = f.settings.inspect().settings().getExcludePatterns();
+        assertEquals(1, entries.size());
+        var literal = LiteralExclusion.fromEntry(entries.getFirst());
+        assertEquals(exact.toString(), literal.literal().path());
+        assertEquals(LiteralExclusion.Scope.FILE, literal.literal().scope());
+        installedLiteral = literal.literal().id();
+        assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
+        assertTrue(f.queue.forgetJobsAbsent(key(exact), false));
+      }
+      var initial = forgotten ? List.of(sibling) : List.of(exact, sibling);
+      assertEquals(initial.size(), f.client.submitBatch(initial, TestEngineContexts.FOREGROUND).getAcceptedCount(),
+          "SETUP: real ordinary intake must accept the eligible readiness corpus");
+      long readyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      boolean ready;
+      do {
+        f.runtime.commitOps().maybeRefreshBlocking();
+        ready = siblingHash.equals(f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+            key(sibling), SchemaFields.SOURCE_SHA256))
+            && (forgotten || exactHash.equals(f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+                key(exact), SchemaFields.SOURCE_SHA256)))
+            && f.queue.jobStateCountsStrict().pendingCount() == 0
+            && f.queue.jobStateCountsStrict().processingCount() == 0;
+        if (!ready) Thread.sleep(20);
+      } while (!ready && System.nanoTime() < readyDeadline);
+      assertTrue(ready, "SETUP: actual extractor/writer must commit current eligible source bytes");
+      assertTrue(f.loop.isRunning(), "SETUP: initial real writer is running");
+      var config = f.config.currentSnapshot();
+      assertNotNull(config, "SETUP: readable current effective policy");
+      var policy = ExclusionPatterns.fromRawJsonStrict(config.ui().excludePatterns(), false);
+      assertEquals(forgotten, policy.isExcludedPath(watched, exact));
+      assertFalse(policy.isExcludedPath(watched, sibling));
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "SETUP: no synthetic or unrelated receipts");
+
+      var admissions = new java.util.concurrent.ConcurrentHashMap<String,
+          io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp>();
+      var observationFailure = new java.util.concurrent.atomic.AtomicReference<RuntimeException>();
+      Runnable capture = () -> {
+        try {
+          for (var op : f.queue.listSwitchBufferOpsStrict()) {
+            if ("UPSERT".equals(op.op()) && op.generation() != null && !op.generation().isBlank()
+                && (("path:" + key(exact)).equals(op.key()) || ("path:" + key(sibling)).equals(op.key()))) {
+              admissions.putIfAbsent(op.key(), op);
+            }
+          }
+        } catch (RuntimeException failure) { observationFailure.compareAndSet(null, failure); }
+      };
+      // Read-only observation of actual queue commits; no notification is blocked or fabricated.
+      try (var subscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run())) {
+        String predecessor = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration().getActiveGenerationId();
+        var started = f.client.startMigration("forget-native-preservation", TestEngineContexts.FOREGROUND);
+        assertTrue(started.accepted(), "SETUP: actual public native migration must be admitted");
+        assertFalse(started.restartRequired(), "SETUP: this fixture requires supported live native admission");
+        successor = started.buildingGenerationId();
+        assertNotNull(successor, "SETUP: actual candidate identity is present");
+        assertFalse(successor.isBlank(), "SETUP: actual candidate identity");
+        assertNotEquals(predecessor, successor);
+        RunningRuntime target = assertInstanceOf(RunningRuntime.class,
+            field(f.server, KnowledgeServer.class, "ingestLifecycle"), "SETUP: actual writable target owner");
+        assertNotNull(target.openedIndexPath(), "SETUP: actual target path is present");
+        assertEquals(successor, target.openedIndexPath().getFileName().toString(), "SETUP: actual target writer");
+        assertTrue(target.isAcceptingWrites(), "SETUP: target is writable");
+        long admittedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
+        Map<String, String> targetRow;
+        boolean settled;
+        do {
+          capture.run();
+          target.commitOps().maybeRefreshBlocking();
+          targetRow = f.queue.watcherReconciliationRow(key(exact));
+          var siblingRow = f.queue.watcherReconciliationRow(key(sibling));
+          boolean enumerationDone = (Boolean) field(f.server, KnowledgeServer.class, "migrationEnumeratorDone");
+          boolean targetSettled = admissions.containsKey("path:" + key(exact))
+              ? targetRow != null && "DONE".equals(targetRow.get("state"))
+              : forgotten && enumerationDone && targetRow == null;
+          settled = enumerationDone && admissions.containsKey("path:" + key(sibling)) && targetSettled
+              && siblingRow != null && "DONE".equals(siblingRow.get("state"))
+              && siblingHash.equals(target.documentFieldOps().getDocumentFieldOrThrow(
+                  key(sibling), SchemaFields.SOURCE_SHA256));
+          if (!settled) Thread.sleep(20);
+        } while (!settled && System.nanoTime() < admittedDeadline);
+        assertNull(observationFailure.get(), "SETUP: actual queue observation must remain readable");
+        assertTrue(settled, "SETUP: actual enumerator receipts and target/sibling writer outcomes are required");
+        boolean targetAdmitted = admissions.containsKey("path:" + key(exact));
+        assertTrue(forgotten || targetAdmitted, "SETUP: nonexcluded control target must actually be admitted");
+        for (var path : targetAdmitted ? List.of(exact, sibling) : List.of(sibling)) {
+          var op = admissions.get("path:" + key(path));
+          var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
+          var row = f.queue.watcherReconciliationRow(key(path));
+          assertNotNull(row, "SETUP: actual committed admission row is still readable");
+          assertEquals(successor, op.generation());
+          assertTrue(op.acceptedOrder() > 0);
+          assertNotNull(op.revision(), "SETUP: actual receipt revision is present");
+          assertFalse(op.revision().isBlank());
+          assertEquals(key(path), upsert.path());
+          assertEquals(watched, upsert.ingestionRoot());
+          assertEquals("documents", upsert.collection());
+          assertNotNull(upsert.provenance(), "SETUP: actual enumerator provenance is present");
+          assertEquals("system", upsert.provenance().originator());
+          assertEquals("MIGRATION_ENUMERATOR", upsert.provenance().transport());
+          assertEquals(path.equals(exact) ? exactHash : siblingHash, upsert.sourceSha256());
+          assertEquals(upsert.unitRevision(), row.get("unit_revision"));
+          assertEquals(upsert.sourceSha256(), row.get("planned_source_sha256"));
+          System.out.println("R2 actual admitted receipt=" + op + "; committed row=" + row);
+        }
+        if (forgotten) {
+          if (targetAdmitted) {
+            assertEquals("SKIPPED_POLICY", targetRow.get("last_outcome_class"));
+            assertEquals("SKIPPED_TEMP_OR_SYSTEM", targetRow.get("last_reason_code"));
+            assertNull(targetRow.get("content_hash"));
+          } else {
+            System.out.println("R2 enumerator completed without target admission; judge actual convergence");
+          }
+          assertEquals(0, target.indexCountOps().countByIdAndChunksStrict(key(exact)));
+          assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
+        } else {
+          assertEquals("SUCCESS_FULL", targetRow.get("last_outcome_class"));
+          assertEquals(exactHash, target.documentFieldOps().getDocumentFieldOrThrow(key(exact), SchemaFields.SOURCE_SHA256));
+        }
+        assertSame(config, f.config.currentSnapshot(), "SETUP: current policy remains unchanged");
+        assertEquals(exactHash, SourceContentHash.sha256(exact));
+        assertEquals(siblingHash, SourceContentHash.sha256(sibling));
+        assertEquals(0, f.queue.jobStateCountsStrict().pendingCount(), "SETUP: no pending unrelated work");
+        assertEquals(0, f.queue.jobStateCountsStrict().processingCount(), "SETUP: no issued unrelated work");
+        assertEquals(0, f.queue.jobStateCountsStrict().failedCount(), "SETUP: no failed unrelated work");
+        // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
+        // The monitor still owns replay/drain/certification; automatic timing is not under test.
+        assertTrue(f.client.requestCutover(true, TestEngineContexts.FOREGROUND).accepted(),
+            "SETUP: public SWITCHING/cutover request must be admitted");
+        boolean terminal = false;
+        Object refusal = null;
+        long completionDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
+        do {
+          var status = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration();
+          terminal = "IDLE".equals(status.getMigrationState()) && successor.equals(status.getActiveGenerationId())
+              && status.getBuildingGenerationId().isBlank();
+          var publisher = ((DefaultWorkerAppServices) f.server.appServices()).ingestService();
+          refusal = field(publisher, WorkerIngestService.class, "watcherReplayFailure");
+          if (terminal || ("Buffered UPSERT lacks its accepted target projection: " + key(exact)).equals(refusal)) break;
+          Thread.sleep(20);
+        } while (System.nanoTime() < completionDeadline);
+        if (!terminal) {
+          assertTrue(forgotten && targetAdmitted
+              && ("Buffered UPSERT lacks its accepted target projection: " + key(exact)).equals(refusal),
+              "SETUP/INCONCLUSIVE: bounded native migration observation lacks the exact target projection refusal: " + refusal);
+          var retained = f.queue.listSwitchBufferOpsStrict().stream()
+              .filter(op -> successor.equals(op.generation()) && ("path:" + key(exact)).equals(op.key()))
+              .findFirst().orElseThrow(() -> new AssertionError("SETUP: exact refused target receipt disappeared"));
+          assertEquals(admissions.get("path:" + key(exact)), retained,
+              "SETUP: the observed refusal must retain the exact actual accepted receipt");
+          var currentRow = f.queue.watcherReconciliationRow(key(exact));
+          assertNotNull(currentRow);
+          assertEquals("DONE", currentRow.get("state"));
+          assertEquals("SKIPPED_POLICY", currentRow.get("last_outcome_class"));
+          assertEquals(io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(retained.payload()).unitRevision(),
+              currentRow.get("unit_revision"));
+          assertEquals(0, f.queue.jobStateCountsStrict().pendingCount());
+          assertEquals(0, f.queue.jobStateCountsStrict().processingCount());
+          assertEquals(0, f.queue.jobStateCountsStrict().failedCount());
+          assertEquals(siblingHash, target.documentFieldOps().getDocumentFieldOrThrow(
+              key(sibling), SchemaFields.SOURCE_SHA256));
+          assertEquals(0, target.indexCountOps().countByIdAndChunksStrict(key(exact)));
+          assertEquals(exactHash, SourceContentHash.sha256(exact));
+          assertTrue(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
+              .isExcludedPath(watched, exact));
+        }
+        assertTrue(terminal, "R2 actual native migration did not settle at the observed exact target receipt refusal; "
+            + "this bounded observation is not a claim of permanent failure: " + refusal);
+        assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "exact replay must be acknowledged after publication");
+        var pointer = JSON.readTree(Files.readString(data.resolve("index/state.json")));
+        assertEquals(successor, pointer.path("active_generation").asString());
+        assertEquals("IDLE", pointer.path("migration_state").asString());
+        assertTrue(((RunningRuntime) field(f.server, KnowledgeServer.class, "ingestLifecycle")).isAcceptingWrites());
+      }
+    }
+    // Real close/reopen of the same saved settings/operations/generation, never a restart counter.
+    try (var reopened = new Fixture(data, List.of(watched))) {
+      var status = reopened.client.getStatus(TestEngineContexts.FOREGROUND).getMigration();
+      assertEquals("IDLE", status.getMigrationState());
+      assertEquals(successor, status.getActiveGenerationId());
+      assertTrue(reopened.runtime.isAcceptingWrites());
+      assertEquals(siblingHash, reopened.runtime.documentFieldOps().getDocumentFieldOrThrow(
+          key(sibling), SchemaFields.SOURCE_SHA256));
+      if (forgotten) {
+        assertEquals(OperationState.COMPLETE, reopened.operations.find(completedForget).orElseThrow().state());
+        assertEquals("forget_complete", reopened.operations.find(completedForget).orElseThrow().receipt().code());
+        var literal = LiteralExclusion.fromEntry(reopened.settings.inspect().settings().getExcludePatterns().getFirst());
+        assertEquals(installedLiteral, literal.literal().id());
+        assertEquals(0, reopened.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
+        var retained = reopened.queue.watcherReconciliationRow(key(exact));
+        assertTrue(retained == null || "DONE".equals(retained.get("state"))
+            && "SKIPPED_POLICY".equals(retained.get("last_outcome_class")),
+            "completed migration must leave no live target claim; its new skipped receipt may remain");
+      } else {
+        assertEquals(exactHash, reopened.runtime.documentFieldOps().getDocumentFieldOrThrow(
+            key(exact), SchemaFields.SOURCE_SHA256));
+      }
+      assertEquals(exactHash, SourceContentHash.sha256(exact));
+      assertEquals(siblingHash, SourceContentHash.sha256(sibling));
+    }
+  }
+
   static String key(Path path) { return PathNormalizer.normalizeKey(path); }
   static Object field(Object owner, Class<?> type, String name) throws Exception {
     var field = type.getDeclaredField(name); field.setAccessible(true); return field.get(owner);

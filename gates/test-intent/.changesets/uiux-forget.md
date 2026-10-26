@@ -148,21 +148,23 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
       ],
       "class": "New",
-      "behaviour": "The production process factory and shared settings/operation/index/queue owners remove the exact parent and proper chunks while preserving sibling/source bytes and durable precise policy. Outside-root FILE completion has no permanent rule; an unrestricted new writer may publish later. Completion-winning withdrawal preserves its immutable receipt. The direct writer case is not evidence of a newly accepted INGEST. One additional main#955 combined-before probe is authored but unexecuted: an accepted completed Forget and real sibling extraction/committed-hash prerequisites precede strict replay convergence without excluded parent/chunk publication; component replay is not actual migration or newly accepted INGEST proof.",
+      "behaviour": "The production process factory and shared settings/operation/index/queue owners remove the exact parent and proper chunks while preserving sibling/source bytes and durable precise policy. Outside-root FILE completion has no permanent rule; an unrestricted new writer may publish later. Completion-winning withdrawal preserves its immutable receipt. The direct writer case is not evidence of a newly accepted INGEST. The main#955 root-only replay check passed on committed combined source4d072a6a59f3659d9c20a2d5adb88a85dce5563f as preservation/characterization: actual accepted completed Forget and real sibling extraction/committed-hash prerequisites precede strict replay convergence without excluded parent/chunk publication. It pins no repaired defect or fail-before; component replay is not actual native migration or newly accepted INGEST proof. Two new actual native-migration tests are authored and execution-pending: matching nonexcluded extraction/terminal writable successor/real profile reopen control, and completed watched FILE Forget followed by the same public native migration and publicly requested SWITCHING/cutover path only after actual enumeration/eligible-writer/queue readiness, real enumerator receipt/skip-or-write observation, strict target absence, exact replay/pointer/successor and retained source/sibling bytes. This scoped path does not prove automatic monitor timing or heuristics and bypasses no replay/drain/certification proof. A bounded exact-target refusal is distinguished from unrelated readiness/timeout; no product failure or repair is yet established.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
           "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
-          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; convergence failure remains source-inferred until admissible execution.",
+          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; the root-only control converged, so no failure or production repair is claimed for that case. R2 and N55.3, adopted after independent receipt challenge PASS1/PASS2: keep-out safety and native migration convergence both matter, with matching real control and specific admitted-target proof; R7/R6/R5 qualifications remain bounded as agreed.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55CompletedForgetAllowsReturnedRootReplayWithoutPublishingExcludedSource"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55CompletedForgetAllowsReturnedRootReplayWithoutPublishingExcludedSource",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2CompletedWatchedFileForgetSurvivesLaterNativeMigrationAndSuccessorBoot"
       ],
       "repaired": false
     },
