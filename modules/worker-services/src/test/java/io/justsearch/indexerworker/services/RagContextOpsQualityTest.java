@@ -312,7 +312,10 @@ final class RagContextOpsQualityTest
     assertTrue(citation.getScore() > 0f, "BM25 citation retains its positive raw score");
     String literal = parent.substring(citation.getStartChar(), citation.getEndChar());
     assertTrue(literal.startsWith(response.getSections(0).getContent()));
-    assertTrue(literal.startsWith(citation.getExcerpt()));
+    assertTrue(response.getSections(0).getTruncated());
+    assertLiteralPreview(literal, citation.getExcerpt());
+    assertTrue(citation.getExcerpt().length() > response.getSections(0).getContent().length(),
+        "the citation previews the original passage, beyond this token-truncated section");
     assertEquals(-3f, response.getQuality().getBestChunkScore());
     assertEquals(-3f, response.getQuality().getScoreGap(), "only the appended CE score counts");
     assertEquals(1, response.getQuality().getChunksIncluded());
@@ -368,8 +371,22 @@ final class RagContextOpsQualityTest
       previousIndex = chunk.getChunkIndex();
       String literal = parent.substring(chunk.getStartChar(), chunk.getEndChar());
       assertTrue(literal.startsWith(response.getSections(i).getContent()));
-      assertTrue(literal.startsWith(chunk.getExcerpt()));
+      assertEquals(literal.length() > response.getSections(i).getContent().length(),
+          response.getSections(i).getTruncated());
+      assertLiteralPreview(literal, chunk.getExcerpt());
     }
+  }
+
+  private static void assertLiteralPreview(String literal, String preview) {
+    String expected = literal;
+    if (literal.length() > 240) {
+      // These worded fixtures have a space within the producer's 40-character lookback.
+      int boundary = literal.lastIndexOf(' ', 240);
+      assertTrue(boundary >= 200, "the fixture supplies a word boundary within the lookback");
+      expected = literal.substring(0, boundary).stripTrailing() + "...";
+    }
+    assertEquals(expected, preview,
+        "the citation previews the exact original parent span with its producer-owned ellipsis");
   }
 
   private static RagContextOps ops(List<SearchHit> hits) {
