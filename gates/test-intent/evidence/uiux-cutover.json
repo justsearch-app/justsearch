@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-24T15:05:54.077Z",
-  "revision": "71e6b643698da2e31601dc0d63c5a3d677431773",
-  "tree": "182149ab71309f1931f4521c8d02add2ed5d9d47",
+  "createdAt": "2026-10-26T11:49:52.615Z",
+  "revision": "5b8ec276a0c71138b8c99f9aa94b95e439eedf7b",
+  "tree": "17b62ab5b3cb626d1124a026935bdb5fc1612fde",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/en2le4sy/tmp/test-intent-vitest-7-1792854337764.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3800827-1793015382433.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 7208
+      "durationMs": 4271
     }
   ],
   "checks": [
@@ -679,236 +679,136 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b49e8b57062a1f225e8b5817dec9ea66d68ccb1ccca6076a6780c53d5e1a055c",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "HO1 HO2 a cold address query arrives intact and is consumed from the address",
-          "status": "passed"
-        },
-        {
-          "name": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
-          "status": "passed"
-        },
-        {
-          "name": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
-          "status": "passed"
-        },
-        {
-          "name": "HO3 HO4 HO5 core.extract prepares the chosen files and waits",
-          "status": "passed"
-        },
-        {
-          "name": "HO3 HO5 HO9 a selection is local to its prepared turn",
-          "status": "passed"
-        },
-        {
-          "name": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn",
-          "status": "passed"
-        },
-        {
-          "name": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 two arrivals replace preparation without sending",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 an incoming query replaces typed Search without creating a conversation place",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 a cold hand-off keeps the restored draft with its previous conversation",
-          "status": "passed"
-        },
-        {
-          "name": "HO11 an answer link ignores agent affordance and conversation and waits",
-          "status": "passed"
-        },
-        {
-          "name": "HO13 an empty file hand-off cannot widen to the whole index",
-          "status": "passed"
-        },
-        {
-          "name": "HO7 a reloaded summary Retry menu names the original summary inputs",
-          "status": "passed"
-        },
-        {
-          "name": "HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
-          "status": "passed"
-        },
-        {
-          "name": "HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 an outgoing conversation keeps its unsent draft and files one click away",
-          "status": "passed"
-        },
-        {
-          "name": "HO9 abandoning a prepared selection cannot attach it to another mode send",
-          "status": "passed"
-        },
-        {
-          "name": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
-          "status": "passed"
-        },
-        {
-          "name": "HO9 leaving the window retires prepared context while a layout reparent keeps it",
-          "status": "passed"
-        },
-        {
-          "name": "HO10 unavailable chat still shows the prepared task and chosen files",
-          "status": "passed"
-        },
-        {
-          "name": "HO12 an incoming task puts keyboard focus in the composer",
-          "status": "passed"
-        },
-        {
-          "name": "HO13 malformed selection data is refused visibly without a crash",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 a held real controller keeps its decision and reopens from the sidebar",
-          "status": "passed"
-        },
-        {
-          "name": "HO8 a locked conversation is left intact by incoming preparation",
-          "status": "passed"
-        },
-        {
-          "name": "HO13 a refused unreadable-document hand-off keeps the instruction and files",
-          "status": "passed"
-        },
-        {
-          "name": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
-          "status": "passed"
-        },
-        {
-          "name": "HO12 keyboard palette search after a hand-off returns focus to the composer",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 a reloaded Explain Retry menu states its actual restoration limit",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 a reloaded Explain retry keeps its trace and states the selection restoration limit",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 a reloaded Explain edit keeps its trace and states the selection restoration limit",
-          "status": "passed"
-        },
-        {
-          "name": "merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
-          "status": "passed"
-        },
-        {
-          "name": "merge an unscoped Summarize input failure is not a no-matching-files result",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 edited Explain keeps selection identity before send: 'inline trace'",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 edited Explain keeps selection identity before send: 'shortened'",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 edited Explain keeps selection identity before send: 'different question'",
-          "status": "passed"
-        },
-        {
-          "name": "HO5 edited Explain keeps selection identity before send: 'emptied'",
-          "status": "passed"
-        },
-        {
           "name": "C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
           "status": "passed"
-        },
-        {
-          "name": "C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
-          "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
           "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a failed durable write leaves the legacy draft recoverable",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C4 A1 a failed durable write leaves the legacy draft recoverable",
           "status": "passed"
-        },
-        {
-          "name": "C8 a compatibility mount for core.rag-ask prepares its mode without sending",
-          "status": "passed"
-        },
-        {
-          "name": "C8 a compatibility mount for core.free-chat prepares its mode without sending",
-          "status": "passed"
-        },
-        {
-          "name": "C8 a compatibility mount for core.extract prepares its mode without sending",
-          "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 a workflow compatibility mount announces its unavailable disposition",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C8 a workflow compatibility mount announces its unavailable disposition",
           "status": "passed"
-        },
-        {
-          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"mode\":[\"ask\",\"search\"]} without losing its text or widening scope",
-          "status": "passed"
-        },
-        {
-          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"forceShapeId\":[]} without losing its text or widening scope",
-          "status": "passed"
-        },
-        {
-          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"docIds\":[\"\",\"chosen.md\"]} without losing its text or widening scope",
-          "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
           "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
-          "name": "C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition",
+          "name": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
           "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C7 C8 an outgoing compatibility view cannot consume the main window arrival",
           "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C9 A3 a shared line passage is highlighted without inventing a missing citation position",
           "status": "passed"
-        },
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 changing the address place keeps the shared reader until explicitly closed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
         {
           "name": "C9 A3 changing the address place keeps the shared reader until explicitly closed",
-          "status": "passed"
-        },
-        {
-          "name": "C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
-          "status": "passed"
-        },
-        {
-          "name": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
           "status": "passed"
         }
       ]
@@ -1240,220 +1140,132 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#declares core.search-v3-surface as USER/RAIL",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6153ff0de8ae8eead4536b983412647bb776fca53e2a8e26bc0fe710dd16f4f6",
+      "contentDigest": "sha256:39676ad475838969a26bc7d021398276401552450589f74e04023f4929aadb18",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "the window mounts with its five regions renders sidebar, topbar, main and composer inside the window host",
-          "status": "passed"
-        },
-        {
-          "name": "the window mounts with its five regions names the window in the topbar and carries ONLY controls that do something",
-          "status": "passed"
-        },
-        {
-          "name": "the window mounts with its five regions opens with an empty sidebar: no sessions until this window has searched",
-          "status": "passed"
-        },
-        {
-          "name": "the window mounts with its five regions claims nothing about the corpus when the window is docked without a search",
-          "status": "passed"
-        },
-        {
-          "name": "the window mounts with its five regions gives the composer a field, its effort control and a send control",
-          "status": "passed"
-        },
-        {
-          "name": "the composer has two anatomies and one way between them opens on the empty hero: headline up, content region empty",
-          "status": "passed"
-        },
-        {
-          "name": "the composer has two anatomies and one way between them docks into the band, dropping the headline and revealing the results",
-          "status": "passed"
-        },
-        {
-          "name": "the composer has two anatomies and one way between them keeps the send control disabled until the field carries something to send",
-          "status": "passed"
-        },
-        {
-          "name": "the composer has two anatomies and one way between them docks on send and returns to the hero on Escape",
-          "status": "passed"
-        },
-        {
-          "name": "the composer has two anatomies and one way between them compacts the effort control into a real glyph that keeps its whole name",
-          "status": "passed"
-        },
-        {
-          "name": "the composer has two anatomies and one way between them routes an external write of the dev attribute through the same morph",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux Tauri shell",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Windows Tauri shell",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a macOS Tauri shell",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux browser",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a API absent",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a reduced motion",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does adopts on connect and removes on the last disconnect",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does scopes the morph attribute to the transition and clears it afterwards",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does never waits on a frame inside the transition callback, which the browser suspends",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does clears the flag on EVERY path a state change can take",
-          "status": "passed"
-        },
-        {
-          "name": "the document-level morph sheet lives exactly as long as the window does swaps instantly under reduced motion, without reaching the API at all",
-          "status": "passed"
-        },
-        {
-          "name": "the session rows render the spec anatomy spends a status colour on the three non-resting states and none on the resting one",
-          "status": "passed"
-        },
-        {
-          "name": "the session rows render the spec anatomy runs the duty-cycled ping on the in-motion row only",
-          "status": "passed"
-        },
-        {
-          "name": "the session rows render the spec anatomy puts every state on the HOST as an attribute, which is what the fills key off",
-          "status": "passed"
-        },
-        {
-          "name": "the session rows render the spec anatomy makes the row a real button and marks an active one for assistive tech",
-          "status": "passed"
-        },
-        {
-          "name": "the window never scrolls; one inner region does clips the window host and the main column",
-          "status": "passed"
-        },
-        {
-          "name": "the window never scrolls; one inner region does clips every region host, so no region can become a second scroller",
-          "status": "passed"
-        },
-        {
-          "name": "the window never scrolls; one inner region does puts the ONE scroller inside the content surface",
-          "status": "passed"
-        },
-        {
-          "name": "the window never scrolls; one inner region does adopts the scroller mixin exactly once across the rendered window",
-          "status": "passed"
-        },
-        {
           "name": "the surface is registered as the main Search window declares core.search-v3-surface as USER/RAIL",
-          "status": "passed"
-        },
-        {
-          "name": "the surface is registered as the main Search window loads lazily on its first activation",
-          "status": "passed"
-        },
-        {
-          "name": "the surface is registered as the main Search window is in the component vocabulary, with every region it composes",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": {
-    "ref": "98e2d9bc56",
+    "ref": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
     "revision": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/en2le4sy/tmp/test-intent-vitest-7-1792854346273.json\"",
+        "command": "npx vitest run \"src/shell-v0/state/windowCutover.test.ts\" \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/plugin-api/HostApiSelection.test.ts\" \"src/shell-v0/router/intentRouter.test.ts\" \"src/shell-v0/state/UserStateDocument.test.ts\" \"src/shell-v0/utils/compose.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/substrates/actions/actions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3800827-1793015388302.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 7555,
-        "output": "JSON report written to /home/elias/.cache/am/en2le4sy/tmp/test-intent-vitest-7-1792854346273.json\n\n"
+        "durationMs": 3984,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3800827-1793015388302.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/state/windowCutover.test.ts",
         "classification": "assertion",
-        "detail": "WP1.5a window cutover C1 promotes exactly one Search rail window and pairs it with Library:  AssertionError: expected { id: 'core.search-v3-surface', …(5) } to match object { audience: 'USER', …(2) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1 | WP1.5a window cutover C2 resolves core.unified-chat-surface directly to Search:  AssertionError: expecte"
+        "detail": "WP1.5a window cutover C1 promotes exactly one Search rail window and pairs it with Library:  AssertionError: expected { id: 'core.search-v3-surface', …(5) } to match object { audience: 'USER', …(2) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/mod | WP1.5a window cutover C2 resolves core.unified-chat-surface directly to Search:  AssertionError: expecte"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts",
         "classification": "assertion",
-        "detail": "C5 A8 publishes the chosen hit and chosen result set, and clears on deselect and leave:  AssertionError: expected { items: [], primaryIndex: +0, …(1) } to match object { …(2) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy. | C5 A8 a replacement result list and a changed query cannot leave a stale Find related hit:  AssertionError: "
+        "detail": "C5 A8 publishes the chosen hit and chosen result set, and clears on deselect and leave:  AssertionError: expected { items: [], primaryIndex: +0, …(1) } to match object { …(2) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/node_modu | C5 A8 a replacement result list and a changed query cannot leave a stale Find related hit:  AssertionError: "
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
         "classification": "assertion",
-        "detail": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:112:35\n    at file:///home/elias/dev/justsearch/.clau | native search summon shared destination SC4 navigates from a non-modal view"
+        "detail": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:112:35\n    at file:///home/elias/dev/justsear | native search summon shared destination SC4 navigates from a non-modal view"
       },
       {
         "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts",
         "classification": "assertion",
-        "detail": "C5 plugin compose captures its chosen passage before navigation clears selection:  AssertionError: expected null to deeply equal { kind: 'item', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts:44:36\n    at file:///home/elias/dev/justsearch/.claude/"
+        "detail": "C5 plugin compose captures its chosen passage before navigation clears selection:  AssertionError: expected null to deeply equal { kind: 'item', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/plugin-api/HostApiSelection.test.ts:44:36\n    at file:///home/elias/dev/justsearch/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/router/intentRouter.test.ts",
         "classification": "assertion",
-        "detail": "IntentRouter — Query intents (548 S4-A) lowers a query to a search-surface navigation carrying the query in state:  AssertionError: expected { kind: 'navigate', …(2) } to deeply equal { kind: 'navigate', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/router/intentRouter.test.ts:237:38\n    at file:///home/elias/dev/ | IntentRouter — Answer intents (548 §4.5) parks the answer shape without an automa"
+        "detail": "IntentRouter — Query intents (548 S4-A) lowers a query to a search-surface navigation carrying the query in state:  AssertionError: expected { kind: 'navigate', …(2) } to deeply equal { kind: 'navigate', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/router/intentRouter.test.ts:237:38\n    at file:///home/el | IntentRouter — Answer intents (548 §4.5) parks the answer shape without an automa"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts",
         "classification": "assertion",
-        "detail": "UserStateDocument — §11.3 Profiles V2 V1 legacy doc migrates forward into the default profile:  AssertionError: expected [ 'core.search-surface' ] to deeply equal [ 'core.search-v3-surface' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts:872:41\n    at file:///home/elias"
+        "detail": "UserStateDocument — §11.3 Profiles V2 V1 legacy doc migrates forward into the default profile:  AssertionError: expected [ 'core.search-surface' ] to deeply equal [ 'core.search-v3-surface' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/state/UserStateDocument.test.ts:872:41\n    at file:///ho"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/compose.test.ts",
         "classification": "assertion",
-        "detail": "compose() core.ask with user prompt dispatches navigate-with-context:  AssertionError: expected 'core.unified-chat-surface' to be 'core.search-v3-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/utils/compose.test.ts:67:23\n    at file:///home/elias/"
+        "detail": "compose() core.ask with user prompt dispatches navigate-with-context:  AssertionError: expected 'core.unified-chat-surface' to be 'core.search-v3-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/utils/compose.test.ts:67:23\n    at file:///hom"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
         "classification": "assertion",
-        "detail": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace:  AssertionError: expected { …(4) } to deeply equal { …(3) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:138:17\n    at file:///home/elias/dev/justsearch/.claude | C4 A1 transfers the legacy draft durably once and never resurrects it after Clear:  AssertionError: expected '' to be 'le"
+        "detail": "C4 A1 transfers the legacy draft durably once and never resurrects it after Clear:  AssertionError: expected '' to be 'legacy unsent' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:542:85\n    at file:///home/elias/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+        "classification": "assertion",
+        "detail": "C4 A1 defers legacy transfer for an explicit arrival until a later clean mount:  AssertionError: expected '' to be 'legacy unsent' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:571:85\n    at file:///home/elias/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a failed durable write leaves the legacy draft recoverable",
+        "classification": "assertion",
+        "detail": "C4 A1 a failed durable write leaves the legacy draft recoverable:  AssertionError: expected '' to be 'legacy unsent' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:584:85\n    at file:///home/elias/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 a workflow compatibility mount announces its unavailable disposition",
+        "classification": "assertion",
+        "detail": "C8 a workflow compatibility mount announces its unavailable disposition:  AssertionError: expected '\\n      \\n        \\n      \\n        W…' to contain 'Workflow runs are not available here'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoff"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+        "classification": "assertion",
+        "detail": "C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:619:20\n    at file:///home/elias/dev/justsearch/.claude/workt"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
+        "classification": "assertion",
+        "detail": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render:  AssertionError: expected '' to be 'recover once' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:695:85\n    at file:///home/elias/de"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+        "classification": "assertion",
+        "detail": "C7 C8 an outgoing compatibility view cannot consume the main window arrival:  AssertionError: expected '\\n      \\n        \\n      \\n        W…' to contain 'Workflow runs are not available here'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoff"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+        "classification": "assertion",
+        "detail": "C9 A3 a shared line passage is highlighted without inventing a missing citation position:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:663:67\n    at file:///home/elias/dev/justsearch/.claude/workt"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 changing the address place keeps the shared reader until explicitly closed",
+        "classification": "assertion",
+        "detail": "C9 A3 changing the address place keeps the shared reader until explicitly closed:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:672:35\n    at file:///home/elias/dev/justsearch/.claude/workt"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
         "classification": "assertion",
-        "detail": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner yields on the chat surface when the verdict warrants that surface a banner:  AssertionError: expected 'Service degraded' not to contain 'degraded'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:612:32\n    at runNextTicks (node:internal/process/task_queue"
+        "detail": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner yields on the chat surface when the verdict warrants that surface a banner:  AssertionError: expected 'Service degraded' not to contain 'degraded'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:612:32\n    at runNextTicks (node:internal/process/ta"
       },
       {
         "id": "modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts",
         "classification": "assertion",
-        "detail": "shell actions — AI install palette reachability (727 F-1) 923 F-22 — registers one Search destination and no duplicate Go to Chat alias:  AssertionError: expected { kind: 'navigate', …(1) } to deeply equal { kind: 'navigate', …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts:114:66\n    at file:///home/eli"
+        "detail": "shell actions — AI install palette reachability (727 F-1) 923 F-22 — registers one Search destination and no duplicate Go to Chat alias:  AssertionError: expected { kind: 'navigate', …(1) } to deeply equal { kind: 'navigate', …(1) }\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/substrates/actions/actions.test.ts:114:66\n    at file:///"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#declares core.search-v3-surface as USER/RAIL",
         "classification": "assertion",
-        "detail": "the surface is registered as the main Search window declares core.search-v3-surface as USER/RAIL:  AssertionError: expected 'DEVELOPER' to be 'USER' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/finishing/test-intent-before-r4RIXx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts:615:26\n    at file:///home/elias/dev/justsearch/.cl"
+        "detail": "the surface is registered as the main Search window declares core.search-v3-surface as USER/RAIL:  AssertionError: expected 'DEVELOPER' to be 'USER' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-VU4DpW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts:631:26\n    at file:///home/elias/dev/justse"
       }
     ]
   },
-  "digest": "sha256:ddde945ebdeca385224b88125b907e9abf9717ee44e9c733d75561760abe3e50"
+  "digest": "sha256:95fe45ba5216c7a3b575e6c7c0e34695df998e98f358664f259caaa651849e64"
 }

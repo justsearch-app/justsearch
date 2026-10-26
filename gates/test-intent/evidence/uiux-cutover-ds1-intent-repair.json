@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T12:24:02.804Z",
+  "revision": "3d25dea55d300bfc26431ea2ffff1b8b54e7f669",
+  "tree": "f1ba697386c7683f368c16d20af8dab7adc25c28",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3830490-1793017424332.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8330
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d8dd65634d6dace8ddd9633b623f2c9a49f3d32496674782534a67c15c93f94d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 incoming preserves raw C and session B before refusing a third incoming snapshot",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d8dd65634d6dace8ddd9633b623f2c9a49f3d32496674782534a67c15c93f94d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 incoming preserves raw C and session B before refusing a third incoming snapshot",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5c545311fc85d3922d4de0654fb92a36fd961b04c770999b4c2ef977a812fed5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 FC15 a restored journal task cannot replace legacy text or issue it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 FC15 a restored journal task cannot replace legacy text or issue it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7b2692fffe97de58780bc7a12f76d69c422e3158",
+    "revision": "7b2692fffe97de58780bc7a12f76d69c422e3158",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3830490-1793017434260.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8205,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3830490-1793017434260.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B",
+        "classification": "assertion",
+        "detail": "NR15 human admission and RR15 refusal recovery DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B:  AssertionError: expected [ [ …(2) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-HBSHeZ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<ano"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 incoming preserves raw C and session B before refusing a third incoming snapshot",
+        "classification": "assertion",
+        "detail": "NR15 human admission and RR15 refusal recovery DS1 incoming preserves raw C and session B before refusing a third incoming snapshot:  AssertionError: expected 'incoming D' to be 'raw C' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-HBSHeZ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts:487:55\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B:  AssertionError: expected [ { …(2) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-HBSHeZ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:1207:32\n    at file:///home/elias/dev/justsearch/.c"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 FC15 a restored journal task cannot replace legacy text or issue it",
+        "classification": "assertion",
+        "detail": "DS1 FC15 a restored journal task cannot replace legacy text or issue it:  AssertionError: expected '# & % \"日本語\" — سؤال' to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-HBSHeZ/modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts:202:30\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A",
+        "classification": "assertion",
+        "detail": "DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A:  AssertionError: expected 'old A' to be 'newer raw B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-HBSHeZ/modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts:308:30\n    at file:///home/elias/dev/justsearc"
+      }
+    ]
+  },
+  "digest": "sha256:f730e19a1fc25b523001b8d2c2c4f72f76c65b9ef39b9a6e2b67f76857f203c7"
+}

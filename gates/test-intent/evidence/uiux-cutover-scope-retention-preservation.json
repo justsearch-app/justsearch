@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-26T07:38:59.146Z",
-  "revision": "9f7686e4c4be74fc7344ac6a853f5324bbba21c4",
-  "tree": "f0e445d27899b9f15d4fa39c11313ccffcd8c5cc",
+  "createdAt": "2026-10-26T12:00:59.120Z",
+  "revision": "5b8ec276a0c71138b8c99f9aa94b95e439eedf7b",
+  "tree": "17b62ab5b3cb626d1124a026935bdb5fc1612fde",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" \"src/shell-v0/controllers/draftPersistence.test.ts\" \"src/shell-v0/router/sources/URLSource.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.structured.test.ts\" \"src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts\" \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/sv3-recovery.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" \"src/shell-v0/views/search-v3/sv3-occlusion.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/scope-13/scratch/test-intent-vitest-3444717-1793000330041.json\"",
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" \"src/shell-v0/controllers/draftPersistence.test.ts\" \"src/shell-v0/router/sources/URLSource.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.structured.test.ts\" \"src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts\" \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/sv3-recovery.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" \"src/shell-v0/views/search-v3/sv3-occlusion.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3808905-1793016050191.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9101
+      "durationMs": 8924
     }
   ],
   "checks": [
@@ -1213,7 +1213,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2b0b5bea0a8432f408801cd74c0c947e06a900609a68a579c7a4ea154ae58fbe",
+      "contentDigest": "sha256:d8dd65634d6dace8ddd9633b623f2c9a49f3d32496674782534a67c15c93f94d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1696,7 +1696,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:258df469fe080d7c00e2c35f5f15a3da5a5e96f3498419626352acc577e3bd3d",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1767,6 +1767,10 @@
         },
         {
           "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later Retry of a scoped answer keeps the same files, and says so",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later DS1 known live chosen-file Ask Edit forks its own exact inputs while unrelated review-required B remains recoverable",
           "status": "passed"
         },
         {
@@ -2455,5 +2459,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:15a507f13b0c42dbddb26ef1fcd21654144f71a1a1efd0669bcb1fc99ea237ad"
+  "digest": "sha256:ed5b97edf668051360abf15f3ea6b1a62222f6a6b102f6efeb7a9258c5594979"
 }
