@@ -4,7 +4,6 @@ package io.justsearch.ui.api;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.justsearch.app.api.OpCriticality;
-import io.justsearch.app.api.OpLeaseOutcome;
 import io.justsearch.app.api.OperationAdmissionClosedException;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.services.HeadAssembly;
@@ -30,8 +29,9 @@ import org.slf4j.LoggerFactory;
  * ~300 LOC of {@code app.before(...)} filter wiring plus the rate-limited deny/slow-dump bookkeeping
  * it carries. It keeps the loopback bind policy (Hard Invariant #2) single-authority: {@link
  * #resolveAllowedOrigin} is the one CORS-origin decision and is still exercised verbatim by {@code
- * LocalApiCorsPolicyTest} / {@code LocalApiUiTokenPolicyTest}. Behaviour is identical — the filter
- * bodies moved verbatim; LocalApiServer constructs one instance and calls {@link #install} from
+ * LocalApiCorsPolicyTest} / {@code LocalApiUiTokenPolicyTest}. Security decisions retain those rules;
+ * {@link RequestReleaseOwner} also releases exact request references on exceptional completion.
+ * LocalApiServer constructs one instance and calls {@link #install} from
  * {@code buildAndStartApp} (and {@link #maybeCaptureSlowRequestDump} from the shared after-hook).
  */
 final class ApiSecurityFilters {
@@ -68,7 +68,7 @@ final class ApiSecurityFilters {
   private static final int MAX_LOGGED_ORIGIN_CHARS = 128;
   private static final long SLOW_REQUEST_THRESHOLD_MS = 3000;
   private static final long SLOW_DUMP_RATE_LIMIT_MS = 30_000;
-  private static final String MUTATION_LEASE_ATTRIBUTE = "__upgrade_mutation_lease__";
+  private static final String MUTATION_LEASE_ATTRIBUTE = RequestReleaseOwner.MUTATION_LEASE_ATTRIBUTE;
 
   private final boolean prodMode;
   private final String sessionToken;
@@ -170,8 +170,17 @@ final class ApiSecurityFilters {
     setupCors(app, prodMode);
     setupSessionTokenEnforcement(app);
     app.before(ctx -> RequestEngineContext.get(ctx, mcpClientIdentity));
+    var releases = RequestReleaseOwner.install(app);
+    app.before(ctx -> {
+      String method = ctx.method().name();
+      boolean engine = engineAdmission != null && !"OPTIONS".equals(method) && !"/api/health".equals(ctx.path());
+      boolean mutation = operationLeases != null && !"GET".equals(method) && !"OPTIONS".equals(method)
+          && !ctx.path().startsWith("/api/upgrade/");
+      releases.before(ctx, engine || mutation);
+    });
     setupOperationAdmission(app);
     setupEngineAdmission(app);
+    app.after(releases::after);
     setupCapabilityGates(app);
   }
 
@@ -185,10 +194,11 @@ final class ApiSecurityFilters {
       // The native protocol parses once, resolves its operation binding and admits the message.
       if ("/mcp".equals(ctx.path()) && "POST".equals(ctx.method().name())) return;
       try {
+        RequestReleaseOwner.requireLiveIfInstalled(ctx);
         var incoming = RequestEngineContext.get(ctx);
         if ("GET".equals(ctx.method().name()) && "/api/status".equals(ctx.path())) {
           // A status request occupies its fairness slot through response serialization.
-          ctx.attribute("status-admission-reservation", engineAdmission.reserveStatusAdmission(incoming));
+          ctx.attribute(RequestReleaseOwner.STATUS_RESERVATION_ATTRIBUTE, engineAdmission.reserveStatusAdmission(incoming));
           return;
         }
         var operation = admissionOperation.apply(ctx);
@@ -210,16 +220,6 @@ final class ApiSecurityFilters {
         throw refused;
       }
     });
-    app.after(ctx -> {
-      io.justsearch.app.api.EngineAdmissionService.StatusReservation reservation =
-          ctx.attribute("status-admission-reservation");
-      if (reservation != null) reservation.close();
-      var work = RequestEngineWork.get(ctx);
-      if (work != null) {
-        if (Boolean.TRUE.equals(ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE))) work.waitingClientGone();
-        work.close();
-      }
-    });
   }
 
   private void setupOperationAdmission(Javalin app) {
@@ -230,6 +230,7 @@ final class ApiSecurityFilters {
           if ("GET".equals(method) || "OPTIONS".equals(method)) return;
           if (ctx.path().startsWith("/api/upgrade/")) return;
           try {
+            RequestReleaseOwner.requireLiveIfInstalled(ctx);
             OperationLeaseHandle handle =
                 operationLeases.register(
                     "api.mutation",
@@ -255,14 +256,6 @@ final class ApiSecurityFilters {
                         "retrySafe", true,
                         "preparationId", e.preparationId()));
             throw new io.javalin.http.HttpResponseException(503, "Upgrade preparing");
-          }
-        });
-    app.after(
-        ctx -> {
-          OperationLeaseHandle handle = ctx.attribute(MUTATION_LEASE_ATTRIBUTE);
-          if (handle != null) {
-            handle.release(
-                ctx.statusCode() >= 500 ? OpLeaseOutcome.FAILURE : OpLeaseOutcome.SUCCESS);
           }
         });
   }

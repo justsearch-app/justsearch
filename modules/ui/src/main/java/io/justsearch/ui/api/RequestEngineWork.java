@@ -17,6 +17,11 @@ public final class RequestEngineWork {
 
   public static EngineWorkHandle get(Context context) { return context.attribute(ATTRIBUTE); }
 
+  /** Installed HTTP must remain LIVE; standalone controllers retain their own lifetime. */
+  public static void requireLiveOwner(Context context) {
+    RequestReleaseOwner.requireLiveIfInstalled(context);
+  }
+
   public static String errorCode(EngineAdmissionException failure) {
     return switch (failure.reason()) {
       case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT.name();
