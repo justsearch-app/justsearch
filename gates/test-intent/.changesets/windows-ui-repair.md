@@ -78,3 +78,14 @@ from another candidate is carried forward.
   "note": "Non-author delegated orchestrator /root/ui_closeout acting under root authority. Reviewed baseline and settled WU1/WU3, preserved positional and filesystem oracles, and corrected delegated-choice provenance. This accepts the two Adaptation entries only; independent committed behavior and Windows proof remain required."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a175a7-0941-7642-824b-b15bba715f23",
+  "verdict": "accept",
+  "digest": "sha256:ddc2c408100c1c61bb9c26bc53956faaaa579769bdd19baab742fddabc7eb351",
+  "note": "Independent Codex verifier session 01a175a7-0941-7642-824b-b15bba715f23. Compared committed baseline and exact candidate 582633aa source. Accept only the WU1 portable-fixture and WU3 diagnostic Adaptation entries: complete non-Windows hostile-name list, both HTTP methods and unchanged-file oracles retained; every original NoEvidence positional assertion retained. Delegated-choice provenance correctly labels orchestrator decisions and only supplied autonomy wording as owner quote. This records source adaptation acceptance; Java runtime and Windows qualification remain pending. No claim of parent/root authority or original owner conversation access."
+}
+```
