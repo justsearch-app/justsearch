@@ -578,6 +578,17 @@ public final class TextQueryOps {
       RuntimeSearchFilters filters,
       RuntimeSearchFilters boostFilters,
       QuerySyntax syntax) {
+    return searchText(queryText, limit, filters, boostFilters, syntax, null);
+  }
+
+  /** Text search with the existing relevance search-after cursor, for BM25-only retrieval. */
+  public SearchResult searchText(
+      String queryText,
+      int limit,
+      RuntimeSearchFilters filters,
+      RuntimeSearchFilters boostFilters,
+      QuerySyntax syntax,
+      String cursorToken) {
     if (queryText == null || queryText.isBlank()) {
       return new SearchResult(List.of(), 0, 0, null);
     }
@@ -590,7 +601,7 @@ public final class TextQueryOps {
             qb, boostFilters, QueryFilterBuilder.DEFAULT_BOOST_WEIGHT);
         combined = qb.build();
       }
-      return readPathOps.search(combined, limit, null, RuntimeSearchSort.RELEVANCE, null);
+      return readPathOps.search(combined, limit, null, RuntimeSearchSort.RELEVANCE, cursorToken);
     } catch (org.apache.lucene.queryparser.classic.ParseException e) {
       log.warn("Failed to parse query", e);
       log.debug("Failed query text: {}", queryText);
