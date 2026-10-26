@@ -188,7 +188,7 @@ final class IngestSwitchBufferOps {
 
   // ==================== Per-endpoint buffer methods ====================
 
-  SwitchBufferCapableQueue.AcceptedReceipt journalSyncRootForGeneration(String generation, String rootPath, boolean force,
+  SwitchBufferCapableQueue.SwitchBufferOp journalSyncRootForGeneration(String generation, String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance) {
     String root = resolveNormalizedPathPrefix(rootPath);
     if (!(jobQueue instanceof SwitchBufferCapableQueue queue)

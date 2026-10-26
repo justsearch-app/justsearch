@@ -575,12 +575,12 @@ final class SyncDirectoryOps {
   SyncDirectoryResponse enumerateRetirementRoot(String rootPath,String collection,
       java.util.function.BooleanSupplier cancelled,boolean automatic,
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
-      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt original) {
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp original) {
     Path root=resolveSyncRoot(rootPath);
     if(root==null)return syncDirectoryErrorResponse("ROOT enumeration unavailable");
     try {
       var result=walkAndEnqueueMissingFiles(root,true,java.util.Set.of(),
-          io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.operation().payload()).provenance(),
+          io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).provenance(),
           cancelled,collection,automatic?AdmissionMode.UPGRADE_RECOVERY:AdmissionMode.RETIREMENT_REPLAY,
           recoveryAdmission,original);
       if(result.walkInterrupted()||cancelled.getAsBoolean())return syncDirectoryErrorResponse("ROOT enumeration cancelled");
@@ -607,7 +607,7 @@ final class SyncDirectoryOps {
 
   SyncDirectoryResponse execute(String rootPath,boolean force,JobQueue.EnqueueProvenance provenance,
       java.util.function.BooleanSupplier cancelled,String collection,AdmissionMode admissionMode,
-      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     return execute(rootPath,force,provenance,cancelled,collection,admissionMode,
         java.util.function.IntSupplier::getAsInt,originalRoot);
   }
@@ -615,7 +615,7 @@ final class SyncDirectoryOps {
   SyncDirectoryResponse execute(String rootPath,boolean force,JobQueue.EnqueueProvenance provenance,
       java.util.function.BooleanSupplier cancelled,String collection,AdmissionMode admissionMode,
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
-      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     boolean upgradeRecovery = admissionMode == AdmissionMode.UPGRADE_RECOVERY;
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
@@ -804,7 +804,7 @@ final class SyncDirectoryOps {
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode,
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
-      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt originalRoot) throws IOException {
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {

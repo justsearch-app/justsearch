@@ -651,6 +651,26 @@ For `N >= 0`, the Engine blocks native cutover and marks the migration `FAILED` 
 
 To avoid hanging forever in `SWITCHING`, the Worker enforces a maximum switching duration and transitions to `FAILED` if it cannot drain in time (no pointer swap).
 
+### Returning watched drives during a held cutover
+
+A drive becoming readable again does not by itself release a held cutover. The Engine must
+freshly reconcile the root under the mutation fence, against the frozen migration declarations
+and journal. It rechecks the same root and volume, current file bytes or proven absence,
+collection ownership, and queue/journal versions before committing and verifying the result.
+A stale queued copy is not evidence that the current file was indexed; unreadable or conflicting
+evidence keeps replay pending. Independently owned work is not silently replaced to make replay pass.
+
+Only successful reconciliation clears that root's unavailable uncertainty. Watcher termination,
+re-registration or a readable mount alone does not clear it. Other roots' uncertainty and a
+runtime-wide lost-effect uncertainty still block certification. Named collection labels compare
+exactly; omitted, blank and `default` labels are aliases only for root ownership comparison.
+These rules allow a safe return to resume the held migration without declaring every remove or
+rebuild valid in every migration state.
+
+Sources: [WatcherReplay](../../modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WatcherReplay.java),
+[mutation admission](../../modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerMutationAdmission.java),
+and [migration replay](../../modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java).
+
 ## Removing documents whose source is gone
 
 Task t-20261013-ef3c41. A document is removed because its file is gone only when the file is
@@ -728,7 +748,8 @@ it syncs the roots that read unavailable again. The first sync or reindex walk t
 because the recorded volume is back, clears that state: the root reads indexed again, its held
 watch is registered, and the sync reconciles it as usual, pruning what was genuinely deleted.
 
-Removing the root keeps nothing of it: its record and held watch are dropped, a reconcile the
+Once removal completes, the selected root's record and held watch are dropped; independently
+declared descendants retain their ownership. A reconcile the
 Worker's watcher asked for before the removal and has not run yet (an event overflow or burst) is
 dropped, the periodic cycle that listed the root before the removal does not ask its volume, and
 the Head forgets the root's last availability answer. The Worker drops the record when the root
@@ -768,7 +789,7 @@ Accepted limits:
 
 - A buffered `PRUNE_PREFIX` replayed after a legacy single-runtime switch checks that the prefix
   folder is present and listable, but not that it is the same folder or volume.
-- The volume check compares the Windows volume serial number only, so two volumes that share a
+- On Windows the volume check compares the volume serial number, so two volumes that share a
   serial (a cloned disk, for example) count as the same volume.
 - The person's add records whatever volume is at the root's path at that moment. A root added
   while its drive letter held another volume has that volume recorded, and the original is then
@@ -777,12 +798,18 @@ Accepted limits:
   least half of the sampled files with the same size and time would be adopted; a drive whose
   files were mostly changed or touched since they were indexed is not, and stays unavailable
   until it is removed and added again.
-- On a platform that exposes no volume identity (anything but Windows), no volume is ever
+- Linux reconciliation uses directory identity and mount/UUID evidence where available. A returning
+  root must prove the recorded volume and folder; a changed Linux device number alone is allowed
+  only with matching UUID and folder evidence. See
+  [root identity](../../modules/worker-services/src/main/java/io/justsearch/indexerworker/services/RootIdentity.java)
+  and its [Linux lease](../../modules/worker-services/src/main/java/io/justsearch/indexerworker/services/LinuxRootIdentityLease.java).
+- On a platform or filesystem that exposes no volume identity, no volume is ever
   recorded or compared: an add, an explicit ingest and the upgrade record nothing, and no root is
   refused for its volume. Deletion there still requires the file to be reported not found under a
   root that is present and can be listed, so nothing is pruned on uncertainty, but another volume
   mounted at the same path is not told apart from the original. This path cannot be exercised on
-  Windows, where the checks run.
+  Windows, where volume identity is available. Returned-root cutover reconciliation still requires
+  volume evidence and remains held when it cannot obtain it.
 - A migration cutover that is replaying a buffered `SYNC_ROOT` waits, holding the runtime lock, for
   every queued file to settle, files awaiting a retry included, up to the 30-minute `SWITCHING`
   budget. While a file waits for a retry then (a locked file, say), closing the index cannot take
@@ -809,6 +836,29 @@ Accepted limits:
 ## Operator surface (Head REST → index-half port call)
 
 The Head exposes operator endpoints (Head never touches Lucene or `state.json` directly):
+
+Removal completion includes visibility through a fresh serving read, rather than just a queued
+delete. A buffered delete is pending, not completed. Incomplete watched-root removal keeps
+its registration and retry state. Resolve the reported failure before retrying Remove; for a rebuilding refusal, wait for rebuild completion.
+The REST removal handler's explicit incomplete-removal response is HTTP 500 `INDEX_ERROR` with
+`retrySafe:false`; other refusals follow the normal API error mapping.
+`core.remove-watched-root` also reports failure rather than successful removal
+and declares no automatic retry. A read-only serving view after a failed migration can refuse
+removal before changing either generation. Check the operation result and current status instead
+of treating an accepted request as a completed rebuild or removal.
+
+An unreadable document count is unknown when no earlier count exists for that reader, even if a legacy numeric field carries zero.
+Read `indexedDocumentsUnknown` on the public knowledge status view (`docCountUnknown` in the
+internal status extras). Schema compatibility can be `UNAVAILABLE` when fingerprint,
+metadata or required count evidence cannot be read; uncertainty alone establishes neither
+compatibility nor a rebuild requirement. A separately established rebuild-brake hold remains
+`BLOCKED_REBUILD_BRAKE` and requires its stated remedy.
+
+Sources: [root lifecycle](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java),
+[REST controller](../../modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java),
+[operation handler](../../modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RemoveWatchedRootHandler.java),
+[operation policy](../../modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java),
+and [index status](../../modules/worker-services/src/main/java/io/justsearch/indexerworker/services/IndexStatusOps.java).
 
 - Migration controls:
   - `POST /api/indexing/migration/start`

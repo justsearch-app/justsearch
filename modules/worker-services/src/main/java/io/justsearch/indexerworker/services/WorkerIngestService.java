@@ -250,6 +250,7 @@ public final class WorkerIngestService {
             indexingLoop,
             signalBus,
             migrationSwitchingMaxDurationMs);
+    this.statusOps.setMigrationReplayFailure(() -> watcherReplayFailure);
     if (ingestLifecycle != null) {
       this.statusOps.setWriterTragic(ingestLifecycle::hasTragicWriterException);
     }
@@ -778,6 +779,67 @@ public final class WorkerIngestService {
   }
 
   private static final String WATCHER_RECONCILE = WatcherRootReconciliation.OPERATION;
+  private volatile String watcherReplayFailure;
+
+  public void watcherReplayRefusal(String reason) { watcherReplayFailure = reason; }
+
+  /** Failure callbacks cannot take admission: they can arrive while the final fence is held. */
+  public void retainUnavailableWatcherRoot(WorkerMutationAdmission.RootUncertainty uncertainty) {
+    var debt = uncertainty.debt();
+    if (mutationAdmission == null || !(jobQueue instanceof SwitchBufferCapableQueue journal)) {
+      throw WorkerServiceException.unavailable("Watcher root debt has no durable owner");
+    }
+    mutationAdmission.markRootUnavailable(uncertainty);
+    if (journal.listSwitchBufferOpsStrict().stream().anyMatch(receipt ->
+        debt.key().equals(receipt.key()) && WATCHER_RECONCILE.equals(receipt.op()))) return;
+    if (!journal.putSwitchBuffer(debt.key(), WATCHER_RECONCILE, debt.encode())) {
+      mutationAdmission.markReplayUncertain();
+      throw IngestSwitchBufferOps.switchBufferUnavailable();
+    }
+  }
+
+  /** Called only with committed per-path evidence, never with a receipt alone. */
+  public void watcherRootReconciled(WatcherRootReconciliation debt,
+      List<WorkerMutationAdmission.RootUncertainty> captured) {
+    if (mutationAdmission == null) return;
+    for (var exact : captured) {
+      if (exact.debt().equals(debt)) mutationAdmission.reconciledRoot(exact);
+    }
+  }
+
+  public List<WorkerMutationAdmission.RootUncertainty> unavailableWatcherRoots() {
+    return mutationAdmission == null ? List.of() : mutationAdmission.unavailableRoots();
+  }
+
+  public boolean acknowledgeWatcherReplay(java.util.function.BooleanSupplier acknowledgement) {
+    return mutationAdmission == null ? acknowledgement.getAsBoolean()
+        : mutationAdmission.acknowledgeReconciledRoots(acknowledgement);
+  }
+
+  /** Restore observation before releasing a repaired root's uncertainty under the final fence. */
+  public void resumeReconciledWatcherRoot(WatcherRootReconciliation debt) throws IOException {
+    Path root = Path.of(debt.root());
+    var registry = rootWatcherRegistry.current();
+    var identity = registry.registeredIdentity(root);
+    if (identity == null) {
+      // On boot, fresh replay already matched this root against frozen durable membership.
+      if (!registry.watch(root.toString(), debt.collection()).watching()) {
+        throw new IOException("Reconciled watcher root could not be registered");
+      }
+      identity = registry.registeredIdentity(root);
+    }
+    if (identity == null || !identity.matchesReceipt(debt.rootIdentity())) {
+      throw new IOException("Reconciled watcher registration identity is unavailable");
+    }
+    registry.resumeAwaitingVolume(root);
+    var subscription = registry.subscription(root);
+    if (subscription == null || !registry.isCurrentAndActive(subscription)
+        || !subscription.rootIdentity().matchesReceipt(debt.rootIdentity())
+        || !java.util.Objects.equals(WatcherReplay.rootOwnerCollection(subscription.collection()),
+            WatcherReplay.rootOwnerCollection(debt.collection()))) {
+      throw new IOException("Reconciled watcher root is not observed by its declared owner");
+    }
+  }
 
   private void deferWatcherRootReconciliation(Path root, RootIdentity expectedRootIdentity) {
     try {
@@ -1118,7 +1180,7 @@ public final class WorkerIngestService {
     return recoverRelease030Root(root,collection,cancelled,null);
   }
   public SyncDirectoryResponse recoverRelease030Root(Path root,String collection,
-      java.util.function.BooleanSupplier cancelled,SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
+      java.util.function.BooleanSupplier cancelled,SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     try (var ignoredMutation = mutationLease()) {
       RootWatcherRegistry registry = rootWatcherRegistry;
       // Any removal after this authority decision must invalidate the ensuing sync.
@@ -1138,10 +1200,10 @@ public final class WorkerIngestService {
   }
 
   /** Rebuild membership under the ORIGINAL intent without executing later ROOT prunes early. */
-  public SyncDirectoryResponse enumerateRetirementRoot(SwitchBufferCapableQueue.AcceptedReceipt original,
+  public SyncDirectoryResponse enumerateRetirementRoot(SwitchBufferCapableQueue.SwitchBufferOp original,
       String configuredCollection,boolean automatic,java.util.function.BooleanSupplier cancelled) {
     try(var ignoredMutation=mutationLease()) {
-      Path root=Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.operation().payload()).rootPath()).toAbsolutePath().normalize();
+      Path root=Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).rootPath()).toAbsolutePath().normalize();
       var refused=refuseSyncOfRootOnAnotherVolume(root.toString());if(refused!=null)return refused;
       if(!rootWitness.admits(root)||!canApplyWatcherReceipts())return syncDirectoryErrorResponse("ROOT membership waits for its source");
       var binding=rootWatcherRegistry.subscription(root);
@@ -2405,7 +2467,7 @@ public final class WorkerIngestService {
   /** Retirement replay retains exact owners and retry work without a new acknowledgement. */
   public SyncDirectoryResponse syncDirectoryForRelease030Replay(
       SyncDirectoryRequest request, JobQueue.EnqueueProvenance provenance,
-      SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
+      SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     return syncDirectoryCommon(request, CallContext.none(), provenance, true,
         SyncDirectoryOps.AdmissionMode.RETIREMENT_REPLAY, false,originalRoot);
   }
@@ -2419,7 +2481,7 @@ public final class WorkerIngestService {
 
   private SyncDirectoryResponse syncDirectoryCommon(
       SyncDirectoryRequest request, CallContext ctx, JobQueue.EnqueueProvenance provenance,
-      boolean finalCutoverReplay, SyncDirectoryOps.AdmissionMode admissionMode, boolean liveSync,SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
+      boolean finalCutoverReplay, SyncDirectoryOps.AdmissionMode admissionMode, boolean liveSync,SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       boolean force = request.getForce();
@@ -2469,7 +2531,7 @@ public final class WorkerIngestService {
           : admissionMode == SyncDirectoryOps.AdmissionMode.MAINTENANCE
               ? SyncDirectoryOps.AdmissionMode.RETIREMENT_MAINTENANCE
               : SyncDirectoryOps.AdmissionMode.RETIREMENT_LIVE;
-      java.util.function.Function<SwitchBufferCapableQueue.AcceptedReceipt,SyncDirectoryResponse> sync = origin -> {
+      java.util.function.Function<SwitchBufferCapableQueue.SwitchBufferOp,SyncDirectoryResponse> sync = origin -> {
         var binding = rootWatcherRegistry.subscription(parsedRoot(rootPath));
         if (binding == null && effectiveMode == SyncDirectoryOps.AdmissionMode.DEFAULT) {
           return syncOps.execute(rootPath, force, provenance, ctx::cancelled);

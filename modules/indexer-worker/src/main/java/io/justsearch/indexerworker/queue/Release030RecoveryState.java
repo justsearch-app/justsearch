@@ -102,25 +102,29 @@ public final class Release030RecoveryState {
     save();
   }
   public synchronized boolean rootsInventoried() { return "true".equals(state.getProperty(RETIRE + "root-inventory")); }
-  public synchronized java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> rootReceipts() throws IOException {
-    var receipts = new java.util.ArrayList<SwitchBufferCapableQueue.AcceptedReceipt>();
+  public synchronized java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> rootReceipts() throws IOException {
+    var receipts = new java.util.ArrayList<SwitchBufferCapableQueue.SwitchBufferOp>();
     for (String key : state.stringPropertyNames()) if (key.startsWith(RECEIPT)) {
       var receipt = decodeReceipt(state.getProperty(key));
-      if (!"SYNC_ROOT".equals(receipt.operation().op()) || !key.equals(RECEIPT + receipt.uuid()))
+      if (!"SYNC_ROOT".equals(receipt.op()) || !key.equals(RECEIPT + receipt.retirementUuid()))
         throw new IOException("Invalid retained ROOT receipt");
       receipts.add(receipt);
     }
-    receipts.sort(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.AcceptedReceipt::acceptedOrder));
+    receipts.sort(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder));
     return java.util.List.copyOf(receipts);
   }
-  public synchronized java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> committedDeletes() throws IOException {
-    var result = new java.util.ArrayList<SwitchBufferCapableQueue.AcceptedReceipt>();
+  public synchronized java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> committedDeletes() throws IOException {
+    var result = new java.util.ArrayList<SwitchBufferCapableQueue.SwitchBufferOp>();
     for (String key : state.stringPropertyNames()) if (key.startsWith(RETIRE + "delete|") && !key.endsWith("|queue"))
       result.add(decodeReceipt(state.getProperty(key)));
     return java.util.List.copyOf(result);
   }
-  private static SwitchBufferCapableQueue.AcceptedReceipt decodeReceipt(String value) throws IOException {
-    try { return JSON.readValue(value, SwitchBufferCapableQueue.AcceptedReceipt.class); }
+  private static SwitchBufferCapableQueue.SwitchBufferOp decodeReceipt(String value) throws IOException {
+    try {
+      var receipt = JSON.readValue(value, SwitchBufferCapableQueue.SwitchBufferOp.class);
+      receipt.retirementUuid();
+      return receipt;
+    }
     catch (RuntimeException invalid) { throw new IOException("Unbound or invalid retirement receipt", invalid); }
   }
   private static String headKey(String generation, String key) {
@@ -129,74 +133,78 @@ public final class Release030RecoveryState {
   }
   /** Save the predecessor BEFORE the queue transaction can replace its coalesced SQL head. */
   public synchronized void replacingRoot(String generation, String key,
-      SwitchBufferCapableQueue.AcceptedReceipt predecessor) throws IOException {
+      SwitchBufferCapableQueue.SwitchBufferOp predecessor) throws IOException {
     if (predecessor != null) retainRoot(predecessor);
-    state.setProperty(REPLACING + headKey(generation, key), predecessor == null ? "new" : predecessor.uuid());
+    state.setProperty(REPLACING + headKey(generation, key), predecessor == null ? "new" : predecessor.retirementUuid());
     save();
   }
-  public synchronized void retainRootCollection(SwitchBufferCapableQueue.AcceptedReceipt root,String collection) throws IOException {
+  public synchronized void retainRootCollection(SwitchBufferCapableQueue.SwitchBufferOp root,String collection) throws IOException {
     if (!rootReceipts().contains(root)) throw new IOException("ROOT collection lacks retained intent");
     if (collection != null && !collection.isBlank()) {
-      state.setProperty(RETIRE + "root-collection|" + root.uuid(),collection);save();
+      state.setProperty(RETIRE + "root-collection|" + root.retirementUuid(),collection);save();
     }
   }
-  public synchronized String rootCollection(SwitchBufferCapableQueue.AcceptedReceipt root) {
-    return state.getProperty(RETIRE + "root-collection|" + root.uuid());
+  public synchronized String rootCollection(SwitchBufferCapableQueue.SwitchBufferOp root) {
+    return state.getProperty(RETIRE + "root-collection|" + root.retirementUuid());
   }
-  private void retainRoot(SwitchBufferCapableQueue.AcceptedReceipt receipt) {
-    state.setProperty(RECEIPT + receipt.uuid(), JSON.writeValueAsString(receipt));
+  private void retainRoot(SwitchBufferCapableQueue.SwitchBufferOp receipt) {
+    state.setProperty(RECEIPT + receipt.retirementUuid(), JSON.writeValueAsString(receipt));
   }
-  public synchronized void retainRootHead(SwitchBufferCapableQueue.AcceptedReceipt receipt) throws IOException {
-    String key = headKey(receipt.operation().generation(), receipt.operation().key());
+  public synchronized void retainRootHead(SwitchBufferCapableQueue.SwitchBufferOp receipt) throws IOException {
+    String key = headKey(receipt.generation(), receipt.key());
     String previous = state.getProperty(HEAD + key);
     retainRoot(receipt);
-    if (previous != null && !previous.equals(receipt.uuid())) state.setProperty(NEXT + previous, receipt.uuid());
-    state.setProperty(HEAD + key, receipt.uuid());
+    if (previous != null && !previous.equals(receipt.retirementUuid())) state.setProperty(NEXT + previous, receipt.retirementUuid());
+    state.setProperty(HEAD + key, receipt.retirementUuid());
     state.remove(REPLACING + key);
     save();
   }
-  public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> roots) throws IOException {
+  public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> roots) throws IOException {
     if (rootsInventoried()) throw new IOException("ROOT inventory already exists");
     for (var root : roots) {
       retainRoot(root);
-      state.setProperty(HEAD + headKey(root.operation().generation(), root.operation().key()), root.uuid());
+      state.setProperty(HEAD + headKey(root.generation(), root.key()), root.retirementUuid());
     }
     state.setProperty(RETIRE + "root-inventory", "true");
     save();
   }
   /** A crash may leave exactly the committed replacement after a saved predecessor intent. */
-  public synchronized void validateRootHeads(java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> actual) throws IOException {
+  public synchronized void validateRootHeads(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> actual) throws IOException {
     if (!rootsInventoried()) throw new IOException("Missing retirement ROOT inventory");
-    var heads = new java.util.HashMap<String,SwitchBufferCapableQueue.AcceptedReceipt>();
-    for (var root : actual) heads.put(headKey(root.operation().generation(),root.operation().key()),root);
+    var heads = new java.util.HashMap<String,SwitchBufferCapableQueue.SwitchBufferOp>();
+    for (var root : actual) heads.put(headKey(root.generation(),root.key()),root);
     for (String key : java.util.List.copyOf(state.stringPropertyNames())) if (key.startsWith(REPLACING)) {
       String head = key.substring(REPLACING.length());var surviving = heads.get(head);
       if (surviving == null) throw new IOException("Missing interrupted ROOT replacement");
       String predecessor = state.getProperty(key);
-      if (!predecessor.equals("new") && !predecessor.equals(surviving.uuid())) {
+      if (!predecessor.equals("new")) {
         var prior = decodeReceipt(state.getProperty(RECEIPT + predecessor));
-        if (prior.acceptedOrder() >= surviving.acceptedOrder()) throw new IOException("Stale ROOT replacement");
+        if (predecessor.equals(surviving.retirementUuid())) {
+          if (!prior.equals(surviving)) throw new IOException("Interrupted ROOT predecessor changed");
+        } else if (prior.acceptedOrder() >= surviving.acceptedOrder()) {
+          throw new IOException("Stale ROOT replacement");
+        }
       }
       retainRootHead(surviving);
     }
     for (String key : state.stringPropertyNames()) if (key.startsWith(HEAD)) {
       String head = key.substring(HEAD.length());String required = state.getProperty(key);
       var current = heads.get(head);
-      if (current == null || !current.uuid().equals(required)
+      if (current == null || !current.retirementUuid().equals(required)
           || !current.equals(decodeReceipt(state.getProperty(RECEIPT + required))))
         throw new IOException("Required latest ROOT receipt missing or changed");
     }
-    var byUuid = new java.util.HashMap<String,SwitchBufferCapableQueue.AcceptedReceipt>();
-    for (var root : rootReceipts()) byUuid.put(root.uuid(),root);
+    var byUuid = new java.util.HashMap<String,SwitchBufferCapableQueue.SwitchBufferOp>();
+    for (var root : rootReceipts()) byUuid.put(root.retirementUuid(),root);
     for (var root : byUuid.values()) {
-      String required = state.getProperty(HEAD + headKey(root.operation().generation(),root.operation().key()));
+      String required = state.getProperty(HEAD + headKey(root.generation(),root.key()));
       var seen = new java.util.HashSet<String>();var cursor = root;
-      while (!cursor.uuid().equals(required)) {
-        if (!seen.add(cursor.uuid())) throw new IOException("Cyclic ROOT receipt history");
-        var next = byUuid.get(state.getProperty(NEXT + cursor.uuid()));
+      while (!cursor.retirementUuid().equals(required)) {
+        if (!seen.add(cursor.retirementUuid())) throw new IOException("Cyclic ROOT receipt history");
+        var next = byUuid.get(state.getProperty(NEXT + cursor.retirementUuid()));
         if (next == null || next.acceptedOrder() <= cursor.acceptedOrder()
-            || !next.operation().key().equals(root.operation().key())
-            || !next.operation().generation().equals(root.operation().generation()))
+            || !next.key().equals(root.key())
+            || !next.generation().equals(root.generation()))
           throw new IOException("Incomplete ROOT successor chain");
         cursor = next;
       }
@@ -296,11 +304,11 @@ public final class Release030RecoveryState {
   public boolean replayComplete() { return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "replayed")); }
   public boolean differencesComplete() { return "true".equals(state.getProperty(RETIRE + "differences")); }
 
-  public boolean rootEnumerated(SwitchBufferCapableQueue.AcceptedReceipt root) {
-    return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "root-enum|" + root.uuid()));
+  public boolean rootEnumerated(SwitchBufferCapableQueue.SwitchBufferOp root) {
+    return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "root-enum|" + root.retirementUuid()));
   }
-  public synchronized void markRootEnumerated(SwitchBufferCapableQueue.AcceptedReceipt root) throws IOException {
-    state.setProperty(RETIRE + "root-enum|" + root.uuid(),java.util.Objects.requireNonNull(openedSession));save();
+  public synchronized void markRootEnumerated(SwitchBufferCapableQueue.SwitchBufferOp root) throws IOException {
+    state.setProperty(RETIRE + "root-enum|" + root.retirementUuid(),java.util.Objects.requireNonNull(openedSession));save();
   }
   public boolean rootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) {
     return openedSession != null && openedSession.equals(state.getProperty(rootWalkKey(op)));
@@ -315,7 +323,7 @@ public final class Release030RecoveryState {
   public boolean deletionCommitted(SwitchBufferCapableQueue.SwitchBufferOp op) {
     String value = state.getProperty(deletionKey(op));
     if (value == null) return false;
-    try { return decodeReceipt(value).operation().equals(op); }
+    try { return decodeReceipt(value).equals(op); }
     catch (IOException invalid) { throw new IllegalStateException("Unbound historical delete proof", invalid); }
   }
 
@@ -325,9 +333,9 @@ public final class Release030RecoveryState {
   }
 
   /** Historical A effect and CURRENT Q removal are separate even after supported DB replacement. */
-  public synchronized void markDeletionCommitted(SwitchBufferCapableQueue.AcceptedReceipt receipt) throws IOException {
-    state.setProperty(deletionKey(receipt.operation()), JSON.writeValueAsString(receipt));
-    markDeletionQueueComplete(receipt.operation());
+  public synchronized void markDeletionCommitted(SwitchBufferCapableQueue.SwitchBufferOp receipt) throws IOException {
+    state.setProperty(deletionKey(receipt), JSON.writeValueAsString(receipt));
+    markDeletionQueueComplete(receipt);
   }
   public synchronized void markDeletionQueueComplete(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
     state.setProperty(deletionKey(op) + "|queue", java.util.Objects.requireNonNull(openedSession));

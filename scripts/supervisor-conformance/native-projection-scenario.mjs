@@ -235,7 +235,7 @@ function assertProjectionHit(body, projection, label) {
     `${label} did not return its exact accepted fields: ${JSON.stringify(body)}`);
 }
 
-function assertExactJournal({ rows, generation, sourceGeneration, fixture, lateReceipt, check = requireThat }) {
+export function assertExactJournal({ rows, generation, sourceGeneration, fixture, lateReceipt, check = requireThat }) {
   check(rows.length === 9,
     `native mixed journal expected 9 rows, got ${rows.length}: ${JSON.stringify(rows)}`);
   check(rows.every(row => row.generation === generation), 'journal crossed candidate generations');
@@ -268,7 +268,12 @@ function assertExactJournal({ rows, generation, sourceGeneration, fixture, lateR
     'native enumeration did not precede the complete source snapshot');
   for (const row of rows.slice(0, 4)) {
     const payload = JSON.parse(row.payload);
-    check(payload.version === 2 && row.key === `path:${payload.path}`
+    const declaration = fixture.watchedRoots.roots.find(root => root.path
+      === (payload.path === fixture.pathKeys.collection ? fixture.collectionRoot : fixture.prefixRoot));
+    const declaredPath = declaration && path.resolve(declaration.path);
+    const rootKey = process.platform === 'win32' ? declaredPath?.toLowerCase() : declaredPath;
+    check(payload.version === 3 && declaration != null && payload.ingestion_root === rootKey
+        && row.key === `path:${payload.path}`
         && Object.values(fixture.pathKeys).includes(payload.path)
         && payload.collection === (payload.path === fixture.pathKeys.collection
           ? deletedFilesCollection : retainedFilesCollection)
@@ -284,9 +289,11 @@ function assertExactJournal({ rows, generation, sourceGeneration, fixture, lateR
     const row = rows[4 + offset];
     check(row.op === op && row.key === key, `native mixed ordered suffix missing ${op}:${key}`);
     const expectedPayload = op === 'PROJECTION_SOURCE' ? NATIVE_SOURCE_ID
-      : op === 'DELETE_PREFIX' ? fixture.prefixKey
+      : op === 'DELETE_PREFIX' ? { version: 1, prefix: fixture.prefixKey, excludedSubtrees: [] }
         : op === 'DELETE_COLLECTION' ? deletedFilesCollection : null;
-    if (expectedPayload !== null) check(row.payload === expectedPayload, `wrong ${op} scope`);
+    if (op === 'DELETE_PREFIX') check(JSON.stringify(canonicalJson(JSON.parse(row.payload)))
+        === JSON.stringify(canonicalJson(expectedPayload)), `wrong ${op} scope`);
+    else if (expectedPayload !== null) check(row.payload === expectedPayload, `wrong ${op} scope`);
     else check(JSON.stringify(canonicalJson(JSON.parse(row.payload)))
         === JSON.stringify(canonicalJson(offset === 1 ? retained : late)),
       `wrong accepted ${op} payload`);
@@ -295,7 +302,7 @@ function assertExactJournal({ rows, generation, sourceGeneration, fixture, lateR
     'native mixed journal contains an unversioned receipt');
 }
 
-function assertJobsAtAction({ jobsPath, fixture, check = requireThat }) {
+export function assertJobsAtAction({ jobsPath, fixture, check = requireThat }) {
   const rows = jobRows(jobsPath, [fixture.pathKeys.retained, fixture.pathKeys.prefix,
     fixture.pathKeys.dual, fixture.pathKeys.collection]);
   check(rows.length === 2 && rows.every(row => row.state === 'DONE'

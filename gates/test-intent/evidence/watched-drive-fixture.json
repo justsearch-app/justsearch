@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T20:01:48.058Z",
+  "revision": "d4657b989be82eacbe2701d0dac185a5565f78da",
+  "tree": "a29af12caa0fd7da042560ec0940cbc536b87920",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.app.engine.LinuxWatchedDriveReturnIntegrationTest.stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission\" --tests \"io.justsearch.app.engine.LinuxWatchedDriveReturnIntegrationTest.fixtureBudgetReportsIncompleteExitAndSupportsRetry\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31624
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbc79eff82e4917825052383bddd0c9215c618457d76c78062453bd24a90bc7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java#fixtureBudgetReportsIncompleteExitAndSupportsRetry",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbc79eff82e4917825052383bddd0c9215c618457d76c78062453bd24a90bc7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fixtureBudgetReportsIncompleteExitAndSupportsRetry(0)",
+          "status": "passed"
+        },
+        {
+          "name": "fixtureBudgetReportsIncompleteExitAndSupportsRetry(500000)",
+          "status": "passed"
+        },
+        {
+          "name": "fixtureBudgetReportsIncompleteExitAndSupportsRetry(2500000000)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:425f922c5644f2629672ba0a68829a75858169389e3278b2e774e7f5788e33e5"
+}

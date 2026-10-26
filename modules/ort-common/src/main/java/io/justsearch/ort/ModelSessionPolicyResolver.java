@@ -28,6 +28,8 @@ import java.util.Optional;
  *       ({@code KnowledgeServer:620}). Keyed on {@link VariantSelection#executionProvider()}
  *       rather than {@code cfg.gpuEnabled()} because those diverge when the user configures
  *       GPU but hardware lacks CUDA (degraded variant drops to CPU EP).
+ *   <li>SPLADE/reranker defer CPU backups only when the effective GPU arena is nonzero; selected
+ *       CUDA variants intentionally placed on CPU stay eager.
  *   <li>The "NER gets {@code gpuRetryEnabled=false}" rule.
  * </ul>
  *
@@ -135,13 +137,15 @@ public final class ModelSessionPolicyResolver {
 
   private static ModelSessionPolicy resolveSplade(
       ResolvedConfig.Ai.Splade cfg, VariantSelection variant, boolean planned) {
+    ModelSessionPolicy.Gpu gpu =
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned);
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
+        gpu,
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
-            /* deferCpuSession= */ false,
+            /* deferCpuSession= */ gpu.arenaCapBytes() > 0L,
             /* gpuRetryEnabled= */ true,
             DEFAULT_GPU_RETRY_INTERVAL_MS),
         defaultRunOptions());
@@ -177,13 +181,15 @@ public final class ModelSessionPolicyResolver {
 
   private static ModelSessionPolicy resolveReranker(
       ResolvedConfig.Ai.Reranker cfg, VariantSelection variant, boolean planned) {
+    ModelSessionPolicy.Gpu gpu =
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned);
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
+        gpu,
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
-            /* deferCpuSession= */ false,
+            /* deferCpuSession= */ gpu.arenaCapBytes() > 0L,
             /* gpuRetryEnabled= */ true,
             DEFAULT_GPU_RETRY_INTERVAL_MS),
         defaultRunOptions());

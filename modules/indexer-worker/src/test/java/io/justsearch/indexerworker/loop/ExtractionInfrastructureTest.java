@@ -133,9 +133,10 @@ final class ExtractionInfrastructureTest {
     final AtomicBoolean probeSnapshot = new AtomicBoolean();
     final List<Throwable> errors = new CopyOnWriteArrayList<>();
     final List<Path> sources;
-    final TimeboxedContentExtractor timebox;
-    final Path snapshotFolder;
-    final ExtractionSandbox actual;
+    TimeboxedContentExtractor timebox;
+    Path snapshotFolder;
+    Path childScratchRoot;
+    ExtractionSandbox actual;
     IndexingLoop loop;
     WorkerIngestService service;
     boolean mixed;
@@ -144,63 +145,70 @@ final class ExtractionInfrastructureTest {
     Fixture() throws Exception { this(false); }
 
     Fixture(boolean process) throws Exception {
-      Path corpus = Path.of(System.getProperty("justsearch.test.outageCorpus",
-          Path.of(System.getProperty("java.io.tmpdir"), "justsearch-outage-regression-corpus").toString()));
-      Files.createDirectories(corpus);
-      sources = List.of(corpus.resolve("snapshot-healthy-a.txt"), corpus.resolve("snapshot-healthy-b.txt"));
-      // Generate once in a fixed folder; later cases, attempts and builder rounds reuse the bytes.
-      for (Path source : sources) {
-        if (!Files.exists(source)) Files.writeString(source, "healthy readable source content\n".repeat(36_000));
-      }
-      Path warmup = corpus.resolve("canary-warmup.rtf");
-      if (!Files.exists(warmup)) Files.writeString(warmup, "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fnil Arial;}}\\pard\\f0 JustSearch healthy extraction canary.\\par}");
-      queue.open();
-      assertTrue(provider.extractArtifact(corpus.resolve("canary-warmup.rtf")).result().content()
-          .contains("healthy extraction canary"), "publish a warmed real parser before timed recovery checks");
-      if (process) {
-        var readers = owners.register(new EngineExecutorSpec("round9-reader", EngineExecutorSpec.Kind.BACKGROUND,
-            EngineExecutorSpec.Mode.PLATFORM, 1, 8, 2));
-        actual = new PersistentExtractionSandbox(readers,
-            List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp", System.getProperty("java.class.path"), ExtractionSandboxChild.class.getName()),
-            TikaExtractionPolicy.defaults(), null, Duration.ofSeconds(5), 1, 100, null);
-        Set<Path> before = snapshotFolders();
-        actual.extract(sources.getFirst());
-        Set<Path> created = snapshotFolders(); created.removeAll(before);
-        assertEquals(1, created.size(), "one real child owns one private snapshot folder");
-        snapshotFolder = created.iterator().next();
-      } else {
-        actual = provider::extractArtifact;
-        var field = PolicyDrivenTikaExtractor.class.getDeclaredField("inputFactory"); field.setAccessible(true);
-        Object factory = field.get(provider);
-        var dir = factory.getClass().getDeclaredField("directory"); dir.setAccessible(true);
-        snapshotFolder = (Path) dir.get(factory);
-      }
-      ExtractionSandbox sandbox = new ExtractionSandbox() {
-        @Override public ExtractionArtifact extract(Path file) throws IOException, ContentExtractor.ExtractionException {
-          boolean probe = file.getFileName().toString().startsWith("justsearch-extraction-canary-");
-          if (probe) probes.incrementAndGet();
-          try {
-            if (unknown.get()) throw new ContentExtractor.ExtractionException("untyped infrastructure fault");
-            if (poison.get() && !probe && (!mixed || file.equals(sources.getFirst()))) {
-              throw new IllegalStateException("content crashes parser");
-            }
-            var artifact = actual.extract(file);
-            if (probe) {
-              assertTrue(artifact.result().content().contains("healthy extraction canary"));
-              var field = PolicyDrivenTikaExtractor.class.getDeclaredField("inputFactory"); field.setAccessible(true);
-              Object factory = field.get(provider);
-              var dir = factory.getClass().getDeclaredField("directory"); dir.setAccessible(true);
-              probeSnapshot.set(dir.get(factory) != null);
-            }
-            return artifact;
-          } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
-          catch (IOException | ContentExtractor.ExtractionException | RuntimeException failure) { errors.add(failure); throw failure; }
+      try {
+        Path corpus = Path.of(System.getProperty("justsearch.test.outageCorpus",
+            Path.of(System.getProperty("java.io.tmpdir"), "justsearch-outage-regression-corpus").toString()));
+        Files.createDirectories(corpus);
+        sources = List.of(corpus.resolve("snapshot-healthy-a.txt"), corpus.resolve("snapshot-healthy-b.txt"));
+        // Generate once in a fixed folder; later cases, attempts and builder rounds reuse the bytes.
+        for (Path source : sources) {
+          if (!Files.exists(source)) Files.writeString(source, "healthy readable source content\n".repeat(36_000));
         }
-      };
-      var registration = owners.register(new EngineExecutorSpec("round9-timebox", EngineExecutorSpec.Kind.BACKGROUND,
-          EngineExecutorSpec.Mode.PLATFORM, 1, 8, 2));
-      timebox = new TimeboxedContentExtractor(registration, sandbox, Duration.ofSeconds(5), null);
+        Path warmup = corpus.resolve("canary-warmup.rtf");
+        if (!Files.exists(warmup)) Files.writeString(warmup, "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fnil Arial;}}\\pard\\f0 JustSearch healthy extraction canary.\\par}");
+        queue.open();
+        assertTrue(provider.extractArtifact(corpus.resolve("canary-warmup.rtf")).result().content()
+            .contains("healthy extraction canary"), "publish a warmed real parser before timed recovery checks");
+        if (process) {
+          childScratchRoot = Files.createTempDirectory(temp, "extraction-child-").toAbsolutePath().normalize();
+          var readers = owners.register(new EngineExecutorSpec("round9-reader", EngineExecutorSpec.Kind.BACKGROUND,
+              EngineExecutorSpec.Mode.PLATFORM, 1, 8, 2));
+          actual = new PersistentExtractionSandbox(readers,
+              List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                  "-Djava.io.tmpdir=" + childScratchRoot, "-cp", System.getProperty("java.class.path"), ExtractionSandboxChild.class.getName()),
+              TikaExtractionPolicy.defaults(), null, Duration.ofSeconds(5), 1, 100, null);
+          Set<Path> before = snapshotFolders();
+          actual.extract(sources.getFirst());
+          Set<Path> created = snapshotFolders(); created.removeAll(before);
+          assertEquals(1, created.size(), "one real child owns one private snapshot folder");
+          snapshotFolder = created.iterator().next();
+          assertEquals(childScratchRoot, snapshotFolder.getParent(), "snapshot must belong to this fixture's child");
+        } else {
+          actual = provider::extractArtifact;
+          var field = PolicyDrivenTikaExtractor.class.getDeclaredField("inputFactory"); field.setAccessible(true);
+          Object factory = field.get(provider);
+          var dir = factory.getClass().getDeclaredField("directory"); dir.setAccessible(true);
+          snapshotFolder = (Path) dir.get(factory);
+        }
+        ExtractionSandbox sandbox = new ExtractionSandbox() {
+          @Override public ExtractionArtifact extract(Path file) throws IOException, ContentExtractor.ExtractionException {
+            boolean probe = file.getFileName().toString().startsWith("justsearch-extraction-canary-");
+            if (probe) probes.incrementAndGet();
+            try {
+              if (unknown.get()) throw new ContentExtractor.ExtractionException("untyped infrastructure fault");
+              if (poison.get() && !probe && (!mixed || file.equals(sources.getFirst()))) {
+                throw new IllegalStateException("content crashes parser");
+              }
+              var artifact = actual.extract(file);
+              if (probe) {
+                assertTrue(artifact.result().content().contains("healthy extraction canary"));
+                var field = PolicyDrivenTikaExtractor.class.getDeclaredField("inputFactory"); field.setAccessible(true);
+                Object factory = field.get(provider);
+                var dir = factory.getClass().getDeclaredField("directory"); dir.setAccessible(true);
+                probeSnapshot.set(dir.get(factory) != null);
+              }
+              return artifact;
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+            catch (IOException | ContentExtractor.ExtractionException | RuntimeException failure) { errors.add(failure); throw failure; }
+          }
+        };
+        var registration = owners.register(new EngineExecutorSpec("round9-timebox", EngineExecutorSpec.Kind.BACKGROUND,
+            EngineExecutorSpec.Mode.PLATFORM, 1, 8, 2));
+        timebox = new TimeboxedContentExtractor(registration, sandbox, Duration.ofSeconds(5), null);
+      } catch (Exception | Error failure) {
+        close(failure);
+        throw failure;
+      }
     }
 
     void resetSnapshotAfterWarmup() throws Exception {
@@ -215,7 +223,7 @@ final class ExtractionInfrastructureTest {
     }
 
     Set<Path> snapshotFolders() throws IOException {
-      try (var paths = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
+      try (var paths = Files.list(childScratchRoot)) {
         return new HashSet<>(paths.filter(p -> p.getFileName().toString().startsWith("justsearch-parse-input-"))
             .toList());
       }
@@ -290,9 +298,20 @@ final class ExtractionInfrastructureTest {
         return result;
       }
     }
-    @Override public void close() throws Exception {
-      if (loop != null) loop.close();
-      timebox.close(); actual.close(); provider.close(); owners.close(); queue.close();
+    @Override public void close() throws Exception { close(null); }
+
+    private void close(Throwable primary) throws Exception {
+      Throwable failure = primary;
+      for (AutoCloseable resource : new AutoCloseable[] {loop, timebox, actual, provider, owners, queue}) {
+        if (resource == null) continue;
+        try { resource.close(); }
+        catch (Exception | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else if (failure != cleanup) failure.addSuppressed(cleanup);
+        }
+      }
+      if (primary == null && failure instanceof Exception exception) throw exception;
+      if (primary == null && failure instanceof Error error) throw error;
     }
   }
 }

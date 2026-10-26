@@ -31,27 +31,32 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       String op,
       String payload,
       long lastUpdatedMs,
-      String revision) {
+      String revision,
+      long acceptedOrder) {
+
+    public SwitchBufferOp(String generation, String key, String op, String payload,
+        long lastUpdatedMs, String revision) {
+      this(generation, key, op, payload, lastUpdatedMs, revision, 0);
+    }
+
+    /** Release retirement requires the actual SQL order and exact replacement UUID. */
+    public String retirementUuid() {
+      if (acceptedOrder <= 0 || revision == null
+          || !revision.replace("-", "").matches("[0-9a-f]{32}")) {
+        throw new IllegalArgumentException("Incomplete ordered retirement receipt");
+      }
+      return revision.replace("-", "");
+    }
+
+    public String retirementRootUnit() {
+      if (!"SYNC_ROOT".equals(op)) throw new IllegalStateException("Not a ROOT receipt");
+      return "root1:" + retirementUuid() + ":" + acceptedOrder + ":"
+          + java.util.UUID.randomUUID().toString().replace("-", "");
+    }
 
     /** Compatibility constructor for the pre-generation switch buffer API. */
     public SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs, String revision) {
       this("", key, op, payload, lastUpdatedMs, revision);
-    }
-  }
-
-  /** Exact SQL admission position, retained only by release retirement's existing owner. */
-  record AcceptedReceipt(SwitchBufferOp operation, long acceptedOrder) {
-    public AcceptedReceipt {
-      if (operation == null || acceptedOrder <= 0 || operation.revision() == null
-          || !operation.revision().replace("-", "").matches("[0-9a-f]{32}")) {
-        throw new IllegalArgumentException("Incomplete ordered retirement receipt");
-      }
-    }
-    public String uuid() { return operation.revision().replace("-", ""); }
-    public String rootUnit() {
-      if (!"SYNC_ROOT".equals(operation.op())) throw new IllegalStateException("Not a ROOT receipt");
-      return "root1:" + uuid() + ":" + acceptedOrder + ":"
-          + java.util.UUID.randomUUID().toString().replace("-", "");
     }
   }
 
@@ -69,16 +74,16 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
-  default AcceptedReceipt retirementRootReceipt(String generation, String key) {
+  default SwitchBufferOp retirementRootReceipt(String generation, String key) {
     throw new UnsupportedOperationException("Ordered ROOT receipt unavailable");
   }
 
-  default void retainRetirementRootCollection(AcceptedReceipt root,String collection) {
+  default void retainRetirementRootCollection(SwitchBufferOp root,String collection) {
     throw new UnsupportedOperationException("ROOT collection evidence unavailable");
   }
-  default String retirementRootCollection(AcceptedReceipt root) { return null; }
+  default String retirementRootCollection(SwitchBufferOp root) { return null; }
 
-  default int enqueueRetirementRootEntries(AcceptedReceipt root, List<EnqueueEntry> entries,
+  default int enqueueRetirementRootEntries(SwitchBufferOp root, List<EnqueueEntry> entries,
       String collection, boolean maintenance, boolean replay,
       java.util.function.BooleanSupplier cancelled) {
     throw new UnsupportedOperationException("Receipt-owned ROOT admissions unavailable");
@@ -97,6 +102,20 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   default int enqueueRelease030LiveSyncEntries(List<EnqueueEntry> entries, String collection,
       boolean maintenance, java.util.function.BooleanSupplier cancelled) {
     throw new UnsupportedOperationException("Atomic retirement sync admissions are unavailable");
+  }
+
+  /** Full expected row, including absence, used only by fenced watcher reconciliation. */
+  default java.util.Map<String, String> watcherReconciliationRow(String path) {
+    throw new UnsupportedOperationException("Watcher reconciliation row evidence unavailable");
+  }
+
+  /**
+   * One conditional file transition. Caller holds the actual writer file fence. The queue
+   * reserves the write transaction, rechecks journal/row/ownership, then calls fresh proof.
+   */
+  default boolean reconcileWatcherFile(WatcherReconciliationFile file, Runnable freshProof,
+      Runnable removeIndex) {
+    throw new UnsupportedOperationException("Conditional watcher reconciliation unavailable");
   }
 
   /**

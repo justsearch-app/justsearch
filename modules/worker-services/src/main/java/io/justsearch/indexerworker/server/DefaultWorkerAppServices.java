@@ -339,6 +339,19 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return target.ingest().watcherRecoveryRoots();
     }
 
+    private void failure(RuntimeException failure) {
+      Target selected = target;
+      if (failure instanceof io.justsearch.indexerworker.services.WorkerMethvinWatcher.RootUnavailableFailure root) {
+        try {
+          selected.ingest().retainUnavailableWatcherRoot(root.uncertainty());
+          return;
+        } catch (RuntimeException journalUnavailable) {
+          failure.addSuppressed(journalUnavailable);
+        }
+      }
+      selected.mutationAdmission().markReplayUncertain();
+    }
+
     private void recoverRoot(Path root) {
       try (RoutedTarget routed = acquireTarget()) {
         try {
@@ -796,7 +809,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.workerWatcher = new io.justsearch.indexerworker.services.WorkerMethvinWatcher(
           executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
-          ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
+          watcherCallbacks::failure, watcherCallbacks::route,
           watcherCallbacks::delete);
       workerWatcher.usePendingReceipts(watcherCallbacks::applyPendingReceipts);
       this.rootWatcherRegistry =

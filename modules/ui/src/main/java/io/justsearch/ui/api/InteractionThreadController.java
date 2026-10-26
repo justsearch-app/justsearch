@@ -105,6 +105,7 @@ public final class InteractionThreadController {
           events.add(turn);
         }
       }
+      int chatCount = events.size();
       // Action plane: every agent run of this conversation, projected read-time from AgentRunStore.
       io.justsearch.agent.api.interaction.ThreadProjection projection =
           agentService.threadProjection(conversationId, answeredRunIds);
@@ -126,10 +127,36 @@ public final class InteractionThreadController {
               io.justsearch.agent.AgentInteractionMapper.withReasoning(events.get(at), e.getValue()));
         }
       }
-      // Interleave by the authoritative timestamp (stable id tiebreak for determinism).
-      events.sort(
-          Comparator.comparing(InteractionEvent::occurredAt)
-              .thenComparing(InteractionEvent::id));
+      // Decorate AFTER withReasoning has replaced any chat rows. Provenance belongs to each
+      // projected occurrence, including duplicate IDs; an action ERROR/ASSISTANT is not chat.
+      record Occurrence(InteractionEvent event, int chatOrder) {}
+      List<Occurrence> ordered = new ArrayList<>(events.size());
+      for (int i = 0; i < events.size(); i++) {
+        ordered.add(new Occurrence(events.get(i), i < chatCount ? i : -1));
+      }
+      ordered.sort(Comparator.comparing((Occurrence o) -> o.event().occurredAt())
+          .thenComparing(o -> o.event().id()));
+      // Retain the old action slots/order; restore only chat slots within each exact Instant.
+      // Chat may therefore cross a workflow boundary while the action boundaries stay fixed.
+      for (int start = 0; start < ordered.size(); ) {
+        int end = start + 1;
+        while (end < ordered.size()
+            && ordered.get(start).event().occurredAt().equals(ordered.get(end).event().occurredAt())) {
+          end++;
+        }
+        List<Occurrence> chat = new ArrayList<>();
+        for (int i = start; i < end; i++) {
+          if (ordered.get(i).chatOrder() >= 0) chat.add(ordered.get(i));
+        }
+        chat.sort(Comparator.comparingInt(Occurrence::chatOrder));
+        int next = 0;
+        for (int i = start; i < end; i++) {
+          if (ordered.get(i).chatOrder() >= 0) ordered.set(i, chat.get(next++));
+        }
+        start = end;
+      }
+      events.clear();
+      for (Occurrence occurrence : ordered) events.add(occurrence.event());
 
       List<Map<String, Object>> wire = new ArrayList<>(events.size());
       for (InteractionEvent e : events) {
