@@ -488,7 +488,8 @@ final class EngineForgetInProcessTest {
           assertFalse(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
               .isExcludedPath(watched, exact));
           assertEquals(completedForgetRecord, f.operations.find(completedForget).orElseThrow());
-          System.out.println("R9 actual HOT public Save=" + JSON.writeValueAsString(saved));
+          System.out.println("R9 actual HOT public Save=" + JSON.writeValueAsString(
+              Map.of("response", saved.response(), "record", saved.record())));
         }
         // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
         // The monitor still owns replay/drain/certification; automatic timing is not under test.
