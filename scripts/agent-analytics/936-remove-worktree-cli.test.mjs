@@ -478,7 +478,7 @@ try {
       const { fx, dest, short } = nested;
       const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: short, resource: 'nested-alias', policy: DEFAULT_ARCHIVE_POLICY });
       assert.equal(saved.refused, undefined, JSON.stringify(saved));
-      git(fx.repo, 'worktree', 'add', '-b', 'codex/936-nested-alias', path.join(short, 'nested'));
+      git(fx.repo, 'worktree', 'add', '-b', 'codex/936-nested-alias-child', path.join(short, 'nested'));
       const entry = registeredPaths(fx.repo).find((item) => path.basename(item) === 'nested');
       assert.ok(entry);
       console.log(`S17 actual nested Git spelling: ${entry}; admitted parent: ${dest}`);
@@ -630,7 +630,7 @@ try {
     const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
     const refused = runCli(primary, dest, ['--archive-manifest', archiveManifest]);
     assert.equal(refused.status, 1, refused.output);
-    assert.match(refused.output, /archive manifest .* is for .*not /);
+    assert.match(refused.output, /archive manifest .* (?:is for .*, not |target proof failed: archive manifest is for a different physical worktree: )/);
     assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
   });
 
