@@ -11,12 +11,16 @@ All listed additions are durable component/integration tests; existing checks re
 Repair checks and pass-before preservation controls are listed separately, including within the same file.
 The sources below are delegated agent choices; the settled scenario wording is not represented as owner-authored words.
 
-Canonical script-produced repair/preservation evidence and non-author acceptance are outstanding.
-The evidence paths are reserved names, not assertions that those files exist. Exact commands, raw stdout
-and JUnit XML from the builder are retained under tmp/uq-builder1 for independent review.
-The independent verifier will run canonical repair/preservation batches after root commits the candidate,
-using stock run-evidence.mjs --before-root with its own Git checkout/admin area and unchanged guard/slot.
-No governance tool was modified and no script-produced evidence or acceptance record was invented.
+The independent verifier ran the unchanged canonical producer on committed candidate a588476ad3:
+15 repaired methods (24 cases) fail the intended assertions before the change and pass after;
+seven preservation methods (seven cases) pass on both revisions. The referenced JSON files are
+unedited stock producer outputs. Independent acceptance of this final record is pending.
+
+The component checks inspect the constructed IndexDocument score; they do not prove that scalar
+is persisted. Real Engine verification found the unchanged Lucene mapper ignores catalog type
+double, so extraction_quality_score is absent even for a healthy positive baseline control.
+The saved-scalar portion of UQ6 remains failed and is a separate repair. Numeric extraction evidence
+is distinct from the absent scalar. Existing PDF phantom-page behavior also remains a separate limit.
 
 ```json
 {
@@ -236,14 +240,14 @@ No governance tool was modified and no script-produced evidence or acceptance re
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ExtractionDropoutPdfFixturesTest.java"
       ],
       "class": "New",
-      "behaviour": "UQ5/UQ6/UQP3/UQC3: deterministic physical one-page PDF independently decodes its complete supplementary sequence in PDFBox and production Tika, including the ordinary structured separator. Actual evidence retains the known separate phantom-page defect (reported 2 pages/1 missing), so OCR stays DISABLED and VDU stays PENDING baseline_text. The counting repair changes actual page-aware quality from 0 to .8, page-unaware/stored quality to 1 and ratio to .96, removes the false dropout reason and retains structured method, selected content and raw source bytes. Whole-Tika-PDF no-demand proof is limited by the existing page-summary defect; no-missing-pages TEXTUAL proof is separate.",
+      "behaviour": "UQ5/UQ6/UQP3/UQC3: deterministic physical one-page PDF independently decodes its complete supplementary sequence in PDFBox and production Tika, including the ordinary structured separator. Actual evidence retains the known separate phantom-page defect (reported 2 pages/1 missing), so OCR stays DISABLED and VDU stays PENDING baseline_text. The counting repair changes actual page-aware quality from 0 to .8, page-unaware quality in the constructed IndexDocument to 1 (actual scalar persistence remains failed because the unchanged mapper ignores double fields) and ratio to .96, removes the false dropout reason and retains structured method, selected content and raw source bytes. Whole-Tika-PDF no-demand proof is limited by the existing page-summary defect; no-missing-pages TEXTUAL proof is separate.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed accordingly, only use codex agents",
           "delegationLocation": "task extraction-unicode request",
           "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
-          "choice": "UQ5/UQ6/UQP3/UQC3: deterministic physical one-page PDF independently decodes its complete supplementary sequence in PDFBox and production Tika, including the ordinary structured separator. Actual evidence retains the known separate phantom-page defect (reported 2 pages/1 missing), so OCR stays DISABLED and VDU stays PENDING baseline_text. The counting repair changes actual page-aware quality from 0 to .8, page-unaware/stored quality to 1 and ratio to .96, removes the false dropout reason and retains structured method, selected content and raw source bytes. Whole-Tika-PDF no-demand proof is limited by the existing page-summary defect; no-missing-pages TEXTUAL proof is separate.",
+          "choice": "UQ5/UQ6/UQP3/UQC3: deterministic physical one-page PDF independently decodes its complete supplementary sequence in PDFBox and production Tika, including the ordinary structured separator. Actual evidence retains the known separate phantom-page defect (reported 2 pages/1 missing), so OCR stays DISABLED and VDU stays PENDING baseline_text. The counting repair changes actual page-aware quality from 0 to .8, page-unaware quality in the constructed IndexDocument to 1 (actual scalar persistence remains failed because the unchanged mapper ignores double fields) and ratio to .96, removes the false dropout reason and retains structured method, selected content and raw source bytes. Whole-Tika-PDF no-demand proof is limited by the existing page-summary defect; no-missing-pages TEXTUAL proof is separate.",
           "label": "agent choice"
         }
       ],

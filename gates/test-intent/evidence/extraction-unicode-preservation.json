@@ -1,0 +1,136 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T15:24:01.941Z",
+  "revision": "a588476ad33ac36157dd63669edec0fe3039affe",
+  "tree": "ed6acf1a5c9977472b64459e05f3fb1fb2515468",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.symbolEmojiAndDigitKeycapCategoryRulesRemainStable\" --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.isolatedReversedAndSeparatedSurrogatesRemainTotal\" --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.bmpLengthAndDensityNeighborsRemainUnchanged\" --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.existingCategoriesMarkersAndDecompositionRulesRemainStable\" --tests \"io.justsearch.indexerworker.extract.ExtractionDropoutPolicyTest.surrogateAndCategoryBoundariesRetainTheExistingRules\" --tests \"io.justsearch.indexerworker.loop.ops.VisualRoutingDecisionTest.independentMixedPdfSignalStillQueuesEnrichment\" --tests \"io.justsearch.indexerworker.extract.ExtractionDropoutFallbackChainTest.supplementaryQualityDoesNotEraseMissingPagesOrBudgetGates\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3580
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#symbolEmojiAndDigitKeycapCategoryRulesRemainStable",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:922f284b4bdf165f94d9d56297bea0beca1f426f4b20a2c5b253432ae1d9988a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "symbolEmojiAndDigitKeycapCategoryRulesRemainStable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#isolatedReversedAndSeparatedSurrogatesRemainTotal",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:922f284b4bdf165f94d9d56297bea0beca1f426f4b20a2c5b253432ae1d9988a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "isolatedReversedAndSeparatedSurrogatesRemainTotal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#bmpLengthAndDensityNeighborsRemainUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:922f284b4bdf165f94d9d56297bea0beca1f426f4b20a2c5b253432ae1d9988a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bmpLengthAndDensityNeighborsRemainUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#existingCategoriesMarkersAndDecompositionRulesRemainStable",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:922f284b4bdf165f94d9d56297bea0beca1f426f4b20a2c5b253432ae1d9988a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "existingCategoriesMarkersAndDecompositionRulesRemainStable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java#surrogateAndCategoryBoundariesRetainTheExistingRules",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a73717d66356f3a822a81212db6605fa6e0b7fa397569e3dde9155005eb47f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "surrogateAndCategoryBoundariesRetainTheExistingRules()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java#independentMixedPdfSignalStillQueuesEnrichment",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be9bb341da83efe7a18a98445d87a7a3db0ef0f7b0b1682f9832df44fce2a389",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "independentMixedPdfSignalStillQueuesEnrichment()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutFallbackChainTest.java#supplementaryQualityDoesNotEraseMissingPagesOrBudgetGates",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutFallbackChainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:310302e2e88426be6c1f7a693e8dd41ca4c9520d3d8431370a858b38898e6cd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supplementaryQualityDoesNotEraseMissingPagesOrBudgetGates()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5489f166f40a7053f86a855cd61ad9fe2f7ab641e60c28472f01172c847760cc"
+}
