@@ -520,3 +520,14 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
   "note": "Expected-value review only against NR15/RR15, including explicit reviewed slot retirement; product verdict fails initial-context lifecycle revocation. Existing unit expectations do not cover that adversarial combination; runtime and final gates remain unverified."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cutover-final-independent-cv10-supplement",
+  "verdict": "accept",
+  "digest": "sha256:6f459dee442cdfbb6b0beace5156c3d03cdbfcbf33fe19a2c620f9b8976f1ccd",
+  "note": "Expected-value review only against adopted NR15/RR15/IR15/GA15. Reviewed before affected tests, changed instrumentation and explicit retirement oracles, full new residency/lifecycle/authority cases and declared official evidence digests. Fresh full8101 tests and current boundary subsets plus labeled independent carried evidence do not close unverified runtime/before/platform obligations. Product remains HOLD for full registered measurement failures. This record accepts intent, not whole-product readiness."
+}
+```
