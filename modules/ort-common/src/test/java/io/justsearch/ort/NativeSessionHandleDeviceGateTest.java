@@ -56,10 +56,15 @@ final class NativeSessionHandleDeviceGateTest {
     try {
       assertFalse(held.isCpu(), "the bulk run holds the GPU");
       waiters.add(queue("bulk-1", bulk, SessionAcquisitionRequest.Urgency.BACKGROUND, seated, failure));
+      awaitQueued(DeviceEncoderGates.forDevice(device), waiters.size());
       waiters.add(queue("bulk-2", query, SessionAcquisitionRequest.Urgency.BACKGROUND, seated, failure));
+      awaitQueued(DeviceEncoderGates.forDevice(device), waiters.size());
       waiters.add(queue("bulk-3", bulk, SessionAcquisitionRequest.Urgency.BACKGROUND, seated, failure));
+      awaitQueued(DeviceEncoderGates.forDevice(device), waiters.size());
       waiters.add(queue("query", query, SessionAcquisitionRequest.Urgency.FOREGROUND, seated, failure));
-      Thread.sleep(100);
+      awaitQueued(DeviceEncoderGates.forDevice(device), waiters.size());
+      assertEquals(4, DeviceEncoderGates.forDevice(device).waiting(),
+          "all four requests reached the shared device gate before release");
       assertEquals(
           List.of(),
           List.copyOf(seated),
@@ -73,7 +78,11 @@ final class NativeSessionHandleDeviceGateTest {
       assertEquals("query", seated.peek(), "the query is seated next: " + seated);
     } finally {
       if (held != null) held.close();
-      for (Thread waiter : waiters) waiter.join(5_000);
+      for (Thread waiter : waiters) waiter.interrupt();
+      for (Thread waiter : waiters) {
+        waiter.join(5_000);
+        assertFalse(waiter.isAlive(), "owned waiter terminated: " + waiter.getName());
+      }
       bulk.close();
       query.close();
     }
@@ -149,8 +158,7 @@ final class NativeSessionHandleDeviceGateTest {
       NativeSessionHandle handle,
       SessionAcquisitionRequest.Urgency urgency,
       Queue<String> seated,
-      AtomicReference<Throwable> failure)
-      throws InterruptedException {
+      AtomicReference<Throwable> failure) {
     Thread waiter = new Thread(() -> {
       try (SessionHandle.Lease lease = handle.acquire(request(urgency))) {
         assertFalse(lease.isCpu(), name + " was seated on the GPU");
@@ -160,19 +168,15 @@ final class NativeSessionHandleDeviceGateTest {
       }
     }, "g1-" + name);
     waiter.start();
-    awaitWaitingOrDone(waiter);
     return waiter;
   }
 
-  /** Lets a waiter reach its timed wait for the device (or finish) before the next one starts. */
-  private static void awaitWaitingOrDone(Thread waiter) throws InterruptedException {
+  private static void awaitQueued(DeviceEncoderGate gate, int expected) throws InterruptedException {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-    while (waiter.getState() != Thread.State.TIMED_WAITING
-        && waiter.getState() != Thread.State.TERMINATED
-        && System.nanoTime() < deadline) {
+    while (gate.waiting() != expected && System.nanoTime() < deadline) {
       Thread.sleep(1);
     }
-    Thread.sleep(20);
+    assertEquals(expected, gate.waiting(), "every started request is queued before proceeding");
   }
 
   private static SessionAcquisitionRequest request(SessionAcquisitionRequest.Urgency urgency) {

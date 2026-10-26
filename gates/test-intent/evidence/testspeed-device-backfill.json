@@ -1,0 +1,172 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T18:02:37.800Z",
+  "revision": "ae5ede2bcac54c34ca61cc966df74d6229404cea",
+  "tree": "59da37fff500e2c937b072fc81a85bd331a60414",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.DeviceEncoderGateBreakerTest.aFirstRunOrAGateTimeoutDoesNotOpenTheBreakerButALaterRunDoes\" --tests \"io.justsearch.ort.DeviceEncoderGateBreakerTest.anAgedWaiterBehindAColdRunStartsItsHeldAgeOnlyWhenGranted\" --tests \"io.justsearch.ort.DeviceEncoderGateBreakerTest.multipleSeatsKeepIndependentAgesAndReleaseClearsOnlyTheOverAgeSeat\" --tests \"io.justsearch.ort.DeviceEncoderGateBreakerTest.onlyForegroundLegsWithAKeywordFallbackAreTurnedAway\" --tests \"io.justsearch.ort.DeviceLostIsNotStuckTest.aStuckRunOpensTheBreakerButLatchesNothingWhileALostDeviceSkipsTheGate\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceGateTest.aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3896
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseTest.whileAGpuRunIsStuckSearchesGetTheirVectorsFromTheWarmCpuSession\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.pendingIngestArrivingMidBatch_preemptsWithoutFinishingTheBatch\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.rootRemovedMidBatch_remainingDocumentsAreNeitherEncodedNorWritten\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.documentsSkippedByAnAbortedBatchResumeOnTheNextCycle\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7468
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java#aFirstRunOrAGateTimeoutDoesNotOpenTheBreakerButALaterRunDoes",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03f2b05641a28a3ea77ebc335dd7ff60e5e5739b6e5f5046ce0539d4922b7915",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFirstRunOrAGateTimeoutDoesNotOpenTheBreakerButALaterRunDoes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java#anAgedWaiterBehindAColdRunStartsItsHeldAgeOnlyWhenGranted",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03f2b05641a28a3ea77ebc335dd7ff60e5e5739b6e5f5046ce0539d4922b7915",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anAgedWaiterBehindAColdRunStartsItsHeldAgeOnlyWhenGranted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java#multipleSeatsKeepIndependentAgesAndReleaseClearsOnlyTheOverAgeSeat",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03f2b05641a28a3ea77ebc335dd7ff60e5e5739b6e5f5046ce0539d4922b7915",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "multipleSeatsKeepIndependentAgesAndReleaseClearsOnlyTheOverAgeSeat()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java#onlyForegroundLegsWithAKeywordFallbackAreTurnedAway",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03f2b05641a28a3ea77ebc335dd7ff60e5e5739b6e5f5046ce0539d4922b7915",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyForegroundLegsWithAKeywordFallbackAreTurnedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostIsNotStuckTest.java#aStuckRunOpensTheBreakerButLatchesNothingWhileALostDeviceSkipsTheGate",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostIsNotStuckTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c919c1a8f10a9a63980c3f43caf1fcda5a33955fda2c01be5e6dfb0b84ec1ff8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStuckRunOpensTheBreakerButLatchesNothingWhileALostDeviceSkipsTheGate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java#aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ded6743acc1ffd70ed389e1012ae90628168ef963fe00327813f87428e847bcb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseTest.java#whileAGpuRunIsStuckSearchesGetTheirVectorsFromTheWarmCpuSession",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:44096dd13cac8dc317b253e5e02a19a13feb344ca8a53764bf71c1d4f2352eb4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "whileAGpuRunIsStuckSearchesGetTheirVectorsFromTheWarmCpuSession()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#pendingIngestArrivingMidBatch_preemptsWithoutFinishingTheBatch",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1023193ec2a338aee1b58aba31a5cd99d75d26ded959a7f96259ba7aaa74f1dc",
+      "executed": false,
+      "skipped": false,
+      "outcome": "not-found",
+      "cases": []
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#rootRemovedMidBatch_remainingDocumentsAreNeitherEncodedNorWritten",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1023193ec2a338aee1b58aba31a5cd99d75d26ded959a7f96259ba7aaa74f1dc",
+      "executed": false,
+      "skipped": false,
+      "outcome": "not-found",
+      "cases": []
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#documentsSkippedByAnAbortedBatchResumeOnTheNextCycle",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1023193ec2a338aee1b58aba31a5cd99d75d26ded959a7f96259ba7aaa74f1dc",
+      "executed": false,
+      "skipped": false,
+      "outcome": "not-found",
+      "cases": []
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:dd9b29ffeb09a99eea32e504ee86bd144e1e9288c6e6845107342c467fea2746"
+}
