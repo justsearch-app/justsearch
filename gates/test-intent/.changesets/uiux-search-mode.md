@@ -192,13 +192,6 @@ Phase17 metadata follow-up preserves every original owner-adopted quote and acce
           "scenario": "SM11",
           "quote": "The palette's developer-only \"Search this text\" entry is gone; searching from the palette uses Search mode and its results are visible.",
           "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "removal",
-          "removed": [
-            "modules/ui-web/src/shell-v0/views/search-v3/sv3-results.ts",
-            "modules/ui-web/src/shell-v0/views/search-v3/fixtures.ts#SV3_COMMAND_SEARCH_TEXT"
-          ]
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none (docs/decisions/0001-0051 searched for Search v3, composer, tier, palette, search mode and session in-motion indicator; none governs these behaviours)",
