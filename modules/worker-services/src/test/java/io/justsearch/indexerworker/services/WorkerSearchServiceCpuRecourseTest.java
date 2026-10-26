@@ -134,15 +134,22 @@ final class WorkerSearchServiceCpuRecourseTest
     });
     Thread owner = new Thread(scenario, "cpu-recourse-gate-owner");
     owner.start();
+    Throwable scenarioFailure = null;
     try {
       scenario.get();
     } catch (ExecutionException failure) {
-      throw failure.getCause();
+      scenarioFailure = failure.getCause();
+      throw scenarioFailure;
+    } catch (Exception | Error failure) {
+      scenarioFailure = failure;
+      throw failure;
     } finally {
       bulkMayReturn.countDown();
       owner.interrupt();
-      joinOwned(owner);
-      assertFalse(owner.isAlive(), "the injected-gate owner terminated");
+      joinOwned(owner, scenarioFailure);
+      if (scenarioFailure == null) {
+        assertFalse(owner.isAlive(), "the injected-gate owner terminated");
+      }
     }
   }
 
@@ -152,6 +159,7 @@ final class WorkerSearchServiceCpuRecourseTest
     DeviceEncoderGate gate = new DeviceEncoderGate(DeviceGatePolicy.DEFAULTS, clock::get);
     Map<Integer, DeviceEncoderGate> gates = gates();
     assertEquals(null, gates.putIfAbsent(device, gate), "the test owns a fresh device");
+    Thread bulk = null;
     try (SessionHandle embeddingHandle = embeddingHandle("cpu-recourse-stuck", device)) {
       assertTrue(gate == DeviceEncoderGates.forDevice(device), "the registered gate is shared");
       var service =
@@ -165,7 +173,7 @@ final class WorkerSearchServiceCpuRecourseTest
       assertFalse(warm.getSearchTrace().getDegradation().getHybridFallback(), "warm dense leg");
 
       AtomicReference<Throwable> runFailure = new AtomicReference<>();
-      Thread bulk =
+      bulk =
           new Thread(
               () -> {
                 try (SessionHandle.Lease lease = holdBackground(embeddingHandle);
@@ -177,6 +185,7 @@ final class WorkerSearchServiceCpuRecourseTest
               },
               BULK_THREAD);
       bulk.start();
+      Throwable scenarioFailure = null;
       try {
         assertTrue(bulkRunning.await(10, TimeUnit.SECONDS), "the bulk run started");
         clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(STUCK_AFTER_MS + 1));
@@ -204,11 +213,17 @@ final class WorkerSearchServiceCpuRecourseTest
         assertEquals("VECTOR", vector.getSearchTrace().getEffectiveMode());
         assertTrue(vector.getTotalHits() >= 1, "the vector results came back");
         assertEquals(cpuBefore + 2, cpuRuns.get(), "the VECTOR-only leg ran on the CPU session");
+      } catch (Exception | Error failure) {
+        scenarioFailure = failure;
+        throw failure;
       } finally {
+        if (scenarioFailure != null) bulk.interrupt();
         bulkMayReturn.countDown();
-        joinOwned(bulk);
-        assertFalse(bulk.isAlive(), "the native run returned before handle cleanup");
-        assertEquals(null, runFailure.get(), "the native run completed without a thread failure");
+        joinOwned(bulk, scenarioFailure);
+        if (scenarioFailure == null) {
+          assertFalse(bulk.isAlive(), "the native run returned before handle cleanup");
+          assertEquals(null, runFailure.get(), "the native run completed without a thread failure");
+        }
       }
       assertFalse(bulk.isAlive(), "the stuck run returned and released its seat");
 
@@ -219,12 +234,15 @@ final class WorkerSearchServiceCpuRecourseTest
       assertFalse(after.getSearchTrace().getDegradation().getHybridFallback(), "dense after");
       assertEquals(gpuBefore + 1, gpuRuns.get(), "the leg after the stuck run ran on the GPU");
     } finally {
-      assertTrue(gates.remove(device, gate), "remove only this test's gate after handle close");
+      // A failed bounded join must retain the registration while its acquisition/run still owns it.
+      if (bulk == null || !bulk.isAlive()) {
+        assertTrue(gates.remove(device, gate), "remove only this test's gate after handle close");
+      }
     }
   }
 
   /** Finish cleanup even when the test owner is interrupted; retain its interrupt afterwards. */
-  private static void joinOwned(Thread thread) {
+  private static void joinOwned(Thread thread, Throwable scenarioFailure) {
     boolean interrupted = false;
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     try {
@@ -237,7 +255,12 @@ final class WorkerSearchServiceCpuRecourseTest
           interrupted = true;
         }
       }
-      assertFalse(thread.isAlive(), "owned thread terminated: " + thread.getName());
+      try {
+        assertFalse(thread.isAlive(), "owned thread terminated: " + thread.getName());
+      } catch (AssertionError cleanupFailure) {
+        if (scenarioFailure == null) throw cleanupFailure;
+        scenarioFailure.addSuppressed(cleanupFailure);
+      }
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }

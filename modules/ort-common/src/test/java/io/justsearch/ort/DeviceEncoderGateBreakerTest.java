@@ -9,8 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +39,7 @@ final class DeviceEncoderGateBreakerTest {
    */
   @Test
   void aFirstRunOrAGateTimeoutDoesNotOpenTheBreakerButALaterRunDoes() throws Exception {
-    try (DeviceEncoderGate.Seat firstRun = gate.seat(session, background())) {
+    try (DeviceEncoderGate.Seat _ = gate.seat(session, background())) {
       clock.addAndGet(PAST_STUCK_NANOS);
       assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "a cold first run is not stuck");
 
@@ -50,7 +52,7 @@ final class DeviceEncoderGateBreakerTest {
       assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "a gate timeout does not open the breaker");
     }
     long seatedAt = clock.get();
-    try (DeviceEncoderGate.Seat secondRun = gate.seat(session, background())) {
+    try (DeviceEncoderGate.Seat _ = gate.seat(session, background())) {
       long threshold = TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs());
       clock.addAndGet(threshold - 1);
       assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "one nanosecond before the threshold");
@@ -72,6 +74,66 @@ final class DeviceEncoderGateBreakerTest {
       assertTrue(since.isPresent(), "the session's second run past stuckAfterMs opens the breaker");
       assertEquals(seatedAt + TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs()), since.getAsLong());
     }
+  }
+
+  /** D8: queue residence is not held-seat age, even for an already-warm session. */
+  @Test
+  void anAgedWaiterBehindAColdRunStartsItsHeldAgeOnlyWhenGranted() throws Exception {
+    gate.seat(session, background()).close();
+    CountDownLatch granted = new CountDownLatch(1);
+    CountDownLatch mayReturn = new CountDownLatch(1);
+    AtomicReference<Throwable> runFailure = new AtomicReference<>();
+    Thread waiter = new Thread(() -> {
+      try (DeviceEncoderGate.Seat _ = gate.seat(session, background())) {
+        granted.countDown();
+        assertTrue(mayReturn.await(60, TimeUnit.SECONDS), "the granted waiter may return");
+      } catch (Throwable thrown) {
+        runFailure.set(thrown);
+      }
+    }, "gate-aged-waiter");
+    try (DeviceEncoderGate.Seat coldFirstRun = gate.seat(new Object(), background())) {
+      waiter.start();
+      Throwable scenarioFailure = null;
+      try {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (gate.waiting() != 1 && waiter.isAlive() && System.nanoTime() < deadline) {
+          TimeUnit.MILLISECONDS.sleep(1);
+        }
+        assertEquals(1, gate.waiting(), "the waiter queued behind the held cold first seat");
+        assertEquals(1L, granted.getCount(), "the queued waiter has not acquired a seat");
+        clock.addAndGet(PAST_STUCK_NANOS);
+        assertEquals(1, gate.waiting(), "advancing gate age does not grant the waiter");
+        assertTrue(gate.breakerOpenSinceNanos().isEmpty(),
+            "neither an aged queue entry nor the cold held seat opens the breaker");
+
+        long grantedAt = clock.get();
+        coldFirstRun.close();
+        assertTrue(granted.await(10, TimeUnit.SECONDS), "the warmed waiter acquired the released seat");
+        assertEquals(0, gate.waiting(), "the waiter now holds its seat");
+        assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "queue residence is not held-seat age");
+        long threshold = TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs());
+        clock.addAndGet(threshold - 1);
+        assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "one nanosecond before held-seat threshold");
+        clock.incrementAndGet();
+        assertEquals(OptionalLong.of(grantedAt + threshold), gate.breakerOpenSinceNanos(),
+            "held-seat age starts at grant, not at queue entry");
+        clock.incrementAndGet();
+        assertEquals(OptionalLong.of(grantedAt + threshold), gate.breakerOpenSinceNanos(),
+            "the opening timestamp stays at the grant-based threshold");
+      } catch (Exception | Error failure) {
+        scenarioFailure = failure;
+        throw failure;
+      } finally {
+        if (scenarioFailure != null) waiter.interrupt();
+        mayReturn.countDown();
+        joinOwned(waiter, scenarioFailure);
+        if (scenarioFailure == null) {
+          assertEquals(null, runFailure.get(), "the waiter completed without a thread failure");
+        }
+      }
+    }
+    assertEquals(0, gate.waiting(), "no waiter survives cleanup");
+    assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "the granted seat was released");
   }
 
   /**
@@ -141,7 +203,7 @@ final class DeviceEncoderGateBreakerTest {
     long firstSeatedAt = clock.get();
     try (DeviceEncoderGate.Seat first = twoSeats.seat(session, background())) {
       clock.incrementAndGet();
-      try (DeviceEncoderGate.Seat second = twoSeats.seat(otherSession, background())) {
+      try (DeviceEncoderGate.Seat _ = twoSeats.seat(otherSession, background())) {
         clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs()) - 2);
         assertTrue(twoSeats.breakerOpenSinceNanos().isEmpty(), "neither seat reached its threshold");
         clock.incrementAndGet();
@@ -159,8 +221,33 @@ final class DeviceEncoderGateBreakerTest {
       }
     }
     assertTrue(twoSeats.breakerOpenSinceNanos().isEmpty(), "the last stuck seat released");
-    try (DeviceEncoderGate.Seat next = twoSeats.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
+    try (DeviceEncoderGate.Seat _ = twoSeats.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
       assertEquals(0, twoSeats.waiting(), "a fresh query can acquire after both releases");
+    }
+  }
+
+  /** Finish cleanup even if the test is interrupted, without replacing its causal failure. */
+  private static void joinOwned(Thread thread, Throwable scenarioFailure) {
+    boolean interrupted = false;
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    try {
+      while (thread.isAlive()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          TimeUnit.NANOSECONDS.timedJoin(thread, remaining);
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
+      }
+      try {
+        assertFalse(thread.isAlive(), "owned thread terminated: " + thread.getName());
+      } catch (AssertionError cleanupFailure) {
+        if (scenarioFailure == null) throw cleanupFailure;
+        scenarioFailure.addSuppressed(cleanupFailure);
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
   }
 

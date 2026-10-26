@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
-import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -55,14 +54,21 @@ final class DeviceLostIsNotStuckTest {
     });
     Thread owner = new Thread(scenario, "lost-not-stuck-owner");
     owner.start();
+    Throwable scenarioFailure = null;
     try {
       scenario.get();
     } catch (ExecutionException failure) {
-      throw failure.getCause();
+      scenarioFailure = failure.getCause();
+      throw scenarioFailure;
+    } catch (Exception | Error failure) {
+      scenarioFailure = failure;
+      throw failure;
     } finally {
       owner.interrupt();
-      joinOwned(owner);
-      assertFalse(owner.isAlive(), "the injected-gate owner terminated");
+      joinOwned(owner, scenarioFailure);
+      if (scenarioFailure == null) {
+        assertFalse(owner.isAlive(), "the injected-gate owner terminated");
+      }
     }
   }
 
@@ -72,6 +78,7 @@ final class DeviceLostIsNotStuckTest {
     DeviceEncoderGate gate = new DeviceEncoderGate(DeviceGatePolicy.DEFAULTS, clock::get);
     Map<Integer, DeviceEncoderGate> gates = gates();
     assertEquals(null, gates.putIfAbsent(device, gate), "the test owns a fresh device");
+    Thread stuck = null;
     try {
       AtomicInteger runs = new AtomicInteger();
       CountDownLatch stuckRunning = new CountDownLatch(1);
@@ -104,7 +111,7 @@ final class DeviceLostIsNotStuckTest {
           warm.run(Map.of()).close();
         }
         AtomicReference<Throwable> runFailure = new AtomicReference<>();
-        Thread stuck =
+        stuck =
             new Thread(
                 () -> {
                   try (SessionHandle.Lease lease = handle.acquire(background())) {
@@ -115,6 +122,7 @@ final class DeviceLostIsNotStuckTest {
                 },
                 "stuck-run");
         stuck.start();
+        Throwable scenarioFailure = null;
         try {
           assertTrue(stuckRunning.await(10, TimeUnit.SECONDS), "the stuck run started");
           clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(STUCK_AFTER_MS + 1));
@@ -130,11 +138,17 @@ final class DeviceLostIsNotStuckTest {
           assertTrue(peerTurnedAway.breakerOpen(), "the second handle shares the held gate");
           assertFalse(health.isLost(), "a stuck run is not device loss");
           assertEquals(QueryDevice.GPU, handle.queryDevice(), "a stuck device keeps its GPU session");
+        } catch (Exception | Error failure) {
+          scenarioFailure = failure;
+          throw failure;
         } finally {
+          if (scenarioFailure != null) stuck.interrupt();
           stuckMayReturn.countDown();
-          joinOwned(stuck);
-          assertFalse(stuck.isAlive(), "the native run returned before handle cleanup");
-          assertEquals(null, runFailure.get(), "the native run completed without a thread failure");
+          joinOwned(stuck, scenarioFailure);
+          if (scenarioFailure == null) {
+            assertFalse(stuck.isAlive(), "the native run returned before handle cleanup");
+            assertEquals(null, runFailure.get(), "the native run completed without a thread failure");
+          }
         }
         assertFalse(stuck.isAlive());
         assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "the returned run closed the breaker");
@@ -153,12 +167,15 @@ final class DeviceLostIsNotStuckTest {
         assertEquals(QueryDevice.CPU, handle.queryDevice());
       }
     } finally {
-      assertTrue(gates.remove(device, gate), "remove only this test's gate after handle close");
+      // A failed bounded join must retain the registration while its acquisition/run still owns it.
+      if (stuck == null || !stuck.isAlive()) {
+        assertTrue(gates.remove(device, gate), "remove only this test's gate after handle close");
+      }
     }
   }
 
   /** Finish cleanup even when the test owner is interrupted; retain its interrupt afterwards. */
-  private static void joinOwned(Thread thread) {
+  private static void joinOwned(Thread thread, Throwable scenarioFailure) {
     boolean interrupted = false;
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     try {
@@ -171,7 +188,12 @@ final class DeviceLostIsNotStuckTest {
           interrupted = true;
         }
       }
-      assertFalse(thread.isAlive(), "owned thread terminated: " + thread.getName());
+      try {
+        assertFalse(thread.isAlive(), "owned thread terminated: " + thread.getName());
+      } catch (AssertionError cleanupFailure) {
+        if (scenarioFailure == null) throw cleanupFailure;
+        scenarioFailure.addSuppressed(cleanupFailure);
+      }
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }
@@ -179,7 +201,7 @@ final class DeviceLostIsNotStuckTest {
 
   @SuppressWarnings("unchecked")
   private static Map<Integer, DeviceEncoderGate> gates() throws Exception {
-    Field field = DeviceEncoderGates.class.getDeclaredField("GATES");
+    java.lang.reflect.Field field = DeviceEncoderGates.class.getDeclaredField("GATES");
     field.setAccessible(true);
     return (Map<Integer, DeviceEncoderGate>) field.get(null);
   }
