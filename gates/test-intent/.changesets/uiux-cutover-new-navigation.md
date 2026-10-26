@@ -27,7 +27,7 @@ Invalid first harness cleanup/parser outputs, the added inputs.docIds TypeError 
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "standing cutover delegation; root independently challenged/adopted New/navigation C1\u2013C14 and C10 post-write uncertainty addendum,2026-10-26",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work, preserving human Send, current work and unrelated retained proposals.",
           "choice": "Explicit New settles its own accepted navigation, acknowledges raw/pointer retirement, and reports before-write failure versus partial unconfirmed applied-write retirement truthfully. Existing raw/SESSION/key/incarnation and history authorities remain; no rollback, new copies, blanket two-slot ban or automatic retry. Automatic capacity refusal names the moved address and prevents wrong ambient operations while keeping A/B/origins and Forward. Whole empty-text schema/file proposals remain data through recovery and manual review.",
           "label": "agent choice"
@@ -80,7 +80,7 @@ Invalid first harness cleanup/parser outputs, the added inputs.docIds TypeError 
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "standing cutover delegation; root independently challenged/adopted New/navigation C1\u2013C14 and C10 post-write uncertainty addendum,2026-10-26",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work, preserving human Send, current work and unrelated retained proposals.",
           "choice": "Explicit New settles its own accepted navigation, acknowledges raw/pointer retirement, and reports before-write failure versus partial unconfirmed applied-write retirement truthfully. Existing raw/SESSION/key/incarnation and history authorities remain; no rollback, new copies, blanket two-slot ban or automatic retry. Automatic capacity refusal names the moved address and prevents wrong ambient operations while keeping A/B/origins and Forward. Whole empty-text schema/file proposals remain data through recovery and manual review.",
           "label": "agent choice"
