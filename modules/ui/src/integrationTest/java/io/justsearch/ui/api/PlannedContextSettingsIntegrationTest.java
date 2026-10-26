@@ -13,7 +13,6 @@ import io.justsearch.app.services.gpu.GpuProfileResolver;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.ort.EncoderRole;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +24,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** P4 through HTTP, durable settings, config planning and the real query-only ownership guard. */
 final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTestBase {
-  private ConfigStore prior;
   private ConfigStore config;
   private io.justsearch.indexerworker.server.PlannedSettingsQueryOwner owner;
   private io.justsearch.app.inference.InferenceLifecycleManager inference;
@@ -33,7 +31,6 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
   private io.justsearch.core.component.ComponentHandle indexComponent;
 
   @Override protected void beforeServerStart() throws Exception {
-    prior = ConfigStore.globalOrNull();
     setPropForTest("policy.gpu_acceleration_enabled", "true");
     setPropForTest("justsearch.llm.enabled", "true");
     setPropForTest("justsearch.gpu.layers", "99");
@@ -49,11 +46,6 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
     ConfigStoreRebuilder.rememberDevicePlanner(cfg -> GpuProfileResolver.resolve(cfg, facts,
         Map.of(EncoderRole.EMBEDDING, 598.3, EncoderRole.SPLADE, 474.2,
             EncoderRole.NER, 257.2, EncoderRole.RERANKER, 600.3), Set.of(ChatModelProfile.STANDARD)));
-    config = new ConfigStore(ConfigStoreRebuilder.prepare(new io.justsearch.app.api.UiSettings()));
-    ConfigStore.setGlobal(config);
-    DevicePlanState.process().publish(ConfigStoreRebuilder.planOf(config.get()).orElseThrow());
-    config.addListener(event -> DevicePlanState.process().publish(
-        ConfigStoreRebuilder.planOf(event.current()).orElseThrow()));
   }
 
   @Override protected io.justsearch.app.inference.InferenceLifecycleManager settingsInferenceManager()
@@ -77,6 +69,10 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
       io.justsearch.app.services.settings.FixedSettingsComponentComposer composer,
       io.justsearch.core.component.EngineComponentRegistry registry, ConfigStore store,
       UiSettingsStore settings) throws Exception {
+    config = store;
+    DevicePlanState.process().publish(ConfigStoreRebuilder.planOf(config.get()).orElseThrow());
+    config.addListener(event -> DevicePlanState.process().publish(
+        ConfigStoreRebuilder.planOf(event.current()).orElseThrow()));
     this.registry = registry;
     indexComponent = registry.register(new io.justsearch.core.component.ComponentSpec("index", false, Set.of(),
         io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
@@ -94,7 +90,6 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
     ConfigStoreRebuilder.rememberDevicePlanner(null);
     ConfigStoreRebuilder.rememberAutoDetected(Map.of());
     DevicePlanState.process().publish(GpuProfileResolver.Resolution.unresolved());
-    TestResolvedConfigHelper.restoreGlobal(prior);
   }
 
   @ParameterizedTest

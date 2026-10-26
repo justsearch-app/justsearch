@@ -6,6 +6,8 @@ import tools.jackson.databind.node.ObjectNode;
 import io.justsearch.app.api.SearchRequest;
 import io.justsearch.app.api.SearchResponse;
 import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.io.BufferedOutputStream;
 import java.io.OutputStream;
 import java.net.URI;
@@ -45,10 +47,13 @@ abstract class LocalApiIntegrationTestBase {
   private String prevDataDir;
   private String prevApiPort;
   private String prevLlmModelPath;
+  private ConfigStore previousConfig;
+  private ConfigStore config;
   private final Map<String, String> extraProps = new LinkedHashMap<>();
 
   @BeforeEach
   void startServer() throws Exception {
+    previousConfig = ConfigStore.globalOrNull();
     // Snapshot sysprops we may overwrite so tests are isolated.
     prevHome = System.getProperty("justsearch.home");
     prevDataDir = System.getProperty("justsearch.data.dir");
@@ -73,9 +78,11 @@ abstract class LocalApiIntegrationTestBase {
     rememberProp("justsearch.policy.disallowExternalInferenceServers");
     beforeServerStart();
 
-    // Policy discovery publishes process sources. Do this before the first configuration
-    // snapshot, just as HeadlessApp.loadPolicySources() does, so settings candidates retain
-    // the same restart-only source fingerprint. Both publications were saved before the hook.
+    // Policy discovery reads the global home and AI switches. Publish this fixture's launch
+    // properties first so a retained foreign store cannot choose its policy inputs.
+    config = TestResolvedConfigHelper.storeFromEnvironment();
+    // Discover policy before preparing settings, as HeadlessApp.loadPolicySources() does, so
+    // settings candidates retain the same restart-only source fingerprint.
     new io.justsearch.app.services.policy.EnterprisePolicyServiceImpl().snapshot();
 
     // Resolved the way the shipped Head resolves it — the persistence mode is part of the
@@ -88,13 +95,11 @@ abstract class LocalApiIntegrationTestBase {
     operations =
         new io.justsearch.app.observability.operations.SqliteOperationStore(
             aiHome.resolve("operations.db"));
-    var config = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-    if (config == null) {
-      config =
-          new io.justsearch.configuration.resolved.ConfigStore(
-              io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(
-                  settingsStore.inspect().settings()));
-    }
+    // A previous fixture may retain its store while its live owners drain. Build this fixture's
+    // complete settings snapshot instead of inheriting that foreign publication.
+    config = new ConfigStore(io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(
+        settingsStore.inspect().settings()));
+    ConfigStore.setGlobal(config);
     var settingsConfig = config;
     settingsResources = new io.justsearch.app.engine.DefaultEngineProcessResources(
         settingsConfig.publicationLock());
@@ -155,8 +160,8 @@ abstract class LocalApiIntegrationTestBase {
     if (server != null) {
       try {
         server.stop();
-      } catch (Exception ignored) {
-        // best-effort
+      } catch (Exception failure) {
+        closeFailure = failure;
       } finally {
         server = null;
       }
@@ -166,7 +171,8 @@ abstract class LocalApiIntegrationTestBase {
       try {
         operations.close();
       } catch (Exception failure) {
-        closeFailure = failure;
+        if (closeFailure == null) closeFailure = failure;
+        else closeFailure.addSuppressed(failure);
       } finally {
         operations = null;
       }
@@ -181,6 +187,9 @@ abstract class LocalApiIntegrationTestBase {
     }
 
     executors.close();
+    if (config != null && closeFailure == null) {
+      ConfigStore.restoreGlobal(config, previousConfig);
+    }
 
     // Best-effort cleanup: remove any machine policy file created during the test, but only inside the sandbox.
     cleanupMachinePolicySandboxBestEffort();
