@@ -77,3 +77,14 @@ extra call-count checks. Reviewed final raw evidence is under
 test-intent acceptance remain outstanding.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177e6-8c39-7423-93b5-dca337a309c8",
+  "verdict": "accept",
+  "digest": "sha256:858457bf71ce03a95841ae672c5b23447715a194f27d54fa30347de16149d878",
+  "note": "Independent verification of c1cf44bc57111d0719efc76525826be0f5150918: both Adaptations preserve the oracle and truthfully label delegated agent choices. Matched runs passed all 112 identities with zero skips; target seven summed 64.440s before and 0.804s after. The actual 6000ms mutation failed both original aged HTTP assertions in each arm. Delayed publication/older timestamp/expiry counterexample passed both arms. Production unchanged. Historical author measurements were not used as execution proof."
+}
+```
