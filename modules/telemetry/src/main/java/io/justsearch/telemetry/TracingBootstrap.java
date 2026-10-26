@@ -143,8 +143,12 @@ public final class TracingBootstrap implements AutoCloseable {
 	/** Final teardown after all Engine span producers drain; never call during local recovery. */
 	public static synchronized void shutdownIndexing() {
 		if (indexingBootstrap == null) return;
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
 		try {
-			indexingBootstrap.tracerProvider.close();
+			indexingBootstrap.flush(deadline);
+			// Provider.close() has its own ten-second wait. Share the flush budget instead.
+			indexingBootstrap.tracerProvider.shutdown()
+				.join(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
 		} finally {
 			indexingBootstrap = null;
 		}
@@ -162,7 +166,10 @@ public final class TracingBootstrap implements AutoCloseable {
 	 * next batch export cycle. Failures are logged but not thrown.
 	 */
 	public void flush() {
-		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		flush(System.nanoTime() + TimeUnit.SECONDS.toNanos(5));
+	}
+
+	private void flush(long deadline) {
 		try {
 			if (shutdown || Thread.currentThread().isInterrupted()) return;
 			var first = requestLocalFlush();
