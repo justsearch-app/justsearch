@@ -89,15 +89,15 @@ public final class ChunkSplitter {
   }
 
   /**
-   * Version of the splitting <em>algorithm</em>, as opposed to its tunable sizes. Bump it whenever
-   * a change here would put existing chunk documents at different boundaries even with the token
-   * counts unchanged — new boundary patterns, a different token estimator, a changed CJK rule.
+   * Physical splitting-shape version. Bump whenever any previously valid, complete emitted plan
+   * changes with the same settings (including boundary preferences or the token estimator).
    *
-   * <p>It is an {@code index_fingerprint} input (tempdoc 915 §C): chunk boundaries are on-disk
-   * shape, so a silent algorithm change would otherwise leave an index whose chunks no longer match
-   * what the runtime would produce, with nothing to detect it.
+   * <p>The bounded Unicode repair retains v1: it preserves every pair-safe v1 emitted plan and
+   * only expands invalid surrogate cuts after raw planning is complete. The fingerprint is not
+   * row-integrity evidence. Retained unsafe rows need source replacement or an explicit rebuild;
+   * this repair does not schedule unchanged files or a global migration.
    */
-  public static final String ALGORITHM_VERSION = "v2";
+  public static final String ALGORITHM_VERSION = "v1";
 
   /**
    * Content length at or above which a document is split into chunk documents at all. It lives
@@ -272,8 +272,9 @@ public final class ChunkSplitter {
     // Keep invariants when callers request very small targetTokens (e.g., tests).
     minChars = Math.min(minChars, Math.max(1, targetChars));
 
-    List<String> chunks = new ArrayList<>();
+    List<ChunkSpan> spans = new ArrayList<>();
     String remaining = content.trim();
+    int contentOffset = trimLeadingChars(content);
 
     List<Range> fences = (mode == Mode.MARKDOWN) ? findMarkdownCodeFences(remaining) : List.of();
 
@@ -293,14 +294,12 @@ public final class ChunkSplitter {
         }
       }
 
-      if (bisectsSurrogatePair(remaining, endPos)) {
-        endPos++;
-      }
-
       // Extract chunk
-      String chunk = remaining.substring(0, endPos).trim();
+      String rawChunk = remaining.substring(0, endPos);
+      String chunk = rawChunk.trim();
       if (!chunk.isEmpty()) {
-        chunks.add(chunk);
+        int start = contentOffset + trimLeadingChars(rawChunk);
+        spans.add(new ChunkSpan(start, start + chunk.length(), spans.size()));
       }
 
       // A chunk reaching the text end makes any further window a contained suffix.
@@ -320,19 +319,21 @@ public final class ChunkSplitter {
         }
       }
 
-      if (bisectsSurrogatePair(remaining, advance)) {
-        // Keep overlap where possible; a one-unit budget still advances a whole code point.
-        advance = advance > 1 ? advance - 1 : Character.charCount(remaining.codePointAt(0));
-      }
       if (advance >= remaining.length()) {
         break;
       }
-      remaining = remaining.substring(advance).trim();
+      String tail = remaining.substring(advance);
+      contentOffset += advance + trimLeadingChars(tail);
+      remaining = tail.trim();
       if (mode == Mode.MARKDOWN) {
         fences = findMarkdownCodeFences(remaining);
       }
     }
 
+    List<String> chunks = new ArrayList<>();
+    for (ChunkSpan span : alignEmittedSpans(content, spans)) {
+      chunks.add(content.substring(span.start(), span.end()));
+    }
     return chunks;
   }
 
@@ -750,6 +751,49 @@ public final class ChunkSplitter {
         && Character.isLowSurrogate(text.charAt(offset));
   }
 
+  private static int trimLeadingChars(String text) {
+    int start = 0;
+    while (start < text.length() && text.charAt(start) <= ' ') start++;
+    return start;
+  }
+
+  private record ChunkSpan(int start, int end, int ordinal) {}
+
+  /** Repairs emitted geometry only; expanded spans never participate in raw planning. */
+  private static List<ChunkSpan> alignEmittedSpans(String source, List<ChunkSpan> raw) {
+    boolean needsAlignment = false;
+    for (ChunkSpan span : raw) {
+      if (bisectsSurrogatePair(source, span.start()) || bisectsSurrogatePair(source, span.end())) {
+        needsAlignment = true;
+        break;
+      }
+    }
+    if (!needsAlignment) return raw;
+    List<ChunkSpan> result = new ArrayList<>();
+    for (ChunkSpan span : raw) {
+      ChunkSpan mapped = new ChunkSpan(
+          span.start() - (bisectsSurrogatePair(source, span.start()) ? 1 : 0),
+          span.end() + (bisectsSurrogatePair(source, span.end()) ? 1 : 0), span.ordinal());
+      boolean newlyContained = false;
+      for (ChunkSpan previous : result) {
+        if (contains(previous, mapped) && !contains(raw.get(previous.ordinal()), span)) {
+          newlyContained = true;
+          break;
+        }
+      }
+      if (newlyContained) continue;
+      // Keep ordinary old overlap/containment. Remove only containment introduced by expansion.
+      result.removeIf(previous -> contains(mapped, previous)
+          && !contains(span, raw.get(previous.ordinal())));
+      result.add(mapped);
+    }
+    return result;
+  }
+
+  private static boolean contains(ChunkSpan outer, ChunkSpan inner) {
+    return outer.start() <= inner.start() && outer.end() >= inner.end();
+  }
+
   /**
    * Represents a chunk with its metadata.
    */
@@ -834,10 +878,6 @@ public final class ChunkSplitter {
         endPos = (boundary > position && boundary <= text.length()) ? boundary : targetEnd;
       }
 
-      if (bisectsSurrogatePair(text, endPos)) {
-        endPos++;
-      }
-
       String rawChunk = text.substring(position, endPos);
       String chunkContent = rawChunk.strip();
       if (!chunkContent.isEmpty()) {
@@ -876,15 +916,27 @@ public final class ChunkSplitter {
         }
       }
 
-      int nextPosition = position + advance;
-      if (bisectsSurrogatePair(text, nextPosition)) {
-        nextPosition = nextPosition > position + 1
-            ? nextPosition - 1
-            : position + Character.charCount(text.codePointAt(position));
-      }
-      position = nextPosition;
+      position = position + advance;
     }
 
-    return chunks;
+    List<ChunkSpan> spans = new ArrayList<>();
+    for (Chunk chunk : chunks) {
+      spans.add(new ChunkSpan(chunk.startChar(), chunk.endChar(), chunk.index()));
+    }
+    List<ChunkSpan> aligned = alignEmittedSpans(content, spans);
+    if (aligned == spans) return chunks;
+    List<Chunk> result = new ArrayList<>();
+    for (ChunkSpan span : aligned) {
+      Chunk original = chunks.get(span.ordinal());
+      boolean moved = span.start() != original.startChar() || span.end() != original.endChar();
+      if (!moved && original.index() == result.size()) {
+        result.add(original);
+      } else {
+        String textContent = moved ? content.substring(span.start(), span.end()) : original.content();
+        result.add(new Chunk(result.size(), textContent, span.start(), span.end(),
+            moved ? estimateTokens(textContent) : original.estimatedTokens()));
+      }
+    }
+    return result;
   }
 }

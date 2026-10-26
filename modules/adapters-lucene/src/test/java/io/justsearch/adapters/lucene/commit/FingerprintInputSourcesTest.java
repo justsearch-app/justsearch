@@ -16,18 +16,18 @@ import org.junit.jupiter.api.Test;
 final class FingerprintInputSourcesTest {
 
   @Test
-  void canonicalInputsAndDigestCarryTheV2ChunkAlgorithm() throws Exception {
+  void canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm() throws Exception {
     var absent = IndexFingerprint.ModelFingerprint.notConfigured();
     var meta = new SsotCommitMetadataSource(ResolvedConfig.builder().contributeBaseSources().build(),
         new SsotCommitMetadataSource.RuntimeFingerprintInputs(null, absent, absent, absent)).build();
     String inputs = meta.get(IndexFingerprint.COMMIT_META_INPUTS_KEY).toString();
-    assertTrue(inputs.contains("\"algorithm_version\":\"v2\""), inputs);
+    assertTrue(inputs.contains("\"algorithm_version\":\"v1\""), inputs);
     assertNotNull(meta.get(IndexFingerprint.COMMIT_META_KEY));
     assertEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
         .digest(inputs.getBytes(java.nio.charset.StandardCharsets.UTF_8))), meta.get(IndexFingerprint.COMMIT_META_KEY));
-    String v1 = inputs.replace("\"algorithm_version\":\"v2\"", "\"algorithm_version\":\"v1\"");
+    String v2 = inputs.replace("\"algorithm_version\":\"v1\"", "\"algorithm_version\":\"v2\"");
     assertNotEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-        .digest(v1.getBytes(java.nio.charset.StandardCharsets.UTF_8))), meta.get(IndexFingerprint.COMMIT_META_KEY));
+        .digest(v2.getBytes(java.nio.charset.StandardCharsets.UTF_8))), meta.get(IndexFingerprint.COMMIT_META_KEY));
   }
 
   /**

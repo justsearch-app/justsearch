@@ -61,6 +61,12 @@ it against an index that was physically still perfectly compatible (tempdoc 804)
   - Chunking: target/overlap/minimum tokens, `threshold_chars` (the size above which a document is
     chunked at all, so it decides whether chunk documents exist), and the splitter's algorithm
     version.
+    The version changes whenever any previously valid, complete emitted plan changes. The bounded
+    surrogate-boundary repair retains v1: raw v1 planning finishes first, pair-safe emitted plans
+    stay identical, and only invalid cuts expand outward afterwards. The fingerprint does not prove
+    row integrity. Retained unsafe legacy rows omit their chunk text until source replacement or an
+    explicit **Rebuild Index** regenerates them; this repair does not automatically reschedule
+    unchanged files or require a global reindex. Unknown/disabled metadata is not universally healed.
   - `preview.max_chars` — the bound on `content_preview`, a `stored:true` field.
   - `analysis.lucene_version` + `analysis.icu_version` — the libraries that perform index-time
     analysis. An analyzer upgrade changes the postings with every descriptor unchanged, so the

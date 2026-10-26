@@ -56,31 +56,33 @@ final class PreOpenSchemaMismatchBootTest {
     return new IndexGenerationManager(layout.indexBase()).initializeOrLoad().state();
   }
 
-  @org.junit.jupiter.params.ParameterizedTest(name = "chunkAlgorithmUpgradeUsesExistingBootRecoveryPolicies({0})")
+  @org.junit.jupiter.params.ParameterizedTest(name = "compatibleV1ReleaseDoesNotStartChunkRepairMigration({0})")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"BLUE_GREEN_MIGRATE", "FAIL_CLOSED", "REBUILD_BACKUP_FIRST"})
-  void chunkAlgorithmUpgradeUsesExistingBootRecoveryPolicies(String policy, @TempDir Path tempDir)
+  @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
+  void compatibleV1ReleaseDoesNotStartChunkRepairMigration(String policy, @TempDir Path tempDir)
       throws Exception {
-    var layout = WorkerBootFixture.layout(tempDir);
-    WorkerBootFixture.seedChunkAlgorithm(layout.activePath(), "v1", 3);
-    WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), policy);
-    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
-        WorkerBootFixture.workerConfig(layout.dataDir()));
-    if (policy.equals("FAIL_CLOSED")) {
-      assertThrows(IOException.class, server::start);
-      assertEquals(3, docCount(layout.activePath()), "refusal keeps the source generation");
-    } else {
-      server.start();
-      assertNotNull(server.appServices());
-      if (policy.equals("BLUE_GREEN_MIGRATE")) {
-        assertEquals(IndexGenerationManager.MigrationState.MIGRATING.name(), stateAfterBoot(layout).migration_state());
-        assertNotNull(stateAfterBoot(layout).building_generation());
-        assertEquals(3, docCount(layout.activePath()), "Blue remains intact during rebuild");
-      } else {
-        Path backup = soleSiblingWithSuffix(layout.activePath(), ".bak-");
-        assertNotNull(backup);
-        assertEquals(3, docCount(backup));
-        assertEquals(0, docCount(layout.activePath()));
+    Path root = Release030Fixture.unpack("small", tempDir);
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    WorkerBootFixture.publishConfig(root.resolve("data"), root.resolve("data/index/default"), policy,
+        java.util.Map.of("justsearch.ai.disabled", "true", "justsearch.ai.embed.enabled", "false",
+            "justsearch.splade.enabled", "false", "justsearch.ner.enabled", "false"));
+    var installed = io.justsearch.configuration.resolved.ConfigStore.global();
+    try {
+      var original = Release030UpgradeCharacterizationTest.state(root).active_generation();
+      // The authentic archive and the existing strict released-model identity guard are unchanged.
+      var identities = new Release030UpgradeCharacterizationTest.ReleasedModelIdentities(root);
+      try (identities; var executors = new io.justsearch.core.execution.TestEngineExecutors();
+          var running = Release030UpgradeCharacterizationTest.boot(root, executors)) {
+        assertNotNull(running.appServices());
+        var state = Release030UpgradeCharacterizationTest.state(root);
+        assertEquals("IDLE", state.migration_state());
+        assertEquals(original, state.active_generation());
+        assertNull(state.building_generation());
+        assertTrue(Release030UpgradeCharacterizationTest.search(running, "nebula")
+            .contains(Release030UpgradeCharacterizationTest.key(root.resolve("roots/alpha/file-01.txt"))));
       }
+    } finally {
+      io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installed, previous);
     }
   }
 

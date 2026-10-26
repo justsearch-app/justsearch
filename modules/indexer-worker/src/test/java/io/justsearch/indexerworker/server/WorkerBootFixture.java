@@ -47,16 +47,6 @@ final class WorkerBootFixture {
   static final String NO_FINGERPRINT = "<<absent>>";
 
   static void seed(Path path, String fingerprintOverride, int docs) throws Exception {
-    seed(path, fingerprintOverride, docs, null);
-  }
-
-  /** A comparable recorded shape differing only in the chunker's physical algorithm. */
-  static void seedChunkAlgorithm(Path path, String algorithmVersion, int docs) throws Exception {
-    seed(path, null, docs, algorithmVersion);
-  }
-
-  private static void seed(Path path, String fingerprintOverride, int docs, String algorithmVersion)
-      throws Exception {
     Map<String, Object> meta = new HashMap<>(new SsotCommitMetadataSource().build());
     if (NO_FINGERPRINT.equals(fingerprintOverride)) {
       meta.remove(IndexFingerprint.COMMIT_META_KEY);
@@ -67,13 +57,6 @@ final class WorkerBootFixture {
       meta.remove(IndexFingerprint.COMMIT_META_INPUTS_KEY);
     } else if (fingerprintOverride != null) {
       meta.put(IndexFingerprint.COMMIT_META_KEY, fingerprintOverride);
-    }
-    if (algorithmVersion != null) {
-      String inputs = meta.get(IndexFingerprint.COMMIT_META_INPUTS_KEY).toString()
-          .replaceAll("\"algorithm_version\":\"[^\"]+\"", "\"algorithm_version\":\"" + algorithmVersion + "\"");
-      meta.put(IndexFingerprint.COMMIT_META_INPUTS_KEY, inputs);
-      meta.put(IndexFingerprint.COMMIT_META_KEY, java.util.HexFormat.of().formatHex(
-          java.security.MessageDigest.getInstance("SHA-256").digest(inputs.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
     }
     Map<String, Object> frozen = Map.copyOf(meta);
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
