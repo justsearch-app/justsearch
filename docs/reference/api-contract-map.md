@@ -637,6 +637,44 @@ Interaction / memory surfaces (tempdoc 561 P-A/P-B + 565):
 - `POST /api/thread/{id}/events` — tempdoc S4b (Search Thread): the FE write path for a thread event kind that does not originate from the agent loop. Today only `kind: "SEARCH"` (a manually-triggered search action) is supported. Body `{kind: "SEARCH", query, mode, matchCount, resultCount, docIds[], executedAt?}`; response `{id}` (201). Persisted via a small dedicated `core.search-event`-shaped run (`AgentRunStore.appendSearchEvent`) that joins the conversation exactly like a workflow run — no new store.
 - `GET /api/memory` · `POST /api/memory` · `DELETE /api/memory/{id}` — the durable learned-facts store ("what it knows"), the `core.memory-surface` peer surface (561 P-E). Distinct from "what it did" (the runs), which the §26.D fold moved to the thread/inbox.
 
+#### Conditional memory deletion
+
+Sources: [MemoryController](../../modules/ui/src/main/java/io/justsearch/ui/api/MemoryController.java),
+[FileMemoryStore](../../modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java), and
+[MemorySurface](../../modules/ui-web/src/shell-v0/views/MemorySurface.ts).
+The existing local API session-token, host and origin requirements still apply.
+
+`GET /api/memory` returns `{memories, locked}`. Each readable row includes `id`, `kind`,
+`content`, `sourceConversationId`, `actor`, `createdAt`, and an opaque `revision`.
+Treat the revision as a value to copy, including its double quotes: send exactly one
+`If-Match` header containing that quoted revision when deleting the listed item.
+Do not add another pair of quotes. For example, a revision value consisting of a double
+quote, 64 lowercase hexadecimal characters and a closing double quote is the complete header value.
+
+| DELETE request or state | Result |
+| --- | --- |
+| Current revision matches | HTTP 200 `{ok:true, removed:true}` after removal |
+| ID already absent | HTTP 200 `{ok:true, removed:false}` |
+| ID exists with a different revision | HTTP 412 `INVALID_STATE`; current item kept |
+| Malformed, repeated, list-valued, weak or `*` header | HTTP 400 `INVALID_REQUEST`; no deletion |
+| Header omitted (legacy ID deletion) | Previous `{ok:true}` response; no conditional protection |
+
+Revisions bind all six record fields, a process-local epoch and an insertion incarnation.
+Replacing an item, even by an identical reinsertion under the same ID, invalidates its previous
+revision; restarting also invalidates previously listed revisions. Revisions are never persisted,
+so the `memory.json` format is unchanged. Repeated reads and a key lock/unlock do not themselves
+replace an item's incarnation.
+
+This protects a replacement from a stale window or a resend after a lost response. Once removal
+has completed, that same request either finds absence or receives 412 for a replacement at that ID.
+The Memory surface sends the confirmed row's revision with automatic retries disabled, then
+refreshes the list. It says “Forgotten” only for `removed:true`, says the item was already gone
+for `removed:false`, and keeps the 412 explanation while refreshing the current item. A lost
+reply leaves the outcome unknown until a fresh readable list resolves it; it is not a removal
+acknowledgement. A current replacement requires a fresh decision using its newly listed revision.
+Locked stores still refuse mutations with HTTP 423 `STORE_LOCKED`; an unavailable memory store
+returns HTTP 503 `MEMORIES_UNAVAILABLE`, rather than an empty-store claim.
+
 `POST /api/chat/agent` SSE event types (unchanged by the 491 rename):
 
 - `session_started`

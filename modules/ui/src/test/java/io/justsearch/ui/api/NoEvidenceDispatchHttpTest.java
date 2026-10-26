@@ -243,7 +243,9 @@ final class NoEvidenceDispatchHttpTest {
       var history = get("/api/chat/conversations/" + outcome + "/history").path("messages");
       assertEquals(2, history.size());
       assertEquals(outcome, history.get(1).path("errorCode").asString());
-      assertEquals("ERROR", get("/api/thread/" + outcome).path("events").get(1).path("kind").asString());
+      var response = get("/api/thread/" + outcome);
+      assertEquals("ERROR", response.path("events").get(1).path("kind").asString(),
+          () -> "history=" + history + " thread=" + response);
     }
     assertEquals(0, ai.requests.size(), "retrieval errors never become model answers");
   }
@@ -335,11 +337,13 @@ final class NoEvidenceDispatchHttpTest {
 
   private void assertNoEvidence(String id, boolean scoped) throws Exception {
     var saved = coldHistory(id);
-    assertEquals("NO_CONTENT", saved.get(1).get("errorCode"));
-    assertEquals(scoped, saved.get(1).get("retrievalScoped"));
-    var error = get("/api/thread/" + id).path("events").get(1);
-    assertEquals("ERROR", error.path("kind").asString());
-    assertEquals(scoped, error.path("attributes").path("retrievalScoped").asBoolean(!scoped));
+    var response = get("/api/thread/" + id);
+    String diagnostic = "history=" + saved + " thread=" + response;
+    assertEquals("NO_CONTENT", saved.get(1).get("errorCode"), diagnostic);
+    assertEquals(scoped, saved.get(1).get("retrievalScoped"), diagnostic);
+    var error = response.path("events").get(1);
+    assertEquals("ERROR", error.path("kind").asString(), diagnostic);
+    assertEquals(scoped, error.path("attributes").path("retrievalScoped").asBoolean(!scoped), diagnostic);
   }
 
   private List<Map<String, Object>> coldHistory(String id) {

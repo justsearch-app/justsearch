@@ -148,20 +148,21 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
       ],
       "class": "New",
-      "behaviour": "The production process factory and shared settings/operation/index/queue owners remove the exact parent and proper chunks while preserving sibling/source bytes and durable precise policy. Outside-root FILE completion has no permanent rule; an unrestricted new writer may publish later. Completion-winning withdrawal preserves its immutable receipt. The direct writer case is not evidence of a newly accepted INGEST.",
+      "behaviour": "The production process factory and shared settings/operation/index/queue owners remove the exact parent and proper chunks while preserving sibling/source bytes and durable precise policy. Outside-root FILE completion has no permanent rule; an unrestricted new writer may publish later. Completion-winning withdrawal preserves its immutable receipt. The direct writer case is not evidence of a newly accepted INGEST. One additional main#955 combined-before probe is authored but unexecuted: an accepted completed Forget and real sibling extraction/committed-hash prerequisites precede strict replay convergence without excluded parent/chunk publication; component replay is not actual migration or newly accepted INGEST proof.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
           "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
-          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled.",
+          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; convergence failure remains source-inferred until admissible execution.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
       "newChecks": [
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55CompletedForgetAllowsReturnedRootReplayWithoutPublishingExcludedSource"
       ],
       "repaired": false
     },

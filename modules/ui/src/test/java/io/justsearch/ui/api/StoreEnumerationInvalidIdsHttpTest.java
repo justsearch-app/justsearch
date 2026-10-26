@@ -121,8 +121,11 @@ class StoreEnumerationInvalidIdsHttpTest {
   }
 
   private static List<String> plantInvalidFolders(Path root) throws Exception {
-    var ids = List.of(" ", "\t", "\u2028", "CON", "NUL.txt", "bad\\id", "bad:stream", "trailing.");
+    var ids = System.getProperty("os.name", "").startsWith("Windows")
+        ? List.of("\u2028", "\u2003")
+        : List.of(" ", "\t", "\u2028", "CON", "NUL.txt", "bad\\id", "bad:stream", "trailing.");
     for (String id : ids) {
+      assertFalse(io.justsearch.configuration.persistence.StoreIds.isValid(id), "invalid fixture: " + id);
       Path dir = Files.createDirectory(root.resolve(id));
       Files.writeString(dir.resolve("meta.json"), "not metadata");
       Files.writeString(dir.resolve("sentinel"), "keep");

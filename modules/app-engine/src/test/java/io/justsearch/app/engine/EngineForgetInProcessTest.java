@@ -24,14 +24,23 @@ import io.justsearch.app.services.registry.operations.handlers.ForgetIndexedPath
 import io.justsearch.app.services.settings.SettingsCommitCoordinator;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.configuration.excludes.ExclusionPatterns;
 import io.justsearch.configuration.excludes.LiteralExclusion;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.loop.IndexingLoop;
+import io.justsearch.indexerworker.loop.SourceContentHash;
+import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
+import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.WatcherRootReconciliation;
 import io.justsearch.indexerworker.server.DefaultWorkerAppServices;
 import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
+import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
@@ -44,9 +53,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Actual process factory/shared settings owner/SQLite/Lucene; no substitute FORGET response. */
@@ -106,6 +117,130 @@ final class EngineForgetInProcessTest {
       f.seed(outside, "new deliberate index text");
       assertEquals(3, f.runtime.indexCountOps().countByIdAndChunksStrict(key(outside)));
       assertEquals("source remains", Files.readString(outside));
+    }
+  }
+
+  @Test
+  void S55CompletedForgetAllowsReturnedRootReplayWithoutPublishingExcludedSource() throws Exception {
+    Path watched = Files.createDirectory(directory.resolve("replay-watched"));
+    Path exact = Files.writeString(watched.resolve("report.txt"), "private physical source remains");
+    Path sibling = Files.writeString(watched.resolve("report.txt.bak"), "allowed sibling extraction control");
+    try (var f = new Fixture(directory.resolve("replay-process"), List.of(watched))) {
+      f.seed(exact, "private indexed parent and proper chunks");
+      var result = f.forget(exact, "FILE");
+      var outcome = JSON.valueToTree(result.structuredData().get("forget"));
+      assertTrue(result.success(), "SETUP: the actual prepared Forget must succeed: " + result.message());
+      assertEquals("COMPLETE", outcome.path("status").asString(), "SETUP: completed accepted owner");
+      assertEquals("CONFIRMED", outcome.path("removal").asString(), "SETUP: confirmed removal");
+      assertEquals("INSTALLED", outcome.path("keepOut").asString(), "SETUP: installed keep-out");
+      assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
+      assertTrue(f.queue.forgetJobsAbsent(key(exact), false));
+      var saved = f.settings.inspect().settings().getExcludePatterns();
+      assertEquals(1, saved.size(), "SETUP: one actual owner-installed literal");
+      var literal = LiteralExclusion.fromEntry(saved.getFirst());
+      assertEquals(exact.toString(), literal.literal().path());
+      assertEquals(LiteralExclusion.Scope.FILE, literal.literal().scope());
+      assertSame(f.config, ConfigStore.globalOrNull(), "SETUP: actual published policy owner");
+      var configuration = f.config.currentSnapshot();
+      assertNotNull(configuration, "SETUP: readable effective configuration");
+      var policy = ExclusionPatterns.fromRawJsonStrict(configuration.ui().excludePatterns(), false);
+      assertTrue(policy.isExcludedPath(watched, exact));
+      assertFalse(policy.isExcludedPath(watched, sibling));
+      assertTrue(f.loop.isRunning(), "SETUP: the production indexing loop must be running");
+      var publisher = ((DefaultWorkerAppServices) f.server.appServices()).ingestService();
+      assertNotNull(publisher, "SETUP: actual non-null replay publisher");
+      assertTrue(publisher.ownsForgetQueue(f.queue), "SETUP: publisher and queue have the same owner");
+
+      // This direct enqueue is a real-extractor readiness control, not a new accepted INGEST proof.
+      String siblingHash = SourceContentHash.sha256(sibling);
+      assertEquals(1, f.queue.enqueueEntriesWithExactCollection(List.of(new JobQueue.EnqueueEntry(
+          sibling, JobQueue.EnqueueEntry.stat(sibling).sizeBytes(), null, siblingHash, watched)), "documents"));
+      long extractionDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+      boolean extracted = false;
+      do {
+        f.runtime.commitOps().maybeRefreshBlocking();
+        var row = f.queue.watcherReconciliationRow(key(sibling));
+        extracted = siblingHash.equals(f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+            key(sibling), SchemaFields.SOURCE_SHA256)) && row != null && "DONE".equals(row.get("state"))
+            && f.queue.matchesAcceptedFileProjection(key(sibling), row.get("unit_revision"), siblingHash);
+        if (!extracted) Thread.sleep(20);
+      } while (!extracted && System.nanoTime() < extractionDeadline);
+      assertTrue(extracted, "SETUP: sibling must actually extract, publish and commit its current source hash; row="
+          + f.queue.watcherReconciliationRow(key(sibling)));
+      var siblingBefore = f.queue.watcherReconciliationRow(key(sibling));
+      assertEquals(siblingHash, siblingBefore.get("planned_source_sha256"));
+      assertEquals("documents", siblingBefore.get("collection"));
+      assertEquals(watched.toString(), siblingBefore.get("ingestion_root"));
+      assertEquals(0, f.queue.jobStateCountsStrict().pendingCount(), "SETUP: no pending unrelated work");
+      assertEquals(0, f.queue.jobStateCountsStrict().processingCount(), "SETUP: no issued unrelated work");
+      assertEquals(0, f.queue.jobStateCountsStrict().failedCount(), "SETUP: no failed unrelated work");
+      assertNull(f.queue.watcherReconciliationRow(key(exact)), "SETUP: Forget left no target queue row");
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "SETUP: no unrelated replay receipts");
+
+      // RootIdentity is package-private; use the existing app-engine test reflection seam, not a new API.
+      var identityType = Class.forName("io.justsearch.indexerworker.services.RootIdentity");
+      var capture = identityType.getDeclaredMethod("capture", Path.class);
+      capture.setAccessible(true);
+      var rootIdentity = capture.invoke(null, watched);
+      var volume = identityType.getDeclaredMethod("volume");
+      volume.setAccessible(true);
+      assertNotNull(volume.invoke(rootIdentity), "SETUP: returned-root replay requires real volume evidence");
+      var debt = new WatcherRootReconciliation(watched.toString(), rootIdentity.toString(), "documents");
+      assertTrue(f.queue.putSwitchBuffer(debt.key(), WatcherRootReconciliation.OPERATION, debt.encode()));
+      var journal = f.queue.listSwitchBufferOpsStrict();
+      assertEquals(1, journal.size(), "SETUP: one exact root receipt");
+      assertTrue(journal.getFirst().acceptedOrder() > 0);
+      assertEquals(debt.encode(), journal.getFirst().payload());
+      var declarations = List.of(new ResolvedConfig.FileSource(watched, "documents"));
+      Path indexBase = (Path) field(f.server, KnowledgeServer.class, "indexBasePath");
+      Path activeIndex = (Path) field(f.server, KnowledgeServer.class, "activeIndexPath");
+      var signals = (WorkerSignalBus) field(f.server, KnowledgeServer.class, "signalBus");
+      long replayDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(f.queue, f.runtime,
+          signals, IndexingPacing.unthrottled(), indexBase, activeIndex, JSON, () -> false, () -> true,
+          LoggerFactory.getLogger(getClass()), replayDeadline, "green", ignored -> true)
+          .withPublisher(publisher).withMigrationRoots(declarations);
+      var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(context);
+
+      // Establish every admissibility condition before the intended convergence assertion.
+      assertEquals(journal, f.queue.listSwitchBufferOpsStrict(), "SETUP: preparation retains exact journal");
+      assertSame(configuration, f.config.currentSnapshot(), "SETUP: effective policy did not change");
+      assertTrue(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
+          .isExcludedPath(watched, exact), "SETUP: target is still currently excluded");
+      assertEquals(rootIdentity.toString(), capture.invoke(null, watched).toString(), "SETUP: same readable root");
+      assertTrue(Files.isRegularFile(exact) && Files.isReadable(exact), "SETUP: source remains present/readable");
+      assertEquals("private physical source remains", Files.readString(exact));
+      assertEquals("allowed sibling extraction control", Files.readString(sibling));
+      assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)),
+          "forbidden parent/chunks must remain absent");
+      assertEquals(siblingHash, f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+          key(sibling), SchemaFields.SOURCE_SHA256), "SETUP: allowed current-byte output survives");
+      assertEquals(siblingBefore, f.queue.watcherReconciliationRow(key(sibling)),
+          "SETUP: independent committed sibling row remains exact");
+      assertEquals(0, f.queue.jobStateCountsStrict().pendingCount(), "SETUP: no unsettled queue work");
+      assertEquals(0, f.queue.jobStateCountsStrict().processingCount(), "SETUP: no issued queue owner");
+      var targetRow = f.queue.watcherReconciliationRow(key(exact));
+      if (targetRow != null) {
+        assertEquals("DONE", targetRow.get("state"), "SETUP: target has no live foreign claim");
+        assertEquals("WATCHER_RECONCILIATION", targetRow.get("transport"));
+        assertEquals(watched.toString(), targetRow.get("ingestion_root"));
+        assertEquals("documents", targetRow.get("collection"));
+      }
+      Object refusal = field(publisher, WorkerIngestService.class, "watcherReplayFailure");
+      if (replay.isEmpty()) {
+        assertEquals("Watcher reconciliation lacks a committed path outcome: " + key(exact), refusal,
+            "SETUP: distinguish the hypothesized excluded-path proof refusal from another failure");
+      }
+      assertTrue(replay.isPresent(), "returned-root replay must converge without publishing the forgotten source; "
+          + "refusal=" + refusal + "; targetRow=" + targetRow + "; journal=" + journal);
+      assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay.orElseThrow()));
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
+      assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
+      assertTrue(f.queue.forgetJobsAbsent(key(exact), false));
+      assertEquals(siblingHash, f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+          key(sibling), SchemaFields.SOURCE_SHA256));
+      assertEquals("private physical source remains", Files.readString(exact));
+      assertEquals("allowed sibling extraction control", Files.readString(sibling));
     }
   }
 

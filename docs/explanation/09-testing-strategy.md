@@ -18,6 +18,90 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
 > instead of in an opt-in tier. The process boundaries that survive — `llama-server` and the
 > extraction sandbox child pool — are still exercised from `modules/system-tests`.
 
+## Local test profiles and bounded Gradle runs
+
+Run checks against private fixtures, never a copy of your real `.justsearch` profile.
+The [JVM conventions](../../build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt)
+give each Gradle `Test` task a profile under that module's `build/test-profile/<task>/home`:
+`HOME`, `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, the XDG config/data/cache/state paths, and
+Java `user.home` point there. The task removes inherited JustSearch home/data overrides.
+Before invoking Gradle, also unset `JUSTSEARCH_HOME`, `JUSTSEARCH_DATA_DIR`,
+`JAVA_TOOL_OPTIONS` and `JDK_JAVA_OPTIONS`. Environment overrides can defeat fixture defaults;
+JDK option announcements can also break tests that assert exact process output.
+These task settings do not establish every helper JVM's home or temporary directory.
+
+From the checkout root, install the root lockfile's Node dependencies before UI status isolation
+checks or supervisor checks:
+
+```bash
+mkdir -p tmp/npm-cache
+npm ci --audit=false --cache "$PWD/tmp/npm-cache"
+```
+
+The root installation supplies `esbuild` for UI status isolation and `js-yaml` for tooling.
+`installDist`'s web dependency task installs in `modules/ui-web`, so that install alone does
+not supply root dependencies.
+
+### Maintainer-local guard and slot prerequisites
+
+The following Linux workflow requires two **external maintainer tools**: a supplied memory guard
+and `js-gradle-slot` on `PATH` (the local slot installation uses
+`~/.local/share/justsearch-tools/gradle-slot.sh`). A fresh clone installs neither tool.
+Set `MEM_GUARD` to the supplied guard's actual path; it is not a repository `tmp/` script.
+Keep the guard's existing 6144 MiB default, normal priority and the slot tool's standard settings.
+The guard samples Gradle Test JVM RSS plus swap for this checkout every five seconds; it does
+not account for the complete process tree. The slot tool serializes Gradle within a checkout
+and admits calls through the shared slots. Run one module per invocation.
+
+For a changed failure, select one class or method first. This Bash example assumes `MEM_GUARD`
+already names the supplied executable and writes the guard log inside this checkout:
+
+```bash
+env -u JUSTSEARCH_HOME -u JUSTSEARCH_DATA_DIR -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS \
+  "$MEM_GUARD" "$PWD/tmp/core-test-memory.log" -- js-gradle-slot \
+  ./gradlew :modules:core:test --tests 'io.justsearch.core.context.EngineContextTest' --rerun
+```
+
+For the full UI unit selection, use both existing CI shards in **separate invocations**, each
+under the same guard and slot composition; do not substitute the full `:modules:ui:test` task:
+
+```bash
+env -u JUSTSEARCH_HOME -u JUSTSEARCH_DATA_DIR -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS \
+  "$MEM_GUARD" "$PWD/tmp/ui-shard-1-memory.log" -- js-gradle-slot \
+  ./gradlew :modules:ui:ciUnitTest1 --rerun
+env -u JUSTSEARCH_HOME -u JUSTSEARCH_DATA_DIR -u JAVA_TOOL_OPTIONS -u JDK_JAVA_OPTIONS \
+  "$MEM_GUARD" "$PWD/tmp/ui-shard-2-memory.log" -- js-gradle-slot \
+  ./gradlew :modules:ui:ciUnitTest2 --rerun
+```
+
+The [hosted shard policy](../../scripts/ci/unit-test-shard-policy.v1.json) names the tasks;
+the [class partitions](../../scripts/ci/unit-test-class-shards.v1.json) and JVM conventions
+assign classes to disjoint tasks. Do not repeat an identical failed run without changed code or
+inputs. `--rerun` requests execution of the selected Test task: a cached, skipped, unavailable
+or merely configured check is not evidence that the behavior passed. Inspect the executed tests.
+
+### Installed Engine children need their own Java home
+
+A Test JVM's `-Duser.home` and shell `HOME` do not automatically set Java `user.home` in an
+installed Engine child. Supply a private home through Engine-only `UI_OPTS` for each installed
+child launch. For a Bash-launched dev runner or real-writer-recovery fixture, set this before
+running that fixture's documented command:
+
+```bash
+mkdir -p "$PWD/tmp/installed-engine-home"
+export UI_OPTS="-Duser.home=\"$PWD/tmp/installed-engine-home\""
+```
+
+The inner quotes keep a path containing spaces together in the
+[Engine option parser](../../scripts/dev/lib/engine-java-launch.cjs).
+The [dev runner](../../scripts/dev/dev-runner.cjs) forwards `UI_OPTS`; the
+[real-writer-recovery fixture](../../scripts/supervisor-conformance/real-writer-recovery.mjs)
+inherits it through its environment, including successor launches.
+For diagnostics, append `-XshowSettings:properties` to this Engine option list and inspect the
+actual first and successor Engine output for `user.home`. A test-side property assertion alone
+does not prove child isolation. This home override does not certify all helper JVM homes,
+temporary paths, shutdown behavior or resource usage.
+
 ## Tier 1: Unit Tests (Fast)
 *   **Scope:** Single class/method.
 *   **Mocking:** Heavy usage of Mockito.

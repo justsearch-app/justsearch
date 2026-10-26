@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T19:11:48.446Z",
+  "revision": "d726693c43d712b81961df08b9db8835c39512e8",
+  "tree": "3125700a89d6e9a6dacac2b8bade808df0f99f39",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.ReturnedRootCurrentByteReplayTest.reconciliationExcludesTheActualLoopWriterUntilConditionalAdmissionFinishes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4675
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#reconciliationExcludesTheActualLoopWriterUntilConditionalAdmissionFinishes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8518ffd22072db91fc34d3c7f13d395e0c4a0e1df257968fc369f374c0e58e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reconciliationExcludesTheActualLoopWriterUntilConditionalAdmissionFinishes()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ff2afacc48ac83f3fd7fb008d5dd5e64e68175f3796745b022da1cc67c838b51"
+}

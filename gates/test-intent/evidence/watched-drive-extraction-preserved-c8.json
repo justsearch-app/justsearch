@@ -1,0 +1,74 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-25T21:22:34.198Z",
+  "revision": "c8d5876786c852bc5b702f2dcd9568f497a46cb5",
+  "tree": "a33902bc47b12e569a0264045847ca9ee19ecb0b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.ExtractionInfrastructureTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 99213
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9eee9560aff668a0e17892f8862a0e236a5d43ebf01c182a2279a85b01377cf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "untypedInfrastructureFailureIsProvenByTheSameExtractionCanary()",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(mixed)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(one)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(all)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(readonly)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(lost-directory)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(readonly-child)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(lost-directory-child)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fcad35142a504149a8959a6b21484a3b37ed536c0683e1ca3deba3692e043bcc"
+}

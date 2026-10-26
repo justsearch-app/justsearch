@@ -407,7 +407,7 @@ final class SqliteQueueSwitchBufferOps {
             out.add(
                 new SwitchBufferCapableQueue.SwitchBufferOp(
                     rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                    rs.getLong(5), rs.getString(6)));
+                    rs.getLong(5), rs.getString(6), order));
           }
         }
       }

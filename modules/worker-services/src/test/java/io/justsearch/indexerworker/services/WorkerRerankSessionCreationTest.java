@@ -51,12 +51,12 @@ final class WorkerRerankSessionCreationTest
   }
 
   @Test
-  void coldRequestRerankSkipsWithLoadingWithoutCreatingAnySession() throws Exception {
+  void nonDeferredColdRequestRerankSkipsWithLoadingWithoutCreatingAnySession() throws Exception {
     try (var _ = mockStatic(OrtCudaHelper.class);
         var _ = mockConstruction(OrtSession.SessionOptions.class);
         var _ = mockConstruction(ai.onnxruntime.providers.OrtCUDAProviderOptions.class);
         var cache = mockStatic(OnnxSessionCache.class);
-        var handle = failedGpuHandle(null);
+        var handle = nonDeferredColdHandle(cache);
         var index = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(dir)
             .withExecutorRegistrations(testLuceneExecutors()).open()) {
       cache.when(() -> OnnxSessionCache.createCachedGpuSession(any(), any(), any()))
@@ -145,9 +145,24 @@ final class WorkerRerankSessionCreationTest
     return session;
   }
 
+  private static NativeSessionHandle nonDeferredColdHandle(org.mockito.MockedStatic<OnnxSessionCache> cache) throws Exception {
+    // A non-deferred owner eagerly bootstraps CPU. Model the later absence of a ready session;
+    // the owner still retains the bootstrap session for close, and the request must create none.
+    var bootstrap = scoredSession();
+    cache.when(() -> OnnxSessionCache.createCachedSession(any(), any(), any(), any())).thenReturn(bootstrap);
+    var handle = failedGpuHandle(null, false);
+    cache.verify(() -> OnnxSessionCache.createCachedSession(any(), any(), any(), any()));
+    cache.clearInvocations();
+    return handle;
+  }
+
   private static NativeSessionHandle failedGpuHandle(OrtSession cpu) throws Exception {
+    return failedGpuHandle(cpu, true);
+  }
+
+  private static NativeSessionHandle failedGpuHandle(OrtSession cpu, boolean deferred) throws Exception {
     var model = Path.of("missing", "model.onnx");
-    var policy = ModelSessionPolicy.forFallback(new GpuSessionConfig(0, 512L * 1024 * 1024), null, true, true, 60_000L);
+    var policy = ModelSessionPolicy.forFallback(new GpuSessionConfig(0, 512L * 1024 * 1024), null, deferred, true, 60_000L);
     var handle = spy((NativeSessionHandle) OrtSessionAssembler.buildManager(EncoderRole.RERANKER.consumerName(),
         new Composition(RuntimePolicy.defaults(), policy, new ModelArtifacts(model, model)), () -> true));
     set(handle, "gpuSessionAttempted", true); set(handle, "gpuAvailable", false);
