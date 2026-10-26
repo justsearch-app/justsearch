@@ -937,3 +937,14 @@ Sources below are agent choices under the quoted delegation, not owner-verbatim 
   "note": "Expected-value review only against C1-C9/A1-A9/FC15; product verdict fails initial-context lifecycle revocation. Runtime and final gates remain unverified."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177cd-4618-7f90-a04a-31d7b2b2ce45/cutover_intent_source_reviewer_1",
+  "verdict": "accept",
+  "digest": "sha256:78ff6fed31de49f3ebf270088dc75ccd068f9efa79090d292ac3ce27b8292c79",
+  "note": "Independent source-first test-intent review of final digest and official named execution evidence; exact current Node/frontend positive checks also passed. No product, Engine/model/native or whole-scenario runtime acceptance."
+}
+```

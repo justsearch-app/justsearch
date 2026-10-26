@@ -767,3 +767,14 @@ Phase17 metadata follow-up preserves every original owner-adopted quote and acce
   "note": "Audit of cd9fc274b (tree identical to c0e4b32c3) against merge-base f72fffe6. Baseline tests and cited agreed scenarios reviewed before diff and entry classes; provisional classes saved. Adaptations retain issuance, exact rendered count equality and row-count probe; visible full paths and default-Ask/session-busy claims separately retired with specific SM sources and actual removals. Repeated decision-record conflict search found none. New expectations checked against sources, including mode/scope membership without unsupported ordering or Set identity. Script/evidence/check-file digests validated; run-evidence rerun: all 58 named checks passed; missing-file repair assertion-fails on merge-base and passes after. Preservation suites: 401/401 before, 454/454 after, none skipped. Own tampered/stale evidence counterexamples rejected. Separate session and checkout; model-family independence not established. Audit scope only; no dev stack touched."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177cd-4618-7f90-a04a-31d7b2b2ce45/cutover_intent_source_reviewer_1",
+  "verdict": "accept",
+  "digest": "sha256:25252e30aa8320de4d2fb1b84e89f3dc6c3ee76fb61a42fcda833e724f0dbfd0",
+  "note": "Independent source-first test-intent review of final digest and official named execution evidence; exact current Node/frontend positive checks also passed. No product, Engine/model/native or whole-scenario runtime acceptance."
+}
+```

@@ -68,3 +68,14 @@ Phase17 changes tests and declarations only; production remains963d. Original14m
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177cd-4618-7f90-a04a-31d7b2b2ce45/cutover_intent_source_reviewer_1",
+  "verdict": "accept",
+  "digest": "sha256:9770aede40ce652548551f69dcd1d25b50c3e758eeef0b76646b15cd677b4801",
+  "note": "Independent source-first test-intent review of final digest and official named execution evidence; exact current Node/frontend positive checks also passed. No product, Engine/model/native or whole-scenario runtime acceptance."
+}
+```

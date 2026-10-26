@@ -796,3 +796,14 @@ NR15/RR15 choices are agent-adopted under the quoted delegation, not owner-verba
   "note": "Expected-value review only against adopted NR15/RR15/IR15/GA15. Reviewed before affected tests, changed instrumentation and explicit retirement oracles, full new residency/lifecycle/authority cases and declared official evidence digests. Fresh full8101 tests and current boundary subsets plus labeled independent carried evidence do not close unverified runtime/before/platform obligations. Product remains HOLD for full registered measurement failures. This record accepts intent, not whole-product readiness."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177cd-4618-7f90-a04a-31d7b2b2ce45/cutover_intent_source_reviewer_1",
+  "verdict": "accept",
+  "digest": "sha256:4ccce7ef208416fab4d09edf72f171da0ea58a5231d921c8abc414be78eb8f72",
+  "note": "Independent source-first test-intent review of final digest and official named execution evidence; exact current Node/frontend positive checks also passed. No product, Engine/model/native or whole-scenario runtime acceptance."
+}
+```

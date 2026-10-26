@@ -117,3 +117,13 @@ Invalid first harness cleanup/parser outputs, the added inputs.docIds TypeError 
 
 ## Acceptance records
 
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177cd-4618-7f90-a04a-31d7b2b2ce45/cutover_intent_source_reviewer_1",
+  "verdict": "accept",
+  "digest": "sha256:74d6cc97e01b7229b77d8a2ef48ea62aff5f51a758c0e40cbfa44bc2888bfb8f",
+  "note": "Independent source-first test-intent review of final digest and official named execution evidence; exact current Node/frontend positive checks also passed. No product, Engine/model/native or whole-scenario runtime acceptance."
+}
+```

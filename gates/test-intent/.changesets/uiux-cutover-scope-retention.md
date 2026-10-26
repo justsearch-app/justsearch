@@ -164,3 +164,13 @@ Formal producer evidence is generated only after root normal-commits this candid
 
 ## Acceptance records
 
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a177cd-4618-7f90-a04a-31d7b2b2ce45/cutover_intent_source_reviewer_1",
+  "verdict": "accept",
+  "digest": "sha256:7f5616732117b6a159d06293606be6c8856bcc65a858b230ab9eb484af25d8d2",
+  "note": "Independent source-first test-intent review of final digest and official named execution evidence; exact current Node/frontend positive checks also passed. No product, Engine/model/native or whole-scenario runtime acceptance."
+}
+```
