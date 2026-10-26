@@ -38,7 +38,7 @@ final class Release030RetirementContinuationTest {
     var projection=new AcceptedProjection("continuation-source","doc",1,AcceptedProjection.Kind.UPSERT,
         "{\"title\":\"continuationprojectionviolet\",\"content\":\"continuationprojectionviolet\"}");
     Path target=beta.resolve("continuation-new.txt");
-    try(var models=new ReleasedModelIdentities(root)) {
+    try(var _=new ReleasedModelIdentities(root)) {
       try(var ex=new TestEngineExecutors();var server=Release030RetirementTransitiveOrderTest.bootRoots(root,ex,false,t->{
         if(t.point().equals("release030-before-replay")) {
           if(first.compareAndSet(false,true)){firstEntered.countDown();assertTrue(firstRelease.await(30,TimeUnit.SECONDS));}

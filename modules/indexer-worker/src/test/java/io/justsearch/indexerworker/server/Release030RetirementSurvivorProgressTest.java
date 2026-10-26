@@ -23,7 +23,7 @@ final class Release030RetirementSurvivorProgressTest {
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();var attempts=new AtomicInteger();
   Path betaOnly=beta.resolve("late-unqueued.txt"),ack=beta.resolve("independent-ack.txt");
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=Release030RetirementWalkOrderTest.namedBoot(root,ex,t->{
     if(t.point().equals("release030-before-replay")){attempts.incrementAndGet();if(once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}}
    })) {

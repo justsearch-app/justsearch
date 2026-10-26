@@ -349,7 +349,7 @@ public final class Release030RecoveryState {
     save();
   }
   public synchronized boolean rootsInventoried() { return "true".equals(state.getProperty(RETIRE + "root-inventory")); }
-  public synchronized java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> rootReceipts() throws IOException {
+  public synchronized List<SwitchBufferCapableQueue.SwitchBufferOp> rootReceipts() throws IOException {
     var receipts = new java.util.ArrayList<SwitchBufferCapableQueue.SwitchBufferOp>();
     for (String key : state.stringPropertyNames()) if (key.startsWith(RECEIPT)) {
       var receipt = decodeReceipt(state.getProperty(key));
@@ -358,13 +358,13 @@ public final class Release030RecoveryState {
       receipts.add(receipt);
     }
     receipts.sort(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder));
-    return java.util.List.copyOf(receipts);
+    return List.copyOf(receipts);
   }
-  public synchronized java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> committedDeletes() throws IOException {
+  public synchronized List<SwitchBufferCapableQueue.SwitchBufferOp> committedDeletes() throws IOException {
     var result = new java.util.ArrayList<SwitchBufferCapableQueue.SwitchBufferOp>();
     for (String key : state.stringPropertyNames()) if (key.startsWith(RETIRE + "delete|") && !key.endsWith("|queue"))
       result.add(decodeReceipt(state.getProperty(key)));
-    return java.util.List.copyOf(result);
+    return List.copyOf(result);
   }
   private static SwitchBufferCapableQueue.SwitchBufferOp decodeReceipt(String value) throws IOException {
     try {
@@ -465,7 +465,7 @@ public final class Release030RecoveryState {
     state.remove(REPLACING + key);
     save();
   }
-  public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> roots,
+  public synchronized void inventoryRoots(List<SwitchBufferCapableQueue.SwitchBufferOp> roots,
       java.util.Map<String,SwitchBufferUpsert> legacyFiles,
       java.util.Map<String,io.justsearch.adapters.lucene.runtime.PathPrefixScope> scopes) throws IOException {
     if (rootsInventoried()) throw new IOException("ROOT inventory already exists");
@@ -486,11 +486,11 @@ public final class Release030RecoveryState {
     } catch (IOException | RuntimeException failed) { state.clear(); state.putAll(previous); throw failed; }
   }
   /** A crash may leave exactly the committed replacement after a saved predecessor intent. */
-  public synchronized void validateRootHeads(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> actual) throws IOException {
+  public synchronized void validateRootHeads(List<SwitchBufferCapableQueue.SwitchBufferOp> actual) throws IOException {
     if (!rootsInventoried()) throw new IOException("Missing retirement ROOT inventory");
     var heads = new java.util.HashMap<String,SwitchBufferCapableQueue.SwitchBufferOp>();
     for (var root : actual) heads.put(headKey(root.generation(),root.key()),root);
-    for (String key : java.util.List.copyOf(state.stringPropertyNames())) if (key.startsWith(REPLACING)) {
+    for (String key : List.copyOf(state.stringPropertyNames())) if (key.startsWith(REPLACING)) {
       String head = key.substring(REPLACING.length());var surviving = heads.get(head);
       if (surviving == null) throw new IOException("Missing interrupted ROOT replacement");
       String predecessor = state.getProperty(key);

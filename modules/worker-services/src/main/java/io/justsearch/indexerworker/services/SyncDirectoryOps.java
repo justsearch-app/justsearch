@@ -581,7 +581,7 @@ final class SyncDirectoryOps {
     Path root=resolveSyncRoot(rootPath);
     if(root==null)return syncDirectoryErrorResponse("ROOT enumeration unavailable");
     try {
-      var result=walkAndEnqueueMissingFiles(root,true,java.util.Set.of(),
+      var result=walkAndEnqueueMissingFiles(root,true,Set.of(),
           io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).provenance(),
           cancelled,collection,automatic?AdmissionMode.UPGRADE_RECOVERY:AdmissionMode.RETIREMENT_REPLAY,
           recoveryAdmission,original);
@@ -920,8 +920,8 @@ final class SyncDirectoryOps {
               var queue=(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue)jobQueue;
               boolean replay = admissionMode==AdmissionMode.RETIREMENT_REPLAY || admissionMode==AdmissionMode.UPGRADE_RECOVERY;
               var completedRows = new java.util.HashMap<String,java.util.Map<String,String>>();
-              var changedPaths = new java.util.ArrayList<String>();
-              var corrections = new java.util.ArrayList<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation>();
+              var changedPaths = new ArrayList<String>();
+              var corrections = new ArrayList<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation>();
               var rootFiles=replay?queue.retirementRootFiles():null;
               if (replay) for (var entry : admitted) {
                 if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new java.io.UncheckedIOException(new IOException("ROOT proof cancelled"));
@@ -954,11 +954,11 @@ final class SyncDirectoryOps {
                 String source;
                 String sourceState;
                 try {
-                  var before = Files.readAttributes(entry.path(), java.nio.file.attribute.BasicFileAttributes.class,
+                  var before = Files.readAttributes(entry.path(), BasicFileAttributes.class,
                       java.nio.file.LinkOption.NOFOLLOW_LINKS);
                   source = io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),
                       () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
-                  var after = Files.readAttributes(entry.path(), java.nio.file.attribute.BasicFileAttributes.class,
+                  var after = Files.readAttributes(entry.path(), BasicFileAttributes.class,
                       java.nio.file.LinkOption.NOFOLLOW_LINKS);
                   if (!before.isRegularFile() || !after.isRegularFile() || before.size()!=after.size()
                       || !before.lastModifiedTime().equals(after.lastModifiedTime())

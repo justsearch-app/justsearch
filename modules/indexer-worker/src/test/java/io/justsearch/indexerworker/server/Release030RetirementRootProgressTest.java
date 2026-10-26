@@ -24,7 +24,7 @@ final class Release030RetirementRootProgressTest {
   Path betaOnly=Files.writeString(beta.resolve("unqueued-root-only.txt"),"unqueuedbetaviolet");
   Path acknowledged=Files.writeString(beta.resolve("acknowledged.txt"),"acknowledgedbetaviolet");
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);var attempts=new AtomicInteger();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=Release030RetirementOrderingTest.bootWithBarrier(root,ex,t->{if(t.point().equals("release030-before-replay"))attempts.incrementAndGet();})) {
     var q=Release030RetirementWalkOrderTest.queue(server);
     assertEquals(0,count(root,"path='"+key(betaOnly)+"'"),"new beta source starts genuinely unqueued");

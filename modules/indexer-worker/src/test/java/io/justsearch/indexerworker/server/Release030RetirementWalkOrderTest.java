@@ -38,7 +38,7 @@ final class Release030RetirementWalkOrderTest {
   var faultObserved=new CountDownLatch(1);
   var target=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();var injected=new AtomicBoolean();
   var walked=new AtomicInteger();var ref=new AtomicReference<KnowledgeServer>();
-  try (var models=new ReleasedModelIdentities(root)) {
+  try (var _=new ReleasedModelIdentities(root)) {
    try (var executors=new TestEngineExecutors();var server=bootBarrier(root,executors,t->{
     if(t.point().equals("release030-before-replay")) {
      int attempt=attempts.incrementAndGet();
@@ -107,13 +107,13 @@ final class Release030RetirementWalkOrderTest {
         &&original.building_generation().equals(op.generation())
         &&op.key().equals("sync_root:"+io.justsearch.indexerworker.util.PathNormalizer.normalizePathPrefix(key(alpha)))
         &&Path.of(SwitchBufferSyncRoot.decode(op.payload()).rootPath()).equals(alpha))
-        .max(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElseThrow());
+        .max(Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElseThrow());
     admittedRow.set(queue(server).watcherReconciliationRow(key(later)));
     assertEquals("PENDING",admittedRow.get().get("state"));
     assertNotNull(admittedRow.get().get("unit_revision"));
     var exactReceipt=queue(server).retirementReplayOps().stream().filter(op -> op.op().equals("UPSERT")
         && SwitchBufferUpsert.decode(op.payload()).path().equals(key(later)))
-        .max(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder));
+        .max(Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder));
     if (owner.equals("root")) {
      assertTrue(exactReceipt.isEmpty(),"ordinary public ROOT has no per-file receipt");
      var origin=SwitchBufferCapableQueue.RootOrigin.fromUnit(admittedRow.get().get("unit_revision"));
@@ -180,7 +180,7 @@ final class Release030RetirementWalkOrderTest {
   Path root=Release030Fixture.unpack("small",temporary);Path alpha=root.resolve("roots/alpha");
   Path file=Files.writeString(alpha.resolve("independent-ordinary-sync.txt"),"independentordinarysyncviolet");
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
-  try(var models=new ReleasedModelIdentities(root)){
+  try(var _=new ReleasedModelIdentities(root)){
    try(var ex=new TestEngineExecutors();var s=boot(root,ex)){
     activate(s);await(()->queue(s).jobStateCountsStrict().pendingReadyCount()==0&&queue(s).jobStateCountsStrict().processingCount()==0,"initial recovery completes");
     var producer=(DefaultWorkerAppServices)s.appServices();assertTrue(producer.pauseProducerForCutover(10000));
@@ -209,7 +209,7 @@ final class Release030RetirementWalkOrderTest {
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
   var arrived=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
   var exactOwners=new ArrayList<SwitchBufferUpsert>();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=namedBoot(root,ex,t->{
     if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)) {
      arrived.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));
@@ -240,7 +240,7 @@ final class Release030RetirementWalkOrderTest {
        var rawPath=key(alpha.resolve("pending.txt"));
        var refreshed=queue(server).retirementReplayOps().stream().filter(op->op.op().equals("UPSERT")
            &&op.generation().equals(original.building_generation())&&op.key().equals("path:"+rawPath))
-           .max(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElseThrow(
+           .max(Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElseThrow(
                ()->new AssertionError("public LIVE ROOT must refresh the already retained raw path"));
        var refreshedFile=SwitchBufferUpsert.decode(refreshed.payload());
        assertNotNull(refreshedFile.unitRevision(),"raw refresh has its actual new exact unit");
@@ -353,7 +353,7 @@ final class Release030RetirementWalkOrderTest {
   var arrived=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
   var injected=new AtomicBoolean();var observed=new CountDownLatch(1);
   var target=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();var ref=new AtomicReference<KnowledgeServer>();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=bootBarrier(root,ex,t->{
     if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)) {
      arrived.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));
@@ -433,7 +433,7 @@ final class Release030RetirementWalkOrderTest {
   var arrived=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
   var injected=new AtomicBoolean();var observed=new CountDownLatch(1);
   var target=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();var ref=new AtomicReference<KnowledgeServer>();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=bootBarrier(root,ex,t->{
     if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)) {
      arrived.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));

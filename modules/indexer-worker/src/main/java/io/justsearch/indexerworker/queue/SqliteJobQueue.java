@@ -728,7 +728,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // Run integrity check on existing databases (throws SQLException on corruption)
       performIntegrityCheck();
-      openedQueueSession = java.util.UUID.randomUUID().toString();
+      openedQueueSession = UUID.randomUUID().toString();
       rootClaimsPrepared = false;
       retirementClaimsBinding = null;
       if (releaseRecovery != null) {
@@ -1325,10 +1325,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     finally{unlockAfterChanges();}
   }
 
-  public java.util.Set<String> retirementRootCollections(SwitchBufferOp op) {
+  public Set<String> retirementRootCollections(SwitchBufferOp op) {
     lockTimed();try {
       String declared=retirementRootCollection(op);
-      return declared == null ? java.util.Set.of() : java.util.Set.of(declared);
+      return declared == null ? Set.of() : Set.of(declared);
     }
     finally{unlockAfterChanges();}
   }
@@ -1337,7 +1337,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     var roots = new ArrayList<String>();
     for (var root : releaseRecovery.rootReceipts())
       roots.add(PathNormalizer.normalizePathPrefix(SwitchBufferSyncRoot.decode(root.payload()).rootPath()));
-    var exact = new java.util.HashSet<String>();
+    var exact = new HashSet<String>();
     for (Path path : releaseRecovery.retirementPaths().keySet()) exact.add(PathNormalizer.normalizeKey(path));
     for (Path path : release030ExactFiles) exact.add(PathNormalizer.normalizeKey(path));
     for (Path path : release030IndependentDebt) exact.add(PathNormalizer.normalizeKey(path));
@@ -1349,7 +1349,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         || roots.stream().anyMatch(prefix -> path.equals(prefix.substring(0,prefix.length()-1)) || path.startsWith(prefix));
   }
   private record RetirementDelete(long order, String path,
-      io.justsearch.adapters.lucene.runtime.PathPrefixScope prefix, String collection) {
+      PathPrefixScope prefix, String collection) {
     boolean matches(String candidate, String owner) {
       return path != null ? path.equals(candidate) : prefix != null ? prefix.contains(candidate)
           : Objects.equals(collection, owner == null || owner.isBlank() ? "default" : owner);
@@ -1370,7 +1370,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             result.add(new RetirementDelete(receipt.acceptedOrder(), deletion.path(), null, null));
         }
         case "DELETE_PREFIX" -> result.add(new RetirementDelete(receipt.acceptedOrder(), null,
-            io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(receipt.payload()), null));
+            PathPrefixScope.decode(receipt.payload()), null));
         case "DELETE_COLLECTION" -> result.add(new RetirementDelete(receipt.acceptedOrder(), null, null, receipt.payload()));
         default -> throw new IOException("Invalid retained delete receipt");
       }
@@ -1381,7 +1381,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private long latestDelete(List<RetirementDelete> deletes, String path, String collection) {
     return deletes.stream().filter(d -> d.matches(path,collection)).mapToLong(RetirementDelete::order).max().orElse(0);
   }
-  private record RetirementRoot(io.justsearch.adapters.lucene.runtime.PathPrefixScope scope,
+  private record RetirementRoot(PathPrefixScope scope,
       JobQueue.EnqueueProvenance provenance, String collection, String policy) {}
   private record RetirementOrders(Map<String,Long> roots, Map<String,Long> files, Map<String,Long> fileWinners,
       Map<String,List<SwitchBufferUpsert>> filesByPath, Map<String,RetirementRoot> rootIntents,
@@ -1389,7 +1389,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       Map<String,List<Release030RecoveryState.Correction>> predecessors, Map<String,SwitchBufferOp> receipts) {}
 
   private PathPrefixScope retirementScope(SwitchBufferOp receipt,List<SwitchBufferOp> roots) throws IOException {
-    var declarations = new java.util.HashSet<>(
+    var declarations = new HashSet<>(
         io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(dbPath.getParent()));
     for (var root : roots) if (root.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX))
       declarations.add(Path.of(SwitchBufferSyncRoot.decode(root.payload()).rootPath()).toAbsolutePath().normalize());
@@ -1598,7 +1598,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private boolean preservedCorrectionOwner(Release030RecoveryState.Correction correction,
       RetirementOrders orders,List<RetirementDelete> deletes) throws IOException,SQLException {
-    var seen=new java.util.HashSet<String>();var current=correction;
+    var seen=new HashSet<String>();var current=correction;
     while(current.predecessor()!=null) {
       var predecessor=current.predecessor();
       var earlier=orders.corrections().get(predecessor.get("unit_revision"));
@@ -2628,9 +2628,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           var refreshable = refreshableRetirementFiles(journal, root.generation(), live);
           for(var entry:entries) {
             if(cancelled.getAsBoolean()||Thread.currentThread().isInterrupted())throw new IllegalStateException("ROOT admission cancelled");
-            String path=normalizePath(entry.path());String unit=null,oldCollection=null,state=null,hash=null;
+            String path=normalizePath(entry.path());String unit=null,oldCollection=null,state=null;
             try(var q=connection.prepareStatement("SELECT unit_revision,collection,state,content_hash FROM jobs WHERE path=?")) {
-              q.setString(1,path);try(var r=q.executeQuery()){if(r.next()){unit=r.getString(1);oldCollection=r.getString(2);state=r.getString(3);hash=r.getString(4);}}
+              q.setString(1,path);try(var r=q.executeQuery()){if(r.next()){unit=r.getString(1);oldCollection=r.getString(2);state=r.getString(3);r.getString(4);}}
             }
             if(maintenance && preservesMaintenanceRetryWait(entry.path(),System.currentTimeMillis())){covered++;continue;}
             var current = watcherRowLocked(path);
@@ -2692,8 +2692,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private Set<String> refreshableRetirementFiles(List<SwitchBufferOp> journal,
       String generation, boolean live) {
-    var seen = new java.util.HashSet<String>();
-    var result = new java.util.HashSet<String>();
+    var seen = new HashSet<String>();
+    var result = new HashSet<String>();
     for (var op : journal.reversed()) {
       if (!"UPSERT".equals(op.op()) || op.generation() != null && !op.generation().isBlank()
           && !generation.equals(op.generation())) continue;

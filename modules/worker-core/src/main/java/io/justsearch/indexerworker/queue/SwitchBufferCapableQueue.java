@@ -122,7 +122,7 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   }
 
   /** Targeted recovery only; source and complete rows are observed before Q's batch reservation. */
-  default java.util.List<Integer> correctRetirementSources(java.util.List<RetirementSourceObservation> observations,
+  default List<Integer> correctRetirementSources(List<RetirementSourceObservation> observations,
       java.util.function.BooleanSupplier cancelled) {
     throw new UnsupportedOperationException("Conditional retirement source correction unavailable");
   }

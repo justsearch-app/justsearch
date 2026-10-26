@@ -24,7 +24,7 @@ final class Release030RetirementInheritedPolicyTest {
     Path alpha=root.resolve("roots/alpha"),old=alpha.resolve("file-01.txt"),fresh=alpha.resolve("inherited-new.txt");
     var previous=ConfigStore.globalOrNull();var installed=configure(root);
     var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
-    try(var models=new ReleasedModelIdentities(root)) {
+    try(var _=new ReleasedModelIdentities(root)) {
       try(var ex=new TestEngineExecutors();var server=Release030RetirementRootImageTest.boot(root,ex,false,t->{
         if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)) {
           entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));

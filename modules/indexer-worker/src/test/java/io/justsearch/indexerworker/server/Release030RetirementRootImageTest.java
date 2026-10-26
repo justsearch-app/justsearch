@@ -33,7 +33,7 @@ final class Release030RetirementRootImageTest {
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);Set<PosixFilePermission> permissions=null;
   var initial=new AtomicBoolean();var initialEntered=new CountDownLatch(1);var initialRelease=new CountDownLatch(1);
   var pause=new AtomicBoolean();var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var attempts=new AtomicInteger();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=boot(root,ex,named,t->{
     if(t.point().equals("release030-before-replay")) {
      attempts.incrementAndGet();
@@ -98,7 +98,7 @@ final class Release030RetirementRootImageTest {
   Release030Fixture.unpack("switching",root);var original=state(root);Path alpha=root.resolve("roots/alpha"),held=Files.move(alpha,root.resolve("held-alpha")),beta=root.resolve("roots/beta");
   Path file=Files.writeString(beta.resolve("same-stamp.txt"),"firstcontentviolet"),sibling=Files.writeString(beta.resolve("stable-sibling.txt"),"stablesiblingviolet");
   var stamp=Files.getLastModifiedTime(file);ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=boot(root,ex,false,t->{if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}})) {
     activate(server);assertTrue(entered.await(30,TimeUnit.SECONDS));var service=server.appServices().ingestService();
     Release030RetirementTransitiveOrderTest.sync(service,beta);

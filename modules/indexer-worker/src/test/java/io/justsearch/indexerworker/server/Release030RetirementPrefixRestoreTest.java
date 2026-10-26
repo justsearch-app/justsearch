@@ -26,7 +26,7 @@ final class Release030RetirementPrefixRestoreTest {
   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var first=new AtomicBoolean();
   var raw=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();var converted=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();long[] count={0};
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=Release030RetirementTransitiveOrderTest.bootRoots(root,ex,false,t->{
     if(t.point().equals("release030-before-replay")&&first.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}
    })) {

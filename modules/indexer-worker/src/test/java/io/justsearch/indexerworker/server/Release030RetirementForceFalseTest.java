@@ -31,7 +31,7 @@ final class Release030RetirementForceFalseTest {
   Path file=Files.writeString(beta.resolve("older-d.txt"),"oldernamespaceviolet"),missing=beta.resolve("new-c.txt");
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
   Map<String,String> before;
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
    try(var ex=new TestEngineExecutors();var server=boot(root,ex,"older-d",t->{if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}})) {
     activate(server);assertTrue(entered.await(30,TimeUnit.SECONDS));

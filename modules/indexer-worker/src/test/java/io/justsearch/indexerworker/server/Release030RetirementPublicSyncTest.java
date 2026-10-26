@@ -24,7 +24,7 @@ class Release030RetirementPublicSyncTest {
   Files.writeString(alpha.resolve("sibling.txt"),"ordersiblingviolet");
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
   var arrived=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=Release030RetirementWalkOrderTest.namedBoot(root,ex,t->{
     if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)) {arrived.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}
    })) {

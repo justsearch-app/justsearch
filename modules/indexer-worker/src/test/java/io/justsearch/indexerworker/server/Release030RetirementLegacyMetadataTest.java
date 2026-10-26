@@ -29,7 +29,7 @@ final class Release030RetirementLegacyMetadataTest {
     Path neighbor = Files.writeString(root.resolve("neighbor-never-admitted.txt"), "unrequestedlegacyneighbor");
     saveOriginal(root, "named-original");
     var previous = ConfigStore.globalOrNull(); var installed = configure(root);
-    try (var models = new ReleasedModelIdentities(root)) {
+    try (var _ = new ReleasedModelIdentities(root)) {
       try (var ex = new TestEngineExecutors(); var server = boot(root, ex)) {
         var op = raw(queue(server).listSwitchBufferOpsStrict(), file);
         var frozen = queue(server).release030RecoveryState().legacyExpectation(op);
@@ -64,7 +64,7 @@ final class Release030RetirementLegacyMetadataTest {
     rawReceipt(root, file); saveOriginal(root, "missing-original");
     var previous = ConfigStore.globalOrNull(); var installed = configure(root);
     SwitchBufferCapableQueue.SwitchBufferOp first = null;
-    try (var models = new ReleasedModelIdentities(root)) {
+    try (var _ = new ReleasedModelIdentities(root)) {
       for (int restart = 0; restart < 2; restart++) {
         var attempts = new AtomicInteger();
         try (var ex = new TestEngineExecutors(); var server = changedRoots(root, ex, "new-config-" + restart, attempts)) {

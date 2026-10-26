@@ -66,7 +66,7 @@ final class Release030RetirementWalkCrashTest {
     }
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
-    try (var models = new ReleasedModelIdentities(root)) {
+    try (var _ = new ReleasedModelIdentities(root)) {
       for (int restart = 0; restart < 2; restart++) {
         try (var ex = new TestEngineExecutors(); var server = boot(root, ex)) {
           activate(server);
@@ -104,7 +104,7 @@ final class Release030RetirementWalkCrashTest {
     var once = new AtomicBoolean();
     var injected = new AtomicBoolean();
     var serverRef = new AtomicReference<KnowledgeServer>();
-    try (var models = new ReleasedModelIdentities(root); var ex = new TestEngineExecutors();
+    try (var _ = new ReleasedModelIdentities(root); var ex = new TestEngineExecutors();
         var server = Release030RetirementOrderingTest.bootWithBarrier(root, ex, transition -> {
           if (transition.point().equals("release030-before-replay") && once.compareAndSet(false, true)) {
             arrived.countDown(); assertTrue(release.await(30, TimeUnit.SECONDS));

@@ -24,7 +24,7 @@ final class Release030RetirementSyncPolicyTest {
   List<Path> files=new ArrayList<>();for(String name:List.of("ordinary-io","ordinary-parser","exact-io","exact-parser"))files.add(Files.writeString(alpha.resolve(name+".txt"),name+" policyviolet"));
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=Release030RetirementWalkOrderTest.namedBoot(root,ex,t->{
     if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}
    })) {

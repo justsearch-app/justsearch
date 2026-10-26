@@ -26,7 +26,7 @@ final class Release030RetirementTransitiveOrderTest {
   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var first=new AtomicBoolean();var attempts=new AtomicInteger();
   var targetOp=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();var deletion=new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();
   var firstVisibility=new AtomicBoolean();var tokenBeforeDelete=new AtomicBoolean();var serverRef=new AtomicReference<KnowledgeServer>();
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=bootRoots(root,ex,true,t->{
     try {
     if(t.point().equals("release030-before-replay")) {attempts.incrementAndGet();if(first.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}}

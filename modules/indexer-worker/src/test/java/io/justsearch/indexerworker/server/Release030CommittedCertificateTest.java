@@ -22,7 +22,7 @@ final class Release030CommittedCertificateTest {
   Path active=Release030CompatibilityTest.generation(root);
   ConfigStore previous=ConfigStore.globalOrNull();
   var installed=configure(root);
-  try (var models=new ReleasedModelIdentities(root)) {
+  try (var _=new ReleasedModelIdentities(root)) {
    var metadata=new HashMap<>(Release030CompatibilityTest.readMetadata(active));
    var json=new tools.jackson.databind.ObjectMapper();
    var inputs=(tools.jackson.databind.node.ObjectNode)json.readTree(metadata.get("index_fingerprint_inputs"));
@@ -52,7 +52,7 @@ final class Release030CommittedCertificateTest {
   Path root=Release030Fixture.unpack(fixture,temporary);var original=state(root);
   Path active=Release030CompatibilityTest.generation(root);
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    var expected=Release030CompatibilityTest.expected(Release030CompatibilityTest.readMetadata(active));
    var metadata=new HashMap<String,Object>(expected);
    if(form.equals("digest-only")) metadata.remove("index_fingerprint_inputs");
@@ -76,7 +76,7 @@ final class Release030CommittedCertificateTest {
   Path root=Release030Fixture.unpack(fixture,temporary);var original=state(root);
   Path active=Release030CompatibilityTest.generation(root);
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
-  try(var models=new ReleasedModelIdentities(root)) {
+  try(var _=new ReleasedModelIdentities(root)) {
    var metadata=new HashMap<String,Object>(Release030CompatibilityTest.readMetadata(active));
    var json=new tools.jackson.databind.ObjectMapper();
    var inputs=(tools.jackson.databind.node.ObjectNode)json.readTree((String)metadata.get("index_fingerprint_inputs"));

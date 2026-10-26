@@ -667,11 +667,6 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static SwitchBufferUpsert releaseRootScope(SwitchBufferCapableQueue queue,
-      SwitchBufferCapableQueue.SwitchBufferOp owner,String path) throws IOException {
-    return releaseRootScope(queue,owner,path,queue.retirementRootFiles());
-  }
-
-  private static SwitchBufferUpsert releaseRootScope(SwitchBufferCapableQueue queue,
       SwitchBufferCapableQueue.SwitchBufferOp owner, String path,
       java.util.function.Function<String,SwitchBufferCapableQueue.RetirementRootFile> rootFiles) throws IOException {
     String collection = queue.retirementRootCollection(owner);
@@ -2098,7 +2093,7 @@ public final class KnowledgeServerMigrationOps {
           if(ordered.acceptedOrder()>=member.root().acceptedOrder()
               ||deleteOrders.applyAsLong(member.path(),member.collection())>member.root().acceptedOrder())continue;
           boolean matches=switch(deletion.op()) {
-            case "DELETE" -> io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(deletion.payload()).path().equals(member.path());
+            case "DELETE" -> SwitchBufferDelete.decode(deletion.payload()).path().equals(member.path());
             case "DELETE_PREFIX" -> PathPrefixScope.decode(deletion.payload()).contains(member.path());
             case "DELETE_COLLECTION" -> releaseCollection(member.collection()).equals(releaseCollection(deletion.payload()));
             default -> false;
@@ -2419,7 +2414,7 @@ public final class KnowledgeServerMigrationOps {
             continue;
           }
         }
-        var laterSync = latestConfirmedReleaseSync(context, deleteOrder, upsert.path(),
+        var laterSync = latestConfirmedReleaseSync(deleteOrder, upsert.path(),
             deleteOrder.positions().get(op));
         if (laterSync != null && upsert.unitRevision() == null) {
           Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot
@@ -3102,7 +3097,7 @@ public final class KnowledgeServerMigrationOps {
 
   /** Only a completed exact walk receipt can supersede an earlier overlapping effect. */
   private static SwitchBufferCapableQueue.SwitchBufferOp latestConfirmedReleaseSync(
-      DrainSwitchBufferContext context, ReplayDeleteOrder order, String file, int afterIndex) {
+      ReplayDeleteOrder order, String file, int afterIndex) {
     if (order.releaseRecovery() == null || file == null) return null;
     SwitchBufferCapableQueue.SwitchBufferOp latest = null;
     int position = afterIndex;
@@ -3224,7 +3219,7 @@ public final class KnowledgeServerMigrationOps {
         default -> { }
       }
     }
-    return lastDelete >= 0 && latestConfirmedReleaseSync(context, deleteOrder, path, lastDelete) == null;
+    return lastDelete >= 0 && latestConfirmedReleaseSync(deleteOrder, path, lastDelete) == null;
   }
 
   private static boolean isVduBufferKind(String kind) {
