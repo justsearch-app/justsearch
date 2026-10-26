@@ -7,7 +7,7 @@ author-session: 01a174a9-dd7d-77e2-be5b-a6fa8bc27300
 
 # Canonical Unicode chunk stage
 
-These are agent technical choices under the quoted owner delegation, not owner-adopted scenario labels or owner words taken from the orchestrator brief. This stage does not complete the separate legacy safeguards. No author acceptance is supplied.
+These are agent technical choices under the quoted owner delegation, not owner-adopted scenario labels or owner words taken from the orchestrator brief. This stage does not complete the separate legacy safeguards. The original author-added v2-only fingerprint/boot expectations are now explicitly Obsolete under the final bounded v1 contract; their execution files remain immutable history. Other unchanged canonical writer/read/RMW evidence is retained without regeneration. No author acceptance is supplied.
 
 The evidence generator ran in an isolated shared clone containing byte-identical candidate production/tests. Its temporary launcher substitutes shared clones for before-worktrees (the builder contract prohibits source-repository worktree mutations), removes only those temporary clones, and routes every Gradle invocation through js-gradle-slot. The generator itself writes the evidence, including its actual script digest; no evidence JSON is hand-edited. The launcher patch and initial failed attempt logs are retained in the assignment's scratch directory for review. Preservation checks also passed in the unchanged f8e16e326bf30acc885eebcca0064c0e0d91aaff shared clone; repaired checks require assertion failures there.
 
@@ -153,45 +153,45 @@ The evidence generator ran in an isolated shared clone containing byte-identical
       "items": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java"
       ],
-      "class": "New",
-      "behaviour": "With explicitly unconfigured model roles, canonical fingerprint inputs contain algorithm v2 and their exact SHA-256 is the recorded digest, distinct from the same inputs with v1. This is the algorithm-version default upgrade; no token-size/threshold/estimator default changes.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; don't ask me for verdicts on technical work.",
           "delegationLocation": "task t-20261025-665d69 request",
-          "delegationScope": "Technical choices within the remaining Unicode repair, with this builder bounded to canonical chunk splitting, replacement validation and versioned recovery. Legacy read/RMW/selection/rename safeguards remain a separate unfinished stage.",
-          "choice": "Produce canonical chunks without cutting an existing high/low surrogate pair, validate every supplied plan before parent publication or child deletion, and bump the existing physical-shape algorithm input from v1 to v2 without changing ASCII/BMP behavior, token budgets or legacy safeguards.",
+          "delegationScope": "Technical choices in the Unicode repair. The resumed bounded assignment explicitly amends only this repair: preserve complete valid v1 emitted plans, finish raw planning before outward alignment, retain algorithm v1, preserve authentic release/recovery compatibility and use explicit rebuild for retained invalid rows. All detailed cases and this compatibility amendment are orchestrator choices under the delegation, not owner words or owner adoption.",
+          "choice": "Restore exact a5ff raw planning for both APIs, then align only emitted source spans and suppress only expansion-induced containment. Keep every pair-safe complete old record unchanged and preserve mutable/nonblank versus immutable null/blank returns. Retain the v1 fingerprint because valid emitted plans do not change; remove the superseded v2-only boot/fingerprint expectation and synthetic version-restamping helper. Retained invalid v1 rows still require source replacement or explicit Rebuild Index; no automatic global/unchanged-file repair or parity exception.",
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/665d69-canonical-unicode-repair.json",
-      "newChecks": [
+      "conflictSearch": "decision records searched for a conflict: none. The final bounded v1 compatibility contract explicitly supersedes this author\u2019s v2-only technical choice; future version bumps for any changed valid complete plan remain required. No owner change of intent or historical release-oracle relaxation is claimed.",
+      "historicalEvidence": "gates/test-intent/evidence/665d69-canonical-unicode-repair.json",
+      "historicalChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java#canonicalInputsAndDigestCarryTheV2ChunkAlgorithm"
-      ]
+      ],
+      "supersededBy": "gates/test-intent/.changesets/665d69-emitted-plan-v1.md"
     },
     {
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java"
       ],
-      "class": "New",
-      "behaviour": "A real model-free boot of a comparable recorded v1 shape takes existing BLUE_GREEN_MIGRATE, FAIL_CLOSED and REBUILD_BACKUP_FIRST paths under v2, preserving Blue or its backup. Existing matching/empty, policy, backup/refusal and brake cases are retained. Unknown or disabled shape evidence is not claimed universally migratable; Green promotion is unchanged.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "Work autonomously; don't ask me for verdicts on technical work.",
           "delegationLocation": "task t-20261025-665d69 request",
-          "delegationScope": "Technical choices within the remaining Unicode repair, with this builder bounded to canonical chunk splitting, replacement validation and versioned recovery. Legacy read/RMW/selection/rename safeguards remain a separate unfinished stage.",
-          "choice": "Produce canonical chunks without cutting an existing high/low surrogate pair, validate every supplied plan before parent publication or child deletion, and bump the existing physical-shape algorithm input from v1 to v2 without changing ASCII/BMP behavior, token budgets or legacy safeguards.",
+          "delegationScope": "Technical choices in the Unicode repair. The resumed bounded assignment explicitly amends only this repair: preserve complete valid v1 emitted plans, finish raw planning before outward alignment, retain algorithm v1, preserve authentic release/recovery compatibility and use explicit rebuild for retained invalid rows. All detailed cases and this compatibility amendment are orchestrator choices under the delegation, not owner words or owner adoption.",
+          "choice": "Restore exact a5ff raw planning for both APIs, then align only emitted source spans and suppress only expansion-induced containment. Keep every pair-safe complete old record unchanged and preserve mutable/nonblank versus immutable null/blank returns. Retain the v1 fingerprint because valid emitted plans do not change; remove the superseded v2-only boot/fingerprint expectation and synthetic version-restamping helper. Retained invalid v1 rows still require source replacement or explicit Rebuild Index; no automatic global/unchanged-file repair or parity exception.",
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/665d69-canonical-unicode-repair.json",
-      "newChecks": [
+      "conflictSearch": "decision records searched for a conflict: none. The final bounded v1 compatibility contract explicitly supersedes this author\u2019s v2-only technical choice; future version bumps for any changed valid complete plan remain required. No owner change of intent or historical release-oracle relaxation is claimed.",
+      "historicalEvidence": "gates/test-intent/evidence/665d69-canonical-unicode-repair.json",
+      "historicalChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java#chunkAlgorithmUpgradeUsesExistingBootRecoveryPolicies"
-      ]
+      ],
+      "supersededBy": "gates/test-intent/.changesets/665d69-emitted-plan-v1.md"
     },
     {
       "items": [

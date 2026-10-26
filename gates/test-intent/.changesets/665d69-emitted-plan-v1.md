@@ -11,7 +11,7 @@ The owner quote above is only the autonomy grant. All detailed expectations and 
 
 The gzip resource was captured from unchanged a5ff12b4001ea33c5b5846888d6c8fbf07f8c926. Its UTF stream records source/settings, real plain output with source-coordinate instrumentation checked against the untouched old API, and every metadata field. The concise capture launcher/private old-class instrumentation and raw a5ff/02ad/new runs are retained in this builder’s scratch directory. There is no copied production planner or new dependency in the candidate. Evidence runs use the documented temporary shared-clone/slot launcher adaptation; source repository launcher and prior evidence are unchanged.
 
-Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild execution to a fresh independent verifier. The missing boot evidence is explicit, not a pass. D1 execution generation was stopped while queued near the Stage-1 return deadline; repair/preservation JSON files are also explicitly pending. The temporary launcher inherits HOME/DATA/JDK environment unchanged. Raw direct old/before/fix geometry and mutability probes and scoped Gradle results are retained. No author acceptance is supplied.
+Stage 1 raw/corpus/quality results remain unchanged. This metadata-only author pass produces real standard-runner receipts against bad38888a592631fd6ed7d20b9b901bec9bc8bea, 02ad regression baseline and aef origin/main. The private runner inherits HOME/DATA/JDK environment unchanged, prefixes Gradle with js-gradle-slot, creates only owned shared before clones and detaches external links before removing those clones; its exact departure patch/digest is retained. Preservation receipts record actual before/current passes; the producer’s repair-only --before exit condition may return 1 for those expected before passes, without changing their recorded outcome. The completed receipts contain three repaired cases against 02ad, one primary pair-cut case against aef, and six preservation cases (including the three authentic policies) passing on both aef and current. All product/test/resource/doc files remain byte-identical to bad38888a592631fd6ed7d20b9b901bec9bc8bea. Full release/worker/manual-rebuild suites are not repeated. No author acceptance is supplied.
 
 ```json
 {
@@ -34,7 +34,7 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-repair.json",
+      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-02ad-repair.json",
       "newChecks": [
         "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#discardedCsvWindowCannotChangeAnAlreadySafeEmittedPlan",
         "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#expansionCollisionsKeepWholePairsWithoutMergingPartialOverlap",
@@ -58,7 +58,7 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
         }
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-preservation.json",
+      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-main-preservation.json",
       "newChecks": [
         "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#originalMalformedAndReturnMutabilityContractsRemain"
       ]
@@ -68,7 +68,7 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java"
       ],
       "class": "New",
-      "behaviour": "P5 amended agent choice: replace this builder\u2019s added v2-specific expectation with v1 compatibility preservation. Effective canonical inputs retain v1 and their exact SHA-256 digest; changing the version still changes the digest. Existing fingerprint sensitivity/default checks are unchanged. The earlier v2 evidence is retained as immutable history, not a current compatibility oracle.",
+      "behaviour": "P5 preservation against unchanged origin/main aef: canonical inputs retain v1 and their exact SHA-256 digest; changing the version still changes the digest. This is not a repaired mainline failure: aef/a5ff already use v1. Only this builder\u2019s superseded v2-specific expectation is replaced; all other fingerprint checks remain unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -79,8 +79,8 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-repair.json",
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-main-preservation.json",
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java#canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm"
       ]
@@ -90,7 +90,7 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java"
       ],
       "class": "New",
-      "behaviour": "P5 durable but Stage-1 execution UNVERIFIED: replace only this builder\u2019s added synthetic v1->v2 recovery case with three mismatch-policy controls over the authentic Release030 archive. Reuse the unchanged strict ReleasedModelIdentities guard, require IDLE/same active generation/no Green and searchable old content. No archive, non-field equality guard, historic metadata or existing 65 release/recovery checks are edited. This case is compiled/PMD-checked only in Stage 1; fresh parent verification owns actual boot execution and evidence.",
+      "behaviour": "P5 preservation against unchanged origin/main aef: three mismatch-policy controls boot the authentic Release030 archive with unchanged strict ReleasedModelIdentities, requiring IDLE/same active generation/no Green and searchable old content. Both before and current executions are required. No archive, released-model equality guard or historical release/recovery case changes. This replaces only this builder\u2019s superseded synthetic v2 expectation; it does not claim mainline repair by a weaker oracle.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -101,8 +101,8 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-authentic-boot-pending.json",
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/665d69-emitted-plan-main-preservation.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java#compatibleV1ReleaseDoesNotStartChunkRepairMigration"
       ]
@@ -115,7 +115,7 @@ Stage 1 intentionally leaves actual authentic boot/release/legacy/manual-rebuild
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Retire only the earlier added seedChunkAlgorithm helper/private overload/version override, now unused after replacement of the v2-only boot expectation. Original seed implementation and every pre-existing caller\u2019s metadata/doc inputs are unchanged; no synthetic compatible fixture derivative or historic metadata restamp is introduced.",
+      "whatMoved": "Retire only the earlier added seedChunkAlgorithm helper/private overload/version override, now unused after replacement of the v2-only boot expectation. Original seed implementation and every pre-existing caller\u2019s metadata/doc inputs are unchanged; no synthetic compatible fixture derivative or historic metadata restamp is introduced. Against final origin/main aef this helper is byte-identical and unflagged; this entry records intermediate retirement, not a final helper change.",
       "sources": [
         {
           "kind": "delegated-choice",
