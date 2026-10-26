@@ -582,11 +582,42 @@ final class EngineForgetInProcessTest {
         try {
           client = (EngineKnowledgeClient) root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
           server = (KnowledgeServer) field(root, EngineRoot.class, "server");
-          runtime = (RunningRuntime) field(server, KnowledgeServer.class, "ingestLifecycle");
-          queue = (SqliteJobQueue) field(server, KnowledgeServer.class, "jobQueue");
-          identities = (io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore)
-              field(server, KnowledgeServer.class, "documentIdentityStore");
-          loop = (IndexingLoop) field(server.appServices(), DefaultWorkerAppServices.class, "indexingLoop");
+          if ("in_process".equals(fixtureConfig.get("justsearch.extraction.sandbox.mode"))) {
+            RunningRuntime selectedRuntime = null;
+            IndexingLoop selectedLoop = null;
+            long startupDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(deadlineMs);
+            do {
+              // Release every observed view before waiting so the real deferred upgrade can publish.
+              try (var view = server.captureServingView()) {
+                if (view.ingestRuntime() instanceof RunningRuntime candidate
+                    && candidate.isAcceptingWrites()
+                    && candidate.openedIndexPath() != null
+                    && candidate.openedIndexPath().equals(view.activeGenerationPath())
+                    && view.services() instanceof DefaultWorkerAppServices producer
+                    && producer.recordedWriterReady()) {
+                  selectedRuntime = candidate;
+                  selectedLoop = assertInstanceOf(IndexingLoop.class,
+                      field(producer, DefaultWorkerAppServices.class, "indexingLoop"),
+                      "SETUP: published writer services must own the actual loop");
+                }
+              }
+              if (selectedRuntime == null) Thread.sleep(20);
+            } while (selectedRuntime == null && System.nanoTime() < startupDeadline);
+            assertNotNull(selectedRuntime, "SETUP: actual published writable startup view must become ready");
+            assertNotNull(selectedLoop, "SETUP: actual published startup writer loop must become ready");
+            runtime = selectedRuntime;
+            queue = (SqliteJobQueue) field(server, KnowledgeServer.class, "jobQueue");
+            identities = (io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore)
+                field(server, KnowledgeServer.class, "documentIdentityStore");
+            loop = selectedLoop;
+            System.out.println("R2 actual startup writer/loop ready at=" + runtime.openedIndexPath());
+          } else {
+            runtime = (RunningRuntime) field(server, KnowledgeServer.class, "ingestLifecycle");
+            queue = (SqliteJobQueue) field(server, KnowledgeServer.class, "jobQueue");
+            identities = (io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore)
+                field(server, KnowledgeServer.class, "documentIdentityStore");
+            loop = (IndexingLoop) field(server.appServices(), DefaultWorkerAppServices.class, "indexingLoop");
+          }
           runtime.commitOps().stopCommitTimer();
           assertTrue(root.forgetService().hasOwner(), "explicit process factory binds actual shared settings owner");
         } catch (Exception | Error failure) {
