@@ -336,14 +336,14 @@ abstract class MmrEngineFixture {
       assertEquals(article.toString(), citation.parentDocId());
       assertFalse(citation.inclusion().absent(), "head owns the inclusion verdict");
       assertEquals(citation.inclusion().includedChars(), source.literalText().length());
-      cut |= citation.inclusion().state() == DocumentService.ContextInclusion.State.PARTIAL
-          || citation.inclusion().state() == DocumentService.ContextInclusion.State.DROPPED;
+      cut |= citation.inclusion().wireName().equals("partial")
+          || citation.inclusion().wireName().equals("dropped");
       if (!source.literalText().isEmpty()) {
         retained = true;
         assertEquals(citation, source.citation());
         assertTrue(prompt.contains(source.literalText()), "verification reads the retained literal");
       } else {
-        assertEquals(DocumentService.ContextInclusion.State.DROPPED, citation.inclusion().state());
+        assertEquals("dropped", citation.inclusion().wireName());
         assertEquals(DocumentService.ContextCitation.CHUNK_INDEX_ABSENT, source.citation().chunkIndex());
       }
     }
