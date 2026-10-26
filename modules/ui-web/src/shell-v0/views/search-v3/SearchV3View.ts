@@ -648,10 +648,13 @@ export class SearchV3View extends JfElement {
          collapse the centred landing into a bottom-anchored strip. In hero the dock is a plain flow
          wrapper and hero resolves against .column exactly as before. */
       .dock {
-        /* Click-through everywhere except the two centred content columns inside it (.band in the
-           composer, .bar in the context bar), so the transcript underneath stays wheel-scrollable
-           right up to the glass edge. */
+        /* Click-through except the recovery notice and the two centred content columns inside it
+           (.band in the composer, .bar in the context bar), so the transcript underneath stays
+           wheel-scrollable right up to the glass edge. */
         pointer-events: none;
+      }
+      .dock > .notice {
+        pointer-events: auto;
       }
       :host([composer-state='docked']) .dock {
         position: absolute;
