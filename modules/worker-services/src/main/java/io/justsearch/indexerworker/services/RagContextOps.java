@@ -1577,8 +1577,17 @@ final class RagContextOps {
       int targetK, boolean allowQueryEmbeddings,
       InferenceRequest acquisition) {
 
-    if (hits.size() <= targetK) {
-      return hits;
+    if (targetK <= 0 || hits.isEmpty()) {
+      return List.of();
+    }
+
+    List<LuceneRuntimeTypes.SearchHit> usableHits = new ArrayList<>(hits.size());
+    for (var hit : hits) {
+      String content = excerptTextFor(hit);
+      if (content != null && !content.isBlank()) usableHits.add(hit);
+    }
+    if (usableHits.size() <= targetK) {
+      return usableHits;
     }
 
     if (!switch (embeddingProvider.availability().state()) {
@@ -1588,102 +1597,96 @@ final class RagContextOps {
       log.debug(
           "MMR diversification requested but embeddings are unavailable;"
               + " using position diversification");
-      return diversifyByPosition(hits, targetK);
+      return diversifyByPosition(usableHits, targetK);
     }
 
-    int maxCandidates = Math.max(targetK, resolvedConfigSupplier.get().rag().mmrMaxCandidates());
-    List<LuceneRuntimeTypes.SearchHit> candidates = hits;
-    if (hits.size() > maxCandidates) {
-      candidates = hits.subList(0, maxCandidates);
+    if (acquisition.semanticBudget() == InferenceRequest.SemanticBudget.FALLBACK
+        && acquisition.deadlinePassed()) {
+      return mmrSkippedAtSemanticDeadline(usableHits, targetK);
     }
 
+    int dimension = embeddingProvider.dimension();
     float[] qv = queryVector;
     if (qv == null || qv.length == 0) {
       try {
         qv = embeddingProvider.embedQuery(question, acquisition);
       } catch (RuntimeException e) {
-        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(hits, targetK);
+        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(usableHits, targetK);
         log.debug("MMR query embedding failed: {}", e.getMessage());
-        qv = null;
+        return diversifyByPosition(usableHits, targetK);
       }
     }
+    if (!validMmrVector(qv, dimension)) {
+      return diversifyByPosition(usableHits, targetK);
+    }
 
-    List<LuceneRuntimeTypes.SearchHit> embeddedHits = new ArrayList<>(candidates.size());
+    int maxCandidates = Math.max(targetK, resolvedConfigSupplier.get().rag().mmrMaxCandidates());
+    List<LuceneRuntimeTypes.SearchHit> candidates =
+        usableHits.subList(0, Math.min(usableHits.size(), maxCandidates));
     List<float[]> vectors = new ArrayList<>(candidates.size());
     for (var hit : candidates) {
-      String content = excerptTextFor(hit);
-      if (content == null || content.isBlank()) continue;
+      if (acquisition.semanticBudget() == InferenceRequest.SemanticBudget.FALLBACK
+          && acquisition.deadlinePassed()) {
+        return mmrSkippedAtSemanticDeadline(usableHits, targetK);
+      }
       try {
-        float[] v = embeddingProvider.embedDocument(content, acquisition);
-        if (v == null || v.length == 0) continue;
-        embeddedHits.add(hit);
+        float[] v = embeddingProvider.embedDocument(excerptTextFor(hit), acquisition);
+        if (!validMmrVector(v, qv.length)) {
+          return diversifyByPosition(usableHits, targetK);
+        }
         vectors.add(v);
       } catch (RuntimeException e) {
-        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(hits, targetK);
+        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(usableHits, targetK);
         log.debug("MMR chunk embedding failed: {}", e.getMessage());
+        return diversifyByPosition(usableHits, targetK);
       }
     }
-
-    if (embeddedHits.size() <= targetK) {
-      if (!embeddedHits.isEmpty()) {
-        return embeddedHits;
-      }
-      return diversifyByPosition(hits, targetK);
+    if (acquisition.semanticBudget() == InferenceRequest.SemanticBudget.FALLBACK
+        && acquisition.deadlinePassed()) {
+      return mmrSkippedAtSemanticDeadline(usableHits, targetK);
     }
 
-    // Use cosine(query, chunk) as relevance when we have a query vector; otherwise fall back to
-    // rank.
-    List<Double> relevance = new ArrayList<>(embeddedHits.size());
-    boolean canUseQuerySim = qv != null && qv.length == vectors.get(0).length;
-    if (canUseQuerySim) {
-      for (float[] v : vectors) {
-        relevance.add(VectorUtils.cosine(qv, v));
-      }
-    } else {
-      for (int i = 0; i < embeddedHits.size(); i++) {
-        relevance.add((double) (embeddedHits.size() - i));
-      }
+    List<Double> relevance = new ArrayList<>(vectors.size());
+    for (float[] v : vectors) {
+      relevance.add(Math.max(-1.0, Math.min(1.0, VectorUtils.cosine(qv, v))));
     }
 
     double lambda = resolvedConfigSupplier.get().rag().mmrLambda();
     List<Integer> selectedIdx = MmrSelector.select(lambda, relevance, vectors, targetK);
-    if (selectedIdx.isEmpty()) {
-      return diversifyByPosition(hits, targetK);
+    if (selectedIdx.size() != targetK) {
+      return diversifyByPosition(usableHits, targetK);
     }
 
-    boolean[] chosen = new boolean[embeddedHits.size()];
+    boolean[] chosen = new boolean[candidates.size()];
     List<LuceneRuntimeTypes.SearchHit> selected = new ArrayList<>(targetK);
     for (int idx : selectedIdx) {
-      if (idx < 0 || idx >= embeddedHits.size()) continue;
+      if (idx < 0 || idx >= candidates.size() || chosen[idx]) {
+        return diversifyByPosition(usableHits, targetK);
+      }
       chosen[idx] = true;
-      selected.add(embeddedHits.get(idx));
-    }
-
-    // Fill any remaining slots from embedded candidates, then from full candidate list.
-    if (selected.size() < targetK) {
-      for (int i = 0; i < embeddedHits.size() && selected.size() < targetK; i++) {
-        if (!chosen[i]) {
-          selected.add(embeddedHits.get(i));
-        }
-      }
-    }
-    if (selected.size() < targetK) {
-      for (var hit : candidates) {
-        if (selected.size() >= targetK) break;
-        if (!selected.contains(hit)) {
-          selected.add(hit);
-        }
-      }
+      selected.add(candidates.get(idx));
     }
 
     log.debug(
-        "MMR diversification: {} candidates (embedded {}), selected {} (lambda={})",
+        "MMR diversification: {} candidates, selected {} (lambda={})",
         candidates.size(),
-        embeddedHits.size(),
         selected.size(),
         String.format("%.2f", lambda));
 
     return selected;
+  }
+
+  /** Validates model output before using it as query relevance or candidate novelty. */
+  private static boolean validMmrVector(float[] vector, int dimension) {
+    if (vector == null || vector.length == 0 || (dimension > 0 && vector.length != dimension)) {
+      return false;
+    }
+    double norm = 0.0;
+    for (float component : vector) {
+      if (!Float.isFinite(component)) return false;
+      norm += (double) component * component;
+    }
+    return norm > 0.0;
   }
 
   /**
