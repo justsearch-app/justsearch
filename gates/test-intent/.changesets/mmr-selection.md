@@ -292,4 +292,13 @@ remains separate. Independent acceptance for the final digest is recorded below.
 
 ## Acceptance records
 
-Pending independent verifier acceptance after native execution evidence is available.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1798a-47ec-77c2-8375-d971097ad20d",
+  "verdict": "accept",
+  "digest": "sha256:8c721f262cd1b4beade4bec4e1cc039ab9f9bb8fd879452b297e8b6d8f0fce19"
+}
+```
