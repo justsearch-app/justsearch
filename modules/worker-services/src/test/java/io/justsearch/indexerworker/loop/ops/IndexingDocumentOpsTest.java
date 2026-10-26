@@ -9,6 +9,17 @@ import org.junit.jupiter.api.Test;
 class IndexingDocumentOpsTest {
 
   @Test
+  void extractionQualityRetainsTheComputedDoubleWithoutFloatRounding() {
+    String content = "a".repeat(31) + "!".repeat(69);
+    double expected = io.justsearch.indexerworker.text.TextQualityAnalyzer.computeQualityScore(content);
+    assertTrue(expected > 0.0 && expected < 1.0, "fixture must have a fractional score");
+    assertNotEquals((double) (float) expected, expected, "fixture must distinguish float precision");
+    var document = io.justsearch.indexerworker.fixtures.TestDocumentBuilder.buildDocument(
+        java.nio.file.Path.of("fraction.txt"), new ContentExtractor.ExtractionResult(content, null, "text/plain"));
+    assertEquals(expected, document.fields().get(io.justsearch.indexing.SchemaFields.EXTRACTION_QUALITY_SCORE));
+  }
+
+  @Test
   void estimateTokenCount_nonBlankAndBlank() {
     // chars/3: a 2000-char doc (the chunk threshold) estimates ~666 tokens.
     assertEquals(666L, IndexingDocumentOps.estimateTokenCount("x".repeat(2000)));

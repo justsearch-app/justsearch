@@ -125,7 +125,7 @@ final class ExtractionDropoutMarkerTest {
           doc.fields().get(SchemaFields.EXTRACTION_METHOD));
       assertNull(doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE));
       assertEquals(SchemaFields.VDU_STATUS_NOT_NEEDED, doc.fields().get(SchemaFields.VDU_STATUS));
-      assertEquals(1.0f, doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE));
+      assertEquals(1.0, doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE));
       assertEquals(artifact.result().content(), doc.fields().get(SchemaFields.CONTENT));
       org.junit.jupiter.api.Assertions.assertArrayEquals(bytes, java.nio.file.Files.readAllBytes(file));
     }

@@ -321,7 +321,7 @@ public final class IndexingDocumentOps {
     // Extraction provenance (tempdoc 252 Tier 1+2).
     fields.put(SchemaFields.EXTRACTION_METHOD, extractionMethod);
     double qualityScore = TextQualityAnalyzer.computeQualityScore(extraction.content());
-    fields.put(SchemaFields.EXTRACTION_QUALITY_SCORE, (float) qualityScore);
+    fields.put(SchemaFields.EXTRACTION_QUALITY_SCORE, qualityScore);
 
     // Tempdoc 410 §11 — search-time honesty fields. Written from the validated artifact when one
     // is available (production path); skipped on the legacy/test path where sourceMetadata is null
