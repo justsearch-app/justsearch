@@ -33,7 +33,7 @@ class StatusIsolationHttpTest {
       .embeddingReady(true).build();
   }
   static final class Fixture implements AutoCloseable {
-    final StatusComponentFixture components = new StatusComponentFixture();
+    StatusComponentFixture components;
     final AtomicBoolean block = new AtomicBoolean();
     final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
     final AtomicInteger calls = new AtomicInteger();
@@ -41,33 +41,44 @@ class StatusIsolationHttpTest {
     final KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     final KnowledgeClient kc = mock(KnowledgeClient.class);
     final StatusLifecycleHandler handler;
-    final Javalin app;
+    Javalin app;
     final io.justsearch.app.engine.EngineAdmissionController admission=new io.justsearch.app.engine.EngineAdmissionController(4,16,1);
     Fixture(boolean workerBlock) {
-      when(ks.hasClient()).thenReturn(true);
-      BootstrapLeaseFixtures.bind(ks,kc);
-      when(kc.getWorkerOperationalView(any())).thenAnswer(a -> {
-        if (workerBlock) probe();
-        return workerView.get();
-      });
-      var caps = components.capabilities();
-      handler = new StatusLifecycleHandler(mock(io.justsearch.app.api.OnlineAiService.class),
-        mock(io.justsearch.agent.api.AgentService.class), () -> null, ks, null,
-        java.nio.file.Path.of("C:/agent-sandbox-tmp/b53/test-tmp"), Instant.now(),
-        () -> { if (!workerBlock) probe(); return "OK"; }, null,null,null,caps.worker(),caps.inference());
-      components.attach(handler);
-      handler.sampleAndBuildStatusSnapshot();
-      app=Javalin.create();
-      new ApiSecurityFilters(false,null,null,null,null,null,admission).install(app);
-      io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(app,handler::handleStatus,handler::handleHealth);
-      app.start("127.0.0.1",0);
-      // Warm route registration and JSON serialization before measuring diagnostic poll latency.
-      try (var warm = HttpClient.newHttpClient()) {
-        var response = warm.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port()
-            + "/api/status")).timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, response.statusCode());
-      } catch (Exception failure) { throw new AssertionError(failure); }
-
+      try {
+        components = new StatusComponentFixture();
+        when(ks.hasClient()).thenReturn(true);
+        BootstrapLeaseFixtures.bind(ks,kc);
+        when(kc.getWorkerOperationalView(any())).thenAnswer(a -> {
+          if (workerBlock) probe();
+          return workerView.get();
+        });
+        var caps = components.capabilities();
+        handler = new StatusLifecycleHandler(mock(io.justsearch.app.api.OnlineAiService.class),
+          mock(io.justsearch.agent.api.AgentService.class), () -> null, ks, null,
+          java.nio.file.Path.of("C:/agent-sandbox-tmp/b53/test-tmp"), Instant.now(),
+          () -> { if (!workerBlock) probe(); return "OK"; }, null,null,null,caps.worker(),caps.inference());
+        components.attach(handler);
+        handler.sampleAndBuildStatusSnapshot();
+        app=Javalin.create();
+        new ApiSecurityFilters(false,null,null,null,null,null,admission).install(app);
+        io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(app,handler::handleStatus,handler::handleHealth);
+        app.start("127.0.0.1",0);
+        // Warm route registration and JSON serialization before measuring diagnostic poll latency.
+        try (var warm = HttpClient.newHttpClient()) {
+          var response = warm.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port()
+              + "/api/status")).timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.ofString());
+          assertEquals(200, response.statusCode());
+        } catch (Exception failure) { throw new AssertionError(failure); }
+      } catch (RuntimeException | Error failure) {
+        release.countDown();
+        try {
+          if (app != null) app.stop();
+        } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        try {
+          if (components != null) components.close();
+        } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        throw failure;
+      }
     }
     StatusObservation<?> lane(String name) throws Exception {
       var field = StatusLifecycleHandler.class.getDeclaredField("observations");
@@ -76,6 +87,13 @@ class StatusIsolationHttpTest {
       var lane = (StatusObservation<?>) lanes.get(name);
       assertNotNull(lane, "published lane " + name);
       return lane;
+    }
+    StatusObservation.Sample<?> published(String name) throws Exception {
+      var field = StatusObservation.class.getDeclaredField("sample");
+      field.setAccessible(true);
+      var sample = (StatusObservation.Sample<?>) field.get(lane(name));
+      assertNotNull(sample, "publication from " + name);
+      return sample;
     }
     void probe() {
       calls.incrementAndGet();

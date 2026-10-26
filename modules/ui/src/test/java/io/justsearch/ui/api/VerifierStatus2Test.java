@@ -63,7 +63,9 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       assertFalse(before.failed());
       assertFalse(before.staleSource());
       assertNotNull(before.value(), "mandatory supplier must publish a typed value, not absence");
-      assertKnownPublic(name, get(f, ""), before);
+      var knownBody = get(f, "");
+      assertKnownPublic(name, knownBody, before);
+      assertPublicFreshness(name, knownBody, false);
       long period = before.periodMs();
       assertTrue(heldLane.equals("gpu") ? period == 5_000L || period == 10_000L
           : period == 2_000L || period == 10_000L, "supported producer period");
@@ -94,6 +96,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
           assertNotNull(publication.value(), healthy);
         }
         var s=get(f,"");
+        assertPublicFreshness(name, s, true);
         System.out.println("OWNER="+name+" calls="+calls.get());
         assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"worker independent of "+name);
         assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean(),"registry AI independent of "+name);
@@ -118,6 +121,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       assertNotNull(publication.value());
       var recovered=get(f,"");
       assertKnownPublic(name, recovered, publication);
+      assertPublicFreshness(name, recovered, false);
       assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
       assertFalse(recovered.path("readiness").path("components").path("ai").path("stale").asBoolean());
       if(name.equals("inferenceSnapshotSupplier")) assertFalse(recovered.path("operating").path("freshness").path("staleSources").toString().contains("chat"),"recovered inference clears only its stale state");
@@ -147,6 +151,11 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         when(nvml.available()).thenReturn(true);
         when(nvml.gpuUtilizationPercent()).thenReturn(37);
         when(caps.nvml()).thenReturn(nvml);
+        when(caps.effective()).thenReturn(new io.justsearch.gpu.GpuCapabilities.Effective(
+            true, "nvml", io.justsearch.gpu.GpuCapabilities.Confidence.HIGH,
+            "580.1", 580, 1, 1, 12L << 30, 8L << 30, 4L << 30,
+            new io.justsearch.gpu.GpuCapabilities.Cuda(true, "cuda-driver-api",
+                io.justsearch.gpu.GpuCapabilities.Confidence.HIGH)));
         when(service.snapshot(any(io.justsearch.gpu.GpuCapabilities.Cuda.class))).thenReturn(caps);
         yield service;
       }
@@ -209,6 +218,9 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       case "gpuCapabilitiesSupplier", "rrdStoreSupplier" -> {
         assertTrue(body.path("gpu").path("available").asBoolean());
         assertEquals(37, body.path("gpu").path("gpuUtilizationPercent").asInt());
+        assertEquals("nvml", body.path("gpu").path("source").asText());
+        assertEquals("HIGH", body.path("gpu").path("confidence").asText());
+        assertTrue(body.path("gpu").path("cudaFunctional").asBoolean());
         if (name.equals("rrdStoreSupplier")) {
           assertEquals(37.5, body.path("gpu").path("recentUtilizationPercent").path(0).asDouble());
           assertEquals(37.5, body.path("gpu").path("recentMemoryUtilizationPercent").path(0).asDouble());
@@ -232,6 +244,54 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         assertFalse(component.path("stale").asBoolean());
       }
       default -> throw new AssertionError("no public oracle for " + name);
+    }
+  }
+
+  private static void assertPublicFreshness(String name, tools.jackson.databind.JsonNode body,
+      boolean stale) {
+    String dimension = switch (name) {
+      case "telemetryHealthSupplier" -> "telemetry";
+      case "vduCapabilitySnapshotSupplier", "vduProcessingSupplier" -> "visualDocumentUnderstanding";
+      case "lambdamartRerankerSupplier", "gplCoordinatorSupplier" -> "lambdamartModel";
+      default -> null;
+    };
+    if (dimension != null) {
+      var component = body.path("readiness").path("components").path(dimension);
+      String source = switch (dimension) {
+        case "telemetry" -> "telemetry_health";
+        case "visualDocumentUnderstanding" -> "head_vdu_status";
+        case "lambdamartModel" -> "head_gpl_status";
+        default -> throw new AssertionError(dimension);
+      };
+      assertEquals(source, component.path("source").asText());
+      assertTrue(component.path("stale").isBoolean(), "public freshness marker: " + name);
+      assertEquals(stale, component.path("stale").asBoolean(), "public owner freshness: " + name);
+      return;
+    }
+    String block = switch (name) {
+      case "inferenceSnapshotSupplier" -> "chat";
+      case "knowledgeServerLifecycleSupplier" -> "indexing";
+      case "devicePlanSupplier" -> "gpu";
+      default -> null;
+    };
+    if (block != null) {
+      var sources = body.path("operating").path("freshness").path("staleSources");
+      assertTrue(sources.isArray(), "public operating freshness must be present");
+      boolean listed = false;
+      for (var source : sources) if (block.equals(source.asText())) listed = true;
+      assertEquals(stale, listed, "public owner freshness: " + name);
+      return;
+    }
+    // These wire contracts have no freshness flag or source timestamp. The explicit unknown/
+    // unavailable sentinel differs from the known value; sample identity/time is checked separately.
+    switch (name) {
+      case "conversationProtectionStateSupplier" -> assertEquals(stale ? "unknown" : "locked",
+          body.path("conversationProtection").path("state").asText());
+      case "gpuCapabilitiesSupplier", "rrdStoreSupplier" -> {
+        assertTrue(body.path("gpu").path("available").isBoolean());
+        assertEquals(!stale, body.path("gpu").path("available").asBoolean());
+      }
+      default -> throw new AssertionError("no public freshness contract for " + name);
     }
   }
   @Test void failingConversationIsUnknownAndRecoveryReportsNewState() throws Exception {

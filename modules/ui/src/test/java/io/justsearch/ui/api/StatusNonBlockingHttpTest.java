@@ -94,6 +94,7 @@ final class StatusNonBlockingHttpTest {
       }
       var knownBody = new ObjectMapper().readTree(fixture.get("").body());
       fixture.assertKnownPublic(knownBody);
+      fixture.assertPublicFreshness(knownBody, false);
       for (var entry : heldPublications.entrySet())
         fixture.assertPublicPublication(knownBody, entry.getKey(), entry.getValue());
       // A warm HTTP request establishes that the route/serialization work before contention.
@@ -163,6 +164,7 @@ final class StatusNonBlockingHttpTest {
         assertTrue(elapsedMs < 1_000L, "status must fit its budget while " + source + " is held");
         assertEquals(200, response.statusCode());
         JsonNode body = new ObjectMapper().readTree(response.body());
+        fixture.assertPublicFreshness(body, true);
         boolean workerLost = source.equals("worker") || source.endsWith("lock");
         assertEquals(workerLost, body.path("meta").path("workerRpcStale").asBoolean());
         boolean aiLost = source.equals("registry") || source.endsWith("lock");
@@ -228,6 +230,7 @@ final class StatusNonBlockingHttpTest {
       assertEquals(200, recovered.statusCode());
       var recoveredBody = new ObjectMapper().readTree(recovered.body());
       fixture.assertKnownPublic(recoveredBody);
+      fixture.assertPublicFreshness(recoveredBody, false);
       for (String lane : fixture.heldLanes())
         fixture.assertPublicPublication(recoveredBody, lane, fixture.published(lane));
       assertFalse(new ObjectMapper().readTree(recovered.body())
@@ -300,7 +303,7 @@ final class StatusNonBlockingHttpTest {
   }
 
   private static final class Fixture implements AutoCloseable {
-    final StatusComponentFixture components = new StatusComponentFixture();
+    StatusComponentFixture components;
     final AtomicBoolean block = new AtomicBoolean();
     final AtomicBoolean fail = new AtomicBoolean();
     final AtomicLong now = new AtomicLong(System.currentTimeMillis());
@@ -308,163 +311,170 @@ final class StatusNonBlockingHttpTest {
     java.nio.file.Path modelHome;
     final CountDownLatch entered = new CountDownLatch(1);
     final CountDownLatch release = new CountDownLatch(1);
-    final StatusLifecycleHandler handler;
-    final Javalin app;
+    StatusLifecycleHandler handler;
+    Javalin app;
     final String source;
     final io.justsearch.configuration.resolved.ConfigStore priorConfig;
-    final HttpClient http = HttpClient.newHttpClient();
+    HttpClient http;
     final io.justsearch.app.engine.EngineAdmissionController admission =
         new io.justsearch.app.engine.EngineAdmissionController(1, 1, 1);
 
     Fixture(String source) throws Exception {
       this.source = source;
       priorConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-      if (source.equals("model-file-path")) {
-        modelHome = java.nio.file.Files.createTempDirectory("status-model-contract-");
-        io.justsearch.configuration.model.InstallContractIO.write(
-            new io.justsearch.configuration.model.InstallContract(2, now.get(),
-                new io.justsearch.configuration.model.HardwareProfile(false, false, -1L),
-                io.justsearch.configuration.model.DownloadProfile.CPU, java.util.Map.of(), modelHome), modelHome);
-        var config = mock(io.justsearch.configuration.resolved.ConfigStore.class, RETURNS_DEEP_STUBS);
-        var home = mock(java.nio.file.Path.class);
-        when(config.get().paths().home()).thenReturn(home);
-        when(home.resolve(io.justsearch.configuration.model.InstallContract.CONTRACT_FILENAME))
-            .thenAnswer(i -> {
-              gate("model-file-path");
-              return modelHome.resolve(io.justsearch.configuration.model.InstallContract.CONTRACT_FILENAME);
-            });
-        io.justsearch.configuration.resolved.ConfigStore.setGlobal(config);
-      }
-      var graph = components.capabilities();
-      var onlineAi = mock(io.justsearch.app.api.OnlineAiService.class, withSettings()
-          .extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeIntrospection.class));
-      when(((io.justsearch.app.api.OnlineAiRuntimeIntrospection) onlineAi).hasVisionCapability())
-          .thenAnswer(i -> { gate("vision"); return true; });
-      when(onlineAi.isAvailable()).thenAnswer(i -> { gate("online-ai"); return source.equals("online-ai"); });
-      var agent = mock(io.justsearch.agent.api.AgentService.class);
-      when(agent.isAvailable()).thenAnswer(i -> { gate("agent"); return true; });
-      when(agent.activeSessionCount()).thenReturn(source.equals("agent") ? 7 : 0);
-      var reranker = mock(io.justsearch.app.api.gpl.RerankerService.class);
-      when(reranker.isLoaded()).thenReturn(true);
-      var coordinator = mock(io.justsearch.app.api.gpl.GplStatusProvider.class);
-      when(coordinator.getStatus()).thenReturn(new io.justsearch.app.api.gpl.GplJobStatus(
-          io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED, 1L, 1L, 1L, null, null));
-      handler = new StatusLifecycleHandler(onlineAi, agent,
-          () -> { gate("inference"); return new InferenceRuntimeView("ONLINE", null, false, null,
-              new LifecycleCounters(0L, 0L, 0L), true, "Healthy", "", "", ""); },
-          null, null, null, Instant.now(), () -> { gate("disk-pressure"); return "OK"; },
-          () -> { gate("gpl"); return source.equals("gpl") ? reranker : null; },
-          () -> source.equals("gpl") ? coordinator : null,
-          () -> { gate("gpu-capabilities"); return gpuService(); }, graph.worker(), graph.inference());
-      components.attach(handler);
-      if (source.equals("online-ai") || source.equals("gpu-saturation")) {
-        var monitor = mock(io.justsearch.ui.observability.GpuSaturationMonitor.class);
-        when(monitor.compute(anyLong())).thenAnswer(i -> {
-          gate("gpu-saturation");
-          // Online-AI's true value must affect the public verdict; monitor absence would be READY.
-          return new io.justsearch.ui.observability.GpuSaturationMonitor.Result(95.0,
-              source.equals("online-ai") && (long) i.getArgument(0) > 0 ? "HEALTHY" : "SATURATED");
+      try {
+        components = new StatusComponentFixture();
+        http = HttpClient.newHttpClient();
+        if (source.equals("model-file-path")) {
+          modelHome = java.nio.file.Files.createTempDirectory("status-model-contract-");
+          io.justsearch.configuration.model.InstallContractIO.write(
+              new io.justsearch.configuration.model.InstallContract(2, now.get(),
+                  new io.justsearch.configuration.model.HardwareProfile(false, false, -1L),
+                  io.justsearch.configuration.model.DownloadProfile.CPU, java.util.Map.of(), modelHome), modelHome);
+          var config = mock(io.justsearch.configuration.resolved.ConfigStore.class, RETURNS_DEEP_STUBS);
+          var home = mock(java.nio.file.Path.class);
+          when(config.get().paths().home()).thenReturn(home);
+          when(home.resolve(io.justsearch.configuration.model.InstallContract.CONTRACT_FILENAME))
+              .thenAnswer(i -> {
+                gate("model-file-path");
+                return modelHome.resolve(io.justsearch.configuration.model.InstallContract.CONTRACT_FILENAME);
+              });
+          io.justsearch.configuration.resolved.ConfigStore.setGlobal(config);
+        }
+        var graph = components.capabilities();
+        var onlineAi = mock(io.justsearch.app.api.OnlineAiService.class, withSettings()
+            .extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeIntrospection.class));
+        when(((io.justsearch.app.api.OnlineAiRuntimeIntrospection) onlineAi).hasVisionCapability())
+            .thenAnswer(i -> { gate("vision"); return true; });
+        when(onlineAi.isAvailable()).thenAnswer(i -> { gate("online-ai"); return source.equals("online-ai"); });
+        var agent = mock(io.justsearch.agent.api.AgentService.class);
+        when(agent.isAvailable()).thenAnswer(i -> { gate("agent"); return true; });
+        when(agent.activeSessionCount()).thenReturn(source.equals("agent") ? 7 : 0);
+        var reranker = mock(io.justsearch.app.api.gpl.RerankerService.class);
+        when(reranker.isLoaded()).thenReturn(true);
+        var coordinator = mock(io.justsearch.app.api.gpl.GplStatusProvider.class);
+        when(coordinator.getStatus()).thenReturn(new io.justsearch.app.api.gpl.GplJobStatus(
+            io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED, 1L, 1L, 1L, null, null));
+        handler = new StatusLifecycleHandler(onlineAi, agent,
+            () -> { gate("inference"); return new InferenceRuntimeView("ONLINE", null, false, null,
+                new LifecycleCounters(0L, 0L, 0L), true, "Healthy", "", "", ""); },
+            null, null, null, Instant.now(), () -> { gate("disk-pressure"); return "OK"; },
+            () -> { gate("gpl"); return source.equals("gpl") ? reranker : null; },
+            () -> source.equals("gpl") ? coordinator : null,
+            () -> { gate("gpu-capabilities"); return gpuService(); }, graph.worker(), graph.inference());
+        components.attach(handler);
+        if (source.equals("online-ai") || source.equals("gpu-saturation")) {
+          var monitor = mock(io.justsearch.ui.observability.GpuSaturationMonitor.class);
+          when(monitor.compute(anyLong())).thenAnswer(i -> {
+            gate("gpu-saturation");
+            // Online-AI's true value must affect the public verdict; monitor absence would be READY.
+            return new io.justsearch.ui.observability.GpuSaturationMonitor.Result(95.0,
+                source.equals("online-ai") && (long) i.getArgument(0) > 0 ? "HEALTHY" : "SATURATED");
+          });
+          handler.setGpuSaturationMonitor(monitor);
+        }
+        if (source.equals("registry")) {
+          var registry = mock(EngineComponentRegistry.class);
+          when(registry.snapshot()).thenAnswer(i -> { gate("registry"); return components.registry().snapshot(); });
+          handler.setIndexComponent(registry, components.index());
+        }
+        handler.setClockForTesting(now::get);
+        handler.setConversationProtectionSupplier(() -> { gate("conversation"); return "locked"; });
+        var telemetry = new io.justsearch.telemetry.TelemetryHealthState();
+        telemetry.recordFlushFailure();
+        handler.setTelemetryHealthSupplier(() -> { gate("telemetry"); return source.equals("telemetry") ? telemetry : null; });
+        handler.setVduCapabilitySnapshotSupplier(() -> { gate("vdu");
+          return source.equals("vdu")
+              ? new io.justsearch.app.services.vdu.VduCapabilityState.Snapshot("vdu.circuit_open", now.get())
+              : null; });
+        handler.setVduProcessingSupplier(() -> { gate("vdu-processing"); return source.equals("vdu-processing"); });
+        var arena = new io.justsearch.ort.GpuArenaPlan(io.justsearch.ort.GpuArenaPlan.Profile.P12,
+            false, new io.justsearch.ort.GpuArenaPlan.Chat(java.util.Optional.empty(),
+                java.util.OptionalInt.empty(), false, 0.0, false),
+            java.util.Optional.empty(), java.util.Map.of(), 0, java.util.Set.of());
+        var plan = new io.justsearch.app.services.gpu.GpuProfileResolver.Resolution(
+            java.util.Optional.of(arena), io.justsearch.app.api.status.operating.ProfileSource.MEASURED, 0);
+        handler.setDevicePlanSupplier(() -> { gate("device-plan"); return source.equals("device-plan") ? plan : null; });
+        var probe = mock(io.justsearch.app.services.atrest.DiskEncryptionProbe.class);
+        when(probe.current()).thenReturn(io.justsearch.app.services.atrest.AtRestProtection.unknown());
+        when(probe.reading()).thenAnswer(i -> {
+          gate("at-rest");
+          if (!source.equals("at-rest") && !source.endsWith("lock")) return null;
+          return new io.justsearch.app.services.atrest.DiskEncryptionProbe.Reading(
+              encrypted(), now.get(), Duration.ZERO, false);
         });
-        handler.setGpuSaturationMonitor(monitor);
+        handler.setAtRestTap(null, probe);
+        {
+          // Every held-producer case has a healthy independent Worker to protect.
+          var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+          var client = mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+          when(ks.hasClient()).thenReturn(true);
+          when(client.getWorkerOperationalView(any())).thenAnswer(i -> {
+            gate("worker");
+            return WorkerOperationalViewBuilder.builder(WorkerOperationalView.fallback("READY"))
+                .core(new CoreIndexView(true, indexedDocuments.get(), 0, "SERVING", 0, 0)).build();
+          });
+          BootstrapLeaseFixtures.bind(ks, client);
+          handler.setKnowledgeServer(ks, null);
+        }
+        if (source.equals("rrd")) {
+          var rrd = mock(io.justsearch.telemetry.RrdMetricStore.class);
+          when(rrd.query(anyString(), anyLong(), anyLong())).thenAnswer(i -> {
+            gate("rrd"); return new io.justsearch.telemetry.RrdMetricStore.TimeSeriesResult(
+                i.getArgument(0), new long[] {i.getArgument(2)}, new double[] {37.5});
+          });
+          handler.setRrdStoreSupplier(() -> rrd);
+        }
+        if (source.equals("bulk-gate")) {
+          var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+          var bulk = new io.justsearch.core.scheduling.BulkWorkGate();
+          bulk.setGame(true);
+          when(ks.bulkWork()).thenReturn(bulk);
+          handler.setKnowledgeServerLifecycleSupplier(() -> { gate("bulk-gate"); return ks; });
+        }
+        if (source.equals("power") || source.equals("resume")) {
+          var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+          when(ks.bulkWork()).thenReturn(new io.justsearch.core.scheduling.BulkWorkGate());
+          when(ks.energyState()).thenAnswer(i -> {
+            gate("power");
+            return new io.justsearch.app.util.EnergyState(io.justsearch.app.util.EnergyState.Intent.FULL,
+                io.justsearch.app.util.EnergyState.Source.AC);
+          });
+          when(ks.recentlyResumed(anyLong())).thenAnswer(i -> { gate("resume"); return true; });
+          handler.setKnowledgeServerLifecycleSupplier(() -> ks);
+        }
+        if (source.equals("gpu-memory")) {
+          var reader = mock(io.justsearch.app.api.gpu.GpuMemoryReader.class);
+          when(reader.sampleNow()).thenAnswer(i -> {
+            gate("gpu-memory");
+            return new io.justsearch.app.api.gpu.GpuMemorySample(
+                io.justsearch.app.api.gpu.GpuMemorySource.NVML, java.util.Optional.empty(),
+                java.util.Optional.of(new io.justsearch.app.api.gpu.GpuDevice("luid_0x00000000_0x00000001", java.util.OptionalInt.of(0))),
+                java.util.Optional.of("fixture GPU"), java.util.OptionalLong.of(12L * 1024 * 1024 * 1024),
+                java.util.OptionalLong.of(1024L * 1024 * 1024), java.util.Map.of(), Instant.ofEpochMilli(now.get()));
+          });
+          handler.setGpuMemoryReader(reader);
+          // The first native sample must have completed before we block a refresh.
+          var field = StatusLifecycleHandler.class.getDeclaredField("gpuMemory");
+          field.setAccessible(true);
+          Object hold = field.get(handler);
+          var method = hold.getClass().getDeclaredMethod("projection");
+          method.setAccessible(true);
+          var projection = (OperatingGpuProjection) method.invoke(hold);
+          projection.sampleFirst();
+          var at = OperatingGpuProjection.class.getDeclaredField("cachedAt");
+          at.setAccessible(true);
+          at.set(projection, Instant.ofEpochMilli(now.get()).minusSeconds(10));
+        }
+        app = Javalin.create(c -> c.showJavalinBanner = false);
+        new ApiSecurityFilters(false, null, null, null, null, null, admission).install(app);
+        io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(
+            app, handler::handleStatus, handler::handleHealth);
+        app.start("127.0.0.1", 0);
+      } catch (Exception | Error failure) {
+        cleanUp(failure);
+        throw failure;
       }
-      if (source.equals("registry")) {
-        var registry = mock(EngineComponentRegistry.class);
-        when(registry.snapshot()).thenAnswer(i -> { gate("registry"); return components.registry().snapshot(); });
-        handler.setIndexComponent(registry, components.index());
-      }
-      handler.setClockForTesting(now::get);
-      handler.setConversationProtectionSupplier(() -> { gate("conversation"); return "locked"; });
-      var telemetry = new io.justsearch.telemetry.TelemetryHealthState();
-      telemetry.recordFlushFailure();
-      handler.setTelemetryHealthSupplier(() -> { gate("telemetry"); return source.equals("telemetry") ? telemetry : null; });
-      handler.setVduCapabilitySnapshotSupplier(() -> { gate("vdu");
-        return source.equals("vdu")
-            ? new io.justsearch.app.services.vdu.VduCapabilityState.Snapshot("vdu.circuit_open", now.get())
-            : null; });
-      handler.setVduProcessingSupplier(() -> { gate("vdu-processing"); return source.equals("vdu-processing"); });
-      var arena = new io.justsearch.ort.GpuArenaPlan(io.justsearch.ort.GpuArenaPlan.Profile.P12,
-          false, new io.justsearch.ort.GpuArenaPlan.Chat(java.util.Optional.empty(),
-              java.util.OptionalInt.empty(), false, 0.0, false),
-          java.util.Optional.empty(), java.util.Map.of(), 0, java.util.Set.of());
-      var plan = new io.justsearch.app.services.gpu.GpuProfileResolver.Resolution(
-          java.util.Optional.of(arena), io.justsearch.app.api.status.operating.ProfileSource.MEASURED, 0);
-      handler.setDevicePlanSupplier(() -> { gate("device-plan"); return source.equals("device-plan") ? plan : null; });
-      var probe = mock(io.justsearch.app.services.atrest.DiskEncryptionProbe.class);
-      when(probe.current()).thenReturn(io.justsearch.app.services.atrest.AtRestProtection.unknown());
-      when(probe.reading()).thenAnswer(i -> {
-        gate("at-rest");
-        if (!source.equals("at-rest") && !source.endsWith("lock")) return null;
-        return new io.justsearch.app.services.atrest.DiskEncryptionProbe.Reading(
-            encrypted(), now.get(), Duration.ZERO, false);
-      });
-      handler.setAtRestTap(null, probe);
-      {
-        // Every held-producer case has a healthy independent Worker to protect.
-        var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-        var client = mock(io.justsearch.app.services.worker.KnowledgeClient.class);
-        when(ks.hasClient()).thenReturn(true);
-        when(client.getWorkerOperationalView(any())).thenAnswer(i -> {
-          gate("worker");
-          return WorkerOperationalViewBuilder.builder(WorkerOperationalView.fallback("READY"))
-              .core(new CoreIndexView(true, indexedDocuments.get(), 0, "SERVING", 0, 0)).build();
-        });
-        BootstrapLeaseFixtures.bind(ks, client);
-        handler.setKnowledgeServer(ks, null);
-      }
-      if (source.equals("rrd")) {
-        var rrd = mock(io.justsearch.telemetry.RrdMetricStore.class);
-        when(rrd.query(anyString(), anyLong(), anyLong())).thenAnswer(i -> {
-          gate("rrd"); return new io.justsearch.telemetry.RrdMetricStore.TimeSeriesResult(
-              i.getArgument(0), new long[] {i.getArgument(2)}, new double[] {37.5});
-        });
-        handler.setRrdStoreSupplier(() -> rrd);
-      }
-      if (source.equals("bulk-gate")) {
-        var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-        var bulk = new io.justsearch.core.scheduling.BulkWorkGate();
-        bulk.setGame(true);
-        when(ks.bulkWork()).thenReturn(bulk);
-        handler.setKnowledgeServerLifecycleSupplier(() -> { gate("bulk-gate"); return ks; });
-      }
-      if (source.equals("power") || source.equals("resume")) {
-        var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-        when(ks.bulkWork()).thenReturn(new io.justsearch.core.scheduling.BulkWorkGate());
-        when(ks.energyState()).thenAnswer(i -> {
-          gate("power");
-          return new io.justsearch.app.util.EnergyState(io.justsearch.app.util.EnergyState.Intent.FULL,
-              io.justsearch.app.util.EnergyState.Source.AC);
-        });
-        when(ks.recentlyResumed(anyLong())).thenAnswer(i -> { gate("resume"); return true; });
-        handler.setKnowledgeServerLifecycleSupplier(() -> ks);
-      }
-      if (source.equals("gpu-memory")) {
-        var reader = mock(io.justsearch.app.api.gpu.GpuMemoryReader.class);
-        when(reader.sampleNow()).thenAnswer(i -> {
-          gate("gpu-memory");
-          return new io.justsearch.app.api.gpu.GpuMemorySample(
-              io.justsearch.app.api.gpu.GpuMemorySource.NVML, java.util.Optional.empty(),
-              java.util.Optional.of(new io.justsearch.app.api.gpu.GpuDevice("luid_0x00000000_0x00000001", java.util.OptionalInt.of(0))),
-              java.util.Optional.of("fixture GPU"), java.util.OptionalLong.of(12L * 1024 * 1024 * 1024),
-              java.util.OptionalLong.of(1024L * 1024 * 1024), java.util.Map.of(), Instant.ofEpochMilli(now.get()));
-        });
-        handler.setGpuMemoryReader(reader);
-        // The first native sample must have completed before we block a refresh.
-        var field = StatusLifecycleHandler.class.getDeclaredField("gpuMemory");
-        field.setAccessible(true);
-        Object hold = field.get(handler);
-        var method = hold.getClass().getDeclaredMethod("projection");
-        method.setAccessible(true);
-        var projection = (OperatingGpuProjection) method.invoke(hold);
-        projection.sampleFirst();
-        var at = OperatingGpuProjection.class.getDeclaredField("cachedAt");
-        at.setAccessible(true);
-        at.set(projection, Instant.ofEpochMilli(now.get()).minusSeconds(10));
-      }
-      app = Javalin.create(c -> c.showJavalinBanner = false);
-      new ApiSecurityFilters(false, null, null, null, null, null, admission).install(app);
-      io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(
-          app, handler::handleStatus, handler::handleHealth);
-      app.start("127.0.0.1", 0);
     }
 
     private static io.justsearch.app.services.atrest.AtRestProtection encrypted() {
@@ -515,6 +525,9 @@ final class StatusNonBlockingHttpTest {
         case "gpu-capabilities", "rrd" -> {
           assertTrue(body.path("gpu").path("available").asBoolean());
           assertEquals(37, body.path("gpu").path("gpuUtilizationPercent").asInt());
+          assertEquals("nvml", body.path("gpu").path("source").asText());
+          assertEquals("HIGH", body.path("gpu").path("confidence").asText());
+          assertTrue(body.path("gpu").path("cudaFunctional").asBoolean());
           if (source.equals("rrd")) {
             assertEquals(37.5, body.path("gpu").path("recentUtilizationPercent").path(0).asDouble());
             assertEquals(37.5, body.path("gpu").path("recentMemoryUtilizationPercent").path(0).asDouble());
@@ -593,6 +606,87 @@ final class StatusNonBlockingHttpTest {
       }
     }
 
+    void assertPublicFreshness(JsonNode body, boolean stale) {
+      String dimension = switch (source) {
+        case "gpl" -> "lambdamartModel";
+        case "telemetry" -> "telemetry";
+        case "vdu", "vdu-processing", "vision" -> "visualDocumentUnderstanding";
+        case "online-ai", "gpu-saturation" -> "gpu";
+        case "registry", "assembly-lock", "admission-lock" -> "ai";
+        default -> null;
+      };
+      if (dimension != null) {
+        var component = body.path("readiness").path("components").path(dimension);
+        String expectedSource = switch (dimension) {
+          case "lambdamartModel" -> "head_gpl_status";
+          case "telemetry" -> "telemetry_health";
+          case "visualDocumentUnderstanding" -> "head_vdu_status";
+          case "gpu" -> "gpu_saturation_monitor";
+          case "ai" -> "lifecycle_inference";
+          default -> throw new AssertionError(dimension);
+        };
+        assertEquals(expectedSource, component.path("source").asText());
+        assertTrue(component.path("stale").isBoolean(), "public freshness marker: " + source);
+        assertEquals(stale, component.path("stale").asBoolean(), "public owner freshness: " + source);
+      }
+      String block = switch (source) {
+        case "inference" -> "chat";
+        case "bulk-gate", "power" -> "indexing";
+        case "gpu-memory", "device-plan" -> "gpu";
+        default -> null;
+      };
+      if (block != null) {
+        var sources = body.path("operating").path("freshness").path("staleSources");
+        assertTrue(sources.isArray(), "public operating freshness must be present");
+        boolean listed = false;
+        for (var entry : sources) if (block.equals(entry.asText())) listed = true;
+        assertEquals(stale, listed, "public owner freshness: " + source);
+      }
+      switch (source) {
+        case "worker", "assembly-lock", "admission-lock" -> {
+          assertTrue(body.path("meta").path("workerRpcStale").isBoolean());
+          assertEquals(stale, body.path("meta").path("workerRpcStale").asBoolean());
+          if (source.endsWith("lock")) assertEquals(stale ? "UNKNOWN" : "ENCRYPTED",
+              body.path("atRestProtection").path("diskEncryption").asText());
+        }
+        case "gpu-memory" -> {
+          assertTrue(body.path("operating").path("gpu").path("stale").isBoolean());
+          assertEquals(stale, body.path("operating").path("gpu").path("stale").asBoolean());
+        }
+        // The following fields expose absence/unknown sentinels, without a separate freshness
+        // flag or wire observation time (except encryption's probedAtMs). Check known identity
+        // versus that sentinel; lane publication identity/time is checked in all phases too.
+        case "disk-pressure" -> {
+          if (stale) assertTrue(body.path("diskPressure").isMissingNode() || body.path("diskPressure").isNull());
+          else assertEquals("OK", body.path("diskPressure").asText());
+        }
+        case "gpu-capabilities", "rrd" -> {
+          assertTrue(body.path("gpu").path("available").isBoolean());
+          assertEquals(!stale, body.path("gpu").path("available").asBoolean());
+        }
+        case "conversation" -> assertEquals(stale ? "unknown" : "locked",
+            body.path("conversationProtection").path("state").asText());
+        case "at-rest" -> assertEquals(stale ? "UNKNOWN" : "ENCRYPTED",
+            body.path("atRestProtection").path("diskEncryption").asText());
+        case "agent" -> {
+          if (stale) assertTrue(body.path("agentSessions").isMissingNode() || body.path("agentSessions").isNull());
+          else assertEquals(7, body.path("agentSessions").path("activeCount").asInt(-1));
+        }
+        case "model-file-path" -> {
+          if (stale) assertTrue(body.path("modelDistribution").path("installProfile").isMissingNode());
+          else assertEquals("CPU", body.path("modelDistribution").path("installProfile").asText());
+        }
+        case "power" -> assertEquals(stale ? "UNKNOWN" : "AC", body.path("power").path("source").asText());
+        case "resume" -> {
+          assertTrue(body.path("catchingUp").isBoolean());
+          assertEquals(!stale, body.path("catchingUp").asBoolean());
+        }
+        default -> {
+          if (dimension == null && block == null) throw new AssertionError("no freshness contract for " + source);
+        }
+      }
+    }
+
     String[] heldLanes() {
       return switch (source) {
         case "assembly-lock", "admission-lock" -> new String[] {"worker", "registry", "at-rest"};
@@ -661,6 +755,11 @@ final class StatusNonBlockingHttpTest {
       when(nvml.available()).thenReturn(true);
       when(nvml.gpuUtilizationPercent()).thenReturn(37);
       when(caps.nvml()).thenReturn(nvml);
+      when(caps.effective()).thenReturn(new io.justsearch.gpu.GpuCapabilities.Effective(
+          true, "nvml", io.justsearch.gpu.GpuCapabilities.Confidence.HIGH,
+          "580.1", 580, 1, 1, 12L << 30, 8L << 30, 4L << 30,
+          new io.justsearch.gpu.GpuCapabilities.Cuda(true, "cuda-driver-api",
+              io.justsearch.gpu.GpuCapabilities.Confidence.HIGH)));
       when(service.snapshot(any(io.justsearch.gpu.GpuCapabilities.Cuda.class))).thenReturn(caps);
       return service;
     }
@@ -684,15 +783,35 @@ final class StatusNonBlockingHttpTest {
     }
 
     @Override public void close() throws Exception {
+      var failure = new Exception("status fixture cleanup failed");
+      cleanUp(failure);
+      if (failure.getSuppressed().length > 0) throw failure;
+    }
+
+    private void cleanUp(Throwable failure) {
       release.countDown();
-      app.stop();
-      http.close();
-      handler.closeGpuMemoryReader();
-      components.close();
-      if (source.equals("model-file-path")) {
-        io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(priorConfig);
-        java.nio.file.Files.deleteIfExists(modelHome.resolve(io.justsearch.configuration.model.InstallContract.CONTRACT_FILENAME));
-        java.nio.file.Files.deleteIfExists(modelHome);
+      try {
+        if (app != null) app.stop();
+      } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      try {
+        if (http != null) http.close();
+      } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      try {
+        if (handler != null) handler.closeGpuMemoryReader();
+      } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      try {
+        if (components != null) components.close();
+      } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (source.equals("model-file-path") && modelHome != null) {
+        try {
+          io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(priorConfig);
+        } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        try {
+          java.nio.file.Files.deleteIfExists(modelHome.resolve(io.justsearch.configuration.model.InstallContract.CONTRACT_FILENAME));
+        } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        try {
+          java.nio.file.Files.deleteIfExists(modelHome);
+        } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       }
     }
   }
