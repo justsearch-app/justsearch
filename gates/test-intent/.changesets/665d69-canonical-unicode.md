@@ -219,3 +219,14 @@ The evidence generator ran in an isolated shared clone containing byte-identical
   "note": "Non-author reviewed settled/challenged canonicalA1-A6 and legacyL1-L5, minimum4productionseams and durabletests. Pair-safe splitter+v2 fingerprint, whole-plan prepublication/predelete refusal, central unsafe-text read omission only; unchanged faithful matching-proof RMW/selectors/scheduler. New red checks have actual f8 assertion-failure evidence; same-analyzer Lucene postings/norms/dense preservation passes before/after, SPLADE reset exception explicit. Existing boot fixture helper instrumentation preserves alloldcallerinputs/oracles. Author160stageA plus40legacy/80adapter/12canonical evidence inspected; no selfacceptance or owner scenario adoption. Independent committed verification, full Green rebuild/promotion and remaining hardware proof are not inferred. Every new check kept as durable boundary/recovery/preservation regression coverage."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17604-d9de-7ea1-866e-8f07a7c87b14",
+  "verdict": "accept",
+  "digest": "sha256:6750f0066d6bbbbc49ba8fb74e339d9e098c4f31dbb809d8b1f595bef51ce091",
+  "note": "Independent fresh Codex session; scoped final metadata review only. Git blob closure proves 54f production/tests/resources/docs/build/dependencies identical to bad388; only two old v2 agent expectations become Obsolete, historical evidence retained. Final bounded v1 choice preserves complete valid plans and future shape-version bump rule; retained unsafe rows still need source replacement or explicit rebuild. Active check/evidence digests, assertion-before classifications and unchanged legacy-reads digest inspected; no owner adoption or broad behavior pass inferred. Original unchanged Release030ConfiguredHeadlessRecoveryTest actually passed aef and 54f, one test each, zero skips, normal owned model-disabled HeadlessApp fixtures. All other Unicode/release/Lucene/manual rebuild behavior remains outside this verifier scope."
+}
+```

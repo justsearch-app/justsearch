@@ -132,3 +132,14 @@ Stage 1 raw/corpus/quality results remain unchanged. This metadata-only author p
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17604-d9de-7ea1-866e-8f07a7c87b14",
+  "verdict": "accept",
+  "digest": "sha256:540d3a0d633d7ab5172b42f9a592b8fdc46029eee15466c42472d19f8e41d626",
+  "note": "Independent scoped metadata acceptance after S1 blob closure and S2 authentic headless preservation pass before/current. Reviewed three committed receipt inputs at bad388 source, exact supplied adapted-producer digest 099675065bc74e7e12d2f24c312edb2901acadfc1d7f701ba22e97d1886eac63, source/self digests, commands, test-only before overlays, zero skipped cases, assertion failures on 02ad (three) and aef (one), and six preservation cases passing before/current including all three policy parameters. V1 fingerprint, boot and mutability are New repaired:false against aef, not mainline repairs. No receipt relabel or owner adoption inferred. Private adapted producer bytes were not supplied to recompute its digest; committed producer unchanged. Own negative stale-source-digest control is rejected. No broader product verification or other verifier conclusions admitted."
+}
+```
