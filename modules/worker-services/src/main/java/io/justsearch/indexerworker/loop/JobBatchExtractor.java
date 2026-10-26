@@ -81,6 +81,7 @@ public final class JobBatchExtractor {
   private final IndexingDocumentOps.StageRecorder stageRecorder;
   private final BooleanSupplier detailedTracingSupplier;
   private final LongConsumer indexedDelta;
+  private final FileMutationFence fileMutationFence;
 
   private boolean indexEmptyForBatch;
   private final BatchServiceFailures identityFailures = new BatchServiceFailures();
@@ -103,7 +104,8 @@ public final class JobBatchExtractor {
       Supplier<DocumentIdentityStore> documentIdentityStoreSupplier,
       IndexingDocumentOps.StageRecorder stageRecorder,
       BooleanSupplier detailedTracingSupplier,
-      LongConsumer indexedDelta) {
+      LongConsumer indexedDelta,
+      FileMutationFence fileMutationFence) {
     this.ingestionAuthority = ingestionAuthority;
     this.journal = journal;
     this.jobQueue = jobQueue;
@@ -121,6 +123,7 @@ public final class JobBatchExtractor {
     this.stageRecorder = stageRecorder;
     this.detailedTracingSupplier = detailedTracingSupplier;
     this.indexedDelta = indexedDelta;
+    this.fileMutationFence = Objects.requireNonNull(fileMutationFence, "file mutation fence");
   }
 
   /**
@@ -216,10 +219,20 @@ public final class JobBatchExtractor {
     Path sourceRealPath = null;
 
     try {
-      SourceAdmission admission = ingestionAuthority.admit(claim);
+      SourceAdmission admission;
+      fileMutationFence.lock();
+      try {
+        // A source/root/policy observation made before waiting cannot authorize retirement.
+        admission = ingestionAuthority.admit(claim);
+        if (admission.action() == SourceAdmissionAction.STALE_DONE) {
+          if (!jobQueue.ownsClaimForPublication(claim)) return null;
+          bestEffortDeleteMissingSource(filePath);
+        }
+      } finally {
+        fileMutationFence.unlock();
+      }
       if (admission.action() == SourceAdmissionAction.STALE_DONE) {
         log.debug("File not found, treating as delete: {}", filePath);
-        bestEffortDeleteMissingSource(filePath);
         journal.recordOutcomeSafely(
             filePath,
             "STALE_DONE",

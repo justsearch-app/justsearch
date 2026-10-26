@@ -98,7 +98,7 @@ final class OriginBoundaryAdmissionTest {
         mock(BatchStats.class), mock(StaleSnapshotResolver.class), mock(StaleSourceHandler.class),
         IndexingPacing.unthrottled(), new AtomicBoolean(true), new java.util.HashSet<>(),
         () -> mock(PathResolutionStore.class), () -> identity,
-        mock(IndexingDocumentOps.StageRecorder.class), () -> false, ignored -> {});
+        mock(IndexingDocumentOps.StageRecorder.class), () -> false, ignored -> {}, new FileMutationFence());
 
     extractor.extractAll(List.of(claim));
 
