@@ -10,16 +10,22 @@ import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.ipc.DeleteByPathRequest;
 import io.justsearch.ipc.SyncDirectoryRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,7 +42,7 @@ final class Release030RetirementWalkCrashTest {
       throws Exception {
     Path root = Release030Fixture.unpack(fixture, temporary);
     var original = state(root);
-    Path file = Files.writeString(root.resolve("roots/alpha/walk-crash.txt"), "walkcrashviolet");
+    Path file = root.resolve("roots/alpha/walk-crash.txt");
     Path args = root.resolve("child.args");
     Files.writeString(args, "-cp\n\"" + System.getProperty("java.class.path")
         .replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n");
@@ -88,7 +94,7 @@ final class Release030RetirementWalkCrashTest {
   }
 
   private static boolean checkpointWalked(Path root,
-      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp op) {
+      SwitchBufferCapableQueue.SwitchBufferOp op) {
     try { return io.justsearch.indexerworker.queue.Release030RecoveryState.load(root.resolve("data/jobs.db")).rootWalked(op); }
     catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
   }
@@ -98,49 +104,111 @@ final class Release030RetirementWalkCrashTest {
     Path root = Path.of(args[0]);
     Path alpha = root.resolve("roots/alpha");
     Path file = alpha.resolve("walk-crash.txt");
+    Path beta = root.resolve("roots/beta");
+    // Keep B while the old Alpha walk and the earlier delete finish. Beta is restored at the cut.
+    Path held = Files.move(beta, root.resolve("held-beta"));
+    var original = state(root);
     configure(root);
     var arrived = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var once = new AtomicBoolean();
+    var arm = new AtomicBoolean();
+    var attempts = new AtomicInteger();
+    var heldAttempt = new AtomicInteger();
     var injected = new AtomicBoolean();
+    var target = new AtomicReference<SwitchBufferCapableQueue.SwitchBufferOp>();
+    var admittedRow = new AtomicReference<Map<String, String>>();
     var serverRef = new AtomicReference<KnowledgeServer>();
     try (var _ = new ReleasedModelIdentities(root); var ex = new TestEngineExecutors();
         var server = Release030RetirementOrderingTest.bootWithBarrier(root, ex, transition -> {
-          if (transition.point().equals("release030-before-replay") && once.compareAndSet(false, true)) {
-            arrived.countDown(); assertTrue(release.await(30, TimeUnit.SECONDS));
+          if (transition.point().equals("release030-before-replay")) {
+            int attempt = attempts.incrementAndGet();
+            if (arm.get() && once.compareAndSet(false, true)) {
+              heldAttempt.set(attempt);
+              arrived.countDown(); assertTrue(release.await(30, TimeUnit.SECONDS));
+            }
           }
           if (transition.point().equals("release030-root-walked")) {
             var queue = Release030RetirementWalkOrderTest.queue(serverRef.get());
-            // The public forced-sync receipt is last; observe its newly admitted queue row.
-            if (queue.hasNonterminalJobsByPathPrefixStrict(key(alpha))
-                && queue.listSwitchBufferOpsStrict().stream().anyMatch(op ->
-                    op.op().equals("SYNC_ROOT") && !op.key().startsWith("release030-root:")
-                        && Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath()).equals(alpha)
-                        && checkpointWalked(root, op)) && injected.compareAndSet(false, true)) {
+            if (target.get() != null && checkpointWalked(root, target.get())
+                && injected.compareAndSet(false, true)) {
+              assertEquals(heldAttempt.get(), attempts.get(),
+                  "no replay attempt released the continuous producer hold");
+              assertTrue(queue.hasNonterminalJobsByPathPrefixStrict(key(alpha)));
+              var row = queue.watcherReconciliationRow(key(file));
+              assertEquals("PENDING", row.get("state"));
+              for (String field : List.of("state", "unit_revision", "planned_source_sha256",
+                  "collection", "originator", "transport", "ingestion_root", "attempts", "retry_after"))
+                assertEquals(admittedRow.get().get(field), row.get(field), "checkpoint preserves " + field);
+              var owner = SwitchBufferCapableQueue.RootOrigin.fromUnit(row.get("unit_revision"));
+              assertNotNull(owner);
+              assertEquals(target.get().retirementUuid(), owner.uuid());
+              assertEquals(target.get().acceptedOrder(), owner.acceptedOrder());
+              assertNull(row.get("planned_source_sha256"));
+              System.out.println("WALK_PENDING_CHECKPOINT target=" + target.get() + " row=" + row);
               queue.markFailed(file, IngestionOutcome.of(IngestionOutcomeClass.IO_FAILED,
                   IngestionReasonCodes.SOURCE_UNREADABLE, IngestionRetryPolicy.RETRY_UNTIL_AVAILABLE,
                   "walk crash writer retry"));
-              var target = queue.listSwitchBufferOpsStrict().stream().filter(op ->
-                  op.op().equals("SYNC_ROOT") && !op.key().startsWith("release030-root:")
-                      && Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath()).equals(alpha))
-                  .findFirst().orElseThrow();
-              Release030RetirementWalkOrderTest.observeRetry(root, file, target, 1);
+              Release030RetirementWalkOrderTest.observeRetry(root, file, target.get(), 1);
+              Files.move(held, beta);
+              try {
+                Release030RetirementRootImageTest.capture(root, serverRef.get(), "walk-cut", List.of(file));
+              } catch (Exception failure) {
+                throw new java.io.IOException("walk checkpoint evidence unavailable", failure);
+              }
               if (queue.jobStateCountsStrict().pendingBackoffCount() > 0) {
+                Release030RetirementSafetyTest.assertRetained(root, original.building_generation());
                 Files.writeString(root.resolve("walk-cut"), "pid=" + ProcessHandle.current().pid()
+                    + " target=" + target.get() + " row=" + queue.watcherReconciliationRow(key(file))
                     + " state=" + queue.jobStateCountsStrict());
                 new CountDownLatch(1).await();
               }
             }
           }
         })) {
-      serverRef.set(server); activate(server); assertTrue(arrived.await(30, TimeUnit.SECONDS));
+      serverRef.set(server); activate(server);
+      var queue = Release030RetirementWalkOrderTest.queue(server);
+      await(() -> queue.listSwitchBufferOpsStrict().stream().anyMatch(op -> op.op().equals("SYNC_ROOT")
+          && op.key().startsWith("release030-root:")
+          && Path.of(SwitchBufferSyncRoot.decode(op.payload()).rootPath()).equals(alpha)
+          && checkpointWalked(root, op)), "old automatic Alpha walk actually completes", 90);
+      var service = server.appServices().ingestService();
+      assertTrue(service.deleteByPath(DeleteByPathRequest.newBuilder()
+          .setPath(alpha.toString()).build(), CallContext.none()).getError().isBlank());
+      var deletion = queue.listSwitchBufferOpsStrict().stream().filter(op -> op.op().equals("DELETE_PREFIX")
+          && io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(op.payload()).contains(key(file)))
+          .findFirst().orElseThrow();
+      await(() -> queue.release030RecoveryState().deletionCommitted(deletion)
+          && queue.release030RecoveryState().deletionQueueComplete(deletion),
+          "earlier delete commits before final public sync", 90);
+      Release030RetirementSafetyTest.assertRetained(root, original.building_generation());
+      arm.set(true); assertTrue(arrived.await(30, TimeUnit.SECONDS));
       var producer = (DefaultWorkerAppServices) server.appServices();
       assertTrue(producer.pauseProducerForCutover(10000));
       try {
-        assertTrue(server.appServices().ingestService().deleteByPath(DeleteByPathRequest.newBuilder()
-            .setPath(alpha.toString()).build(), CallContext.none()).getError().isBlank());
-        assertTrue(server.appServices().ingestService().syncDirectory(SyncDirectoryRequest.newBuilder()
-            .setRootPath(alpha.toString()).setForce(true).build(), CallContext.none()).getError().isBlank());
+        assertFalse(Files.exists(file), "target cannot have an old automatic DONE admission");
+        Files.writeString(file, "walkcrashviolet");
+        assertTrue(service.syncDirectory(SyncDirectoryRequest.newBuilder()
+            .setRootPath(alpha.toString()).setForce(true).build(),
+            CallContext.none()).getError().isBlank());
+        target.set(queue.listSwitchBufferOpsStrict().stream().filter(op -> op.op().equals("SYNC_ROOT")
+            && original.building_generation().equals(op.generation())
+            && op.key().equals("sync_root:" + io.justsearch.indexerworker.util.PathNormalizer.normalizePathPrefix(key(alpha)))
+            && Path.of(SwitchBufferSyncRoot.decode(op.payload()).rootPath()).equals(alpha))
+            .max(Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElseThrow());
+        admittedRow.set(queue.watcherReconciliationRow(key(file)));
+        assertEquals("PENDING", admittedRow.get().get("state"));
+        var owner = SwitchBufferCapableQueue.RootOrigin.fromUnit(admittedRow.get().get("unit_revision"));
+        assertNotNull(owner);
+        assertEquals(target.get().retirementUuid(), owner.uuid());
+        assertEquals(target.get().acceptedOrder(), owner.acceptedOrder());
+        assertNull(admittedRow.get().get("planned_source_sha256"));
+        assertTrue(queue.retirementReplayOps().stream().noneMatch(op -> op.op().equals("UPSERT")
+            && SwitchBufferUpsert.decode(op.payload()).path().equals(key(file))),
+            "ordinary public ROOT has no per-file receipt");
+        assertFalse(checkpointWalked(root, target.get()));
+        System.out.println("WALK_CONTINUOUS_PENDING_HOLD attempt=" + heldAttempt.get()
+            + " target=" + target.get() + " deletion=" + deletion + " row=" + admittedRow.get());
       } finally { release.countDown(); }
       new CountDownLatch(1).await();
     } finally { release.countDown(); }
