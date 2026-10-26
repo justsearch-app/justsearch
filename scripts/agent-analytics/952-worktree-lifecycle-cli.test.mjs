@@ -29,6 +29,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_ROOT = path.resolve(HERE, '..', '..');
 const require = createRequire(import.meta.url);
+// Preserve the measured runner spelling before ordinary fixture roots are canonicalized.
+const NATIVE_ALIAS_TEMP = process.env.ARCHIVE_ALIAS_TEMP ?? os.tmpdir();
 
 /** Staged into every fixture checkout: the CLI, its deletion primitive, and their libraries. */
 const CLI_FILES = [
@@ -266,13 +268,40 @@ function createWorktree(fixture, name, sessionId, extra = []) {
 }
 
 function shortSpelling(directory) {
-  const result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `for %I in ("${directory}") do @echo %~sI`], { encoding: 'utf8' });
-  const short = result.stdout?.trim();
-  if (result.status !== 0 || !short || path.resolve(short).toLowerCase() === path.resolve(directory).toLowerCase()) return null;
-  const original = fs.statSync(directory, { bigint: true });
-  const alias = fs.statSync(short, { bigint: true });
-  assert.equal(alias.dev, original.dev);
-  assert.equal(alias.ino, original.ino);
+  const key = (value) => path.resolve(value).toLowerCase();
+  const inspect = (spelling) => {
+    assert.ok(typeof spelling === 'string' && path.isAbsolute(spelling), 'Native alias spelling must be absolute');
+    const root = path.parse(spelling).root;
+    let current = root;
+    let stat;
+    for (const part of ['', ...spelling.slice(root.length).split(/[\\/]+/).filter(Boolean)]) {
+      assert.ok(part !== '.' && part !== '..', 'Native alias spelling must not contain dot components');
+      current = part ? path.join(current, part) : current;
+      stat = fs.lstatSync(current, { bigint: true });
+      assert.ok(stat.isDirectory() && !stat.isSymbolicLink(), `Native alias must traverse plain directories: ${current}`);
+    }
+    assert.equal(typeof stat.dev, 'bigint');
+    assert.equal(typeof stat.ino, 'bigint');
+    assert.ok(stat.ino > 0n, 'Native directory identity must be unambiguous');
+    return { real: fs.realpathSync.native(spelling), dev: stat.dev, ino: stat.ino };
+  };
+  const native = inspect(NATIVE_ALIAS_TEMP);
+  const canonical = inspect(native.real);
+  assert.equal(key(native.real), key(canonical.real));
+  assert.equal(native.dev, canonical.dev);
+  assert.equal(native.ino, canonical.ino);
+  if (key(NATIVE_ALIAS_TEMP) === key(canonical.real)) return null; // No genuine native alias capability.
+
+  const target = inspect(directory);
+  const relative = path.relative(canonical.real, target.real);
+  assert.ok(!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`),
+    'Owned fixture is outside the measured native temp alias; fixture geometry needs repair');
+  const short = path.join(NATIVE_ALIAS_TEMP, relative);
+  assert.notEqual(key(short), key(directory), 'Native alias must be a distinct spelling');
+  const alias = inspect(short);
+  assert.equal(key(alias.real), key(target.real));
+  assert.equal(alias.dev, target.dev);
+  assert.equal(alias.ino, target.ino);
   return short;
 }
 
