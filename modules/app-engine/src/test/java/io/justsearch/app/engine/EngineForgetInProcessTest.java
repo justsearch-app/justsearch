@@ -266,7 +266,11 @@ final class EngineForgetInProcessTest {
     String completedForget = null;
     String installedLiteral = null;
     String successor;
-    try (var f = new Fixture(data, List.of(watched))) {
+    var fixtureConfig = Map.of("justsearch.extraction.sandbox.mode", "in_process");
+    try (var f = new Fixture(data, List.of(watched), fixtureConfig)) {
+      assertEquals("in_process", f.config.currentSnapshot().extraction().sandboxMode(),
+          "SETUP: scoped fixture selects the real in-process extractor before startup");
+      System.out.println("R2 component extraction mode=" + f.config.currentSnapshot().extraction().sandboxMode());
       f.seed(exact, "indexed private parent with two proper chunks");
       if (forgotten) {
         var response = f.forget(exact, "FILE");
@@ -304,6 +308,8 @@ final class EngineForgetInProcessTest {
       assertTrue(f.loop.isRunning(), "SETUP: initial real writer is running");
       var config = f.config.currentSnapshot();
       assertNotNull(config, "SETUP: readable current effective policy");
+      assertEquals("in_process", config.extraction().sandboxMode(),
+          "SETUP: settings preparation retains the scoped extraction input");
       var policy = ExclusionPatterns.fromRawJsonStrict(config.ui().excludePatterns(), false);
       assertEquals(forgotten, policy.isExcludedPath(watched, exact));
       assertFalse(policy.isExcludedPath(watched, sibling));
@@ -332,12 +338,33 @@ final class EngineForgetInProcessTest {
         assertNotNull(successor, "SETUP: actual candidate identity is present");
         assertFalse(successor.isBlank(), "SETUP: actual candidate identity");
         assertNotEquals(predecessor, successor);
-        RunningRuntime target = assertInstanceOf(RunningRuntime.class,
-            field(f.server, KnowledgeServer.class, "ingestLifecycle"), "SETUP: actual writable target owner");
+        long admittedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
+        RunningRuntime target = null;
+        do {
+          var status = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration();
+          Object current = field(f.server, KnowledgeServer.class, "ingestLifecycle");
+          var services = f.server.appServices();
+          if (successor.equals(status.getBuildingGenerationId())
+              && current instanceof RunningRuntime candidate
+              && candidate.openedIndexPath() != null
+              && successor.equals(candidate.openedIndexPath().getFileName().toString())
+              && candidate.isAcceptingWrites()
+              && services instanceof DefaultWorkerAppServices producer
+              && producer.recordedWriterReady()
+              && field(producer.ingestService(), WorkerIngestService.class, "ingestLifecycle") == candidate
+              && field(f.server, KnowledgeServer.class, "ingestLifecycle") == candidate
+              && f.server.appServices() == producer) {
+            target = candidate;
+            break;
+          }
+          Thread.sleep(20);
+        } while (System.nanoTime() < admittedDeadline);
+        assertNotNull(target, "SETUP: actual candidate writer/publisher must bind within the shared readiness budget");
         assertNotNull(target.openedIndexPath(), "SETUP: actual target path is present");
         assertEquals(successor, target.openedIndexPath().getFileName().toString(), "SETUP: actual target writer");
         assertTrue(target.isAcceptingWrites(), "SETUP: target is writable");
-        long admittedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
+        System.out.println("R2 actual writer/publisher bound generation=" + successor
+            + "; writable target=" + target.openedIndexPath());
         Map<String, String> targetRow;
         boolean settled;
         do {
@@ -450,7 +477,9 @@ final class EngineForgetInProcessTest {
       }
     }
     // Real close/reopen of the same saved settings/operations/generation, never a restart counter.
-    try (var reopened = new Fixture(data, List.of(watched))) {
+    try (var reopened = new Fixture(data, List.of(watched), fixtureConfig)) {
+      assertEquals("in_process", reopened.config.currentSnapshot().extraction().sandboxMode(),
+          "SETUP: actual same-profile reopen retains the explicit component fixture scope");
       var status = reopened.client.getStatus(TestEngineContexts.FOREGROUND).getMigration();
       assertEquals("IDLE", status.getMigrationState());
       assertEquals(successor, status.getActiveGenerationId());
@@ -508,47 +537,68 @@ final class EngineForgetInProcessTest {
       this(data, watched, 30_000);
     }
     Fixture(Path data, List<Path> watched, long deadlineMs) throws Exception {
-      Files.createDirectories(data);
-      System.setProperty("justsearch.data.dir", data.toString());
-      System.setProperty("user.home", data.resolve("home").toString());
-      for (var entry : Map.of("justsearch.models.dir", data.resolve("missing-models").toString(),
-          "justsearch.index.base_path", data.resolve("index").toString(),
-          "justsearch.ssot.path", data.resolve("SSOT").toString()).entrySet()) {
-        previousFixtureProperties.put(entry.getKey(), System.getProperty(entry.getKey()));
-        System.setProperty(entry.getKey(), entry.getValue());
-      }
-      EngineTestHarness.publishConfig(data, data.resolve("index"),
-          Map.of("justsearch.models.dir", data.resolve("missing-models").toString()));
-      config = ConfigStore.global();
-      if (!watched.isEmpty()) Files.writeString(data.resolve("watched_roots.json"), JSON.writeValueAsString(Map.of(
-          "schemaVersion", 1, "roots", watched.stream().map(path -> Map.of("path", path.toString(), "collection", "documents")).toList())));
-      settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, data.resolve("settings.json"));
-      config.update(io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settings.inspect().settings()));
-      operations = new SqliteOperationStore(data.resolve("operations.db"));
-      var settingsOwner = new SettingsCommitCoordinator(settings, config,
-          () -> { throw new AssertionError("Unexpected settings restart"); }, candidate -> OperationResult.success("prepared"));
-      attempts = new OperationAttemptRunnerImpl(operations, CLOCK,
-          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS,
-              OperationKind.FORGET, OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE),
-          settingsOwner, new RecordedIngestPlanResolver());
-      authority = OperationAuthority.load(data);
-      resources = new DefaultEngineProcessResources(config.publicationLock());
-      root = EngineRoot.forProcess(operations, attempts, deadlineMs, 100,
-          code -> { throw new AssertionError("Unexpected fatal writer exit " + code); },
-          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
-          () -> { throw new AssertionError("Unexpected migration restart"); }, authority, config, resources);
+      this(data, watched, deadlineMs, Map.of());
+    }
+    Fixture(Path data, List<Path> watched, Map<String, String> fixtureConfig) throws Exception {
+      this(data, watched, 30_000, fixtureConfig);
+    }
+    Fixture(Path data, List<Path> watched, long deadlineMs, Map<String, String> fixtureConfig) throws Exception {
       try {
-        client = (EngineKnowledgeClient) root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
-        server = (KnowledgeServer) field(root, EngineRoot.class, "server");
-        runtime = (RunningRuntime) field(server, KnowledgeServer.class, "ingestLifecycle");
-        queue = (SqliteJobQueue) field(server, KnowledgeServer.class, "jobQueue");
-        identities = (io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore)
-            field(server, KnowledgeServer.class, "documentIdentityStore");
-        loop = (IndexingLoop) field(server.appServices(), DefaultWorkerAppServices.class, "indexingLoop");
-        runtime.commitOps().stopCommitTimer();
-        assertTrue(root.forgetService().hasOwner(), "explicit process factory binds actual shared settings owner");
+        // A builder default alone is lost when settings preparation rereads base sources.
+        // Scope this input to the fixture's existing property save/restore boundary instead.
+        for (var entry : fixtureConfig.entrySet()) {
+          previousFixtureProperties.put(entry.getKey(), System.getProperty(entry.getKey()));
+          System.setProperty(entry.getKey(), entry.getValue());
+        }
+        Files.createDirectories(data);
+        System.setProperty("justsearch.data.dir", data.toString());
+        System.setProperty("user.home", data.resolve("home").toString());
+        for (var entry : Map.of("justsearch.models.dir", data.resolve("missing-models").toString(),
+            "justsearch.index.base_path", data.resolve("index").toString(),
+            "justsearch.ssot.path", data.resolve("SSOT").toString()).entrySet()) {
+          previousFixtureProperties.put(entry.getKey(), System.getProperty(entry.getKey()));
+          System.setProperty(entry.getKey(), entry.getValue());
+        }
+        EngineTestHarness.publishConfig(data, data.resolve("index"),
+            Map.of("justsearch.models.dir", data.resolve("missing-models").toString()));
+        config = ConfigStore.global();
+        if (!watched.isEmpty()) Files.writeString(data.resolve("watched_roots.json"), JSON.writeValueAsString(Map.of(
+            "schemaVersion", 1, "roots", watched.stream().map(path -> Map.of("path", path.toString(), "collection", "documents")).toList())));
+        settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, data.resolve("settings.json"));
+        config.update(io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settings.inspect().settings()));
+        operations = new SqliteOperationStore(data.resolve("operations.db"));
+        var settingsOwner = new SettingsCommitCoordinator(settings, config,
+            () -> { throw new AssertionError("Unexpected settings restart"); }, candidate -> OperationResult.success("prepared"));
+        attempts = new OperationAttemptRunnerImpl(operations, CLOCK,
+            Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS,
+                OperationKind.FORGET, OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE),
+            settingsOwner, new RecordedIngestPlanResolver());
+        authority = OperationAuthority.load(data);
+        resources = new DefaultEngineProcessResources(config.publicationLock());
+        root = EngineRoot.forProcess(operations, attempts, deadlineMs, 100,
+            code -> { throw new AssertionError("Unexpected fatal writer exit " + code); },
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            () -> { throw new AssertionError("Unexpected migration restart"); }, authority, config, resources);
+        try {
+          client = (EngineKnowledgeClient) root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+          server = (KnowledgeServer) field(root, EngineRoot.class, "server");
+          runtime = (RunningRuntime) field(server, KnowledgeServer.class, "ingestLifecycle");
+          queue = (SqliteJobQueue) field(server, KnowledgeServer.class, "jobQueue");
+          identities = (io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore)
+              field(server, KnowledgeServer.class, "documentIdentityStore");
+          loop = (IndexingLoop) field(server.appServices(), DefaultWorkerAppServices.class, "indexingLoop");
+          runtime.commitOps().stopCommitTimer();
+          assertTrue(root.forgetService().hasOwner(), "explicit process factory binds actual shared settings owner");
+        } catch (Exception | Error failure) {
+          try { close(); } catch (Exception | Error cleanup) { failure.addSuppressed(cleanup); } throw failure;
+        }
       } catch (Exception | Error failure) {
-        try { close(); } catch (Exception | Error cleanup) { failure.addSuppressed(cleanup); } throw failure;
+        // Also restore the optional input if construction fails before close() is usable.
+        fixtureConfig.keySet().forEach(name -> {
+          String previous = previousFixtureProperties.get(name);
+          if (previous == null) System.clearProperty(name); else System.setProperty(name, previous);
+        });
+        throw failure;
       }
     }
     void seed(Path path, String content) {
