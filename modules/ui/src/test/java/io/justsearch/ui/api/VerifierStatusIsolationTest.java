@@ -31,6 +31,8 @@ class VerifierStatusIsolationTest {
     final AtomicBoolean block = new AtomicBoolean();
     final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
     final AtomicInteger calls = new AtomicInteger();
+    final AtomicInteger freshRequests = new AtomicInteger();
+    final ConcurrentLinkedQueue<Thread> freshDispatches = new ConcurrentLinkedQueue<>();
     final AtomicReference<WorkerOperationalView> workerView = new AtomicReference<>(view());
     final StatusLifecycleHandler handler;
     Javalin app;
@@ -87,6 +89,35 @@ class VerifierStatusIsolationTest {
       assertNotNull(sample, "publication from " + name);
       return sample;
     }
+    void drainPublications(String heldLane) throws Exception {
+      // The matrix records each owned dispatch through the existing refresh-request callback.
+      // An HTTP deadline can answer before dispatch ends; join those exact threads before inputs change.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
+      while (freshDispatches.size() < freshRequests.get() && System.nanoTime() < deadline) Thread.sleep(10L);
+      assertEquals(freshRequests.get(), freshDispatches.size(), "every owned fresh request must reach dispatch");
+      for (Thread dispatch : freshDispatches) {
+        dispatch.join(Math.max(1L, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
+        assertFalse(dispatch.isAlive(), "the owned fresh dispatch must finish before publication capture");
+      }
+      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
+      field.setAccessible(true);
+      var observations = (java.util.Map<?, ?>) field.get(handler);
+      // Raw completion can enqueue registry and companion work. No producer is resampled here.
+      for (Object key : observations.keySet()) {
+        String name = (String) key;
+        boolean sameOwnerHeld = "bulk-gate".equals(heldLane)
+            && java.util.Set.of("power", "resume", "indexing-hold").contains(name);
+        if (!name.equals(heldLane) && !sameOwnerHeld && !name.equals("registry")
+            && !name.equals("operating") && !name.startsWith("readiness-"))
+          lane(name).completion().get(2, TimeUnit.SECONDS);
+      }
+      lane("registry").completion().get(2, TimeUnit.SECONDS);
+      for (Object key : observations.keySet()) {
+        String name = (String) key;
+        if (!name.equals(heldLane) && (name.equals("operating") || name.startsWith("readiness-")))
+          lane(name).completion().get(2, TimeUnit.SECONDS);
+      }
+    }
     void probe() {
       calls.incrementAndGet();
       if (block.get()) { entered.countDown(); try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new RuntimeException(e); } }
@@ -94,6 +125,7 @@ class VerifierStatusIsolationTest {
     public void close() { release.countDown(); app.stop(); components.close(); }
   }
   tools.jackson.databind.JsonNode get(Fixture f, String query) throws Exception {
+    if (query.equals("?fresh=true")) f.freshRequests.incrementAndGet();
     long t=System.nanoTime();
     var r=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+f.app.port()+"/api/status"+query)).timeout(Duration.ofSeconds(2)).GET().build(),HttpResponse.BodyHandlers.ofString());
     long ms=TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-t);

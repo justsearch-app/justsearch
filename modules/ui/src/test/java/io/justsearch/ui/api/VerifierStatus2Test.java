@@ -3,6 +3,7 @@ package io.justsearch.ui.api;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import io.justsearch.app.api.status.*;
+import java.time.Instant;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.function.Supplier;
@@ -24,6 +25,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     try(var f=new Fixture(true)) {
       var clock = new AtomicLong(System.currentTimeMillis());
       f.handler.setClockForTesting(clock::get);
+      f.handler.setRefreshRequest(() -> f.freshDispatches.add(Thread.currentThread()));
       String heldLane = switch (name) {
         case "inferenceSnapshotSupplier" -> "inference";
         case "conversationProtectionStateSupplier" -> "conversation";
@@ -36,26 +38,46 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         case "lambdamartRerankerSupplier", "gplCoordinatorSupplier" -> "readiness-lambdamartModel";
         default -> throw new AssertionError("unmapped mandatory supplier " + name);
       };
-      var block=new AtomicBoolean(false); var entered=new CountDownLatch(1); var release=new CountDownLatch(1);
+      var block=new AtomicBoolean(false);
+      // The lifecycle supplier is read independently by power/resume/bulk-gate/indexing-hold.
+      var entered=new CountDownLatch(name.equals("knowledgeServerLifecycleSupplier") ? 4 : 1);
+      var release=new CountDownLatch(1);
       var calls=new AtomicInteger();
-      Object known = knownSupplierValue(name, clock.get());
+      var input = new AtomicReference<>(knownSupplierValue(name, clock.get(), false));
       Supplier<Object> supplier=()->{
         calls.incrementAndGet();
         if(block.get()){ entered.countDown(); try{release.await();}catch(InterruptedException e){throw new RuntimeException(e);} }
-        return known;
+        return input.get();
       };
-      set(f.handler,name,supplier);
+      switch (name) {
+        case "devicePlanSupplier" -> f.handler.setDevicePlanSupplier(
+            () -> (io.justsearch.app.services.gpu.GpuProfileResolver.Resolution) supplier.get());
+        case "knowledgeServerLifecycleSupplier" -> f.handler.setKnowledgeServerLifecycleSupplier(
+            () -> (io.justsearch.app.services.worker.KnowledgeServerBootstrap) supplier.get());
+        default -> set(f.handler,name,supplier);
+      }
       if(name.equals("gpuCapabilitiesSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
-      if(name.equals("lambdamartRerankerSupplier"))set(f.handler,"gplCoordinatorSupplier",
-          (Supplier<Object>)()->knownSupplierValue("gplCoordinatorSupplier", clock.get()));
-      if(name.equals("gplCoordinatorSupplier"))set(f.handler,"lambdamartRerankerSupplier",
-          (Supplier<Object>)()->knownSupplierValue("lambdamartRerankerSupplier", clock.get()));
+      if(name.equals("lambdamartRerankerSupplier")) {
+        Object coordinator = knownSupplierValue("gplCoordinatorSupplier", clock.get(), true);
+        set(f.handler,"gplCoordinatorSupplier", (Supplier<Object>)()->coordinator);
+      }
+      if(name.equals("gplCoordinatorSupplier")) {
+        Object unloadedReranker = knownSupplierValue("lambdamartRerankerSupplier", clock.get(), true);
+        set(f.handler,"lambdamartRerankerSupplier", (Supplier<Object>)()->unloadedReranker);
+      }
       if(name.equals("rrdStoreSupplier")) {
-        set(f.handler,"gpuCapabilitiesSupplier",
-            (Supplier<Object>)()->knownSupplierValue("gpuCapabilitiesSupplier", clock.get()));
+        Object capabilities = knownSupplierValue("gpuCapabilitiesSupplier", clock.get(), false);
+        set(f.handler,"gpuCapabilitiesSupplier", (Supplier<Object>)()->capabilities);
         set(f.handler,"cachedGpuStatusAtMs",0L);
       }
+      if (name.equals("vduCapabilitySnapshotSupplier")) f.workerView.set(
+          WorkerOperationalViewBuilder.builder(view()).visualExtraction(
+              new VisualExtractionView(false, false, null, null, 0L, 1L, null, false)).build());
+      Instant beforeProjection = Instant.now();
       f.handler.sampleAndBuildStatusSnapshot();
+      f.drainPublications(null);
+      var beforeCompanion = captureCompanion(f, name);
+      Instant beforeProjected = Instant.now();
       f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
       assertTrue(calls.get() > 0, "mandatory supplier prerequisite must reach " + name);
       var before = f.published(heldLane);
@@ -64,8 +86,9 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       assertFalse(before.staleSource());
       assertNotNull(before.value(), "mandatory supplier must publish a typed value, not absence");
       var knownBody = get(f, "");
-      assertKnownPublic(name, knownBody, before);
-      assertPublicFreshness(name, knownBody, false);
+      assertKnownPublic(name, knownBody, before, false);
+      assertCompanion(name, knownBody, beforeCompanion, false, beforeProjection, beforeProjected);
+      assertPublicFreshness(name, knownBody, false, false);
       long period = before.periodMs();
       assertTrue(heldLane.equals("gpu") ? period == 5_000L || period == 10_000L
           : period == 2_000L || period == 10_000L, "supported producer period");
@@ -77,10 +100,13 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       }
       if(name.equals("gpuCapabilitiesSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
       if(name.equals("rrdStoreSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
+      Instant heldProjection = Instant.now();
       block.set(true);
       var sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
       try {
         assertTrue(entered.await(2,TimeUnit.SECONDS), "mandatory supplier must enter: " + name);
+        sampler.join(6000);
+        assertFalse(sampler.isAlive(), "the sampler must finish without waiting for its held supplier");
         assertSame(before, f.published(heldLane), "held supplier cannot publish a new observation");
         clock.set(before.observedAtMs() + 3L * before.cadenceMs() + 1L);
         assertTrue(clock.get() - before.observedAtMs() > 3L * before.cadenceMs());
@@ -95,8 +121,15 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
           assertFalse(publication.staleSource(), healthy);
           assertNotNull(publication.value(), healthy);
         }
+        f.drainPublications(heldLane);
+        var heldCompanion = captureCompanion(f, name);
+        Instant heldProjected = Instant.now();
         var s=get(f,"");
-        assertPublicFreshness(name, s, true);
+        assertPublicFreshness(name, s, true, false);
+        assertHeldPublic(name, s);
+        boolean companionHeld = heldLane.startsWith("readiness-");
+        assertCompanion(name, s, heldCompanion, false, companionHeld ? beforeProjection : heldProjection,
+            companionHeld ? beforeProjected : heldProjected);
         System.out.println("OWNER="+name+" calls="+calls.get());
         assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"worker independent of "+name);
         assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean(),"registry AI independent of "+name);
@@ -110,9 +143,17 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       } finally {block.set(false);release.countDown();sampler.join(6000);assertFalse(sampler.isAlive());}
       // The released call began before aging. Drain it, then demand a post-hold source read.
       f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
+      f.drainPublications(null);
+      int drainedCalls = calls.get();
+      input.set(knownSupplierValue(name, clock.get(), true));
       if (heldLane.equals("gpu")) set(f.handler,"cachedGpuStatusAtMs",0L);
+      Instant recoveryProjection = Instant.now();
       f.handler.sampleAndBuildStatusSnapshot();
+      f.drainPublications(null);
+      var recoveryCompanion = captureCompanion(f, name);
+      Instant recoveryProjected = Instant.now();
       f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
+      assertTrue(calls.get() > drainedCalls, "recovery must read the changed mandatory supplier");
       var publication = f.published(heldLane);
       assertEquals(clock.get(), publication.observedAtMs(), "recovery must publish after the hold");
       assertNotSame(before, publication);
@@ -120,27 +161,29 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       assertFalse(publication.staleSource());
       assertNotNull(publication.value());
       var recovered=get(f,"");
-      assertKnownPublic(name, recovered, publication);
-      assertPublicFreshness(name, recovered, false);
+      assertKnownPublic(name, recovered, publication, true);
+      assertCompanion(name, recovered, recoveryCompanion, true, recoveryProjection, recoveryProjected);
+      assertPublicFreshness(name, recovered, false, true);
       assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
       assertFalse(recovered.path("readiness").path("components").path("ai").path("stale").asBoolean());
       if(name.equals("inferenceSnapshotSupplier")) assertFalse(recovered.path("operating").path("freshness").path("staleSources").toString().contains("chat"),"recovered inference clears only its stale state");
     }
   }
-  private static Object knownSupplierValue(String name, long nowMs) {
+  private static Object knownSupplierValue(String name, long nowMs, boolean after) {
     return switch (name) {
       case "inferenceSnapshotSupplier" -> new InferenceRuntimeView("ONLINE", null, false, null,
-          new LifecycleCounters(0L, 0L, 0L), true, "Healthy", "", "", "CHAT");
-      case "conversationProtectionStateSupplier" -> "locked";
+          new LifecycleCounters(0L, 0L, 0L), true, after ? "Recovering" : "Healthy", "", "", "CHAT");
+      case "conversationProtectionStateSupplier" -> after ? "unlocked" : "locked";
       case "telemetryHealthSupplier" -> {
         var state = new io.justsearch.telemetry.TelemetryHealthState();
         state.recordFlushFailure();
+        if (after) { state.recordFlushFailure(); state.recordDiskSpaceLowEvent(); }
         yield state;
       }
       case "knowledgeServerLifecycleSupplier" -> {
         var server = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
         var gate = new io.justsearch.core.scheduling.BulkWorkGate();
-        gate.setGame(true);
+        gate.setGame(!after);
         when(server.bulkWork()).thenReturn(gate);
         yield server;
       }
@@ -149,7 +192,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         var caps = mock(io.justsearch.gpu.GpuCapabilities.class);
         var nvml = mock(io.justsearch.gpu.GpuCapabilities.Nvml.class);
         when(nvml.available()).thenReturn(true);
-        when(nvml.gpuUtilizationPercent()).thenReturn(37);
+        when(nvml.gpuUtilizationPercent()).thenReturn(after ? 42 : 37);
         when(caps.nvml()).thenReturn(nvml);
         when(caps.effective()).thenReturn(new io.justsearch.gpu.GpuCapabilities.Effective(
             true, "nvml", io.justsearch.gpu.GpuCapabilities.Confidence.HIGH,
@@ -163,14 +206,15 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         var store = mock(io.justsearch.telemetry.RrdMetricStore.class);
         when(store.query(anyString(), anyLong(), anyLong())).thenAnswer(i ->
             new io.justsearch.telemetry.RrdMetricStore.TimeSeriesResult(i.getArgument(0),
-                new long[] {i.getArgument(2)}, new double[] {37.5}));
+                new long[] {i.getArgument(2)}, new double[] {after ? 42.5 : 37.5}));
         yield store;
       }
       case "vduCapabilitySnapshotSupplier" ->
-          new io.justsearch.app.services.vdu.VduCapabilityState.Snapshot("vdu.circuit_open", nowMs);
-      case "vduProcessingSupplier" -> true;
+          new io.justsearch.app.services.vdu.VduCapabilityState.Snapshot(after ? "vdu.missing_mmproj" : "vdu.circuit_open", nowMs);
+      case "vduProcessingSupplier" -> !after;
       case "devicePlanSupplier" -> {
-        var arena = new io.justsearch.ort.GpuArenaPlan(io.justsearch.ort.GpuArenaPlan.Profile.P12,
+        var arena = new io.justsearch.ort.GpuArenaPlan(after
+            ? io.justsearch.ort.GpuArenaPlan.Profile.P16_PLUS : io.justsearch.ort.GpuArenaPlan.Profile.P12,
             false, new io.justsearch.ort.GpuArenaPlan.Chat(java.util.Optional.empty(),
                 java.util.OptionalInt.empty(), false, 0.0, false),
             java.util.Optional.empty(), java.util.Map.of(), 0, java.util.Set.of());
@@ -180,13 +224,14 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       }
       case "lambdamartRerankerSupplier" -> {
         var reranker = mock(io.justsearch.app.api.gpl.RerankerService.class);
-        when(reranker.isLoaded()).thenReturn(true);
+        when(reranker.isLoaded()).thenReturn(!after);
         yield reranker;
       }
       case "gplCoordinatorSupplier" -> {
         var coordinator = mock(io.justsearch.app.api.gpl.GplStatusProvider.class);
         when(coordinator.getStatus()).thenReturn(new io.justsearch.app.api.gpl.GplJobStatus(
-            io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED, 1L, 1L, 1L, null, null));
+            after ? io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED
+                : io.justsearch.app.api.gpl.GplJobStatus.Status.FAILED, 1L, 1L, 1L, null, null));
         yield coordinator;
       }
       default -> throw new AssertionError("no typed value for " + name);
@@ -194,7 +239,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
   }
 
   private void assertKnownPublic(String name, tools.jackson.databind.JsonNode body,
-      StatusObservation.Sample<?> publication) throws Exception {
+      StatusObservation.Sample<?> publication, boolean after) throws Exception {
     String directField = switch (name) {
       case "inferenceSnapshotSupplier" -> "inference";
       case "conversationProtectionStateSupplier" -> "conversationProtection";
@@ -206,40 +251,51 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     switch (name) {
       case "inferenceSnapshotSupplier" -> {
         assertEquals("ONLINE", body.path("inference").path("phase").asText());
-        assertEquals("Healthy", body.path("inference").path("engineState").asText());
+        assertEquals(after ? "Recovering" : "Healthy", body.path("inference").path("engineState").asText());
         assertEquals("CHAT", body.path("inference").path("leaseHolder").asText());
+        assertEquals(after ? "LOADING" : "READY", body.path("operating").path("chat").path("state").asText());
+        if (after) assertEquals("RECOVERY", body.path("operating").path("chat").path("reason").asText());
       }
       case "conversationProtectionStateSupplier" ->
-          assertEquals("locked", body.path("conversationProtection").path("state").asText());
-      case "telemetryHealthSupplier" ->
-          assertEquals(1L, body.path("telemetryHealth").path("flushFailures").asLong());
-      case "knowledgeServerLifecycleSupplier" ->
-          assertEquals("GAME_MODE", body.path("operating").path("indexing").path("reasons").path(0).asText());
+          assertEquals(after ? "unlocked" : "locked", body.path("conversationProtection").path("state").asText());
+      case "telemetryHealthSupplier" -> {
+        assertEquals(after ? 2L : 1L, body.path("telemetryHealth").path("flushFailureCount").asLong(-1L));
+        assertEquals(0L, body.path("telemetryHealth").path("gaugeCallbackFailureCount").asLong(-1L));
+      }
+      case "knowledgeServerLifecycleSupplier" -> {
+        assertTrue(body.path("operating").path("indexing").path("reasons").isArray());
+        assertEquals(!after, body.path("operating").path("indexing").path("reasons").toString().contains("GAME_MODE"));
+      }
       case "gpuCapabilitiesSupplier", "rrdStoreSupplier" -> {
         assertTrue(body.path("gpu").path("available").asBoolean());
-        assertEquals(37, body.path("gpu").path("gpuUtilizationPercent").asInt());
+        assertEquals(name.equals("gpuCapabilitiesSupplier") && after ? 42 : 37, body.path("gpu").path("gpuUtilizationPercent").asInt());
         assertEquals("nvml", body.path("gpu").path("source").asText());
         assertEquals("HIGH", body.path("gpu").path("confidence").asText());
         assertTrue(body.path("gpu").path("cudaFunctional").asBoolean());
         if (name.equals("rrdStoreSupplier")) {
-          assertEquals(37.5, body.path("gpu").path("recentUtilizationPercent").path(0).asDouble());
-          assertEquals(37.5, body.path("gpu").path("recentMemoryUtilizationPercent").path(0).asDouble());
+          assertEquals(after ? 42.5 : 37.5, body.path("gpu").path("recentUtilizationPercent").path(0).asDouble());
+          assertEquals(after ? 42.5 : 37.5, body.path("gpu").path("recentMemoryUtilizationPercent").path(0).asDouble());
         }
       }
-      case "vduCapabilitySnapshotSupplier" -> assertEquals("vdu.circuit_open",
+      case "vduCapabilitySnapshotSupplier" -> assertEquals(after ? "vdu.missing_mmproj" : "vdu.circuit_open",
           body.path("worker").path("visualExtraction").path("vduBlockedReason").asText());
-      case "vduProcessingSupplier" ->
-          assertTrue(body.path("worker").path("visualExtraction").path("vduProcessing").asBoolean());
+      case "vduProcessingSupplier" -> {
+        assertTrue(body.path("worker").path("visualExtraction").path("vduProcessing").isBoolean());
+        assertEquals(!after, body.path("worker").path("visualExtraction").path("vduProcessing").asBoolean());
+      }
       case "devicePlanSupplier" -> {
-        assertEquals("P12", body.path("operating").path("gpu").path("profile").asText());
+        assertEquals(after ? "P16_PLUS" : "P12", body.path("operating").path("gpu").path("profile").asText());
         assertEquals("MEASURED", body.path("operating").path("gpu").path("profileSource").asText());
       }
       case "lambdamartRerankerSupplier", "gplCoordinatorSupplier" -> {
         var component = body.path("readiness").path("components").path("lambdamartModel");
         assertEquals(json.readTree(json.writeValueAsString(publication.value())), component,
             "the exact readiness value, source and observation time must reach HTTP");
-        assertEquals("READY", component.path("state").asText());
-        assertTrue(component.path("reasonCode").isMissingNode() || component.path("reasonCode").isNull(),
+        assertEquals(name.equals("gplCoordinatorSupplier") && !after ? "DEGRADED" : "READY", component.path("state").asText());
+        if (name.equals("gplCoordinatorSupplier")) assertEquals(after ? "lambdamart.not_configured" : "lambdamart.failed",
+            component.path("reasonCode").asText());
+        else if (after) assertEquals("lambdamart.not_configured", component.path("reasonCode").asText());
+        else assertTrue(component.path("reasonCode").isMissingNode() || component.path("reasonCode").isNull(),
             "loaded model differs from legitimate lambdamart.not_configured absence");
         assertFalse(component.path("stale").asBoolean());
       }
@@ -247,8 +303,84 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     }
   }
 
+  private static void assertHeldPublic(String name, tools.jackson.databind.JsonNode body) {
+    switch (name) {
+      case "inferenceSnapshotSupplier" -> {
+        assertEquals("Healthy", body.path("inference").path("engineState").asText());
+        assertEquals("CHAT", body.path("inference").path("leaseHolder").asText());
+        assertEquals("READY", body.path("operating").path("chat").path("state").asText());
+      }
+      case "telemetryHealthSupplier" -> {
+        assertEquals(1L, body.path("telemetryHealth").path("flushFailureCount").asLong(-1L));
+        assertEquals(0L, body.path("telemetryHealth").path("gaugeCallbackFailureCount").asLong(-1L));
+      }
+      case "vduCapabilitySnapshotSupplier" -> assertEquals("vdu.circuit_open",
+          body.path("worker").path("visualExtraction").path("vduBlockedReason").asText());
+      case "vduProcessingSupplier" -> assertTrue(body.path("worker").path("visualExtraction").path("vduProcessing").asBoolean());
+      case "devicePlanSupplier" -> assertEquals("P12", body.path("operating").path("gpu").path("profile").asText());
+      case "knowledgeServerLifecycleSupplier" -> assertTrue(body.path("operating").path("indexing").path("reasons").toString().contains("GAME_MODE"));
+      default -> { } // Sentinels and the blocked GPL companion are checked separately.
+    }
+  }
+
+  private static String companionDimension(String name) {
+    return switch (name) {
+      case "telemetryHealthSupplier" -> "telemetry";
+      case "vduCapabilitySnapshotSupplier", "vduProcessingSupplier" -> "visualDocumentUnderstanding";
+      case "lambdamartRerankerSupplier", "gplCoordinatorSupplier" -> "lambdamartModel";
+      default -> null;
+    };
+  }
+
+  private static ReadinessComponentView captureCompanion(Fixture f, String name) throws Exception {
+    String dimension = companionDimension(name);
+    return dimension == null ? null : (ReadinessComponentView) f.published("readiness-" + dimension).value();
+  }
+
+  private static void assertCompanion(String name, tools.jackson.databind.JsonNode body,
+      ReadinessComponentView publication, boolean after, Instant started, Instant completed) {
+    String dimension = companionDimension(name);
+    if (dimension == null) return;
+    assertNotNull(publication, "capture the relevant companion before HTTP");
+    String state = "READY";
+    String reason = null;
+    String source;
+    switch (name) {
+      case "telemetryHealthSupplier" -> {
+        source = "telemetry_health";
+        if (after) { state = "DEGRADED"; reason = "telemetry.disk_space_low"; }
+      }
+      case "vduCapabilitySnapshotSupplier", "vduProcessingSupplier" -> {
+        source = "head_vdu_status";
+        if (name.equals("vduCapabilitySnapshotSupplier")) {
+          state = "DEGRADED";
+          reason = after ? "vdu.missing_mmproj" : "vdu.circuit_open";
+        }
+      }
+      case "lambdamartRerankerSupplier", "gplCoordinatorSupplier" -> {
+        source = "head_gpl_status";
+        if (after) reason = "lambdamart.not_configured";
+        else if (name.equals("gplCoordinatorSupplier")) { state = "DEGRADED"; reason = "lambdamart.failed"; }
+      }
+      default -> throw new AssertionError(name);
+    }
+    var component = body.path("readiness").path("components").path(dimension);
+    assertEquals(state, publication.state());
+    assertEquals(reason, publication.reasonCode());
+    assertEquals(source, publication.source());
+    assertEquals(state, component.path("state").asText());
+    assertEquals(reason, component.path("reasonCode").asText(null));
+    assertEquals(source, component.path("source").asText());
+    // Companion time belongs to its real projection, independent of raw fake/event time.
+    Instant observed = Instant.parse(publication.observedAt());
+    assertFalse(observed.isBefore(started), "companion predates its actual projection window");
+    assertFalse(observed.isAfter(completed), "companion is later than its actual projection window");
+    assertEquals(publication.observedAt(), component.path("observedAt").asText(),
+        "HTTP must retain the captured companion's real observation time");
+  }
+
   private static void assertPublicFreshness(String name, tools.jackson.databind.JsonNode body,
-      boolean stale) {
+      boolean stale, boolean after) {
     String dimension = switch (name) {
       case "telemetryHealthSupplier" -> "telemetry";
       case "vduCapabilitySnapshotSupplier", "vduProcessingSupplier" -> "visualDocumentUnderstanding";
@@ -285,7 +417,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     // These wire contracts have no freshness flag or source timestamp. The explicit unknown/
     // unavailable sentinel differs from the known value; sample identity/time is checked separately.
     switch (name) {
-      case "conversationProtectionStateSupplier" -> assertEquals(stale ? "unknown" : "locked",
+      case "conversationProtectionStateSupplier" -> assertEquals(stale ? "unknown" : after ? "unlocked" : "locked",
           body.path("conversationProtection").path("state").asText());
       case "gpuCapabilitiesSupplier", "rrdStoreSupplier" -> {
         assertTrue(body.path("gpu").path("available").isBoolean());
