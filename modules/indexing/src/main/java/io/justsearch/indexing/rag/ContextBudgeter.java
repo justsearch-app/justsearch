@@ -130,6 +130,9 @@ public final class ContextBudgeter {
     if (content.length() > availableForContent) {
       // Append partial content to fit. Surrogate-safe: never cut mid-pair (tempdoc 554 §B.1).
       String truncatedContent = Strings.codePointSafePrefix(content, availableForContent);
+      if (truncatedContent.isEmpty()) {
+        return AppendResult.STOPPED_BUDGET;
+      }
       sb.append(sep).append(header).append(truncatedContent);
       sections.add(new Section(label, truncatedContent, true, sections.size()));
       first = false;

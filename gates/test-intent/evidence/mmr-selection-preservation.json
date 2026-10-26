@@ -1,0 +1,302 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T18:27:17.008Z",
+  "revision": "4773e54e8f7ea4f35b01b2c748ca8cf020e43f50",
+  "tree": "d22c5aa567149229d2e69b25cbf733fec08a5d25",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.rag.MmrSelectorTest.negativeCosineDoesNotBecomeANoveltyReward\" --tests \"io.justsearch.indexing.rag.MmrSelectorTest.validCosinesStayInRangeAtFloatExtremes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6772
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.validQueryIsReusedOrAcquiredExactlyOnce\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.nonpositiveProviderDimensionIsUndeclared\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.denseQueryFailureAllowsOnlyTheExistingOneMmrRetry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.workerParentCheckStillObservesCancellationAfterNormallyReturningProviders\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5269
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/MmrSelectorTest.java#negativeCosineDoesNotBecomeANoveltyReward",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/rag/MmrSelectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe6757852aa3de6421b0d7f104baa5ebe8a5f75e94206419d59d354cc86eaaac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "negativeCosineDoesNotBecomeANoveltyReward()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/MmrSelectorTest.java#validCosinesStayInRangeAtFloatExtremes",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/rag/MmrSelectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe6757852aa3de6421b0d7f104baa5ebe8a5f75e94206419d59d354cc86eaaac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validCosinesStayInRangeAtFloatExtremes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#validQueryIsReusedOrAcquiredExactlyOnce",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dadd8f23033f8360dca634bb4ec0c31b672f96e49a1a7c67759a87c84b692fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validQueryIsReusedOrAcquiredExactlyOnce(supplied) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "validQueryIsReusedOrAcquiredExactlyOnce(null) [2]",
+          "status": "passed"
+        },
+        {
+          "name": "validQueryIsReusedOrAcquiredExactlyOnce(empty) [3]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#nonpositiveProviderDimensionIsUndeclared",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dadd8f23033f8360dca634bb4ec0c31b672f96e49a1a7c67759a87c84b692fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nonpositiveProviderDimensionIsUndeclared(0) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "nonpositiveProviderDimensionIsUndeclared(-1) [2]",
+          "status": "passed"
+        },
+        {
+          "name": "nonpositiveProviderDimensionIsUndeclared(2) [3]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dadd8f23033f8360dca634bb4ec0c31b672f96e49a1a7c67759a87c84b692fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dadd8f23033f8360dca634bb4ec0c31b672f96e49a1a7c67759a87c84b692fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference(position) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference(unknown) [2]",
+          "status": "passed"
+        },
+        {
+          "name": "positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference(default) [3]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dadd8f23033f8360dca634bb4ec0c31b672f96e49a1a7c67759a87c84b692fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback(NONE) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback(REQUIRED) [2]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#denseQueryFailureAllowsOnlyTheExistingOneMmrRetry",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4346be1a4e227d688c088dd5396dd2858d11cc675796ece06b39c4d4a13da146",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "denseQueryFailureAllowsOnlyTheExistingOneMmrRetry(null) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "denseQueryFailureAllowsOnlyTheExistingOneMmrRetry(empty) [2]",
+          "status": "passed"
+        },
+        {
+          "name": "denseQueryFailureAllowsOnlyTheExistingOneMmrRetry(throw) [3]",
+          "status": "passed"
+        },
+        {
+          "name": "denseQueryFailureAllowsOnlyTheExistingOneMmrRetry(valid) [4]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#workerParentCheckStillObservesCancellationAfterNormallyReturningProviders",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4346be1a4e227d688c088dd5396dd2858d11cc675796ece06b39c4d4a13da146",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "workerParentCheckStillObservesCancellationAfterNormallyReturningProviders(query) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "workerParentCheckStillObservesCancellationAfterNormallyReturningProviders(document) [2]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4346be1a4e227d688c088dd5396dd2858d11cc675796ece06b39c4d4a13da146",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b1462152fbf317526e7bff86dbe72605a5da94d4",
+    "revision": "b1462152fbf317526e7bff86dbe72605a5da94d4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.rag.MmrSelectorTest.negativeCosineDoesNotBecomeANoveltyReward\" --tests \"io.justsearch.indexing.rag.MmrSelectorTest.validCosinesStayInRangeAtFloatExtremes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6643
+      },
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.validQueryIsReusedOrAcquiredExactlyOnce\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.nonpositiveProviderDimensionIsUndeclared\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.denseQueryFailureAllowsOnlyTheExistingOneMmrRetry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.workerParentCheckStillObservesCancellationAfterNormallyReturningProviders\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 8232
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/MmrSelectorTest.java#negativeCosineDoesNotBecomeANoveltyReward",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/MmrSelectorTest.java#validCosinesStayInRangeAtFloatExtremes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#validQueryIsReusedOrAcquiredExactlyOnce",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#nonpositiveProviderDimensionIsUndeclared",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagContextOpsDiversifyTest.java#newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#denseQueryFailureAllowsOnlyTheExistingOneMmrRetry",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#workerParentCheckStillObservesCancellationAfterNormallyReturningProviders",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0972f853bdbbdd8effe5ba062319696cd66168643b977e657458cd6d8cfa68d1"
+}
