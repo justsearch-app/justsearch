@@ -82,7 +82,7 @@ export class DraftPersistence implements ReactiveController {
   private rehydrated = false;
   private restorationFailed = false;
   /** An unreadable raw draft is not evidence that the durable slot was empty. */
-  get restoreUnavailable(): boolean { return this.restorationFailed; }
+  get restoreUnavailable(): boolean { return this.restorationFailed || !this.provider.readable; }
   private attachment: {
     key: string; expected: string | null; safe: boolean;
     validate: (value: unknown) => boolean; get: () => unknown; failed: () => void;
@@ -117,6 +117,23 @@ export class DraftPersistence implements ReactiveController {
     }
   }
 
+  /** Retire only the last raw snapshot; byte equality never establishes preparation authority. */
+  retireRawDraft(): boolean {
+    const p = this.provider;
+    if (!p.readable) return false;
+    try {
+      if (localStorage.getItem(storageKey(p.key)) !== p.saved) throw new Error('raw owner changed');
+      localStorage.removeItem(storageKey(p.key));
+      if (localStorage.getItem(storageKey(p.key)) !== null) throw new Error('raw removal not acknowledged');
+      p.saved = null;
+      return true;
+    } catch {
+      // An unreadable or changed slot may hold a sole successor: lifecycle flushes cannot replace it.
+      p.readable = false;
+      return false;
+    }
+  }
+
   /** Opt-in, fixed-owner recovery for a surviving tab session. The raw local draft stays a string. */
   openSessionAttachment(
     owner: string,
@@ -145,10 +162,11 @@ export class DraftPersistence implements ReactiveController {
     }
   }
 
-  /** ACK before issuance/clear. Compare bytes rejects stale overlapping mounts; never delete on failure. */
-  saveSessionAttachment(payload: unknown): boolean {
+  /** ACK before issuance/clear. Stale bytes refuse before writing; a returned write can remain unconfirmed after ACK failure. */
+  saveSessionAttachment(payload: unknown): 'saved' | 'refused' | 'unconfirmed' {
     const a = this.attachment;
-    if (a === null || !a.safe) return false;
+    if (a === null || !a.safe) return 'refused';
+    let applied = false;
     try {
       if (!a.validate(payload)) throw new Error('invalid');
       // Each ACK advances the opaque incarnation, even when the inputs return to identical text.
@@ -156,12 +174,13 @@ export class DraftPersistence implements ReactiveController {
       const bytes = JSON.stringify({ version: 1, incarnation: crypto.randomUUID(), payload });
       if (new TextEncoder().encode(bytes).length > 262144 || sessionStorage.getItem(a.key) !== a.expected) throw new Error('stale or oversize');
       sessionStorage.setItem(a.key, bytes);
+      applied = true;
       if (sessionStorage.getItem(a.key) !== bytes) throw new Error('not acknowledged');
       a.expected = bytes;
-      return true;
+      return 'saved';
     } catch {
       a.failed();
-      return false;
+      return applied ? 'unconfirmed' : 'refused';
     }
   }
 
