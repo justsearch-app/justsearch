@@ -106,7 +106,12 @@ public final class Release030RecoveryState {
 
   public synchronized void bindAdmissions(List<SwitchBufferCapableQueue.SwitchBufferOp> receipts) {
     try {
-      byte[] bytes = JSON.writeValueAsString(receipts).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      var collections = new java.util.TreeMap<String,String>();
+      for (var receipt : receipts) if ("SYNC_ROOT".equals(receipt.op())) {
+        String collection = rootCollection(receipt);
+        if (collection != null) collections.put(receipt.retirementUuid(), collection);
+      }
+      byte[] bytes = JSON.writeValueAsString(List.of(receipts, collections)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
       admissionSet = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
     } catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
   }
@@ -307,12 +312,30 @@ public final class Release030RecoveryState {
   }
   public synchronized void retainRootCollection(SwitchBufferCapableQueue.SwitchBufferOp root,String collection) throws IOException {
     if (!rootReceipts().contains(root)) throw new IOException("ROOT collection lacks retained intent");
-    if (collection != null && !collection.isBlank()) {
-      state.setProperty(RETIRE + "root-collection|" + root.retirementUuid(),collection);save();
-    }
+    if (!java.util.Objects.equals(rootCollection(root), normalizedCollection(collection)))
+      throw new IOException("ROOT collection is unknown or conflicts with its creator intent");
   }
   public synchronized String rootCollection(SwitchBufferCapableQueue.SwitchBufferOp root) {
+    if (!JSON.writeValueAsString(root).equals(state.getProperty(RECEIPT + root.retirementUuid()))) return null;
     return state.getProperty(RETIRE + "root-collection|" + root.retirementUuid());
+  }
+  private static String normalizedCollection(String collection) {
+    return collection == null || collection.isBlank() ? "default" : collection;
+  }
+  /** Fresh creator publication only; historical inventory never calls this overload. */
+  public synchronized void retainRootHead(SwitchBufferCapableQueue.SwitchBufferOp receipt, String collection) throws IOException {
+    captureFreshRootCollection(receipt, collection);
+    retainRootHead(receipt);
+  }
+  /** A precommit slot has no authority until the matching committed receipt is retained. */
+  public synchronized void captureFreshRootCollection(SwitchBufferCapableQueue.SwitchBufferOp receipt, String collection) throws IOException {
+    String key = RETIRE + "root-collection|" + receipt.retirementUuid();
+    String normalized = normalizedCollection(collection);
+    if (state.containsKey(key) && !normalized.equals(state.getProperty(key)))
+      throw new IOException("Conflicting ROOT creator collection");
+    state.setProperty(key, normalized);
+    admissionsChanged();
+    save();
   }
   private void retainRoot(SwitchBufferCapableQueue.SwitchBufferOp receipt) {
     state.setProperty(RECEIPT + receipt.retirementUuid(), JSON.writeValueAsString(receipt));

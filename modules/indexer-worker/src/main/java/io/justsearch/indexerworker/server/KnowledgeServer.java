@@ -7338,7 +7338,7 @@ public final class KnowledgeServer implements Closeable {
     queue.prepareRelease030ExplicitFiles();
     if (release030Recovery.retiringBuild()) {
       if (!release030Recovery.rootsJournaled()) {
-        queue.journalRelease030Roots(release030Recovery.retiringBuilding(), release030Recovery.pendingRoots());
+        queue.journalRelease030Roots(release030Recovery.retiringBuilding(), release030Recovery.pendingRoots(), this::release030Collection);
         release030RetirementCut("release030-roots-journaled");
         queue.inventoryRetirementRoots();
         release030Recovery.markRootsJournaled();

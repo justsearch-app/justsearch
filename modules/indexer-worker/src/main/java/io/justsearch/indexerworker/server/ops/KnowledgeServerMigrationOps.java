@@ -2321,7 +2321,7 @@ public final class KnowledgeServerMigrationOps {
           Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot
               .decode(laterSync.payload()).rootPath()).toAbsolutePath().normalize();
           String collection = ((SqliteJobQueue)context.jobQueue()).retirementRootCollection(laterSync);
-          if (collection == null) collection = context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(upsert.path(),SchemaFields.COLLECTION);
+          if (collection == null) return false;
           upsert = new SwitchBufferUpsert(upsert.path(), collection,
               upsert.provenance(), upsert.unitRevision(), upsert.sourceSha256(), root);
         }

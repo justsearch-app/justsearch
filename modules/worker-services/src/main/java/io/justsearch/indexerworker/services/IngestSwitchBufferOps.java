@@ -189,11 +189,11 @@ final class IngestSwitchBufferOps {
   // ==================== Per-endpoint buffer methods ====================
 
   SwitchBufferCapableQueue.SwitchBufferOp journalSyncRootForGeneration(String generation, String rootPath, boolean force,
-      JobQueue.EnqueueProvenance provenance) {
+      JobQueue.EnqueueProvenance provenance, String collection) {
     String root = resolveNormalizedPathPrefix(rootPath);
     if (!(jobQueue instanceof SwitchBufferCapableQueue queue)
         || !queue.putSyncRootForGeneration(generation, switchBufferSyncRootKey(root),
-            new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(root, force, provenance))) {
+            new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(root, force, provenance), collection)) {
       throw switchBufferUnavailable();
     }
     return ((SwitchBufferCapableQueue) jobQueue).retirementRootReceipt(generation,switchBufferSyncRootKey(root));
@@ -201,11 +201,11 @@ final class IngestSwitchBufferOps {
 
   SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(
       SwitchBufferCapableQueue sbq, String rootPath, boolean force,
-      JobQueue.EnqueueProvenance provenance) throws Exception {
+      JobQueue.EnqueueProvenance provenance, String collection) throws Exception {
     String resolvedRoot = resolveNormalizedPathPrefix(rootPath);
     if (!sbq.putSyncRootForGeneration(buildingGenerationForFileAdmission(),
         switchBufferSyncRootKey(resolvedRoot),
-        new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(resolvedRoot, force, provenance))) {
+        new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(resolvedRoot, force, provenance), collection)) {
       throw switchBufferUnavailable();
     }
     return deferredSyncDirectoryResponse();

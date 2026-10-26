@@ -301,6 +301,14 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         "Generation-scoped sync-root buffering is unavailable");
   }
 
+  /** Fresh creator namespace, frozen with the retained ROOT before acknowledgement. */
+  default boolean putSyncRootForGeneration(String generation, String key,
+      SwitchBufferSyncRoot payload, String collection) {
+    if (release030RetirementGeneration() != null)
+      throw new UnsupportedOperationException("Creator ROOT namespace admission unavailable");
+    return putSyncRootForGeneration(generation, key, payload);
+  }
+
   /** Durably freezes legacy prefix scopes before any reader may apply them. */
   default void scopeLegacyPrefixReceipts(
       java.util.function.Function<String, PathPrefixScope> scope) {

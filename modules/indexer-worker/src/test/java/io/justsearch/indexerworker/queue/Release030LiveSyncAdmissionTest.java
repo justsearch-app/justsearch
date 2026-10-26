@@ -84,7 +84,7 @@ final class Release030LiveSyncAdmissionTest {
       raw=q.retirementReplayOps().getFirst();frozen=q.release030RecoveryState().legacyExpectation(raw);
       assertNotNull(frozen);assertEquals("original",frozen.collection());
       String key="sync_root:"+io.justsearch.indexerworker.util.PathNormalizer.normalizePathPrefix(root.toString());
-      assertTrue(q.putSyncRootForGeneration("building",key,new SwitchBufferSyncRoot(root.toString(),true,null)));
+      assertTrue(q.putSyncRootForGeneration("building",key,new SwitchBufferSyncRoot(root.toString(),true,null),"new"));
       var token=q.retirementRootReceipt("building",key);
       long admissions=q.switchBufferAdmissions();
       assertEquals(2,q.enqueueRetirementRootEntries(token,List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root),

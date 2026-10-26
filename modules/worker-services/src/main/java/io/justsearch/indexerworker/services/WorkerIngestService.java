@@ -1193,8 +1193,12 @@ public final class WorkerIngestService {
         return syncDirectoryErrorResponse("Upgrade recovery waits for its writable root");
       }
       var binding = rootWatcherRegistry.subscription(root);
+      String retained = originalRoot != null && jobQueue instanceof SwitchBufferCapableQueue queue
+          ? queue.retirementRootCollection(originalRoot) : null;
+      if (originalRoot != null && retained == null)
+        return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
       return syncOps.execute(root.toString(), true, null, cancelled,
-          binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY,
+          originalRoot != null ? retained : binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY,
           admission -> registry.admitRecovery(root, mark,
               () -> exclusionRoots.get().stream().anyMatch(path -> path.toAbsolutePath().normalize()
                   .equals(root.toAbsolutePath().normalize())) || configuredRecoveryRoots.contains(root), admission),originalRoot);
@@ -1208,10 +1212,9 @@ public final class WorkerIngestService {
       Path root=Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).rootPath()).toAbsolutePath().normalize();
       var refused=refuseSyncOfRootOnAnotherVolume(root.toString());if(refused!=null)return refused;
       if(!rootWitness.admits(root)||!canApplyWatcherReceipts())return syncDirectoryErrorResponse("ROOT membership waits for its source");
-      var binding=rootWatcherRegistry.subscription(root);
       String retained=jobQueue instanceof SwitchBufferCapableQueue queue?queue.retirementRootCollection(original):null;
-      String collection=binding!=null?binding.collection():retained!=null?retained:configuredCollection;
-      if(jobQueue instanceof SwitchBufferCapableQueue queue)queue.retainRetirementRootCollection(original,collection);
+      if(retained==null)return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
+      String collection=retained;
       long mark=rootWatcherRegistry.removalMark();
       return syncOps.enumerateRetirementRoot(root.toString(),collection,cancelled,automatic,
           admission->automatic?rootWatcherRegistry.admitRecovery(root,mark,
@@ -2509,7 +2512,7 @@ public final class WorkerIngestService {
             "syncDirectory",
             sbq ->
                 switchBufferOps.bufferSyncDirectoryDuringSwitching(
-                    sbq, rootPath, force, provenance));
+                    sbq, rootPath, force, provenance, creatorRootCollection(rootPath)));
       }
       if (!finalCutoverReplay && switchBufferOps.migratingGeneration() != null) {
         if (hasDistinctWritableServingTarget()) {
@@ -2538,20 +2541,24 @@ public final class WorkerIngestService {
         if (binding == null && effectiveMode == SyncDirectoryOps.AdmissionMode.DEFAULT) {
           return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
         }
-        String collection=binding==null && origin!=null && jobQueue instanceof SwitchBufferCapableQueue queue
+        String collection=origin!=null && jobQueue instanceof SwitchBufferCapableQueue queue
             ? queue.retirementRootCollection(origin) : binding==null?null:binding.collection();
-        if(origin!=null && liveSync && jobQueue instanceof SwitchBufferCapableQueue queue)
-          queue.retainRetirementRootCollection(origin,collection);
+        if(origin!=null && collection==null)return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
         return syncOps.execute(rootPath, force, provenance, ctx::cancelled,collection,effectiveMode,origin);
       };
       if (liveSync && retirement != null) {
         return withFileMutationFence(() -> {
-          var origin=switchBufferOps.journalSyncRootForGeneration(retirement,rootPath,force,provenance);
+          var origin=switchBufferOps.journalSyncRootForGeneration(retirement,rootPath,force,provenance,creatorRootCollection(rootPath));
           return sync.apply(origin);
         });
       }
       return sync.apply(originalRoot);
     }
+  }
+
+  private String creatorRootCollection(String rootPath) {
+    var binding=rootWatcherRegistry.subscription(parsedRoot(rootPath));
+    return binding==null?null:binding.collection();
   }
 
   /**
