@@ -1464,6 +1464,7 @@ export class SearchV3View extends JfElement {
     if (!this.departureBlocked && !this.draftPersistence.restoreUnavailable && !this.draftReview && task === null && !this.recoveryError && companions.length === 0 && this.aiSnapshot?.chatUnloadedReason == null) return nothing;
     const eligible = task !== null && this.humanOwned(task) && task.saved.delivery === 'unaccepted' && task.refusal !== null;
     return html`<div class="notice recovery-notice" role="status" data-testid="sv3-residency-notice">
+      ${this.recoveryError ? html`<p role="alert">${this.recoveryError}</p>` : nothing}
       ${this.departureBlocked ? html`<p role="alert" data-testid="sv3-departure-notice">The address has moved, but this view did not leave safely. Text and settings are kept here. Use Forward or select this conversation to return before sending; no new task will be issued from this mismatched view.</p>` : nothing}
       ${this.draftPersistence.restoreUnavailable ? html`<p role="alert">A raw draft could not be read or safely retired. Saved text may remain; raw draft saving is unavailable in this view. Keep or copy current text and settings before closing.</p>` : nothing}
       ${this.draftReview ? html`<section data-testid="sv3-draft-review" aria-label="Review restored draft">
@@ -1495,7 +1496,6 @@ export class SearchV3View extends JfElement {
         <button type="button" data-testid="sv3-recovery-review-copy" @click=${() => this.reviewRecoveryDraft(draft)}>Review this draft</button>
         <button type="button" data-testid="sv3-recovery-discard-copy" @click=${() => this.discardRecoveryDraft(draft)}>Discard this extra recovery copy</button>`)}
       ${task !== null || companions.length > 0 ? html`<p>Extra recovery copies last only for this tab session. They are not permanent history and may be lost when the tab or app closes. Your current draft uses normal draft saving when storage is available.</p>` : nothing}
-      ${this.recoveryError ? html`<p role="alert">${this.recoveryError}</p>` : nothing}
       ${task === null && this.aiSnapshot?.chatUnloadedReason ? html`<p>${reasonFor(this.aiSnapshot.chatUnloadedReason).wording}</p>` : nothing}
     </div>`;
   }
@@ -2161,10 +2161,20 @@ export class SearchV3View extends JfElement {
     void this.refreshHistory(storeActiveId);
   }
 
+  private revealRecoveryOutcome(): void {
+    const warning = this.recoveryError, departure = this.departureBlocked;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      if (!this.isConnected || this.recoveryError !== warning || this.departureBlocked !== departure) return;
+      const row = this.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-residency-notice"]');
+      if (row) row.scrollTop = 0;
+    });
+  }
+
   private blockDeparture(): void {
     this.departureBlocked = true;
     this.revokeHumanTask(true);
-    this.requestUpdate();
+    this.revealRecoveryOutcome();
   }
 
   /**
@@ -5234,7 +5244,7 @@ export class SearchV3View extends JfElement {
         this.recoveryError = this.recoveryWriteUnconfirmed
           ? 'Partial, unconfirmed retirement: New could not be confirmed. This draft’s saved settings may already have been retired and exact settings may not survive closing or reloading. Current text and settings are still visible here; raw draft and reload pointer have not been retired. Keep or copy current text and settings before leaving.'
           : `New was not confirmed. ${this.recoveryError || 'Recovery could not be acknowledged. Current text and settings are kept here.'}`;
-        this.requestUpdate();
+        this.revealRecoveryOutcome();
       }
       return false;
     }
@@ -5243,7 +5253,7 @@ export class SearchV3View extends JfElement {
       // Independent stores are not transactional: keep the live owner and its recoverable proposal.
       this.saveRecovery();
       this.recoveryError = 'New was not confirmed: raw draft or reload-pointer retirement could not be acknowledged. Current text and settings are kept here; saved copies may remain. Raw saving may be unavailable. Saved settings may not survive reload. Keep or copy current text and settings before closing, or reload to review available saved copies.';
-      this.requestUpdate();
+      this.revealRecoveryOutcome();
       return false;
     }
     if (leaving !== null) {
