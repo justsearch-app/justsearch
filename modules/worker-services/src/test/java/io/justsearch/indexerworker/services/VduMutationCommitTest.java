@@ -106,6 +106,41 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
   }
 
   @Test
+  void supplementaryVduReplacementIsExactAfterCommitAndReopen() throws Exception {
+    String content = "a" + "\uD83D\uDE00\uD840\uDC00".repeat(3000);
+    try (var runtime = open()) {
+      seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
+      var service = service(runtime);
+      var context = procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
+          .setDocId(DOC).setAttemptId(ATTEMPT).build(), context).getSuccess());
+      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder()
+          .setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
+          .setExtractedContent(content).build(), context);
+      assertTrue(result.getSuccess(), result.getError());
+    }
+    try (var runtime = open()) {
+      assertEquals(content, runtime.documentFieldOps().getDocumentField(DOC, SchemaFields.CONTENT));
+      var chunks = runtime.documentFieldOps().queryDocIdsByField(SchemaFields.PARENT_DOC_ID, DOC, 100);
+      assertTrue(chunks.size() > 1);
+      for (String chunkId : chunks) {
+        int start = Integer.parseInt(runtime.documentFieldOps().getDocumentField(chunkId, SchemaFields.CHUNK_START_CHAR));
+        int end = Integer.parseInt(runtime.documentFieldOps().getDocumentField(chunkId, SchemaFields.CHUNK_END_CHAR));
+        assertFalse(start > 0 && Character.isHighSurrogate(content.charAt(start - 1))
+            && Character.isLowSurrogate(content.charAt(start)));
+        assertFalse(end < content.length() && Character.isHighSurrogate(content.charAt(end - 1))
+            && Character.isLowSurrogate(content.charAt(end)));
+        var hit = runtime.readPathOps().search(new TermQuery(new Term(SchemaFields.DOC_ID, chunkId)),
+            1, java.util.Set.of(SchemaFields.CHUNK_CONTENT),
+            io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSort.RELEVANCE, null).hits().get(0);
+        assertEquals(content.substring(start, end), hit.fields().get(SchemaFields.CHUNK_CONTENT));
+        assertEquals("PENDING", runtime.documentFieldOps().getDocumentField(chunkId, SchemaFields.CHUNK_EMBEDDING_STATUS));
+        assertEquals("0", runtime.documentFieldOps().getDocumentField(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
+      }
+    }
+  }
+
+  @Test
   void processingClaimAndRecoveryAreCommittedBeforeTheirCountsReturn() throws Exception {
     try (var runtime = open()) {
       seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);

@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:d5f592a3ea781bceaed40b806308911f06b5304496605613c03a05dae2dfa7a9"
+  },
+  "createdAt": "2026-10-25T21:04:06.399Z",
+  "revision": "f8e16e326bf30acc885eebcca0064c0e0d91aaff",
+  "tree": "f781abe11e64573015313d4d0009703e1e780f3c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest.legacyMatchingProofRmwAndRenamePreservePostingsAndDenseVector\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 89720
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java#legacyMatchingProofRmwAndRenamePreservePostingsAndDenseVector",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b429d894f44d6dfe5db6a688b6a172735df0e4c7afc532b554552612f4b30fba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyMatchingProofRmwAndRenamePreservePostingsAndDenseVector()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f3ab37d32d0a78a240ecc267369181c1ff5a4883c57e36d06eda4793722e0fa6"
+}

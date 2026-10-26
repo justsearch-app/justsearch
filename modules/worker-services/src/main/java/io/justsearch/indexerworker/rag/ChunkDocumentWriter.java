@@ -126,9 +126,6 @@ public final class ChunkDocumentWriter {
     if (indexingCoordinator == null || parentDocId == null || parentDocId.isBlank()) {
       return 0;
     }
-    if (plan == null || !plan.revision().equals(revision(content))) {
-      throw new IllegalArgumentException("The chunk plan was not cut from this parent content");
-    }
     return writeChunks(indexingCoordinator, parentDocId, plan, content, meta, chunkSpladeEnabled,
         false);
   }
@@ -174,6 +171,26 @@ public final class ChunkDocumentWriter {
     }
   }
 
+  /** Validates the entire replacement before publishing its parent or deleting any old child. */
+  public static void validatePlan(ChunkPlan plan, String content) {
+    if (plan == null || !plan.revision().equals(revision(content))) {
+      throw new IllegalArgumentException("The chunk plan was not cut from this parent content");
+    }
+    String source = content == null ? "" : content;
+    for (int i = 0; i < plan.total(); i++) {
+      ChunkSplitter.Chunk chunk = plan.chunks().get(i);
+      int start = chunk.startChar();
+      int end = chunk.endChar();
+      if (chunk.index() != i || chunk.content() == null || chunk.content().isBlank()
+          || start < 0 || end <= start || end > source.length()
+          || ChunkSplitter.bisectsSurrogatePair(source, start)
+          || ChunkSplitter.bisectsSurrogatePair(source, end)
+          || !source.substring(start, end).equals(chunk.content())) {
+        throw new IllegalArgumentException("Invalid chunk plan entry at ordinal " + i);
+      }
+    }
+  }
+
   private static String revision(String content) {
     return ChunkParentRevision.sha256Hex(content == null ? "" : content);
   }
@@ -181,6 +198,7 @@ public final class ChunkDocumentWriter {
   private static int writeChunks(
       IndexingCoordinator indexingCoordinator, String parentDocId, ChunkPlan plan, String content,
       ParentChunkMetadata meta, boolean chunkSpladeEnabled, boolean declareParent) {
+    validatePlan(plan, content);
     if (plan.total() == 0) {
       indexingCoordinator.deleteChunksForParentDocId(parentDocId);
       if (declareParent) declareChunkSet(indexingCoordinator, parentDocId, 0, plan.revision());
@@ -210,10 +228,6 @@ public final class ChunkDocumentWriter {
     int indexed = 0;
     for (ChunkSplitter.Chunk chunk : chunks) {
       String chunkContent = chunk.content();
-      if (chunkContent == null || chunkContent.isBlank()) {
-        continue;
-      }
-
       Map<String, Object> fields = new HashMap<>();
       String chunkId = ChunkIds.newChunkDocId();
       fields.put(SchemaFields.DOC_ID, chunkId);

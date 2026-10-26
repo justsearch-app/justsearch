@@ -2,6 +2,7 @@ package io.justsearch.indexing.chunking;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexing.chunking.ChunkSplitter.Chunk;
 import io.justsearch.indexing.chunking.ChunkSplitter.Mode;
@@ -23,6 +24,30 @@ import net.jqwik.api.constraints.StringLength;
  * exactly at text end, exercising that guard.
  */
 class ChunkTilingPropertyTest {
+
+  @Property(tries = 100)
+  void supplementaryWindowsPreservePairs(
+      @ForAll @IntRange(min = 1, max = 300) int pairs,
+      @ForAll @IntRange(min = 0, max = 7) int prefix,
+      @ForAll @IntRange(min = 0, max = 510) int target,
+      @ForAll @IntRange(min = 0, max = 600) int overlap,
+      @ForAll Mode mode) {
+    String content = "a".repeat(prefix) + "\uD83D\uDE00\uD840\uDC00".repeat(pairs);
+    var chunks = ChunkSplitter.splitWithMetadata(content, target, overlap, mode);
+    int previousEnd = 0;
+    for (var chunk : chunks) {
+      for (int offset : new int[] {chunk.startChar(), chunk.endChar()}) {
+        assertFalse(offset > 0 && offset < content.length()
+            && Character.isHighSurrogate(content.charAt(offset - 1))
+            && Character.isLowSurrogate(content.charAt(offset)));
+      }
+      assertTrue(chunk.startChar() <= previousEnd);
+      assertTrue(chunk.endChar() > previousEnd);
+      assertEquals(content.substring(chunk.startChar(), chunk.endChar()), chunk.content());
+      previousEnd = chunk.endChar();
+    }
+    assertEquals(content.length(), previousEnd);
+  }
 
   @Property(tries = 400)
   void splitterOutputAlwaysFormsAValidTiling(

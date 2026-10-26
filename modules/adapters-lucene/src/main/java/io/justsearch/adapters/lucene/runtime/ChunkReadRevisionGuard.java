@@ -2,6 +2,7 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import io.justsearch.indexing.chunking.ChunkParentRevision;
+import io.justsearch.indexing.chunking.ChunkSplitter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -82,6 +83,12 @@ final class ChunkReadRevisionGuard {
           slice.parentDocId(),
           ChunkParentRevision.shortForm(chunkRevision),
           ChunkParentRevision.shortForm(parentRevision));
+      return Optional.empty();
+    }
+    // Retained v1 geometry must not expose a newly malformed slice. Matching-proof RMW still
+    // reconstructs the original substring independently, preserving its indexed artifacts.
+    if (ChunkSplitter.bisectsSurrogatePair(content, slice.startChar())
+        || ChunkSplitter.bisectsSurrogatePair(content, slice.endChar())) {
       return Optional.empty();
     }
     return Optional.of(content.substring(slice.startChar(), slice.endChar()));
