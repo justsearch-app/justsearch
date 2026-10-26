@@ -406,9 +406,13 @@ final class WorkerSearchServiceRagBudgetTest
       String parent = chunk.getParentDocId().equals("doc-1") ? syntheticText : realText;
       String literal = parent.substring(chunk.getStartChar(), chunk.getEndChar());
       assertEquals(literal, response.getSections(index).getContent());
-      assertTrue(literal.startsWith(chunk.getExcerpt()));
-      assertFalse(chunk.getExcerpt().isBlank());
-      assertTrue(chunk.getExcerpt().length() <= 240, "citation previews keep their existing bound");
+      assertFalse(response.getSections(index).getTruncated(), "the fixture has room for each literal span");
+      String preview = chunk.getExcerpt();
+      String previewBody = literal.length() > 240 ? preview.substring(0, preview.length() - 3) : preview;
+      assertTrue(literal.startsWith(previewBody), "the preview body comes from the exact parent span");
+      assertFalse(previewBody.isBlank());
+      assertTrue(previewBody.length() <= 240, "the literal body keeps its existing character bound");
+      assertTrue(preview.length() <= 243, "a truncated preview adds three ellipsis characters");
     }
     verify(provider, times(1)).embedQuery(anyString(), any());
     verify(provider, org.mockito.Mockito.atLeast(5)).embedDocument(anyString(), any());
@@ -431,9 +435,17 @@ final class WorkerSearchServiceRagBudgetTest
       var section = response.getSections(i);
       assertEquals(i, section.getSectionIndex());
       assertEquals(i, section.getChunkIndex());
+      String expectedPreview = section.getContent();
+      if (expectedPreview.length() > 240) {
+        // These worded fixtures have a space within the producer's 40-character lookback.
+        // The ellipsis is a display marker, separate from the literal prefix and its 240-char cap.
+        int boundary = expectedPreview.lastIndexOf(' ', 240);
+        assertTrue(boundary >= 200, "the fixture supplies a word boundary within the lookback");
+        expectedPreview = expectedPreview.substring(0, boundary).stripTrailing() + "...";
+      }
       assertFalse(response.getChunks(i).getExcerpt().isBlank());
-      assertTrue(section.getContent().startsWith(response.getChunks(i).getExcerpt()),
-          "the bounded citation preview belongs to the same literal section");
+      assertEquals(expectedPreview, response.getChunks(i).getExcerpt(),
+          "the citation is the exact literal section prefix with its producer-owned ellipsis");
       assertEquals(ContextBudgeter.sectionHeader(i + 1, section.getSourceLabel()) + section.getContent(),
           rendered[i]);
     }
