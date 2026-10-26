@@ -3252,12 +3252,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     lock.lock();
     try {
       ensureOpen();
-      String key = folder ? PathNormalizer.normalizePathPrefix(path) : PathNormalizer.normalizePath(path);
+      String key = PathNormalizer.normalizePath(path);
       if (key == null || key.isBlank()) throw new IllegalArgumentException("Forget requires an exact nonempty path");
-      String predicate = folder ? "path >= ? AND path < ?" : "path = ?";
+      String predicate = folder ? "(path = ? OR (path >= ? AND path < ?))" : "path = ?";
       try (var query = connection.prepareStatement("SELECT 1 FROM jobs WHERE " + predicate + " LIMIT 1")) {
         query.setString(1, key);
-        if (folder) query.setString(2, upperBoundExclusive(key));
+        if (folder) {
+          String prefix = PathNormalizer.normalizePathPrefix(key);
+          query.setString(2, prefix);
+          query.setString(3, upperBoundExclusive(prefix));
+        }
         try (var row = query.executeQuery()) { return !row.next(); }
       }
     } catch (SQLException unavailable) {

@@ -4,7 +4,6 @@ package io.justsearch.ui.api;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.javalin.Javalin;
-import io.javalin.http.Context;
 import io.justsearch.app.api.ExcludesService;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.routes.IndexingRoutes;

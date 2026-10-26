@@ -4,6 +4,7 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.configuration.excludes.LiteralExclusion;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import java.lang.reflect.InvocationTargetException;
@@ -26,6 +27,10 @@ final class EngineForgetFolderIdentityTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   @TempDir Path directory;
 
+  private static tools.jackson.databind.JsonNode outcome(OperationResult result) {
+    return JSON.valueToTree((result.success() ? result.structuredData() : result.errorDetails()).get("forget"));
+  }
+
   @ParameterizedTest
   @CsvSource({"true,false", "false,true", "true,true", "false,false"})
   void FX55FolderCoversEqualityAndDescendantsWithoutSiblingWidening(boolean equality, boolean descendants)
@@ -45,7 +50,7 @@ final class EngineForgetFolderIdentityTest {
       // This is the real UI handler preparation/accepted SQLite intent/Engine owner interface.
       // A preparation refusal is a setup failure, never an asserted behavioral reproduction.
       var result = f.forget(target, "FOLDER");
-      var outcome = JSON.valueToTree(result.structuredData().get("forget"));
+      var outcome = outcome(result);
       assertEquals("COMPLETE", outcome.path("status").asString(), result.message());
       assertEquals("CONFIRMED", outcome.path("removal").asString());
       assertEquals("INSTALLED", outcome.path("keepOut").asString());
@@ -84,14 +89,14 @@ final class EngineForgetFolderIdentityTest {
             + failedKey.replace("'", "''") + "' BEGIN SELECT RAISE(ABORT, 'private fixture delete failure'); END");
       }
       var result = f.forgetAttempt(target, "FOLDER");
-      var outcome = JSON.valueToTree(result.structuredData().get("forget"));
+      var outcome = outcome(result);
       assertEquals("INCOMPLETE", outcome.path("status").asString(), result.message());
       assertNotEquals("CONFIRMED", outcome.path("removal").asString());
       String key = outcome.path("operationKey").asString();
       assertFalse(f.operations.find(key).orElseThrow().state().terminal());
       try (var statement = db.createStatement()) { statement.execute("DROP TRIGGER private_forget_failure"); }
       var retry = f.root.forgetService().retry(key, EngineForgetInProcessTest.webview());
-      assertEquals("COMPLETE", JSON.valueToTree(retry.structuredData().get("forget")).path("status").asString(), retry.message());
+      assertEquals("COMPLETE", outcome(retry).path("status").asString(), retry.message());
       assertEquals(OperationState.COMPLETE, f.operations.find(key).orElseThrow().state());
       assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(EngineForgetInProcessTest.key(target)));
       assertTrue(f.queue.forgetJobsAbsent(EngineForgetInProcessTest.key(target), false));
@@ -116,7 +121,7 @@ final class EngineForgetFolderIdentityTest {
             + "' BEGIN SELECT RAISE(IGNORE); END");
       }
       var result = f.forgetAttempt(target, "FOLDER");
-      var outcome = JSON.valueToTree(result.structuredData().get("forget"));
+      var outcome = outcome(result);
       assertEquals("INCOMPLETE", outcome.path("status").asString(),
           "a nonnegative delete result cannot certify a still-present exact job: " + result.message());
       assertNotEquals("CONFIRMED", outcome.path("removal").asString());
@@ -125,7 +130,7 @@ final class EngineForgetFolderIdentityTest {
       String key = outcome.path("operationKey").asString();
       try (var statement = db.createStatement()) { statement.execute("DROP TRIGGER private_forget_ignore"); }
       var retry = f.root.forgetService().retry(key, EngineForgetInProcessTest.webview());
-      assertEquals("COMPLETE", JSON.valueToTree(retry.structuredData().get("forget")).path("status").asString(), retry.message());
+      assertEquals("COMPLETE", outcome(retry).path("status").asString(), retry.message());
       assertTrue(f.queue.forgetJobsAbsent(EngineForgetInProcessTest.key(target), false));
       assertEquals("descendant source", Files.readString(child));
     }
@@ -157,14 +162,14 @@ final class EngineForgetFolderIdentityTest {
       String key;
       try {
         var result = f.forgetAttempt(target, "FOLDER");
-        var outcome = JSON.valueToTree(result.structuredData().get("forget"));
+        var outcome = outcome(result);
         assertEquals("INCOMPLETE", outcome.path("status").asString(), result.message());
         assertNotEquals("CONFIRMED", outcome.path("removal").asString());
         key = outcome.path("operationKey").asString();
         assertFalse(f.operations.find(key).orElseThrow().state().terminal());
       } finally { connectionField.set(f.queue, actual); }
       var retry = f.root.forgetService().retry(key, EngineForgetInProcessTest.webview());
-      assertEquals("COMPLETE", JSON.valueToTree(retry.structuredData().get("forget")).path("status").asString(), retry.message());
+      assertEquals("COMPLETE", outcome(retry).path("status").asString(), retry.message());
       assertEquals("descendant source", Files.readString(child));
     }
   }

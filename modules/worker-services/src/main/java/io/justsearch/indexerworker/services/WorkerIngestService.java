@@ -1710,17 +1710,21 @@ public final class WorkerIngestService {
       if (fileReleased || queueReleased) throw new IllegalStateException("Forget mutation owners are released");
       String key = PathNormalizer.normalizeKey(Path.of(plan.path()));
       boolean folder = plan.scope() == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER;
+      // A FOLDER literal includes equality. A former file at this path can still own parent,
+      // chunk and queue rows after the physical path has become a directory.
+      runtime.indexingCoordinator().deleteByIdAndChunks(key);
       if (folder) runtime.indexingCoordinator().deleteByPathPrefix(key);
-      else runtime.indexingCoordinator().deleteByIdAndChunks(key);
-      int removed = folder ? jobQueue.deleteByPathPrefix(key) : jobQueue.deleteByExactPath(key);
-      if (removed < 0) throw new IllegalStateException("Forget queue removal did not complete");
+      if (jobQueue.deleteByExactPath(key) < 0
+          || folder && jobQueue.deleteByPathPrefix(key) < 0) {
+        throw new IllegalStateException("Forget queue removal did not complete");
+      }
       runtime.commitOps().commitAndTrack(folder ? CommitReason.GRPC_DELETE_BY_PATH : CommitReason.GRPC_DELETE_BY_ID);
       runtime.commitOps().maybeRefreshBlocking();
       try {
-        int remaining = folder
-            ? runtime.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(key, List.of(), List.of())
-            : runtime.indexCountOps().countByIdAndChunksStrict(key);
-        return remaining == 0 && jobQueue.forgetJobsAbsent(key, folder);
+        return runtime.indexCountOps().countByIdAndChunksStrict(key) == 0
+            && (!folder || runtime.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(
+                key, List.of(), List.of()) == 0)
+            && jobQueue.forgetJobsAbsent(key, folder);
       } catch (java.io.IOException unknown) {
         throw new java.io.UncheckedIOException("Forget index absence could not be verified", unknown);
       }

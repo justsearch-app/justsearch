@@ -26,6 +26,14 @@ class LiteralExclusionPolicyTest {
         "typed exact paths must compile without interpreting their bytes as a glob");
   }
 
+  // The released public method has the same erased List boundary, while its old generic
+  // declaration was List<String>. Exercise that actual boundary without requiring new types
+  // or casting mixed entries into a fictitious typed old list in the before checkout.
+  private static void validateSaved(List<?> entries) throws Throwable {
+    try { ExclusionPatterns.class.getMethod("validateSavedPatterns", List.class).invoke(null, entries); }
+    catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+  }
+
   @Test @EnabledOnOs(OS.LINUX)
   void RF55FilePreservesUnixPunctuationBackslashAndTrailingSpace() {
     Path root = Path.of("/docs");
@@ -84,9 +92,16 @@ class LiteralExclusionPolicyTest {
     List<Object> atLimit = new ArrayList<>();
     for (int i = 0; i < 511; i++) atLimit.add("**/file" + i + ".tmp");
     atLimit.add(literal(Path.of("/docs/exact").toAbsolutePath().toString(), "FILE"));
-    assertDoesNotThrow(() -> ExclusionPatterns.validateSavedPatterns(atLimit));
+    assertDoesNotThrow(() -> validateSaved(atLimit));
+  }
+
+  @Test
+  void RF55CapacityRejects513MixedEntries() {
+    List<Object> atLimit = new ArrayList<>();
+    for (int i = 0; i < 511; i++) atLimit.add("**/file" + i + ".tmp");
+    atLimit.add(literal(Path.of("/docs/exact").toAbsolutePath().toString(), "FILE"));
     atLimit.add("**/one-more.tmp");
-    assertThrows(IllegalArgumentException.class, () -> ExclusionPatterns.validateSavedPatterns(atLimit));
+    assertThrows(IllegalArgumentException.class, () -> validateSaved(atLimit));
   }
 
   @Test

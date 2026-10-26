@@ -97,7 +97,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java"
       ],
       "class": "New",
-      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0–v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6.",
+      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0\u2013v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -155,7 +155,7 @@ Isolated new files remain subject to independent scenario and execution review e
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
           "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
-          "choice": "S55.1–S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled.",
+          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled.",
           "label": "agent choice"
         }
       ],
@@ -274,6 +274,138 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "RF55 allowed and excluded physical MOVE preserve the shared destination-policy/identity/publication fence. The ordinary allowed move keeps its actual source/destination bytes, identity and indexed content.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "RF55: recheck live destination policy inside the same file fence as identity and Lucene publication; preserve ordinary allowed move semantics.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-existing-repairs.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetFolderIdentityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Real prepared FOLDER Forget covers equality and separator descendants, including former-file proper chunks and exact queued work, without widening to sibling bc. Delete failures, ignored exact deletion and unknown absence remain incomplete; original-intent Retry converges and source files survive.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "FX55: FOLDER equality belongs to its exact target; COMPLETE requires exact and descendant rows/chunks/owned queue absence, with truthful partial/unknown results and same-intent recovery.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-folder-identity-repair.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetFolderIdentityTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Real physical MOVE/RENAME/undo with actual request expiry or cancellation cannot rekey or republish after outside-FILE Forget completes, including root retirement and delayed resumed publishers. An already admitted publisher keeps Forget incomplete until explicit Retry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "MD55: original request cancellation or elapsed absolute deadline must be checked under the MOVE file fence before identity and rows; no permanent outside-FILE rule or unrelated cancellation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-move-deadline-repair.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Existing Budget cancellation polling observes CANCELLED and EXPIRED unary outcomes before delayed signal handlers, preserving caller-first completion and handler notification order.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "MD55: existing outcome plus signal closes the cancellation-before-signal publication gap without a cancellation framework.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-cancellation-gap-repair.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerForgetHttpContractTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Actual HTTP registrar/controller/schema distinguish exact bounded pages and missing-key UNKNOWN from unavailable/unsupported reads, reject non-WEBVIEW and malformed queries, and never trigger effects. A fixed read-owner proxy does not claim Engine deletion coverage.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "S55.12/S56.7/RF55: UI-only read contract preserves exact target identities and truthfully distinguishes absent intent from unavailable observation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerForgetHttpContractTest.java"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/excludes/LiteralExclusionPolicyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Portable existing JSON/public policy interfaces cover exact Unix bytes, folder separator boundaries, explicit OS case rules, unchanged legacy globs, long literal root-plan projection, strict malformed objects and combined cap. The public saved-list method is invoked through its unchanged erased signature to compile against the old List<String> declaration; identical mixed inputs and assertions are retained.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "RF55/S55.2/S55.4: exact literal objects use the released JSON/public policy boundary, preserve legacy strings and malformed-object refusal, and count against the existing combined cap. New capability is demonstrated against compilable old interfaces, never absent types.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-literal-policy-new.json",
+      "newChecks": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/excludes/LiteralExclusionPolicyTest.java"
+      ],
+      "repaired": false
     }
   ]
 }
