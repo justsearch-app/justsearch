@@ -24,6 +24,8 @@ import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.queue.SwitchBufferDelete;
+import io.justsearch.indexerworker.queue.WatcherRootReconciliation;
+import io.justsearch.indexerworker.services.WatcherReplay;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.indexerworker.services.ProjectionDocumentMapper;
@@ -136,10 +138,29 @@ public final class KnowledgeServerMigrationOps {
       // The live Worker whose indexing loop may write while this replay runs, or null when none
       // exists yet (the synchronous boot replay runs before any application service is built).
       // Replayed prunes take its root authority and its file-mutation fence.
-      WorkerIngestService publisher) {
+      WorkerIngestService publisher,
+      List<ResolvedConfig.FileSource> migrationRoots) {
     public DrainSwitchBufferContext {
       approvedGapVersions = Set.copyOf(approvedGapVersions);
+      migrationRoots = migrationRoots == null ? null : List.copyOf(migrationRoots);
     }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration, java.util.function.Predicate<String> projectionSourceReady,
+        Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions, WorkerIngestService publisher) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath, activeIndexPath,
+          json, chunkSpladeEnabledSupplier, vduReplayAllowed, log, deadlineNanos, replayGeneration,
+          projectionSourceReady, approvedGapVersions, publisher, null);
+    }
+    public DrainSwitchBufferContext withMigrationRoots(List<ResolvedConfig.FileSource> roots) {
+      return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
+          indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher,
+          List.copyOf(roots));
+    }
+
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
         Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
@@ -154,7 +175,7 @@ public final class KnowledgeServerMigrationOps {
     public DrainSwitchBufferContext withPublisher(WorkerIngestService publisher) {
       return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
           indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
-          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher);
+          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher, migrationRoots);
     }
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
@@ -295,7 +316,8 @@ public final class KnowledgeServerMigrationOps {
 
         long now = System.currentTimeMillis();
         long switchingAgeMs = state == null ? 0L : Math.max(0L, now - state.updated_at_ms());
-        if (switchingAgeMs > context.migrationSwitchingMaxDurationMs()) {
+        if (switchingAgeMs > context.migrationSwitchingMaxDurationMs()
+            && !hasWatcherReconciliationDebt(context.jobQueue())) {
           context.log().warn(
               "Migration cutover failed: SWITCHING exceeded deadline (ageMs={}, queueDepth={})",
               switchingAgeMs,
@@ -326,7 +348,8 @@ public final class KnowledgeServerMigrationOps {
             "Migration drain criteria met in SWITCHING (queueDepth={}). Finalizing cutover...",
             depth);
 
-        if (!context.liveCutover().recorded()) {
+        if (!context.liveCutover().recorded()
+            && !hasWatcherReconciliationDebt(context.jobQueue())) {
           long failedJobs;
           try {
             // U12: terminal pre-boundary rows are retained, but cannot veto this cutover.
@@ -400,6 +423,12 @@ public final class KnowledgeServerMigrationOps {
         }
       }
     }
+  }
+
+  /** Recoverable root debt remains fenced and retryable beyond an individual replay budget. */
+  public static boolean hasWatcherReconciliationDebt(JobQueue queue) {
+    return queue instanceof SwitchBufferCapableQueue journal && journal.listSwitchBufferOpsStrict()
+        .stream().anyMatch(op -> WatcherRootReconciliation.OPERATION.equals(op.op()));
   }
 
   public static boolean verifyGreenCommitMetadataBestEffort(
@@ -616,6 +645,12 @@ public final class KnowledgeServerMigrationOps {
     catch (RuntimeException unavailable) { return false; }
   }
 
+  public static boolean promotionReplaySnapshotUnchanged(JobQueue queue, String generation,
+      StrictReplay replay) {
+    return queue instanceof SwitchBufferCapableQueue journal
+        && strictReplayOps(journal, generation).equals(replay.versions());
+  }
+
   /**
    * A strict PROMOTED boot proves the pre-pointer replay and Green commit already completed.
    * Admission stayed fenced until cleanup was certified, so retained versions need only exact
@@ -628,8 +663,10 @@ public final class KnowledgeServerMigrationOps {
   public static boolean finishCommittedBootSwitchReplay(JobQueue queue, String generation) {
     if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
     try {
-      return finishPromotedSwitchReplay(queue,
-          new StrictReplay(strictReplayOps(sbq, generation)))
+      var committed = strictReplayOps(sbq, generation);
+      // A pointer certifies the earlier replay, not a root failure retained after that commit.
+      if (committed.stream().anyMatch(op -> WatcherRootReconciliation.OPERATION.equals(op.op()))) return false;
+      return finishPromotedSwitchReplay(queue, new StrictReplay(committed))
           && switchBufferEmptyStrict(queue, generation);
     } catch (RuntimeException unreadable) {
       return false;
@@ -694,7 +731,7 @@ public final class KnowledgeServerMigrationOps {
         }
         if ("DELETE_PREFIX".equals(effect.op().op())
             || "DELETE_COLLECTION".equals(effect.op().op())) {
-          if (!certifyCommittedDeleteScope(queue, active, effects, survivors, i)) return false;
+          if (!certifyCommittedDeleteScope(queue, active, effects, survivors, i, List.of())) return false;
         }
       }
       if (scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) return false;
@@ -869,9 +906,10 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static boolean certifyCommittedDeleteScope(JobQueue queue, RunningRuntime active,
-      List<CommittedNativeEffect> effects, Set<CommittedNativeEffect> survivors, int index) throws IOException {
+      List<CommittedNativeEffect> effects, Set<CommittedNativeEffect> survivors, int index,
+      List<String> reconciledFiles) throws IOException {
     var deletion = effects.get(index);
-    List<String> files = new ArrayList<>();
+    List<String> files = new ArrayList<>(reconciledFiles);
     List<String> projections = new ArrayList<>();
     for (int next = index + 1; next < effects.size(); next++) {
       var survivor = effects.get(next);
@@ -1014,7 +1052,12 @@ public final class KnowledgeServerMigrationOps {
 
   private static List<SwitchBufferCapableQueue.SwitchBufferOp> strictReplayOps(
       SwitchBufferCapableQueue queue, String generation) {
-    return queue.listSwitchBufferOpsStrict().stream()
+    var snapshot = queue.listSwitchBufferOpsStrict();
+    if (snapshot.stream().anyMatch(op -> WatcherRootReconciliation.OPERATION.equals(op.op())
+        && op.generation() != null && !op.generation().isBlank())) {
+      throw new IllegalArgumentException("Watcher reconciliation debt must be unscoped");
+    }
+    return snapshot.stream()
         .filter(op -> op.generation() == null || op.generation().isEmpty()
             || (generation != null && generation.equals(op.generation()))).toList();
   }
@@ -1063,6 +1106,7 @@ public final class KnowledgeServerMigrationOps {
                       && context.replayGeneration().equals(op.generation()))).toList();
     } catch (RuntimeException unreadable) {
       context.log().warn("Switch buffer cannot certify final replay", unreadable);
+      if (context.publisher() != null) context.publisher().watcherReplayRefusal(unreadable.getMessage());
       return new ReplayOutcome(false, List.of());
     }
     // Conversion replaces a receipt revision. An approval to skip the old exact version
@@ -1088,12 +1132,41 @@ public final class KnowledgeServerMigrationOps {
       deleteOrder = replayDeleteOrder(context, ops, exactRead);
       supersededLegacyFiles = supersededLegacyFiles(context, ops);
       fileAuthorizingDeletes = exactRead ? fileRelatedBroadDeletes(context, ops, deleteOrder) : Set.of();
-      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes);
-    } catch (IOException | RuntimeException invalid) {
+
+    } catch (RuntimeException invalid) {
       context.log().warn("Buffered file/delete receipts cannot certify replay", invalid);
       return new ReplayOutcome(false, List.of());
     }
 
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations = new LinkedHashMap<>();
+    try {
+      List<String> admittedPaths = ops.stream()
+          .filter(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op()))
+          .map(op -> "UPSERT".equals(op.op()) ? SwitchBufferUpsert.decode(op.payload()).path()
+              : SwitchBufferDelete.decode(op.payload()).path()).toList();
+      for (var op : ops) {
+        if (!WatcherRootReconciliation.OPERATION.equals(op.op())) continue;
+        var debt = WatcherRootReconciliation.decode(op.payload());
+        if (!debt.key().equals(op.key()) || op.generation() != null && !op.generation().isBlank()
+            || op.revision() == null || op.revision().isBlank()) {
+          throw new IOException("Invalid watcher reconciliation key, generation or revision");
+        }
+        reconciliations.put(op, new WatcherReplay(debt, context.ingestLifecycle(), context.jobQueue(),
+            context.publisher(), context.indexingPacing(), context.migrationRoots(), admittedPaths,
+            () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos()));
+      }
+      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes,
+          deleteOrder, reconciliations);
+      for (var entry : reconciliations.entrySet()) {
+        entry.getValue().prepare(context.replayGeneration(), allOps, entry.getKey());
+      }
+    } catch (IOException | RuntimeException incomplete) {
+      closeReconciliations(reconciliations, context.log());
+      context.log().warn("Watcher reconciliation preflight keeps cutover fenced: {}", incomplete.getMessage());
+      if (context.publisher() != null) context.publisher().watcherReplayRefusal(incomplete.getMessage());
+      return new ReplayOutcome(false, List.of());
+    }
+    try {
     ArrayList<SwitchBufferCapableQueue.SwitchBufferOp> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
@@ -1113,9 +1186,9 @@ public final class KnowledgeServerMigrationOps {
       // that a later DELETE_PREFIX removed.
       if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
         if (!enqueueBufferedUpserts(context, toEnqueue)
-            || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery)
+            || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)
                 || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false,
-                    refusedSourceRecovery)))) {
+                    refusedSourceRecovery, reconciliations)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
           return new ReplayOutcome(false, List.of());
         }
@@ -1130,6 +1203,23 @@ public final class KnowledgeServerMigrationOps {
       }
       boolean appliedProjection = false;
       switch (kind) {
+        case WatcherRootReconciliation.OPERATION -> {
+          var reconciliation = reconciliations.get(op);
+          try {
+            if (reconciliation == null) throw new IOException("Watcher reconciliation has no fresh preflight");
+            reconciliation.apply();
+            if (!awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)) {
+              throw new IOException("Watcher reconciliation writer has not drained");
+            }
+            reconciliation.commitAndVerify();
+            mutatedLucene = false; // The root commit includes every preceding target write.
+
+          } catch (IOException | RuntimeException incomplete) {
+            context.log().warn("Watcher reconciliation keeps cutover fenced: {}", incomplete.getMessage());
+            if (context.publisher() != null) context.publisher().watcherReplayRefusal(incomplete.getMessage());
+            return new ReplayOutcome(false, List.of());
+          }
+        }
         case "PROJECTION_SOURCE" -> {
           String marker = "projection-source:" + payload.length() + ":" + payload;
           if (op.generation() == null || op.generation().isBlank()
@@ -1231,6 +1321,18 @@ public final class KnowledgeServerMigrationOps {
               if (!op.key().equals("path:" + deletion.path())) {
                 throw new IllegalArgumentException("Buffered DELETE key mismatch");
               }
+              boolean reconciledDelete = false;
+              for (var root : reconciliations.entrySet()) {
+                if (!root.getValue().coversDelete(deletion)) continue;
+                if (deleteOrder.positions().get(root.getKey()) < deleteOrder.positions().get(op)
+                    && !root.getValue().verifies(deletion.path(), deletion.collection())) {
+                  throw new IOException("Watcher DELETE lost its committed current-path outcome");
+                }
+                // A conditional event is debt, not an explicit removal. Its fresh path outcome
+                // either already committed or must commit at the later root receipt position.
+                reconciledDelete = true;
+              }
+              if (reconciledDelete) break;
               if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
                 context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(deletion.path());
                 if (context.jobQueue().deleteByExactPath(deletion.path()) < 0) {
@@ -1515,7 +1617,7 @@ public final class KnowledgeServerMigrationOps {
                 // Enumeration may enqueue a file that the Green loop has already claimed. A
                 // subsequent direct DELETE_PREFIX must wait for that writer, not merely remove its
                 // queue row while it can still publish a late Lucene write.
-                if (exactRead && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
+                if (exactRead && !awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1569,7 +1671,7 @@ public final class KnowledgeServerMigrationOps {
                 // A removed file found present again was queued; a later direct delete must wait
                 // for its writer, as after a replayed SYNC_ROOT.
                 if (exactRead && replayed.requeued() > 0
-                    && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
+                    && !awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1603,7 +1705,7 @@ public final class KnowledgeServerMigrationOps {
 
     if (!toEnqueue.isEmpty()) {
       allApplied &= enqueueBufferedUpserts(context, toEnqueue)
-          && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery));
+          && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations));
     }
 
     // Refused recovery also judges file admissions by A's writer, whose batches A's reader sees
@@ -1629,7 +1731,7 @@ public final class KnowledgeServerMigrationOps {
       allApplied = verifyBufferedUpserts(context, ops.stream()
           .filter(op -> "UPSERT".equalsIgnoreCase(op.op())
               && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true,
-          refusedSourceRecovery);
+          refusedSourceRecovery, reconciliations);
     }
     if (allApplied) {
       allApplied = verifyBufferedProjections(context, ops, deleteOrder);
@@ -1648,9 +1750,13 @@ public final class KnowledgeServerMigrationOps {
     }
     if (allApplied && removeAfterReplay) {
       try {
-        int cleared = sbq.removeReplayedSwitchBufferOps(ops);
-        context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
-        removed = cleared == ops.size();
+        BooleanSupplier acknowledge = () -> {
+          int cleared = sbq.removeReplayedSwitchBufferOps(ops);
+          context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
+          return cleared == ops.size();
+        };
+        removed = reconciliations.isEmpty() || context.publisher() == null
+            ? acknowledge.getAsBoolean() : context.publisher().acknowledgeWatcherReplay(acknowledge);
       } catch (IllegalStateException failure) {
         context.log().warn("Failed to remove committed buffer versions; retaining for retry", failure);
       }
@@ -1659,6 +1765,16 @@ public final class KnowledgeServerMigrationOps {
     }
     return new ReplayOutcome(allApplied && (removed || !removeAfterReplay) && !deferredVdu,
         allApplied ? ops : List.of());
+    } finally { closeReconciliations(reconciliations, context.log()); }
+
+  }
+
+  private static void closeReconciliations(
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations, Logger log) {
+    for (var reconciliation : reconciliations.values()) {
+      try { reconciliation.close(); }
+      catch (IOException failure) { log.warn("Cannot close watcher replay root lease", failure); }
+    }
   }
 
   /**
@@ -1714,12 +1830,14 @@ public final class KnowledgeServerMigrationOps {
 
   /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
   private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context,
-      boolean refusedSourceRecovery) {
+      boolean refusedSourceRecovery,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) {
     // All replay barriers consume the same SWITCHING budget. Returning early would re-enqueue
     // retained UPSERT versions on the next attempt, possibly resetting a claimed write.
     long deadline = context.deadlineNanos();
     try {
       while (true) {
+        for (var reconciliation : reconciliations.values()) reconciliation.prepare();
         JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
         // Refused-candidate recovery runs with its writer paused and proved idle, so pending rows
         // cannot move here; they stay durable queue work that surviving A's writer runs between
@@ -1737,7 +1855,7 @@ public final class KnowledgeServerMigrationOps {
         if (System.nanoTime() >= deadline) return false;
         Thread.sleep(50);
       }
-    } catch (RuntimeException unavailable) {
+    } catch (IOException | RuntimeException unavailable) {
       context.log().warn("Cannot certify buffered UPSERT settlement", unavailable);
       return false;
     } catch (InterruptedException interrupted) {
@@ -1832,7 +1950,8 @@ public final class KnowledgeServerMigrationOps {
   private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> upserts,
       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder,
-      boolean finalEffects, boolean refusedSourceRecovery) {
+      boolean finalEffects, boolean refusedSourceRecovery,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) {
     if (upserts.isEmpty()) return true;
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
@@ -1840,6 +1959,8 @@ public final class KnowledgeServerMigrationOps {
       context.ingestLifecycle().commitOps().maybeRefreshBlocking();
     } catch (RuntimeException unavailable) {
       context.log().warn("Buffered UPSERT reader could not refresh", unavailable);
+      if (context.publisher() != null) context.publisher().watcherReplayRefusal(
+          "Buffered UPSERT reader could not refresh: " + unavailable.getMessage());
       return false;
     }
     int awaited = 0;
@@ -1850,6 +1971,19 @@ public final class KnowledgeServerMigrationOps {
         if (upsert.sourceSha256() == null) continue; // Historical unscoped cutover payload.
         boolean scoped = op.generation() != null && !op.generation().isBlank()
             && op.generation().equals(context.replayGeneration());
+        var rootReplay = laterWatcherReplay(upsert.path(), upsert.collection(),
+            deleteOrder.positions().get(op), deleteOrder, reconciliations);
+        if (rootReplay != null) {
+          WatcherReplay reconciled = rootReplay.getValue();
+          int reconciliationPosition = deleteOrder.positions().get(rootReplay.getKey());
+          if (finalEffects) {
+            if (hasLaterAcceptedDelete(context, deleteOrder, reconciliationPosition, upsert.path(),
+                upsert.path(), upsert.collection(), op.generation())) {
+              if (context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) != 0) return false;
+            } else if (!reconciled.verifies(upsert.path(), upsert.collection())) return false;
+          }
+          continue; // Earlier UPSERT evidence waits for the root receipt's committed path outcomes.
+        }
         if (scoped && hasLaterAcceptedDelete(context, deleteOrder, deleteOrder.positions().get(op),
             upsert.path(), upsert.path(), upsert.collection(), op.generation())) {
           // Live broad deletion may already have removed this exact admission on B. Await
@@ -1871,6 +2005,8 @@ public final class KnowledgeServerMigrationOps {
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
         if (!settled) {
           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
+          if (context.publisher() != null) context.publisher().watcherReplayRefusal(
+              "Buffered UPSERT lacks its accepted target projection: " + upsert.path());
           return false;
         }
       }
@@ -1879,9 +2015,11 @@ public final class KnowledgeServerMigrationOps {
             awaited, firstAwaited);
         return false;
       }
-      return !finalEffects || certifyReplayFileDeleteScopes(context, orderedOps, deleteOrder);
+      return !finalEffects || certifyReplayFileDeleteScopes(context, orderedOps, deleteOrder, reconciliations);
     } catch (IOException | RuntimeException unavailable) {
       context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
+      if (context.publisher() != null) context.publisher().watcherReplayRefusal(
+          "Buffered UPSERT projection evidence is unreadable: " + unavailable.getMessage());
       return false;
     }
   }
@@ -2093,7 +2231,8 @@ public final class KnowledgeServerMigrationOps {
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */
   private static boolean certifyReplayFileDeleteScopes(DrainSwitchBufferContext context,
-      List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder) throws IOException {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) throws IOException {
     String generation = context.replayGeneration();
     if (generation == null || generation.isBlank()) return true;
     Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes =
@@ -2111,6 +2250,9 @@ public final class KnowledgeServerMigrationOps {
           || (observed.id() != null && !observed.upsert())) deleteIndexes.add(index);
     }
     Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
+    // A later root receipt supersedes only the old file effects it freshly proved per path.
+    survivors.removeIf(effect -> effect.file() != null && laterWatcherReplay(effect.path(),
+        effect.collection(), deleteOrder.positions().get(effect.op()), deleteOrder, reconciliations) != null);
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
     for (int index = 0; index < effects.size(); index++) {
       var deletion = effects.get(index);
@@ -2120,9 +2262,12 @@ public final class KnowledgeServerMigrationOps {
         if (survivors.contains(survivor) && nativeDeleteMatches(deletion, survivor)
             && !certifyCommittedSurvivor(queue, active, effects, deleteIndexes, next)) return false;
       }
-      if (!certifyCommittedDeleteScope(context.jobQueue(), active, effects, survivors, index)) return false;
+      List<String> reconciledFiles = reconciledSurvivorsAfterDelete(
+          context, orderedOps, deleteOrder, deletion.op(), reconciliations);
+      if (!certifyCommittedDeleteScope(context.jobQueue(), active, effects, survivors, index,
+          reconciledFiles)) return false;
       if ("DELETE_PREFIX".equals(deletion.op().op())) {
-        List<String> certifiedPaths = new ArrayList<>();
+        List<String> certifiedPaths = new ArrayList<>(reconciledFiles);
         for (int next = index + 1; next < effects.size(); next++) {
           var survivor = effects.get(next);
           if (survivor.file() != null && survivors.contains(survivor)
@@ -2151,6 +2296,44 @@ public final class KnowledgeServerMigrationOps {
     return true;
   }
 
+  private static Map.Entry<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> laterWatcherReplay(
+      String path, String collection, int earlierPosition, ReplayDeleteOrder order,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) {
+    Map.Entry<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> selected = null;
+    for (var root : reconciliations.entrySet()) {
+      if (order.positions().get(root.getKey()) > earlierPosition
+          && root.getValue().covers(path, collection)) selected = root;
+    }
+    return selected;
+  }
+
+  private static List<String> reconciledSurvivorsAfterDelete(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops, ReplayDeleteOrder order,
+      SwitchBufferCapableQueue.SwitchBufferOp deletion,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) throws IOException {
+    List<String> paths = new ArrayList<>();
+    for (var root : reconciliations.entrySet()) {
+      int rootPosition = order.positions().get(root.getKey());
+      if (rootPosition <= order.positions().get(deletion)) continue;
+      String collection = WatcherRootReconciliation.decode(root.getKey().payload()).collection();
+      for (String path : root.getValue().presentPaths()) {
+        boolean matches = "DELETE_PREFIX".equals(deletion.op())
+            ? PathPrefixScope.decode(deletion.payload()).contains(path)
+            : deletion.payload().equals(collection);
+        if (!matches || hasLaterAcceptedDelete(context, order, rootPosition,
+            path, path, collection, context.replayGeneration())) continue;
+        boolean laterFile = ops.stream().anyMatch(op -> "UPSERT".equals(op.op())
+            && order.positions().get(op) > rootPosition && ("path:" + path).equals(op.key()));
+        if (laterFile) continue; // That admission must supply its own exact projection proof.
+        if (!root.getValue().verifies(path, collection)) {
+          throw new IOException("Later watcher outcome cannot certify a broad delete survivor: " + path);
+        }
+        paths.add(path);
+      }
+    }
+    return paths;
+  }
+
   private static List<CommittedNativeEffect> replayAcceptedEffects(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps) {
     var scopedOps = orderedOps.stream()
@@ -2175,7 +2358,8 @@ public final class KnowledgeServerMigrationOps {
 
   private static Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> replayFileSurvivorExclusions(
       DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps,
-      Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes) throws IOException {
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes, ReplayDeleteOrder deleteOrder,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) throws IOException {
     if (authorizingDeletes.isEmpty()) return Map.of();
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) {
@@ -2207,7 +2391,9 @@ public final class KnowledgeServerMigrationOps {
           throw new IOException("Broad replay found an uncertified projection survivor");
         }
         if (next > index && effect.file() != null && survivors.contains(effect)) {
-          if (!certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
+          if (laterWatcherReplay(effect.path(), effect.collection(),
+                  deleteOrder.positions().get(effect.op()), deleteOrder, reconciliations) == null
+              && !certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
             throw new IOException("Later file survivor lacks its exact accepted certificate");
           }
           files.add(effect.id());
@@ -2396,6 +2582,19 @@ public final class KnowledgeServerMigrationOps {
   /** Loads complete declared coverage; an unreadable source cannot certify an empty migration. */
   public static List<ResolvedConfig.FileSource> loadMigrationRoots(
       Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json) throws IOException {
+    var roots = readMigrationRootDeclarations(dataDir, collections, json);
+    for (Path root : roots.keySet()) requireMigrationRoot(root);
+    return withMigrationHelpRoot(roots, collections);
+  }
+
+  /** Freeze authored ownership separately from the walk's availability checks. */
+  public static List<ResolvedConfig.FileSource> loadMigrationRootDeclarations(
+      Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json) throws IOException {
+    return withMigrationHelpRoot(readMigrationRootDeclarations(dataDir, collections, json), collections);
+  }
+
+  private static Map<Path, ResolvedConfig.FileSource> readMigrationRootDeclarations(
+      Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json) throws IOException {
     Map<Path, ResolvedConfig.FileSource> roots = new LinkedHashMap<>();
     Path rootsFile = dataDir.resolve("watched_roots.json");
     String content;
@@ -2437,7 +2636,11 @@ public final class KnowledgeServerMigrationOps {
         }
       }
     }
-    for (Path root : roots.keySet()) requireMigrationRoot(root);
+    return roots;
+  }
+
+  private static List<ResolvedConfig.FileSource> withMigrationHelpRoot(
+      Map<Path, ResolvedConfig.FileSource> roots, ResolvedConfig.Collections collections) {
     // Startup's version marker is not a migration coverage authority.
     var help = collections == null ? null : collections.bundledHelp();
     if (!EnvRegistry.EVAL_MODE.getBoolean(false)

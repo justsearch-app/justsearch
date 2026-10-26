@@ -27,8 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Warms the serving set's query encoders so that a search never creates a session (Spec D §4.2,
- * S21).
+ * Warms the serving set's query devices before readiness (Spec D §4.2, S21). Deferred SPLADE and
+ * reranker CPU backups may prepare on first CPU demand; queries never create GPU sessions.
  *
  * <p>A pass runs one FOREGROUND encode, allowed to create sessions, through each configured query
  * encoder that is not warm, each under {@code InferenceRequest.within(FOREGROUND, budget,
@@ -42,10 +42,10 @@ import org.slf4j.LoggerFactory;
  * <p>Completion is reported to {@link QueryPrewarmListener}s (§4.3): the boot sequence waits on it
  * before it reports the models ready.
  *
- * <p>After a pass has reported ready, each encoder that serves queries on the GPU also warms its CPU
+ * <p>After a pass has reported ready, GPU encoders other than SPLADE and reranker warm their CPU
  * session, which a query the device turns away (busy or stuck) runs on instead of falling back to
- * keyword search. That warm-up does not delay readiness, and its failure only leaves those queries
- * to the keyword fallback.
+ * keyword search. SPLADE and reranker prepare their CPU backups only on real CPU demand. This
+ * warm-up does not delay readiness, and its failure leaves those queries to the keyword fallback.
  */
 final class QueryEncoderPrewarm implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(QueryEncoderPrewarm.class);
@@ -269,7 +269,9 @@ final class QueryEncoderPrewarm implements AutoCloseable {
       for (Target target : held.targets()) {
         if (closed) return;
         try {
-          if (target.device().get() != QueryDevice.GPU) continue;
+          if (target.device().get() != QueryDevice.GPU
+              || target.role() == EncoderRole.SPLADE
+              || target.role() == EncoderRole.RERANKER) continue;
           InferenceRequest request = InferenceRequest.within(
               InferenceRequest.Urgency.FOREGROUND, budget, () -> closed);
           if (!target.cpuWarm().run(request)) {

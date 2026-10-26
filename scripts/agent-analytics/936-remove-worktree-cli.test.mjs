@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_ROOT = path.resolve(HERE, '..', '..');
 const require = createRequire(import.meta.url);
+// Preserve the measured runner spelling before ordinary fixture roots are canonicalized.
+const NATIVE_ALIAS_TEMP = process.env.ARCHIVE_ALIAS_TEMP ?? os.tmpdir();
 const { recordMergeLink } = require(path.join(SOURCE_ROOT, 'scripts', 'dev', 'remove-worktree.cjs'));
 const { readProcessTable } = require(path.join(SOURCE_ROOT, 'scripts', 'dev', 'lib', 'process-identity.cjs'));
 const FIXTURE_PROCESS_TABLE_ENV = 'JUSTSEARCH_936_FIXTURE_PROCESS_TABLE_PIDS';
@@ -102,7 +104,8 @@ if (encodedPids === undefined) {
 }
 
 async function makeRepo(label) {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), `remove-wt-936-${label}-`));
+  const createdRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `remove-wt-936-${label}-`));
+  const root = process.platform === 'win32' ? fs.realpathSync.native(createdRoot) : createdRoot;
   const repo = path.join(root, 'owner repo');
   await fsp.mkdir(repo, { recursive: true });
   git(repo, 'init', '-b', 'main');
@@ -111,8 +114,20 @@ async function makeRepo(label) {
   await fsp.writeFile(path.join(repo, '.gitignore'), 'ignored/\nnode_modules\n', 'utf8');
   await fsp.writeFile(path.join(repo, 'tracked.txt'), 'base\n', 'utf8');
   git(repo, 'add', '.gitignore', 'tracked.txt');
+  let nativeSymlinks = true;
+  try {
+    // Every admission/runtime/lock/registration regression also carries a committed native link.
+    await fsp.writeFile(path.join(root, 'gate-sentinel'), 'external gate sentinel\n');
+    await fsp.symlink('../gate-sentinel', path.join(repo, 'gate-link'));
+    git(repo, 'config', 'core.symlinks', 'true');
+    git(repo, 'add', 'gate-link');
+  } catch (err) {
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'ENOSYS'].includes(err.code)) throw err;
+    nativeSymlinks = false;
+    console.log(`UNVERIFIED native Windows link removal scenarios: ${err.code}`);
+  }
   git(repo, 'commit', '-m', 'fixture');
-  return { root, repo, cli: await installProductionCli(repo) };
+  return { root, repo, cli: await installProductionCli(repo), nativeSymlinks };
 }
 
 async function mutateInstalledCli(cli, mutate) {
@@ -126,13 +141,19 @@ function addWorktree(fixture, relativeName, branch, { detached = false, parent =
   const target = path.join(parent, relativeName);
   if (detached) git(fixture.repo, 'worktree', 'add', '--detach', target, 'HEAD');
   else git(fixture.repo, 'worktree', 'add', '-b', branch, target, 'HEAD');
-  return target;
+  const members = registeredPaths(fixture.repo).filter((entry) => process.platform === 'win32'
+    ? entry.toLowerCase() === path.resolve(target).toLowerCase() : entry === path.resolve(target));
+  assert.equal(members.length, 1, 'capture canonical Git membership before any removal');
+  return members[0];
 }
 
 function runCli(fixture, target, args = [], {
   stateRoot = path.join(fixture.root, 'isolated-state'),
   env = {},
   processTablePids,
+  cwd = fixture.repo,
+  cli = fixture.cli,
+  nodeArgs = [],
 } = {}) {
   const childEnv = {
     ...process.env,
@@ -144,8 +165,8 @@ function runCli(fixture, target, args = [], {
   if (processTablePids !== undefined) {
     childEnv[FIXTURE_PROCESS_TABLE_ENV] = JSON.stringify(processTablePids);
   }
-  const result = spawnSync(process.execPath, [fixture.cli, target, ...args], {
-    cwd: fixture.repo,
+  const result = spawnSync(process.execPath, [...nodeArgs, cli, target, ...args], {
+    cwd,
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
     env: childEnv,
@@ -160,6 +181,99 @@ function registeredPaths(repo) {
 
 function refExists(repo, ref) {
   return spawnSync('git', ['show-ref', '--verify', '--quiet', ref], { cwd: repo }).status === 0;
+}
+
+function shortSpelling(directory) {
+  const key = (value) => path.resolve(value).toLowerCase();
+  const inspect = (spelling) => {
+    assert.ok(typeof spelling === 'string' && path.isAbsolute(spelling), 'Native alias spelling must be absolute');
+    const root = path.parse(spelling).root;
+    let current = root;
+    let stat;
+    for (const part of ['', ...spelling.slice(root.length).split(/[\\/]+/).filter(Boolean)]) {
+      assert.ok(part !== '.' && part !== '..', 'Native alias spelling must not contain dot components');
+      current = part ? path.join(current, part) : current;
+      stat = fs.lstatSync(current, { bigint: true });
+      assert.ok(stat.isDirectory() && !stat.isSymbolicLink(), `Native alias must traverse plain directories: ${current}`);
+    }
+    assert.equal(typeof stat.dev, 'bigint');
+    assert.equal(typeof stat.ino, 'bigint');
+    assert.ok(stat.ino > 0n, 'Native directory identity must be unambiguous');
+    return { real: fs.realpathSync.native(spelling), dev: stat.dev, ino: stat.ino };
+  };
+  const native = inspect(NATIVE_ALIAS_TEMP);
+  const canonical = inspect(native.real);
+  assert.equal(key(native.real), key(canonical.real));
+  assert.equal(native.dev, canonical.dev);
+  assert.equal(native.ino, canonical.ino);
+  if (key(NATIVE_ALIAS_TEMP) === key(canonical.real)) return null; // No genuine native alias capability.
+
+  const target = inspect(directory);
+  const relative = path.relative(canonical.real, target.real);
+  assert.ok(!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`),
+    'Owned fixture is outside the measured native temp alias; fixture geometry needs repair');
+  const short = path.join(NATIVE_ALIAS_TEMP, relative);
+  assert.notEqual(key(short), key(directory), 'Native alias must be a distinct spelling');
+  const alias = inspect(short);
+  assert.equal(key(alias.real), key(target.real));
+  assert.equal(alias.dev, target.dev);
+  assert.equal(alias.ino, target.ino);
+  return short;
+}
+
+// Deterministic mutations in an owned copied CLI/library; no timing sleeps or product hook.
+async function installLateMutation(fixture, { target, manifestPath, point, kind, rewrite = false }) {
+  const probe = path.join(fixture.root, 'late-mutation.json');
+  const action = `(() => {
+    const fs = require('node:fs');
+    const target = ${JSON.stringify(target)};
+    const before = fs.lstatSync(target, { bigint: true }).ino.toString();
+    if (${JSON.stringify(kind)} === 'root') {
+      fs.renameSync(target, target + '-previous');
+      fs.cpSync(target + '-previous', target, { recursive: true, dereference: false, verbatimSymlinks: true });
+      if (${rewrite}) {
+        const file = ${JSON.stringify(manifestPath)};
+        const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+        manifest.worktreePath = target;
+        fs.writeFileSync(file, JSON.stringify(manifest));
+      }
+    } else if (${JSON.stringify(kind)} === 'head') {
+      require('node:child_process').execFileSync('git', ['commit', '--allow-empty', '-m', 'late head'], { cwd: target, stdio: 'pipe' });
+    } else if (${JSON.stringify(kind)} === 'branch') {
+      require('node:child_process').execFileSync('git', ['branch', '-m', 'late-renamed-branch'], { cwd: target, stdio: 'pipe' });
+    } else if (${JSON.stringify(kind)} === 'ignored') {
+      fs.mkdirSync(require('node:path').join(target, 'ignored'), { recursive: true });
+      fs.writeFileSync(require('node:path').join(target, 'ignored', 'late.txt'), 'never retained');
+    } else fs.writeFileSync(require('node:path').join(target, 'draft.txt'), 'late unretained bytes');
+    fs.writeFileSync(${JSON.stringify(probe)}, JSON.stringify({ before, after: fs.lstatSync(target, { bigint: true }).ino.toString() }));
+  })()`;
+  if (point === 'helper') {
+    const needle = 'consult = await consultAgentSpawnsForTeardown({ mainRepoRoot, targetPath: admission.abs, callerIdentity });';
+    await mutateInstalledCli(fixture.cli, (source) => source.replace(needle,
+      `consult = await (async () => { const pending = consultAgentSpawnsForTeardown({ mainRepoRoot, targetPath: admission.abs, callerIdentity }); ${action}; return await pending; })();`));
+  } else {
+    const file = path.join(fixture.repo, 'scripts/dev/lib/worktree-archive.cjs');
+    fs.renameSync(file, path.join(path.dirname(file), 'worktree-archive.production.cjs'));
+    fs.writeFileSync(file, `const p = require('./worktree-archive.production.cjs');
+let verification = 0, classification = 0, performed = false;
+function mutate() { if (performed) return; performed = true; ${action}; }
+module.exports = { ...p,
+  verifyArchive(args) {
+    const pass = ++verification;
+    return p.verifyArchive({ ...args, git(argv, options) {
+      const out = p.defaultGit(argv, options);
+      if (${JSON.stringify(point)} === 'hash' && pass === 2 && argv[0] === 'hash-object') mutate();
+      return out;
+    }});
+  },
+  classifyIgnored(args) {
+    const out = p.classifyIgnored(args);
+    if (${JSON.stringify(point)} === 'ignored' && ++classification === 2) mutate();
+    return out;
+  }
+};\n`);
+  }
+  return probe;
 }
 
 function captureErrors(action) {
@@ -278,6 +392,184 @@ try {
   assert.equal(archived.refused, undefined, `archive refused: ${JSON.stringify(archived)}`);
   const archiveManifest = archived.manifestPath;
 
+  for (const kind of ['head', 'branch']) await check(`a ${kind} move during final archive hashing refuses before deletion`, async () => {
+    const fx = await makeRepo(`late-${kind}`);
+    fixtures.push(fx);
+    const dest = addWorktree(fx, `late-${kind}`, `codex/936-late-${kind}`);
+    fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained draft\n');
+    const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: dest, resource: `late-${kind}`, policy: DEFAULT_ARCHIVE_POLICY });
+    assert.equal(saved.refused, undefined, JSON.stringify(saved));
+    const probe = await installLateMutation(fx, { target: dest, manifestPath: saved.manifestPath, point: 'hash', kind });
+    const result = runCli(fx, dest, ['--archive-manifest', saved.manifestPath]);
+    assert.ok(fs.existsSync(probe), 'the final hashing seam really executed');
+    assert.equal(result.status, 1, result.output);
+    assert.match(result.output, /branch or HEAD changed during archive verification/);
+    assert.equal(fs.readFileSync(path.join(dest, 'draft.txt'), 'utf8'), 'retained draft\n');
+    assert.equal(git(fx.repo, 'rev-parse', saved.stateRef).trim(), saved.stateCommit);
+    assert.ok(registeredPaths(fx.repo).includes(dest));
+  });
+
+  if (process.platform === 'win32') {
+    async function aliasedTarget(label, { scriptOwned = false } = {}) {
+      const fx = await makeRepo(`alias-${label}`);
+      fixtures.push(fx);
+      const dest = addWorktree(fx, `long target ${label}`, `codex/936-${label}`);
+      const short = shortSpelling(dest);
+      if (!short) { console.log(`UNVERIFIED S17 ${label}: native 8.3 spelling unavailable`); return null; }
+      if (scriptOwned) await installProductionCli(dest);
+      fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained draft\n');
+      return { fx, dest, short };
+    }
+    const valid = await aliasedTarget('valid-legacy');
+    if (valid) await check('actual removal accepts a genuine short manifest only for the admitted canonical target', () => {
+      const { fx, dest, short } = valid;
+      const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: short, resource: 'valid-legacy', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      const bytes = fs.readFileSync(saved.manifestPath);
+      assert.ok(registeredPaths(fx.repo).includes(dest));
+      const directAlias = runCli(fx, short, ['--dry-run', '--archive-manifest', saved.manifestPath]);
+      assert.equal(directAlias.status, 1, directAlias.output);
+      assert.match(directAlias.output, /not one exact registered worktree|resolves through an alias/);
+      const result = runCli(fx, dest, ['--archive-manifest', saved.manifestPath]);
+      assert.equal(result.status, 0, result.output);
+      assert.equal(fs.existsSync(dest), false);
+      assert.deepEqual(fs.readFileSync(saved.manifestPath), bytes);
+      assert.equal(git(fx.repo, 'show', `${saved.stateRef}:draft.txt`), 'retained draft\n');
+    });
+
+    const wrong = await aliasedTarget('different-identity');
+    if (wrong) await check('equal basename, HEAD and bytes never substitute for physical manifest identity', async () => {
+      const { fx, dest, short } = wrong;
+      const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: short, resource: 'different-identity', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      const parent = path.join(fx.root, 'other-parent');
+      fs.mkdirSync(parent);
+      const other = addWorktree(fx, path.basename(dest), 'codex/936-other-identity', { parent });
+      fs.writeFileSync(path.join(other, 'draft.txt'), 'retained draft\n');
+      assert.equal(git(other, 'rev-parse', 'HEAD'), saved.head + '\n');
+      const before = await snapshot(fx, other, path.join(fx.root, 'isolated-state'));
+      const result = runCli(fx, other, ['--archive-manifest', saved.manifestPath]);
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.output, /archive manifest/);
+      assert.deepEqual(await snapshot(fx, other, path.join(fx.root, 'isolated-state')), before);
+    });
+
+    for (const kind of ['root', 'ancestor']) {
+      const f = await aliasedTarget(`junction-${kind}`);
+      if (!f) continue;
+      await check(`manifest proof refuses ${kind} junction traversal into an admitted target`, async () => {
+        const { fx, dest } = f;
+        const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: dest, resource: `junction-${kind}`, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        const alias = path.join(fx.root, 'junction-spelling');
+        fs.symlinkSync(kind === 'root' ? dest : path.dirname(dest), alias, 'junction');
+        saved.manifest.worktreePath = kind === 'root' ? alias : path.join(alias, path.basename(dest));
+        fs.writeFileSync(saved.manifestPath, JSON.stringify(saved.manifest));
+        const before = await snapshot(fx, dest, path.join(fx.root, 'isolated-state'));
+        const result = runCli(fx, dest, ['--archive-manifest', saved.manifestPath]);
+        assert.equal(result.status, 1, result.output);
+        assert.match(result.output, /target proof failed|archive manifest.*not /);
+        assert.deepEqual(await snapshot(fx, dest, path.join(fx.root, 'isolated-state')), before);
+      });
+    }
+
+    const nested = await aliasedTarget('nested-alias');
+    if (nested) await check('a Git nested entry created through the opposite alias still protects its parent', async () => {
+      const { fx, dest, short } = nested;
+      const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: short, resource: 'nested-alias', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      git(fx.repo, 'worktree', 'add', '-b', 'codex/936-nested-alias-child', path.join(short, 'nested'));
+      const entry = registeredPaths(fx.repo).find((item) => path.basename(item) === 'nested');
+      assert.ok(entry);
+      console.log(`S17 actual nested Git spelling: ${entry}; admitted parent: ${dest}`);
+      const before = await snapshot(fx, dest, path.join(fx.root, 'isolated-state'));
+      const result = runCli(fx, dest, ['--archive-manifest', saved.manifestPath]);
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.output, /contains registered worktree/);
+      assert.deepEqual(await snapshot(fx, dest, path.join(fx.root, 'isolated-state')), before);
+    });
+
+    const mainFx = await makeRepo('legacy-main-markers');
+    fixtures.push(mainFx);
+    const shortMain = shortSpelling(mainFx.repo);
+    if (!shortMain) console.log('UNVERIFIED S17 main removal aliases: native 8.3 spelling unavailable');
+    else await check('legacy wrong main markers and a retained archive never override main Git identity', async () => {
+      git(mainFx.repo, 'config', 'branch.main.justsearch-resource', 'legacy-wrong-main');
+      const owner = addWorktree(mainFx, 'linked-script-owner', 'codex/936-main-proof-owner');
+      const ownerCli = await installProductionCli(owner);
+      const fx = { ...mainFx, repo: owner, cli: ownerCli };
+      const saved = archiveWorktree({ mainRepoRoot: mainFx.repo, worktreePath: shortMain, resource: 'legacy-main', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      const before = await snapshot(mainFx, mainFx.repo, path.join(mainFx.root, 'isolated-state'));
+      const config = fs.readFileSync(path.join(mainFx.repo, '.git/config'));
+      for (const target of [mainFx.repo, shortMain]) {
+        const result = runCli(fx, target, ['--archive-manifest', saved.manifestPath]);
+        assert.equal(result.status, 1, result.output);
+        assert.match(result.output, target === mainFx.repo ? /main worktree|main-worktree|main Git-directory/
+          : /main worktree|main-worktree|main Git-directory|not one exact registered worktree/);
+        assert.deepEqual(await snapshot(mainFx, mainFx.repo, path.join(mainFx.root, 'isolated-state')), before);
+        assert.deepEqual(fs.readFileSync(path.join(mainFx.repo, '.git/config')), config);
+        assert.equal(fs.readFileSync(path.join(mainFx.root, 'gate-sentinel'), 'utf8'), 'external gate sentinel\n');
+      }
+    });
+
+    for (const spelling of ['ordinary', 'legacy']) for (const protectedKind of ['script', 'cwd-root', 'cwd-subdir']) {
+      const label = `${spelling}-${protectedKind}`;
+      const f = await aliasedTarget(label, { scriptOwned: protectedKind === 'script' });
+      if (!f) continue;
+      await check(`${spelling} manifest cannot remove an opposite-alias protected ${protectedKind}`, async () => {
+        const { fx, dest, short } = f;
+        fs.mkdirSync(path.join(dest, 'cwd child'));
+        const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: spelling === 'legacy' ? short : dest, resource: label, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        const before = await snapshot(fx, dest, path.join(fx.root, 'isolated-state'));
+        const options = protectedKind === 'script'
+          ? { cli: path.join(short, 'scripts/dev/remove-worktree.cjs'), nodeArgs: ['--preserve-symlinks-main'] }
+          : { cwd: protectedKind === 'cwd-root' ? short : path.join(short, 'cwd child') };
+        const result = runCli(fx, dest, ['--archive-manifest', saved.manifestPath], options);
+        assert.equal(result.status, 1, result.output);
+        assert.match(result.output, protectedKind === 'script' ? /owns this running script/ : /current process directory/);
+        assert.deepEqual(await snapshot(fx, dest, path.join(fx.root, 'isolated-state')), before);
+      });
+    }
+
+    for (const point of ['helper', 'hash', 'ignored']) for (const rewrite of [false, true]) {
+      const label = `root-${point}-${rewrite}`;
+      const f = await aliasedTarget(label);
+      if (!f) continue;
+      await check(`sticky first exception refuses root replacement at ${point}, lexical rewrite=${rewrite}`, () => {
+        const { fx, dest, short } = f;
+        const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: short, resource: label, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        return installLateMutation(fx, { target: dest, manifestPath: saved.manifestPath, point, kind: 'root', rewrite }).then((probe) => {
+          const result = runCli(fx, dest, ['--archive-manifest', saved.manifestPath]);
+          assert.ok(fs.existsSync(probe), 'root replacement seam executed after first archive admission');
+          const ids = JSON.parse(fs.readFileSync(probe, 'utf8'));
+          assert.notEqual(ids.before, ids.after, 'the owned root was physically replaced');
+          assert.equal(result.status, 1, result.output);
+          assert.equal(fs.readFileSync(path.join(dest, 'draft.txt'), 'utf8'), 'retained draft\n');
+          assert.equal(fs.readFileSync(path.join(`${dest}-previous`, 'draft.txt'), 'utf8'), 'retained draft\n');
+          assert.ok(fs.lstatSync(path.join(dest, 'gate-link')).isSymbolicLink(), 'first mutation never unlinked native pointers');
+          assert.equal(git(fx.repo, 'rev-parse', saved.stateRef).trim(), saved.stateCommit);
+        });
+      });
+    }
+    for (const kind of ['ignored', 'file']) {
+      const f = await aliasedTarget(`late-${kind}`);
+      if (!f) continue;
+      await check(`legacy exception still refuses new ${kind} state across helper consult`, async () => {
+        const { fx, dest, short } = f;
+        const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: short, resource: `late-${kind}`, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        const probe = await installLateMutation(fx, { target: dest, manifestPath: saved.manifestPath, point: 'helper', kind });
+        const result = runCli(fx, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+        assert.ok(fs.existsSync(probe));
+        assert.equal(result.status, 1, result.output);
+        assert.ok(fs.existsSync(path.join(dest, '.git')));
+      });
+    }
+  } else console.log('UNVERIFIED S17 actual Windows 8.3 manifest/protected-root/replacement cases: Linux host');
+
   await check('dry-run inventories ignored paths and has zero filesystem, ref, registry, state, or telemetry effects', async () => {
     const before = await snapshot(primary, target, stateRoot);
     const result = runCli(primary, target, ['--dry-run', '--allow-ignored', '--archive-manifest', archiveManifest], { stateRoot });
@@ -333,6 +625,170 @@ try {
     assert.equal(fs.existsSync(partial), true);
   });
 
+  await check('an archive for another worktree cannot authorize actual removal', async () => {
+    const dest = addWorktree(primary, 'wrong-archive-target', 'codex/936-wrong-archive-target');
+    const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+    const refused = runCli(primary, dest, ['--archive-manifest', archiveManifest]);
+    assert.equal(refused.status, 1, refused.output);
+    assert.match(refused.output, /archive manifest .* (?:is for .*, not |target proof failed: archive manifest is for a different physical worktree: )/);
+    assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+  });
+
+  // Durable boundary checks: each refusal runs the actual destructive CLI in an owned fixture.
+  for (const mutation of ['new-ignored', 'recreated-deletion', 'committed-after-archive', 'forged-blob']) {
+    await check(`retained archive refuses ${mutation} at actual removal`, async () => {
+      const dest = addWorktree(primary, mutation, `codex/936-${mutation}`);
+      if (mutation === 'recreated-deletion') fs.unlinkSync(path.join(dest, 'tracked.txt'));
+      else fs.writeFileSync(path.join(dest, 'draft.txt'), 'retained draft\n');
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: mutation, policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      if (mutation === 'new-ignored') {
+        fs.mkdirSync(path.join(dest, 'ignored'));
+        fs.writeFileSync(path.join(dest, 'ignored', 'new.txt'), 'never retained\n');
+      } else if (mutation === 'recreated-deletion') {
+        fs.writeFileSync(path.join(dest, 'tracked.txt'), 'recreated, never retained\n');
+      } else if (mutation === 'committed-after-archive') {
+        fs.writeFileSync(path.join(dest, 'new-commit.txt'), 'newly committed, never retained\n');
+        git(dest, 'add', 'new-commit.txt');
+        git(dest, 'commit', '-m', 'new state after archive');
+      } else {
+        fs.writeFileSync(path.join(dest, 'draft.txt'), 'forged mapping, unretained\n');
+        saved.manifest.files.find((e) => e.path === 'draft.txt').blob = git(dest, 'hash-object', '-w', 'draft.txt').trim();
+        fs.writeFileSync(saved.manifestPath, JSON.stringify(saved.manifest));
+      }
+      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+      const refused = runCli(primary, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(refused.status, 1, refused.output);
+      assert.match(refused.output, /archive|retained/i);
+      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+      assert.equal(git(primary.repo, 'rev-parse', saved.stateRef).trim(), saved.stateCommit);
+    });
+  }
+
+  if (primary.nativeSymlinks) {
+    if (process.platform === 'win32') await check('junction removal follows Git representation and preserves its external witness', async () => {
+      const dest = addWorktree(primary, 'native-junction', 'codex/936-native-junction');
+      const outside = path.join(primary.root, 'native-junction-target');
+      fs.mkdirSync(outside);
+      fs.writeFileSync(path.join(outside, 'sentinel'), 'external junction witness\n');
+      fs.symlinkSync(outside, path.join(dest, 'junction'), 'junction');
+      const staged = spawnSync('git', ['add', '--force', '--', 'junction'], { cwd: dest, encoding: 'utf8' });
+      const representation = staged.status === 0 ? git(dest, 'ls-files', '--stage', '--', 'junction') : '';
+      const nativeGitLink = /^120000 [0-9a-f]{40,64} 0\tjunction\s*$/.test(representation);
+      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'native-junction', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+      const args = saved.refused ? [] : ['--archive-manifest', saved.manifestPath];
+      const removed = runCli(primary, dest, args);
+      assert.equal(removed.status, nativeGitLink && !saved.refused ? 0 : 1, removed.output);
+      if (!nativeGitLink || saved.refused) assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+      assert.equal(fs.readFileSync(path.join(outside, 'sentinel'), 'utf8'), 'external junction witness\n');
+    });
+
+    if (process.platform !== 'win32' && process.getuid() !== 0) await check('real permission-denied inspection cannot authorize actual removal', async () => {
+      const dest = addWorktree(primary, 'permission-denied', 'codex/936-permission-denied');
+      fs.mkdirSync(path.join(dest, 'private'));
+      fs.writeFileSync(path.join(dest, 'private/draft.txt'), 'retained private draft\n');
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'permission-denied', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+      let refused;
+      fs.chmodSync(path.join(dest, 'private'), 0);
+      try { refused = runCli(primary, dest, ['--archive-manifest', saved.manifestPath]); }
+      finally { fs.chmodSync(path.join(dest, 'private'), 0o755); }
+      assert.equal(refused.status, 1, refused.output);
+      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+    });
+
+    await check('new valuable dangling links block removal while declared disposal and recorded discards remain allowed', async () => {
+      const fx = await makeRepo('ignored-policy');
+      fixtures.push(fx);
+      const policy = { ...DEFAULT_ARCHIVE_POLICY, ignoredPerFileCapBytes: 16,
+        valuableIgnored: ['ignored/*.patch'], disposableIgnored: ['ignored/disposable/**'] };
+      fs.mkdirSync(path.join(fx.repo, 'governance'));
+      fs.writeFileSync(path.join(fx.repo, 'governance/worktree-lifecycle.v1.json'), JSON.stringify({ archive: policy }));
+      const dest = addWorktree(fx, 'ignored-policy', 'codex/936-ignored-policy');
+      fs.mkdirSync(path.join(dest, 'ignored'));
+      fs.writeFileSync(path.join(dest, 'ignored/discard.bin'), 'X'.repeat(32));
+      const saved = archiveWorktree({ mainRepoRoot: fx.repo, worktreePath: dest, resource: 'ignored-policy', policy, discardIgnored: ['ignored/discard.bin'] });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      fs.writeFileSync(path.join(dest, 'ignored/discard.bin'), 'smaller');
+      fs.mkdirSync(path.join(dest, 'ignored/disposable'));
+      fs.writeFileSync(path.join(dest, 'ignored/disposable/new.bin'), 'X'.repeat(32));
+      const outside = path.join(fx.root, 'outside-cache');
+      fs.mkdirSync(outside);
+      fs.writeFileSync(path.join(outside, 'sentinel'), 'must survive\n');
+      fs.symlinkSync(outside, path.join(dest, 'node_modules'), 'dir');
+      fs.symlinkSync('missing valuable destination'.repeat(2), path.join(dest, 'ignored/new.patch'));
+      const refused = runCli(fx, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(refused.status, 1, refused.output);
+      assert.match(refused.output, /ignored paths not covered.*ignored\/new.patch/);
+      assert.ok(fs.lstatSync(path.join(dest, 'ignored/new.patch')).isSymbolicLink());
+      fs.unlinkSync(path.join(dest, 'ignored/new.patch'));
+      const removed = runCli(fx, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(removed.status, 0, removed.output);
+      assert.equal(fs.existsSync(dest), false);
+      assert.equal(fs.readFileSync(path.join(outside, 'sentinel'), 'utf8'), 'must survive\n');
+    });
+
+    for (const mutation of ['dangling-retarget', 'relative-retarget', 'absolute-retarget', 'link-to-file', 'file-to-link', 'recreated-deletion-link']) {
+      await check(`actual removal refuses ${mutation} and preserves source/index/external targets`, async () => {
+        const dest = addWorktree(primary, mutation, `codex/936-${mutation}`);
+        git(dest, 'config', 'core.symlinks', 'true');
+        const targetA = path.join(primary.root, `${mutation}-a`);
+        const targetB = path.join(primary.root, `${mutation}-b`);
+        const payload = mutation === 'absolute-retarget' ? targetA : mutation === 'dangling-retarget' ? 'missing-a' : `../${mutation}-a`;
+        fs.writeFileSync(targetA, payload);
+        fs.writeFileSync(targetB, payload);
+        const entry = mutation === 'recreated-deletion-link' ? 'tracked.txt' : 'entry';
+        if (mutation === 'recreated-deletion-link') fs.unlinkSync(path.join(dest, entry));
+        else if (mutation === 'file-to-link') fs.writeFileSync(path.join(dest, entry), payload);
+        else fs.symlinkSync(payload, path.join(dest, entry));
+        const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: mutation, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        if (mutation !== 'recreated-deletion-link') fs.unlinkSync(path.join(dest, entry));
+        if (mutation === 'link-to-file') fs.writeFileSync(path.join(dest, entry), payload);
+        else fs.symlinkSync(mutation === 'dangling-retarget' ? 'missing-b' : mutation === 'absolute-retarget' ? targetB
+          : mutation === 'relative-retarget' ? `../${mutation}-b` : payload, path.join(dest, entry));
+        const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+        const refused = runCli(primary, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+        assert.equal(refused.status, 1, refused.output);
+        assert.match(refused.output, /does not verify/);
+        assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+        assert.equal(fs.readFileSync(targetA, 'utf8'), payload);
+        assert.equal(fs.readFileSync(targetB, 'utf8'), payload);
+      });
+    }
+
+    await check('unchanged retained link text permits external destination edits/deletion and actual removal', async () => {
+      const dest = addWorktree(primary, 'link-release', 'codex/936-link-release');
+      const outside = path.join(primary.root, 'release-external');
+      fs.writeFileSync(outside, 'destination before archive\n');
+      fs.symlinkSync(outside, path.join(dest, 'saved-link'));
+      let canonicalLink;
+      if (process.platform === 'win32') {
+        git(dest, 'add', '--', 'saved-link');
+        canonicalLink = git(dest, 'rev-parse', ':saved-link').trim();
+      }
+      fs.mkdirSync(path.join(dest, 'ignored'));
+      fs.symlinkSync('missing destination', path.join(dest, 'ignored', 'dangling'));
+      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'link-release', policy: DEFAULT_ARCHIVE_POLICY });
+      assert.equal(saved.refused, undefined, JSON.stringify(saved));
+      fs.writeFileSync(outside, 'destination after archive\n');
+      assert.equal(runCli(primary, dest, ['--dry-run', '--allow-ignored', '--archive-manifest', saved.manifestPath]).status, 0);
+      assert.equal(fs.readFileSync(outside, 'utf8'), 'destination after archive\n');
+      fs.unlinkSync(outside);
+      const removed = runCli(primary, dest, ['--allow-ignored', '--archive-manifest', saved.manifestPath]);
+      assert.equal(removed.status, 0, removed.output);
+      assert.equal(fs.existsSync(dest), false);
+      assert.equal(fs.existsSync(outside), false);
+      if (process.platform === 'win32') {
+        assert.match(git(primary.repo, 'ls-tree', saved.stateCommit, '--', 'saved-link'), /^120000 blob /);
+        assert.equal(git(primary.repo, 'rev-parse', `${saved.stateCommit}:saved-link`).trim(), canonicalLink);
+      } else assert.equal(git(primary.repo, 'show', `${saved.stateCommit}:saved-link`), outside);
+    });
+  }
+
   await check('an exact external path with spaces removes its captured codex branch, preserves guessed branch and junction target', () => {
     const result = runCli(primary, target, ['--allow-ignored', '--archive-manifest', archiveManifest, '--delete-branch']);
     assert.equal(result.status, 0, result.output);
@@ -376,7 +832,8 @@ try {
   });
 
   await check('a separate-git-dir named .git refuses its exact registered main metadata entry on the destructive path', async () => {
-    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'remove-wt-936-separate-git-'));
+    const createdRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'remove-wt-936-separate-git-'));
+    const root = process.platform === 'win32' ? fs.realpathSync.native(createdRoot) : createdRoot;
     const main = path.join(root, 'separate main');
     const admin = path.join(root, 'metadata', '.git');
     await fsp.mkdir(path.dirname(admin), { recursive: true });
@@ -868,6 +1325,7 @@ try {
     const linkedFixture = { root: mutant.root, repo: linked, cli };
     await mutateInstalledCli(cli, (source) => source
       .replace(/  if \(samePath\(abs, facts\.mainWorktree\)\) fail\([^\n]+\);\r?\n/, '')
+      .replace(/  if \(isSameDirectory\(facts\.mainWorktree\)\) fail\([^\n]+\);\r?\n/, '')
       .replace(/  if \(samePath\(targetGitDir, facts\.commonDir\)\) \{\r?\n    fail\([^\n]+\);\r?\n  \}\r?\n/, ''));
     const result = runCli(linkedFixture, mutant.repo);
     assert.equal(result.status, 1, result.output);
