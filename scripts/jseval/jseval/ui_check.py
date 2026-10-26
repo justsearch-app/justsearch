@@ -45,8 +45,12 @@ async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
     AppNotMountedError with the best-available reason (Vite stderr tail / error-overlay
     text / failed resource status / honest fallback). ONE gate, reused by every capture path."""
     try:
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=timeout_ms)
+        # WP1.5a promotes Search v3; retain the older main rail as a known-good control.
+        # Only an actually visible Search rail button establishes shell readiness.
+        await page.locator(
+            f'{S.rail_css("core.search-v3-surface")}:visible, '
+            f'{S.rail_css(S.RAIL_SURFACE_SEARCH)}:visible'
+        ).first.wait_for(state="visible", timeout=timeout_ms)
         return
     except Exception:
         pass  # fall through to assemble the reason — never let the bare timeout escape
@@ -1259,14 +1263,13 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # Measure at MAX SCROLL. At rest the last element is nowhere near the dock and the overlap
         # row would pass for a reason unrelated to the defect; the assertion only means something
         # where "scrolled to the end" is claimed to mean "the last line is above the glass".
-        await page.evaluate(
-            """() => {
-                const w = document.querySelector('jf-sv3-window');
-                const m = w && w.shadowRoot && w.shadowRoot.querySelector('jf-sv3-main');
-                const s = m && m.shadowRoot && m.shadowRoot.querySelector('.scroller');
-                if (s) s.scrollTop = s.scrollHeight;
-            }"""
+        scroller = page.locator('jf-sv3-window [data-testid="sv3-main-scroller"]').first
+        at_end = await scroller.evaluate(
+            "(s) => { s.scrollTop = s.scrollHeight;"
+            " return s.scrollHeight - s.scrollTop - s.clientHeight <= 1 && s.scrollTop > 0; }"
         )
+        if not at_end:
+            raise AssertionError("sv3-composer-occlusion: the transcript did not overflow and scroll to its end")
         if cooldown_ms > 0:
             await asyncio.sleep(cooldown_ms / 1000)
 

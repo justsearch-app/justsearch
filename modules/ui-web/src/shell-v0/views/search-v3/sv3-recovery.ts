@@ -14,7 +14,7 @@ export interface Sv3RecoveryTask {
   effort: 'quick' | 'standard' | 'thorough';
   delivery: 'unaccepted' | 'unknown' | 'review';
 }
-export interface Sv3RecoveryDraft { place: string | null; text: string }
+interface Sv3RecoveryDraft { place: string | null; text: string }
 export interface Sv3Recovery {
   task: Sv3RecoveryTask | null;
   drafts: Sv3RecoveryDraft[];

@@ -127,7 +127,7 @@ export function projectAvailability(
   // successful startup ("…still starting — usually ready in ~Ns"); when there is no prior duration
   // the estimate is null and the reason stays the bare "still starting" — the unknown arm, never a
   // fabricated number (601 §9). Estimate-only, never a decrementing countdown.
-  const continuingLoad = humanRequest && loadContinuation && s.status?.inference?.chatEnabledSpec !== false
+  const continuingLoad = humanRequest && loadContinuation && !s.chatDisabledBySpec
     && !s.chatFailureReason && ['UNLOADED', 'LOADING', 'READY'].includes(s.status?.operating?.chat?.state ?? '');
   if (s.runtime?.mode === 'starting' && !continuingLoad) {
     return unavailableFor('inference.starting', true, formatStartupEstimate(s.inference?.lastStartupDurationMs));
@@ -136,8 +136,7 @@ export function projectAvailability(
   // Settled: the local AI model is offline. The single capability gate every affordance shares.
   // Spec A step 7 (F1): when chat failed, the control says why ("The local AI model file could not
   // be loaded"), in the same words as the readiness notice, instead of a bare "offline".
-  const humanUnloaded = humanRequest && s.status?.inference?.chatEnabledSpec !== false
-    && !s.chatFailureReason && s.chatUnloadedReason != null
+  const humanUnloaded = humanRequest && !s.chatFailureReason && s.chatUnloadedReason != null
     && s.status?.operating?.chat?.state === 'UNLOADED';
   if (!s.capabilities.chat && !humanUnloaded && !continuingLoad) {
     const activity = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples).activity;

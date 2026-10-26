@@ -13,6 +13,8 @@ Changed old expectations are explicit: the branch successful-terminal and two ex
 
 IR15 initial-lifecycle repair (builder initial-8): the additional file and entries below use their own genuine final producer against a47f7c47d25164c69a8f1e833bc59b316b1babb2. The original whole-feature producer/evidence and all existing tests are unchanged. The historical 1a026 acceptance record remains as recorded; it does not accept these new entries and is stale for the changed changeset. Official d5 acceptance in the separate uiux-cutover changeset is preserved. Fresh independent expected-value review and committed-candidate runtime verification remain required.
 
+GA15 adds only the real store-to-availability preservation cases below. Their separate official producer uses exact baseline 54035be4431245ffbe3b3c65c12cccedbb13f114; before passes are intentional preservation. An initial author-only READY/failure expectation was corrected to preserve actual existing precedence before the producer ran; its first negative output remains scratch evidence, not a repaired behavior claim. Existing acceptances remain historical and require fresh independent review.
+
 ```json
 {
   "entries": [
@@ -478,6 +480,28 @@ IR15 initial-lifecycle repair (builder initial-8): the additional file and entri
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with navigation-ABA while the fork waits cannot issue an abandoned task",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with discard while the fork waits cannot issue an abandoned task"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/aiStateStore.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve real store-to-availability behavior while GA15 moves explicit chat-configuration projection into the existing store: true/absent legacy config permits human UNLOADED admission and captured LOADING continuation; explicit off blocks both; Delegate remains gated; zero-document grounded Ask remains gated while typed/model requests work; classified failure prevents residency bypass, retained READY keeps its existing precedence, and lost contact blocks retained snapshots. Existing assertions are unchanged. These new API checks are preservation, not repaired-behavior fail-before claims.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request; agent-adopted GA15 scenarios and design, 2026-10-26",
+          "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
+          "choice": "GA15 preserves exact false/true/absent legacy semantics, live/unreachable/starting/failure precedence, human UNLOADED admission and captured 200/202 continuation, and agent/background gates while consuming the existing AI authority.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-cutover-gate-alignment.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/aiStateStore.test.ts"
       ]
     }
   ]
