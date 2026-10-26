@@ -4231,7 +4231,28 @@ export class UnifiedChatView extends JfElement {
       return true; // other progress / handoff / error are ephemeral — never in the record
     });
 
-    const ordered = [...recordItems, ...liveOnly].sort(compareUnifiedTurnItems);
+    // Decorate actual occurrences after directive upgrades and occurrence-aware deduplication.
+    const occurrences = [
+      ...recordItems.map((item, recordOrder) => ({ item, recordOrder })),
+      ...liveOnly.map((item) => ({ item, recordOrder: -1 })),
+    ].sort((a, b) => compareUnifiedTurnItems(a.item, b.item));
+    for (let start = 0; start < occurrences.length;) {
+      const first = occurrences[start]!.item;
+      let end = start + 1;
+      while (
+        end < occurrences.length && occurrences[end]!.item.ts === first.ts
+        && (occurrences[end]!.item.subMillisecond ?? 0) === (first.subMillisecond ?? 0)
+      ) end++;
+      const record = occurrences.slice(start, end)
+        .filter((o) => o.recordOrder >= 0).sort((a, b) => a.recordOrder - b.recordOrder);
+      let next = 0;
+      for (let i = start; i < end; i++) {
+        if (occurrences[i]!.recordOrder >= 0) occurrences[i] = record[next++]!;
+      }
+      start = end;
+    }
+    // Live slots/order stay fixed: a genuine live USER may interrupt a saved pair.
+    const ordered = occurrences.map((o) => o.item);
 
     // Tempdoc 577 §2.14 Root I (#19) — the run/session boundary seam: when a thread is RESTORED
     // (the record carries prior turns) and a new run continues live, the seam marks where the
