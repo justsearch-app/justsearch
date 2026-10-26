@@ -57,6 +57,11 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     try (var f = new Fixture()) {
       Path file = f.source("private.txt"); var op = f.skipped(file);
       var store = f.configuration("[\"private.txt\"]");
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var subscription = f.registry.subscription(f.root);
+      assertNotNull(subscription);
+      assertTrue(f.registry.isCurrentAndActive(subscription));
+      assertEquals(RootIdentity.capture(f.root), subscription.rootIdentity());
       var policy = f.policy(store, false);
       var replay = f.prepare(policy);
       assertTrue(replay.isPresent(), "the no-root-debt path needs complete explicit declarations");
@@ -159,6 +164,17 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           SchemaFields.PATH, projectionPath.toString(), SchemaFields.PROJECTION_SOURCE_ID, "owned-projection",
           SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "projection-owned text")));
       f.runtime.commitOps().commitAndTrack();
+      f.runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(projectionPath.toString(), f.runtime.documentFieldOps()
+          .getDocumentFieldOrThrow("projection-owned-id", SchemaFields.PATH));
+      assertEquals("owned-projection", f.runtime.documentFieldOps()
+          .getDocumentFieldOrThrow("projection-owned-id", SchemaFields.PROJECTION_SOURCE_ID));
+      assertEquals(1, f.runtime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.PATH,
+              projectionPath.toString())), org.apache.lucene.search.BooleanClause.Occur.FILTER)
+          .add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.PROJECTION_SOURCE_ID,
+              "owned-projection")), org.apache.lucene.search.BooleanClause.Occur.FILTER).build()),
+          "SETUP: actual committed canonical projection membership precedes the protection check");
       var snapshot = f.queue.listSwitchBufferOpsStrict();
       var policy = f.policy(f.configuration("[]"), false);
       assertFalse(f.readmit(policy));
@@ -387,9 +403,19 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     final WorkerIngestService publisher;
     final WorkerMutationAdmission mutation;
     final ReentrantReadWriteLock publication = new ReentrantReadWriteLock();
+    final io.justsearch.app.services.worker.WatchedRootsState rootsOwner;
+    // Each immutable attempt keeps its own complete declarations; no production getter is added.
+    final Map<NativePolicyReplay, List<ResolvedConfig.FileSource>> attemptRoots = new java.util.IdentityHashMap<>();
     Fixture() throws Exception { this(false); }
     Fixture(boolean nativeTransition) throws Exception {
       data = Files.createDirectories(nativeTransition ? directory.resolve("data") : root.resolve("data"));
+      var binding = new java.util.LinkedHashMap<String, Object>();
+      binding.put("path", root.toString()); binding.put("collection", null);
+      Files.writeString(data.resolve("watched_roots.json"), JsonMapper.builder().build().writeValueAsString(
+          Map.of("schemaVersion", 1, "roots", List.of(binding))));
+      rootsOwner = io.justsearch.app.services.worker.WatchedRootsState.load(data);
+      assertEquals(List.of(new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, null)),
+          rootsOwner.snapshotBindings(), "SETUP: one actual official watched-root owner is loaded before runtime");
       manager = nativeTransition ? new io.justsearch.indexerworker.index.IndexGenerationManager(base) : null;
       if (manager != null) {
         manager.initializeOrLoad();
@@ -399,8 +425,9 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       queue.open();
       var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
       fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256, "keyword", true, false, List.of(), null, null, false));
+      fields.add(new FieldCatalogDef.FieldDef(SchemaFields.PROJECTION_SOURCE_ID, "keyword", true, false, List.of(), null, null, false));
       runtime = withTestExecutors(IndexSchema.fromCatalog(new FieldCatalogDef("native-policy", fields), () -> Map.of(), ignored -> {})
-          .atPath(base.resolve(generation))).open();
+          .atPath(manager == null ? base.resolve(generation) : manager.resolveGenerationPathStrict(generation))).open();
       runtime.commitOps().stopCommitTimer();
       var loop = mock(IndexingLoop.class); var fence = new FileMutationFence();
       when(loop.fileMutationFence()).thenReturn(fence);
@@ -449,10 +476,28 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       }
     }
     NativePolicyReplay policy(ConfigStore owner, boolean boot) {
-      var roots = List.of(new ResolvedConfig.FileSource(root, null));
-      return boot ? NativePolicyReplay.forCommittedBoot(owner, owner.publicationLock(), queue, runtime, publisher,
-          generation, roots, owner.currentSnapshot()) : new NativePolicyReplay(owner, owner.publicationLock(), queue,
-              runtime, publisher, generation, roots, owner.currentSnapshot());
+      return rootsOwner.withForgetBindings(official -> {
+        owner.publicationLock().readLock().lock();
+        try {
+          var snapshot = owner.currentSnapshot();
+          var roots = List.copyOf(KnowledgeServerMigrationOps.loadMigrationRootDeclarations(data,
+              snapshot.collections(), JsonMapper.builder().build(), official));
+          assertTrue(roots.contains(new ResolvedConfig.FileSource(root, null)));
+          var policy = boot ? NativePolicyReplay.forCommittedBoot(owner, owner.publicationLock(), queue, runtime, publisher,
+              generation, roots, snapshot) : new NativePolicyReplay(owner, owner.publicationLock(), queue,
+                  runtime, publisher, generation, roots, snapshot);
+          attemptRoots.put(policy, roots);
+          assertTrue(policy.matchesAuthority(owner, publication, roots));
+          var changed = new ArrayList<>(roots);
+          changed.remove(new ResolvedConfig.FileSource(root, null));
+          assertFalse(policy.matchesAuthority(owner, publication, changed),
+              "a changed declaration set cannot borrow this attempt's exact authority");
+          System.out.println("Caller frozen policy roots=" + roots + "; official=" + official
+              + "; writable=" + runtime.isAcceptingWrites() + "; snapshotIdentity=" + System.identityHashCode(snapshot));
+          return policy;
+        } catch (java.io.IOException unknown) { throw new java.io.UncheckedIOException(unknown); }
+        finally { owner.publicationLock().readLock().unlock(); }
+      });
     }
     void addMixedOrRoot(String route) throws Exception {
       if (route.equals("mixed")) {
@@ -475,12 +520,17 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       var state = manager.readStateBestEffort();
       try (var promotion = manager.beginNativePromotion(state.active_generation(), generation)) { promotion.promote(); }
       assertEquals(generation, manager.readStateBestEffort().active_generation());
+      var promoted = manager.inspectCurrentLayoutForBoot().orElseThrow();
+      assertEquals(generation, promoted.activeGenerationId());
+      assertEquals("IDLE", promoted.state().migration_state());
+      assertNull(promoted.state().building_generation());
+      assertEquals(manager.resolveGenerationPathStrict(generation), runtime.openedIndexPath());
+      assertEquals(promoted.activeGenerationPath(), runtime.openedIndexPath());
+      assertTrue(runtime.isAcceptingWrites());
+      System.out.println("Caller promoted pointer=" + promoted.state() + "; runtime=" + runtime.openedIndexPath());
     }
-    io.justsearch.app.services.worker.WatchedRootsState officialRoots() throws Exception {
-      var binding = new java.util.LinkedHashMap<String, Object>(); binding.put("path", root.toString()); binding.put("collection", null);
-      Files.writeString(data.resolve("watched_roots.json"), JsonMapper.builder().build().writeValueAsString(
-          Map.of("schemaVersion", 1, "roots", List.of(binding))));
-      return io.justsearch.app.services.worker.WatchedRootsState.load(data);
+    io.justsearch.app.services.worker.WatchedRootsState officialRoots() {
+      return rootsOwner;
     }
     boolean settle(String route, NativePolicyReplay policy) throws Exception {
       try (var fence = mutation.beginFinalFence(runtime, 1_000)) {
@@ -497,13 +547,21 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
         policy.bindCommittedAcknowledgement(selected -> {
           before.run();
           boolean accepted;
+          assertTrue(runtime.isAcceptingWrites());
+          assertTrue(publisher.ownsForgetQueue(queue));
+          assertSame(publication, store.publicationLock());
           try (var state = manager.beginForgetNoCandidate(runtime.openedIndexPath())) {
+            System.out.println("Caller no-candidate guard acquired for=" + runtime.openedIndexPath());
             store.publicationLock().writeLock().lock();
             try {
               var currentRoots = KnowledgeServerMigrationOps.loadMigrationRootDeclarations(data,
                   store.currentSnapshot().collections(), JsonMapper.builder().build(), official);
-              accepted = policy.matchesAuthority(store, store.publicationLock(), currentRoots)
-                  && policy.reproveCommittedAcknowledgement(selected);
+              boolean authority = policy.matchesAuthority(store, store.publicationLock(), currentRoots);
+              boolean proof = authority && policy.reproveCommittedAcknowledgement(selected);
+              System.out.println("Caller final decision official=" + official + "; frozen=" + attemptRoots.get(policy)
+                  + "; current=" + currentRoots + "; authority=" + authority + "; proof=" + proof
+                  + "; selected=" + selected + "; snapshotIdentity=" + System.identityHashCode(store.currentSnapshot()));
+              accepted = authority && proof;
             } finally { store.publicationLock().writeLock().unlock(); }
           } catch (java.io.IOException unknown) { return false; }
           assertFalse(store.publicationLock().isWriteLockedByCurrentThread());
@@ -529,7 +587,8 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
               throw new AssertionError("Unexpected component settings restart");
             }, candidate -> io.justsearch.agent.api.registry.OperationResult.success("prepared"));
             var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operations,
-                java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY), coordinator);
+                java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+                    io.justsearch.agent.api.registry.OperationKind.RECONFIGURE), coordinator);
             var json = JsonMapper.builder().build();
             var patch = json.readValue(json.writeValueAsString(Map.of("ui", Map.of("excludePatterns", patterns),
                 "witness", settings.inspect().witness(), "operationKey", io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC()))),
@@ -542,6 +601,9 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
             var result = new io.justsearch.app.services.settings.SettingsServiceImpl(settings, runner).applyPublic(patch, null, context);
             assertTrue(result.response().success());
             assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE, result.record().state());
+            assertEquals(result.record().key(), settings.inspect().witness().lastCommittedOperationKey());
+            System.out.println("Caller actual public Save=" + json.writeValueAsString(
+                Map.of("response", result.response(), "record", result.record(), "witness", settings.inspect().witness())));
           } finally {
             if (oldData == null) System.clearProperty("justsearch.data.dir"); else System.setProperty("justsearch.data.dir", oldData);
             if (oldIndex == null) System.clearProperty("justsearch.index.base_path"); else System.setProperty("justsearch.index.base_path", oldIndex);
@@ -563,10 +625,12 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       }
     }
     KnowledgeServerMigrationOps.DrainSwitchBufferContext context(NativePolicyReplay policy) {
+      var roots = attemptRoots.get(policy);
+      assertNotNull(roots, "SETUP: context uses this exact attempt's complete frozen declarations");
       return new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, runtime, null, IndexingPacing.unthrottled(),
           base, runtime.openedIndexPath(), JsonMapper.builder().build(), () -> false, () -> true,
           LoggerFactory.getLogger(NativePolicyReadmissionCallerTest.class), System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5),
-          generation, ignored -> true).withPublisher(publisher).withMigrationRoots(List.of(new ResolvedConfig.FileSource(root, null)))
+          generation, ignored -> true).withPublisher(publisher).withMigrationRoots(roots)
           .withNativePolicy(policy);
     }
     @Override public void close() throws Exception { try { runtime.close(); } finally { queue.close(); } }
