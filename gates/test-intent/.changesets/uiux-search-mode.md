@@ -12,7 +12,7 @@ documents on the shared results card. Scenarios S1.n are cited as SMn and N1.n a
 accepts only short ids). S1.12 (results reachable beside the floating composer at narrow width) is
 checked by the jseval `sv3-search-results` capture, which this gate does not cover.
 
-Evidence: `gates/test-intent/evidence/uiux-search-mode.json` runs all 57 new checks on the
+Historical WP1.1 evidence narrative: `gates/test-intent/evidence/uiux-search-mode.json` runs all 57 new checks on the
 candidate. The one repaired behaviour (a missing document's message) has a fail-before on the
 merge base in `gates/test-intent/evidence/uiux-search-mode-repaired.json`. The other new checks
 pin new behaviour and carry no fail-before requirement; most fail on the before-state, but several
@@ -46,6 +46,8 @@ plain-click selection (SM5) compares ids as a set; and the card path check (SM5)
 path with its own title instead of with its position. Orders that a source or the input sequence
 does fix are kept: quick before refined (SM3), the keys pressed one after another, and the Ask
 followed by a later Ask. Product code is unchanged.
+
+Phase17 metadata follow-up preserves every original owner-adopted quote and acceptance record. XT1 supersedes only three-only mode membership; DS1 supersedes only the all-files-after-reload alternative. The actual current four-mode membership and no-chip/unknown-Edit-wording checks are separately sourced New preservation observations. Corrected57 current checks pair with known-good9f; historical unsupported/missing outputs are not repaired evidence.
 
 ```json
 {
@@ -213,7 +215,7 @@ followed by a later Ask. Product code is unchanged.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Three modes (membership and count; their order is not specified), Search the default; Search labelled for finding matching documents, with no \"no AI\" claim; the mode is announced; Enter, Shift+Enter and IME composition do in Search what the label and hint say; the delegate chord is named only where it delegates.",
+      "behaviour": "Search remains the default; Search is labelled for finding matching documents, with no \"no AI\" claim; the mode is announced; Enter, Shift+Enter and IME composition do in Search what the label and hint say; the delegate chord is named only where it delegates. The old three-only membership obligation is separately Obsolete after XT1 added Structured; actual four-mode membership has its own New entry with no order claim.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -232,7 +234,6 @@ followed by a later Ask. Product code is unchanged.
       ],
       "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask and Delegate, and nothing else",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#starts a fresh window in Search (S1.2) and badges it as the default",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and makes no \"no AI\" claim",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is always the search control, even while a run holds a decision or is running",
@@ -356,7 +357,7 @@ followed by a later Ask. Product code is unchanged.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
       ],
       "class": "New",
-      "behaviour": "Chosen files do not carry into a later ordinary Ask or a new session; Retry keeps the same files (membership and count on both sends; order is not specified) and says so, naming both files and their count; after reload an unsaved scope does not look scoped and Retry/Edit say they search all files.",
+      "behaviour": "Chosen files do not carry into a later ordinary Ask or a new session; known live Retry keeps the same files (membership and count on both sends; order is not specified) and says so, naming both files and their count. The prior SM7 all-files-after-reload alternative is separately Obsolete under DS1. Existing known-scope/all-files note-helper controls remain; the actual unknown-input Edit wording observation has its own New entry. Actual unknown-action refusal and known live Retry/Edit operations are proved separately, not inferred from wording.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -371,7 +372,6 @@ followed by a later Ask. Product code is unchanged.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not carry the files into a later ordinary Ask",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a prepared scope on New session",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#Retry of a scoped answer keeps the same files, and says so",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a reload the turn does not look scoped, and Retry/Edit say they search all files",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the same files when the turn carries its scope, and says all files when it does not"
       ]
     },
@@ -619,6 +619,88 @@ followed by a later Ask. Product code is unchanged.
       "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#shows any other failure as a failure, not as a missing file"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX work, including Structured compatibility and preservation of exact own inputs and unrelated current work.",
+          "choice": "XT1 later added Structured as a first-class composer mode. Supersede ONLY the old SM1 exactly-three-mode membership/count obligation; retain Search default, labels, assistive announcement, mouse/keyboard/IME behavior and no unsupported mode-order claim. Original SM1 owner-adopted quotes remain historical and unmodified.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none; later adopted XT1/DS1 choices specifically supersede only the named older membership/reload alternatives"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX work, including Structured compatibility and preservation of exact own inputs and unrelated current work.",
+          "choice": "DS1 unknown own Ask inputs after reload require review/refusal rather than the old SM7 alternative of replaying as an all-files Ask. Supersede ONLY that all-files-after-reload alternative; retain chosen-scope lifetime, known live Retry/Edit, unrelated B and all other SM7 obligations. Original SM7 owner-adopted quotes remain historical and unmodified.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none; later adopted XT1/DS1 choices specifically supersede only the named older membership/reload alternatives"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The composer offers exactly Search, Ask, Delegate and Structured by membership/count. This check makes no mode-order claim; default/labels/IME behavior remain independently covered.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX work, including Structured compatibility and preservation of exact own inputs and unrelated current work.",
+          "choice": "Preserve actual XT1 four-mode membership after Structured was added; original three-only SM1 membership is specifically obsolete. This is a matching known-good9f preservation check, not a new product repair.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask, Delegate and Structured, and nothing else"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "After reload this fixture shows no saved scope chip and the ordinary inline Edit scope note truthfully says the original Ask inputs are unknown. This check observes the chip and Edit wording ONLY. Actual pre-fork/Send refusal and known live chosen/unrestricted Ask Retry/Edit positives remain separately covered by the DS1 and live-action checks.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX work, including Structured compatibility and preservation of exact own inputs and unrelated current work.",
+          "choice": "Preserve DS1 truthful unknown-own-input presentation after reload. Do not infer actual issuance refusal from a missing chip or wording; separate DS1 action guards and known live positives prove those operations. Matching known-good9f preservation only; no new product repair.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-search-mode.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#DS1 after reload Retry/Edit say the original Ask inputs are unknown"
       ]
     }
   ]
