@@ -1195,10 +1195,12 @@ public final class WorkerIngestService {
       var binding = rootWatcherRegistry.subscription(root);
       String retained = originalRoot != null && jobQueue instanceof SwitchBufferCapableQueue queue
           ? queue.retirementRootCollection(originalRoot) : null;
-      if (originalRoot != null && retained == null)
+      if (originalRoot != null && !((SwitchBufferCapableQueue)jobQueue).retirementRootPolicyKnown(originalRoot))
         return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
-      return syncOps.execute(root.toString(), true, null, cancelled,
-          originalRoot != null ? retained : binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY,
+      boolean legacy = originalRoot != null && ((SwitchBufferCapableQueue)jobQueue).retirementRootLegacyExecution(originalRoot);
+      var intent = originalRoot == null ? null : io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(originalRoot.payload());
+      return syncOps.execute(root.toString(), intent == null || intent.force(), intent == null ? null : intent.provenance(), cancelled,
+          originalRoot != null && !legacy ? retained : binding == null ? collection : binding.collection(), SyncDirectoryOps.AdmissionMode.UPGRADE_RECOVERY,
           admission -> registry.admitRecovery(root, mark,
               () -> exclusionRoots.get().stream().anyMatch(path -> path.toAbsolutePath().normalize()
                   .equals(root.toAbsolutePath().normalize())) || configuredRecoveryRoots.contains(root), admission),originalRoot);
@@ -1213,8 +1215,10 @@ public final class WorkerIngestService {
       var refused=refuseSyncOfRootOnAnotherVolume(root.toString());if(refused!=null)return refused;
       if(!rootWitness.admits(root)||!canApplyWatcherReceipts())return syncDirectoryErrorResponse("ROOT membership waits for its source");
       String retained=jobQueue instanceof SwitchBufferCapableQueue queue?queue.retirementRootCollection(original):null;
-      if(retained==null)return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
-      String collection=retained;
+      if (!(jobQueue instanceof SwitchBufferCapableQueue queue) || !queue.retirementRootPolicyKnown(original))
+        return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
+      var binding = rootWatcherRegistry.subscription(root);
+      String collection=queue.retirementRootLegacyExecution(original) ? binding == null ? null : binding.collection() : retained;
       long mark=rootWatcherRegistry.removalMark();
       return syncOps.enumerateRetirementRoot(root.toString(),collection,cancelled,automatic,
           admission->automatic?rootWatcherRegistry.admitRecovery(root,mark,
@@ -2543,7 +2547,9 @@ public final class WorkerIngestService {
         }
         String collection=origin!=null && jobQueue instanceof SwitchBufferCapableQueue queue
             ? queue.retirementRootCollection(origin) : binding==null?null:binding.collection();
-        if(origin!=null && collection==null)return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
+        if(origin!=null && !((SwitchBufferCapableQueue)jobQueue).retirementRootPolicyKnown(origin))return syncDirectoryErrorResponse("ROOT creator namespace is unknown");
+        if(origin!=null && ((SwitchBufferCapableQueue)jobQueue).retirementRootLegacyExecution(origin))
+          collection=binding==null?null:binding.collection();
         return syncOps.execute(rootPath, force, provenance, ctx::cancelled,collection,effectiveMode,origin);
       };
       if (liveSync && retirement != null) {

@@ -39,7 +39,9 @@ final class Release030RootIntentTest {
 
   @Test void freshDefaultCannotBeReinterpreted() throws Exception {
     try(var q=queue()) {
-      var receipt=root(q,temporary);
+      // New: explicit Default is distinct from the native NULL/INHERIT policy.
+      assertTrue(q.putSyncRootForGeneration("building","root",new SwitchBufferSyncRoot(temporary.toString(),true,null),"default"));
+      var receipt=q.retirementRootReceipt("building","root");
       assertEquals("default",q.retirementRootCollection(receipt));
       assertThrows(IllegalStateException.class,()->q.retainRetirementRootCollection(receipt,"C"));
       assertEquals("default",q.retirementRootCollection(receipt));
@@ -66,15 +68,18 @@ final class Release030RootIntentTest {
     }
   }
 
-  @Test void ordinaryRootClearsEarlierAttributionAndPlan() throws Exception {
+  @Test void ordinaryRootInheritsEarlierAttributionAndClearsPlan() throws Exception {
     Path file=Files.writeString(temporary.resolve("file.txt"),"content");
     try(var q=queue()) {
       q.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file,7,new JobQueue.EnqueueProvenance("user","rpc"),"a".repeat(64),temporary)),"C");
       var receipt=root(q,temporary);
       assertEquals(1,q.enqueueRetirementRootEntries(receipt,List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(temporary)),null,false,false,()->false));
       var row=q.watcherReconciliationRow(file.toString());
-      assertNull(row.get("originator"));assertNull(row.get("transport"));
-      assertNull(row.get("planned_source_sha256"));assertEquals("default",row.get("collection"));
+      // Obsolete: uniform Default/null-clearing contradicted native enqueue's NULL semantics
+      // (SqliteJobQueue.enqueueEntriesInTransaction, inherited from release 0.3.0).
+      // New: bind effective inherited metadata while the ordinary ROOT has no source plan.
+      assertEquals("user",row.get("originator"));assertEquals("rpc",row.get("transport"));
+      assertNull(row.get("planned_source_sha256"));assertEquals("C",row.get("collection"));
       q.prepareRetirementClaims();assertEquals(List.of(file),q.pollPending(1).stream().map(JobQueue.IndexJob::path).toList());
     }
   }

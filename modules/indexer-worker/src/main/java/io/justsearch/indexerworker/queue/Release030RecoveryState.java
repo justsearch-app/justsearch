@@ -47,6 +47,11 @@ public final class Release030RecoveryState {
   }
 
   static void capture(Path database) throws IOException {
+    try { capture(database,null); }
+    catch (java.sql.SQLException impossible) { throw new IOException(impossible); }
+  }
+
+  static void capture(Path database, java.sql.Connection connection) throws IOException, java.sql.SQLException {
     var existing = load(database);
     if (existing != null) {
       if (existing.prepared()) {
@@ -58,6 +63,13 @@ public final class Release030RecoveryState {
     }
     Properties state = new Properties();
     state.setProperty("format", "1");
+    // Positive original-v13 evidence is captured in the first atomic checkpoint, before DDL
+    // or startup producers can add receipts. Match the complete imported payload at inventory.
+    if (connection != null) try (var query = connection.createStatement();
+        var rows = query.executeQuery("SELECT key,payload,last_updated FROM switch_buffer WHERE op='SYNC_ROOT'")) {
+      while (rows.next()) state.setProperty("import-root|" + rows.getString(1),
+          JSON.writeValueAsString(List.of(rows.getString(2), rows.getLong(3))));
+    }
     new Release030RecoveryState(path(database), state).save();
   }
 
@@ -109,8 +121,10 @@ public final class Release030RecoveryState {
     try {
       var collections = new java.util.TreeMap<String,String>();
       for (var receipt : receipts) if ("SYNC_ROOT".equals(receipt.op())) {
-        String collection = rootCollection(receipt);
-        if (collection != null) collections.put(receipt.retirementUuid(), collection);
+        String policy = rootPolicy(receipt);
+        if (policy != null) collections.put(receipt.retirementUuid(), policy);
+        String scope = state.getProperty(RETIRE + "root-scope|" + receipt.retirementUuid());
+        if (scope != null) collections.put(receipt.retirementUuid() + "/scope",scope);
       }
       byte[] bytes = JSON.writeValueAsString(List.of(receipts, collections)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
       admissionSet = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
@@ -121,6 +135,11 @@ public final class Release030RecoveryState {
 
   private String currentProof() {
     return openedSession == null || admissionSet == null ? null : openedSession + ":" + admissionSet;
+  }
+
+  public synchronized boolean retainsRemovalPacket(SwitchBufferCapableQueue.SwitchBufferOp receipt) throws IOException {
+    String value = state.getProperty(REMOVAL + receipt.retirementUuid());
+    return value != null && decodeReceipt(value).equals(receipt);
   }
 
   public synchronized List<SwitchBufferCapableQueue.SwitchBufferOp> removalPackets() throws IOException {
@@ -148,11 +167,28 @@ public final class Release030RecoveryState {
     for (String key : state.stringPropertyNames()) if (key.startsWith(CORRECTION)) {
       var version = JSON.readValue(state.getProperty(key), Correction.class);
       if (version.scope() == null || version.sourceState() == null || version.replacement() == null
+          || version.scope().unitRevision() != null || version.scope().sourceSha256() != null
           || !version.scope().path().equals(version.replacement().path())
+          || !java.util.Objects.equals(version.scope().collection(), version.replacement().collection())
+          || !java.util.Objects.equals(version.scope().provenance(), version.replacement().provenance())
+          || !java.util.Objects.equals(version.scope().ingestionRoot(), version.replacement().ingestionRoot())
+          || version.replacement().unitRevision() == null
+          || !JobQueue.IngestionLedgerTransition.isSha256(version.replacement().sourceSha256())
           || !key.equals(CORRECTION + version.replacement().unitRevision())
           || !java.util.Objects.equals(retiringActive(), version.active())
           || !java.util.Objects.equals(retiringBuilding(), version.building()))
         throw new IOException("Unbound retirement correction version");
+      var origin = SwitchBufferCapableQueue.RootOrigin.fromUnit(version.replacement().unitRevision());
+      if (version.owner() != null && "SYNC_ROOT".equals(version.owner().op())) {
+        if (origin == null || !origin.uuid().equals(version.owner().retirementUuid())
+            || origin.acceptedOrder()!=version.owner().acceptedOrder()) throw new IOException("Correction ROOT role changed");
+      } else if (origin != null) throw new IOException("Exact correction has a ROOT role");
+      if (version.replacement().unitRevision().startsWith("root2:")) {
+        var file = version.replacement(); var provenance = file.provenance();
+        if (!file.unitRevision().split(":",-1)[4].equals(SwitchBufferCapableQueue.rootMemberDigest(file.path(),file.collection(),
+            provenance == null ? null : provenance.originator(),provenance == null ? null : provenance.transport(),
+            PathNormalizer.normalizeKey(file.ingestionRoot()),file.sourceSha256()))) throw new IOException("Correction metadata binding changed");
+      }
       result.add(version);
     }
     return List.copyOf(result);
@@ -356,7 +392,19 @@ public final class Release030RecoveryState {
   }
   public synchronized String rootCollection(SwitchBufferCapableQueue.SwitchBufferOp root) {
     if (!JSON.writeValueAsString(root).equals(state.getProperty(RECEIPT + root.retirementUuid()))) return null;
+    String policy = rootPolicy(root);
+    if (policy != null && policy.startsWith("DECLARED:")) return policy.substring("DECLARED:".length());
     return state.getProperty(RETIRE + "root-collection|" + root.retirementUuid());
+  }
+  public synchronized String rootPolicy(SwitchBufferCapableQueue.SwitchBufferOp root) {
+    if (!JSON.writeValueAsString(root).equals(state.getProperty(RECEIPT + root.retirementUuid()))) return null;
+    String policy = state.getProperty(RETIRE + "root-policy|" + root.retirementUuid());
+    if (policy == null) {
+      String frozen = state.getProperty(RETIRE + "root-collection|" + root.retirementUuid());
+      return frozen == null ? null : "DECLARED:" + frozen;
+    }
+    if (!(policy.equals("INHERIT") || policy.equals("LEGACY_EXECUTION") || (policy.startsWith("DECLARED:") && policy.length()>9))) return null;
+    return policy;
   }
   private static String normalizedCollection(String collection) {
     return collection == null || collection.isBlank() ? "default" : collection;
@@ -368,8 +416,8 @@ public final class Release030RecoveryState {
   }
   /** A precommit slot has no authority until the matching committed receipt is retained. */
   public synchronized void captureFreshRootCollection(SwitchBufferCapableQueue.SwitchBufferOp receipt, String collection) throws IOException {
-    String key = RETIRE + "root-collection|" + receipt.retirementUuid();
-    String normalized = normalizedCollection(collection);
+    String key = RETIRE + "root-policy|" + receipt.retirementUuid();
+    String normalized = collection == null || collection.isBlank() ? "INHERIT" : "DECLARED:" + collection;
     if (state.containsKey(key)) {
       if (!normalized.equals(state.getProperty(key))) throw new IOException("Conflicting ROOT creator collection");
       return;
@@ -385,6 +433,26 @@ public final class Release030RecoveryState {
       throw failed;
     }
   }
+  public synchronized io.justsearch.adapters.lucene.runtime.PathPrefixScope rootScope(
+      SwitchBufferCapableQueue.SwitchBufferOp root) {
+    if (!JSON.writeValueAsString(root).equals(state.getProperty(RECEIPT + root.retirementUuid()))) return null;
+    String scope = state.getProperty(RETIRE + "root-scope|" + root.retirementUuid());
+    return scope == null ? null : io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(scope);
+  }
+
+  /** O(ROOT versions), frozen with the creator/inventory; never derived from completion state. */
+  public synchronized void captureRootScope(SwitchBufferCapableQueue.SwitchBufferOp root,
+      io.justsearch.adapters.lucene.runtime.PathPrefixScope scope) throws IOException {
+    String key = RETIRE + "root-scope|" + root.retirementUuid();
+    String encoded = scope.encode(); String previous=state.getProperty(key);
+    if (previous != null) {
+      if (!previous.equals(encoded)) throw new IOException("ROOT scope changed");
+      return;
+    }
+    try { state.setProperty(key,encoded); save(); admissionsChanged(); }
+    catch (IOException | RuntimeException failed) { state.remove(key); throw failed; }
+  }
+
   private void retainRoot(SwitchBufferCapableQueue.SwitchBufferOp receipt) {
     state.setProperty(RECEIPT + receipt.retirementUuid(), JSON.writeValueAsString(receipt));
   }
@@ -398,15 +466,24 @@ public final class Release030RecoveryState {
     save();
   }
   public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> roots,
-      java.util.Map<String,SwitchBufferUpsert> legacyFiles) throws IOException {
+      java.util.Map<String,SwitchBufferUpsert> legacyFiles,
+      java.util.Map<String,io.justsearch.adapters.lucene.runtime.PathPrefixScope> scopes) throws IOException {
     if (rootsInventoried()) throw new IOException("ROOT inventory already exists");
+    var previous=new Properties(); previous.putAll(state);
+    try {
     for (var root : roots) {
       retainRoot(root);
+      state.setProperty(RETIRE + "root-scope|" + root.retirementUuid(),scopes.get(root.retirementUuid()).encode());
+      String imported = state.getProperty("import-root|" + root.key());
+      if (imported != null && imported.equals(JSON.writeValueAsString(List.of(root.payload(), root.lastUpdatedMs())))
+          && (root.generation() == null || root.generation().isBlank()))
+        state.setProperty(RETIRE + "root-policy|" + root.retirementUuid(), "LEGACY_EXECUTION");
       state.setProperty(HEAD + headKey(root.generation(), root.key()), root.retirementUuid());
     }
     for (var entry : legacyFiles.entrySet()) state.setProperty(EXPECTATION + entry.getKey(),entry.getValue().encode());
     state.setProperty(RETIRE + "root-inventory", "true");
     save();
+    } catch (IOException | RuntimeException failed) { state.clear(); state.putAll(previous); throw failed; }
   }
   /** A crash may leave exactly the committed replacement after a saved predecessor intent. */
   public synchronized void validateRootHeads(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> actual) throws IOException {
@@ -468,7 +545,7 @@ public final class Release030RecoveryState {
     boolean uncertain = "true".equals(state.getProperty("uncertain"));
     var quarantine = new Properties();
     for (String key : state.stringPropertyNames()) {
-      if (key.startsWith(QUARANTINED) || key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH))
+      if (key.startsWith(QUARANTINED) || key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH) || key.startsWith("import-root|"))
         quarantine.setProperty(key, state.getProperty(key));
     }
     state.clear();

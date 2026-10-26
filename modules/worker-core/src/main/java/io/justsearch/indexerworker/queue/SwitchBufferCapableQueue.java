@@ -60,12 +60,14 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
-  /** The opaque root1 unit keeps its original receipt position across later walks and restarts. */
+  /** Both ROOT formats preserve their original receipt position; root1 nonces remain opaque. */
   record RootOrigin(String uuid, long acceptedOrder) {
     public static RootOrigin fromUnit(String unit) {
-      if (unit == null || !unit.startsWith("root1:")) return null;
+      if (unit == null || !(unit.startsWith("root1:") || unit.startsWith("root2:"))) return null;
       String[] parts = unit.split(":", -1);
-      if (parts.length != 4 || !parts[1].matches("[0-9a-f]{32}")
+      boolean bound = unit.startsWith("root2:");
+      if (parts.length != (bound ? 5 : 4) || bound && !parts[4].matches("[0-9a-f]{64}")
+          || !parts[1].matches("[0-9a-f]{32}")
           || !parts[3].matches("[0-9a-f]{32}") || !parts[2].matches("[1-9][0-9]{0,18}")) {
         throw new IllegalArgumentException("Invalid ROOT unit identity");
       }
@@ -74,9 +76,50 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
+  /** Integrity binding of resolved admission metadata, not authentication or source proof. */
+  static String rootMemberDigest(String path, String collection, String originator, String transport,
+      String ingestionRoot, String plannedHash) {
+    try {
+      var bytes = new java.io.ByteArrayOutputStream();
+      try (var out = new java.io.DataOutputStream(bytes)) {
+        out.writeUTF("justsearch/retirement-root-member/v2");
+        for (String value : new String[] {path, collection, originator, transport, ingestionRoot, plannedHash}) {
+          if (value == null) out.writeInt(-1);
+          else {
+            byte[] encoded = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            out.writeInt(encoded.length); out.write(encoded);
+          }
+        }
+      }
+      return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
+    } catch (java.io.IOException | java.security.NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException(impossible);
+    }
+  }
+
+  default boolean retirementRootPolicyKnown(SwitchBufferOp root) { return retirementRootCollection(root) != null; }
+  default SwitchBufferUpsert retirementRootFileScope(SwitchBufferOp root,String path) {
+    throw new UnsupportedOperationException("Resolved ROOT member metadata unavailable");
+  }
+  default boolean retirementRootLegacyExecution(SwitchBufferOp root) { return false; }
+
+  /** Actual retained ROOT owner of the fully validated current row, never inferred from A. */
+  default SwitchBufferOp retirementSourceRoot(String path) { return null; }
+
+  record RetirementRootFile(SwitchBufferOp owner, SwitchBufferUpsert scope) {}
+
+  /** One immutable history snapshot for a caller's existing source-observation batch. */
+  default java.util.function.Function<String,RetirementRootFile> retirementRootFiles() { return path -> null; }
+
   record RetirementSourceObservation(SwitchBufferOp owner, SwitchBufferUpsert scope,
       java.util.Map<String,String> observedRow, String sourceState, String sourceSha256,
-      long size, boolean targetMatches) {}
+      long size, boolean targetMatches, boolean indexedParentMatches) {
+    public RetirementSourceObservation(SwitchBufferOp owner, SwitchBufferUpsert scope,
+        java.util.Map<String,String> observedRow, String sourceState, String sourceSha256,
+        long size, boolean targetMatches) {
+      this(owner,scope,observedRow,sourceState,sourceSha256,size,targetMatches,false);
+    }
+  }
 
   /** Targeted recovery only; source and complete rows are observed before Q's batch reservation. */
   default java.util.List<Integer> correctRetirementSources(java.util.List<RetirementSourceObservation> observations,

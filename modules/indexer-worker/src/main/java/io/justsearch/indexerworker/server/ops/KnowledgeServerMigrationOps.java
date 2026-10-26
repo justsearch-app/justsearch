@@ -626,30 +626,91 @@ public final class KnowledgeServerMigrationOps {
   public static boolean reconcileRelease030Path(DrainSwitchBufferContext context, Path file,
       Path boundary, String collection, List<SwitchBufferCapableQueue.SwitchBufferOp> journal) throws IOException {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
-    String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
-    var owner = applicableReleaseRoot(context,journal,key,0);
+    return reconcileRelease030Path(context,file,collection,releaseRootIntents(journal),queue.retirementRootFiles());
+  }
+
+  private static boolean reconcileRelease030Path(DrainSwitchBufferContext context, Path file, String collection,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp,io.justsearch.indexerworker.queue.SwitchBufferSyncRoot> roots,
+      java.util.function.Function<String,SwitchBufferCapableQueue.RetirementRootFile> rootFiles) throws IOException {
+    var queue=(SwitchBufferCapableQueue)context.jobQueue();
+    String key=io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+    var owner = applicableReleaseRoot(context,roots,key,0,rootFiles);
     var upsert = owner == null ? new SwitchBufferUpsert(key,collection,
-        null,null,null,file) : releaseRootScope(queue,owner,key);
+        null,null,null,file) : releaseRootScope(queue,owner,key,rootFiles);
     return sourceHoldsAdmission(context, queue, owner, upsert,
         context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(
             key, SchemaFields.SOURCE_SHA256));
   }
 
+  /** A conditional DELETE owns its current-path outcome, without selecting a historical creator. */
+  private static boolean settleRelease030ConditionalDelete(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue.SwitchBufferOp receipt,SwitchBufferDelete deletion,
+      Path file,Path boundary,String collection,ReplayDeleteOrder order) throws IOException {
+    var queue=(SqliteJobQueue)context.jobQueue();
+    var observedRow=queue.watcherReconciliationRow(deletion.path());
+    var source=observeForCleanup(context.publisher(),file,boundary);
+    if(source.kind()==CleanupPathKind.UNCERTAIN)return false;
+    var fields=context.ingestLifecycle().documentFieldOps();
+    String indexed=fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.SOURCE_SHA256);
+    String namespace=fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.COLLECTION);
+    boolean matches=source.kind()==CleanupPathKind.REGULAR
+        ? source.sha256()!=null && source.sha256().equals(indexed)
+            && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.DOC_ID))
+            && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.PATH))
+            && namespace!=null && !namespace.isBlank() && (collection==null || collection.equals(namespace))
+        : indexed==null && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(deletion.path())==0;
+    String knownCollection=source.kind()==CleanupPathKind.REGULAR?namespace:collection;
+    if(knownCollection==null && observedRow!=null)knownCollection=observedRow.get("collection");
+    if(matches && queue.matchesRetirementConditionalDelete(receipt,observedRow,knownCollection))return true;
+    // A correction still needs the existing independent FILE or fully validated ROOT authority.
+    return reconcileRelease030Path(context,file,Objects.toString(collection,""),order.rootIntents(),order.rootFiles());
+  }
+
   private static SwitchBufferUpsert releaseRootScope(SwitchBufferCapableQueue queue,
-      SwitchBufferCapableQueue.SwitchBufferOp owner, String path) throws IOException {
+      SwitchBufferCapableQueue.SwitchBufferOp owner,String path) throws IOException {
+    return releaseRootScope(queue,owner,path,queue.retirementRootFiles());
+  }
+
+  private static SwitchBufferUpsert releaseRootScope(SwitchBufferCapableQueue queue,
+      SwitchBufferCapableQueue.SwitchBufferOp owner, String path,
+      java.util.function.Function<String,SwitchBufferCapableQueue.RetirementRootFile> rootFiles) throws IOException {
     String collection = queue.retirementRootCollection(owner);
-    if (collection == null) throw new IOException("Current ROOT creator namespace is unknown");
+    if (!queue.retirementRootPolicyKnown(owner)) throw new IOException("Current ROOT creator namespace is unknown");
     var root = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(owner.payload());
+    if (collection == null || root.provenance() == null) {
+      var member=rootFiles.apply(path);
+      boolean administrative=owner.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX);
+      if(member==null || !administrative && !owner.equals(member.owner())
+          || administrative && member.owner().acceptedOrder()>owner.acceptedOrder())
+        throw new IOException("ROOT member metadata is unavailable");
+      return member.scope();
+    }
     return new SwitchBufferUpsert(path,collection,root.provenance(),null,null,Path.of(root.rootPath()));
   }
 
+  private static Map<SwitchBufferCapableQueue.SwitchBufferOp,io.justsearch.indexerworker.queue.SwitchBufferSyncRoot>
+      releaseRootIntents(List<SwitchBufferCapableQueue.SwitchBufferOp> journal) {
+    var roots=new LinkedHashMap<SwitchBufferCapableQueue.SwitchBufferOp,io.justsearch.indexerworker.queue.SwitchBufferSyncRoot>();
+    for(var op:journal) if("SYNC_ROOT".equals(op.op())
+        && !op.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX))
+      roots.put(op,io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()));
+    return java.util.Collections.unmodifiableMap(roots);
+  }
+
   private static SwitchBufferCapableQueue.SwitchBufferOp applicableReleaseRoot(DrainSwitchBufferContext context,
-      List<SwitchBufferCapableQueue.SwitchBufferOp> journal, String path, long after) {
+      Map<SwitchBufferCapableQueue.SwitchBufferOp,io.justsearch.indexerworker.queue.SwitchBufferSyncRoot> roots, String path, long after,
+      java.util.function.Function<String,SwitchBufferCapableQueue.RetirementRootFile> rootFiles) {
     SwitchBufferCapableQueue.SwitchBufferOp result = null;
-    for (var op : journal) if ("SYNC_ROOT".equals(op.op()) && op.acceptedOrder() > after) {
-      var root = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload());
+    for (var entry : roots.entrySet()) {
+      var op=entry.getKey();var root=entry.getValue();
+      if(op.acceptedOrder()<=after)continue;
       if (context.publisher().prefixScope(root.rootPath()).contains(path)
           && (result == null || result.acceptedOrder() < op.acceptedOrder())) result = op;
+    }
+    if (result!=null && !roots.get(result).force()
+        && context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
+      var member=rootFiles.apply(path);var actual=member==null?null:member.owner();
+      if(actual!=null && actual.acceptedOrder()<result.acceptedOrder())return actual;
     }
     return result;
   }
@@ -1289,7 +1350,7 @@ public final class KnowledgeServerMigrationOps {
         if (!enqueueBufferedUpserts(context, toEnqueue)
             || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery, reconciliations)
                 || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false,
-                    refusedSourceRecovery, reconciliations)))) {
+                    refusedSourceRecovery, reconciliations, fileSurvivorExclusions)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
           return new ReplayOutcome(false, List.of());
         }
@@ -1410,7 +1471,7 @@ public final class KnowledgeServerMigrationOps {
                 throw new IllegalArgumentException("Scoped UPSERT has no exact source witness");
               }
               if (recoveryRoots != null) {
-                allApplied = verifyBufferedUpserts(context, List.of(op), ops, deleteOrder, false, true, reconciliations);
+                allApplied = verifyBufferedUpserts(context, List.of(op), ops, deleteOrder, false, true, reconciliations, fileSurvivorExclusions);
               } else {
                 toEnqueue.add(op);
               }
@@ -1461,8 +1522,7 @@ public final class KnowledgeServerMigrationOps {
                   String collection = deletion.collection();
                   if (collection == null) collection = context.ingestLifecycle().documentFieldOps()
                       .getDocumentFieldOrThrow(deletion.path(), SchemaFields.COLLECTION);
-                  allApplied &= reconcileRelease030Path(context, file, boundary,
-                      Objects.toString(collection, ""));
+                  allApplied &= settleRelease030ConditionalDelete(context,op,deletion,file,boundary,collection,deleteOrder);
                 } else if (uncertainBeneathItsRoot(authority, deletion)) {
                   // The root vouches, but the path's own state cannot be confirmed (a folder on
                   // the way cannot be listed): nothing is admitted or removed on the target, and
@@ -1899,7 +1959,7 @@ public final class KnowledgeServerMigrationOps {
       allApplied = verifyBufferedUpserts(context, ops.stream()
           .filter(op -> "UPSERT".equalsIgnoreCase(op.op())
               && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true,
-          refusedSourceRecovery, reconciliations);
+          refusedSourceRecovery, reconciliations, fileSurvivorExclusions);
     }
     if (allApplied) {
       allApplied = verifyBufferedProjections(context, ops, deleteOrder);
@@ -2033,8 +2093,7 @@ public final class KnowledgeServerMigrationOps {
       var page=queue.rootMembersAfter(cursor);if(page.isEmpty())break;
       for(var member:page) {
         for(var deletion:ops) {
-          if(!List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(deletion.op())
-              || queue.release030RecoveryState().deletionQueueComplete(deletion))continue;
+          if(!List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(deletion.op()))continue;
           var ordered=deletion;
           if(ordered.acceptedOrder()>=member.root().acceptedOrder()
               ||deleteOrders.applyAsLong(member.path(),member.collection())>member.root().acceptedOrder())continue;
@@ -2318,7 +2377,8 @@ public final class KnowledgeServerMigrationOps {
       List<SwitchBufferCapableQueue.SwitchBufferOp> upserts,
       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder,
       boolean finalEffects, boolean refusedSourceRecovery,
-      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations) {
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp,List<String>> fileSurvivorExclusions) {
     if (upserts.isEmpty()) return true;
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
@@ -2330,6 +2390,7 @@ public final class KnowledgeServerMigrationOps {
           "Buffered UPSERT reader could not refresh: " + unavailable.getMessage());
       return false;
     }
+    var sourceObservations = new ArrayList<SwitchBufferCapableQueue.RetirementSourceObservation>();
     int awaited = 0;
     String firstAwaited = null;
     try {
@@ -2341,13 +2402,30 @@ public final class KnowledgeServerMigrationOps {
         if (upsert.sourceSha256() == null && !retirement) continue;
         boolean scoped = op.generation() != null && !op.generation().isBlank()
             && op.generation().equals(context.replayGeneration());
+        // A declared forced ROOT can establish the namespace of its ordered deletion
+        // without inventing the provenance of a member already removed from Q.
+        var deletionOwner = retirement && upsert.unitRevision() == null
+            ? declaredReleaseDeletionOwner(context, orderedOps, upsert.path(), op.acceptedOrder()) : null;
+        if (deletionOwner != null) {
+          String namespace = queue.retirementRootCollection(deletionOwner);
+          int ownerPosition = deleteOrder.positions().get(deletionOwner);
+          var namespaceDeletion=lastMatchingReleaseDelete(context,orderedOps,deleteOrder,ownerPosition,upsert.path(),namespace);
+          if (namespaceDeletion!=null && "DELETE_COLLECTION".equals(namespaceDeletion.op())
+              && hasLaterAcceptedDelete(context,deleteOrder,ownerPosition,upsert.path(),upsert.path(),
+                  namespace,context.replayGeneration())) {
+            var namespaceOnly = new SwitchBufferUpsert(upsert.path(),namespace,null,null,null,null);
+            if (finalEffects && !verifyDeletedReleaseFile(context,orderedOps,deleteOrder,ownerPosition,
+                namespaceOnly,reconciliations,fileSurvivorExclusions)) return false;
+            continue;
+          }
+        }
         var laterSync = latestConfirmedReleaseSync(context, deleteOrder, upsert.path(),
             deleteOrder.positions().get(op));
         if (laterSync != null && upsert.unitRevision() == null) {
           Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot
               .decode(laterSync.payload()).rootPath()).toAbsolutePath().normalize();
           String collection = ((SqliteJobQueue)context.jobQueue()).retirementRootCollection(laterSync);
-          if (collection == null) return false;
+          if (collection == null) collection = releaseRootScope(queue,laterSync,upsert.path(),deleteOrder.rootFiles()).collection();
           upsert = new SwitchBufferUpsert(upsert.path(), collection,
               upsert.provenance(), upsert.unitRevision(), upsert.sourceSha256(), root);
         }
@@ -2359,7 +2437,7 @@ public final class KnowledgeServerMigrationOps {
           if (finalEffects) {
             if (hasLaterAcceptedDelete(context, deleteOrder, reconciliationPosition, upsert.path(),
                 upsert.path(), upsert.collection(), op.generation())) {
-              if (!verifyDeletedReleaseFile(context, orderedOps, deleteOrder, reconciliationPosition, upsert, reconciliations)) return false;
+              if (!verifyDeletedReleaseFile(context, orderedOps, deleteOrder, reconciliationPosition, upsert, reconciliations, fileSurvivorExclusions)) return false;
             } else if (!reconciled.verifies(upsert.path(), upsert.collection())) return false;
           }
           continue; // Earlier UPSERT evidence waits for the root receipt's committed path outcomes.
@@ -2369,7 +2447,7 @@ public final class KnowledgeServerMigrationOps {
           // Live broad deletion may already have removed this exact admission on B. Await
           // the queue before crossing the boundary, then prove final absence after all writes.
           if (finalEffects && !verifyDeletedReleaseFile(context, orderedOps, deleteOrder,
-              deleteOrder.positions().get(op), upsert, reconciliations)) {
+              deleteOrder.positions().get(op), upsert, reconciliations, fileSurvivorExclusions)) {
             context.log().warn("Superseded file still has an indexed image: path={} expectedCollection={} indexedCollection={} laterSync={}",
                 upsert.path(),upsert.collection(),context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(upsert.path(),SchemaFields.COLLECTION),laterSync);
             return false;
@@ -2381,10 +2459,13 @@ public final class KnowledgeServerMigrationOps {
         if (refusedSourceRecovery) {
           // Judge every admission, so each one A lacks gets its A job in this attempt.
           var owner = upsert.unitRevision() == null
-              ? applicableReleaseRoot(context,orderedOps,upsert.path(),op.acceptedOrder()) : null;
-          if (owner != null) upsert = releaseRootScope(queue,owner,upsert.path());
+              ? applicableReleaseRoot(context,deleteOrder.rootIntents(),upsert.path(),op.acceptedOrder(),deleteOrder.rootFiles()) : null;
+          if (owner != null) upsert = releaseRootScope(queue,owner,upsert.path(),deleteOrder.rootFiles());
           else owner = op;
-          if (!sourceHoldsAdmission(context, queue, owner, upsert, indexed)) {
+          boolean settled = release030Retirement(context)
+              ? retirementSourceHoldsAdmission(context,queue,owner,upsert,indexed,sourceObservations)
+              : sourceHoldsAdmission(context,queue,owner,upsert,indexed);
+          if (!settled) {
             if (awaited++ == 0) firstAwaited = upsert.path();
           }
           continue;
@@ -2397,6 +2478,10 @@ public final class KnowledgeServerMigrationOps {
               "Buffered UPSERT lacks its accepted target projection: " + upsert.path());
           return false;
         }
+      }
+      if (!sourceObservations.isEmpty()) {
+        var results = queue.correctRetirementSources(sourceObservations,()->Thread.currentThread().isInterrupted());
+        for (int result : results) if (result == 2) awaited--;
       }
       if (awaited != 0) {
         context.log().warn("Refused candidate awaits A's effect on {} accepted file(s), first: {}",
@@ -2448,20 +2533,8 @@ public final class KnowledgeServerMigrationOps {
       SwitchBufferCapableQueue queue, SwitchBufferCapableQueue.SwitchBufferOp owner,
       SwitchBufferUpsert upsert, String indexed) throws IOException {
     if (release030Retirement(context)) return retirementSourceHoldsAdmission(context,queue,owner,upsert,indexed);
-    if (release030Retirement(context) && context.jobQueue() instanceof SqliteJobQueue sqlite
-        && sqlite.isRelease030RetirementFile(Path.of(upsert.path()))
-        && sqlite.hasUnownedModernAdmission(Path.of(upsert.path()))) return false;
     CleanupPathState now = observeForCleanup(context.publisher(), Path.of(upsert.path()),
         upsert.ingestionRoot());
-    if (release030Retirement(context) && upsert.unitRevision()!=null && now.kind()==CleanupPathKind.REGULAR) {
-      var sqlite=(SqliteJobQueue)context.jobQueue();
-      var row=sqlite.watcherReconciliationRow(upsert.path());
-      if (row==null || !upsert.unitRevision().equals(row.get("unit_revision"))) {
-        if (upsert.sourceSha256().equals(now.sha256())) sqlite.recoverRetirementExact(upsert);
-        return false;
-      }
-      if (!"DONE".equals(row.get("state"))) return false;
-    }
     switch (now.kind()) {
       case UNCERTAIN -> {
         return false; // Fail-closed: Green and the journal stay until the path can be judged.
@@ -2473,15 +2546,8 @@ public final class KnowledgeServerMigrationOps {
         }
       }
       case REGULAR -> {
-        if (now.sha256() != null && now.sha256().equals(indexed)
-            && (!release030Retirement(context) || releaseCollection(upsert.collection()).equals(
-                releaseCollection(context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(
-                    upsert.path(), SchemaFields.COLLECTION))))) return true;
+        if (now.sha256() != null && now.sha256().equals(indexed)) return true;
       }
-    }
-    if (release030Retirement(context) && (now.sha256() == null && now.kind() == CleanupPathKind.REGULAR
-        || context.jobQueue() instanceof SqliteJobQueue sqlite && sqlite.hasUnfinishedFileJob(upsert.path()))) {
-      return false; // Existing retry deadlines remain authoritative; unreadable bytes prove nothing.
     }
     String admission = cleanupAdmission(context.replayGeneration(), upsert.path(), now.fileState());
     var work = queue.sourceFileWork(upsert.path(), indexed);
@@ -2506,6 +2572,13 @@ public final class KnowledgeServerMigrationOps {
   private static boolean retirementSourceHoldsAdmission(DrainSwitchBufferContext context,
       SwitchBufferCapableQueue queue, SwitchBufferCapableQueue.SwitchBufferOp owner,
       SwitchBufferUpsert scope, String indexed) throws IOException {
+    return retirementSourceHoldsAdmission(context,queue,owner,scope,indexed,null);
+  }
+
+  private static boolean retirementSourceHoldsAdmission(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue queue, SwitchBufferCapableQueue.SwitchBufferOp owner,
+      SwitchBufferUpsert scope, String indexed,
+      List<SwitchBufferCapableQueue.RetirementSourceObservation> observations) throws IOException {
     var sqlite = (SqliteJobQueue)queue;
     Path file = Path.of(scope.path());
     if (sqlite.hasUnownedModernAdmission(file)) return false;
@@ -2527,19 +2600,28 @@ public final class KnowledgeServerMigrationOps {
           && releaseCollection(scope.collection()).equals(releaseCollection(context.ingestLifecycle()
               .documentFieldOps().getDocumentFieldOrThrow(scope.path(),SchemaFields.COLLECTION)));
     }
-    boolean targetMatches;
+    boolean targetMatches;boolean indexedParentMatches=false;
     if (source.kind() == CleanupPathKind.REGULAR) {
       var fields = context.ingestLifecycle().documentFieldOps();
-      targetMatches = source.sha256().equals(indexed)
+      String namespace=fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.COLLECTION);
+      boolean knownNamespace=scope.collection()!=null && !scope.collection().isBlank()
+          || owner!=null && "SYNC_ROOT".equals(owner.op());
+      indexedParentMatches = knownNamespace
           && scope.path().equals(fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.DOC_ID))
           && scope.path().equals(fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.PATH))
           && releaseCollection(scope.collection()).equals(releaseCollection(
-              fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.COLLECTION)));
+              namespace));
+      targetMatches=source.sha256().equals(indexed) && indexedParentMatches;
     } else targetMatches = indexed == null
         && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(scope.path()) == 0;
-    int result = sqlite.correctRetirementSources(List.of(new SwitchBufferCapableQueue.RetirementSourceObservation(
-        owner,scope,observedRow,source.fileState(),source.sha256(),JobQueue.EnqueueEntry.stat(file).sizeBytes(),
-        targetMatches)),() -> Thread.currentThread().isInterrupted()).getFirst();
+    var observation = new SwitchBufferCapableQueue.RetirementSourceObservation(
+        owner,scope,observedRow,source.fileState(),source.sha256(),JobQueue.EnqueueEntry.stat(file).sizeBytes(),targetMatches,indexedParentMatches);
+    if (observations != null) {
+      observations.add(observation);
+      return false; // The caller batches the already observed transitions under one Q reservation.
+    }
+    int result = sqlite.correctRetirementSources(List.of(observation),
+        () -> Thread.currentThread().isInterrupted()).getFirst();
     return result == 2;
   }
 
@@ -2977,7 +3059,9 @@ public final class KnowledgeServerMigrationOps {
       Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> positions,
       Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> deletes,
       Map<String, Map<String, Integer>> exactDeletes,
-      Release030Roots releaseRecovery) {}
+      Release030Roots releaseRecovery,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp,io.justsearch.indexerworker.queue.SwitchBufferSyncRoot> rootIntents,
+      java.util.function.Function<String,SwitchBufferCapableQueue.RetirementRootFile> rootFiles) {}
 
   private static ReplayDeleteOrder replayDeleteOrder(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> ops, boolean exactRead, Release030Roots recovery) {
@@ -3010,7 +3094,10 @@ public final class KnowledgeServerMigrationOps {
     }
     exactDeletes.replaceAll((generation, indexes) -> Map.copyOf(indexes));
     return new ReplayDeleteOrder(Map.copyOf(positions), java.util.Collections.unmodifiableMap(deletes),
-        Map.copyOf(exactDeletes), recovery);
+        Map.copyOf(exactDeletes), recovery, recovery == null ? Map.of() : releaseRootIntents(ops.stream()
+            .filter(op -> !context.approvedGapVersions().contains(op)).toList()),
+        recovery!=null && context.jobQueue() instanceof SwitchBufferCapableQueue queue
+            ? queue.retirementRootFiles() : path->null);
   }
 
   /** Only a completed exact walk receipt can supersede an earlier overlapping effect. */
@@ -3026,16 +3113,54 @@ public final class KnowledgeServerMigrationOps {
       String root = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath();
       if (op.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)
           && !order.releaseRecovery().currentRoots().containsKey(Path.of(root))) continue;
-      if (!context.publisher().prefixScope(root).contains(file)) continue;
+      var frozen=order.releaseRecovery().checkpoint().rootScope(op);
+      if (frozen==null || !frozen.contains(file)) continue;
+      // Administrative discovery and force=false cannot supersede indexed work by
+      // declaration alone. Require this exact ROOT's actual validated current admission.
+      if (op.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)
+          || !io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).force()) {
+        var actual=order.rootFiles().apply(file);
+        if(actual==null || !actual.owner().equals(op))continue;
+      }
       latest = op;
       position = entry.getValue();
     }
     return latest;
   }
 
+  private static SwitchBufferCapableQueue.SwitchBufferOp lastMatchingReleaseDelete(
+      DrainSwitchBufferContext context,List<SwitchBufferCapableQueue.SwitchBufferOp> ops,ReplayDeleteOrder order,
+      int earlier,String path,String collection) {
+    for(var op:ops.reversed()) {
+      if(order.positions().get(op)<=earlier || !Objects.equals(context.replayGeneration(),op.generation())
+          || context.approvedGapVersions().contains(op))continue;
+      if("DELETE".equals(op.op()) && SwitchBufferDelete.decode(op.payload()).path().equals(path)
+          || "DELETE_PREFIX".equals(op.op()) && PathPrefixScope.decode(op.payload()).contains(path)
+          || "DELETE_COLLECTION".equals(op.op()) && op.payload().equals(collection))return op;
+    }
+    return null;
+  }
+
+  private static SwitchBufferCapableQueue.SwitchBufferOp declaredReleaseDeletionOwner(
+      DrainSwitchBufferContext context,List<SwitchBufferCapableQueue.SwitchBufferOp> ops,
+      String path,long after) {
+    if (!(context.jobQueue() instanceof SqliteJobQueue queue)) return null;
+    var cp=queue.release030RecoveryState();
+    return ops.stream().filter(op -> "SYNC_ROOT".equals(op.op()) && op.acceptedOrder()>after
+        && !op.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX))
+        .filter(op -> {
+          var intent=io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload());
+          var scope=cp.rootScope(op);String policy=cp.rootPolicy(op);
+          return intent.force() && policy!=null && policy.startsWith("DECLARED:")
+              && scope!=null && scope.contains(path) && (cp.rootEnumerated(op)||cp.rootWalked(op))
+              && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path),Path.of(intent.rootPath()));
+        }).max(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElse(null);
+  }
+
   private static boolean verifyDeletedReleaseFile(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> ops, ReplayDeleteOrder order, int earlier,
-      SwitchBufferUpsert file, Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations)
+      SwitchBufferUpsert file, Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp,List<String>> fileSurvivorExclusions)
       throws IOException {
     if (release030Retirement(context)) {
       // Only the last matching deletion determines whether absence is namespace-scoped.
@@ -3049,6 +3174,7 @@ public final class KnowledgeServerMigrationOps {
             && PathPrefixScope.decode(deletion.payload()).contains(file.path())) break;
         if (!"DELETE_COLLECTION".equals(deletion.op()) || !deletion.payload().equals(file.collection())) continue;
         var survivors = new ArrayList<>(reconciledSurvivorsAfterDelete(context, ops, order, deletion, reconciliations));
+        survivors.addAll(fileSurvivorExclusions.getOrDefault(deletion,List.of()));
         for (var later : ops) if ("UPSERT".equals(later.op())
             && order.positions().get(later) > order.positions().get(deletion)) {
           var accepted = resolveReleaseUpsert(context,later);

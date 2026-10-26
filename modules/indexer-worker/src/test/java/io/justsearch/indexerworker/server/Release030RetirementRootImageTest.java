@@ -67,7 +67,9 @@ final class Release030RetirementRootImageTest {
     await(()->search(server,"ordinaryackimageviolet").contains(key(file))&&"DONE".equals(queue(server).watcherReconciliationRow(key(file)).get("state")),"later public ROOT writer completed",30);
     assertEquals(collection,Objects.toString(server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(key(file),io.justsearch.indexing.SchemaFields.COLLECTION),"default"));
     String unit=queue(server).watcherReconciliationRow(key(file)).get("unit_revision");
-    assertTrue(unit.startsWith("root1:"));assertEquals(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(key(file),io.justsearch.indexing.SchemaFields.SOURCE_SHA256));
+    // Obsolete: newly admitted inherited metadata cannot be represented by root1's opaque nonce.
+    // New: root2 retains the exact original receipt position and binds resolved member metadata.
+    assertTrue(unit.startsWith("root2:"));assertEquals(new SwitchBufferCapableQueue.RootOrigin(later.retirementUuid(),later.acceptedOrder()),SwitchBufferCapableQueue.RootOrigin.fromUnit(unit));assertEquals(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(key(file),io.justsearch.indexing.SchemaFields.SOURCE_SHA256));
     permissions=Files.getPosixFilePermissions(file);Files.setPosixFilePermissions(file,Set.of());assertFalse(Files.isReadable(file));
     int before=attempts.get();release.countDown();await(()->attempts.get()>before+1,"ordered replay observes later source uncertainty",30);
     assertTrue(Files.isRegularFile(file));assertTrue(search(server,"ordinaryackimageviolet").contains(key(file)),"later acknowledged image remains visible while source is unreadable");assertTrue(search(server,"unrelatedackviolet").contains(key(unrelated)),"unrelated acknowledged content remains visible");
