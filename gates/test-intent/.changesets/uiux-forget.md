@@ -252,6 +252,28 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Actual catalog-minted Stage, Library and Search v3 route confirmed Retry through the initial target-specific reconciliation, including retained/remounted, split and late-result owners. Exact key/path/scope mismatch stays unknown. Noncomplete outcomes, API-owner ABA, evicted origins, duplicate notifications, new unrelated draft/query/pane/Ask scope and saved turn scopes retain their boundaries. No global event bus, replay journal, durable UI event or cross-tab exactly-once guarantee.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "LR56 clarifies S56.3/S56.7: successful Library Retry reconciles the same affected current results/count/selection/one-send prepared Ask scope/document pane as initial completion, through the existing retained-surface owner. Wrong, stale, partial or unknown receipts cannot reconcile; unrelated queries/panes/drafts/conversations/saved turn scopes survive and late completion cannot widen context.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-library-recovery-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

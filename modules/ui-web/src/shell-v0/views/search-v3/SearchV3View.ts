@@ -329,8 +329,9 @@ import {
 import { confirmConversationTree, conversationDeleteOutcome } from '../../components/chat/conversationDelete.js';
 import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
 import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
-import { createForgetAttempt, executeForget, forgetContainsPath, forgetObservationText,
-  forgetParentFolder, readUnfinishedForgets } from '../../../api/domains/forget.js';
+import { completedForget, createForgetAttempt, executeForget, forgetContainsPath, forgetObservationText,
+  forgetParentFolder, publishForgetCompletion, readUnfinishedForgets,
+  type IndexedForgetCompletion } from '../../../api/domains/forget.js';
 import { confirmForget } from '../../components/searchResults/forgetConsent.js';
 import type { CardForgetDetail } from '../../components/searchResults/ResultsCard.js';
 import { describeExactPath } from '../../../api/exclusionPolicy.js';
@@ -811,6 +812,7 @@ export class SearchV3View extends JfElement {
   declare theme: AppearanceMode;
   /** Set by the shell on every render of a mounted surface (`chrome/Shell.ts:2945-2949`). */
   declare apiBase: string;
+  declare forgetCompletionOwner: object | undefined;
   private declare forgetAvailable: boolean;
   private declare forgetBusy: boolean;
   private declare forgetNotice: string;
@@ -3160,6 +3162,16 @@ export class SearchV3View extends JfElement {
     } catch { /* A host must prove that it handles the action before any card offers it. */ }
   }
 
+  /** One target-specific reconciliation for initial completion and the owning Stage's Retry. */
+  reconcileConfirmedForget(detail: IndexedForgetCompletion): void {
+    if (detail.apiBase !== this.apiBase || detail.owner !== this.forgetCompletionOwner) return;
+    const outcome = completedForget(detail.outcome);
+    if (outcome?.path == null || outcome.scope === null) return;
+    const cleared = this.search.reconcileForgotten(outcome.path, outcome.scope);
+    if (cleared && this.tier === 'ask') this.tier = 'search';
+    if (this.paneDocPath !== null && forgetContainsPath(outcome.path, outcome.scope, this.paneDocPath)) this.closePane();
+  }
+
   private async onCardForget(event: Event): Promise<void> {
     const detail = (event as CustomEvent<CardForgetDetail>).detail;
     if (!detail || !this.forgetAvailable || this.forgetBusy || !this.search.showing) return;
@@ -3173,6 +3185,7 @@ export class SearchV3View extends JfElement {
     const placement = this.forgetPlacement;
     const session = this.sessions.activeId;
     const base = this.apiBase;
+    const completionOwner = this.forgetCompletionOwner;
     const current = () => this.isConnected && this.forgetPlacement === placement
       && this.sessions.activeId === session && this.apiBase === base && this.search.showing;
     const consent = new AbortController();
@@ -3195,9 +3208,8 @@ export class SearchV3View extends JfElement {
       }
       this.forgetNotice = `${describeExactPath(path)}: ${forgetObservationText(outcome)}`;
       if (outcome.status === 'COMPLETE' && outcome.path !== null && outcome.scope !== null) {
-        const cleared = this.search.reconcileForgotten(outcome.path, outcome.scope);
-        if (cleared && this.tier === 'ask') this.tier = 'search';
-        if (this.paneDocPath !== null && forgetContainsPath(outcome.path, outcome.scope, this.paneDocPath)) this.closePane();
+        this.reconcileConfirmedForget({ apiBase: base, owner: completionOwner, outcome });
+        publishForgetCompletion(this, base, outcome, completionOwner);
         const focused = deepActiveElement();
         if (focused === document.body || focused === detail.invoker || detail.invoker?.contains(focused)) this.composer?.focusField();
       }

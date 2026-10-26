@@ -18,7 +18,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { describeExactPath, type ExactPathExclusion } from '../../api/exclusionPolicy.js';
-import { decideForget, forgetObservationText, parseForgetPage } from '../../api/domains/forget.js';
+import { decideForget, forgetObservationText, parseForgetPage, publishForgetCompletion } from '../../api/domains/forget.js';
 import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types/index.js';
 import { confirmForget } from '../components/searchResults/forgetConsent.js';
 import { JfElement } from '../primitives/JfElement.js';
@@ -246,6 +246,8 @@ export class LibrarySurface extends JfElement {
   declare private excludesNotice: string;
   declare private excludesResult: ExcludesResult | null;
   private declare unfinishedForgets: ForgetPage | null;
+  /** Ephemeral Stage API-owner identity, captured before an asynchronous decision. */
+  declare forgetCompletionOwner: object | undefined;
   private declare forgetReadStatus: 'loading' | 'ready' | 'unavailable' | 'unsupported';
   private declare forgetDecisionKey: string | null;
   private declare forgetMessage: string;
@@ -842,6 +844,7 @@ export class LibrarySurface extends JfElement {
         || this.forgetReadStatus !== 'ready' || decision === 'retry' && item.reason === 'WITHDRAWAL_PENDING') return;
     const base = this.apiBase;
     const placement = this.forgetPlacement;
+    const completionOwner = this.forgetCompletionOwner;
     const current = () => this.isConnected && this.apiBase === base && this.activeTab === 'folders'
       && this.forgetPlacement === placement;
     const consent = new AbortController();
@@ -850,7 +853,11 @@ export class LibrarySurface extends JfElement {
     this.forgetMessage = 'Preparing the exact saved target…';
     try {
       const outcome = await decideForget(base, key, decision, async prompt =>
-        current() && !consent.signal.aborted && await confirmForget(prompt, consent.signal) && current());
+        current() && !consent.signal.aborted && await confirmForget(prompt, consent.signal) && current(),
+        { path: item.path, scope: item.scope });
+      // The owning Stage also retains detached Search v3 nodes. This notification does not paint
+      // the departed Library, and carries the exact API owner captured before the request.
+      if (decision === 'retry' && outcome !== null) publishForgetCompletion(this, base, outcome, completionOwner);
       if (!current()) return;
       this.forgetMessage = outcome === null ? 'Decision cancelled before approval.'
         : `${describeExactPath(item.path)}: ${forgetObservationText(outcome)}`;

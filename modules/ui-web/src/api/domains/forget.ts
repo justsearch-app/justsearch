@@ -7,6 +7,28 @@ import { OperationClient, OperationError } from '../../shell-v0/operations/Opera
 
 export type ForgetScope = NonNullable<ForgetOutcome['scope']>;
 
+/** A node-owned notification for the Stage that already retains the originating surface. */
+export const FORGET_COMPLETED_EVENT = 'jf-indexed-forget-completed';
+export interface IndexedForgetCompletion {
+  readonly apiBase: string;
+  readonly owner: object | undefined;
+  readonly outcome: ForgetOutcome;
+}
+
+export function completedForget(value: unknown): ForgetOutcome | null {
+  const parsed = forgetOutcomeSchema.safeParse(value);
+  return parsed.success && parsed.data.status === 'COMPLETE' && parsed.data.removal === 'CONFIRMED'
+    && parsed.data.operationKey !== null && parsed.data.path !== null && parsed.data.scope !== null
+    ? parsed.data : null;
+}
+
+export function publishForgetCompletion(node: HTMLElement, apiBase: string, outcome: ForgetOutcome,
+  owner: object | undefined): void {
+  const confirmed = completedForget(outcome);
+  if (confirmed !== null) node.dispatchEvent(new CustomEvent<IndexedForgetCompletion>(FORGET_COMPLETED_EVENT,
+    { detail: { apiBase, owner, outcome: confirmed } }));
+}
+
 function outcomeFor(value: unknown, key: string, target?: Pick<ForgetAttempt, 'path' | 'scope'>): ForgetOutcome | null {
   const parsed = forgetOutcomeSchema.safeParse(value);
   if (!parsed.success || parsed.data.operationKey !== key
@@ -62,8 +84,8 @@ export async function executeForget(base: string, attempt: ForgetAttempt,
 }
 
 export async function decideForget(base: string, forgetKey: string, decision: 'retry' | 'withdraw',
-  consent: (prompt: ForgetConsent) => Promise<boolean>): Promise<ForgetOutcome | null> {
-  return invoke(base, `core.${decision}-forget`, { forgetKey }, createOperationKey(), forgetKey, consent);
+  consent: (prompt: ForgetConsent) => Promise<boolean>, target?: Pick<ForgetAttempt, 'path' | 'scope'>): Promise<ForgetOutcome | null> {
+  return invoke(base, `core.${decision}-forget`, { forgetKey }, createOperationKey(), forgetKey, consent, target);
 }
 
 async function invoke(base: string, operationId: string, args: Record<string, unknown>,
