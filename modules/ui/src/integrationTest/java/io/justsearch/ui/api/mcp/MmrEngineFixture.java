@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import io.javalin.Javalin;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.agent.api.registry.OperationCatalog;
@@ -25,6 +27,7 @@ import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.server.WorkerAppServices;
 import io.justsearch.indexerworker.services.WorkerSearchService;
+import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.PipelineConfigs;
 import io.justsearch.ui.api.RetrieveContextController;
 import io.justsearch.ui.api.TestRequestContexts;
@@ -45,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -146,10 +150,7 @@ abstract class MmrEngineFixture {
       return found.getResultsList().stream().anyMatch(h -> h.getId().equals(article.toString()))
           && found.getResultsList().stream().anyMatch(h -> h.getId().equals(outside.toString()));
     });
-    await("more than K real passages, all K fit", Duration.ofMinutes(2), () -> {
-      var result = retrieve();
-      return result.chunksUsed() == K && result.quality().chunksConsidered() > K;
-    });
+    awaitPassages();
     var adversarial = client.search(QUESTION, 10, PipelineConfigs.TEXT, TestRequestContexts.browser());
     var decoy = adversarial.getResultsList().stream()
         .filter(hit -> hit.getId().equals(outside.toString())).findFirst().orElseThrow();
@@ -162,6 +163,41 @@ abstract class MmrEngineFixture {
     mountHttp();
   }
 
+  private void awaitPassages() throws Exception {
+    var rag = field(worker, "ragContextOps");
+    var counts = (IndexCountOps) field(rag, "indexCountOps");
+    var fields = (DocumentFieldOps) field(rag, "documentFieldOps");
+    var last = new AtomicReference<DocumentService.ContextResult>();
+    try {
+      await("more than K real passages, all K fit", Duration.ofMinutes(2), () -> {
+        var result = retrieve();
+        if (last.get() == null) setupDiagnostics("initial", result, counts, fields);
+        last.set(result);
+        return result.chunksUsed() == K && result.quality().chunksConsidered() > K;
+      });
+    } finally {
+      if (last.get() != null) setupDiagnostics("last", last.get(), counts, fields);
+    }
+  }
+
+  private void setupDiagnostics(String stage, DocumentService.ContextResult result,
+      IndexCountOps counts, DocumentFieldOps fields) {
+    // Observe the existing readiness retrieval, with two small index reads per snapshot.
+    // No extra retrieval, embedding, or per-poll logging.
+    var parent = fields.getDocumentFieldsBatch(List.of(article.toString()),
+        Set.of(SchemaFields.CHUNK_TOTAL, SchemaFields.MIME_BASE, SchemaFields.FILE_KIND));
+    System.out.println("MMR_SETUP stage=" + stage + " pathPrefix=" + params().pathPrefix()
+        + " mode=" + result.retrievalMode() + " reason=" + result.retrievalModeReason()
+        + " cause=" + result.retrievalModeCause() + " chunksUsed=" + result.chunksUsed()
+        + " chunksConsidered=" + result.quality().chunksConsidered()
+        + " chunksFound=" + result.chunksFound() + " truncated=" + result.contextTruncated()
+        + " sections=" + result.sections().stream().map(s -> s.sourceLabel() + "#"
+            + s.sectionIndex() + ":" + s.chunkIndex() + " chars=" + s.content().length()).toList()
+        + " citations=" + identities(result) + " storedParent=" + parent
+        + " indexedParentChunks=" + counts.countByField(SchemaFields.PARENT_DOC_ID,
+            article.toString()));
+  }
+
   private io.justsearch.configuration.resolved.ResolvedConfig configuration() {
     var builder = new ResolvedConfigBuilder().contributeBaseSources();
     settings.forEach((key, value) -> builder.put(key, ResolvedConfigBuilder.ORDINAL_JVM_ARG,
@@ -170,9 +206,11 @@ abstract class MmrEngineFixture {
   }
 
   RetrieveContextParams params() {
+    // Path prefixes are directories: production normalization appends a separator.
     return new RetrieveContextParams(QUESTION, Set.of(article.toString()), K, 6000,
         List.of(), List.of(), List.of(), RetrieveContextParams.TimeRange.UNSET,
-        false, article.toString(), List.of(), false, RetrieveContextParams.ContextFormat.LABELED,
+        false, article.getParent().toString(), List.of(), false,
+        RetrieveContextParams.ContextFormat.LABELED,
         List.of(), List.of(), List.of(), RetrieveContextParams.TimeRange.UNSET,
         false, List.of(), List.of());
   }
@@ -201,14 +239,14 @@ abstract class MmrEngineFixture {
   JsonNode rest() throws Exception {
     return post("/api/knowledge/retrieve-context", Map.of("query", QUESTION, "top_k", K,
         "max_tokens", 6000, "auto_entity_extract", false,
-        "filters", Map.of("path_prefix", article.toString())));
+        "filters", Map.of("path_prefix", article.getParent().toString())));
   }
 
   JsonNode mcp() throws Exception {
     var envelope = post("/mcp", Map.of("jsonrpc", "2.0", "id", 11, "method", "tools/call",
         "params", Map.of("name", "justsearch_answer", "arguments",
             Map.of("query", QUESTION, "top_k", K,
-                "filters", Map.of("path_prefix", article.toString())))));
+                "filters", Map.of("path_prefix", article.getParent().toString())))));
     assertFalse(envelope.has("error"), envelope.toString());
     var result = envelope.path("result");
     assertFalse(result.path("isError").asBoolean(true), result.toString());
