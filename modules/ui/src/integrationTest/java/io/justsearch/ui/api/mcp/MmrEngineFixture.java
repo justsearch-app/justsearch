@@ -221,7 +221,10 @@ abstract class MmrEngineFixture {
   }
 
   private void mountHttp() {
-    var controller = new RetrieveContextController(null, documents, null, () -> "", store);
+    // Public no-inference collaborator: constructor guards and deterministic normalization stay
+    // real; optional LLM sufficiency remains unavailable without composing a model session.
+    var controller = new RetrieveContextController(
+        null, documents, OnlineAiService.unavailable(), () -> "", store);
     HeadAssembly facade = mock(HeadAssembly.class);
     McpAnswerCaptureFixture.bind(facade, documents);
     var surface = new McpToolSurface(List.of(OperationCatalog.of("core", List.of())),
