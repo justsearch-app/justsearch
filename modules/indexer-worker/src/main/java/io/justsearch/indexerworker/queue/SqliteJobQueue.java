@@ -1020,7 +1020,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     // A kill after migration must not erase the fact that these were release-v13 jobs. Capture
     // before any DDL, leaving the migration itself lossless (including every saved retry field).
     if (SqliteQueueMigrationOps.getSchemaVersion(connection) == 13) {
-      Release030RecoveryState.capture(dbPath, connection);
       // Mark a known v13 database before its existing atomic migration. Its new v17 unit
       // revisions carry this generation, including a backup or kill before queue repair.
       int generation;
@@ -1033,6 +1032,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           update.execute("PRAGMA application_id=" + ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE));
         }
       }
+      Release030RecoveryState.capture(dbPath, connection);
     }
     var recovery = Release030RecoveryState.load(dbPath);
     releaseRecovery = recovery;
@@ -1550,6 +1550,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               Path.of(scope.path()),scope.ingestionRoot())) return -1;
       return owner.acceptedOrder();
     }
+    if (owner != null && "DELETE".equals(owner.op()))
+      return nativeConditionalCorrectionOwner(owner,scope,orders) ? owner.acceptedOrder() : -1;
     if (owner != null) {
       var frozen = releaseRecovery.legacyExpectation(owner);
       if (!"UPSERT".equals(owner.op()) || owner.payload().stripLeading().startsWith("{")
@@ -1561,6 +1563,51 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         && scope.provenance() == null ? 0 : -1;
   }
 
+  /** A native conditional event owns present-file reconciliation, never a historical ROOT role. */
+  private boolean nativeConditionalCorrectionOwner(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      RetirementOrders orders) throws IOException {
+    var deletion=SwitchBufferDelete.decode(owner.payload());
+    if (deletion.origin()!=SwitchBufferDelete.Origin.LEGACY || !owner.generation().isBlank()
+        || !owner.key().equals("path:"+deletion.path()) || !deletion.path().equals(scope.path())
+        || !scope.path().equals(PathNormalizer.normalizeKey(scope.ingestionRoot()))
+        || scope.collection()==null || scope.collection().isBlank() || scope.provenance()!=null
+        || scope.unitRevision()!=null || scope.sourceSha256()!=null
+        || !orders.filesByPath().getOrDefault(scope.path(),List.of()).isEmpty()
+        || orders.rootIntents().values().stream().noneMatch(root -> "LEGACY_EXECUTION".equals(root.policy()))) return false;
+    try {
+      if (!releaseRecovery.preparedFor(release030RecoveryIdentity())
+          || hasUnownedModernAdmission(Path.of(scope.path()))) return false;
+      var row=watcherRowLocked(scope.path());
+      if (row==null || correctionHasRecordedOwner(scope.path(),row)) return false;
+      var seen=new HashSet<String>();
+      while (true) {
+        var version=orders.corrections().get(row.get("unit_revision"));
+        if (version==null) {
+          // A cancelled SQL transition may leave mutable retry fields on its original unit.
+          var predecessor=row;
+          version=orders.predecessors().getOrDefault(row.get("unit_revision"),List.of()).stream()
+              .filter(v -> Objects.equals(v.owner(),owner) && v.scope().equals(scope)
+                  && sameCorrectionPredecessor(v.predecessor(),predecessor)).findFirst().orElse(null);
+          if (version==null) break;
+        } else if (!matchesCorrection(correctionCandidate(row),version.replacement())) return false;
+        if (!Objects.equals(version.owner(),owner) || !version.scope().equals(scope)
+            || version.predecessor()==null || !seen.add(version.replacement().unitRevision())) return false;
+        row=version.predecessor();
+        // An intent whose SQL rolled back points to the same original unit.
+        if (row.get("unit_revision")==null) return false;
+        if (row.get("unit_revision").startsWith("release030/job/")) break;
+      }
+      String unit=row.get("unit_revision");
+      String cohort=releaseRecovery.nativeCohort();
+      return cohort!=null && unit!=null && unit.matches("release030/job/"+cohort+"/[0-9a-f]{32}")
+          && STATE_DONE.equals(row.get("state")) && row.get("retry_after")==null
+          && Objects.equals(scope.collection(),row.get("collection"))
+          && row.get("ingestion_root")==null && row.get("planned_source_sha256")==null
+          && row.get("originator")==null && row.get("transport")==null
+          && !correctionHasRecordedOwner(scope.path(),row);
+    } catch (SQLException invalid) { throw new IOException("Native conditional predecessor unavailable",invalid); }
+  }
+
   private boolean currentCorrectionOwner(SwitchBufferOp owner, SwitchBufferUpsert scope,
       RetirementOrders orders, List<RetirementDelete> deletes) throws IOException {
     long order = correctionOwnerOrder(owner,scope,orders);
@@ -1568,7 +1615,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         || latestDelete(deletes,scope.path(),scope.collection()) > order) return false;
     for (var root : orders.rootIntents().entrySet())
       if (root.getValue().scope().contains(scope.path()) && orders.roots().get(root.getKey()) > order
-          && !orders.receipts().get(root.getKey()).key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)) return false;
+          && !orders.receipts().get(root.getKey()).key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)
+          && !(owner!=null && "DELETE".equals(owner.op()) && root.getValue().policy()!=null
+              && !SwitchBufferSyncRoot.decode(orders.receipts().get(root.getKey()).payload()).force())) return false;
     return true;
   }
 
@@ -1908,6 +1957,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     var retained = versions.stream().filter(version -> Objects.equals(version.owner(),owner)
         && version.scope().equals(scope) && sameCorrectionPredecessor(version.predecessor(),row))
         .findFirst().orElse(null);
+    if (owner != null && "DELETE".equals(owner.op()) && !observation.indexedParentMatches()) return 0;
     if (owner != null && !journal.contains(owner)
         || !(currentCorrectionOwner(owner,scope,orders,deletes)
             || (targetMatches || observation.indexedParentMatches())

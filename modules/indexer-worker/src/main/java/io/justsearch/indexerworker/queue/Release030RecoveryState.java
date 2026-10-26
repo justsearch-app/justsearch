@@ -52,8 +52,17 @@ public final class Release030RecoveryState {
   }
 
   static void capture(Path database, java.sql.Connection connection) throws IOException, java.sql.SQLException {
+    String cohort = null;
+    if (connection != null) try (var query = connection.createStatement();
+        var row = query.executeQuery("PRAGMA application_id")) {
+      if (!row.next() || row.getInt(1) == 0) throw new java.sql.SQLException("Missing native v13 cohort");
+      cohort = Integer.toString(row.getInt(1));
+    }
     var existing = load(database);
     if (existing != null) {
+      String retained = existing.state.getProperty("native-cohort");
+      if (retained != null && !retained.equals(cohort))
+        throw new IOException("Restored v13 cohort conflicts with recovery checkpoint");
       if (existing.prepared()) {
         existing.state.remove("prepared");
         existing.state.remove("database");
@@ -63,6 +72,7 @@ public final class Release030RecoveryState {
     }
     Properties state = new Properties();
     state.setProperty("format", "1");
+    if (cohort != null) state.setProperty("native-cohort", cohort);
     // Positive original-v13 evidence is captured in the first atomic checkpoint, before DDL
     // or startup producers can add receipts. Match the complete imported payload at inventory.
     if (connection != null) try (var query = connection.createStatement();
@@ -71,6 +81,12 @@ public final class Release030RecoveryState {
           JSON.writeValueAsString(List.of(rows.getString(2), rows.getLong(3))));
     }
     new Release030RecoveryState(path(database), state).save();
+  }
+
+  /** Original v13 identity; never inferred from a current database or surviving job. */
+  synchronized String nativeCohort() {
+    String cohort = state.getProperty("native-cohort");
+    return cohort != null && cohort.matches("[1-9][0-9]*") ? cohort : null;
   }
 
   public static Release030RecoveryState load(Path database) throws IOException {
@@ -545,7 +561,7 @@ public final class Release030RecoveryState {
     boolean uncertain = "true".equals(state.getProperty("uncertain"));
     var quarantine = new Properties();
     for (String key : state.stringPropertyNames()) {
-      if (key.startsWith(QUARANTINED) || key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH) || key.startsWith("import-root|"))
+      if (key.equals("native-cohort") || key.startsWith(QUARANTINED) || key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH) || key.startsWith("import-root|"))
         quarantine.setProperty(key, state.getProperty(key));
     }
     state.clear();

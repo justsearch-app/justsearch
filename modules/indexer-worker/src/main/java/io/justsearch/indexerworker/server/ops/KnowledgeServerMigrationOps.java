@@ -662,7 +662,13 @@ public final class KnowledgeServerMigrationOps {
     String knownCollection=source.kind()==CleanupPathKind.REGULAR?namespace:collection;
     if(knownCollection==null && observedRow!=null)knownCollection=observedRow.get("collection");
     if(matches && queue.matchesRetirementConditionalDelete(receipt,observedRow,knownCollection))return true;
-    // A correction still needs the existing independent FILE or fully validated ROOT authority.
+    if (source.kind()==CleanupPathKind.REGULAR && knownCollection!=null
+        && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.DOC_ID))
+        && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.PATH))) {
+      // The native conditional operation owns only reconciliation of its exact current path.
+      var scope=new SwitchBufferUpsert(deletion.path(),knownCollection,null,null,null,file);
+      return sourceHoldsAdmission(context,queue,receipt,scope,indexed);
+    }
     return reconcileRelease030Path(context,file,Objects.toString(collection,""),order.rootIntents(),order.rootFiles());
   }
 
