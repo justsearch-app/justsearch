@@ -1,0 +1,255 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-R35-evidence-audit/collect.mjs",
+      "digest": "sha256:34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36",
+      "configuration": {
+        "path": "tmp/builder/retire-R35-evidence-audit/collect.json",
+        "sha256": "sha256:7ca9557c8a98d81b947ed3c40adbee73aee0c7dc1eb560c7c975d21a17db3051",
+        "bytes": 20868
+      },
+      "canonicalParsers": [
+        {
+          "path": "scripts/governance/gates/test-intent/evidence-runners.mjs",
+          "sha256": "sha256:5edf1266ced4b81b748a21ae22168e029aba07cfc16b024a9d993cc1081b5c25",
+          "bytes": 7879
+        },
+        {
+          "path": "scripts/governance/gates/test-intent/evidence.mjs",
+          "sha256": "sha256:f5a094974e7f55bb5ee9d1d3452387dfaeebf2602dd1995af65be4aab366e44c",
+          "bytes": 5439
+        }
+      ],
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-R35-evidence-audit/producers/34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36.mjs",
+        "sha256": "sha256:34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36",
+        "bytes": 12802
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:39:57.399Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootProgressTest :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest.xml",
+          "sha256": "sha256:3df6984bf080c4ee6f713ac2e137174d97cb688773e0ea65b5989efe8cfd5188",
+          "bytes": 658127
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/command.json",
+          "sha256": "sha256:c446eff632b2eca66eadbd22de426d28605efe105fc0b47cff41f38ec2ba726b",
+          "bytes": 1702110
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java",
+          "sha256": "sha256:c2308d919b5ba1a118efcb3178aa325cff629246afe98e1607f348d39007a0ea",
+          "bytes": 10272
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java",
+          "sha256": "sha256:7fb06cab16ac2e0ddc370d141c5aa038446ee2805d0b8e7409b6ba01f16ec560",
+          "bytes": 3946
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/run.py",
+          "sha256": "sha256:23e543637a13dca06b569f1a0992ffb981ba9ef7513a3ad91dabdc18c55736e9",
+          "bytes": 2739
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/selection.init.gradle",
+          "sha256": "sha256:b500028cfd20bff2ee200d580c234093e3af6c6bfe183a3968b25c70fc9e1332",
+          "bytes": 2208
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-effective.json",
+          "sha256": "sha256:2bb1dbb72bbfc1edffc8926b93d666e50b24f5be302a6d333283fada68dfe84f",
+          "bytes": 33039
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/selected-daemon-writeability.json",
+          "sha256": "sha256:13bce67b506f5a425ce68aa530de1f9963222cee3a36ddf191bcdf6caf573ee3",
+          "bytes": 1610
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:e3af9fee636e4d52c13f0856013c5d38c2930f1619f48038e3cdd8b71bbb9c4c",
+          "bytes": 774206
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:8a1725d2e1d93d76ba7e672e0490701aa72e4289b994b630705bf5690d5910b2",
+          "bytes": 2550
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:478f5586a3c78c514408110b4c5b578ac8dbcba5930f91cf0f199f0ccc47dea9",
+          "bytes": 7070
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java#laterPublicSyncMaySupersedeAnEarlierExactAdmission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c2308d919b5ba1a118efcb3178aa325cff629246afe98e1607f348d39007a0ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] true, false",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] true, false",
+          "method": "laterPublicSyncMaySupersedeAnEarlierExactAdmission"
+        },
+        {
+          "name": "[2] false, false",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] false, false",
+          "method": "laterPublicSyncMaySupersedeAnEarlierExactAdmission"
+        },
+        {
+          "name": "[3] true, true",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[3] true, true",
+          "method": "laterPublicSyncMaySupersedeAnEarlierExactAdmission"
+        },
+        {
+          "name": "[4] false, true",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[4] false, true",
+          "method": "laterPublicSyncMaySupersedeAnEarlierExactAdmission"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest.xml",
+          "sha256": "sha256:3df6984bf080c4ee6f713ac2e137174d97cb688773e0ea65b5989efe8cfd5188",
+          "bytes": 658127
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/command.json",
+          "sha256": "sha256:c446eff632b2eca66eadbd22de426d28605efe105fc0b47cff41f38ec2ba726b",
+          "bytes": 1702110
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java",
+          "sha256": "sha256:c2308d919b5ba1a118efcb3178aa325cff629246afe98e1607f348d39007a0ea",
+          "bytes": 10272
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java",
+          "sha256": "sha256:7fb06cab16ac2e0ddc370d141c5aa038446ee2805d0b8e7409b6ba01f16ec560",
+          "bytes": 3946
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/run.py",
+          "sha256": "sha256:23e543637a13dca06b569f1a0992ffb981ba9ef7513a3ad91dabdc18c55736e9",
+          "bytes": 2739
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/selection.init.gradle",
+          "sha256": "sha256:b500028cfd20bff2ee200d580c234093e3af6c6bfe183a3968b25c70fc9e1332",
+          "bytes": 2208
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-effective.json",
+          "sha256": "sha256:2bb1dbb72bbfc1edffc8926b93d666e50b24f5be302a6d333283fada68dfe84f",
+          "bytes": 33039
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/selected-daemon-writeability.json",
+          "sha256": "sha256:13bce67b506f5a425ce68aa530de1f9963222cee3a36ddf191bcdf6caf573ee3",
+          "bytes": 1610
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:e3af9fee636e4d52c13f0856013c5d38c2930f1619f48038e3cdd8b71bbb9c4c",
+          "bytes": 774206
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:8a1725d2e1d93d76ba7e672e0490701aa72e4289b994b630705bf5690d5910b2",
+          "bytes": 2550
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:478f5586a3c78c514408110b4c5b578ac8dbcba5930f91cf0f199f0ccc47dea9",
+          "bytes": 7070
+        }
+      ],
+      "executionScope": "Actual whole-check source execution on bbdd production snapshot; HISTORICAL PRODUCTION relative to e948; not current-parent runtime proof or independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": []
+  },
+  "unverified": [
+    {
+      "scope": "applied-parent runtime revalidation",
+      "reason": "Production changed after this bbdd execution",
+      "owner": "root / independent verifier"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java#laterPublicSyncMaySupersedeAnEarlierExactAdmission",
+      "scope": "fail-before",
+      "reason": "Actual b84 whole source differs from the final qualifier-clean source; cannot substitute its hash",
+      "owner": "root evidence execution lane"
+    }
+  ],
+  "appliedSourceEquivalence": null,
+  "sourceBindings": [
+    {
+      "run": "tmp/builder/retire-P4-evidence-closure/final-public-progress-pmd-after",
+      "comparisonArtifact": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json"
+    }
+  ],
+  "scope": "Raw runs and flags retained. Source/producer/listener/binary bindings disclose actual execution inputs. Earlier bbdd execution does not automatically establish behavior on the applied e948 production.",
+  "digest": "sha256:9b984d04b3d4b7dcbed2e04a0199a766c0f3a3d8b1d99c41e934a31b955dc585"
+}

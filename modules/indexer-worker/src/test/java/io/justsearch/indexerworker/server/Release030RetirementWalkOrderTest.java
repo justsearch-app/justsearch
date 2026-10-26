@@ -335,13 +335,7 @@ final class Release030RetirementWalkOrderTest {
       .setTargetCollection("walk-order").setRootAdded(true).setForceReindex(true).build(),CallContext.none()).getAcceptedCount());
  }
  static KnowledgeServer namedBoot(Path root,TestEngineExecutors ex,MigrationTransitionBarrier.Hook hook)throws Exception {
-  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));
-  org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
-  server.bindBootRootBindings(List.of(new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"),"walk-order"),
-      new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/beta"),null)));
-  server.bindExclusionRoots(()->List.of(root.resolve("roots/alpha"),root.resolve("roots/beta")));
-  server.installMigrationBarrierForTests(hook);
-  try {server.start();} catch(Exception|Error failure) {server.close();throw failure;}return server;
+  return Release030RetirementPublicSyncTest.namedBoot(root,ex,hook);
  }
  @org.junit.jupiter.params.ParameterizedTest(name = "repeated target faults / restore earlier DB={0}")
  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})

@@ -26,7 +26,7 @@ final class Release030RetirementRootProgressTest {
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);var attempts=new AtomicInteger();
   try(var _=new ReleasedModelIdentities(root)) {
    try(var ex=new TestEngineExecutors();var server=Release030RetirementOrderingTest.bootWithBarrier(root,ex,t->{if(t.point().equals("release030-before-replay"))attempts.incrementAndGet();})) {
-    var q=Release030RetirementWalkOrderTest.queue(server);
+    var q=Release030RetirementSafetyTest.queue(server);
     assertEquals(0,count(root,"path='"+key(betaOnly)+"'"),"new beta source starts genuinely unqueued");
     activate(server);
     assertEquals(1,server.appServices().ingestService().submitBatch(BatchRequest.newBuilder().addFilePaths(acknowledged.toString()).setRootAdded(true).build(),CallContext.none()).getAcceptedCount());

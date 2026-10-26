@@ -1,0 +1,335 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952.mjs",
+        "sha256": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+        "bytes": 10467
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:06:15.625Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest.xml",
+          "sha256": "sha256:582e4ccada47fc0cc2ec8983b78ce57be4b6eb6e3199f55c3accff72dd6c14f5",
+          "bytes": 301653
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementRootImageTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementTransitiveOrderTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/root-prefix-order-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest.xml",
+          "sha256": "sha256:cc379f5948d1e4210ff61b2a54e5fb4442587cc2db18bca0c7e05a3f07860e1b",
+          "bytes": 298583
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/root-prefix-order-before/command.json",
+          "sha256": "sha256:a1b7dbab2fc71bcf99a8ebba11a4a34b551b9473578648bde3084c88bda45459",
+          "bytes": 1697936
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/root-prefix-order-before/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:b93912ab383f24a71c8d9eae63488b6c00f4aae969094bab68c9abffb9d7757c",
+          "bytes": 9120
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java#transitiveDeferredCollectionCannotEraseLaterBetaSync",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e65cd3e5c8426aead8f8ca0eaab3f288d45858388f5d03abd985432ff8102fcf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "transitiveDeferredCollectionCannotEraseLaterBetaSync(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "transitiveDeferredCollectionCannotEraseLaterBetaSync(Path)",
+          "method": "transitiveDeferredCollectionCannotEraseLaterBetaSync"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest.xml",
+          "sha256": "sha256:582e4ccada47fc0cc2ec8983b78ce57be4b6eb6e3199f55c3accff72dd6c14f5",
+          "bytes": 301653
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#overlappingScopesKeepTheirAcceptedOrderAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b12f8326db896c88234b688f85c529d5e01f8150775ef924ce804bba2ba43dbb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sync then exact",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sync then prefix",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sync then collection",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "prefix then sync",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[5]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "collection then sync",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[6]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "prefix then explicit",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java#transitiveDeferredCollectionCannotEraseLaterBetaSync",
+        "contentDigest": "sha256:e65cd3e5c8426aead8f8ca0eaab3f288d45858388f5d03abd985432ff8102fcf",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "cases": [
+          {
+            "name": "transitiveDeferredCollectionCannotEraseLaterBetaSync(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "transitiveDeferredCollectionCannotEraseLaterBetaSync(Path)",
+            "method": "transitiveDeferredCollectionCannotEraseLaterBetaSync"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/root-prefix-order-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest.xml",
+            "sha256": "sha256:cc379f5948d1e4210ff61b2a54e5fb4442587cc2db18bca0c7e05a3f07860e1b",
+            "bytes": 298583
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/root-prefix-order-before/command.json",
+            "sha256": "sha256:a1b7dbab2fc71bcf99a8ebba11a4a34b551b9473578648bde3084c88bda45459",
+            "bytes": 1697936
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/root-prefix-order-before/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:b93912ab383f24a71c8d9eae63488b6c00f4aae969094bab68c9abffb9d7757c",
+            "bytes": 9120
+          }
+        ],
+        "revision": "f081bfa9214ad2c91a027daa06efce25d47718c2"
+      }
+    ]
+  },
+  "scope": "Actual final check-source after and actual before where listed. Missing before is UNVERIFIED, not a claimed fail-before. WalkCrash after fails its child marker before intended kill. Whole method oracles remain. Root owns independent acceptance.",
+  "digest": "sha256:3611bc588ff33c0007807cdb88330cd3158200fa80d1c3c846c98719f74ddd09"
+}

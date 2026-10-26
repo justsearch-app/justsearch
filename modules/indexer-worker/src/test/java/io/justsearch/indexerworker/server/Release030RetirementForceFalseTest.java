@@ -20,12 +20,15 @@ import org.junit.jupiter.api.io.TempDir;
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementForceFalseTest {
  @Test void indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(@TempDir Path root)throws Exception {
-  exercise(root,false);
+  exercise(root,false,false);
  }
  @Test void readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(@TempDir Path root)throws Exception {
-  exercise(root,true);
+  exercise(root,true,false);
  }
- private static void exercise(Path root,boolean changed)throws Exception {
+ @Test void logicalDefaultOlderRootSurvivesLaterForceFalseCollectionAndChangedSource(@TempDir Path root)throws Exception {
+  exercise(root,true,true);
+ }
+ private static void exercise(Path root,boolean changed,boolean logicalDefault)throws Exception {
   Release030Fixture.unpack("switching",root);var original=state(root);
   Path alpha=root.resolve("roots/alpha"),held=Files.move(alpha,root.resolve("held-alpha")),beta=root.resolve("roots/beta");
   Path file=Files.writeString(beta.resolve("older-d.txt"),"oldernamespaceviolet"),missing=beta.resolve("new-c.txt");
@@ -33,12 +36,13 @@ final class Release030RetirementForceFalseTest {
   Map<String,String> before;
   try(var _=new ReleasedModelIdentities(root)) {
    var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
-   try(var ex=new TestEngineExecutors();var server=boot(root,ex,"older-d",t->{if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}})) {
+   try(var ex=new TestEngineExecutors();var server=boot(root,ex,logicalDefault?null:"older-d",t->{if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}})) {
     activate(server);assertTrue(entered.await(30,TimeUnit.SECONDS));
     var response=server.appServices().ingestService().syncDirectory(SyncDirectoryRequest.newBuilder().setRootPath(beta.toString()).setForce(true).build(),Release030RetirementSyncPolicyTest.defaultContext());
     assertTrue(response.getError().isBlank(),response.getError());
     await(()->search(server,"oldernamespaceviolet").contains(key(file))&&"DONE".equals(queue(server).watcherReconciliationRow(key(file)).get("state")),"ordinary D ROOT member actually commits",30);
-    before=queue(server).watcherReconciliationRow(key(file));assertEquals("older-d",before.get("collection"));assertNotNull(SwitchBufferCapableQueue.RootOrigin.fromUnit(before.get("unit_revision")));
+    before=queue(server).watcherReconciliationRow(key(file));assertEquals(logicalDefault?null:"older-d",before.get("collection"));assertNotNull(SwitchBufferCapableQueue.RootOrigin.fromUnit(before.get("unit_revision")));
+    if(logicalDefault)assertNull(server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(key(file),io.justsearch.indexing.SchemaFields.COLLECTION),"logical Default is the real native absent collection field");
     assertFalse(queue(server).retirementReplayOps().stream().anyMatch(op->op.key().equals("path:"+key(file))));
     Release030RetirementSafetyTest.assertRetained(root,original.building_generation());save(root,server,"force-false-original-d",List.of(file));release.countDown();
    }finally{release.countDown();}
@@ -71,7 +75,7 @@ final class Release030RetirementForceFalseTest {
           &&"DONE".equals(queue(server).watcherReconciliationRow(key(file)).get("state")),
           "readable changed D source becomes claimable and completes beneath force-false C",90);
       var corrected=queue(server).watcherReconciliationRow(key(file));
-      assertEquals("older-d",corrected.get("collection"));
+      assertEquals(logicalDefault?null:"older-d",corrected.get("collection"));
       assertEquals(before.get("ingestion_root"),corrected.get("ingestion_root"));
       assertEquals(before.get("originator"),corrected.get("originator"));assertEquals(before.get("transport"),corrected.get("transport"));
       assertNotEquals(before.get("unit_revision"),corrected.get("unit_revision"));
@@ -87,7 +91,8 @@ final class Release030RetirementForceFalseTest {
     Release030RetirementSafetyTest.assertRetired(root,original.building_generation());
    }finally{release2.countDown();}
    try(var ex=new TestEngineExecutors();var server=boot(root,ex,"new-c",t->{})) {
-    activate(server);assertTrue(search(server,changed?"changedolderviolet":"oldernamespaceviolet").contains(key(file)));Release030RetirementTransitiveOrderTest.assertCollection(root,file,"older-d");
+    activate(server);assertTrue(search(server,changed?"changedolderviolet":"oldernamespaceviolet").contains(key(file)));Release030RetirementTransitiveOrderTest.assertCollection(root,file,logicalDefault?null:"older-d");
+    assertEquals(logicalDefault?"default":"older-d",Objects.toString(server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(key(file),io.justsearch.indexing.SchemaFields.COLLECTION),"default"));
     Release030RetirementSafetyTest.assertRetired(root,original.building_generation());
    }
   }finally{try{if(Files.exists(held))Files.move(held,alpha);save(root,null,"force-false-final",List.of(file,missing));}finally{ConfigStore.restoreGlobal(installed,previous);}}

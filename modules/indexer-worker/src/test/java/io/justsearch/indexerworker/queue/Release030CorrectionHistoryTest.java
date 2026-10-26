@@ -91,10 +91,21 @@ final class Release030CorrectionHistoryTest {
       var provenance=new JobQueue.EnqueueProvenance("user","rpc");
       q.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file,3,provenance,null,root)),"C",null);
       var owner=admit(q,root,file);complete(q,file);
-      var method=io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.class.getDeclaredMethod(
-          "releaseRootScope",SwitchBufferCapableQueue.class,SwitchBufferCapableQueue.SwitchBufferOp.class,String.class);
-      method.setAccessible(true);
-      var scope=(SwitchBufferUpsert)method.invoke(null,q,owner,file.toString());
+      SwitchBufferUpsert scope;
+      // Exercise the real production helper on both sides of its instrumentation-only signature change.
+      try {
+        var method=io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.class.getDeclaredMethod(
+            "releaseRootScope",SwitchBufferCapableQueue.class,SwitchBufferCapableQueue.SwitchBufferOp.class,String.class);
+        method.setAccessible(true);
+        scope=(SwitchBufferUpsert)method.invoke(null,q,owner,file.toString());
+      } catch(NoSuchMethodException _) {
+        var method=io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.class.getDeclaredMethod(
+            "releaseRootScope",SwitchBufferCapableQueue.class,SwitchBufferCapableQueue.SwitchBufferOp.class,String.class,
+            java.util.function.Function.class);
+        method.setAccessible(true);
+        var rootFiles=q.getClass().getMethod("retirementRootFiles").invoke(q);
+        scope=(SwitchBufferUpsert)method.invoke(null,q,owner,file.toString(),rootFiles);
+      }
       assertEquals("C",scope.collection());assertEquals(provenance,scope.provenance());
       Files.writeString(file,"new");
       assertEquals(List.of(1),q.correctRetirementSources(List.of(observe(q,owner,scope,file)),()->false));

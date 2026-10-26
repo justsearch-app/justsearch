@@ -120,7 +120,7 @@ final class Release030RetirementLegacyMetadataTest {
   }
   private static void saveFinal(Path root, String label) throws Exception {
     String evidence = System.getenv("VERIFY_EVIDENCE"); if (evidence == null) return;
-    Release030RetirementRootImageTest.capture(root, null, label,
+    Release030RetirementPublicSyncTest.capture(root, null, label,
         List.of(root.resolve("explicit.txt"), root.resolve("neighbor-never-admitted.txt")));
     Path folder = Path.of(evidence).resolve(label + "-stores");
     for (int n = 2; Files.exists(folder); n++) folder = Path.of(evidence).resolve(label + "-stores-" + n);

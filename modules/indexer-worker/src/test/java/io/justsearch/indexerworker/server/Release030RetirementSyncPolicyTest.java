@@ -25,7 +25,7 @@ final class Release030RetirementSyncPolicyTest {
   ConfigStore previous=ConfigStore.globalOrNull();var installed=configure(root);
   var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
   try(var _=new ReleasedModelIdentities(root)) {
-   try(var ex=new TestEngineExecutors();var server=Release030RetirementWalkOrderTest.namedBoot(root,ex,t->{
+   try(var ex=new TestEngineExecutors();var server=Release030RetirementPublicSyncTest.namedBoot(root,ex,t->{
     if(t.point().equals("release030-before-replay")&&once.compareAndSet(false,true)){entered.countDown();assertTrue(release.await(30,TimeUnit.SECONDS));}
    })) {
     activate(server);assertTrue(entered.await(30,TimeUnit.SECONDS));var producer=(DefaultWorkerAppServices)server.appServices();assertTrue(producer.pauseProducerForCutover(10000));
@@ -50,7 +50,7 @@ final class Release030RetirementSyncPolicyTest {
  }
  @Test void legacyHashEntryStillReadsOnAnInterruptedThread(@TempDir Path root)throws Exception {
   Path file=Files.writeString(root.resolve("hash.txt"),"legacy interrupt preservation");String expected=io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
-  try {Thread.currentThread().interrupt();assertEquals(expected,io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));assertTrue(Thread.currentThread().isInterrupted());}finally{Thread.interrupted();}
+  try {Thread.currentThread().interrupt();assertEquals(expected,assertDoesNotThrow(()->io.justsearch.indexerworker.loop.SourceContentHash.sha256(file)));assertTrue(Thread.currentThread().isInterrupted());}finally{Thread.interrupted();}
  }
  static CallContext defaultContext(){return new CallContext(null,null,null,new io.justsearch.core.context.EngineContext(io.justsearch.core.context.EngineContext.ClientKind.CLI,"policy-probe",Optional.empty(),Optional.empty(),"TRUSTED","CLI",io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,io.justsearch.core.context.EngineContext.Urgency.FOREGROUND),new io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance("user","CLI"),io.justsearch.core.execution.EngineTaskLifetime.NONE);}
  static Map<String,Map<String,Object>> rows(Path root,List<Path> paths)throws Exception {

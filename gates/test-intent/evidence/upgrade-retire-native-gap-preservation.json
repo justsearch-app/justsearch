@@ -1,0 +1,499 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a.mjs",
+        "sha256": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+        "bytes": 7360
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T19:17:00.615Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring --tests *LegacyApprovedGapReplayTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPartialWalkTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:e8b1c69a04baf538001ab274672b68909886c3879506ed8af7bc08535c8f6d26",
+          "bytes": 163424
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *LegacyApprovedGapReplayTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:2313e184785fc30f00ffe8551a85744d1820bb78669a62a55690d7ad81b57a3b",
+          "bytes": 275404
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/command.json",
+          "sha256": "sha256:f857c8b7e06d8c822bcc6c5000dcb032eb9bf8b1b31d41499366afe32cba1171",
+          "bytes": 1698602
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:08070aca0ba08e5a1907cd8cc089791e33dbe0afe3e54912803e4f5c8bb916df",
+          "bytes": 4012
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring --tests *LegacyApprovedGapReplayTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPartialWalkTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:e8b1c69a04baf538001ab274672b68909886c3879506ed8af7bc08535c8f6d26",
+          "bytes": 163424
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *LegacyApprovedGapReplayTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:2313e184785fc30f00ffe8551a85744d1820bb78669a62a55690d7ad81b57a3b",
+          "bytes": 275404
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/command.json",
+          "sha256": "sha256:f857c8b7e06d8c822bcc6c5000dcb032eb9bf8b1b31d41499366afe32cba1171",
+          "bytes": 1698602
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:08070aca0ba08e5a1907cd8cc089791e33dbe0afe3e54912803e4f5c8bb916df",
+          "bytes": 4012
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring --tests *LegacyApprovedGapReplayTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPartialWalkTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:e8b1c69a04baf538001ab274672b68909886c3879506ed8af7bc08535c8f6d26",
+          "bytes": 163424
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *LegacyApprovedGapReplayTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:2313e184785fc30f00ffe8551a85744d1820bb78669a62a55690d7ad81b57a3b",
+          "bytes": 275404
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/command.json",
+          "sha256": "sha256:f857c8b7e06d8c822bcc6c5000dcb032eb9bf8b1b31d41499366afe32cba1171",
+          "bytes": 1698602
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:08070aca0ba08e5a1907cd8cc089791e33dbe0afe3e54912803e4f5c8bb916df",
+          "bytes": 4012
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#changedRevisionCannotReuseApproval",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedRevisionCannotReuseApproval()",
+          "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "changedRevisionCannotReuseApproval()",
+          "method": "changedRevisionCannotReuseApproval"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:e8b1c69a04baf538001ab274672b68909886c3879506ed8af7bc08535c8f6d26",
+          "bytes": 163424
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#unapprovedMalformedRootIsHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unapprovedMalformedRootIsHeld()",
+          "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "unapprovedMalformedRootIsHeld()",
+          "method": "unapprovedMalformedRootIsHeld"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:e8b1c69a04baf538001ab274672b68909886c3879506ed8af7bc08535c8f6d26",
+          "bytes": 163424
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+          "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+          "method": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+          "sha256": "sha256:e8b1c69a04baf538001ab274672b68909886c3879506ed8af7bc08535c8f6d26",
+          "bytes": 163424
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#changedRevisionCannotReuseApproval",
+        "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "cases": [
+          {
+            "name": "changedRevisionCannotReuseApproval()",
+            "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "changedRevisionCannotReuseApproval()",
+            "method": "changedRevisionCannotReuseApproval"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+            "sha256": "sha256:2313e184785fc30f00ffe8551a85744d1820bb78669a62a55690d7ad81b57a3b",
+            "bytes": 275404
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/command.json",
+            "sha256": "sha256:f857c8b7e06d8c822bcc6c5000dcb032eb9bf8b1b31d41499366afe32cba1171",
+            "bytes": 1698602
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:08070aca0ba08e5a1907cd8cc089791e33dbe0afe3e54912803e4f5c8bb916df",
+            "bytes": 4012
+          }
+        ],
+        "revision": "5d30e51ca79874d9ee06c25d9c0629d94be6d354"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#unapprovedMalformedRootIsHeld",
+        "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "cases": [
+          {
+            "name": "unapprovedMalformedRootIsHeld()",
+            "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "unapprovedMalformedRootIsHeld()",
+            "method": "unapprovedMalformedRootIsHeld"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+            "sha256": "sha256:2313e184785fc30f00ffe8551a85744d1820bb78669a62a55690d7ad81b57a3b",
+            "bytes": 275404
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/command.json",
+            "sha256": "sha256:f857c8b7e06d8c822bcc6c5000dcb032eb9bf8b1b31d41499366afe32cba1171",
+            "bytes": 1698602
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:08070aca0ba08e5a1907cd8cc089791e33dbe0afe3e54912803e4f5c8bb916df",
+            "bytes": 4012
+          }
+        ],
+        "revision": "5d30e51ca79874d9ee06c25d9c0629d94be6d354"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete",
+        "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "cases": [
+          {
+            "name": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+            "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+            "method": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+            "sha256": "sha256:2313e184785fc30f00ffe8551a85744d1820bb78669a62a55690d7ad81b57a3b",
+            "bytes": 275404
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/command.json",
+            "sha256": "sha256:f857c8b7e06d8c822bcc6c5000dcb032eb9bf8b1b31d41499366afe32cba1171",
+            "bytes": 1698602
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-before/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:08070aca0ba08e5a1907cd8cc089791e33dbe0afe3e54912803e4f5c8bb916df",
+            "bytes": 4012
+          }
+        ],
+        "revision": "5d30e51ca79874d9ee06c25d9c0629d94be6d354"
+      }
+    ]
+  },
+  "scope": "Promoted final whole file: exact identical source executed on 5d30 genuine pre-gap, ea61 genuine known-good and bbdd final production. Original approved-prefix conversion oracle retained; malformed-root positive and two refusal controls preserved.",
+  "knownGood": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#changedRevisionCannotReuseApproval",
+        "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "changedRevisionCannotReuseApproval()",
+            "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "changedRevisionCannotReuseApproval()",
+            "method": "changedRevisionCannotReuseApproval"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+            "sha256": "sha256:8820faffaabcfea350ea072ac96b8c840028f2e37663e9b21bc9bbbbfb8cd042",
+            "bytes": 163540
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/command.json",
+            "sha256": "sha256:3884d85b8a945b4108c683ef26d420065574060ffa2c5ddf01f05307668a9705",
+            "bytes": 1698427
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:6d61eb12bda4f2240bcfbce1c8480c5344af1bea2f419f15eebb1a55e7f0805f",
+            "bytes": 2648
+          }
+        ],
+        "revision": "ea61c685cf6d4338697ee65c2160b824339bbf03"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#unapprovedMalformedRootIsHeld",
+        "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "unapprovedMalformedRootIsHeld()",
+            "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "unapprovedMalformedRootIsHeld()",
+            "method": "unapprovedMalformedRootIsHeld"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+            "sha256": "sha256:8820faffaabcfea350ea072ac96b8c840028f2e37663e9b21bc9bbbbfb8cd042",
+            "bytes": 163540
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/command.json",
+            "sha256": "sha256:3884d85b8a945b4108c683ef26d420065574060ffa2c5ddf01f05307668a9705",
+            "bytes": 1698427
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:6d61eb12bda4f2240bcfbce1c8480c5344af1bea2f419f15eebb1a55e7f0805f",
+            "bytes": 2648
+          }
+        ],
+        "revision": "ea61c685cf6d4338697ee65c2160b824339bbf03"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete",
+        "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+            "classname": "io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+            "method": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.xml",
+            "sha256": "sha256:8820faffaabcfea350ea072ac96b8c840028f2e37663e9b21bc9bbbbfb8cd042",
+            "bytes": 163540
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/command.json",
+            "sha256": "sha256:3884d85b8a945b4108c683ef26d420065574060ffa2c5ddf01f05307668a9705",
+            "bytes": 1698427
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-gap-known-good/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:6d61eb12bda4f2240bcfbce1c8480c5344af1bea2f419f15eebb1a55e7f0805f",
+            "bytes": 2648
+          }
+        ],
+        "revision": "ea61c685cf6d4338697ee65c2160b824339bbf03"
+      }
+    ]
+  },
+  "digest": "sha256:beb8ac414212ee1943f4e9eea599a965a021a0afe3f46445b6f10b331dcf5f78"
+}
