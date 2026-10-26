@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,11 +37,14 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -118,6 +122,9 @@ class BackfillSchedulerSlowBatchTest {
   private final List<String> encodedDocIds = new ArrayList<>();
 
   private final AtomicInteger embedCalls = new AtomicInteger();
+  private final AtomicLong monotonicNanos = new AtomicLong();
+  private long modeledNanosPerEncode;
+  private boolean nerPending;
   /** Only synchronous event scenarios remove the artificial stage delay. */
   private volatile long embedMsPerDoc = EMBED_MS_PER_DOC;
   private final List<Integer> eventSlices = new ArrayList<>();
@@ -214,13 +221,14 @@ class BackfillSchedulerSlowBatchTest {
                     id,
                     Map.of(
                         SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
-                        SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED));
+                        SchemaFields.NER_STATUS, nerPending
+                            ? SchemaFields.NER_STATUS_PENDING : SchemaFields.NER_STATUS_COMPLETED));
               }
               return result;
             });
 
     // Fire inside the encode call, before returning its vectors or starting another unit.
-    // Budget/WARN scenarios retain the real proportional stage delay.
+    // The default-clock anchor retains real delay; controlled cases charge completed encodes.
     lenient()
         .when(embeddingProvider.embedDocumentBatch(anyList()))
         .thenAnswer(
@@ -233,6 +241,7 @@ class BackfillSchedulerSlowBatchTest {
                 }
               }
               if (embedMsPerDoc > 0) Thread.sleep(embedMsPerDoc * texts.size());
+              monotonicNanos.addAndGet(modeledNanosPerEncode);
               if (call == fireEventAfterSlice) {
                 pendingIngest.set(pendingIngestScenario);
                 if (rootRemovalScenario) bulkDeleteEpoch.incrementAndGet();
@@ -295,6 +304,17 @@ class BackfillSchedulerSlowBatchTest {
         () -> null,
         () -> nerService,
         () -> null);
+  }
+
+  private BackfillScheduler scheduler(LongSupplier clock) {
+    EmbeddingProviderLifecycle embeddingLifecycle =
+        new EmbeddingProviderLifecycle(signalBus, jobQueue, indexCountOps, commitOps);
+    embeddingLifecycle.setEmbeddingProvider(embeddingProvider);
+    return new BackfillScheduler(
+        documentFieldOps, indexingCoordinator, indexCountOps, commitOps, signalBus,
+        io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(),
+        embeddingLifecycle, new AtomicBoolean(true), this::resolvedConfig,
+        () -> null, () -> null, () -> nerService, () -> null, clock);
   }
 
   private ResolvedConfig resolvedConfig() {
@@ -554,10 +574,13 @@ class BackfillSchedulerSlowBatchTest {
   @Test
   @DisplayName("the budget-trip WARN still fires when a slow cycle advances nothing")
   void budgetTripWithNoProgress_stillLogsTheWarn() {
+    embedMsPerDoc = 0;
+    modeledNanosPerEncode = SLICE_MS * 1_000_000L;
     blankContentDocs = EMBED_SLICE; // write-but-never-advance documents
     embedReturnsNull = true; // the encoder runs but serves nothing usable
 
-    timeIdleCycle(scheduler());
+    timeIdleCycle(scheduler(monotonicNanos::get));
+    assertTrue(monotonicNanos.get() >= CYCLE_BUDGET_MS * 1_000_000L);
 
     assertTrue(
         loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"),
@@ -565,4 +588,54 @@ class BackfillSchedulerSlowBatchTest {
             + " at WARN (tempdoc 798 D2c); observed log lines: "
             + logAppender.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
   }
+
+  @ParameterizedTest
+  @ValueSource(longs = {4_999_999_999L, 5_000_000_000L, 5_000_000_001L})
+  void cycleDeadlineBeforeAtAndAfter_completedEncodeSpendsProbeBudget(long encodeNanos) {
+    embedMsPerDoc = 0;
+    modeledNanosPerEncode = encodeNanos;
+    // Deliberately unrelated to System.nanoTime, and retained across both cycles.
+    monotonicNanos.set(-100_000_000_000L);
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    int unitsPerCycle = encodeNanos < 5_000_000_000L ? 2 : 1;
+    for (int cycle = 1; cycle <= 2; cycle++) {
+      timeIdleCycle(scheduler);
+      assertEquals(cycle * unitsPerCycle, embedCalls.get(),
+          "each cycle samples a fresh deadline; the spent probe cannot start a tight-loop batch");
+      assertEquals(cycle * unitsPerCycle * EMBED_SLICE, encodedDocIds.size());
+      assertEquals(unitsPerCycle * EMBED_SLICE, writtenDocIds.size(),
+          "the probe publishes its completed units before returning");
+      assertTrue(loggedAtLevel(ch.qos.logback.classic.Level.INFO, "still advancing documents"));
+      assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {2_999_999_999L, 3_000_000_000L, 3_000_000_001L})
+  void embedShareBeforeAtAndAfter_reservesTimeForPendingNer(long encodeNanos) {
+    embedMsPerDoc = 0;
+    modeledNanosPerEncode = encodeNanos;
+    nerPending = true;
+    AtomicInteger nerCalls = new AtomicInteger();
+    lenient().when(nerService.extractEntitiesBatch(anyList())).thenAnswer(inv -> {
+      nerCalls.incrementAndGet();
+      pendingIngest.set(true); // positively observed NER work stops the subsequent tight loop
+      List<String> texts = inv.getArgument(0);
+      return java.util.Collections.nCopies(texts.size(), io.justsearch.indexerworker.ner.NerResult.EMPTY);
+    });
+    // The before case spends just one nanosecond in its second encode, leaving NER runnable.
+    AtomicInteger completedEncodes = new AtomicInteger();
+    lenient().doAnswer(inv -> {
+      List<String> texts = inv.getArgument(0);
+      embedCalls.incrementAndGet();
+      monotonicNanos.addAndGet(completedEncodes.getAndIncrement() == 0 ? encodeNanos : 1L);
+      return java.util.Collections.nCopies(texts.size(), new float[] {0.1f, 0.2f});
+    }).when(embeddingProvider).embedDocumentBatch(anyList());
+    timeIdleCycle(scheduler(monotonicNanos::get));
+    assertEquals(encodeNanos < 3_000_000_000L ? 2 : 1, embedCalls.get());
+    assertEquals(1, nerCalls.get(), "the soft reservation must leave the later stage runnable");
+    assertTrue(monotonicNanos.get() < 5_000_000_000L,
+        "pending ingest, rather than the cycle budget, ends the tight loop");
+  }
+
 }
