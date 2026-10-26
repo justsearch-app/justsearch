@@ -5281,7 +5281,7 @@ public final class KnowledgeServer implements Closeable {
       if (splade != null && owner.spladeIdf() == null) {
         targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.SPLADE, splade,
             splade::isQueryWarm, splade::queryDevice, splade::addSessionGenerationListener,
-            (text, request) -> splade.encode(text, request) != null,
+            splade::prewarm,
             splade::prewarmCpuForQueries, splade::isGpuRetryDue));
       }
       return new QueryEncoderPrewarm.Selection(targets, hold::close);

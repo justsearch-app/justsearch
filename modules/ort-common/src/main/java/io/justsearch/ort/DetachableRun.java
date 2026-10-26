@@ -82,7 +82,7 @@ final class DetachableRun {
    * One platform thread per run, not a pool: executors are owned by the engine's executor registry,
    * which this module does not reach. Run threads are bounded per device by {@link Device}.
    */
-  private static final ThreadFactory RUN_THREADS =
+  static final ThreadFactory RUN_THREADS =
       Thread.ofPlatform().daemon(true).name("ort-query-run-", 0).factory();
 
   /** One entry per device for the life of the process, shared by every handle on that device. */

@@ -294,7 +294,16 @@ public final class SpladeEncoder implements Closeable {
   /** Encodes a query using its admitted scheduling and cancellation authority. */
   public Map<String, Float> encode(String text, InferenceRequest request)
       throws OrtException {
-    var acquisition = SessionAcquisitionRequest.from(request);
+    return encode(text, SessionAcquisitionRequest.from(request));
+  }
+
+  /** Serving-device warmup does not create a deferred CPU backup after release or GPU failure. */
+  public boolean prewarm(String text, InferenceRequest request) throws OrtException {
+    return encode(text, SessionAcquisitionRequest.from(request).withoutDeferredCpuPreparation()) != null;
+  }
+
+  private Map<String, Float> encode(String text, SessionAcquisitionRequest acquisition)
+      throws OrtException {
     acquisition.remainingNanos();
     long tTok = System.nanoTime();
     Encoding encoding = tokenizer.encode(text);
