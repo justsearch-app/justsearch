@@ -2,6 +2,7 @@
 package io.justsearch.ui;
 
 import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.app.api.indexing.ProjectionDurability;
 import io.justsearch.app.api.indexing.ProjectionReceipt;
 import io.justsearch.app.api.indexing.ProjectionSeedSource;
@@ -248,8 +249,17 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
 
   private static boolean hasHit(KnowledgeServerBootstrap bootstrap, EngineContext context,
       String query, String id, boolean vector) {
-    var result = call(bootstrap, client -> client.search(query, 20,
-        vector ? PipelineConfigs.VECTOR : PipelineConfigs.TEXT, context));
+    var result = call(bootstrap, client -> {
+      try {
+        return client.search(query, 20,
+            vector ? PipelineConfigs.VECTOR : PipelineConfigs.TEXT, context);
+      } catch (KnowledgeClientException failure) {
+        if (vector && failure.status() == KnowledgeClientException.Status.DEADLINE_EXCEEDED
+            && "SEMANTIC_BUDGET_EXCEEDED (cause: loading)".equals(failure.getMessage())) return null;
+        throw failure;
+      }
+    });
+    if (result == null) return false;
     var trace = result.getSearchTrace();
     if (!result.hasSearchTrace() || trace.getDecisionKind().isBlank()
         || "blocked".equals(trace.getDecisionKind()) || "empty_query".equals(trace.getDecisionKind())

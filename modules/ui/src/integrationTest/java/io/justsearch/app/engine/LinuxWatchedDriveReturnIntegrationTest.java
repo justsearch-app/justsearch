@@ -23,7 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Real Engine, search, queue and physical Linux watchers on disposable udisks loop filesystems. */
 final class LinuxWatchedDriveReturnIntegrationTest {
-  @TempDir Path directory;
+  @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) Path directory;
   private static final EngineContext CONTEXT = EngineProvenance.internal(
       "watched-drive-return", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
 
@@ -394,24 +394,25 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     }
   }
 
-  // REMOUNT-MIGRATION-REPLAY: reproduced on unmodified main b62fc5921 with these same checks.
-  // Seed both receipt kinds, unmount/return at either migration barrier, request cutover, restart.
-  // Retained WATCHER_RECONCILE/native journal rows prevent a writable survivor; migration is out of scope.
-  @org.junit.jupiter.api.Disabled("REMOUNT-MIGRATION-REPLAY: main also cannot resume with these retained journal rows")
-  @org.junit.jupiter.params.ParameterizedTest(name = "returnDuringBootMigrationWaitsForSurvivingRuntime({0})")
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"migration-before-switching", "migration-green-drained"})
+  @org.junit.jupiter.params.ParameterizedTest(name = "returnDuringBootMigrationPromotes({0}, restart={1})")
+  @org.junit.jupiter.params.provider.CsvSource({
+      "migration-before-switching,false", "migration-green-drained,false",
+      "migration-before-switching,true", "migration-green-drained,true"})
   @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
-  @Timeout(240)
-  void returnDuringBootMigrationWaitsForSurvivingRuntime(String point) throws Exception {
+  @Timeout(300)
+  void returnDuringBootMigrationPromotes(String point, boolean restart) throws Exception {
     try (var volume = LinuxLoopVolume.create(directory.resolve("loop"))) {
       Path mount = volume.mounted();
       Path root = Files.createDirectory(mount.resolve("documents"));
       Path gone = Files.writeString(root.resolve("gone.txt"), "migrationmountgone original");
       Path kept = Files.writeString(root.resolve("kept.txt"), "migrationmountkept original");
+      Path modified = Files.writeString(root.resolve("modified.txt"), "migrationoldcontent original");
+      var modifiedTime = Files.getLastModifiedTime(modified);
       try (var old = fixture()) {
         old.client.addWatchedRoot("default", root, CONTEXT);
         old.awaitCount("migrationmountgone", 1);
         old.awaitCount("migrationmountkept", 1);
+        old.awaitCount("migrationoldcontent", 1);
       }
       stampForeignFingerprint();
       var reached = new CountDownLatch(1);
@@ -422,9 +423,10 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           assertTrue(release.await(120, TimeUnit.SECONDS), "release the owned migration barrier");
         }
       };
-      try (var refusals = new MigrationRefusals(); var surviving = fixture(hook)) {
-        String active = surviving.client.getStatus(CONTEXT).getMigration().getActiveGenerationId();
-        List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> beforeReturn;
+      var surviving = fixture(hook);
+      CompletableFuture<Void> closing = null;
+      Throwable primaryFailure = null;
+      try {
         try {
           assertTrue(reached.await(30, TimeUnit.SECONDS), "real migration must reach " + point);
           awaitPhysicalWatcher(surviving, root, true, 10);
@@ -432,92 +434,369 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           var beforeAbsence = surviving.queue().listSwitchBufferOpsStrict();
           volume.away();
           awaitPhysicalWatcher(surviving, root, false, 10);
+          // Establish whether a real unmount used the incarnation-ended callback.
+          assertRootScopedUnavailableFailure(surviving, root);
           volume.label("JS_MIGRATE_AWAY");
-          Files.delete(volume.attachAndMount(false).resolve("documents/gone.txt"));
+          Path elsewhere = volume.attachAndMount(false).resolve("documents");
+          Files.delete(elsewhere.resolve("gone.txt"));
+          Files.writeString(elsewhere.resolve("modified.txt"), "migrationnewcontent original");
+          Files.setLastModifiedTime(elsewhere.resolve("modified.txt"), modifiedTime);
           volume.away();
           volume.label("");
           volume.holdDecoy();
           assertEquals(1, surviving.count("migrationmountgone"));
           assertEquals(1, surviving.count("migrationmountkept"));
-          beforeReturn = surviving.queue().listSwitchBufferOpsStrict();
-          assertTrue(beforeReturn.containsAll(beforeAbsence), "absence keeps every pre-existing receipt");
+          assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeAbsence),
+              "absence keeps every accepted receipt");
+          if (!restart && point.equals("migration-before-switching")) {
+            release.countDown();
+            long fenced = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (!surviving.client.getStatus(CONTEXT).getMigration().getPauseReason()
+                .contains("Cutover fenced:") && System.nanoTime() < fenced) Thread.sleep(50);
+            assertTrue(surviving.client.getStatus(CONTEXT).getMigration().getPauseReason()
+                .contains("Cutover fenced:"), "status must name the root evidence blocking cutover");
+            assertEquals(1, surviving.count("migrationmountkept"), "the fenced Engine remains readable");
+            Thread.sleep(65_000); // A minute of refusal must preserve serving and automatic retry.
+            assertEquals("SWITCHING", surviving.client.getStatus(CONTEXT).getMigration().getMigrationState());
+            assertEquals(1, surviving.count("migrationmountkept"));
+          }
           assertEquals(mount, volume.attachAndMount(false));
-          Thread.sleep(6_000);
-          assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn),
-              "transition keeps every receipt, including both seeded receipt kinds");
-          if (point.equals("migration-green-drained")) {
-            // The orchestrator's deadline amendment allows a held cutover to exceed 60 seconds.
-            Thread.sleep(30_000);
-            assertEquals(1, surviving.count("migrationmountgone"));
-            Thread.sleep(30_000);
-            assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn),
-                "the extended cutover hold retains every receipt");
+          if (restart) {
+            closing = CompletableFuture.runAsync(() -> {
+              try { surviving.close(); }
+              catch (Exception failure) { throw new java.util.concurrent.CompletionException(failure); }
+            });
+            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (!(boolean) inherited(surviving.server, "closeStarted")
+                && System.nanoTime() < until) Thread.sleep(10);
+            assertTrue((boolean) inherited(surviving.server, "closeStarted"));
+            release.countDown();
+          } else {
+            release.countDown();
+            assertPromotedDrive(surviving, root);
           }
         } finally { release.countDown(); }
-        refusals.awaitRefusal();
-        assertFalse(survivingWriterAccepts(surviving), "the refused migration cannot publish its candidate");
-        assertEquals(active, surviving.client.getStatus(CONTEXT).getMigration().getActiveGenerationId());
-        assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn),
-            "refusal keeps every receipt and journal row");
-        assertEquals(1, surviving.count("migrationmountgone"), "refusal prunes nothing from the serving root");
-        assertEquals(1, surviving.count("migrationmountkept"));
-        assertTrue(surviving.client.getWatchedRoots(CONTEXT).stream()
-            .anyMatch(declared -> root.equals(declared.path())),
-            "the root stays declared after the transition refuses promotion");
-        awaitPhysicalWatcher(surviving, root, false, 1);
-        Thread.sleep(1_000);
-        assertTrue(surviving.queue().listSwitchBufferOpsStrict().containsAll(beforeReturn));
-        assertEquals(1, surviving.count("migrationmountgone"));
-        assertEquals(1, surviving.count("migrationmountkept"));
-        // Existing manual control requests SWITCHING and truthfully requires a restart. The
-        // restart creates a fresh producer and enumerates the mounted roots before retrying.
-        var retry = surviving.client.requestCutover(true, CONTEXT);
-        assertTrue(retry.accepted());
-        assertTrue(retry.restartRequired());
-      } finally { release.countDown(); }
-      try (var restarted = fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.NO_HOOK)) {
-        long writable = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
-        while (!survivingWriterAccepts(restarted) && System.nanoTime() < writable) Thread.sleep(50);
-        assertTrue(survivingWriterAccepts(restarted), "the existing restart/rescan route publishes a writable survivor");
-        long started = System.nanoTime();
-        awaitPhysicalWatcher(restarted, root, true, 60);
-        long registered = System.nanoTime();
-        assertTrue(registered - started < TimeUnit.SECONDS.toNanos(60));
-        restarted.awaitCount("migrationmountgone", 0);
-        restarted.awaitCount("migrationmountkept", 1);
-        restarted.awaitReceipts(0, "surviving runtime settles the retained reconciliation receipt");
-        assertTrue(System.nanoTime() - registered < TimeUnit.SECONDS.toNanos(60));
+      } catch (Exception | Error failure) {
+        primaryFailure = failure;
+        throw failure;
+      } finally {
+        try {
+          if (closing == null) surviving.close();
+          else closing.get(60, TimeUnit.SECONDS);
+        } catch (Exception | Error cleanup) {
+          if (primaryFailure == null) throw cleanup;
+          primaryFailure.addSuppressed(cleanup);
+        }
+      }
+      if (restart) {
+        try (var restarted = fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.NO_HOOK)) {
+          assertPromotedDrive(restarted, root);
+        }
       }
     }
   }
 
-  private static final class MigrationRefusals implements AutoCloseable {
-    private final ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger)
-        org.slf4j.LoggerFactory.getLogger(io.justsearch.indexerworker.server.KnowledgeServer.class);
-    private final ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> events =
-        new ch.qos.logback.core.read.ListAppender<>();
-
-    MigrationRefusals() {
-      events.list = new java.util.concurrent.CopyOnWriteArrayList<>();
-      events.start();
-      logger.addAppender(events);
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  @Timeout(150)
+  void watcherAdmissionWaitingAtFinalFenceRunsOnThePublishedWriter() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("watched"));
+    Files.writeString(root.resolve("seed.txt"), "fenceseed");
+    try (var old = fixture()) {
+      old.client.addWatchedRoot("default", root, CONTEXT);
+      old.awaitCount("fenceseed", 1);
     }
-
-    void awaitRefusal() throws Exception {
-      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-      while (!refused() && System.nanoTime() < until) Thread.sleep(50);
-      assertTrue(refused(), "existing migration safety refuses the unrecorded watcher mutation");
+    stampForeignFingerprint();
+    var reached = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    try (var f = fixture(transition -> {
+      if (transition.point().equals("migration-green-drained")) {
+        reached.countDown();
+        assertTrue(release.await(60, TimeUnit.SECONDS));
+      }
+    })) {
+      try {
+        assertTrue(reached.await(30, TimeUnit.SECONDS));
+        awaitPhysicalWatcher(f, root, true, 10);
+        var before = f.queue().listSwitchBufferOpsStrict();
+        Path late = Files.writeString(root.resolve("late.txt"), "fencequeuedadmission");
+        long waiting = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        boolean blocked;
+        do {
+          blocked = Thread.getAllStackTraces().values().stream().anyMatch(stack ->
+              java.util.Arrays.stream(stack).anyMatch(frame -> frame.getClassName().endsWith("$WatcherCallbacks")
+                  && frame.getMethodName().equals("acquireTarget")));
+          if (!blocked) Thread.sleep(10);
+        } while (!blocked && System.nanoTime() < waiting);
+        assertTrue(blocked, "the actual watcher admission must wait on the held final fence");
+        assertEquals(before, f.queue().listSwitchBufferOpsStrict());
+        release.countDown();
+        f.awaitCount("fencequeuedadmission", 1);
+        assertTrue(survivingWriterAccepts(f));
+        var runtime = (io.justsearch.adapters.lucene.runtime.RunningRuntime) inherited(f.server, "ingestLifecycle");
+        assertEquals("default", runtime.documentFieldOps().getDocumentFieldOrThrow(
+            late.toString(), io.justsearch.indexing.SchemaFields.COLLECTION));
+      } finally { release.countDown(); }
     }
+  }
 
-    private boolean refused() {
-      return events.list.stream().anyMatch(event -> event.getFormattedMessage()
-          .toLowerCase(java.util.Locale.ROOT).contains("unrecorded watcher mutation"));
+  @org.junit.jupiter.params.ParameterizedTest(name = "outstandingHttpCleanupSharesTheBudgetAndRetainsOwnersUntilRetry({arguments})")
+  @org.junit.jupiter.params.provider.ValueSource(longs = {0, 500_000, 2_500_000_000L})
+  @Timeout(60)
+  void outstandingHttpCleanupSharesTheBudgetAndRetainsOwnersUntilRetry(long nanos) throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var exited = new CountDownLatch(1);
+    var host = new RuntimeReloadProducersHttpIntegrationTest();
+    host.directory = directory;
+    var f = host.new Fixture();
+    CompletableFuture<?> closing = null;
+    boolean withinBudget = false;
+    boolean ownersRetained = false;
+    boolean independentTransport = false;
+    Throwable bodyFailure = null;
+    try {
+      f.http.get("/fixture-stalled", context -> {
+        entered.countDown();
+        boolean interrupted = false;
+        try {
+          while (release.getCount() != 0) {
+            try { release.await(); }
+            catch (InterruptedException stop) { interrupted = true; }
+          }
+          context.result("released");
+        } finally {
+          exited.countDown();
+          if (interrupted) Thread.currentThread().interrupt();
+        }
+      });
+      f.transport.sendAsync(HttpRequest.newBuilder(
+          URI.create("http://127.0.0.1:" + f.http.port() + "/fixture-stalled")).GET().build(),
+          HttpResponse.BodyHandlers.ofString());
+      assertTrue(entered.await(5, TimeUnit.SECONDS), "the real HTTP handler must be outstanding");
+      closing = CompletableFuture.runAsync(() -> {
+        try { f.close(java.time.Duration.ofNanos(nanos)); }
+        catch (Exception expectedIncomplete) { /* owner retention is asserted below */ }
+      });
+      try { closing.get(nanos + TimeUnit.SECONDS.toNanos(1), TimeUnit.NANOSECONDS); withinBudget = true; }
+      catch (java.util.concurrent.TimeoutException exceeded) { /* release below also makes fail-before safe */ }
+      ownersRetained = !f.closed && !f.server.awaitClosed(0)
+          && Files.isDirectory(directory) && io.justsearch.configuration.resolved.ConfigStore.globalOrNull() != f.previous;
+      try {
+        Thread closer = (Thread) inherited(f, "transportCloser");
+        independentTransport = closer != null && closer.getState() != Thread.State.NEW;
+      } catch (NoSuchFieldException oldSynchronousCleanup) {
+        independentTransport = f.transport.isTerminated();
+      }
+      assertEquals(1, exited.getCount(), "the handler remains physically stalled even if cancellation closes its exchange");
+    } catch (Exception | Error failure) {
+      bodyFailure = failure;
+      throw failure;
+    } finally {
+      finishOutstandingHttpExchange(f, entered, release, exited, closing, bodyFailure);
     }
+    assertTrue(withinBudget, "HTTP/transport cleanup must return within the caller's shared allowance");
+    assertTrue(ownersRetained, "incomplete HTTP cleanup must retain stateful owners and private configuration");
+    assertTrue(independentTransport, "transport cancellation must start independently of blocked HTTP stop");
+    assertTrue(f.closed, "a released exchange must permit retry to physically drain and close owners");
+    assertFalse(Thread.getAllStackTraces().keySet().stream().anyMatch(thread -> thread.isAlive()
+        && (thread.getName().equals("fixture-http-stop") || thread.getName().equals("fixture-transport-close"))));
+  }
 
-    @Override public void close() {
-      logger.detachAppender(events);
-      events.stop();
+  /** Only the outstanding-exchange control owns these signals and this fixture. */
+  static void finishOutstandingHttpExchange(Fixture fixture, CountDownLatch entered,
+      CountDownLatch release, CountDownLatch exited, CompletableFuture<?> closing,
+      Throwable bodyFailure) throws Exception {
+    Throwable first = bodyFailure;
+    release.countDown();
+    try {
+      if (entered.getCount() == 0) assertTrue(exited.await(10, TimeUnit.SECONDS));
+    } catch (Exception | Error cleanup) {
+      if (first == null) first = cleanup;
+      else first.addSuppressed(cleanup);
     }
+    try {
+      if (closing != null) closing.get(10, TimeUnit.SECONDS);
+    } catch (Exception | Error cleanup) {
+      if (first == null) first = cleanup;
+      else first.addSuppressed(cleanup);
+    } finally {
+      try { fixture.close(java.time.Duration.ofSeconds(10)); }
+      catch (Exception | Error cleanup) {
+        if (first == null) first = cleanup;
+        else first.addSuppressed(cleanup);
+      }
+    }
+    if (bodyFailure == null && first != null) {
+      if (first instanceof Exception exception) throw exception;
+      throw (Error) first;
+    }
+  }
+
+  @Test
+  @Timeout(90)
+  void stalledCutoverCleanupRetainsBodyFailureAndPhysicallyDrainsPeriodicAdmission() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("shutdown-root"));
+    Files.writeString(root.resolve("seed.txt"), "shutdownseed");
+    try (var old = fixture()) {
+      old.client.addWatchedRoot("default", root, CONTEXT);
+      old.awaitCount("shutdownseed", 1);
+    }
+    stampForeignFingerprint();
+    var reached = new CountDownLatch(1);
+    var stalled = new CountDownLatch(1);
+    var f = fixture(transition -> {
+      if (transition.point().equals("migration-green-drained")) {
+        reached.countDown();
+        stalled.await(); // The real cutover must be interrupted before admission can drain.
+      }
+    });
+    CompletableFuture<?> periodic = null;
+    Thread cutover = (Thread) inherited(f.server, "migrationCutoverThread");
+    boolean completedClose = false;
+    try {
+      assertTrue(reached.await(30, TimeUnit.SECONDS));
+      periodic = CompletableFuture.runAsync(() -> f.client.syncDirectory(root.toString(), false,
+          EngineProvenance.internal("periodic-root-sync", EngineContext.Survival.DURABLE,
+              EngineContext.Urgency.BACKGROUND)));
+      Thread blocked = awaitMutationBlockedThread();
+      assertTrue(f.root.admission().activeWorkCount() > 0);
+      var original = new AssertionError("original stalled D1 body assertion");
+      long start = System.nanoTime();
+      var observed = assertThrows(AssertionError.class, () -> {
+        try (f) { throw original; }
+      });
+      assertSame(original, observed);
+      assertEquals(0, observed.getSuppressed().length, "ordered cleanup must not add an owner-fence failure");
+      completedClose = true;
+      assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(10));
+      assertEquals(0, f.root.admission().activeWorkCount(), "durable physical references must drain");
+      assertFalse(cutover.isAlive(), "the cutover must physically exit");
+      assertFalse(blocked.isAlive(), "the owned periodic worker must physically exit");
+      assertTrue(periodic.isDone(), "the caller must be released too");
+    } finally {
+      stalled.countDown();
+      // Also make fail-before runs safe without relying on the repaired shutdown method.
+      if (cutover != null && cutover.isAlive()) {
+        cutover.interrupt(); cutover.join(5_000);
+      }
+      if (periodic != null) periodic.get(10, TimeUnit.SECONDS);
+      if (!completedClose) f.close();
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "fixtureBudgetReportsIncompleteExitAndSupportsRetry({arguments})")
+  @org.junit.jupiter.params.provider.ValueSource(longs = {0, 500_000, 2_500_000_000L})
+  @Timeout(90)
+  void fixtureBudgetReportsIncompleteExitAndSupportsRetry(long nanos) throws Exception {
+    Path root = Files.createDirectory(directory.resolve("deadline-root"));
+    Files.writeString(root.resolve("seed.txt"), "deadlineseed");
+    try (var old = fixture()) {
+      old.client.addWatchedRoot("default", root, CONTEXT);
+      old.awaitCount("deadlineseed", 1);
+    }
+    stampForeignFingerprint();
+    var reached = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    try (var f = fixture(transition -> {
+      if (transition.point().equals("migration-green-drained")) {
+        reached.countDown();
+        boolean interrupted = false;
+        while (release.getCount() != 0) {
+          try { release.await(); }
+          catch (InterruptedException stop) { interrupted = true; }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
+      }
+    })) {
+      try {
+        assertTrue(reached.await(30, TimeUnit.SECONDS));
+        long start = System.nanoTime();
+        var original = new AssertionError("body failure during stalled fixture cleanup");
+        var observed = assertThrows(AssertionError.class, () -> {
+          try (AutoCloseable _ = () -> f.close(java.time.Duration.ofNanos(nanos))) {
+            throw original;
+          }
+        });
+        assertSame(original, observed, "the body's assertion must remain primary");
+        assertEquals(1, observed.getSuppressed().length, "retain the physical cleanup refusal as suppressed evidence");
+        assertTrue(Files.isDirectory(directory), "failed drain must retain fixture backing files");
+        assertTrue(System.nanoTime() - start < nanos + TimeUnit.SECONDS.toNanos(1),
+            "the fixture's allowance must not become an additional ten-second join");
+        assertFalse(f.closed, "incomplete physical drain must retain its owners for retry");
+        assertNotNull(f.clientClose, "one cleanup future is retained for retry");
+        assertFalse(f.server.awaitClosed(0), "the index owner must survive failed drainage");
+      } finally { release.countDown(); }
+    }
+  }
+
+  private static Thread awaitMutationBlockedThread() throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    do {
+      for (var entry : Thread.getAllStackTraces().entrySet()) {
+        if (entry.getKey().getName().startsWith("engine-call-background")
+            && java.util.Arrays.stream(entry.getValue()).anyMatch(frame ->
+                frame.getClassName().endsWith("WorkerMutationAdmission") && frame.getMethodName().equals("enter"))) {
+          return entry.getKey();
+        }
+      }
+      Thread.sleep(10);
+    } while (System.nanoTime() < deadline);
+    throw new AssertionError("the real durable sync must wait on the held migration fence");
+  }
+
+  private static void assertRootScopedUnavailableFailure(Fixture f, Path root) throws Exception {
+    Object admission = invoke(f.server.appServices(), "mutationAdmission", new Class<?>[0]);
+    // Physical watch completion and its failure sink are separate asynchronous observations.
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    try {
+      List<?> roots;
+      do {
+        roots = (List<?>) invoke(admission, "unavailableRoots", new Class<?>[0]);
+        if (!roots.isEmpty()) break;
+        Thread.sleep(10);
+      } while ((boolean) invoke(admission, "runtimeReplayCertain", new Class<?>[0])
+          && System.nanoTime() < until);
+      assertTrue((boolean) invoke(admission, "runtimeReplayCertain", new Class<?>[0]),
+          "an observed root loss must leave the runtime-wide certificate intact");
+      assertTrue(roots.stream().anyMatch(item -> item.toString().contains(root.toString())),
+          "the real watcher termination must retain root-scoped uncertainty");
+    } catch (NoSuchMethodException baseline) {
+      while ((boolean) invoke(admission, "replayCertain", new Class<?>[0])
+          && System.nanoTime() < until) Thread.sleep(10);
+      assertTrue((boolean) invoke(admission, "replayCertain", new Class<?>[0]),
+          "the real unmount must not permanently poison promotion");
+    }
+  }
+
+  private static void assertPromotedDrive(Fixture f, Path root) throws Exception {
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+    while (!survivingWriterAccepts(f) && System.nanoTime() < until) Thread.sleep(50);
+    Object admission = invoke(f.server.appServices(), "mutationAdmission", new Class<?>[0]);
+    String certainty;
+    try {
+      certainty = " runtimeCertain=" + invoke(admission, "runtimeReplayCertain", new Class<?>[0])
+          + " rootScopes=" + invoke(admission, "unavailableRoots", new Class<?>[0]);
+    } catch (NoSuchMethodException baseline) {
+      certainty = " replayCertain=" + invoke(admission, "replayCertain", new Class<?>[0]);
+    }
+    assertTrue(survivingWriterAccepts(f), "one writable runtime must serve search and ingest: "
+        + f.client.getStatus(CONTEXT).getMigration() + certainty);
+    assertEquals("IDLE", f.client.getStatus(CONTEXT).getMigration().getMigrationState());
+    awaitPhysicalWatcher(f, root, true, 60);
+    f.awaitCount("migrationmountgone", 0);
+    f.awaitCount("migrationmountkept", 1);
+    f.awaitCount("migrationoldcontent", 0);
+    f.awaitCount("migrationnewcontent", 1);
+    f.awaitReceipts(0, "promotion acknowledges the exact reconciled versions");
+    var runtime = (io.justsearch.adapters.lucene.runtime.RunningRuntime) inherited(f.server, "ingestLifecycle");
+    for (String name : List.of("kept.txt", "modified.txt")) {
+      String collection = runtime.documentFieldOps().getDocumentFieldOrThrow(
+          root.resolve(name).toString(), io.justsearch.indexing.SchemaFields.COLLECTION);
+      assertEquals("default", collection == null ? "default" : collection);
+    }
+    Files.writeString(root.resolve("after-promotion.txt"), "migrationnewadmission");
+    f.awaitCount("migrationnewadmission", 1);
   }
 
   private static boolean survivingWriterAccepts(Fixture fixture) throws Exception {

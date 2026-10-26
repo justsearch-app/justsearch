@@ -264,15 +264,17 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
   // Instead union all events' attributes (record order is chronological, so later events win on
   // conflicts like `status`) and keep the latest event's id/occurredAt/content — mirroring how the
   // live side accumulates `agentCtrl.toolCalls[callId]`.
-  const mergedToolByCall = new Map<string, ThreadEvent>();
-  const passthrough: ThreadEvent[] = [];
-  for (const e of events) {
+  type Occurrence = { event: ThreadEvent; sourceIndex: number };
+  const mergedToolByCall = new Map<string, Occurrence>();
+  const passthrough: Occurrence[] = [];
+  for (const [sourceIndex, e] of events.entries()) {
     if (e.kind === 'TOOL_ACTIVITY') {
       const callId = typeof e.attributes.callId === 'string' ? e.attributes.callId : e.id;
-      const prior = mergedToolByCall.get(callId);
-      if (!prior) {
-        mergedToolByCall.set(callId, { ...e, attributes: { ...e.attributes } });
+      const priorOccurrence = mergedToolByCall.get(callId);
+      if (!priorOccurrence) {
+        mergedToolByCall.set(callId, { event: { ...e, attributes: { ...e.attributes } }, sourceIndex });
       } else {
+        const prior = priorOccurrence.event;
         const base = toMillis(e.occurredAt) >= toMillis(prior.occurredAt) ? e : prior;
         // Tempdoc 859 §A §1.3 — `reasoning` is UNIONED, not overwritten. The attribute merge is
         // later-wins, which is right for `status` and wrong for this: the record fold can attach a
@@ -292,20 +294,26 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
           ...(Array.isArray(e.attributes.reasoning) ? e.attributes.reasoning : []),
         ];
         mergedToolByCall.set(callId, {
-          ...base,
-          attributes: {
-            ...prior.attributes,
-            ...e.attributes,
-            ...(reasoning.length > 0 ? { reasoning } : {}),
+          sourceIndex: base === e ? sourceIndex : priorOccurrence.sourceIndex,
+          event: {
+            ...base,
+            attributes: {
+              ...prior.attributes,
+              ...e.attributes,
+              ...(reasoning.length > 0 ? { reasoning } : {}),
+            },
           },
         });
       }
     } else {
-      passthrough.push(e);
+      passthrough.push({ event: e, sourceIndex });
     }
   }
 
-  const items: UnifiedTurnItem[] = [...passthrough, ...mergedToolByCall.values()].map((e) => {
+  // Collapse retains the selected representative's actual occurrence, not Map insertion order.
+  const occurrences = [...passthrough, ...mergedToolByCall.values()]
+    .sort((a, b) => a.sourceIndex - b.sourceIndex);
+  const items: UnifiedTurnItem[] = occurrences.map(({ event: e }) => {
     const kind = KIND_MAP[e.kind];
     const fraction = subMillisecondOf(e.occurredAt);
     const precision = fraction === 0 ? {} : { subMillisecond: fraction };
@@ -356,8 +364,9 @@ export function projectUnifiedThread(events: ReadonlyArray<ThreadEvent>): Unifie
     };
   });
 
-  // Keep the record's precision: random ids must not reverse a fast question/outcome pair.
-  items.sort(compareUnifiedTurnItems);
+  // Stable time sorting preserves canonical HTTP occurrence order on exact ties. The standalone
+  // comparator and live projection retain their ID policy; record rows already carry server order.
+  items.sort((a, b) => (a.ts - b.ts) + (a.subMillisecond ?? 0) - (b.subMillisecond ?? 0));
   // Tempdoc 565 §26.A — stamp run-structure segments (workflow node grouping) over the ordered stream.
   return assignRunSegments(items);
 }
