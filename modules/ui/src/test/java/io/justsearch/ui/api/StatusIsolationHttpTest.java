@@ -401,7 +401,14 @@ class StatusIsolationHttpTest {
       assertEquals(10L, healthy.path("worker").path("core").path("indexedDocuments").asLong());
       assertFalse(healthy.path("meta").path("workerRpcStale").asBoolean());
       long healthyAt = clock.get();
-      long staleAfter = f.lane("worker").staleAfterMs();
+      var publication = f.published("worker");
+      assertTrue(publication.periodMs() == 2_000L || publication.periodMs() == 10_000L,
+          "Worker uses the supported busy or idle period");
+      assertTrue(publication.cadenceMs() >= publication.periodMs()
+          && publication.cadenceMs() <= 4L * publication.periodMs(),
+          "effective cadence includes at most three periods of probe allowance");
+      // Test-owned policy: a held source is stale after THREE effective cadences.
+      long staleAfter = 3L * publication.cadenceMs();
       assertTrue(staleAfter > 0L);
       f.block.set(true);
       Thread sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
@@ -428,10 +435,18 @@ class StatusIsolationHttpTest {
       assertTrue(recovered.path("meta").path("workerRpcAtMs").asLong() > healthyAt);
       assertEquals(11L, recovered.path("worker").path("core").path("indexedDocuments").asLong(),
           "the recovery response must publish the new Worker source value");
-      String before=recovered.path("observed_at").asText(); get(f,"?fresh=true");
+      f.workerView.set(WorkerOperationalViewBuilder.builder(view())
+          .core(new CoreIndexView(true, 12, 0, view().core().indexState(), 0, 0)).build());
+      long freshAt = clock.incrementAndGet();
+      get(f, "?fresh=true");
       boolean newer=false;
-      for(int i=0;i<20&&!newer;i++){Thread.sleep(50);newer=!before.equals(get(f,"").path("observed_at").asText());}
-      assertTrue(newer,"fresh request must eventually advance observation");
+      for(int i=0;i<20&&!newer;i++) {
+        Thread.sleep(50);
+        var next = get(f, "");
+        newer = next.path("meta").path("workerRpcAtMs").asLong() == freshAt
+            && next.path("worker").path("core").path("indexedDocuments").asLong() == 12L;
+      }
+      assertTrue(newer,"fresh request must eventually publish the exact new Worker value and source timestamp");
     }
   }
   @Test @org.junit.jupiter.api.Timeout(90) void repeatedFreshDuringHangDoesNotPileUpSamplerThreads() throws Exception {
