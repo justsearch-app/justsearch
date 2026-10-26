@@ -13,6 +13,8 @@ import java.util.function.BooleanSupplier;
  * search's semantic sub-budget (Spec D §1). {@link SemanticBudget#NONE} is every other caller.
  * {@code mayCreateSessions} independently restricts request paths that have a fallback, including
  * a caller deadline too short for a semantic sub-budget. Narrowing never restores that permission.
+ * Native owners may prepare explicitly deferred SPLADE/reranker CPU backups under this same
+ * authority; that exception never permits GPU creation/retry or extends the caller deadline.
  */
 public record InferenceRequest(
     Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested,

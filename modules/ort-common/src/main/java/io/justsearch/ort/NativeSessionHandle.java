@@ -22,6 +22,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -86,7 +87,7 @@ public final class NativeSessionHandle implements SessionHandle {
   static final long DEFAULT_GPU_RETRY_INTERVAL_MS = 60_000L;
 
   /**
-   * The longest a query that has a warm CPU session waits for a device seat before it runs on that
+   * The longest a query eligible for CPU recourse waits for a device seat before it runs on that
    * CPU session instead: 1 000 ms, S4's "a search waits at most about one second for any encoder on
    * the device". The wait is also at most half of the query's remaining budget, so the CPU encode
    * keeps the other half.
@@ -154,6 +155,9 @@ public final class NativeSessionHandle implements SessionHandle {
   private final Object closeLock = new Object();
   private final IdentityHashMap<OrtSession, SessionInstance> sessionInstances =
       new IdentityHashMap<>();
+  // Preparation shares inference's bounded native threads; no executor or native-work queue.
+  private final ThreadFactory cpuPreparationThreads = DetachableRun.RUN_THREADS;
+  private volatile CpuPreparation cpuPreparation;
   private volatile OrtSession cpuSession; // null when deferred until first need
   private volatile OrtSession gpuSession;
   private volatile OrtSession.RunOptions gpuRunOptions;
@@ -191,6 +195,7 @@ public final class NativeSessionHandle implements SessionHandle {
   /** Lease accounting belongs to one exact native session identity. Guarded by lifecycleLock. */
   private static final class SessionInstance {
     private final OrtSession session;
+    private final boolean cpu;
     private int leases;
     private boolean unavailable;
     // Spec D §2.3: a GPU session whose release outwaited recompositionWaitMs is retired to the run
@@ -202,8 +207,9 @@ public final class NativeSessionHandle implements SessionHandle {
     // let go of with its device.
     private boolean retiredOpen;
 
-    private SessionInstance(OrtSession session) {
+    private SessionInstance(OrtSession session, boolean cpu) {
       this.session = session;
+      this.cpu = cpu;
     }
   }
 
@@ -268,7 +274,7 @@ public final class NativeSessionHandle implements SessionHandle {
     if (!deferCpuSession) {
       this.cpuSession = createCpuSession();
       synchronized (lifecycleLock) {
-        sessionInstances.put(cpuSession, new SessionInstance(cpuSession));
+        sessionInstances.put(cpuSession, new SessionInstance(cpuSession, true));
       }
     }
     if (gpuConfig != null) {
@@ -294,7 +300,7 @@ public final class NativeSessionHandle implements SessionHandle {
     synchronized (lifecycleLock) {
       List<SessionInstance> dropped = new java.util.ArrayList<>();
       sessionInstances.values().removeIf(instance -> {
-        if (instance.session == cpuSession) return false;
+        if (instance.cpu) return false;
         instance.unavailable = true;
         instance.closeWhenReleased = false;
         dropped.add(instance);
@@ -350,8 +356,8 @@ public final class NativeSessionHandle implements SessionHandle {
    * <p>A request that may not create sessions ({@link
    * SessionAcquisitionRequest#mayCreateGpuSession()} false: a query leg with a keyword fallback)
    * never creates or retries the GPU session and never selects a GPU session that is not warm; it
-   * uses the CPU session instead, and reports {@code LOADING} when no CPU session exists yet
-   * (Spec D §4.2 item 5).
+   * uses the CPU session instead. Explicitly deferred SPLADE/reranker backups may prepare under
+   * the original deadline; other cold owners report {@code LOADING} (Spec D §4.2 item 5).
    *
    * @return the session to use for this inference call (never null)
    */
@@ -440,12 +446,14 @@ public final class NativeSessionHandle implements SessionHandle {
    * The session for {@code request} while this role's retired GPU session is open (Spec E
    * invariant 5). A request that may create sessions (bulk work, a VECTOR-only leg, prewarm) runs on
    * the CPU session for as long as the retired run lasts: holding it would be a deferral. A query
-   * leg takes the CPU session only when it is warm; otherwise it falls back to keyword search with
-   * cause {@code LOADING}. Nothing is marked attempted, so the GPU session is created once the
+   * leg may prepare an explicitly deferred CPU backup, or take an already warm one; otherwise it
+   * falls back with cause {@code LOADING}. Serving warmup cannot create a cold CPU backup. Nothing is marked attempted, so the GPU session is created once the
    * retired one has closed.
    */
   private OrtSession retiredSessionRecourse(SessionAcquisitionRequest request) {
-    if (request.mayCreateGpuSession() || isCpuWarm()) return getCpuSession(request);
+    if (request.mayCreateGpuSession() || preparesCpuOnDemand() || isCpuWarm()) {
+      return getCpuSession(request);
+    }
     request.remainingNanos(LOADING);
     throw new SessionAcquireDeadlineExceededException(
         consumerName + ": retired GPU session still open; no warm CPU session", LOADING);
@@ -467,11 +475,11 @@ public final class NativeSessionHandle implements SessionHandle {
   }
 
   /**
-   * The CPU session for this request. A request that may not create sessions does not create a
-   * deferred CPU session that was never created; it reports {@code LOADING} instead.
+   * The CPU session for this request. Deferred SPLADE/reranker backups may prepare under the
+   * original request authority; other cold owners still report {@code LOADING} to query legs.
    */
   private OrtSession cpuSessionFor(SessionAcquisitionRequest request) {
-    if (!request.mayCreateGpuSession() && cpuSession == null) {
+    if (!request.mayCreateGpuSession() && !preparesCpuOnDemand() && cpuSession == null) {
       request.remainingNanos(LOADING);
       throw new SessionAcquireDeadlineExceededException(
           consumerName + ": no warm query session yet", LOADING);
@@ -561,7 +569,8 @@ public final class NativeSessionHandle implements SessionHandle {
    * first, with aging (Spec D §3.2). CPU sessions are returned without a seat (fully concurrent).
    *
    * <p>A foreground request with a semantic deadline whose handle has a warm CPU session (see
-   * {@link #prewarmCpuForQueries}) is not left without semantics by a busy or stuck device: while
+   * {@link #prewarmCpuForQueries}) or may prepare a deferred SPLADE CPU backup can take CPU
+   * recourse from a busy or stuck device: while
    * the device's breaker is open, or when no seat comes within {@link #CPU_RECOURSE_SEAT_WAIT_MS}
    * (at most half its remaining budget), it gets a CPU lease and runs within what is left of its
    * budget. A free seat is still taken first, so an idle device serves it on the GPU.
@@ -673,7 +682,8 @@ public final class NativeSessionHandle implements SessionHandle {
   /**
    * Whether {@code request} may run on the CPU session when the device cannot seat it within its
    * budget: a foreground request with a semantic deadline (a hybrid query leg with a keyword
-   * fallback, a VECTOR-only leg, a RAG retrieval embed), on a handle whose CPU session is warm.
+   * fallback, a VECTOR-only leg, a RAG retrieval embed), with a warm CPU session or an explicitly
+   * deferred SPLADE backup that can prepare under the same deadline.
    * Bulk work (background), prewarm and the reranker (no semantic deadline) never are.
    */
   private boolean hasCpuRecourse(SessionAcquisitionRequest request) {
@@ -681,7 +691,7 @@ public final class NativeSessionHandle implements SessionHandle {
         || !request.releaseCallerAtDeadline()) {
       return false;
     }
-    return isCpuWarm();
+    return isCpuWarm() || (preparesCpuOnDemand() && request.mayPrepareDeferredCpu());
   }
 
   /** Whether the current CPU session exists, has not been reported failed and has run. */
@@ -705,13 +715,14 @@ public final class NativeSessionHandle implements SessionHandle {
         now + wait,
         request.cancellationRequested(),
         request.mayCreateGpuSession(),
-        request.releaseCallerAtDeadline());
+        request.releaseCallerAtDeadline(),
+        request.mayPrepareDeferredCpu());
   }
 
   /**
    * A query the device turned away (its breaker is open: {@code stuck}; or no seat within the
-   * seat wait: {@code contended}) runs on the warm CPU session within its remaining budget, through
-   * the CPU selection a lost device uses. Its lease is a CPU lease, so the encoder's span records
+   * seat wait: {@code contended}) runs on the CPU session within its remaining budget, preparing
+   * an explicitly deferred backup if needed, through the CPU selection a lost device uses. Its lease is a CPU lease, so the encoder's span records
    * the CPU; a CPU run that also misses the budget is the query's ordinary deadline miss.
    */
   private Lease cpuRecourseLease(SessionAcquisitionRequest request, Span leaseSpan, String cause) {
@@ -729,7 +740,7 @@ public final class NativeSessionHandle implements SessionHandle {
               io.opentelemetry.api.common.AttributeKey.stringKey("fallback.encoder"),
               consumerName));
     }
-    log.debug("{}: device {} {}; query runs on the warm CPU session", consumerName,
+    log.debug("{}: device {} {}; query takes CPU recourse", consumerName,
         gpuConfig.gpuDeviceId(), cause);
     Lease lease = acquireCpuLease(request, cpuSessionFor(request));
     // The trace records the attempted lease. Status is earned by a successful query encoding.
@@ -805,6 +816,7 @@ public final class NativeSessionHandle implements SessionHandle {
     java.util.Objects.requireNonNull(request, "request");
     if (gpuConfig == null || retired) return false;
     if (isCpuWarm()) return true;
+    if (preparesCpuOnDemand()) return false;
     long start = System.nanoTime();
     try (Lease lease = acquireCpuLease(request)) {
       long created = System.nanoTime();
@@ -1280,11 +1292,146 @@ public final class NativeSessionHandle implements SessionHandle {
   // Internal
   // ---------------------------------------------------------------------------
 
-  /**
-   * Gets or lazily creates the CPU session. Handles both deferred creation (first call) and
-   * recreation after a reported failure (D9: dead BFCArena allocations).
-   */
+  /** Only the explicitly deferred CUDA backups may prepare during a query. Never creates a GPU. */
+  private boolean preparesCpuOnDemand() {
+    return deferCpuSession && gpuConfig != null
+        && (EncoderRole.SPLADE.consumerName().equals(consumerName)
+            || EncoderRole.RERANKER.consumerName().equals(consumerName));
+  }
+
+  /** One shared preparation, owned until native exit even when every caller leaves. */
+  private static final class CpuPreparation {
+    private boolean done; // guarded by lifecycleLock
+    private Throwable failure;
+    private volatile boolean initiatingCallerLeft;
+  }
+
   private OrtSession getCpuSession(SessionAcquisitionRequest request) {
+    if (!preparesCpuOnDemand()) return prepareCpuSession(request);
+    while (true) {
+      request.remainingNanos(LOADING);
+      ensureNotRetired();
+      OrtSession ready = cpuSession;
+      if (ready != null && !cpuSessionFailed) return ready;
+      if (!request.mayPrepareDeferredCpu()) {
+        throw new SessionAcquireDeadlineExceededException(
+            consumerName + ": deferred CPU backup waits for real demand", LOADING);
+      }
+      CpuPreparation preparation = cpuPreparation;
+      boolean initiated = false;
+      if (preparation == null) {
+        acquireOwnerLock(cpuSessionLock, request, "CPU preparation admission");
+        try {
+          ensureNotRetired();
+          ready = cpuSession;
+          if (ready != null && !cpuSessionFailed) return ready;
+          preparation = cpuPreparation;
+          if (preparation == null) {
+            preparation = startCpuPreparation(request);
+            initiated = true;
+          }
+        } finally {
+          cpuSessionLock.unlock();
+        }
+      }
+      try {
+        synchronized (lifecycleLock) {
+          while (!preparation.done) {
+            ensureNotRetiredLocked();
+            long remaining = request.remainingNanos(LOADING);
+            try {
+              TimeUnit.NANOSECONDS.timedWait(
+                  lifecycleLock, Math.min(remaining, CANCELLATION_POLL_NANOS));
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              CancellationException cancellation = new CancellationException("CPU preparation wait interrupted");
+              cancellation.initCause(interrupted);
+              throw cancellation;
+            }
+          }
+          // Completion never revives a caller whose own authority has expired.
+          request.remainingNanos(LOADING);
+          ensureNotRetiredLocked();
+          Throwable failure = preparation.failure;
+          // The initiating caller may have left before native entry/repair. A healthy observer
+          // retries with its own original authority, never with maintenance's five-minute budget.
+          if (failure instanceof CancellationException
+              || failure instanceof SessionAcquireDeadlineExceededException) continue;
+          if (failure instanceof RuntimeException runtimeFailure) throw runtimeFailure;
+          if (failure instanceof Error error) throw error;
+        }
+      } finally {
+        // Preserve abandonment after an interrupted caller thread terminates and loses its flag.
+        if (initiated) preparation.initiatingCallerLeft = true;
+      }
+    }
+  }
+
+  /** Called with cpuSessionLock held. Capacity is admitted before starting any native thread. */
+  private CpuPreparation startCpuPreparation(SessionAcquisitionRequest request) {
+    SessionAcquisitionRequest admission = new SessionAcquisitionRequest(
+        request.urgency(), request.deadlineNanos(),
+        () -> retired || request.cancellationRequested().getAsBoolean(),
+        request.mayCreateGpuSession(), request.releaseCallerAtDeadline(), request.mayPrepareDeferredCpu());
+    try {
+      cpuRunThreads.enter(admission, request.deadlineNanos());
+    } catch (CancellationException cancelled) {
+      ensureNotRetired();
+      throw cancelled;
+    }
+    CpuPreparation preparation = new CpuPreparation();
+    boolean owned = false;
+    try {
+      request.remainingNanos(LOADING);
+      synchronized (lifecycleLock) {
+        ensureNotRetiredLocked();
+        nativeActionsInProgress++;
+        cpuPreparation = preparation;
+        owned = true;
+      }
+      Thread caller = Thread.currentThread();
+      SessionAcquisitionRequest authority = new SessionAcquisitionRequest(
+          request.urgency(), request.deadlineNanos(),
+          () -> preparation.initiatingCallerLeft || caller.isInterrupted()
+              || request.cancellationRequested().getAsBoolean(),
+          request.mayCreateGpuSession(), request.releaseCallerAtDeadline(), request.mayPrepareDeferredCpu());
+      try {
+        cpuPreparationThreads.newThread(() -> {
+          Throwable failure = null;
+          try {
+            prepareCpuSession(authority);
+          } catch (Throwable thrown) {
+            failure = thrown;
+          } finally {
+            finishCpuPreparation(preparation, failure);
+          }
+        }).start();
+      } catch (RuntimeException | OutOfMemoryError noThread) {
+        var failure = new SessionAcquireDeadlineExceededException(
+            consumerName + ": no native thread for CPU preparation", LOADING);
+        failure.initCause(noThread);
+        throw failure;
+      }
+      return preparation;
+    } catch (RuntimeException | Error notStarted) {
+      if (owned) finishCpuPreparation(preparation, notStarted);
+      else cpuRunThreads.leave();
+      throw notStarted;
+    }
+  }
+
+  private void finishCpuPreparation(CpuPreparation preparation, Throwable failure) {
+    cpuRunThreads.leave();
+    synchronized (lifecycleLock) {
+      preparation.failure = failure;
+      preparation.done = true;
+      cpuPreparation = null;
+      nativeActionsInProgress--;
+      lifecycleLock.notifyAll();
+    }
+  }
+
+  private OrtSession prepareCpuSession(SessionAcquisitionRequest request) {
     acquireOwnerLock(cpuSessionLock, request, "CPU session ownership");
     try {
       request.remainingNanos(LOADING);
@@ -1292,7 +1439,7 @@ public final class NativeSessionHandle implements SessionHandle {
       OrtSession session = cpuSession;
       if (session != null && !cpuSessionFailed) return session;
 
-      if (!request.mayCreateGpuSession()) {
+      if (!request.mayCreateGpuSession() && !preparesCpuOnDemand()) {
         throw new SessionAcquireDeadlineExceededException(
             consumerName + ": no healthy query session yet", LOADING);
       }
@@ -1323,7 +1470,9 @@ public final class NativeSessionHandle implements SessionHandle {
               }
               ensureNotRetired();
             }
-            nativeActionsInProgress++;
+            request.remainingNanos(LOADING);
+            ensureNotRetiredLocked();
+            if (!preparesCpuOnDemand()) nativeActionsInProgress++;
           }
           boolean closedOld = false;
           try {
@@ -1334,7 +1483,7 @@ public final class NativeSessionHandle implements SessionHandle {
             log.warn("{}: failed CPU session close; replacement refused until retry", consumerName, e);
           } finally {
             synchronized (lifecycleLock) {
-              nativeActionsInProgress--;
+              if (!preparesCpuOnDemand()) nativeActionsInProgress--;
               lifecycleLock.notifyAll();
               if (closedOld) sessionInstances.remove(old);
             }
@@ -1353,19 +1502,19 @@ public final class NativeSessionHandle implements SessionHandle {
       if (session != null) return session;
       synchronized (lifecycleLock) {
         ensureNotRetiredLocked();
-        nativeActionsInProgress++;
+        if (!preparesCpuOnDemand()) nativeActionsInProgress++;
       }
       try {
         OrtSession created = createCpuSession();
         synchronized (lifecycleLock) {
           if (!retired) {
             cpuSession = created;
-            sessionInstances.put(created, new SessionInstance(created));
+            sessionInstances.put(created, new SessionInstance(created, true));
             created = null;
           }
         }
         if (created != null) {
-          retainPrivateCandidate(created);
+          retainPrivateCandidate(created, true);
           closePrivateCandidate(created);
           throw new SessionRetiredException(
               consumerName + ": session handle retired during CPU creation");
@@ -1382,7 +1531,7 @@ public final class NativeSessionHandle implements SessionHandle {
             consumerName + ": CPU session creation failed", e);
       } finally {
         synchronized (lifecycleLock) {
-          nativeActionsInProgress--;
+          if (!preparesCpuOnDemand()) nativeActionsInProgress--;
           lifecycleLock.notifyAll();
         }
       }
@@ -1447,7 +1596,7 @@ public final class NativeSessionHandle implements SessionHandle {
   }
 
   private SessionInstance instanceFor(OrtSession session) {
-    return sessionInstances.computeIfAbsent(session, SessionInstance::new);
+    return sessionInstances.computeIfAbsent(session, current -> new SessionInstance(current, current == cpuSession));
   }
 
   /**
@@ -1510,7 +1659,7 @@ public final class NativeSessionHandle implements SessionHandle {
     OrtSession session = instance.session;
     synchronized (lifecycleLock) {
       if (instance.leases != 0) return false;
-      if (deviceLost() && session != cpuSession) {
+      if (deviceLost() && !instance.cpu) {
         sessionInstances.remove(session);
         return true;
       }
@@ -1539,9 +1688,10 @@ public final class NativeSessionHandle implements SessionHandle {
     }
   }
 
-  private void retainPrivateCandidate(OrtSession session) {
+  private void retainPrivateCandidate(OrtSession session, boolean cpu) {
     synchronized (lifecycleLock) {
-      SessionInstance instance = instanceFor(session);
+      SessionInstance instance = sessionInstances.computeIfAbsent(
+          session, current -> new SessionInstance(current, cpu));
       instance.unavailable = true;
     }
   }
@@ -1608,7 +1758,7 @@ public final class NativeSessionHandle implements SessionHandle {
         runOptions = SessionOptionsApplier.buildGpuRunOptions(policy);
       } catch (OrtException runOptionsFailure) {
         if (deviceLost()) return;
-        retainPrivateCandidate(session);
+        retainPrivateCandidate(session, false);
         try {
           if (deviceLost()) {
             synchronized (lifecycleLock) {
@@ -1627,7 +1777,7 @@ public final class NativeSessionHandle implements SessionHandle {
       synchronized (lifecycleLock) {
         if (deviceLost()) return; // Abandon it as onDeviceLost does: no native teardown.
         rejectCreated = retired;
-        SessionInstance instance = new SessionInstance(session);
+        SessionInstance instance = new SessionInstance(session, false);
         instance.unavailable = rejectCreated;
         gpuSession = session;
         gpuRunOptions = runOptions;
