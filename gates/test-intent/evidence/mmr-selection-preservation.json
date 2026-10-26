@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-26T15:58:38.885Z",
-  "revision": "a16d7e2cd0a01bc3a20b1a500d88d94b503e8114",
-  "tree": "a09573d32434df27545c606cd09d33319fdfef49",
+  "createdAt": "2026-10-26T18:27:17.008Z",
+  "revision": "4773e54e8f7ea4f35b01b2c748ca8cf020e43f50",
+  "tree": "d22c5aa567149229d2e69b25cbf733fec08a5d25",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.rag.MmrSelectorTest.negativeCosineDoesNotBecomeANoveltyReward\" --tests \"io.justsearch.indexing.rag.MmrSelectorTest.validCosinesStayInRangeAtFloatExtremes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2206
+      "durationMs": 6772
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.validQueryIsReusedOrAcquiredExactlyOnce\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.nonpositiveProviderDimensionIsUndeclared\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.denseQueryFailureAllowsOnlyTheExistingOneMmrRetry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.workerParentCheckStillObservesCancellationAfterNormallyReturningProviders\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5559
+      "durationMs": 5269
     }
   ],
   "checks": [
@@ -168,7 +168,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#denseQueryFailureAllowsOnlyTheExistingOneMmrRetry",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:59d644e94806106a9744629829d292c1d016691014493504a53ac4535aabc61b",
+      "contentDigest": "sha256:4346be1a4e227d688c088dd5396dd2858d11cc675796ece06b39c4d4a13da146",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -195,7 +195,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#workerParentCheckStillObservesCancellationAfterNormallyReturningProviders",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:59d644e94806106a9744629829d292c1d016691014493504a53ac4535aabc61b",
+      "contentDigest": "sha256:4346be1a4e227d688c088dd5396dd2858d11cc675796ece06b39c4d4a13da146",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -214,7 +214,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:59d644e94806106a9744629829d292c1d016691014493504a53ac4535aabc61b",
+      "contentDigest": "sha256:4346be1a4e227d688c088dd5396dd2858d11cc675796ece06b39c4d4a13da146",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -236,13 +236,13 @@
         "command": "./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.rag.MmrSelectorTest.negativeCosineDoesNotBecomeANoveltyReward\" --tests \"io.justsearch.indexing.rag.MmrSelectorTest.validCosinesStayInRangeAtFloatExtremes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 2474
+        "durationMs": 6643
       },
       {
         "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.validQueryIsReusedOrAcquiredExactlyOnce\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.nonpositiveProviderDimensionIsUndeclared\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.distinctRealAndSyntheticPassagesKeepTheirOriginalIdentityAndMetadata\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference\" --tests \"io.justsearch.indexerworker.services.RagContextOpsDiversifyTest.newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.denseQueryFailureAllowsOnlyTheExistingOneMmrRetry\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.workerParentCheckStillObservesCancellationAfterNormallyReturningProviders\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest.realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 6983
+        "durationMs": 8232
       }
     ],
     "checks": [
@@ -298,5 +298,5 @@
       }
     ]
   },
-  "digest": "sha256:1c46eb55280e736b25c22ea6a147a848d5ab829fe4d4a93491fb890384122db7"
+  "digest": "sha256:0972f853bdbbdd8effe5ba062319696cd66168643b977e657458cd6d8cfa68d1"
 }
