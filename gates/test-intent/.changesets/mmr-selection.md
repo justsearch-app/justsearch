@@ -15,9 +15,17 @@ All six delegation locations name the original root Codex thread
 is quoted verbatim. The settled agent design is not cited as owner words or pre-existing
 repository authority. Delegation scope is unchanged; quality projection B remains held.
 
-Execution evidence and independent acceptance are PENDING. The referenced D4 files do not
-exist yet and no test execution/pass is claimed. The root native executor owns all Gradle,
-baseline and D4 runs; see `tmp/mmr/native-check-request.md`.
+Native execution evidence is produced by the unchanged D4 runner and cited below. All 17
+repair methods (73 candidate invocations) pass on the candidate and have intended assertion
+failures against the original baseline. All 10 preservation methods (21 candidate invocations)
+pass on both versions. Preserved parameter rows inside compound repair methods are not claimed
+as defects. The preservation producer exits 1 because its `--before` mode requires failures;
+its recorded per-check outcomes are passing on both versions.
+
+Root brokered these runs through the existing 6144 MiB guard and managed Gradle slots, with
+actual native JVM/profile and frozen-source provenance retained. These deterministic component
+and real-index worker checks do not by themselves certify outward transports or a real model.
+Independent verifier acceptance remains PENDING on the final candidate.
 
 ```json
 {
