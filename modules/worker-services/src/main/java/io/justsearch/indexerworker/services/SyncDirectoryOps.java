@@ -203,6 +203,13 @@ final class SyncDirectoryOps {
   RootDifference discoverCandidateDifference(
       String rootPath, boolean force, java.util.function.BooleanSupplier cancelled)
       throws IOException {
+    return discoverCandidateDifference(rootPath, force, cancelled, null, null);
+  }
+
+  /** Native-only strict snapshot; ordinary maintenance/recorded walks keep their existing path. */
+  RootDifference discoverCandidateDifference(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled, NativePolicyReplay nativePolicy, String collection)
+      throws IOException {
     checkCancelled(cancelled);
     Path root;
     try {
@@ -227,6 +234,8 @@ final class SyncDirectoryOps {
                 throws IOException {
               checkCancelled(cancelled);
               if (scope.excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
+              if (!dir.equals(root) && nativePolicy != null
+                  && nativePolicy.excludesDirectory(dir, root, collection)) return FileVisitResult.SKIP_SUBTREE;
               if (!Files.isReadable(dir)) {
                 throw new IOException("Reconciliation directory is unreadable: " + dir);
               }
@@ -252,10 +261,16 @@ final class SyncDirectoryOps {
               if (!seenDiskPaths.add(normalized)) return FileVisitResult.CONTINUE;
               budget.retain(normalized.length());
               requireBelowCap(seenDiskPaths.size(), "disk");
+              // A known UI omission does not read content or require readability. Its
+              // retained receipt, if any, is proved separately by WatcherReplay.
+              if (nativePolicy != null && nativePolicy.excludes(file, root, collection)) {
+                return FileVisitResult.CONTINUE;
+              }
               if (!Files.isReadable(file)) {
                 throw new IOException("Reconciliation file is unreadable: " + file);
               }
-              if (!IngestionSkipPolicy.shouldSkipWithinRoot(file, root) && !isCloudPlaceholder(file)) {
+              if ((nativePolicy == null ? !IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+                      : nativePolicy.allows(file, root, collection)) && !isCloudPlaceholder(file)) {
                 // Conservatively account for the Path's spelling and component storage as well
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());

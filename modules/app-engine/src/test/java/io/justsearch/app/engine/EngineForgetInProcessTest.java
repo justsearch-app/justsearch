@@ -256,7 +256,17 @@ final class EngineForgetInProcessTest {
     nativeMigrationOfPresentFile(true);
   }
 
+  @Test
+  @Timeout(240)
+  void R9HotPublicSaveAfterNativePolicySkipReadmitsCurrentBytesAndKeepsCompletedForgetReceipt() throws Exception {
+    nativeMigrationOfPresentFile(true, true);
+  }
+
   private void nativeMigrationOfPresentFile(boolean forgotten) throws Exception {
+    nativeMigrationOfPresentFile(forgotten, false);
+  }
+
+  private void nativeMigrationOfPresentFile(boolean forgotten, boolean removePolicyAfterSkip) throws Exception {
     Path watched = Files.createDirectory(directory.resolve(forgotten ? "native-forget" : "native-control"));
     Path exact = Files.writeString(watched.resolve("report.txt"), "present native migration target bytes");
     Path sibling = Files.writeString(watched.resolve("report.txt.bak"), "eligible native migration sibling bytes");
@@ -264,6 +274,7 @@ final class EngineForgetInProcessTest {
     String exactHash = SourceContentHash.sha256(exact);
     String siblingHash = SourceContentHash.sha256(sibling);
     String completedForget = null;
+    io.justsearch.app.api.operations.OperationRecord completedForgetRecord = null;
     String installedLiteral = null;
     String successor;
     var fixtureConfig = Map.of("justsearch.extraction.sandbox.mode", "in_process");
@@ -271,15 +282,43 @@ final class EngineForgetInProcessTest {
       assertEquals("in_process", f.config.currentSnapshot().extraction().sandboxMode(),
           "SETUP: scoped fixture selects the real in-process extractor before startup");
       System.out.println("R2 component extraction mode=" + f.config.currentSnapshot().extraction().sandboxMode());
+      // EngineRoot alone does not run Head's watched-root initialization. Establish its real
+      // public live subscription before Forget/START, then let ordinary initial work settle.
+      assertEquals(1, f.client.submitBatch(List.of(sibling), TestEngineContexts.FOREGROUND).getAcceptedCount());
+      long watchReadyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      boolean watchCorpusReady;
+      do {
+        f.runtime.commitOps().maybeRefreshBlocking();
+        watchCorpusReady = siblingHash.equals(f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+            key(sibling), SchemaFields.SOURCE_SHA256)) && f.queue.jobStateCountsStrict().pendingCount() == 0
+            && f.queue.jobStateCountsStrict().processingCount() == 0;
+        if (!watchCorpusReady) Thread.sleep(20);
+      } while (!watchCorpusReady && System.nanoTime() < watchReadyDeadline);
+      assertTrue(watchCorpusReady, "SETUP: real ordinary sibling extraction precedes watch initialization");
+      var watch = f.client.watchRoot(watched.toString(), "documents", TestEngineContexts.FOREGROUND);
+      assertTrue(watch.getWatching(), "SETUP: real live subscription is required: " + watch.getErrorMessage());
+      boolean watchSettled;
+      do {
+        watchSettled = f.queue.jobStateCountsStrict().pendingCount() == 0
+            && f.queue.jobStateCountsStrict().processingCount() == 0;
+        if (!watchSettled) Thread.sleep(20);
+      } while (!watchSettled && System.nanoTime() < watchReadyDeadline);
+      assertTrue(watchSettled, "SETUP: ordinary watch initialization must settle before Forget and START");
+      assertEquals(0, f.queue.jobStateCountsStrict().failedCount());
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "SETUP: watch initialization leaves no candidate/debt");
       f.seed(exact, "indexed private parent with two proper chunks");
       if (forgotten) {
         var response = f.forget(exact, "FILE");
         assertTrue(response.success(), "SETUP: actual accepted Forget must succeed");
         var outcome = JSON.valueToTree(response.structuredData().get("forget"));
+        System.out.println("R2 actual public Forget response=" + JSON.writeValueAsString(response));
         assertEquals("COMPLETE", outcome.path("status").asString());
         assertEquals("CONFIRMED", outcome.path("removal").asString());
         assertEquals("INSTALLED", outcome.path("keepOut").asString());
         completedForget = outcome.path("operationKey").asString();
+        completedForgetRecord = f.operations.find(completedForget).orElseThrow();
+        System.out.println("R2 actual completed operation=" + JSON.writeValueAsString(completedForgetRecord));
+        System.out.println("R2 actual accepted settings=" + JSON.writeValueAsString(f.settings.inspect()));
         var entries = f.settings.inspect().settings().getExcludePatterns();
         assertEquals(1, entries.size());
         var literal = LiteralExclusion.fromEntry(entries.getFirst());
@@ -317,6 +356,8 @@ final class EngineForgetInProcessTest {
 
       var admissions = new java.util.concurrent.ConcurrentHashMap<String,
           io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp>();
+      var latestAdmissions = new java.util.concurrent.ConcurrentHashMap<String,
+          io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp>();
       var observationFailure = new java.util.concurrent.atomic.AtomicReference<RuntimeException>();
       Runnable capture = () -> {
         try {
@@ -324,6 +365,7 @@ final class EngineForgetInProcessTest {
             if ("UPSERT".equals(op.op()) && op.generation() != null && !op.generation().isBlank()
                 && (("path:" + key(exact)).equals(op.key()) || ("path:" + key(sibling)).equals(op.key()))) {
               admissions.putIfAbsent(op.key(), op);
+              latestAdmissions.put(op.key(), op);
             }
           }
         } catch (RuntimeException failure) { observationFailure.compareAndSet(null, failure); }
@@ -426,6 +468,28 @@ final class EngineForgetInProcessTest {
         assertEquals(0, f.queue.jobStateCountsStrict().pendingCount(), "SETUP: no pending unrelated work");
         assertEquals(0, f.queue.jobStateCountsStrict().processingCount(), "SETUP: no issued unrelated work");
         assertEquals(0, f.queue.jobStateCountsStrict().failedCount(), "SETUP: no failed unrelated work");
+        if (removePolicyAfterSkip) {
+          assertTrue(targetAdmitted, "SETUP: HOT removal must follow a real accepted target receipt");
+          assertEquals("SKIPPED_POLICY", targetRow.get("last_outcome_class"));
+          assertFalse(f.config.publicationLock().isWriteLockedByCurrentThread(),
+              "SETUP: public Save starts outside publication ownership");
+          var beforeSave = f.settings.inspect();
+          String saveKey = OperationKeys.generate(CLOCK);
+          var patch = JSON.readValue(JSON.writeValueAsString(Map.of("ui", Map.of("excludePatterns", List.of()),
+              "witness", beforeSave.witness(), "operationKey", saveKey)),
+              io.justsearch.app.api.settings.SettingsV2.class);
+          var saved = new io.justsearch.app.services.settings.SettingsServiceImpl(f.settings, f.attempts)
+              .applyPublic(patch, null, webview());
+          assertTrue(saved.response().success(), "SETUP: actual public settings-service Save must commit");
+          assertEquals(OperationState.COMPLETE, saved.record().state());
+          assertEquals(saveKey, f.settings.inspect().witness().lastCommittedOperationKey());
+          assertTrue(f.settings.inspect().settings().getExcludePatterns().isEmpty());
+          assertNotSame(config, f.config.currentSnapshot());
+          assertFalse(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
+              .isExcludedPath(watched, exact));
+          assertEquals(completedForgetRecord, f.operations.find(completedForget).orElseThrow());
+          System.out.println("R9 actual HOT public Save=" + JSON.writeValueAsString(saved));
+        }
         // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
         // The monitor still owns replay/drain/certification; automatic timing is not under test.
         assertTrue(f.client.requestCutover(true, TestEngineContexts.FOREGROUND).accepted(),
@@ -469,10 +533,39 @@ final class EngineForgetInProcessTest {
         }
         assertTrue(terminal, "R2 actual native migration did not settle at the observed exact target receipt refusal; "
             + "this bounded observation is not a claim of permanent failure: " + refusal);
+        if (removePolicyAfterSkip) {
+          capture.run();
+          var old = admissions.get("path:" + key(exact));
+          var fresh = latestAdmissions.get("path:" + key(exact));
+          assertNotNull(fresh, "read-only feed must observe the actual replacement before exact cleanup");
+          assertNotEquals(old.revision(), fresh.revision());
+          assertTrue(fresh.acceptedOrder() > old.acceptedOrder());
+          var payload = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(fresh.payload());
+          var currentRow = f.queue.watcherReconciliationRow(key(exact));
+          assertNotNull(currentRow);
+          assertNotEquals(io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(old.payload()).unitRevision(),
+              payload.unitRevision());
+          assertEquals(payload.unitRevision(), currentRow.get("unit_revision"));
+          assertEquals("DONE", currentRow.get("state"));
+          assertEquals("SUCCESS_FULL", currentRow.get("last_outcome_class"));
+          assertEquals(exactHash, payload.sourceSha256());
+          assertEquals(watched, payload.ingestionRoot());
+          assertEquals("documents", payload.collection());
+          try (var view = f.server.captureServingView()) {
+            assertEquals(exactHash, view.ingestRuntime().documentFieldOps().getDocumentFieldOrThrow(
+                key(exact), SchemaFields.SOURCE_SHA256));
+          }
+          assertEquals(OperationState.COMPLETE, f.operations.find(completedForget).orElseThrow().state());
+          assertEquals("forget_complete", f.operations.find(completedForget).orElseThrow().receipt().code());
+          assertEquals(completedForgetRecord, f.operations.find(completedForget).orElseThrow());
+          System.out.println("R9 actual replacement receipt=" + fresh + "; final row=" + currentRow);
+        }
         assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "exact replay must be acknowledged after publication");
         var pointer = JSON.readTree(Files.readString(data.resolve("index/state.json")));
         assertEquals(successor, pointer.path("active_generation").asString());
         assertEquals("IDLE", pointer.path("migration_state").asString());
+        System.out.println("R2 actual final pointer=" + pointer);
+        System.out.println("R2 actual journal after publication=" + f.queue.listSwitchBufferOpsStrict());
         assertTrue(((RunningRuntime) field(f.server, KnowledgeServer.class, "ingestLifecycle")).isAcceptingWrites());
       }
     }
@@ -489,13 +582,20 @@ final class EngineForgetInProcessTest {
       if (forgotten) {
         assertEquals(OperationState.COMPLETE, reopened.operations.find(completedForget).orElseThrow().state());
         assertEquals("forget_complete", reopened.operations.find(completedForget).orElseThrow().receipt().code());
-        var literal = LiteralExclusion.fromEntry(reopened.settings.inspect().settings().getExcludePatterns().getFirst());
-        assertEquals(installedLiteral, literal.literal().id());
-        assertEquals(0, reopened.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
-        var retained = reopened.queue.watcherReconciliationRow(key(exact));
-        assertTrue(retained == null || "DONE".equals(retained.get("state"))
-            && "SKIPPED_POLICY".equals(retained.get("last_outcome_class")),
-            "completed migration must leave no live target claim; its new skipped receipt may remain");
+        assertEquals(completedForgetRecord, reopened.operations.find(completedForget).orElseThrow());
+        if (removePolicyAfterSkip) {
+          assertTrue(reopened.settings.inspect().settings().getExcludePatterns().isEmpty());
+          assertEquals(exactHash, reopened.runtime.documentFieldOps().getDocumentFieldOrThrow(
+              key(exact), SchemaFields.SOURCE_SHA256));
+        } else {
+          var literal = LiteralExclusion.fromEntry(reopened.settings.inspect().settings().getExcludePatterns().getFirst());
+          assertEquals(installedLiteral, literal.literal().id());
+          assertEquals(0, reopened.runtime.indexCountOps().countByIdAndChunksStrict(key(exact)));
+          var retained = reopened.queue.watcherReconciliationRow(key(exact));
+          assertTrue(retained == null || "DONE".equals(retained.get("state"))
+              && "SKIPPED_POLICY".equals(retained.get("last_outcome_class")),
+              "completed migration must leave no live target claim; its new skipped receipt may remain");
+        }
       } else {
         assertEquals(exactHash, reopened.runtime.documentFieldOps().getDocumentFieldOrThrow(
             key(exact), SchemaFields.SOURCE_SHA256));

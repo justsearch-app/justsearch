@@ -139,10 +139,29 @@ public final class KnowledgeServerMigrationOps {
       // exists yet (the synchronous boot replay runs before any application service is built).
       // Replayed prunes take its root authority and its file-mutation fence.
       WorkerIngestService publisher,
-      List<ResolvedConfig.FileSource> migrationRoots) {
+      List<ResolvedConfig.FileSource> migrationRoots,
+      io.justsearch.indexerworker.services.NativePolicyReplay nativePolicy) {
     public DrainSwitchBufferContext {
       approvedGapVersions = Set.copyOf(approvedGapVersions);
       migrationRoots = migrationRoots == null ? null : List.copyOf(migrationRoots);
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration, java.util.function.Predicate<String> projectionSourceReady,
+        Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions, WorkerIngestService publisher,
+        List<ResolvedConfig.FileSource> migrationRoots) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath, activeIndexPath,
+          json, chunkSpladeEnabledSupplier, vduReplayAllowed, log, deadlineNanos, replayGeneration,
+          projectionSourceReady, approvedGapVersions, publisher, migrationRoots, null);
+    }
+    public DrainSwitchBufferContext withNativePolicy(
+        io.justsearch.indexerworker.services.NativePolicyReplay policy) {
+      return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
+          indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher,
+          migrationRoots, policy);
     }
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
@@ -158,7 +177,7 @@ public final class KnowledgeServerMigrationOps {
       return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
           indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
           deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher,
-          List.copyOf(roots));
+          List.copyOf(roots), nativePolicy);
     }
 
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
@@ -175,7 +194,7 @@ public final class KnowledgeServerMigrationOps {
     public DrainSwitchBufferContext withPublisher(WorkerIngestService publisher) {
       return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
           indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
-          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher, migrationRoots);
+          deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher, migrationRoots, nativePolicy);
     }
     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
@@ -606,7 +625,9 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
-  public record StrictReplay(List<SwitchBufferCapableQueue.SwitchBufferOp> versions) {
+  public record StrictReplay(List<SwitchBufferCapableQueue.SwitchBufferOp> versions,
+      io.justsearch.indexerworker.services.NativePolicyReplay nativePolicy) {
+    public StrictReplay(List<SwitchBufferCapableQueue.SwitchBufferOp> versions) { this(versions, null); }
     public StrictReplay { versions = List.copyOf(versions); }
   }
 
@@ -633,7 +654,7 @@ public final class KnowledgeServerMigrationOps {
     var result = drainSwitchBuffer(context, true, false, true,
         Objects.requireNonNull(firstCandidateProjectionApplied, "firstCandidateProjectionApplied"),
         false, Objects.requireNonNull(firstPruneRemoval, "firstPruneRemoval"));
-    return result.applied() ? java.util.Optional.of(new StrictReplay(result.versions()))
+    return result.applied() ? java.util.Optional.of(new StrictReplay(result.versions(), context.nativePolicy()))
         : java.util.Optional.empty();
   }
 
@@ -682,14 +703,21 @@ public final class KnowledgeServerMigrationOps {
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
+    return settleCommittedNativeFileWitnesses(queue, active, generation, ownedSources, log, null);
+  }
+
+  public static boolean settleCommittedNativeFileWitnesses(
+      JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log,
+      io.justsearch.indexerworker.services.NativePolicyReplay policy) {
     if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
         || generation == null || generation.isBlank() || ownedSources == null) return false;
     try {
       scopeLegacyPrefixes(scoped, active, null);
+      if (policy != null && !policy.freeze(strictReplayOps(scoped, generation))) return false;
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
           .stream().filter(op -> generation.equals(op.generation())).toList();
       if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
-        return settleCommittedNativeFiles(queue, active, generation, log, selected);
+        return settleCommittedNativeFiles(queue, active, generation, log, selected, policy);
       }
       // Native fallback can reopen a recorded generation whose promotion approved gaps. It does
       // not thereby acquire the native pre-pointer source-completeness authority used below.
@@ -709,6 +737,7 @@ public final class KnowledgeServerMigrationOps {
         }
       }
       Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
+      if (policy != null) survivors.removeIf(effect -> effect.file() != null && policy.certify(effect.op()));
       List<Integer> deleteIndexes = new ArrayList<>();
       for (int i = 0; i < effects.size(); i++) {
         var effect = effects.get(i);
@@ -723,7 +752,7 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         var effect = effects.get(i);
         if (survivors.contains(effect)) {
-          if (!certifyCommittedSurvivor(scoped, active, effects, deleteIndexes, i)) return false;
+          if (!certifyCommittedSurvivor(scoped, active, effects, deleteIndexes, i, policy)) return false;
         } else if (effect.id() != null
             && !survivorIds.contains(effect.id())
             && active.indexCountOps().countByIdAndChunksStrict(effect.id()) != 0) {
@@ -732,8 +761,11 @@ public final class KnowledgeServerMigrationOps {
         if ("DELETE_PREFIX".equals(effect.op().op())
             || "DELETE_COLLECTION".equals(effect.op().op())) {
           if (!certifyCommittedDeleteScope(queue, active, effects, survivors, i, List.of())) return false;
+          if (policy != null && !policy.omittedPaths().isEmpty()
+              && !certifyReplayPrefixQueue(queue, scoped, active, effects, survivors, i, List.of(), policy)) return false;
         }
       }
+      if (policy != null && !policy.confirmCommittedAcknowledgement(selected)) return false;
       if (scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) return false;
       return scoped.listSwitchBufferOpsStrict().stream()
           .noneMatch(op -> generation.equals(op.generation()));
@@ -878,7 +910,14 @@ public final class KnowledgeServerMigrationOps {
   private static boolean certifyCommittedSurvivor(SwitchBufferCapableQueue queue,
       RunningRuntime active, List<CommittedNativeEffect> effects, List<Integer> deleteIndexes,
       int index) throws IOException {
+    return certifyCommittedSurvivor(queue, active, effects, deleteIndexes, index, null);
+  }
+
+  private static boolean certifyCommittedSurvivor(SwitchBufferCapableQueue queue,
+      RunningRuntime active, List<CommittedNativeEffect> effects, List<Integer> deleteIndexes,
+      int index, io.justsearch.indexerworker.services.NativePolicyReplay policy) throws IOException {
     var effect = effects.get(index);
+    if (effect.file() != null && policy != null && policy.certify(effect.op())) return true;
     var fields = active.documentFieldOps();
     if (!effect.id().equals(fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.DOC_ID))) return false;
     if (effect.file() != null) {
@@ -949,7 +988,8 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static boolean settleCommittedNativeFiles(JobQueue queue, RunningRuntime active,
-      String generation, Logger log, List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
+      String generation, Logger log, List<SwitchBufferCapableQueue.SwitchBufferOp> selected,
+      io.justsearch.indexerworker.services.NativePolicyReplay policy) {
     if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
         || generation == null || generation.isBlank()) return false;
     try {
@@ -969,8 +1009,8 @@ public final class KnowledgeServerMigrationOps {
               .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
           if (!op.key().equals("path:" + upsert.path())
               || upsert.sourceSha256() == null
-              || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
-                  upsert.sourceSha256(), indexed)) return false;
+              || !(scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
+                  upsert.sourceSha256(), indexed) || policy != null && policy.certify(op))) return false;
         } else if (!op.key().equals("path:" + SwitchBufferDelete.decode(op.payload()).path())) {
           return false;
         }
@@ -999,6 +1039,7 @@ public final class KnowledgeServerMigrationOps {
           }
         }
       }
+      if (policy != null && !policy.confirmCommittedAcknowledgement(selected)) return false;
       if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
         return false;
       }
@@ -1109,6 +1150,9 @@ public final class KnowledgeServerMigrationOps {
       if (context.publisher() != null) context.publisher().watcherReplayRefusal(unreadable.getMessage());
       return new ReplayOutcome(false, List.of());
     }
+    if (context.nativePolicy() != null && !context.nativePolicy().freeze(allOps)) {
+      return new ReplayOutcome(false, List.of());
+    }
     // Conversion replaces a receipt revision. An approval to skip the old exact version
     // cannot silently turn into permission to apply its replacement's destructive effect.
     if (!context.approvedGapVersions().isEmpty()
@@ -1151,9 +1195,12 @@ public final class KnowledgeServerMigrationOps {
             || op.revision() == null || op.revision().isBlank()) {
           throw new IOException("Invalid watcher reconciliation key, generation or revision");
         }
-        reconciliations.put(op, new WatcherReplay(debt, context.ingestLifecycle(), context.jobQueue(),
+        var reconciliation = new WatcherReplay(debt, context.ingestLifecycle(), context.jobQueue(),
             context.publisher(), context.indexingPacing(), context.migrationRoots(), admittedPaths,
-            () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos()));
+            () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos(),
+            context.nativePolicy());
+        reconciliation.bind(context.replayGeneration(), allOps, op);
+        reconciliations.put(op, reconciliation);
       }
       fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes,
           deleteOrder, reconciliations);
@@ -1380,21 +1427,26 @@ public final class KnowledgeServerMigrationOps {
               List<String> survivors = fileSurvivorExclusions.getOrDefault(op, List.of());
               var scope = PathPrefixScope.decode(payload);
               String prefix = PathPrefixScope.isLegacy(payload) ? payload : scope.prefix();
+              var queueSurvivors = new LinkedHashSet<>(survivors);
+              if (context.nativePolicy() != null) queueSurvivors.addAll(context.nativePolicy().omittedPaths());
+              // Policy omission proves zero index rows. It is only an exact terminal queue
+              // allowance, never an exception to the index deletion.
               if (scope.excludedSubtrees().isEmpty() && survivors.isEmpty()) {
                 context.ingestLifecycle().indexingCoordinator().deleteByPathPrefix(prefix);
-                if (context.jobQueue().deleteByPathPrefix(prefix) < 0) {
-                  throw new IllegalStateException("Buffered prefix queue deletion failed");
-                }
               } else if (scope.excludedSubtrees().isEmpty()) {
                 context.ingestLifecycle().indexingCoordinator()
                     .deleteByPathPrefixExcludingAcceptedSurvivors(prefix, survivors);
-                context.jobQueue().deleteByPathPrefixExcludingAcceptedSurvivors(prefix, survivors);
               } else {
-                context.ingestLifecycle().indexingCoordinator()
-                    .deleteByPathPrefixExcludingAcceptedSurvivors(
-                        prefix, survivors, scope.excludedSubtrees());
+                context.ingestLifecycle().indexingCoordinator().deleteByPathPrefixExcludingAcceptedSurvivors(
+                    prefix, survivors, scope.excludedSubtrees());
+              }
+              if (scope.excludedSubtrees().isEmpty() && queueSurvivors.isEmpty()) {
+                if (context.jobQueue().deleteByPathPrefix(prefix) < 0) {
+                  throw new IllegalStateException("Buffered prefix queue deletion failed");
+                }
+              } else {
                 context.jobQueue().deleteByPathPrefixExcludingAcceptedSurvivors(
-                    scope.prefix(), survivors, scope.excludedSubtrees());
+                    prefix, List.copyOf(queueSurvivors), scope.excludedSubtrees());
               }
               mutatedLucene = true;
             } catch (Exception e) {
@@ -1750,6 +1802,12 @@ public final class KnowledgeServerMigrationOps {
     }
     if (allApplied && removeAfterReplay) {
       try {
+        // Pause preparation and the final read-only decision precede the root uncertainty
+        // monitor. A writer completing root uncertainty must not wait on that monitor while
+        // its caller waits for the same writer to pause.
+        if (context.nativePolicy() != null && !context.nativePolicy().confirmCommittedAcknowledgement(ops)) {
+          return new ReplayOutcome(false, List.of());
+        }
         BooleanSupplier acknowledge = () -> {
           int cleared = sbq.removeReplayedSwitchBufferOps(ops);
           context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
@@ -1892,6 +1950,35 @@ public final class KnowledgeServerMigrationOps {
     return superseded;
   }
 
+  /** Only a surviving exact native file effect may replace its own terminal policy skip. */
+  public static boolean readmitNativePolicySkippedAdmissions(DrainSwitchBufferContext context)
+      throws IOException {
+    if (context.nativePolicy() == null
+        || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
+    var journal = strictReplayOps(queue, context.replayGeneration());
+    var effects = replayAcceptedEffects(context, journal);
+    var survivors = acceptedSurvivors(effects);
+    List<SwitchBufferCapableQueue.SwitchBufferOp> files = new ArrayList<>();
+    for (var effect : survivors) {
+      if (effect.file() == null || !context.replayGeneration().equals(effect.op().generation())) continue;
+      boolean rootOwnsLater = journal.stream().anyMatch(op -> {
+        if (!WatcherRootReconciliation.OPERATION.equals(op.op())
+            || op.acceptedOrder() <= effect.op().acceptedOrder()) return false;
+        var debt = WatcherRootReconciliation.decode(op.payload());
+        return Path.of(effect.path()).startsWith(Path.of(debt.root()))
+            && Objects.equals(normalizeReplayCollection(effect.collection()), normalizeReplayCollection(debt.collection()));
+      });
+      if (!rootOwnsLater) files.add(effect.op());
+    }
+    return context.nativePolicy().readmit(journal, files);
+  }
+
+  private static String normalizeReplayCollection(String collection) {
+    return collection == null || collection.isBlank()
+        || io.justsearch.app.api.knowledge.IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection)
+        ? null : collection;
+  }
+
   private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> upserts) {
     boolean complete = true;
@@ -2003,6 +2090,7 @@ public final class KnowledgeServerMigrationOps {
         }
         boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
+        if (!settled && context.nativePolicy() != null) settled = context.nativePolicy().certify(op);
         if (!settled) {
           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
           if (context.publisher() != null) context.publisher().watcherReplayRefusal(
@@ -2250,6 +2338,8 @@ public final class KnowledgeServerMigrationOps {
           || (observed.id() != null && !observed.upsert())) deleteIndexes.add(index);
     }
     Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
+    if (context.nativePolicy() != null) survivors.removeIf(effect -> effect.file() != null
+        && context.nativePolicy().certify(effect.op()));
     // A later root receipt supersedes only the old file effects it freshly proved per path.
     survivors.removeIf(effect -> effect.file() != null && laterWatcherReplay(effect.path(),
         effect.collection(), deleteOrder.positions().get(effect.op()), deleteOrder, reconciliations) != null);
@@ -2260,40 +2350,50 @@ public final class KnowledgeServerMigrationOps {
       for (int next = index + 1; next < effects.size(); next++) {
         var survivor = effects.get(next);
         if (survivors.contains(survivor) && nativeDeleteMatches(deletion, survivor)
-            && !certifyCommittedSurvivor(queue, active, effects, deleteIndexes, next)) return false;
+            && !certifyCommittedSurvivor(queue, active, effects, deleteIndexes, next, context.nativePolicy())) return false;
       }
       List<String> reconciledFiles = reconciledSurvivorsAfterDelete(
           context, orderedOps, deleteOrder, deletion.op(), reconciliations);
       if (!certifyCommittedDeleteScope(context.jobQueue(), active, effects, survivors, index,
           reconciledFiles)) return false;
-      if ("DELETE_PREFIX".equals(deletion.op().op())) {
-        List<String> certifiedPaths = new ArrayList<>(reconciledFiles);
-        for (int next = index + 1; next < effects.size(); next++) {
-          var survivor = effects.get(next);
-          if (survivor.file() != null && survivors.contains(survivor)
-              && nativeDeleteMatches(deletion, survivor)) certifiedPaths.add(survivor.id());
-        }
-        // Captured settlement is acknowledged only after promotion. Its retained DONE row
-        // may witness an earlier accepted file that this deletion has strictly removed.
-        for (int previous = 0; previous < index; previous++) {
-          var removed = effects.get(previous);
-          if (removed.file() != null && nativeDeleteMatches(deletion, removed)
-              && active.indexCountOps().countByIdAndChunksStrict(removed.id()) == 0
-              && queue.matchesAcceptedCapturedFileDeletion(removed.id(),
-                  removed.file().unitRevision(), removed.file().sourceSha256())) {
-            certifiedPaths.add(removed.id());
-          }
-        }
-        var scope = PathPrefixScope.decode(deletion.op().payload());
-        boolean unexpected = scope.excludedSubtrees().isEmpty()
-            ? context.jobQueue().hasJobsByPathPrefixOutsideCertifiedReplayPaths(
-                PathPrefixScope.isLegacy(deletion.op().payload()) ? deletion.op().payload() : scope.prefix(), certifiedPaths)
-            : context.jobQueue().hasJobsByPathPrefixOutsideCertifiedReplayPaths(
-                scope.prefix(), certifiedPaths, scope.excludedSubtrees());
-        if (unexpected) return false;
-      }
+      if (!certifyReplayPrefixQueue(context.jobQueue(), queue, active, effects, survivors,
+          index, reconciledFiles, context.nativePolicy())) return false;
     }
     return true;
+  }
+
+  /** Terminal policy allowances never enter the independent index-survivor lists. */
+  private static boolean certifyReplayPrefixQueue(JobQueue jobQueue, SwitchBufferCapableQueue queue,
+      RunningRuntime active, List<CommittedNativeEffect> effects, Set<CommittedNativeEffect> survivors,
+      int index, List<String> reconciledFiles,
+      io.justsearch.indexerworker.services.NativePolicyReplay policy) throws IOException {
+    var deletion = effects.get(index);
+    if (!"DELETE_PREFIX".equals(deletion.op().op())) return true;
+    List<String> certifiedPaths = new ArrayList<>(reconciledFiles);
+    if (policy != null) certifiedPaths.addAll(policy.omittedPaths());
+    for (int next = index + 1; next < effects.size(); next++) {
+      var survivor = effects.get(next);
+      if (survivor.file() != null && survivors.contains(survivor)
+          && nativeDeleteMatches(deletion, survivor)) certifiedPaths.add(survivor.id());
+    }
+    // Captured settlement is acknowledged only after promotion. Its retained DONE row
+    // may witness an earlier accepted file that this deletion has strictly removed.
+    for (int previous = 0; previous < index; previous++) {
+      var removed = effects.get(previous);
+      if (removed.file() != null && nativeDeleteMatches(deletion, removed)
+          && active.indexCountOps().countByIdAndChunksStrict(removed.id()) == 0
+          && queue.matchesAcceptedCapturedFileDeletion(removed.id(),
+              removed.file().unitRevision(), removed.file().sourceSha256())) {
+        certifiedPaths.add(removed.id());
+      }
+    }
+    var scope = PathPrefixScope.decode(deletion.op().payload());
+    boolean unexpected = scope.excludedSubtrees().isEmpty()
+        ? jobQueue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+            PathPrefixScope.isLegacy(deletion.op().payload()) ? deletion.op().payload() : scope.prefix(), certifiedPaths)
+        : jobQueue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+            scope.prefix(), certifiedPaths, scope.excludedSubtrees());
+    return !unexpected;
   }
 
   private static Map.Entry<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> laterWatcherReplay(
@@ -2387,16 +2487,18 @@ public final class KnowledgeServerMigrationOps {
             && effect.projection().kind() == AcceptedProjection.Kind.UPSERT
             && Long.toString(effect.projection().sourceRevision()).equals(active.documentFieldOps()
                 .getDocumentFieldOrThrow(effect.id(), SchemaFields.PROJECTION_SOURCE_REVISION))
-            && !certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
+            && !certifyCommittedSurvivor(queue, active, effects, List.of(), next, context.nativePolicy())) {
           throw new IOException("Broad replay found an uncertified projection survivor");
         }
         if (next > index && effect.file() != null && survivors.contains(effect)) {
           if (laterWatcherReplay(effect.path(), effect.collection(),
                   deleteOrder.positions().get(effect.op()), deleteOrder, reconciliations) == null
-              && !certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
+              && !certifyCommittedSurvivor(queue, active, effects, List.of(), next, context.nativePolicy())) {
             throw new IOException("Later file survivor lacks its exact accepted certificate");
           }
-          files.add(effect.id());
+          if (context.nativePolicy() == null || !context.nativePolicy().certify(effect.op())) {
+            files.add(effect.id());
+          }
         }
       }
       exclusions.put(deletion.op(), List.copyOf(files));
@@ -2593,8 +2695,20 @@ public final class KnowledgeServerMigrationOps {
     return withMigrationHelpRoot(readMigrationRootDeclarations(dataDir, collections, json), collections);
   }
 
+  public static List<ResolvedConfig.FileSource> loadMigrationRootDeclarations(Path dataDir,
+      ResolvedConfig.Collections collections, ObjectMapper json, List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> official)
+      throws IOException {
+    return withMigrationHelpRoot(readMigrationRootDeclarations(dataDir, collections, json, Objects.requireNonNull(official)), collections);
+  }
+
   private static Map<Path, ResolvedConfig.FileSource> readMigrationRootDeclarations(
       Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json) throws IOException {
+    return readMigrationRootDeclarations(dataDir, collections, json, null);
+  }
+
+  private static Map<Path, ResolvedConfig.FileSource> readMigrationRootDeclarations(
+      Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json,
+      List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> official) throws IOException {
     Map<Path, ResolvedConfig.FileSource> roots = new LinkedHashMap<>();
     Path rootsFile = dataDir.resolve("watched_roots.json");
     String content;
@@ -2625,6 +2739,18 @@ public final class KnowledgeServerMigrationOps {
         var source = new ResolvedConfig.FileSource(Path.of(path.asText()), collection);
         roots.put(source.path(), source);
       }
+    }
+    if (official != null) {
+      Map<Path, ResolvedConfig.FileSource> expected = new LinkedHashMap<>();
+      for (var binding : official) {
+        Path path = binding.path().toAbsolutePath().normalize();
+        var source = new ResolvedConfig.FileSource(path, normalizeReplayCollection(binding.collection()));
+        if (expected.put(path, source) != null) throw new IOException("Duplicate official watched root");
+      }
+      Map<Path, ResolvedConfig.FileSource> actual = new LinkedHashMap<>();
+      for (var source : roots.values()) actual.put(source.path(),
+          new ResolvedConfig.FileSource(source.path(), normalizeReplayCollection(source.collection())));
+      if (!expected.equals(actual)) throw new IOException("Current watched declarations differ from the official root owner");
     }
     if (collections != null) {
       for (ResolvedConfig.CollectionCfg collection : collections.items()) {

@@ -231,6 +231,17 @@ public final class KnowledgeServer implements Closeable {
     }
   }
   private final ReentrantReadWriteLock publicationLock;
+  private final ConfigStore nativePolicyConfiguration;
+  /** The official Head lifecycle owner, composed before start; never a ready-client RPC. */
+  public interface NativePolicyRootBindings {
+    <T> T withBindings(java.util.function.Function<List<RootBinding>, T> action);
+  }
+  private NativePolicyRootBindings nativePolicyRootBindings;
+
+  public void bindNativePolicyRootBindings(NativePolicyRootBindings owner) {
+    if (running || nativePolicyRootBindings != null) throw new IllegalStateException("Native root owner already started or bound");
+    nativePolicyRootBindings = Objects.requireNonNull(owner);
+  }
   private final Object servingViewMonitor = new Object();
   private ServingView servingView;
   private final List<ServingView> retiredServingViews = new ArrayList<>();
@@ -971,7 +982,29 @@ public final class KnowledgeServer implements Closeable {
       java.util.function.Supplier<ResolvedConfig> liveConfiguration,
       ReentrantReadWriteLock publicationLock,
       java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine> deviceMemoryLine) {
+    this(executors, config, signalBus, childControl, recordedIngestionLifecycle, indexComponent,
+        encoderComponent, startupConfiguration, liveConfiguration, publicationLock, deviceMemoryLine, null);
+  }
+
+  /** Binds native policy certificates to the actual process configuration publication owner. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration,
+      ReentrantReadWriteLock publicationLock,
+      java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine> deviceMemoryLine,
+      ConfigStore nativePolicyConfiguration) {
     this.publicationLock = Objects.requireNonNull(publicationLock, "publicationLock");
+    if (nativePolicyConfiguration != null && nativePolicyConfiguration.publicationLock() != publicationLock) {
+      throw new IllegalArgumentException("Native policy configuration has a different publication owner");
+    }
+    this.nativePolicyConfiguration = nativePolicyConfiguration;
     this.deviceMemoryLine = Objects.requireNonNull(deviceMemoryLine, "deviceMemoryLine");
     this.startupConfiguration = startupConfiguration;
     this.liveConfiguration = liveConfiguration;
@@ -7446,48 +7479,7 @@ public final class KnowledgeServer implements Closeable {
     boolean nativeOwner = generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native;
     if (nativeOwner || KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue)) {
       while (true) {
-        boolean paused = false;
-        boolean settled;
-        try {
-          boolean watcherDebt = KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue);
-          if (!watcherDebt) {
-            if (!producer.pauseProducerForCutover(10_000)) {
-              throw new IOException("Committed native replay writer did not pause");
-            }
-            paused = true;
-          }
-          try (var fence = producer.mutationAdmission().beginFinalFence(
-              producer.mutationOwnerToken(), 10_000)) {
-            if (fence == null) {
-              throw new IOException("Committed native replay mutation fence did not settle");
-            }
-            if (watcherDebt) {
-              // A committed pointer is not evidence for a root that changed after the target
-              // commit. Re-probe and commit its current paths before exact acknowledgement.
-              settled = KnowledgeServerMigrationOps.drainSwitchBufferStrict(
-                  new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
-                      jobQueue, active, signalBus, indexingPacing, indexBasePath, activeIndexPath,
-                      JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
-                      nativeOwner ? expectedActive : null, this::projectionSourceReady)
-                      .withPublisher(producer.ingestService())
-                      .withMigrationRoots(bootRootBindings.stream().map(binding ->
-                          new ResolvedConfig.FileSource(binding.path(), binding.collection())).toList()));
-              if (settled && !nativeOwner) {
-                settled = KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue, expectedActive);
-              }
-              if (settled) replaySettledGeneration = expectedActive;
-            } else {
-              settled = nativeOwner ? nativePredecessorReplaySettled(expectedActive)
-                  : KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue, expectedActive);
-              if (settled) replaySettledGeneration = expectedActive;
-            }
-          }
-        } catch (InterruptedException interrupted) {
-          Thread.currentThread().interrupt();
-          throw new IOException("Committed native switch replay interrupted", interrupted);
-        } finally {
-          if (paused) producer.resumeProducerAfterCutover();
-        }
+        boolean settled = settleCommittedNativeBootAttemptWithRoots(expectedActive, active, producer, nativeOwner, deadline);
         if (settled) break;
         if (closeStarted || System.nanoTime() >= deadline) {
           throw new IOException("Committed native switch replay did not settle before root replay");
@@ -7837,8 +7829,117 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  /** Official roots precede every runtime/pause/mutation acquisition, including cold boot. */
+  private boolean settleCommittedNativeBootAttemptWithRoots(String expectedActive, RunningRuntime active,
+      DefaultWorkerAppServices producer, boolean nativeOwner, long deadline) throws IOException {
+    if (!nativeOwner) return settleCommittedNativeBootAttempt(expectedActive, active, producer, false, deadline, null);
+    if (runtimeSwapLock.isHeldByCurrentThread()) throw new IOException("Native root owner must precede runtime ownership");
+    java.util.function.Function<List<RootBinding>, Boolean> attempt = official -> {
+      runtimeSwapLock.lock();
+      try { return settleCommittedNativeBootAttempt(expectedActive, active, producer, nativeOwner, deadline, official); }
+      catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+      finally { runtimeSwapLock.unlock(); }
+    };
+    try {
+      return nativePolicyRootBindings == null ? attempt.apply(null) : nativePolicyRootBindings.withBindings(attempt);
+    } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
+  }
+
+  private boolean settleCommittedNativeBootAttempt(String expectedActive, RunningRuntime active,
+      DefaultWorkerAppServices producer, boolean nativeOwner, long deadline,
+      List<RootBinding> official) throws IOException {
+    boolean[] paused = {false}; // This attempt's acquired pause; retained through the exact ACK.
+    try {
+      if (closeStarted || System.nanoTime() >= deadline || appServices != producer || ingestLifecycle != active || searchLifecycle != active
+          || !active.isAcceptingWrites()) throw new IOException("Committed native boot owner changed");
+      boolean watcherDebt = KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue);
+      if (!watcherDebt) {
+        long remainingMs = TimeUnit.NANOSECONDS.toMillis(Math.max(0L, deadline - System.nanoTime()));
+        if (remainingMs <= 0 || !producer.pauseProducerForCutover(Math.min(10_000L, remainingMs))) {
+          throw new IOException("Committed native replay writer did not pause");
+        }
+        paused[0] = true;
+      }
+      try (var fence = producer.mutationAdmission().beginFinalFence(producer.mutationOwnerToken(),
+          Math.min(10_000L, TimeUnit.NANOSECONDS.toMillis(Math.max(0L, deadline - System.nanoTime()))))) {
+        if (fence == null) throw new IOException("Committed native replay mutation fence did not settle");
+        var policyRoots = nativeOwner && nativePolicyConfiguration != null && official != null
+            ? nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official)
+            : bootRootBindings.stream().map(binding -> new ResolvedConfig.FileSource(binding.path(), binding.collection())).toList();
+        var policy = nativeOwner ? nativePolicyReplay(active, producer, expectedActive, policyRoots, true, official) : null;
+        if (policy != null) policy.bindCommittedAcknowledgement(selected -> {
+          // Root replay needed its writer for mutable work. Its finalization prepares the
+          // existing pause only now, before generation/publication proof, retaining it to ACK.
+          if (!paused[0]) {
+            long remainingMs = TimeUnit.NANOSECONDS.toMillis(Math.max(0L, deadline - System.nanoTime()));
+            if (closeStarted || remainingMs <= 0 || !producer.pauseProducerForCutover(Math.min(10_000L, remainingMs))) return false;
+            paused[0] = true;
+          }
+          return confirmCommittedNativeAcknowledgement(expectedActive, active, producer, policy, selected, official);
+        });
+        var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(jobQueue, active, signalBus,
+            indexingPacing, indexBasePath, activeIndexPath, JSON, KnowledgeServer::chunkSpladeEnabled, () -> true,
+            log, deadline, nativeOwner ? expectedActive : null, this::projectionSourceReady)
+            .withPublisher(producer.ingestService()).withMigrationRoots(policyRoots).withNativePolicy(policy);
+        if (nativeOwner && KnowledgeServerMigrationOps.readmitNativePolicySkippedAdmissions(context)) return false;
+        boolean settled;
+        if (watcherDebt) {
+          settled = KnowledgeServerMigrationOps.drainSwitchBufferStrict(context);
+          if (settled && !nativeOwner) settled = KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue, expectedActive);
+        } else {
+          settled = nativeOwner ? nativePredecessorReplaySettled(expectedActive, policy)
+              : KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue, expectedActive);
+        }
+        if (settled) replaySettledGeneration = expectedActive;
+        return settled;
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt(); throw new IOException("Committed native switch replay interrupted", interrupted);
+    } finally { if (paused[0]) producer.resumeProducerAfterCutover(); }
+  }
+
+  /** Synchronous read-only decision point; notifying exact ACK runs after this scope returns. */
+  private boolean confirmCommittedNativeAcknowledgement(String expectedActive, RunningRuntime expectedRuntime,
+      DefaultWorkerAppServices expectedProducer, io.justsearch.indexerworker.services.NativePolicyReplay policy,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected, List<RootBinding> official) {
+    if (official == null || nativePolicyRootBindings == null || nativePolicyConfiguration == null
+        || !runtimeSwapLock.isHeldByCurrentThread() || !committedNativeOwnerCurrent(expectedActive, expectedRuntime, expectedProducer)) return false;
+    var exact = List.copyOf(selected);
+    try (var generation = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
+      publicationLock.writeLock().lock();
+      try {
+        if (!committedNativeOwnerCurrent(expectedActive, expectedRuntime, expectedProducer)) return false;
+        synchronized (servingViewMonitor) {
+          if (servingView != null && (servingView.retiring || servingView.services != expectedProducer
+              || servingView.ingestRuntime != expectedRuntime || servingView.searchRuntime != expectedRuntime)) return false;
+        }
+        var declarations = nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official);
+        return policy.matchesAuthority(nativePolicyConfiguration, publicationLock, declarations)
+            && policy.reproveCommittedAcknowledgement(exact);
+      } finally { publicationLock.writeLock().unlock(); }
+    } catch (IOException | RuntimeException unknown) {
+      log.debug("Committed native omission acknowledgement remains unresolved", unknown);
+      return false;
+    }
+  }
+
+  private boolean committedNativeOwnerCurrent(String expected, RunningRuntime runtime, DefaultWorkerAppServices producer) {
+    return !closeStarted && generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native
+        && generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
+        && appServices == producer && ingestLifecycle == runtime && searchLifecycle == runtime
+        && jobQueue != null && producer.ingestService().ownsForgetQueue(jobQueue) && producer.recordedWriterReady()
+        && runtime.isAcceptingWrites() && activeIndexPath != null && runtime.openedIndexPath() != null
+        && expected.equals(activeIndexPath.getFileName().toString())
+        && activeIndexPath.toAbsolutePath().normalize().equals(runtime.openedIndexPath().toAbsolutePath().normalize());
+  }
+
   /** Native boot can finish replay after a pointer-before-publication crash without a new journal. */
   private boolean nativePredecessorReplaySettled(String expectedActive) {
+    return nativePredecessorReplaySettled(expectedActive, null);
+  }
+
+  private boolean nativePredecessorReplaySettled(String expectedActive,
+      io.justsearch.indexerworker.services.NativePolicyReplay policy) {
     if (expectedActive.equals(replaySettledGeneration)) return true;
     if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
         || jobQueue == null || indexGenerationManager == null) {
@@ -7855,7 +7956,7 @@ public final class KnowledgeServer implements Closeable {
       // backlog is neither part of their proof nor a reason to retain the predecessor forever.
       boolean settled = KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
           jobQueue, active, state.active_generation(),
-          expectedProjectionSourceIds(activeIndexPath, generationBootOwnership), log);
+          expectedProjectionSourceIds(activeIndexPath, generationBootOwnership), log, policy);
       if (settled) replaySettledGeneration = expectedActive;
       return settled;
     } catch (IOException | RuntimeException unavailable) {
@@ -9629,9 +9730,50 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  private io.justsearch.indexerworker.services.NativePolicyReplay nativePolicyReplay(
+      RunningRuntime target, DefaultWorkerAppServices producer, String generation,
+      List<ResolvedConfig.FileSource> roots, boolean committedBoot, List<RootBinding> official) {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
+        || nativePolicyConfiguration == null || official == null || ingestLifecycle != target || appServices != producer
+        || !target.isAcceptingWrites() || !producer.recordedWriterReady()) return null;
+    try {
+      var snapshot = nativePolicyConfiguration.currentSnapshot();
+      var declarations = committedBoot ? nativePolicyDeclaredRoots(snapshot, official)
+          : nativePolicyMigrationRoots(snapshot, official);
+      if (!new java.util.HashSet<>(roots).equals(new java.util.HashSet<>(declarations))) return null;
+      return committedBoot
+          ? io.justsearch.indexerworker.services.NativePolicyReplay.forCommittedBoot(nativePolicyConfiguration,
+              publicationLock, jobQueue, target, producer.ingestService(), generation, roots, snapshot)
+          : new io.justsearch.indexerworker.services.NativePolicyReplay(nativePolicyConfiguration,
+              publicationLock, jobQueue, target, producer.ingestService(), generation, roots, snapshot);
+    } catch (IOException | RuntimeException unavailable) {
+      log.debug("Native policy omission authority is unavailable", unavailable);
+      return null;
+    }
+  }
+
   /** Final Flow A fence: replay, certify Green, commit the pointer and install its view. */
   private IndexGenerationManager.State promoteServingSuccessor(
       IndexGenerationManager.BootOwnership.Recorded recorded, int cutoverMaxFailedJobs)
+      throws IOException, InterruptedException {
+    if (recorded != null || nativePolicyRootBindings == null) {
+      return promoteServingSuccessorUnderRoots(recorded, cutoverMaxFailedJobs, null);
+    }
+    if (runtimeSwapLock.isHeldByCurrentThread()) throw new IOException("Native root owner must precede runtime ownership");
+    try {
+      return nativePolicyRootBindings.withBindings(official -> {
+        try { return promoteServingSuccessorUnderRoots(recorded, cutoverMaxFailedJobs, official); }
+        catch (IOException | InterruptedException failure) { throw new java.util.concurrent.CompletionException(failure); }
+      });
+    } catch (java.util.concurrent.CompletionException failure) {
+      if (failure.getCause() instanceof IOException io) throw io;
+      if (failure.getCause() instanceof InterruptedException interrupted) throw interrupted;
+      throw failure;
+    }
+  }
+
+  private IndexGenerationManager.State promoteServingSuccessorUnderRoots(
+      IndexGenerationManager.BootOwnership.Recorded recorded, int cutoverMaxFailedJobs, List<RootBinding> official)
       throws IOException, InterruptedException {
     runtimeSwapLock.lockInterruptibly();
     DefaultWorkerAppServices successor = null;
@@ -9694,14 +9836,18 @@ public final class KnowledgeServer implements Closeable {
             approvedGapVersions = snapshot.acceptedVersions();
           }
         }
-        var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
-            new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+        var policyRoots = recorded == null && nativePolicyConfiguration != null && official != null
+            ? nativePolicyMigrationRoots(nativePolicyConfiguration.currentSnapshot(), official) : watcherReplayMigrationRoots();
+        var replayContext = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
                 JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
                 buildingGeneration, this::projectionSourceReady, approvedGapVersions)
                 // Green's loop is still writing: replayed prunes take its fence.
                 .withPublisher(current.ingestService())
-                .withMigrationRoots(watcherReplayMigrationRoots()),
+                .withMigrationRoots(policyRoots)
+                .withNativePolicy(nativePolicyReplay(green, current, buildingGeneration, policyRoots, false, official));
+        if (KnowledgeServerMigrationOps.readmitNativePolicySkippedAdmissions(replayContext)) return null;
+        var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(replayContext,
             this::migrationReplayCut, this::migrationPruneReplayCut);
         if (replay.isEmpty()) {
           if (recorded != null) {
@@ -9831,6 +9977,12 @@ public final class KnowledgeServer implements Closeable {
                     try {
                       if (projection != null) projection.admitBeforePointer();
                       migrationTransitionForPublication("migration-before-pointer-commit");
+                      if (replay.orElseThrow().nativePolicy() != null
+                          && (!replay.orElseThrow().nativePolicy().matchesAuthority(nativePolicyConfiguration,
+                              publicationLock, nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official))
+                              || !replay.orElseThrow().nativePolicy().reproveBeforePointer())) {
+                        throw new IOException("Native policy omission proof changed before pointer commitment");
+                      }
                       if (!fence.armReplayCertificate()) {
                         throw new IOException(
                             "Unrecorded watcher mutation prevents pointer commitment");
@@ -10308,6 +10460,28 @@ public final class KnowledgeServer implements Closeable {
   public boolean forgetQueueEntryAllowed() {
     JobQueue current = jobQueue;
     return current == null || current.forgetEntryAllowed();
+  }
+
+  /** Native policy has the complete enumeration authority even without watcher debt. */
+  private List<ResolvedConfig.FileSource> nativePolicyDeclaredRoots(ResolvedConfig snapshot, List<RootBinding> official)
+      throws IOException {
+    if (snapshot == null || official == null || !dataDir.toAbsolutePath().normalize()
+        .equals(snapshot.paths().dataDir().toAbsolutePath().normalize())) {
+      throw new IOException("Native policy lacks current official root/configuration ownership");
+    }
+    return KnowledgeServerMigrationOps.loadMigrationRootDeclarations(dataDir, snapshot.collections(), JSON, official);
+  }
+
+  private List<ResolvedConfig.FileSource> nativePolicyMigrationRoots(ResolvedConfig snapshot, List<RootBinding> official) throws IOException {
+    List<ResolvedConfig.FileSource> frozen = migrationRootSnapshot;
+    if (snapshot == null || frozen == null) throw new IOException("Native policy waits for complete migration declarations");
+    var current = nativePolicyDeclaredRoots(snapshot, official);
+    var available = KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, snapshot.collections(), JSON);
+    if (!new java.util.HashSet<>(current).equals(new java.util.HashSet<>(available))
+        || !new java.util.HashSet<>(frozen).equals(new java.util.HashSet<>(current))) {
+      throw new IOException("Native policy declarations changed since migration enumeration");
+    }
+    return frozen;
   }
 
   private List<ResolvedConfig.FileSource> watcherReplayMigrationRoots() throws IOException {

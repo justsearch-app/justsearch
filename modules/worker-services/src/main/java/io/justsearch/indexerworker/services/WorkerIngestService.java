@@ -440,6 +440,128 @@ public final class WorkerIngestService {
     return withFileMutationFence(mutation);
   }
 
+  /** Exact native policy checks inspect both physical generations, independently of row labels. */
+  public boolean nativePolicyProtectedMembershipAbsent(org.apache.lucene.search.Query membership) throws IOException {
+    if (ingestLifecycle == null || searchLifecycle == null) throw new IOException("Native index ownership is unavailable");
+    ingestLifecycle.commitOps().maybeRefreshBlocking();
+    if (ingestLifecycle.indexCountOps().countQueryOrThrow(membership) != 0) return false;
+    if (searchLifecycle != ingestLifecycle) {
+      searchLifecycle.commitOps().maybeRefreshBlocking();
+      if (searchLifecycle.indexCountOps().countQueryOrThrow(membership) != 0) return false;
+    }
+    return true;
+  }
+
+  /** Native policy certification never waits on a file writer under publication ownership. */
+  public boolean tryNativePolicyFileProof(java.util.function.BooleanSupplier proof) {
+    var file = fileMutationFence();
+    if (file == null || !file.tryLock()) return false;
+    try { return proof.getAsBoolean(); }
+    finally { file.unlock(); }
+  }
+
+  /** Read-only proof uses the same real registered root, without waiting on a file writer. */
+  public boolean tryNativePolicyFileProof(Path root, String collection, java.util.function.BooleanSupplier proof) {
+    return tryNativePolicyFileProof(() -> {
+      try {
+        var registry = rootWatcherRegistry.current();
+        var subscription = registry.subscription(root);
+        requireCandidateSubscription(registry, root, subscription);
+        if (!Objects.equals(WatcherReplay.rootOwnerCollection(collection),
+            WatcherReplay.rootOwnerCollection(subscription.collection()))) return false;
+        try (var held = RootIdentity.hold(root)) {
+          if (!held.identity().equals(subscription.rootIdentity())) return false;
+          requireNativePolicyVolume(root, held.identity());
+          held.requireCurrent();
+          boolean matched = proof.getAsBoolean();
+          held.requireCurrent();
+          requireNativePolicyVolume(root, held.identity());
+          requireCandidateSubscription(registry, root, subscription);
+          return matched;
+        }
+      } catch (IOException | RuntimeException unknown) { return false; }
+    });
+  }
+
+  /** The live registered directory/volume and actual writer own this short ordinary admission. */
+  public <T> T withNativePolicyReadmissionRoot(Path root, String collection, Supplier<T> action)
+      throws IOException {
+    var registry = rootWatcherRegistry.current();
+    var subscription = registry.subscription(root);
+    requireCandidateSubscription(registry, root, subscription);
+    if (!Objects.equals(WatcherReplay.rootOwnerCollection(collection),
+        WatcherReplay.rootOwnerCollection(subscription.collection()))) {
+      throw new IOException("Native policy readmission root owner is unavailable");
+    }
+    try (var held = RootIdentity.hold(root)) {
+      requireNativePolicyVolume(root, held.identity());
+      if (!held.identity().equals(subscription.rootIdentity())) {
+        throw new IOException("Native policy readmission needs its registered directory and volume");
+      }
+      try {
+        return underFileMutationFence(() -> {
+          try {
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            requireCandidateSubscription(registry, root, subscription);
+            T result = action.get();
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            requireCandidateSubscription(registry, root, subscription);
+            return result;
+          } catch (IOException changed) { throw new java.io.UncheckedIOException(changed); }
+        });
+      } catch (java.io.UncheckedIOException changed) { throw changed.getCause(); }
+    }
+  }
+
+  /** CURRENT UI/index omission of an admitted pathname, never historical DELETE/root absence. */
+  public boolean tryCommittedBootNativePolicyOmission(Path root, java.util.function.BooleanSupplier proof) {
+    if (mutationAdmission == null || indexingLoop == null || ingestLifecycle == null
+        || ingestLifecycle != searchLifecycle || !ingestLifecycle.isAcceptingWrites()) return false;
+    return tryNativePolicyFileProof(() -> {
+      try (var held = RootIdentity.hold(root)) {
+        held.requireCurrent();
+        requireNativePolicyVolume(root, held.identity());
+        boolean matched = proof.getAsBoolean();
+        held.requireCurrent();
+        requireNativePolicyVolume(root, held.identity());
+        return matched;
+      } catch (IOException | RuntimeException unknown) { return false; }
+    });
+  }
+
+  /** No subscription is invented: committed boot's bound declarations own PRESENT additions only. */
+  public <T> T withCommittedBootNativePolicyRoot(Path root, Supplier<T> action) throws IOException {
+    if (mutationAdmission == null || indexingLoop == null || ingestLifecycle == null
+        || ingestLifecycle != searchLifecycle || !ingestLifecycle.isAcceptingWrites()) {
+      throw new IOException("Native boot readmission lacks its committed writable producer");
+    }
+    try (var held = RootIdentity.hold(root)) {
+      requireNativePolicyVolume(root, held.identity());
+      try {
+        return underFileMutationFence(() -> {
+          try {
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            T result = action.get();
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            return result;
+          } catch (IOException changed) { throw new java.io.UncheckedIOException(changed); }
+        });
+      } catch (java.io.UncheckedIOException changed) { throw changed.getCause(); }
+    }
+  }
+
+  private void requireNativePolicyVolume(Path root, RootIdentity held) throws IOException {
+    String known = held.volume();
+    var recorded = rootVolumes.recordedFor(root);
+    if (known == null || recorded.isEmpty() || !known.equals(recorded.orElseThrow())) {
+      throw new IOException("Native policy root lacks fresh equality to its recorded known volume");
+    }
+  }
+
   /** {@link #confirmedAbsent} under the root that holds the path; an invalid path is not. */
   private boolean confirmedGone(String normalizedPath) {
     try {

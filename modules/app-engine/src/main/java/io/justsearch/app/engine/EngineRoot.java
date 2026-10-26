@@ -922,7 +922,7 @@ public final class EngineRoot implements WorkerHost {
                       .pinnedPciBusId().orElse(null)).effective();
               return new io.justsearch.core.component.DeviceMemoryLine(
                   device.totalVramBytes(), device.freeVramBytes());
-            });
+            }, configStore);
       }
     };
   }
@@ -1075,6 +1075,12 @@ public final class EngineRoot implements WorkerHost {
     started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.installProjectionSeedSources(projectionSeedSources);
+      started.bindNativePolicyRootBindings(new KnowledgeServer.NativePolicyRootBindings() {
+        @Override public <T> T withBindings(java.util.function.Function<
+            java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>, T> action) {
+          return authority.roots().withForgetBindings(action);
+        }
+      });
       started.bindBootRootBindings(authority.roots().snapshotBindings());
       started.bindExclusionRoots(authority.roots()::watchedPaths);
       if (startContext != null) started.bindIndexStartContext(startContext);
