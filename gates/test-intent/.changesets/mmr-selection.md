@@ -277,6 +277,14 @@ remains separate. Independent acceptance for the final digest is recorded below.
       "newChecks": [
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java#cancelledSupplierWithNormallyReturningProviderPreservesWorkerAndOutwardBoundaries"
       ]
+    },
+    {
+      "items": [
+        "modules/app-launcher/archunit_store/fbfdda09-fb1d-494e-a2a6-e593ce75d5a6"
+      ],
+      "class": "Structural rule kept",
+      "rule": "UnreferencedCodeTest#no_unreferenced_non_public_methods: Private/package-private methods should be referenced by other code (potential dead code).",
+      "whySurvives": "C-TI2: the frozen production-method predicate and store guards are unchanged. The actual UnreferencedCodeTest run generated exactly one obsolete-exception removal: RagContextOps$ChunkRerankResult.wasReranked() now has a production caller in scoreFor(), used by computeQualitySignals() for quality projection. Apply only that generated prune; the store strictly shrinks with no new allowances, paths, seeding, refreeze or suppressions. Original-baseline preservation with its own store, candidate execution with the smaller store and a rerun without store writes remain root's verification obligations. No product behaviour, test oracle or scenario is relaxed."
     }
   ]
 }
