@@ -1,0 +1,82 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:d5f592a3ea781bceaed40b806308911f06b5304496605613c03a05dae2dfa7a9"
+  },
+  "createdAt": "2026-10-25T20:17:06.490Z",
+  "revision": "f8e16e326bf30acc885eebcca0064c0e0d91aaff",
+  "tree": "5b466a6b93a3cbd63e3d0a0f7738b8ce8300a9e8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.chunking.ChunkSplitterCoreTest.malformedSourceRemainsUnmodifiedAndTrimDefinitionsStayDistinct\" --tests \"io.justsearch.indexing.chunking.ChunkSplitterCoreTest.asciiAndBmpHardCutOffsetsRemainInUtf16Units\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 60090
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.partialReplacementAndEmptyPlanCleanupRetainCompletenessAfterReopen\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 50104
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/ChunkSplitterCoreTest.java#malformedSourceRemainsUnmodifiedAndTrimDefinitionsStayDistinct",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/ChunkSplitterCoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d167e7e8183617beaa0224e0db137cec5a7b4b1ad691f42ba9ac60845e712f17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedSourceRemainsUnmodifiedAndTrimDefinitionsStayDistinct()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/ChunkSplitterCoreTest.java#asciiAndBmpHardCutOffsetsRemainInUtf16Units",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/ChunkSplitterCoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d167e7e8183617beaa0224e0db137cec5a7b4b1ad691f42ba9ac60845e712f17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "asciiAndBmpHardCutOffsetsRemainInUtf16Units()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#partialReplacementAndEmptyPlanCleanupRetainCompletenessAfterReopen",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:964225a14c509ee88394f33648c4e25cade945b9396bdc1c851c76e45fe57a49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "partialReplacementAndEmptyPlanCleanupRetainCompletenessAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1a82e52f462d094a1ad50ae91506ff80d43f193040bf5dfa560b133f12b236c0"
+}

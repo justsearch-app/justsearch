@@ -150,6 +150,7 @@ public final class IndexingDocumentOps {
    */
   public static IndexDocument withChunkDeclaration(
       IndexDocument document, ChunkDocumentWriter.ChunkPlan chunkPlan) {
+    ChunkDocumentWriter.validatePlan(chunkPlan, (String) document.fields().get(SchemaFields.CONTENT));
     if (!chunkPlan.revision().equals(document.fields().get(SchemaFields.CONTENT_SHA256))) {
       throw new IllegalArgumentException("The chunk plan was not cut from this document's content");
     }

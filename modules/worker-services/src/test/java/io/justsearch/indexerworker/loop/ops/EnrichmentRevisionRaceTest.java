@@ -169,6 +169,229 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
     assertArrayEquals(new float[] {0,1}, progress.complete("parent"));
   }
 
+  private static final String LEGACY = "anchor anchor a" + "\uD83D\uDE00".repeat(1000)
+      + "anchor anchor " + "\uD83D\uDE00".repeat(2000);
+
+  /** Offsets captured by the unchanged f8e16e326bf3 splitter, not by the repaired implementation. */
+  private void seedLegacy(RunningRuntime runtime) throws Exception {
+    seed(runtime, "legacy-parent", LEGACY);
+    runtime.indexingCoordinator().updateDocument("legacy-parent", Map.of(
+        SchemaFields.EMBEDDING_STATUS, "FAILED", SchemaFields.SPLADE_STATUS, "FAILED", SchemaFields.NER_STATUS, "FAILED"));
+    var rows = new ArrayList<int[]>();
+    try (var stream = getClass().getResourceAsStream("/unicode/v1-chunks.tsv")) {
+      assertNotNull(stream);
+      for (String line : new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().toList()) {
+        rows.add(Arrays.stream(line.split("\t")).mapToInt(Integer::parseInt).toArray());
+      }
+    }
+    for (int ordinal : new int[] {1, 2, 0, 3}) {
+      int[] row = rows.get(ordinal);
+      String id = ordinal == 1 ? "bad-0" : ordinal == 2 ? "bad-1" : "safe-" + ordinal;
+      var fields = new HashMap<String, Object>();
+      fields.put(SchemaFields.DOC_ID, id); fields.put(SchemaFields.DOC_UID, id + "-uid");
+      fields.put(SchemaFields.PATH, "legacy-parent"); fields.put(SchemaFields.IS_CHUNK, "true");
+      fields.put(SchemaFields.PARENT_DOC_ID, "legacy-parent");
+      fields.put(SchemaFields.CHUNK_START_CHAR, row[1]); fields.put(SchemaFields.CHUNK_END_CHAR, row[2]);
+      fields.put(SchemaFields.CHUNK_INDEX, row[0]); fields.put(SchemaFields.CHUNK_TOTAL, rows.size());
+      fields.put(SchemaFields.CHUNK_CONTENT, LEGACY.substring(row[1], row[2]));
+      fields.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, ChunkParentRevision.sha256Hex(LEGACY));
+      fields.put(SchemaFields.CHUNK_EMBEDDING_STATUS, "PENDING"); fields.put(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, "0");
+      fields.put(SchemaFields.SPLADE_STATUS, "PENDING"); fields.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+      fields.put(SchemaFields.CHUNK_VECTOR, new float[] {0, 1, 0, 0});
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+    }
+    commit(runtime);
+  }
+
+  @Test
+  void legacyReadOmissionPreservesSafeSiblingsAndSearchableArtifacts() throws Exception {
+    try (var runtime = open()) {
+      seedLegacy(runtime);
+      assertNull(runtime.documentFieldOps().getDocumentContent("bad-0"));
+      assertNull(runtime.documentFieldOps().getDocumentContent("bad-1"));
+      assertEquals(LEGACY, runtime.documentFieldOps().getDocumentContent("legacy-parent"));
+      assertEquals(LEGACY.substring(0, 1923), runtime.documentFieldOps().getDocumentContent("safe-0"));
+      var batch = runtime.documentFieldOps().getDocumentContentBatch(List.of("bad-0", "bad-1", "safe-0", "legacy-parent"));
+      assertEquals(Set.of("safe-0", "legacy-parent"), batch.keySet());
+      var input = runtime.documentFieldOps().getEnrichmentInputs(List.of("bad-0", "safe-0"));
+      assertNull(input.get("bad-0").content());
+      assertNotNull(input.get("bad-0").fields().get(SchemaFields.CHUNK_END_CHAR), "failure publication retains geometry proof");
+      assertEquals(batch.get("safe-0"), input.get("safe-0").content());
+      var projected = runtime.readPathOps().search(new TermQuery(new Term(SchemaFields.DOC_ID, "bad-0")),
+          1, Set.of(SchemaFields.CHUNK_CONTENT), null, null);
+      assertEquals(1, projected.hits().size(), "retained ranking document is still indexed");
+      assertNull(projected.hits().getFirst().fields().get(SchemaFields.CHUNK_CONTENT));
+      var rag = runtime.chunkSearchOps().searchChunksForDocs("anchor", Set.of("legacy-parent"), 10);
+      assertFalse(rag.hits().isEmpty());
+      for (var hit : rag.hits()) {
+        if (hit.docId().equals("bad-0") || hit.docId().equals("bad-1")) {
+          assertEquals("", hit.fields().get(SchemaFields.CHUNK_CONTENT),
+              "RAG's existing missing-slice representation is an empty string");
+        } else assertEquals(runtime.documentFieldOps().getDocumentContent(hit.docId()),
+            hit.fields().get(SchemaFields.CHUNK_CONTENT));
+      }
+      assertFalse(postings("bad-0").isEmpty(), "the old malformed slice has real searchable postings");
+    }
+  }
+
+  @ParameterizedTest(name="legacyFailuresDrainBadHeadsWithoutEncodingTheirText({0})")
+  @EnumSource(value=Stage.class, names={"CHUNK", "SPLADE", "COMBINED", "BGE_M3"})
+  void legacyFailuresDrainBadHeadsWithoutEncodingTheirText(Stage stage) throws Exception {
+    try (var runtime = open()) {
+      seedLegacy(runtime);
+      String status = stage == Stage.CHUNK ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.SPLADE_STATUS;
+      String retry = status.replace("_status", "_retry_count");
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      assertEquals("bad-0", runtime.documentFieldOps().queryDocIdsByField(status, "PENDING", 1).getFirst());
+      for (int pass = 0; pass < 16; pass++) {
+        run(stage, runtime, runtime.documentFieldOps(), calls::incrementAndGet, false, false, 1, true);
+        commit(runtime);
+        for (String id : List.of("bad-0", "bad-1")) {
+          assertNotEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(id, status));
+        }
+        if (runtime.documentFieldOps().queryDocIdsByField(status, "PENDING", 10).isEmpty()) break;
+      }
+      for (String id : List.of("bad-0", "bad-1")) {
+        assertEquals("FAILED", runtime.documentFieldOps().getDocumentField(id, status));
+        assertEquals("3", runtime.documentFieldOps().getDocumentField(id, retry));
+      }
+      for (String id : List.of("safe-0", "safe-3")) {
+        assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(id, status), "safe tail beyond batchSize must run");
+      }
+      assertTrue(calls.get() > 0, "safe work really reached an encoder fake");
+    }
+    try (var runtime = open()) {
+      String status = stage == Stage.CHUNK ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.SPLADE_STATUS;
+      assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("bad-0", status));
+      assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("safe-0", status));
+    }
+  }
+
+  @ParameterizedTest(name="legacyProofRaceCannotPublishFailure({0},{1})")
+  @org.junit.jupiter.params.provider.CsvSource({"CHUNK,geometry", "CHUNK,revision", "SPLADE,geometry", "SPLADE,revision",
+      "COMBINED,geometry", "COMBINED,revision", "BGE_M3,geometry", "BGE_M3,revision"})
+  void legacyProofRaceCannotPublishFailure(Stage stage, String race) throws Exception {
+    try (var runtime = open()) {
+      seedLegacy(runtime);
+      var once = new java.util.concurrent.atomic.AtomicBoolean();
+      var fields = mock(DocumentFieldOps.class, withSettings().spiedInstance(runtime.documentFieldOps()).defaultAnswer(call -> {
+        Object captured = call.callRealMethod();
+        if (call.getMethod().getName().equals("getEnrichmentInputs") && once.compareAndSet(false, true)) {
+          if (race.equals("geometry")) {
+            assertTrue(runtime.indexingCoordinator().updateDocument("bad-0", Map.of(
+                SchemaFields.CHUNK_END_CHAR, 3656, SchemaFields.CHUNK_CONTENT, LEGACY.substring(1731, 3656))));
+          } else {
+            String changed = LEGACY.replace('a', 'b');
+            assertTrue(runtime.indexingCoordinator().updateDocument("legacy-parent", Map.of(
+                SchemaFields.CONTENT, changed, SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(changed))));
+          }
+          commit(runtime);
+        }
+        return captured;
+      }));
+      assertFalse(run(stage, runtime, fields, () -> fail("unsafe text must not reach an encoder"), false, false, 1, true),
+          "a rejected comparison proof cannot claim durable advancement");
+      assertTrue(once.get());
+      commit(runtime);
+      for (String status : List.of(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.SPLADE_STATUS)) {
+        assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("bad-0", status));
+        assertEquals("0", runtime.documentFieldOps().getDocumentField("bad-0", status.replace("_status", "_retry_count")));
+      }
+      assertEquals(race.equals("geometry") ? "3656" : "3654",
+          runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.CHUNK_END_CHAR));
+    }
+  }
+
+  @Test
+  void legacyMatchingProofRmwAndRenamePreservePostingsAndDenseVector() throws Exception {
+    Map<String, List<Integer>> original;
+    long norm;
+    try (var runtime = open()) {
+      seedLegacy(runtime);
+      assertTrue(runtime.indexingCoordinator().updateDocument("bad-0", Map.of(
+          SchemaFields.SPLADE, Map.of("oldweight", 2f), SchemaFields.SPLADE_STATUS, "COMPLETED")));
+      commit(runtime);
+      original = postings("bad-0"); norm = norm("bad-0");
+      assertFalse(original.isEmpty());
+      assertEquals(1, runtime.readPathOps().search(new TermQuery(new Term(SchemaFields.SPLADE, "oldweight")),
+          10, Set.of(), null, null).hits().size());
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        var proof = runtime.documentFieldOps().getEnrichmentInputs(List.of("bad-0")).get("bad-0");
+        assertTrue(runtime.indexingCoordinator().updateDocumentIf("bad-0", proof,
+            EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(attempt - 1)));
+        commit(runtime);
+        assertEquals(original, postings("bad-0"), "same-analyzer terms, frequencies and positions survive exact legacy reconstruction");
+        assertEquals(norm, norm("bad-0"));
+        assertDenseVector();
+        assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.SPLADE_STATUS),
+            "existing reset-status policy drops omitted sparse weights and resets completed status");
+        assertEquals(0, runtime.readPathOps().search(new TermQuery(new Term(SchemaFields.SPLADE, "oldweight")),
+            10, Set.of(), null, null).hits().size());
+      }
+      assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.CHUNK_EMBEDDING_STATUS));
+      assertEquals("3", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
+      assertEquals(5, runtime.indexingCoordinator().updateDocumentPaths("legacy-parent", "renamed-parent"));
+      commit(runtime);
+      assertEquals(original, postings("bad-0")); assertEquals(norm, norm("bad-0")); assertDenseVector();
+      assertEquals("renamed-parent", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.PARENT_DOC_ID));
+    }
+    try (var runtime = open()) {
+      assertEquals(LEGACY, runtime.documentFieldOps().getDocumentContent("renamed-parent"));
+      assertEquals(original, postings("bad-0")); assertEquals(norm, norm("bad-0")); assertDenseVector();
+    }
+  }
+
+  private Map<String, List<Integer>> postings(String id) throws Exception {
+    try (var fs = FSDirectory.open(directory); var reader = new org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper(
+        DirectoryReader.open(fs), SchemaFields.SOFT_DELETE)) {
+      int doc = new IndexSearcher(reader).search(new TermQuery(new Term(SchemaFields.DOC_ID, id)), 1).scoreDocs[0].doc;
+      var result = new TreeMap<String, List<Integer>>();
+      var terms = org.apache.lucene.index.MultiTerms.getTerms(reader, SchemaFields.CHUNK_CONTENT);
+      if (terms == null) return result;
+      var iterator = terms.iterator();
+      for (var term = iterator.next(); term != null; term = iterator.next()) {
+        var postings = iterator.postings(null, org.apache.lucene.index.PostingsEnum.ALL);
+        if (postings.advance(doc) != doc) continue;
+        var positions = new ArrayList<Integer>();
+        positions.add(postings.freq());
+        if (terms.hasPositions()) for (int i = 0; i < postings.freq(); i++) positions.add(postings.nextPosition());
+        result.put(term.utf8ToString(), positions);
+      }
+      return result;
+    }
+  }
+
+  private long norm(String id) throws Exception {
+    try (var fs = FSDirectory.open(directory); var reader = new org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper(
+        DirectoryReader.open(fs), SchemaFields.SOFT_DELETE)) {
+      int doc = new IndexSearcher(reader).search(new TermQuery(new Term(SchemaFields.DOC_ID, id)), 1).scoreDocs[0].doc;
+      var leaf = reader.leaves().get(org.apache.lucene.index.ReaderUtil.subIndex(doc, reader.leaves()));
+      var norms = leaf.reader().getNormValues(SchemaFields.CHUNK_CONTENT);
+      if (norms == null) return -1;
+      assertTrue(norms.advanceExact(doc - leaf.docBase));
+      return norms.longValue();
+    }
+  }
+
+  private void assertDenseVector() throws Exception {
+    try (var fs = FSDirectory.open(directory); var reader = new org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper(
+        DirectoryReader.open(fs), SchemaFields.SOFT_DELETE)) {
+      int doc = new IndexSearcher(reader).search(new TermQuery(new Term(SchemaFields.DOC_ID, "bad-0")), 1).scoreDocs[0].doc;
+      var leaf = reader.leaves().get(org.apache.lucene.index.ReaderUtil.subIndex(doc, reader.leaves()));
+      var vector = leaf.reader().getFloatVectorValues(SchemaFields.CHUNK_VECTOR);
+      assertNotNull(vector);
+      var iterator = vector.iterator(); assertEquals(doc - leaf.docBase, iterator.advance(doc - leaf.docBase));
+      assertArrayEquals(new float[] {0, 1, 0, 0}, vector.vectorValue(iterator.index()));
+    }
+  }
+
+  private static void safeEncoderInputs(List<String> texts) {
+    for (String text : texts) {
+      assertFalse(Character.isLowSurrogate(text.charAt(0)), "unsafe legacy start reached encoder");
+      assertFalse(Character.isHighSurrogate(text.charAt(text.length() - 1)), "unsafe legacy end reached encoder");
+    }
+  }
+
   private RunningRuntime open() {
     var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
     for (String name : List.of("source_sha256", "embedding_retry_count", "splade_status", "splade_retry_count",
@@ -240,14 +463,19 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
 
   private void run(Stage stage, RunningRuntime runtime, DocumentFieldOps inputFields,
       Runnable entered, boolean fail, boolean fallback) throws Exception {
+    run(stage, runtime, inputFields, entered, fail, fallback, 100, false);
+  }
+
+  private boolean run(Stage stage, RunningRuntime runtime, DocumentFieldOps inputFields,
+      Runnable entered, boolean fail, boolean fallback, int batchSize, boolean legacy) throws Exception {
     var embedding = mock(EmbeddingProvider.class);
     when(embedding.isAvailable()).thenReturn(true);
     when(embedding.embedDocumentBatch(anyList())).thenAnswer(call -> {
-      entered.run(); List<String> texts = call.getArgument(0);
+      List<String> texts = call.getArgument(0); if (legacy) safeEncoderInputs(texts); entered.run();
       return fallback ? List.of() : texts.stream().map(text -> fail ? null : new float[]{1,0,0,0}).toList();
     });
     when(embedding.embedDocument(anyString(),any(InferenceRequest.class))).thenAnswer(call -> {
-      entered.run(); return fail ? null : new float[]{1,0,0,0};
+      if (legacy) safeEncoderInputs(List.of(call.getArgument(0))); entered.run(); return fail ? null : new float[]{1,0,0,0};
     });
     when(embedding.embedWithSpans(anyString(),any(int[][].class))).thenAnswer(call -> {
       entered.run();if(fail) throw new IllegalStateException("fixture late-chunk failure");
@@ -255,11 +483,11 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
     });
     var sparse = mock(SpladeEncoder.class);
     when(sparse.encodeBatch(anyList())).thenAnswer(call -> {
-      entered.run(); if (fail || fallback) throw new IllegalStateException("fixture encoder failure");
+      if (legacy) safeEncoderInputs(call.getArgument(0)); entered.run(); if (fail || fallback) throw new IllegalStateException("fixture encoder failure");
       List<String> texts = call.getArgument(0); return texts.stream().map(text -> Map.of("token",1f)).toList();
     });
     when(sparse.encode(anyString(),any(InferenceRequest.class))).thenAnswer(call -> {
-      entered.run(); if (fail) throw new IllegalStateException("fixture encoder failure"); return Map.of("token",1f);
+      if (legacy) safeEncoderInputs(List.of(call.getArgument(0))); entered.run(); if (fail) throw new IllegalStateException("fixture encoder failure"); return Map.of("token",1f);
     });
     var ner = mock(NerService.class);
     when(ner.isAvailable()).thenReturn(true);
@@ -270,29 +498,29 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
     });
     var bge = mock(BgeM3Encoder.class);
     when(bge.encodeBatch(anyList())).thenAnswer(call -> {
-      entered.run(); if (fail || fallback) throw new IllegalStateException("fixture BGE failure");
+      if (legacy) safeEncoderInputs(call.getArgument(0)); entered.run(); if (fail || fallback) throw new IllegalStateException("fixture BGE failure");
       List<String> texts = call.getArgument(0); return texts.stream().map(text -> new BgeM3Output(new float[]{1,0,0,0},Map.of("token",1f))).toList();
     });
     when(bge.encode(anyString(),any(InferenceRequest.class))).thenAnswer(call -> {
-      entered.run(); if (fail) throw new IllegalStateException("fixture BGE failure");
+      if (legacy) safeEncoderInputs(List.of(call.getArgument(0))); entered.run(); if (fail) throw new IllegalStateException("fixture BGE failure");
       return new BgeM3Output(new float[]{1,0,0,0},Map.of("token",1f));
     });
     var fields=inputFields; var coordinator=runtime.indexingCoordinator(); var commits=runtime.commitOps();
     var log=LoggerFactory.getLogger(getClass()); var pace=IndexingPacing.unthrottled();
     var embedContext=new EmbeddingBackfillOps.BackfillContext(fields,coordinator,commits,
-        mock(WorkerSignalBus.class),pace,()->embedding,()->true,()->true,100,log);
-    switch(stage) {
-      case EMBEDDING -> EmbeddingBackfillOps.processEmbeddingBackfill(embedContext);
-      case CHUNK -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(embedContext);
+        mock(WorkerSignalBus.class),pace,()->embedding,()->true,()->true,batchSize,log);
+    return switch(stage) {
+      case EMBEDDING -> EmbeddingBackfillOps.processEmbeddingBackfill(embedContext).docsProcessed() > 0;
+      case CHUNK -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(embedContext).docsProcessed() > 0;
       case SPLADE -> SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->sparse,()->true,100,true,false,log));
+          fields,coordinator,commits,pace,()->sparse,()->true,batchSize,true,legacy,log)).docsProcessed() > 0;
       case NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->ner,()->true,100,log));
+          fields,coordinator,commits,pace,()->ner,()->true,batchSize,log)).docsProcessed() > 0;
       case BGE_M3 -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(
-          fields,coordinator,commits,mock(WorkerSignalBus.class),()->bge,()->true,100,true,false,log));
+          fields,coordinator,commits,mock(WorkerSignalBus.class),()->bge,()->true,batchSize,true,legacy,log)).docsProcessed() > 0;
       case COMBINED, COMBINED_LATE -> CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->embedding,()->sparse,()->ner,()->true,()->true,100,log,
-          false,false,stage==Stage.COMBINED_LATE,50,new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,new WindowedEmbedProgress()));
-    }
+          fields,coordinator,commits,pace,()->embedding,()->sparse,()->ner,()->true,()->true,batchSize,log,
+          legacy,legacy,stage==Stage.COMBINED_LATE,legacy ? 1 : 50,new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,new WindowedEmbedProgress())).progressed();
+    };
   }
 }
