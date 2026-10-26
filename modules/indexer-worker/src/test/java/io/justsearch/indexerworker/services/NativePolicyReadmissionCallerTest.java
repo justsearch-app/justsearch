@@ -351,8 +351,10 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     try (var f = new Fixture(true)) {
       Path file = f.source("private.txt"); var old = f.skipped(file); f.addMixedOrRoot(route); f.commitPointer();
       var journal = f.queue.listSwitchBufferOpsStrict(); var store = f.configuration("[\"private.txt\"]");
-      assertFalse(f.settleWithDecision(route, store, f.policy(store, true), () -> f.queue.close(), () -> {},
-          new java.util.concurrent.atomic.AtomicInteger()));
+      assertFalse(f.settleWithDecision(route, store, f.policy(store, true), () -> {
+        try { f.queue.close(); }
+        catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+      }, () -> {}, new java.util.concurrent.atomic.AtomicInteger()));
       f.queue.open(); assertEquals(journal, f.queue.listSwitchBufferOpsStrict(), "unavailable proof cannot ACK");
       var replacement = new java.util.concurrent.atomic.AtomicReference<SwitchBufferOp>();
       assertFalse(f.settleWithDecision(route, store, f.policy(store, true), () -> {}, () -> {
