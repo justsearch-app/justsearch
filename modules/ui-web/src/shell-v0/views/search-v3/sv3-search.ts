@@ -13,7 +13,7 @@
  * which rows the reader has chosen, the files a prepared Ask is limited to, and which answered turn
  * was limited to which files. None of it is persisted — a search is not a turn, and the store keeps
  * no scope with a turn (`ConversationEngine.persistedAssistant` writes neither `docIds` nor
- * `fileCount`), so a reloaded turn is honestly an unscoped one.
+ * `fileCount`), so a reloaded turn has unknown inputs and cannot safely be replayed.
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import {
@@ -107,7 +107,8 @@ export function sv3ScopeLabel(scope: Sv3AskScope): string {
 }
 
 /** What a Retry or an Edit of a turn will search, said before it is pressed. */
-export function sv3ResendScopeNote(scope: Sv3AskScope | null): string {
+export function sv3ResendScopeNote(scope: Sv3AskScope | null | undefined): string {
+  if (scope === undefined) return 'Original Ask inputs are unknown. Prepare a new Ask and review its files.';
   if (scope === null) return 'Searches all your files';
   return scope.paths.length === 1 ? 'Uses the same file' : `Uses the same ${scope.paths.length} files`;
 }
@@ -225,7 +226,7 @@ export class Sv3SearchController implements ReactiveController {
   private dates: SearchFilterSpec = getFilters();
   private facets: Record<string, string[]> = getFacetSelections();
   /** Which answered turn was limited to which files. Window-local, so a reload forgets it honestly. */
-  private readonly turnScopes = new Map<string, Sv3AskScope>();
+  private readonly turnScopes = new Map<string, Sv3AskScope | null>();
   private unsubscribers: Array<() => void> = [];
 
   constructor(private readonly host: ReactiveControllerHost) {
@@ -361,8 +362,12 @@ export class Sv3SearchController implements ReactiveController {
   }
 
   /** Fix the chosen rows as the next Ask's files. `null` when they name no document. */
+  scopeFromSelection(): Sv3AskScope | null {
+    return sv3ScopeFromHits(this.snapshot?.results ?? [], this.selected);
+  }
+
   prepareFromSelection(): Sv3AskScope | null {
-    return this.prepare(sv3ScopeFromHits(this.snapshot?.results ?? [], this.selected));
+    return this.prepare(this.scopeFromSelection());
   }
 
   prepare(scope: Sv3AskScope | null): Sv3AskScope | null {
@@ -384,7 +389,7 @@ export class Sv3SearchController implements ReactiveController {
     return scope;
   }
 
-  recordTurnScope(turnId: string, scope: Sv3AskScope): void {
+  recordTurnScope(turnId: string, scope: Sv3AskScope | null): void {
     this.turnScopes.set(turnId, scope);
   }
 
@@ -392,9 +397,9 @@ export class Sv3SearchController implements ReactiveController {
     return this.turnScopes.get(turnId) ?? null;
   }
 
-  get scopesByTurn(): ReadonlyMap<string, Sv3AskScope> {
-    return this.turnScopes;
-  }
+  hasTurnScope(turnId: string): boolean { return this.turnScopes.has(turnId); }
+
+  get scopesByTurn(): ReadonlyMap<string, Sv3AskScope | null> { return this.turnScopes; }
 
   /** New session: the result list, its choice and its prepared Ask are all left behind. */
   reset(): void {

@@ -244,12 +244,12 @@ function resolveQuery(args: ComposeArgs): string {
 }
 
 /** Navigation delivers transient state before mounting; the receiving window owns it thereafter. */
-let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null } | null = null;
+let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null; origin: 'fresh' | 'restore' } | null = null;
 
-export function parkSearchV3Handoff(state: Record<string, unknown>): void {
+export function parkSearchV3Handoff(state: Record<string, unknown>, origin: 'fresh' | 'restore' = 'fresh'): void {
   const selection = takePendingSelection();
   takePendingForceShape();
-  searchV3Handoff = { state, selection: typeof state.forceShapeId === 'string' ? selection : null };
+  searchV3Handoff = { state, selection: typeof state.forceShapeId === 'string' ? selection : null, origin };
   takePendingAutoRun(); // Search v3 always waits for a person's send, including answer links.
   window.dispatchEvent(new Event('sv3-handoff'));
 }

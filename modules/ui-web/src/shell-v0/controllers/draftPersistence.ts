@@ -23,6 +23,7 @@ interface Provider {
   readonly key: string;
   readonly get: () => string;
   saved: string | null;
+  readable: boolean;
 }
 
 const providers = new Set<Provider>();
@@ -33,15 +34,18 @@ function storageKey(key: string): string {
   return PREFIX + key;
 }
 
-function readDraft(key: string): string | null {
+function readDraft(key: string, failed?: () => void): string | null {
   try {
     return localStorage.getItem(storageKey(key));
   } catch {
+    failed?.();
     return null;
   }
 }
 
 function writeDraft(provider: Provider, value: string): void {
+  // An unreadable existing slot may hold the only copy. This mount cannot replace it.
+  if (!provider.readable) return;
   const next = value.trim() ? value : null;
   try {
     // An unchanged snapshot cannot overwrite another tab's newer durable draft. In particular,
@@ -76,6 +80,9 @@ export class DraftPersistence implements ReactiveController {
   private readonly provider: Provider;
   private readonly set: (v: string) => void;
   private rehydrated = false;
+  private restorationFailed = false;
+  /** An unreadable raw draft is not evidence that the durable slot was empty. */
+  get restoreUnavailable(): boolean { return this.restorationFailed; }
   private attachment: {
     key: string; expected: string | null; safe: boolean;
     validate: (value: unknown) => boolean; get: () => unknown; failed: () => void;
@@ -91,7 +98,7 @@ export class DraftPersistence implements ReactiveController {
     set: (v: string) => void,
   ) {
     this.host = host;
-    this.provider = { key, get, saved: null };
+    this.provider = { key, get, saved: null, readable: true };
     this.set = set;
     host.addController(this);
   }
@@ -102,7 +109,7 @@ export class DraftPersistence implements ReactiveController {
     attachmentFlushes.add(this.flushAttachment);
     if (this.rehydrated) return; // reconnect of a retained instance — keep the live in-memory draft
     this.rehydrated = true;
-    const saved = readDraft(this.provider.key);
+    const saved = readDraft(this.provider.key, () => { this.restorationFailed = true; this.provider.readable = false; });
     this.provider.saved = saved;
     if (saved !== null) {
       this.set(saved);
@@ -192,6 +199,8 @@ export class DraftPersistence implements ReactiveController {
       void this.host.updateComplete;
       localStorage.removeItem(storageKey(key));
     } catch {
+      this.restorationFailed = true;
+      this.provider.readable = false;
       // Do not mark or remove the only durable copy when the transfer could not be saved.
     }
   }

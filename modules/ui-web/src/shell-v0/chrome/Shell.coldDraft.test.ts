@@ -83,6 +83,9 @@ function retained(): void {
   expect(localStorage.getItem(MARKER), 'incoming work must not dispose of the old draft').toBeNull();
 }
 beforeEach(() => {
+  // These boot fixtures represent an explicit fresh address, not an automatic reload.
+  vi.spyOn(window.performance, 'getEntriesByType').mockImplementation(type => type === 'navigation'
+    ? [{ type: 'navigate' } as unknown as PerformanceEntry] : []);
   localStorage.clear(); sessionStorage.clear();
   resetCatalog(); __resetBootstrapForTest(); __resetSurfaceSchemasForTest(); __resetStoreRegistryForTest();
   __resetUserConfigForTest(); __resetJournalForTest(); __resetConversationListForTest();
@@ -193,10 +196,16 @@ it('FC15 cold no-ingress transfer waits for native absence then remains one time
   expect(input(shell).value).toBe(''); noSend();
 });
 
-it('FC15 cold journal task is applied before legacy disposition', async () => {
+it('DS1 FC15 a restored journal task cannot replace legacy text or issue it', async () => {
   recordNavigation('core.unified-chat-surface', `justsearch://surface/core.unified-chat-surface?query=${encodeURIComponent(prompt)}&mode=ask`, 'Search', 'URL_BAR');
   const shell = await mount(); retained(); await complete();
-  expect(input(shell).value).toBe(prompt); retained(); noSend();
+  expect(input(shell).value).toBe(legacy);
+  expect(localStorage.getItem(DRAFT)).toBe(legacy);
+  expect(localStorage.getItem(MARKER)).toBe('transferred');
+  expect(localStorage.getItem(OLD_DRAFT)).toBeNull();
+  expect(view(shell)!.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
+  input(shell).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await drain(); noSend();
 });
 
 it('FC15 cold rapid arrivals before hydration preserve only the latest prepared scope', async () => {
@@ -289,4 +298,18 @@ it('FC15 neighboring a tab closing before its ingress settles cannot erase anoth
   lastReady.resolve(); await drain();
   expect(localStorage.getItem(DRAFT)).toBe(legacy);
   noSend();
+});
+
+it('DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A', async () => {
+  vi.mocked(window.performance.getEntriesByType).mockReturnValue([{ type: 'reload' } as unknown as PerformanceEntry]);
+  localStorage.setItem(DRAFT, 'newer raw B');
+  window.location.hash = '#justsearch://surface/core.unified-chat-surface?query=old%20A&mode=ask&docIds=alpha.md';
+  const shell = await mount(); await complete();
+  expect(input(shell).value).toBe('newer raw B');
+  expect(localStorage.getItem(DRAFT)).toBe('newer raw B');
+  expect(localStorage.getItem(OLD_DRAFT)).toBe(legacy);
+  expect(localStorage.getItem(MARKER)).toBe('kept-successor');
+  expect(view(shell)!.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
+  input(shell).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await drain();
+  noSend(); expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/knowledge/search'))).toHaveLength(0);
 });

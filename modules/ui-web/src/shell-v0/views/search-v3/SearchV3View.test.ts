@@ -572,20 +572,36 @@ describe('the window never scrolls; one inner region does', () => {
     }
   });
 
-  it('puts the ONE scroller inside the content surface', async () => {
+  it('keeps the ONE transcript scroller and only the bounded recovery data row may scroll separately', async () => {
+    localStorage.setItem('justsearch.draft.search-v3.composer', 'Recover this draft');
     const el = await mount();
     const main = await region(el, 'jf-sv3-main');
     const scroller = main.shadowRoot?.querySelector('[data-testid="sv3-main-scroller"]');
     expect(scroller).toBeTruthy();
     expect(scroller?.classList.contains('sv3-scroller')).toBe(true);
 
-    // XT9 adds a bounded native schema editor. It can scroll its own text; no second
-    // region may scroll the conversation. Keep the original rule for all remaining CSS.
+    // Native schema text and recovery data own only their bounded contents, never the transcript.
     const schemaRule = own(Sv3Composer).match(/:host \.schema-field \[id='sv3-schema'\]\s*\{[^}]*\}/)?.[0];
     expect(schemaRule).toContain('max-block-size: 8rem');
     expect(schemaRule).toContain('overflow: auto');
+    const recoveryRules = own(SearchV3View).match(/^\s*\.column > \.recovery-notice\s*\{[^}]*\}/gm) ?? [];
+    expect(recoveryRules).toHaveLength(1);
+    const recoveryRule = recoveryRules[0]!;
+    expect(recoveryRule).toContain('max-block-size: 20%');
+    expect(recoveryRule).toContain('overflow: auto');
+    expect(recoveryRule).toContain('overflow-wrap: anywhere');
+    expect(recoveryRule).toContain('flex: 0 0 auto');
+    const recovery = el.shadowRoot!.querySelector('[data-testid="sv3-column"] > [data-testid="sv3-residency-notice"]');
+    expect(recovery?.classList.contains('recovery-notice')).toBe(true);
+    expect(el.shadowRoot!.querySelectorAll('.recovery-notice')).toHaveLength(1);
+    expect(el.shadowRoot!.querySelectorAll('[data-testid="sv3-residency-notice"]')).toHaveLength(1);
+    expect(el.shadowRoot!.querySelector('.recovery-notice')).toBe(recovery);
+    expect(recovery?.querySelector('jf-sv3-main, .dock, .sv3-scroller')).toBeNull();
+    expect(main.parentElement?.previousElementSibling).toBe(recovery);
+    expect(el.shadowRoot!.querySelector('.dock')?.contains(recovery)).toBe(false);
     for (const ctor of [SearchV3View, Sv3Sidebar, Sv3Topbar, Sv3Composer]) {
-      const styles = own(ctor).replace(schemaRule ?? '', '');
+      const styles = own(ctor).replace(ctor === Sv3Composer ? schemaRule ?? '' : '', '')
+        .replace(ctor === SearchV3View ? recoveryRule : '', '');
       expect(styles).not.toContain('overflow-y: auto');
       expect(styles).not.toContain('overflow: auto');
       expect(styles).not.toContain('overflow: scroll');

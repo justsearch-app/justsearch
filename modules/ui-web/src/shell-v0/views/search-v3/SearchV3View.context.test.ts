@@ -1981,6 +1981,11 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       if (entry === 'reload') el = await mount();
       else await openTheOnlyConversation(el);
       expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+      const review = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid=sv3-draft-review-confirm]');
+      if (review) {
+        expect(backend.dispatches).toHaveLength(0); review.click(); await settle(el);
+        expect(backend.dispatches).toHaveLength(0);
+      }
       const reads = backend.historyReads.length;
       await ask(el, 'Keep this follow-up');
       expect(backend.historyReads.length).toBeGreaterThan(reads);

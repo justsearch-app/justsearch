@@ -220,13 +220,21 @@ describe('859 §B — the dock floats over the transcript', () => {
     );
   });
 
-  it('adds no scroller — the one-scroller invariant holds by construction', () => {
-    // `SearchV3View.test.ts`'s four structural assertions are the authority; this is the direct
-    // statement that the dock did not become a fifth region with an overflow of its own.
+  it('adds no dock or transcript scroller; only the bounded sibling recovery data row may scroll', () => {
     const styles = own(SearchV3View);
-    expect(styles).not.toContain('overflow-y: auto');
-    expect(styles).not.toContain('overflow: auto');
-    expect(styles).not.toContain('overflow: scroll');
+    const recoveryRules = styles.match(/^\s*\.column > \.recovery-notice\s*\{[^}]*\}/gm) ?? [];
+    expect(recoveryRules).toHaveLength(1);
+    const recoveryRule = recoveryRules[0]!;
+    expect(recoveryRule).toContain('max-block-size: 20%');
+    expect(recoveryRule).toContain('overflow: auto');
+    expect(recoveryRule).toContain('overflow-wrap: anywhere');
+    expect(recoveryRule).toContain('flex: 0 0 auto');
+    const residual = styles.replace(recoveryRule, '');
+    expect(residual).not.toContain('overflow-y: auto');
+    expect(residual).not.toContain('overflow: auto');
+    expect(residual).not.toContain('overflow: scroll');
+    expect(ruleIn(styles, '.dock {')).not.toMatch(/overflow(?:-y)?:\s*(?:auto|scroll)/);
+    expect(ruleIn(styles, '.column {')).toContain('overflow: hidden');
   });
 });
 

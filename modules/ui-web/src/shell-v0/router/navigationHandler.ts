@@ -103,6 +103,8 @@ export interface NavigationHandlerConfig {
 }
 
 export interface NavigationHandleOptions {
+  /** Internal provenance: history/journal restoration never replays a prepared draft. */
+  taskOrigin?: 'fresh' | 'restore';
   /**
    * When true (default) the handler pushes a new history entry via
    * `pushAddress`. When false (used by popstate-driven activations), the
@@ -155,10 +157,10 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       //    was added is reported to the opener as `info.pushed` — the Shell needs
       //    it because `history.back()` is only a valid close when this navigation
       //    is what put the settings address on the stack (855 §11.1 D3/D4).
-      // Tempdoc 864 PR C — `push: false` is the popstate path, i.e. the browser has ALREADY moved
-      // and this address is where it landed. That is the one arrival where an absent argument is a
-      // value rather than a silence; see StoreAdapter.clearsOnTraversal.
-      const traversal = options?.push === false;
+      // Tempdoc 864 PR C — absent arguments clear stores only for actual traversal.
+      // A native fresh hash push also emits popstate and has already moved history,
+      // but it must not clear B after its incoming task is refused by capacity.
+      const traversal = options?.push === false && options.taskOrigin !== 'fresh';
 
       // Review finding F4 — settle the OUTGOING surface's debt first. A claim made within the
       // projector's 75ms window and followed straight away by a surface change would otherwise be
@@ -190,7 +192,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       // A hand-off is read once, never URL-projected. Its verb's task outranks a conversation id.
       if (addr.target === 'core.search-v3-surface' &&
           ['query', 'docIds', 'forceShapeId', 'mode', 'affordance', 'selection'].some(key => Object.hasOwn(addr.state, key))) {
-        parkSearchV3Handoff(addr.state);
+        parkSearchV3Handoff(addr.state, options?.taskOrigin ?? (traversal ? 'restore' : 'fresh'));
         addr = { ...addr, state: {} };
       } else {
         takeSearchV3Handoff();

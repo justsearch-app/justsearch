@@ -200,7 +200,7 @@ function stubFetch(): void {
       backend.dispatches.push({
         conversationId: String(sent.conversationId ?? ''),
         // `core.rag-ask` carries its text as `question` (`unifiedChatRequest.ts:97`).
-        question: String(sent.question ?? ''),
+        question: String(sent.question ?? sent.prompt ?? ''),
       });
       // The re-sent turn REACHES A TERMINAL rather than streaming forever, so the assertions below
       // read a settled transcript — a perpetually-streaming turn would suppress the window-wide
@@ -447,6 +447,15 @@ function twoTurnConversation(id = 'uc-branch'): void {
   };
 }
 
+/** DS1: these fork mechanics require reconstructable own inputs. Model turns need no file scope. */
+function knownModelForkInputs(): void {
+  for (const thread of Object.values(backend.threads)) for (const raw of thread.events) {
+    const event = raw as Record<string, unknown>;
+    event.attributes = { ...(event.attributes as Record<string, unknown> ?? {}), shapeId: 'core.free-chat' };
+  }
+  for (const history of Object.values(backend.histories)) for (const message of history.messages) message.shapeId = 'core.free-chat';
+}
+
 /** A sidebar row, found by the label the reader sees (the list carries no id attribute). */
 async function sidebarRow(el: Mounted, label: string): Promise<Updatable> {
   const sidebar = await region(el, 'jf-sv3-sidebar');
@@ -685,7 +694,7 @@ describe('the version pager', () => {
   });
 
   it('shows a branch as version 2 once it has a turn of its own', async () => {
-    twoTurnConversation();
+    twoTurnConversation(); knownModelForkInputs();
     const el = await mount();
     await openConversation(el);
 
@@ -702,15 +711,15 @@ describe('the version pager', () => {
   });
 
   it('re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch', async () => {
-    twoTurnConversation();
+    twoTurnConversation(); knownModelForkInputs();
     const el = await mount();
     await openConversation(el);
     await editTurn(el, 1, 'and what about the third?');
     expect(el.sessions.activeId).toBe('uc-branch-branch-1');
     // The branch's own turn, as the store recorded it.
     backend.threads['uc-branch-branch-1']!.events.push(
-      wireEvent(storedId(6), 'USER_MESSAGE', 'and what about the third?'),
-      wireEvent(storedId(7), 'ASSISTANT_MESSAGE', 'A third lock.'),
+      wireEvent(storedId(6), 'USER_MESSAGE', 'and what about the third?', { shapeId: 'core.free-chat' }),
+      wireEvent(storedId(7), 'ASSISTANT_MESSAGE', 'A third lock.', { shapeId: 'core.free-chat' }),
     );
     await openConversation(el);
     await openConversation(el, 'branched');
@@ -780,7 +789,7 @@ describe('the version pager', () => {
 
 describe('editing a question re-asks it in a branch', () => {
   it('forks BEFORE the question, not after its answer, and re-sends into the branch', async () => {
-    twoTurnConversation();
+    twoTurnConversation(); knownModelForkInputs();
     const el = await mount();
     await openConversation(el);
 
@@ -800,7 +809,7 @@ describe('editing a question re-asks it in a branch', () => {
   });
 
   it('forks a THIRD turn at the turn before it, not at the conversation’s first answer', async () => {
-    threeTurnConversation();
+    threeTurnConversation(); knownModelForkInputs();
     const el = await mount();
     await openConversation(el);
 
@@ -822,7 +831,7 @@ describe('editing a question re-asks it in a branch', () => {
   });
 
   it('forks the FIRST question at the empty-prefix sentinel', async () => {
-    twoTurnConversation();
+    twoTurnConversation(); knownModelForkInputs();
     const el = await mount();
     await openConversation(el);
 
@@ -840,7 +849,7 @@ describe('editing a question re-asks it in a branch', () => {
   });
 
   it('keeps the rewrite in the editor when the branch is refused', async () => {
-    twoTurnConversation();
+    twoTurnConversation(); knownModelForkInputs();
     backend.refuse.add('branch');
     const el = await mount();
     await openConversation(el);
@@ -918,7 +927,7 @@ describe('editing a question re-asks it in a branch', () => {
   });
 
   it('retries a turn by re-sending its ORIGINAL question from the same fork point', async () => {
-    twoTurnConversation();
+    twoTurnConversation(); knownModelForkInputs();
     const el = await mount();
     await openConversation(el);
 
@@ -1188,18 +1197,16 @@ describe('Retry and Edit on a Delegate turn run the agent again, in a new versio
     expect(backend.threads['uc-delegate']?.events).toHaveLength(2);
   });
 
-  it('keeps Ask turns re-running as Ask, even when the composer shows Delegate', async () => {
-    askThenDelegate();
-    const el = await mount();
-    await openConversation(el);
-    (el as unknown as { tier: string }).tier = 'delegate';
-
+  it('DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B', async () => {
+    askThenDelegate(); const el = await mount(); await openConversation(el);
+    const composer = await region(el, 'jf-sv3-composer');
+    composer.dispatchEvent(new CustomEvent('sv3-tier-change', { bubbles: true, composed: true, detail: { tier: 'delegate' } }));
+    const field = composer.shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-input]')!;
+    field.value = 'unrelated B'; field.dispatchEvent(new Event('input')); await settle(el);
     await chooseFromTurnMenu(el, 0, BRANCH_MENU_RETRY);
-
-    expect(backend.dispatches).toEqual([
-      { conversationId: 'uc-delegate-branch-1', question: 'why did the renewal fail?' },
-    ]);
-    expect(ctrl.send).not.toHaveBeenCalled();
+    expect(backend.dispatches).toEqual([]); expect(backend.branches).toEqual([]);
+    expect(ctrl.send).not.toHaveBeenCalled(); expect(field.value).toBe('unrelated B');
+    expect(el.shadowRoot!.textContent).toContain('original Ask inputs are not known');
   });
 
   it('branches from a Delegate turn without running anything, and leaves the composer in Delegate', async () => {
@@ -1883,7 +1890,7 @@ it('S16.2 never labels a removed open branch as the base version while absence i
 });
 
 it('BN1 S16.2 Retry sends while complete fork reads are still pending', async () => {
-  twoTurnConversation();
+  twoTurnConversation(); knownModelForkInputs();
   const el = await mount();
   await openConversation(el);
   let release!: () => void;

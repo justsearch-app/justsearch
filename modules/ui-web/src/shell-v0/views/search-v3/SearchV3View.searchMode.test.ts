@@ -846,6 +846,15 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
     await askAboutChosen(el);
     await askNow(el, 'when does it end?');
     await answerLatest(el);
+    await chooseTier(el, 'delegate'); await type(el, 'unrelated B');
+    const original = el.sessions.activeId;
+    const { createNavigationHandler } = await import('../../router/navigationHandler.js');
+    await createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} }).handle(
+      { kind: 'navigate', target: 'core.search-v3-surface', state: { query: 'old journal A' } },
+      { push: false, taskOrigin: 'restore' });
+    await settle(el);
+    expect((await fieldOf(el)).value).toBe('unrelated B');
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
 
     const main = await region(el, 'jf-sv3-main');
     const turn = main.shadowRoot?.querySelector('[data-testid="sv3-turn"]');
@@ -871,9 +880,12 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
       ['docs/a.md', 'docs/b.md'],
       ['docs/a.md', 'docs/b.md'],
     ]);
+    expect(ctrl.send).not.toHaveBeenCalled();
+    restoreActiveConversation(original); await settle(el);
+    expect((await fieldOf(el)).value).toBe('unrelated B');
   });
 
-  it('after a reload the turn does not look scoped, and Retry/Edit say they search all files', async () => {
+  it('DS1 after reload Retry/Edit say the original Ask inputs are unknown', async () => {
     recordTurn('uc-old', 'when does it end?', 'In May.');
     aiOnline();
     const el = await mount();
@@ -885,7 +897,7 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
     expect(turn?.querySelector('[data-testid="sv3-turn-scope"]')).toBeNull();
     await press(turn?.querySelector('[data-testid="sv3-turn-edit"]'));
     await settle(el);
-    expect(q(main, 'sv3-turn-edit-scope')?.textContent).toContain('Searches all your files');
+    expect(q(main, 'sv3-turn-edit-scope')?.textContent).toContain('Original Ask inputs are unknown');
   });
 });
 
@@ -1218,4 +1230,116 @@ describe('S1.13 — Back and Forward between results and a conversation', () => 
     composer = await region(el, 'jf-sv3-composer');
     expect(q(composer, 'sv3-composer-scope')?.textContent).toContain('a.md');
   });
+});
+
+
+// DS1: raw persistence has no task provenance; requests are observed at the real shared-store seam.
+describe('DS1 ambiguous restored draft ownership', () => {
+  it.each(['search-v3.composer', 'unified-chat.composer'])('does not issue an unscoped Enter from restored %s', async (key) => {
+    aiOnline();
+    localStorage.setItem('justsearch.draft.' + key, 'Boundary needle');
+    const el = await mount(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('Boundary needle');
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(0);
+    expect(backend.streams).toHaveLength(0);
+    expect(ctrl.send).not.toHaveBeenCalled();
+  });
+
+  it('does not stage an edited restored draft through the typing debounce', async () => {
+    aiOnline();
+    localStorage.setItem('justsearch.draft.search-v3.composer', 'Boundary needle');
+    const el = await mount(); await settle(el);
+    vi.useFakeTimers();
+    await type(el, 'Boundary needle edited');
+    await passTime(el, 1500);
+    expect(backend.searches).toHaveLength(0);
+    expect((await fieldOf(el)).value).toBe('Boundary needle edited');
+  });
+});
+
+const ds1Attachment = 'justsearch.draft.attachment.v1.search-v3.main';
+function ds1SavedProposal(text: string, preparation: unknown): void {
+  sessionStorage.setItem(ds1Attachment, JSON.stringify({ version: 1, incarnation: 'saved-data', payload: {
+    version: 2, task: null, drafts: [{ place: null, text, preparation }],
+  } }));
+}
+function ds1Button(el: Mounted, id: string): HTMLButtonElement {
+  const button = el.shadowRoot?.querySelector<HTMLButtonElement>(`[data-testid="${id}"]`);
+  if (!button) throw new Error(`missing ${id}`);
+  return button;
+}
+
+describe('DS1 review establishes current intent without issuing it', () => {
+  it.each(['same bytes A', 'newer raw B'])('keeps typed A separate from %s until current review', async raw => {
+    aiOnline(); ds1SavedProposal('same bytes A', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } });
+    localStorage.setItem('justsearch.draft.search-v3.composer', raw);
+    const el = await mount(); await settle(el);
+    expect((await fieldOf(el)).value).toBe(raw);
+    expect(el.shadowRoot!.textContent).toContain('docs/alpha.md');
+    for (const opts of [{}, { ctrlKey: true }]) await pressEnter(el, opts);
+    await chooseTier(el, 'delegate'); await pressEnter(el);
+    expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
+    // A mode click configures a proposal, and never confirms it. Pick the retained Ask data explicitly.
+    ds1Button(el, 'sv3-recovery-review-copy').click(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('same bytes A');
+    ds1Button(el, 'sv3-draft-review-confirm').click(); await settle(el);
+    expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0);
+    await type(el, 'reviewed live edit'); await pressEnter(el); await settle(el);
+    expect(backend.streams).toHaveLength(1);
+    expect(backend.streams[0]!.body).toMatchObject({ shapeId: 'core.rag-ask', question: 'reviewed live edit', docIds: ['docs/alpha.md'] });
+    if (raw !== 'same bytes A') expect(sessionStorage.getItem(ds1Attachment)).toContain(raw);
+  });
+  it('explicit Search uses current effective filters and starts only on the next deliberate operation', async () => {
+    aiOnline(); addScopeChip({ kind: 'file', label: 'current', docIds: ['docs/current'] });
+    ds1SavedProposal('old A', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } });
+    localStorage.setItem('justsearch.draft.search-v3.composer', 'newer B');
+    const el = await mount(); await settle(el); const filters = [...getScopeChips()];
+    ds1Button(el, 'sv3-draft-review-search').click(); await settle(el);
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]'), el.shadowRoot!.textContent ?? '').toBeNull();
+    expect(getScopeChips()).toEqual(filters); expect(backend.searches).toHaveLength(0);
+    expect((await fieldOf(el)).value).toBe('newer B');
+    await pressEnter(el); await settle(el);
+    expect(backend.searches, el.shadowRoot!.textContent ?? '').toHaveLength(1); expect(backend.streams).toHaveLength(0);
+    expect(JSON.stringify(backend.searches[0])).toContain('docs/current');
+  });
+  it('an independent shared search C runs while restored B stays in its composer', async () => {
+    aiOnline(); localStorage.setItem('justsearch.draft.search-v3.composer', 'ambiguous B');
+    const el = await mount(); await settle(el);
+    await searchInOtherWindow('independent C'); await settle(el);
+    expect(backend.searches.length).toBeGreaterThan(0);
+    expect((await fieldOf(el)).value).toBe('ambiguous B');
+    await pressEnter(el); await settle(el);
+    expect(backend.searches.every(body => !JSON.stringify(body).includes('ambiguous B'))).toBe(true);
+  });
+  it('real chosen-row preparation survives same-tab reload as data requiring explicit review', async () => {
+    aiOnline(); backend.corpus.lease = [wireHit('a', 'docs/alpha.md')];
+    const first = await mount(); await searchFor(first, 'lease'); await clickRow(first, 'alpha.md', { ctrlKey: true });
+    await askAboutChosen(first); await type(first, 'Boundary needle');
+    window.dispatchEvent(new Event('pagehide')); first.remove(); __resetDraftProvidersForTest();
+    const el = await mount(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('Boundary needle');
+    expect(el.shadowRoot!.textContent).toContain('docs/alpha.md');
+    const before = backend.searches.length; await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(before); expect(backend.streams).toHaveLength(0);
+    ds1Button(el, 'sv3-draft-review-confirm').click(); await settle(el);
+    expect(backend.streams).toHaveLength(0);
+    await pressEnter(el); await settle(el);
+    expect(backend.streams[0]!.body).toMatchObject({ question: 'Boundary needle', docIds: ['docs/alpha.md'] });
+  });
+});
+
+it('DS1 a known live unrestricted Ask still retries as Ask when the unrelated composer is Delegate', async () => {
+  aiOnline(); const el = await mount(); await chooseTier(el, 'ask'); await askNow(el, 'known all-files A'); await answerLatest(el);
+  await chooseTier(el, 'delegate'); await type(el, 'unrelated B');
+  const original = el.sessions.activeId;
+  const main = await region(el, 'jf-sv3-main');
+  const turn = main.shadowRoot!.querySelector('[data-testid=sv3-turn]')!;
+  await press(turn.querySelector('[data-testid=sv3-turn-context-menu]')); await settle(el);
+  const menu = document.querySelector('jf-context-menu') as Mounted; await menu.updateComplete;
+  const retry = [...menu.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.item')].find(b => (b.textContent ?? '').includes(BRANCH_MENU_RETRY))!;
+  expect(retry.textContent).toContain('Searches all your files'); retry.click(); await settle(el);
+  expect(backend.streams).toHaveLength(2); expect(backend.streams[1]!.body.shapeId).toBe('core.rag-ask');
+  expect((backend.streams[1]!.body.docIds as string[] | undefined) ?? []).toEqual([]); expect(ctrl.send).not.toHaveBeenCalled();
+  restoreActiveConversation(original); await settle(el); expect((await fieldOf(el)).value).toBe('unrelated B');
 });

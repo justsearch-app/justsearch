@@ -63,6 +63,8 @@ const DEFAULT_ANSWER_SURFACE_ID = 'core.search-v3-surface';
 const DEFAULT_ANSWER_STATE_KEY = 'query';
 
 export interface DispatchOptions {
+  /** Internal history/journal provenance, never a public URL field or authority. */
+  taskOrigin?: 'fresh' | 'restore';
   /** When false, the handler skips pushAddress. Default true. */
   pushHistory?: boolean;
   /** Per-dispatch policy override (tempdoc 499 F4). Shadows the router-level policy for this one dispatch. */
@@ -116,6 +118,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
               fireListeners(intent, { status: 'dispatched' });
               await config.navigationHandler.handle(intent.address, {
                 push: options?.pushHistory,
+                ...(options?.taskOrigin ? { taskOrigin: options.taskOrigin } : {}),
               });
               break;
             case 'auto-correct':
@@ -127,7 +130,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
               config.onRedirect?.(action.originalId, action.id);
               await config.navigationHandler.handle(
                 { ...intent.address, target: action.id },
-                { push: options?.pushHistory },
+                { push: options?.pushHistory, ...(options?.taskOrigin ? { taskOrigin: options.taskOrigin } : {}) },
               );
               break;
             case 'suggest':
@@ -204,7 +207,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
               fireListeners(intent, { status: 'dispatched' });
               await config.navigationHandler.handle(
                 { kind: 'navigate', target, state: navState },
-                { push: options?.pushHistory },
+                { push: options?.pushHistory, ...(options?.taskOrigin ? { taskOrigin: options.taskOrigin } : {}) },
               );
               break;
             case 'auto-correct':
@@ -216,7 +219,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
               config.onRedirect?.(action.originalId, action.id);
               await config.navigationHandler.handle(
                 { kind: 'navigate', target: action.id, state: navState },
-                { push: options?.pushHistory },
+                { push: options?.pushHistory, ...(options?.taskOrigin ? { taskOrigin: options.taskOrigin } : {}) },
               );
               break;
             case 'suggest':
@@ -263,7 +266,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
               fireListeners(intent, { status: 'dispatched' });
               await config.navigationHandler.handle(
                 { kind: 'navigate', target, state: navState },
-                { push: options?.pushHistory },
+                { push: options?.pushHistory, ...(options?.taskOrigin ? { taskOrigin: options.taskOrigin } : {}) },
               );
               break;
             case 'auto-correct':
@@ -275,7 +278,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
               });
               await config.navigationHandler.handle(
                 { kind: 'navigate', target: action.id, state: navState },
-                { push: options?.pushHistory },
+                { push: options?.pushHistory, ...(options?.taskOrigin ? { taskOrigin: options.taskOrigin } : {}) },
               );
               break;
             case 'suggest':

@@ -245,11 +245,11 @@ describe('IR15 initial context confirmation', () => {
 
 describe('IR15 initial Retry/Edit fork continuation', () => {
   it.each([
-    ['core.rag-ask', 'retry', 'unchanged'], ['core.free-chat', 'edit', 'unchanged'],
-    ['core.rag-ask', 'retry', 'pagehide-return'], ['core.free-chat', 'edit', 'pagehide-return'],
-    ['core.rag-ask', 'edit', 'hidden-return'], ['core.free-chat', 'retry', 'hidden-return'],
-    ['core.rag-ask', 'retry', 'navigation-ABA'], ['core.free-chat', 'edit', 'disconnect-return'],
-    ['core.rag-ask', 'edit', 'discard'],
+    ['core.free-chat', 'retry', 'unchanged'], ['core.free-chat', 'edit', 'unchanged'],
+    ['core.free-chat', 'retry', 'pagehide-return'], ['core.free-chat', 'edit', 'pagehide-return'],
+    ['core.free-chat', 'edit', 'hidden-return'], ['core.free-chat', 'retry', 'hidden-return'],
+    ['core.free-chat', 'retry', 'navigation-ABA'], ['core.free-chat', 'edit', 'disconnect-return'],
+    ['core.free-chat', 'edit', 'discard'],
   ] as const)('%s %s with %s while the fork waits cannot issue an abandoned task', async (shape, action, change) => {
     const messages = [
       { id: '11111111-2222-4333-8444-555555555551', role: 'user', content: 'saved A', shapeId: shape },

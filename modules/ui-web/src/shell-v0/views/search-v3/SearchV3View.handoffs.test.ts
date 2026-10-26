@@ -159,6 +159,9 @@ it('HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask'
   await navigate({ query: 'Who leads this project?', mode: 'ask', forceShapeId: 'core.free-chat', docIds: ['chosen.md'] });
   await drain(view); const notice = (await composer(view)).shadowRoot!.textContent;
   expect(dispatches()).toHaveLength(0);
+  expect(view.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
+  view.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid=sv3-draft-review-confirm]')!.click(); await drain(view);
+  expect(dispatches()).toHaveLength(0);
   const body = await send(view);
   expect(body.shapeId).toBe('core.rag-ask'); expect(body.docIds).toEqual(['chosen.md']);
   expect(body.selection).toEqual({ kind: 'result-set', items: [{ id: 'chosen.md', kind: 'doc' }] });
@@ -181,7 +184,7 @@ it('HO8 an incoming query replaces typed Search without creating a conversation 
   expect((view as unknown as { sessions: { sessions: unknown[] } }).sessions.sessions).toHaveLength(0);
   expect(dispatches()).toHaveLength(0);
 });
-it('HO8 a cold hand-off keeps the restored draft with its previous conversation', async () => {
+it('DS1 HO8 cold third-snapshot intake refuses without replacing the raw or typed draft', async () => {
   savedBackend(); const previous = await mount(); const oldComposer = await composer(previous);
   const input = q<HTMLTextAreaElement>(oldComposer, 'sv3-composer-input')!;
   input.value = 'draft before cold navigation'; input.dispatchEvent(new Event('input')); await drain(previous);
@@ -189,7 +192,9 @@ it('HO8 a cold hand-off keeps the restored draft with its previous conversation'
   __resetConversationListForTest();
   await navigate({ query: 'incoming cold task', forceShapeId: 'core.rag-ask', docIds: ['chosen.md'] });
   const view = await mount();
-  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('incoming cold task');
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('draft before cold navigation');
+  expect(view.shadowRoot!.textContent).toContain('could not be saved safely');
+  expect(sessionStorage.getItem('justsearch.draft.attachment.v1.search-v3.main')).toContain('draft before cold navigation');
   view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
     bubbles: true, composed: true, detail: { id: 'saved' },
   })); await drain(view);
@@ -266,8 +271,10 @@ it.each(['retry', 'edit'])('HO7 a reloaded summary %s states its missing inputs 
     detail: { action, turnId, ...(action === 'edit' ? { text: 'edited summary' } : {}) } }));
   await drain(view); const c = await composer(view);
   expect(dispatches()).toHaveLength(0);
-  expect(c.shadowRoot!.textContent).toMatch(/summary|summarize/i);
-  expect(c.shadowRoot!.textContent).toMatch(/input|file|passage/i);
+  expect(view.shadowRoot!.textContent).toMatch(/summary|summarize/i);
+  expect(view.shadowRoot!.textContent).toMatch(/input|file|passage/i);
+  expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('');
 });
 it('HO8 an outgoing conversation keeps its unsent draft and files one click away', async () => {
   const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
@@ -459,16 +466,18 @@ it('HO5 a reloaded Explain Retry menu states its actual restoration limit', asyn
   expect(retry?.label).toContain('After reload, start Explain from the result again.');
   expect(retry?.label).not.toContain('Summarize');
 });
-it.each(['retry', 'edit'])('HO5 a reloaded Explain %s keeps its trace and states the selection restoration limit', async action => {
+it.each(['retry', 'edit'])('DS1 HO5 a reloaded Explain %s refuses before fork and preserves unrelated B', async action => {
   savedBackend({}, savedExplainQuestion);const view = await mount();
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
   const turnId = (q(main, 'sv3-turn-question')!.getAttribute('data-item-id') ?? '').replace(/:q$/, '');
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = 'unrelated B'; input.dispatchEvent(new Event('input')); await drain(view);
   const text = action === 'edit' ? savedExplainQuestion.replace('Explain why', 'Explain briefly why') : savedExplainQuestion;
   main.dispatchEvent(new CustomEvent('sv3-branch-action', {bubbles: true, composed: true, detail: {action, turnId, ...(action === 'edit' ? {text} : {})}}));
   await drain(view);const c = await composer(view);
-  expect(q(c, 'sv3-composer-notice')?.textContent).toContain('Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.');
-  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe(text);
-  q<HTMLButtonElement>(c, 'sv3-composer-send')!.click();await drain(view);
+  expect(view.shadowRoot!.textContent).toContain('Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.');
+  expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('unrelated B');
+  expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
   expect(dispatches()).toHaveLength(0);
 });
 
@@ -685,4 +694,87 @@ it('C4 A1 C7 a retained window cannot lose its migrated draft when disconnected 
   const next = await mount();
   expect(q<HTMLTextAreaElement>(await composer(next), 'sv3-composer-input')!.value).toBe('recover once');
   expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('recover once');
+});
+
+it('DS1 allows two whole same-text proposals, refusing a third before replacement or a request', async () => {
+  const view = await mount();
+  await navigate({ query: 'same text', mode: 'ask', docIds: ['alpha.md'] }); await drain(view);
+  await navigate({ query: 'same text', mode: 'ask', docIds: ['beta.md'] }); await drain(view);
+  const key = 'justsearch.draft.attachment.v1.search-v3.main';
+  const before = sessionStorage.getItem(key)!;
+  const drafts = JSON.parse(before).payload.drafts;
+  expect(drafts).toHaveLength(2);
+  expect(drafts.map((d: { preparation: { scope: { paths: string[] } } }) => d.preparation.scope.paths[0]).sort()).toEqual(['alpha.md', 'beta.md']);
+  await navigate({ query: 'third C', mode: 'ask', docIds: ['gamma.md'] }); await drain(view);
+  expect(sessionStorage.getItem(key)).toBe(before);
+  expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe('same text');
+  expect((view as unknown as { search: { pendingScope: unknown } }).search.pendingScope).toEqual({ paths: ['beta.md'] });
+  expect(view.shadowRoot!.textContent).toContain('alpha.md');
+  expect(view.shadowRoot!.textContent).toContain('could not be saved safely');
+  expect(dispatches()).toHaveLength(0);
+  expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
+});
+
+it('DS1 ordinary compatibility model tier changes retain the actual no-retrieval proposal before any leave', async () => {
+  const view = document.createElement('jf-sv3-window') as SearchV3View;
+  view.setAttribute('shape-id', 'core.free-chat'); document.body.append(view); await drain(view);
+  const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+  input.value = 'typed model A'; input.dispatchEvent(new Event('input')); await drain(view);
+  for (const tier of ['search', 'ask']) {
+    c.dispatchEvent(new CustomEvent('sv3-tier-change', { bubbles: true, composed: true, detail: { tier } })); await drain(view);
+  }
+  const bytes = sessionStorage.getItem('justsearch.draft.attachment.v1.search-v3.core.free-chat')!;
+  expect(JSON.parse(bytes).payload.drafts[0].preparation).toEqual({ kind: 'model' });
+  expect(input.value).toBe('typed model A'); expect(dispatches()).toHaveLength(0);
+  const body = await send(view); expect(body.shapeId).toBe('core.free-chat'); expect(body.docIds).toBeUndefined();
+});
+
+it('DS1 rejected fresh hash intake preserves live conversation B and both snapshots before traversal clearing', async () => {
+  const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = 'live conversation B'; input.dispatchEvent(new Event('input')); await drain(view);
+  await navigate({ query: 'retained A', mode: 'ask', docIds: ['alpha.md'] }); await drain(view);
+  view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } })); await drain(view);
+  expect(input.value).toBe('live conversation B');
+  window.dispatchEvent(new Event('pagehide')); await drain(view);
+  const key = 'justsearch.draft.attachment.v1.search-v3.main'; const before = sessionStorage.getItem(key);
+  await createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} }).handle(
+    { kind: 'navigate', target: 'core.search-v3-surface', state: { query: 'third C', mode: 'ask', docIds: ['gamma.md'] } },
+    { push: false, taskOrigin: 'fresh' }); await drain(view);
+  expect(input.value).toBe('live conversation B'); expect(sessionStorage.getItem(key)).toBe(before);
+  expect((view as unknown as { sessions: { activeId: string } }).sessions.activeId).toBe('previous');
+  expect(dispatches()).toHaveLength(0); expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
+});
+
+it.each(['live', 'review'])('DS1 bare history restoration cannot retire %s B when both existing recovery slots are needed', async review => {
+  const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = 'live conversation B'; input.dispatchEvent(new Event('input')); await drain(view);
+  await navigate({ query: 'retained A', mode: 'ask', docIds: ['alpha.md'] }); await drain(view);
+  view.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } })); await drain(view);
+  window.dispatchEvent(new Event('pagehide')); await drain(view);
+  const key = 'justsearch.draft.attachment.v1.search-v3.main'; const before = sessionStorage.getItem(key);
+  await createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} }).handle(
+    { kind: 'navigate', target: 'core.search-v3-surface', state: review === 'review' ? { query: 'old task A' } : {} }, { push: false, taskOrigin: 'restore' }); await drain(view);
+  expect(input.value).toBe('live conversation B'); expect(sessionStorage.getItem(key)).toBe(before);
+  expect(dispatches()).toHaveLength(0);
+});
+
+
+it('DS1 one-slot automatic hero navigation retains B at its origin while explicit New retires current B', async () => {
+  const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
+  const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
+  input.value = 'origin B'; input.dispatchEvent(new Event('input')); await drain(view);
+  await createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} }).handle(
+    { kind: 'navigate', target: 'core.search-v3-surface', state: {} }, { push: false, taskOrigin: 'restore' }); await drain(view);
+  expect(input.value).toBe('');
+  const key = 'justsearch.draft.attachment.v1.search-v3.main';
+  expect(JSON.parse(sessionStorage.getItem(key)!).payload.drafts).toEqual(expect.arrayContaining([expect.objectContaining({ place: 'previous', text: 'origin B' })]));
+  const sidebar = view.shadowRoot!.querySelector('jf-sv3-sidebar')!;
+  sidebar.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } })); await drain(view);
+  expect(input.value).toBe('origin B');
+  sidebar.dispatchEvent(new CustomEvent('sv3-session-new', { bubbles: true, composed: true })); await drain(view);
+  expect(input.value).toBe(''); expect(sessionStorage.getItem(key)).not.toContain('origin B');
+  sidebar.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } })); await drain(view);
+  expect(input.value).toBe(''); expect(dispatches()).toHaveLength(0);
 });

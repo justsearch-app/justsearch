@@ -1851,8 +1851,8 @@ export class Shell extends JfElement {
               address: { kind: 'navigate', target, state },
               transport: 'URL_BAR',
             },
-            // pushHistory:true is the URLSource convention for a fresh boot.
-            { pushHistory: true },
+            // This task came from the journal, rather than a new explicit sender.
+            { pushHistory: true, taskOrigin: 'restore' },
           );
         }
       }

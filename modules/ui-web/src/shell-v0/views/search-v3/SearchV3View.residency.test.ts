@@ -395,30 +395,30 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
     state(0, true); const el = await mount(); await send(el, 'grounded A');
     expect(dispatches()).toHaveLength(0); expect(field(el).value).toBe('grounded A'); expect(loads()).toHaveLength(0);
   });
-  it.each(['scope-count', 'scope-id-UTF8', 'schema-UTF8', 'serialized-UTF8'] as const)('%s cap blocks issuance without truncating live inputs or old copies', async variant => {
-    const el = await mount(); localStorage.setItem('justsearch.draft.search-v3.composer', 'raw survivor');
-    let question = 'A';
-    if (variant === 'scope-count') parkSearchV3Handoff({ query: question, mode: 'ask', docIds: Array.from({ length: 129 }, (_, i) => '/file-' + i) });
-    if (variant === 'scope-id-UTF8') parkSearchV3Handoff({ query: question, mode: 'ask', docIds: ['/' + '界'.repeat(1366)] });
-    if (variant === 'serialized-UTF8') {
-      question = '界'.repeat(21000);
-      parkSearchV3Handoff({ query: question, mode: 'ask', docIds: Array.from({ length: 128 }, (_, i) => '/' + i + '界'.repeat(600)) });
-    }
+  it.each(['scope-count', 'scope-id-UTF8', 'schema-UTF8', 'serialized-UTF8'] as const)('DS1 %s cap refuses before replacing current text/settings or any request', async variant => {
+    const el = await mount(); await type(el, 'current B');
+    window.dispatchEvent(new Event('pagehide')); await settle(el);
+    localStorage.setItem('justsearch.draft.search-v3.composer', 'raw survivor');
+    const previous = sessionStorage.getItem(attachmentKey);
+    if (variant === 'scope-count') parkSearchV3Handoff({ query: 'incoming A', mode: 'ask', docIds: Array.from({ length: 129 }, (_, i) => '/file-' + i) });
+    if (variant === 'scope-id-UTF8') parkSearchV3Handoff({ query: 'incoming A', mode: 'ask', docIds: ['/' + '界'.repeat(1366)] });
+    if (variant === 'serialized-UTF8') parkSearchV3Handoff({ query: '界'.repeat(21000), mode: 'ask', docIds: Array.from({ length: 128 }, (_, i) => '/' + i + '界'.repeat(600)) });
     if (variant === 'schema-UTF8') {
       emit(el, 'sv3-tier-change', { tier: 'structured' }); await settle(el);
-      const schema = JSON.stringify({ description: '界'.repeat(5500) });
+      const beforeSchema = sessionStorage.getItem(attachmentKey);
       const input = composer(el).shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-schema]')!;
-      input.value = schema; input.dispatchEvent(new Event('input')); await settle(el);
+      input.value = JSON.stringify({ description: '界'.repeat(5500) }); input.dispatchEvent(new Event('input')); await settle(el);
+      expect(sessionStorage.getItem(attachmentKey)).toBe(beforeSchema);
     }
-    await settle(el); const previous = sessionStorage.getItem(attachmentKey); await send(el, question);
-    expect(dispatches()).toHaveLength(0); expect(field(el).value).toBe(question);
-    expect(sessionStorage.getItem(attachmentKey)).toBe(previous);
+    await settle(el);
+    expect(dispatches()).toHaveLength(0); expect(field(el).value).toBe('current B');
+    if (variant !== 'schema-UTF8') expect(sessionStorage.getItem(attachmentKey)).toBe(previous);
     expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('raw survivor');
     expect(el.shadowRoot!.textContent).toContain('could not be saved safely');
   });
   it.each(['task-field', 'draft-field', 'payload-field', 'scope-type', 'scope-count', 'raw-type', 'raw-UTF8',
     'draft-UTF8', 'schema-type', 'schema-UTF8', 'place-type', 'record-type', 'reselection-type', 'effort-value',
-    'delivery-value', 'three-places', 'typed-version', 'incarnation-type'] as const)(
+    'delivery-value', 'three-places', 'typed-version', 'incarnation-type', 'preparation-kind-array', 'preparation-scope-kind-array'] as const)(
     'invalid %s attachment fails closed and leaves exact durable bytes and raw text', async variant => {
       const task: Record<string, unknown> = { id: 'old', place: null, target: 'original', shape: 'core.rag-ask', raw: 'A', schema: null,
         scope: [], record: null, needsReselection: false, effort: 'quick', delivery: 'unknown' };
@@ -442,20 +442,28 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
       if (variant === 'three-places') payload.drafts = [null, 'one', 'two'].map(place => ({ place, text: 'B' }));
       if (variant === 'typed-version') row.version = '1';
       if (variant === 'incarnation-type') row.incarnation = ['prior'];
+      if (variant === 'preparation-kind-array' || variant === 'preparation-scope-kind-array') {
+        payload.version = 2;
+        payload.drafts = [{ place: null, text: 'B', preparation: variant === 'preparation-kind-array'
+          ? { kind: ['search'] } : { kind: 'ask', scope: { kind: ['files'], paths: ['id'] } } }];
+      }
       const bytes = JSON.stringify(row); sessionStorage.setItem(attachmentKey, bytes);
       localStorage.setItem('justsearch.draft.search-v3.composer', 'raw survivor'); const el = await mount();
       expect(field(el).value).toBe('raw survivor'); await send(el, 'live C');
       expect(dispatches()).toHaveLength(0); expect(sessionStorage.getItem(attachmentKey)).toBe(bytes);
       expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('raw survivor'); expect(field(el).value).toBe('live C');
     });
-  it.each(['raw', 'incoming'] as const)('%s takes composer precedence while the session draft remains recoverable', async owner => {
+  it.each(['raw', 'incoming'] as const)('DS1 %s preserves raw C and session B before refusing a third incoming snapshot', async owner => {
     sessionStorage.setItem(attachmentKey, JSON.stringify({ version: 1, incarnation: 'prior', payload: {
       task: { id: 'old', place: null, target: 'old-target', shape: 'core.rag-ask', raw: 'retained A', schema: null,
         scope: [], record: null, needsReselection: false, effort: 'quick', delivery: 'unknown' }, drafts: [{ place: null, text: 'session B' }],
     } }));
     localStorage.setItem('justsearch.draft.search-v3.composer', 'raw C');
     if (owner === 'incoming') parkSearchV3Handoff({ query: 'incoming D', mode: 'ask', docIds: ['/D.txt'] });
-    const el = await mount(); expect(field(el).value).toBe(owner === 'raw' ? 'raw C' : 'incoming D');
+    const before = sessionStorage.getItem(attachmentKey);
+    const el = await mount(); expect(field(el).value).toBe('raw C');
+    expect(sessionStorage.getItem(attachmentKey)).toBe(before);
+    expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('raw C');
     expect(el.shadowRoot!.textContent).toContain('session B'); expect(el.shadowRoot!.textContent).toContain('retained A');
     expect(dispatches()).toHaveLength(0); expect(action(el, 'sv3-residency-force')).toBeNull();
   });
@@ -512,7 +520,7 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
     expect(action(stale, 'sv3-residency-discard')).not.toBeNull();
   });
 
-  it.each(['core.rag-ask', 'core.free-chat'] as const)('human Retry/Edit of saved %s keep the intended shape and exact text', async shape => {
+  it.each(['core.rag-ask', 'core.free-chat'] as const)('DS1 saved %s Retry/Edit require their own exact scope and preserve B', async shape => {
     const messages = [
       { id: '11111111-2222-4333-8444-555555555551', role: 'user', content: 'saved A', shapeId: shape },
       { id: '11111111-2222-4333-8444-555555555552', role: 'assistant', content: 'saved answer', shapeId: shape },
@@ -528,7 +536,7 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
       })) : [] }));
       return new Response('{}');
     });
-    setLastViewedConversation('saved'); const el = await mount();
+    setLastViewedConversation('saved'); const el = await mount(); await type(el, 'unrelated B');
     for (const action of ['retry', 'edit'] as const) {
       restoreActiveConversation('saved'); await settle(el);
       const main = el.shadowRoot!.querySelector('jf-sv3-main')!;
@@ -536,6 +544,13 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
       const turnId = question!.getAttribute('data-item-id')!.replace(/:q$/, '');
       main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true,
         detail: { action, turnId, ...(action === 'edit' ? { text: 'edited B' } : {}) } })); await settle(el);
+      if (shape === 'core.rag-ask') {
+        expect(dispatches()).toHaveLength(0);
+        expect(http.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
+        expect(field(el).value).toBe('unrelated B');
+        expect(el.shadowRoot!.textContent).toContain('original Ask inputs are not known');
+        continue;
+      }
       expect(dispatches()).toHaveLength(action === 'retry' ? 1 : 2);
       expect(body(action === 'retry' ? 0 : 1)).toMatchObject({ shapeId: shape, allowLoad: true, conversationId: 'child',
         [shape === 'core.free-chat' ? 'prompt' : 'question']: action === 'retry' ? 'saved A' : 'edited B' });
