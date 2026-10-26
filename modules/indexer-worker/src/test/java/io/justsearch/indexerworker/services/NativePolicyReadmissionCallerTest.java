@@ -172,8 +172,8 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       assertEquals(1, f.runtime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.BooleanQuery.Builder()
           .add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.PATH,
               projectionPath.toString())), org.apache.lucene.search.BooleanClause.Occur.FILTER)
-          .add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.PROJECTION_SOURCE_ID,
-              "owned-projection")), org.apache.lucene.search.BooleanClause.Occur.FILTER).build()),
+          .add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.DOC_ID,
+              "projection-owned-id")), org.apache.lucene.search.BooleanClause.Occur.FILTER).build()),
           "SETUP: actual committed canonical projection membership precedes the protection check");
       var snapshot = f.queue.listSwitchBufferOpsStrict();
       var policy = f.policy(f.configuration("[]"), false);
@@ -211,6 +211,115 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       assertFalse(f.readmit(f.policy(f.configuration("[]"), false)));
       assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
       assertEquals("DONE", f.queue.watcherReconciliationRow(file.toString()).get("state"));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"canonical", "dot", "dotdot"})
+  void replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(String spelling) throws Exception {
+    try (var f = new Fixture(false, true)) {
+      Path file = f.source("projected.txt");
+      Files.createDirectory(f.root.resolve("branch"));
+      String raw = switch (spelling) {
+        case "dot" -> f.root + "/./projected.txt";
+        case "dotdot" -> f.root + "/branch/../projected.txt";
+        default -> file.toString();
+      };
+      assertEquals(file, Path.of(raw).toAbsolutePath().normalize());
+      assertTrue(Files.isSameFile(file, Path.of(raw)), "SETUP: aliases refer to the owned ordinary source");
+      var projection = new io.justsearch.app.api.indexing.AcceptedProjection("canonical-source", "document", 1,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          JsonMapper.builder().build().writeValueAsString(Map.of(SchemaFields.PATH, raw,
+              SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "source-owned projection")));
+      KnowledgeServerMigrationOps.seedProjectionSource(f.queue, f.generation,
+          new io.justsearch.app.api.indexing.ProjectionSeedSource() {
+            @Override public String sourceId() { return projection.sourceId(); }
+            @Override public void enumerate(java.util.function.Consumer<io.justsearch.app.api.indexing.AcceptedProjection> sink) {
+              sink.accept(projection);
+            }
+          });
+      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(f.queue, f.runtime, null,
+          IndexingPacing.unthrottled(), f.base, f.runtime.openedIndexPath(), JsonMapper.builder().build(),
+          () -> false, () -> true, LoggerFactory.getLogger(NativePolicyReadmissionCallerTest.class),
+          System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5), f.generation, ignored -> true)
+          .withPublisher(f.publisher).withMigrationRoots(List.of(new ResolvedConfig.FileSource(f.root, null)));
+      try (var fence = f.mutation.beginFinalFence(f.runtime, 1_000)) {
+        assertNotNull(fence);
+        assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(context), "SETUP: real projection seed/replay commits and acknowledges");
+      }
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "SETUP: protection must come from indexed rows, not buffered guard");
+      assertEquals(raw, f.runtime.documentFieldOps().getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PATH));
+      assertEquals(projection.sourceId(), f.runtime.documentFieldOps()
+          .getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID));
+      assertEquals(1, f.runtime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.TermQuery(
+          new org.apache.lucene.index.Term(SchemaFields.DOC_ID, projection.indexId()))));
+      assertEquals(1, f.runtime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.TermQuery(
+          new org.apache.lucene.index.Term(SchemaFields.PATH, raw))));
+      var old = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var journal = f.queue.listSwitchBufferOpsStrict();
+      var row = f.queue.watcherReconciliationRow(file.toString());
+      var omission = f.policy(f.configuration("[\"projected.txt\"]"), false);
+      assertTrue(omission.freeze(journal));
+      boolean certified = omission.certify(old);
+      boolean readmitted = f.readmit(f.policy(f.configuration("[]"), false));
+      assertAll(
+          () -> assertFalse(certified, "indexed canonical projection/alias cannot certify ordinary omission"),
+          () -> assertFalse(readmitted, "indexed canonical projection/alias cannot acquire file readmission"),
+          () -> assertEquals(journal, f.queue.listSwitchBufferOpsStrict()),
+          () -> assertEquals(row, f.queue.watcherReconciliationRow(file.toString())),
+          () -> assertEquals("source-owned projection", f.runtime.documentFieldOps()
+              .getDocumentFieldOrThrow(projection.indexId(), SchemaFields.CONTENT)));
+    }
+  }
+
+  @Test
+  void subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); f.skipped(file);
+      assertTrue(f.registry.watch(directory.toString(), null).watching());
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var store = f.configuration("[\"root/**\"]");
+      var previous = ConfigStore.globalOrNull(); ConfigStore.setGlobal(store);
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertFalse(io.justsearch.configuration.excludes.ExclusionPatterns.fromRawJsonStrict(
+            store.currentSnapshot().ui().excludePatterns(), false).isExcludedPath(f.root, file),
+            "SETUP: anchored glob does not match relative to the file's own ingestion root");
+        assertTrue(f.publisher.isUserExcluded(file, f.root), "SETUP: real subscribed ancestor excludes while own-root spelling does not");
+        var journal = f.queue.listSwitchBufferOpsStrict();
+        var row = f.queue.watcherReconciliationRow(file.toString());
+        boolean first = f.readmit(f.policy(store, false));
+        boolean second = f.readmit(f.policy(store, false));
+        assertAll(
+            () -> assertFalse(first, "ancestor exclusion cannot mint a pending revision"),
+            () -> assertFalse(second),
+            () -> hashes.verify(() -> SourceContentHash.sha256(file), never()),
+            () -> assertEquals(journal, f.queue.listSwitchBufferOpsStrict()),
+            () -> assertEquals(row, f.queue.watcherReconciliationRow(file.toString())));
+      } finally { ConfigStore.restoreGlobal(store, previous); }
+    }
+  }
+
+  @Test
+  void publicSaveAllowAfterSubscribedAncestorGlobReadmitsCurrentBytes() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var old = f.skipped(file);
+      assertTrue(f.registry.watch(directory.toString(), null).watching());
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var store = f.configuration("[\"root/**\"]");
+      var previous = ConfigStore.globalOrNull(); ConfigStore.setGlobal(store);
+      try {
+        assertTrue(f.publisher.isUserExcluded(file, f.root));
+        f.publicSave(store, List.of());
+        assertFalse(f.publisher.isUserExcluded(file, f.root), "public Save updates the real worker predicate too");
+        Files.writeString(file, "current bytes after public allow");
+        assertTrue(f.readmit(f.policy(store, false)));
+        var current = f.queue.listSwitchBufferOpsStrict().getFirst();
+        assertNotEquals(old.revision(), current.revision());
+        assertTrue(current.acceptedOrder() > old.acceptedOrder());
+        assertEquals(SourceContentHash.sha256(file), SwitchBufferUpsert.decode(current.payload()).sourceSha256());
+        assertEquals("PENDING", f.queue.watcherReconciliationRow(file.toString()).get("state"));
+      } finally { ConfigStore.restoreGlobal(store, previous); }
     }
   }
 
@@ -407,7 +516,8 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     // Each immutable attempt keeps its own complete declarations; no production getter is added.
     final Map<NativePolicyReplay, List<ResolvedConfig.FileSource>> attemptRoots = new java.util.IdentityHashMap<>();
     Fixture() throws Exception { this(false); }
-    Fixture(boolean nativeTransition) throws Exception {
+    Fixture(boolean nativeTransition) throws Exception { this(nativeTransition, false); }
+    Fixture(boolean nativeTransition, boolean projectionReplay) throws Exception {
       data = Files.createDirectories(nativeTransition ? directory.resolve("data") : root.resolve("data"));
       var binding = new java.util.LinkedHashMap<String, Object>();
       binding.put("path", root.toString()); binding.put("collection", null);
@@ -426,6 +536,10 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
       fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256, "keyword", true, false, List.of(), null, null, false));
       fields.add(new FieldCatalogDef.FieldDef(SchemaFields.PROJECTION_SOURCE_ID, "keyword", true, false, List.of(), null, null, false));
+      if (projectionReplay) {
+        fields.add(new FieldCatalogDef.FieldDef(SchemaFields.PROJECTION_SOURCE_REVISION, "keyword", true, false, List.of(), null, null, false));
+        fields.add(new FieldCatalogDef.FieldDef(SchemaFields.PROJECTION_DIGEST, "keyword", true, false, List.of(), null, null, false));
+      }
       runtime = withTestExecutors(IndexSchema.fromCatalog(new FieldCatalogDef("native-policy", fields), () -> Map.of(), ignored -> {})
           .atPath(manager == null ? base.resolve(generation) : manager.resolveGenerationPathStrict(generation))).open();
       runtime.commitOps().stopCommitTimer();
