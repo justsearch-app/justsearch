@@ -89,19 +89,31 @@ search, which has no keyword fallback, waits until `D − marginMs` and then fai
 
 #### Native session creation and its remaining limit
 
-Default hybrid search (including MCP search), Ask retrieval, reranking and citation matching use
-existing native sessions. They do not create or repair CPU/GPU sessions on the request thread,
-even when a short caller deadline leaves no semantic sub-budget. Lifecycle prewarm owns cold
-session creation and GPU retries, including the independently owned reranker and citation scorer.
-A cold reranker keeps the fused order with `MODEL_LOADING`; its local 150/200 ms budget bounds
-acquisition and pre-inference preparation, while native scoring can continue until the caller's
-response deadline.
+Default hybrid search (including MCP search), Ask retrieval, reranking and citation matching
+never create or retry GPU sessions on the request path. Lifecycle prewarm owns serving-device
+warmup and GPU retry. CUDA SPLADE and reranker CPU backups are deliberately deferred: readiness,
+periodic prewarm and chat being online do not create or claim warmth for those backups. GTE CPU
+backup warming and CPU-primary eager construction are unchanged.
 
-**Named limit: synchronous VECTOR-only session creation.** A VECTOR-only request has no lexical
-fallback and still permits native session creation and repair. Native construction is synchronous
-and cannot be interrupted by the caller deadline; a cold or retrying VECTOR-only request can
-therefore exceed that deadline while construction runs. General asynchronous session construction
-remains open.
+When an actual CPU route selects one of these deferred backups, the native owner may prepare it,
+even for a request that forbids session creation. This is a deliberate CPU-only exception. One
+shared preparation uses the existing bounded CPU native threads; every caller waits under its own
+original acquisition deadline and cancellation. Expired demand starts no native work. Native work
+already entered remains owned and counted until completion after a caller leaves; late completion
+may be reused by a healthy caller but cannot revive an expired answer or publish to a retired owner.
+Cold SPLADE semantic recourse follows the existing seat-wait and breaker controls. Reranker GPU
+contention still skips under its ordinary acquisition policy, without semantic CPU recourse.
+
+A cold reranker without an eligible deferred CPU route keeps the fused order with `MODEL_LOADING`.
+Its local 150/200 ms budget bounds acquisition and pre-inference preparation, while native scoring
+can continue until the caller's response deadline. Preparation timeout is a budget outcome, not
+proof of CPU warmth or successful recourse; recourse status requires actual successful output.
+
+**Named limit: other synchronous VECTOR-only session creation.** A VECTOR-only request has no
+lexical fallback and still permits native session creation and repair. Construction for owners
+outside the deferred SPLADE/reranker CPU path remains synchronous and cannot be interrupted by the
+caller deadline. A cold or retrying request on those paths can exceed that deadline during native
+construction. General asynchronous session construction remains open.
 
 #### Leg causes (`hybrid_fallback_cause`, `splade_skip_cause`, RAG `retrieval_mode_cause`)
 
@@ -145,7 +157,7 @@ The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its 
 - `DEADLINE_EXCEEDED`: a reranker budget **pre-check** declined to start inference — tokenization or tensor prep had already consumed the latency budget, or no reranker session was acquired within it (the device was busy with other inference, or a session was still being created). When the search's deadline `D`, not the rerank budget, bounded that wait, the skip is `SEARCH_DEADLINE_EXCEEDED` instead. Neither is `RPC_FAILED`. Raising `justsearch.rerank.deadline_ms` is the knob that fixes this one.
 - `SEARCH_DEADLINE_EXCEEDED`: the search's own request deadline `D` (Spec D §1.2) bounded the rerank — either what was left of `D` (less the head's respond margin) could not cover the rerank budget, so the Head did not make the RPC, or the rerank did not return before that point, so the Head stopped waiting. The Worker sends it as the rerank's `skip_reason` when the rerank call cannot finish by the deadline the Head gave it: the models are still loading, the native run does not return in time (it continues on the reranker's own run threads, outside the search's engine admission), or every reranker run thread already holds such a run, so the rerank is skipped at once instead of queueing. Results keep their fusion order and the search still answers within `D`; `justsearch.rerank.deadline_ms` is not the knob for this one.
 - `RPC_FAILED`: the rerank RPC threw — transport, Worker error, or circuit breaker
-- `MODEL_LOADING`: the reranker is wired but no ready native session is available yet. Lifecycle prewarm creates or recovers it; increasing the rerank deadline does not make a request create it.
+- `MODEL_LOADING`: the reranker is wired but no ready native session is available yet. Lifecycle prewarm creates or recovers its serving session. An actual CPU route may prepare an explicitly deferred CUDA backup within the original acquisition budget; GPU contention alone does not choose that route.
 - `MODEL_NOT_LOADED`: the Worker is configured for reranking but the model was not loaded when the RPC arrived
 - `INFERENCE_FAILED`: inference was attempted and ONNX Runtime threw — memory-arena exhaustion, a dead session, a bad output shape. Register F-054 split this out of `DEADLINE_EXCEEDED`, which the Worker used to stamp on *any* reranker skip: a measured campaign found 199/200 "deadline misses" were BFCArena OOM, unfixable by any deadline value and fixed instantly by `JUSTSEARCH_RERANK_GPU_MEM_MB`. The Worker log names that remedy at the failure site.
 - `UNKNOWN`: fall-through for an unrecognised **or unstated** Worker skip reason (a blank `skip_reason` is `UNKNOWN`, not a guessed deadline)

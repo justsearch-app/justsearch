@@ -165,7 +165,7 @@ class ModelSessionPolicyResolverTest {
       var policy =
           ModelSessionPolicyResolver.resolve(EncoderRole.SPLADE, CFG, HW, fp16OnCuda());
       assertTrue(policy.lifecycle().gpuRetryEnabled());
-      assertFalse(policy.lifecycle().deferCpuSession());
+      assertTrue(policy.lifecycle().deferCpuSession());
       assertEquals(4096L * BYTES_PER_MB, policy.gpu().arenaCapBytes());
     }
   }

@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * The query prewarm makes the CPU session of every query encoder that serves queries on the GPU
+ * The query prewarm makes the CPU session of each eligible query encoder serving on the GPU
  * warm, after it has reported the encoders ready, so a query the device turns away has a warm CPU
  * session to run on. Encoders that already serve queries on the CPU are not warmed twice, and a
  * failing CPU warm-up does not hold readiness back.
@@ -44,27 +44,27 @@ final class QueryEncoderPrewarmCpuWarmTest {
               cpuWarmed.countDown();
               return true;
             });
-    var splade =
+    var bgeGpu =
         new QueryEncoderPrewarm.Target(
-            EncoderRole.SPLADE, new Object(), () -> true, () -> QueryDevice.GPU,
+            EncoderRole.BGE_M3, new Object(), () -> true, () -> QueryDevice.GPU,
             listener -> {}, (text, request) -> true,
             request -> {
-              order.add("cpu-warm SPLADE");
+              order.add("cpu-warm BGE_M3 GPU");
               cpuWarmed.countDown();
               throw new IllegalStateException("CPU session could not be created");
             });
     var cpuServed =
         new QueryEncoderPrewarm.Target(
-            EncoderRole.BGE_M3, new Object(), () -> true, () -> QueryDevice.CPU,
+            EncoderRole.CITATION, new Object(), () -> true, () -> QueryDevice.CPU,
             listener -> {}, (text, request) -> true,
             request -> {
-              order.add("cpu-warm BGE_M3");
+              order.add("cpu-warm CITATION");
               return true;
             });
 
     try (var prewarm =
         new QueryEncoderPrewarm(
-            () -> new QueryEncoderPrewarm.Selection(List.of(embedding, splade, cpuServed), () -> {}),
+            () -> new QueryEncoderPrewarm.Selection(List.of(embedding, bgeGpu, cpuServed), () -> {}),
             Duration.ofSeconds(10),
             Executors.newSingleThreadScheduledExecutor())) {
       CountDownLatch ready = new CountDownLatch(1);
@@ -86,11 +86,11 @@ final class QueryEncoderPrewarmCpuWarmTest {
       assertTrue(ready.await(10, TimeUnit.SECONDS), "the encoders were reported ready");
       assertTrue(cpuWarmed.await(10, TimeUnit.SECONDS), () -> "CPU sessions not warmed: " + order);
       assertEquals(
-          List.of("ready", "cpu-warm EMBEDDING", "cpu-warm SPLADE"),
+          List.of("ready", "cpu-warm EMBEDDING", "cpu-warm BGE_M3 GPU"),
           order.subList(0, 3),
           "readiness first, then the CPU sessions of the GPU encoders, never a CPU-served one");
       assertTrue(
-          order.stream().noneMatch(step -> step.equals("cpu-warm BGE_M3")),
+          order.stream().noneMatch(step -> step.equals("cpu-warm CITATION")),
           () -> "a CPU-served encoder was warmed again: " + order);
       assertTrue(
           order.stream().noneMatch(step -> step.startsWith("failed")),
