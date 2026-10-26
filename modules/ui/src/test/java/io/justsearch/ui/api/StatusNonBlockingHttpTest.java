@@ -77,6 +77,19 @@ final class StatusNonBlockingHttpTest {
   void blockedDependencyReturnsAgedSnapshot(String source) throws Exception {
     try (var fixture = new Fixture(source)) {
       fixture.handler.sampleAndBuildStatusSnapshot();
+      var heldPublications = new java.util.LinkedHashMap<String, StatusObservation.Sample<?>>();
+      for (String lane : fixture.heldLanes()) {
+        fixture.lane(lane).completion().get(2, TimeUnit.SECONDS);
+        var publication = fixture.published(lane);
+        assertEquals(fixture.now.get(), publication.observedAtMs(), "known publication before hold: " + lane);
+        assertFalse(publication.failed(), lane);
+        assertFalse(publication.staleSource(), lane);
+        heldPublications.put(lane, publication);
+      }
+      if (source.equals("rrd")) {
+        assertTrue(new ObjectMapper().readTree(fixture.get("").body())
+            .path("gpu").path("available").asBoolean(), "RRD needs an available GPU publication");
+      }
       // A warm HTTP request establishes that the route/serialization work before contention.
       assertEquals(200, fixture.get("").statusCode());
       fixture.block.set(true);
@@ -94,13 +107,46 @@ final class StatusNonBlockingHttpTest {
           sampler.join(10_000L);
           assertFalse(sampler.isAlive(), "independent producers publish without waiting for this owner");
         }
-        // A held lane is stale by its own age: older than three sampling periods (idle 10 s).
-        fixture.now.addAndGet(31_001L);
+        // Use the held source's published effective cadence, including its cache/probe allowance.
+        long agedAt = fixture.now.get();
+        for (var entry : heldPublications.entrySet()) {
+          assertSame(entry.getValue(), fixture.published(entry.getKey()),
+              "the held source must retain its pre-hold publication");
+          agedAt = Math.max(agedAt, entry.getValue().observedAtMs()
+              + fixture.lane(entry.getKey()).staleAfterMs() + 1L);
+        }
+        fixture.now.set(agedAt);
+        for (var publication : heldPublications.values()) {
+          assertTrue(fixture.now.get() - publication.observedAtMs()
+              > StatusLifecycleHandler.SAMPLE_STALE_PERIODS * publication.cadenceMs(),
+              "the held publication must age beyond its actual effective cadence");
+        }
         if (!source.endsWith("lock")) {
           // Every other lane keeps sampling and stays current; only the held one ages.
           Thread pass = Thread.ofPlatform().daemon().start(fixture.handler::sampleAndBuildStatusSnapshot);
           pass.join(10_000L);
           assertFalse(pass.isAlive(), "the next sampler pass is bounded while " + source + " is held");
+          for (String lane : new String[] {"worker", "registry", "disk", "conversation"}) {
+            if ((source.equals("worker") && lane.equals("worker"))
+                || (source.equals("registry") && lane.equals("registry"))
+                || (source.equals("disk-pressure") && lane.equals("disk"))
+                || (source.equals("conversation") && lane.equals("conversation"))) continue;
+            fixture.lane(lane).completion().get(2, TimeUnit.SECONDS);
+            var publication = fixture.published(lane);
+            assertEquals(fixture.now.get(), publication.observedAtMs(), "fresh unrelated source: " + lane);
+            assertFalse(publication.failed(), lane);
+            assertFalse(publication.staleSource(), lane);
+            assertNotNull(publication.value(), lane);
+            if (lane.equals("disk")) assertEquals("OK", publication.value());
+            if (lane.equals("conversation")) assertEquals("locked",
+                ((ConversationProtectionView) publication.value()).state());
+          }
+        }
+        for (var entry : heldPublications.entrySet()) {
+          assertSame(entry.getValue(), fixture.published(entry.getKey()),
+              "unrelated sampling cannot renew the held source");
+          assertTrue(fixture.lane(entry.getKey()).stale(fixture.now.get()),
+              "the aged held publication must actually be classified stale: " + entry.getKey());
         }
         long started = System.nanoTime();
         String query = source.equals("worker") ? "?fresh=true" : "";
@@ -115,6 +161,8 @@ final class StatusNonBlockingHttpTest {
         assertEquals(workerLost, body.path("meta").path("workerRpcStale").asBoolean());
         boolean aiLost = source.equals("registry") || source.endsWith("lock");
         assertEquals(aiLost, body.path("readiness").path("components").path("ai").path("stale").asBoolean());
+        if (!aiLost) assertEquals("READY",
+            body.path("readiness").path("components").path("ai").path("state").asText());
         if (source.equals("at-rest") || source.endsWith("lock")) {
           assertEquals("UNKNOWN", body.path("atRestProtection").path("diskEncryption").asText());
         }
@@ -148,7 +196,7 @@ final class StatusNonBlockingHttpTest {
               "a different blocked owner cannot age telemetry");
         }
         assertIndependentComponentsFresh(body, source);
-        // A fresh request has the same latency contract even while an observation owns a lock.
+        // The subsequent fresh request retains HTTP 200 and the unchanged five-second client deadline.
         assertEquals(200, assertDoesNotThrow(() -> fixture.get("?fresh=true")).statusCode());
       } finally {
         fixture.release.countDown();
@@ -157,6 +205,14 @@ final class StatusNonBlockingHttpTest {
       }
       fixture.block.set(false);
       fixture.handler.sampleAndBuildStatusSnapshot();
+      for (var entry : heldPublications.entrySet()) {
+        fixture.lane(entry.getKey()).completion().get(2, TimeUnit.SECONDS);
+        var publication = fixture.published(entry.getKey());
+        assertNotSame(entry.getValue(), publication, "release must permit a new source publication");
+        assertEquals(fixture.now.get(), publication.observedAtMs(), "recovery publication after aging");
+        assertFalse(publication.failed());
+        assertFalse(publication.staleSource());
+      }
       var recovered = fixture.get("");
       assertEquals(200, recovered.statusCode());
       assertFalse(new ObjectMapper().readTree(recovered.body())
@@ -338,7 +394,7 @@ final class StatusNonBlockingHttpTest {
         when(reader.sampleNow()).thenAnswer(i -> {
           gate("gpu-memory");
           return io.justsearch.app.api.gpu.GpuMemorySample.unknown(
-              io.justsearch.app.api.gpu.GpuMemorySample.UnknownReason.NO_NVIDIA_ADAPTER, Instant.now());
+              io.justsearch.app.api.gpu.GpuMemorySample.UnknownReason.NO_NVIDIA_ADAPTER, Instant.ofEpochMilli(now.get()));
         });
         handler.setGpuMemoryReader(reader);
         // The first native sample must have completed before we block a refresh.
@@ -351,13 +407,42 @@ final class StatusNonBlockingHttpTest {
         projection.sampleFirst();
         var at = OperatingGpuProjection.class.getDeclaredField("cachedAt");
         at.setAccessible(true);
-        at.set(projection, Instant.now().minusSeconds(10));
+        at.set(projection, Instant.ofEpochMilli(now.get()).minusSeconds(10));
       }
       app = Javalin.create(c -> c.showJavalinBanner = false);
       new ApiSecurityFilters(false, null, null, null, null, null, admission).install(app);
       io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(
           app, handler::handleStatus, handler::handleHealth);
       app.start("127.0.0.1", 0);
+    }
+
+    String[] heldLanes() {
+      return switch (source) {
+        case "assembly-lock", "admission-lock" -> new String[] {"worker", "registry", "at-rest"};
+        case "disk-pressure" -> new String[] {"disk"};
+        case "gpu-capabilities", "rrd" -> new String[] {"gpu"};
+        case "gpl" -> new String[] {"readiness-lambdamartModel"};
+        case "online-ai", "gpu-saturation" -> new String[] {"readiness-gpu"};
+        case "model-file-path" -> new String[] {"models"};
+        default -> new String[] {source};
+      };
+    }
+
+    StatusObservation<?> lane(String name) throws Exception {
+      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
+      field.setAccessible(true);
+      var lanes = (java.util.Map<?, ?>) field.get(handler);
+      var lane = (StatusObservation<?>) lanes.get(name);
+      assertNotNull(lane, "published lane " + name);
+      return lane;
+    }
+
+    StatusObservation.Sample<?> published(String name) throws Exception {
+      var field = StatusObservation.class.getDeclaredField("sample");
+      field.setAccessible(true);
+      var sample = (StatusObservation.Sample<?>) field.get(lane(name));
+      assertNotNull(sample, "publication from " + name);
+      return sample;
     }
 
     Object heldLock() {
@@ -388,7 +473,7 @@ final class StatusNonBlockingHttpTest {
       var projection = (OperatingGpuProjection) method.invoke(hold);
       var at = OperatingGpuProjection.class.getDeclaredField("cachedAt");
       at.setAccessible(true);
-      at.set(projection, Instant.now().minusSeconds(10));
+      at.set(projection, Instant.ofEpochMilli(now.get()).minusSeconds(10));
     }
 
     io.justsearch.gpu.GpuCapabilitiesService gpuService() {

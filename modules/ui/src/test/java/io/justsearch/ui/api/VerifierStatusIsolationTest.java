@@ -31,6 +31,7 @@ class VerifierStatusIsolationTest {
     final AtomicBoolean block = new AtomicBoolean();
     final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
     final AtomicInteger calls = new AtomicInteger();
+    final AtomicReference<WorkerOperationalView> workerView = new AtomicReference<>(view());
     final StatusLifecycleHandler handler;
     final Javalin app;
     final io.justsearch.app.engine.EngineAdmissionController admission=new io.justsearch.app.engine.EngineAdmissionController(4,16,1);
@@ -41,7 +42,7 @@ class VerifierStatusIsolationTest {
       BootstrapLeaseFixtures.bind(ks,kc);
       when(kc.getWorkerOperationalView(any())).thenAnswer(a -> {
         if (workerBlock) probe();
-        return view();
+        return workerView.get();
       });
       var caps = components.capabilities();
       handler = new StatusLifecycleHandler(mock(io.justsearch.app.api.OnlineAiService.class),
@@ -58,6 +59,21 @@ class VerifierStatusIsolationTest {
         assertEquals(200,warm.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+app.port()+"/api/status"))
             .timeout(Duration.ofSeconds(2)).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
       }catch(Exception e){throw new AssertionError(e);}
+    }
+    StatusObservation<?> lane(String name) throws Exception {
+      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
+      field.setAccessible(true);
+      var lanes = (java.util.Map<?, ?>) field.get(handler);
+      var lane = (StatusObservation<?>) lanes.get(name);
+      assertNotNull(lane, "published lane " + name);
+      return lane;
+    }
+    StatusObservation.Sample<?> published(String name) throws Exception {
+      var field = StatusObservation.class.getDeclaredField("sample");
+      field.setAccessible(true);
+      var sample = (StatusObservation.Sample<?>) field.get(lane(name));
+      assertNotNull(sample, "publication from " + name);
+      return sample;
     }
     void probe() {
       calls.incrementAndGet();
@@ -117,11 +133,42 @@ class VerifierStatusIsolationTest {
   }
   @Test void recoveryClearsStaleAndFreshEventuallyAdvances() throws Exception {
     try(var f=new Fixture(true)) {
+      var clock = new AtomicLong(System.currentTimeMillis());
+      f.handler.setClockForTesting(clock::get);
+      f.handler.sampleAndBuildStatusSnapshot();
+      f.lane("worker").completion().get(2, TimeUnit.SECONDS);
+      var healthy = get(f, "");
+      assertEquals(clock.get(), healthy.path("meta").path("workerRpcAtMs").asLong());
+      assertEquals(10L, healthy.path("worker").path("core").path("indexedDocuments").asLong());
+      assertFalse(healthy.path("meta").path("workerRpcStale").asBoolean());
+      long healthyAt = clock.get();
+      long staleAfter = f.lane("worker").staleAfterMs();
+      assertTrue(staleAfter > 0L);
       f.block.set(true);
       Thread sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
-      assertTrue(f.entered.await(2,TimeUnit.SECONDS)); Thread.sleep(1200);
-      get(f,""); f.block.set(false); f.release.countDown(); sampler.join(3000);
-      var recovered=get(f,""); assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
+      try {
+        assertTrue(f.entered.await(2,TimeUnit.SECONDS));
+        // Hold the source, then age its last publication beyond its actual effective cadence.
+        clock.addAndGet(staleAfter + 1L);
+        var stale = get(f, "");
+        assertEquals(healthyAt, stale.path("meta").path("workerRpcAtMs").asLong());
+        assertTrue(stale.path("meta").path("workerRpcStale").asBoolean(),
+            "recovery must start from a positively observed stale Worker");
+        f.workerView.set(WorkerOperationalViewBuilder.builder(view())
+            .core(new CoreIndexView(true, 11, 0, view().core().indexState(), 0, 0)).build());
+      } finally {
+        f.block.set(false); f.release.countDown(); sampler.join(3000);
+        assertFalse(sampler.isAlive());
+      }
+      // The held call was stamped before the age interval. Require a new source observation.
+      f.lane("worker").completion().get(2, TimeUnit.SECONDS);
+      f.handler.sampleAndBuildStatusSnapshot();
+      f.lane("worker").completion().get(2, TimeUnit.SECONDS);
+      var recovered=get(f, ""); assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
+      assertEquals(clock.get(), recovered.path("meta").path("workerRpcAtMs").asLong());
+      assertTrue(recovered.path("meta").path("workerRpcAtMs").asLong() > healthyAt);
+      assertEquals(11L, recovered.path("worker").path("core").path("indexedDocuments").asLong(),
+          "the recovery response must publish the new Worker source value");
       String before=recovered.path("observed_at").asText(); get(f,"?fresh=true");
       boolean newer=false;
       for(int i=0;i<20&&!newer;i++){Thread.sleep(50);newer=!before.equals(get(f,"").path("observed_at").asText());}

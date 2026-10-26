@@ -20,6 +20,20 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       "rrdStoreSupplier","lambdamartRerankerSupplier","gplCoordinatorSupplier"})
   void oneHungSupplierLeavesUnrelatedOwnersFreshAndRecovers(String name) throws Exception {
     try(var f=new Fixture(true)) {
+      var clock = new AtomicLong(System.currentTimeMillis());
+      f.handler.setClockForTesting(clock::get);
+      String heldLane = switch (name) {
+        case "inferenceSnapshotSupplier" -> "inference";
+        case "conversationProtectionStateSupplier" -> "conversation";
+        case "telemetryHealthSupplier" -> "telemetry";
+        case "knowledgeServerLifecycleSupplier" -> "bulk-gate";
+        case "gpuCapabilitiesSupplier", "rrdStoreSupplier" -> "gpu";
+        case "vduCapabilitySnapshotSupplier" -> "vdu";
+        case "vduProcessingSupplier" -> "vdu-processing";
+        case "devicePlanSupplier" -> "device-plan";
+        case "lambdamartRerankerSupplier", "gplCoordinatorSupplier" -> "readiness-lambdamartModel";
+        default -> throw new AssertionError("unmapped mandatory supplier " + name);
+      };
       var block=new AtomicBoolean(false); var entered=new CountDownLatch(1); var release=new CountDownLatch(1);
       var calls=new AtomicInteger();
       Supplier<Object> supplier=()->{
@@ -42,22 +56,42 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         set(f.handler,"cachedGpuStatusAtMs",0L);
       }
       f.handler.sampleAndBuildStatusSnapshot();
+      f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
+      assertTrue(calls.get() > 0, "mandatory supplier prerequisite must reach " + name);
+      var before = f.published(heldLane);
+      assertEquals(clock.get(), before.observedAtMs(), "known supplier publication before hold");
+      assertFalse(before.failed());
+      assertFalse(before.staleSource());
+      if (name.equals("rrdStoreSupplier")) {
+        assertTrue(get(f, "").path("gpu").path("available").asBoolean(),
+            "the RRD prerequisite is an available NVML capabilities publication");
+      }
       if(name.equals("gpuCapabilitiesSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
       if(name.equals("rrdStoreSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
       block.set(true);
       var sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
       try {
-        // GPU trend I/O requires an available capabilities reading; if no callback is reachable,
-        // classify as unverified rather than counting an unexercised probe as a pass.
-        if(!entered.await(2,TimeUnit.SECONDS)) {
-          System.out.println("UNEXERCISED_OWNER="+name);
-          org.junit.jupiter.api.Assumptions.assumeTrue(false,"supplier not reached in this fixture: "+name);
+        assertTrue(entered.await(2,TimeUnit.SECONDS), "mandatory supplier must enter: " + name);
+        assertSame(before, f.published(heldLane), "held supplier cannot publish a new observation");
+        clock.set(before.observedAtMs() + f.lane(heldLane).staleAfterMs() + 1L);
+        assertTrue(clock.get() - before.observedAtMs()
+            > StatusLifecycleHandler.SAMPLE_STALE_PERIODS * before.cadenceMs());
+        f.handler.sampleAndBuildStatusSnapshot();
+        assertSame(before, f.published(heldLane), "sampling unrelated owners cannot renew the held source");
+        assertTrue(f.lane(heldLane).stale(clock.get()), "the held supplier publication must actually be stale");
+        for (String healthy : new String[] {"worker", "registry"}) {
+          f.lane(healthy).completion().get(2, TimeUnit.SECONDS);
+          var publication = f.published(healthy);
+          assertEquals(clock.get(), publication.observedAtMs(), "fresh unrelated publication: " + healthy);
+          assertFalse(publication.failed(), healthy);
+          assertFalse(publication.staleSource(), healthy);
+          assertNotNull(publication.value(), healthy);
         }
-        StatusLaneAging.ageHeldLanes(f.handler);
         var s=get(f,"");
         System.out.println("OWNER="+name+" calls="+calls.get());
         assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"worker independent of "+name);
         assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean(),"registry AI independent of "+name);
+        assertEquals("READY", s.path("readiness").path("components").path("ai").path("state").asText());
         if(!name.equals("telemetryHealthSupplier")) assertFalse(s.path("readiness").path("components").path("telemetry").path("stale").asBoolean(),"telemetry independent of "+name);
         if(name.equals("conversationProtectionStateSupplier")) assertEquals("unknown",s.path("conversationProtection").path("state").asText());
         if(name.equals("inferenceSnapshotSupplier")) assertTrue(s.path("operating").path("freshness").path("staleSources").toString().contains("chat"),"hung inference stale chat");
@@ -66,6 +100,12 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         assertEquals(heldCalls,calls.get(),"no duplicate blocked producer");
       } finally {block.set(false);release.countDown();sampler.join(6000);assertFalse(sampler.isAlive());}
       f.handler.sampleAndBuildStatusSnapshot();
+      f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
+      var publication = f.published(heldLane);
+      assertEquals(clock.get(), publication.observedAtMs(), "recovery must publish after the hold");
+      assertNotSame(before, publication);
+      assertFalse(publication.failed());
+      assertFalse(publication.staleSource());
       var recovered=get(f,"");
       assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
       assertFalse(recovered.path("readiness").path("components").path("ai").path("stale").asBoolean());
