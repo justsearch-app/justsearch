@@ -25,6 +25,9 @@ import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.SearchMode;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
+import io.justsearch.ort.DeviceEncoderGate;
+import io.justsearch.ort.DeviceEncoderGates;
+import io.justsearch.ort.DeviceGatePolicy;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.lang.reflect.Field;
@@ -34,11 +37,16 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 
 /**
  * Finding 1 of the search-gate verification (verify-d810): while the device is busy or stuck with
@@ -53,11 +61,13 @@ import org.junit.jupiter.api.Test;
  * made warm the way any CPU run makes it warm, so the check uses only API that exists before the
  * change and runs on the before-state, where these searches fall back or end at their deadline.
  */
+// This fixture starts Lucene executors and synchronous searches, but no worker health service or
+// indexing/pacing loop. Isolation prevents another test's health registry scan during registration.
+@Isolated("owns a synthetic-age gate in the process registry")
 final class WorkerSearchServiceCpuRecourseTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
-  /** Spec D §2.1 {@code stuckAfterMs}, written out so the check runs on the before-state too. */
-  private static final long STUCK_AFTER_MS = 10_000L;
+  private static final long STUCK_AFTER_MS = DeviceGatePolicy.DEFAULTS.stuckAfterMs();
 
   private static final String BULK_THREAD = "cpu-recourse-bulk-run";
 
@@ -115,8 +125,35 @@ final class WorkerSearchServiceCpuRecourseTest
   }
 
   @Test
-  void whileAGpuRunIsStuckSearchesGetTheirVectorsFromTheWarmCpuSession() throws Exception {
-    try (SessionHandle embeddingHandle = embeddingHandle("cpu-recourse-stuck", 53)) {
+  void whileAGpuRunIsStuckSearchesGetTheirVectorsFromTheWarmCpuSession() throws Throwable {
+    // The owner, bulk run and JUnit preemptive-search threads terminate after this scenario.
+    // No injected wait accounting remains on a reused test/pacing thread.
+    FutureTask<Void> scenario = new FutureTask<>(() -> {
+      searchWithControlledGateAge();
+      return null;
+    });
+    Thread owner = new Thread(scenario, "cpu-recourse-gate-owner");
+    owner.start();
+    try {
+      scenario.get();
+    } catch (ExecutionException failure) {
+      throw failure.getCause();
+    } finally {
+      bulkMayReturn.countDown();
+      owner.interrupt();
+      joinOwned(owner);
+      assertFalse(owner.isAlive(), "the injected-gate owner terminated");
+    }
+  }
+
+  private void searchWithControlledGateAge() throws Exception {
+    int device = 53;
+    AtomicLong clock = new AtomicLong(TimeUnit.SECONDS.toNanos(1_000));
+    DeviceEncoderGate gate = new DeviceEncoderGate(DeviceGatePolicy.DEFAULTS, clock::get);
+    Map<Integer, DeviceEncoderGate> gates = gates();
+    assertEquals(null, gates.putIfAbsent(device, gate), "the test owns a fresh device");
+    try (SessionHandle embeddingHandle = embeddingHandle("cpu-recourse-stuck", device)) {
+      assertTrue(gate == DeviceEncoderGates.forDevice(device), "the registered gate is shared");
       var service =
           new WorkerSearchService(
               lifecycle, new HandleBackedEmbeddings(embeddingHandle, /* runsNative= */ true));
@@ -127,24 +164,23 @@ final class WorkerSearchServiceCpuRecourseTest
           service.search(query(SearchMode.SEARCH_MODE_HYBRID), foreground(REQUEST_BUDGET));
       assertFalse(warm.getSearchTrace().getDegradation().getHybridFallback(), "warm dense leg");
 
+      AtomicReference<Throwable> runFailure = new AtomicReference<>();
       Thread bulk =
           new Thread(
               () -> {
                 try (SessionHandle.Lease lease = holdBackground(embeddingHandle);
                     OrtSession.Result ignored = lease.run(Map.of())) {
                   // The run is the stuck one; it returns when the test lets it.
-                } catch (Exception e) {
-                  throw new IllegalStateException(e);
+                } catch (Throwable thrown) {
+                  runFailure.set(thrown);
                 }
               },
               BULK_THREAD);
       bulk.start();
       try {
         assertTrue(bulkRunning.await(10, TimeUnit.SECONDS), "the bulk run started");
-        long stuckAt = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(STUCK_AFTER_MS + 300);
-        while (System.nanoTime() - stuckAt < 0) {
-          TimeUnit.NANOSECONDS.sleep(Math.max(1L, stuckAt - System.nanoTime()));
-        }
+        clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(STUCK_AFTER_MS + 1));
+        assertTrue(gate.breakerOpenSinceNanos().isPresent(), "the warmed held run is stuck");
 
         int cpuBefore = cpuRuns.get();
         SearchResponse hybrid =
@@ -170,7 +206,9 @@ final class WorkerSearchServiceCpuRecourseTest
         assertEquals(cpuBefore + 2, cpuRuns.get(), "the VECTOR-only leg ran on the CPU session");
       } finally {
         bulkMayReturn.countDown();
-        bulk.join(10_000);
+        joinOwned(bulk);
+        assertFalse(bulk.isAlive(), "the native run returned before handle cleanup");
+        assertEquals(null, runFailure.get(), "the native run completed without a thread failure");
       }
       assertFalse(bulk.isAlive(), "the stuck run returned and released its seat");
 
@@ -180,7 +218,36 @@ final class WorkerSearchServiceCpuRecourseTest
           service.search(query(SearchMode.SEARCH_MODE_HYBRID), foreground(REQUEST_BUDGET));
       assertFalse(after.getSearchTrace().getDegradation().getHybridFallback(), "dense after");
       assertEquals(gpuBefore + 1, gpuRuns.get(), "the leg after the stuck run ran on the GPU");
+    } finally {
+      assertTrue(gates.remove(device, gate), "remove only this test's gate after handle close");
     }
+  }
+
+  /** Finish cleanup even when the test owner is interrupted; retain its interrupt afterwards. */
+  private static void joinOwned(Thread thread) {
+    boolean interrupted = false;
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    try {
+      while (thread.isAlive()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          TimeUnit.NANOSECONDS.timedJoin(thread, remaining);
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
+      }
+      assertFalse(thread.isAlive(), "owned thread terminated: " + thread.getName());
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<Integer, DeviceEncoderGate> gates() throws Exception {
+    Field field = DeviceEncoderGates.class.getDeclaredField("GATES");
+    field.setAccessible(true);
+    return (Map<Integer, DeviceEncoderGate>) field.get(null);
   }
 
   /**
@@ -194,7 +261,7 @@ final class WorkerSearchServiceCpuRecourseTest
             invocation -> {
               if (Thread.currentThread().getName().equals(BULK_THREAD)) {
                 bulkRunning.countDown();
-                bulkMayReturn.await(120, TimeUnit.SECONDS);
+                assertTrue(bulkMayReturn.await(120, TimeUnit.SECONDS));
               } else {
                 gpuRuns.incrementAndGet();
               }

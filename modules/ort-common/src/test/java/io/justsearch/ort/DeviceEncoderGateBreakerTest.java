@@ -7,15 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 /**
  * Spec D §2 tests K2 (close rule) and K4 (what does not open the breaker), on the device gate itself
  * with a controllable clock: the breaker is open exactly while a held seat that is not its session's
- * first run is older than {@code stuckAfterMs}, and it turns away only foreground query legs that
+ * first run has reached {@code stuckAfterMs}, and it turns away only foreground query legs that
  * have a keyword fallback.
  */
 final class DeviceEncoderGateBreakerTest {
@@ -35,26 +37,41 @@ final class DeviceEncoderGateBreakerTest {
    */
   @Test
   void aFirstRunOrAGateTimeoutDoesNotOpenTheBreakerButALaterRunDoes() throws Exception {
-    DeviceEncoderGate.Seat firstRun = gate.seat(session, background());
-    clock.addAndGet(PAST_STUCK_NANOS);
-    assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "a cold first run is not stuck");
+    try (DeviceEncoderGate.Seat firstRun = gate.seat(session, background())) {
+      clock.addAndGet(PAST_STUCK_NANOS);
+      assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "a cold first run is not stuck");
 
-    var timedOut =
-        assertThrows(
-            SessionAcquireDeadlineExceededException.class,
-            () -> gate.seat(new Object(), queryLeg(Duration.ofMillis(50))));
-    assertEquals(SessionAcquireDeadlineExceededException.Phase.GATE, timedOut.phase());
-    assertFalse(timedOut.breakerOpen(), "the query waited at the gate; it was not turned away");
-    assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "a gate timeout does not open the breaker");
-
-    firstRun.close();
+      var timedOut =
+          assertThrows(
+              SessionAcquireDeadlineExceededException.class,
+              () -> gate.seat(new Object(), queryLeg(Duration.ofMillis(50))));
+      assertEquals(SessionAcquireDeadlineExceededException.Phase.GATE, timedOut.phase());
+      assertFalse(timedOut.breakerOpen(), "the query waited at the gate; it was not turned away");
+      assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "a gate timeout does not open the breaker");
+    }
     long seatedAt = clock.get();
-    DeviceEncoderGate.Seat secondRun = gate.seat(session, background());
-    clock.addAndGet(PAST_STUCK_NANOS);
-    OptionalLong since = gate.breakerOpenSinceNanos();
-    assertTrue(since.isPresent(), "the session's second run past stuckAfterMs opens the breaker");
-    assertEquals(seatedAt + TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs()), since.getAsLong());
-    secondRun.close();
+    try (DeviceEncoderGate.Seat secondRun = gate.seat(session, background())) {
+      long threshold = TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs());
+      clock.addAndGet(threshold - 1);
+      assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "one nanosecond before the threshold");
+      var before = assertThrows(SessionAcquireDeadlineExceededException.class,
+          () -> gate.seat(new Object(), queryLeg(Duration.ofMillis(50))));
+      assertFalse(before.breakerOpen(), "before the threshold a fresh query really waits");
+      assertEquals(SessionAcquireDeadlineExceededException.Phase.GATE, before.phase());
+
+      clock.incrementAndGet();
+      assertEquals(OptionalLong.of(seatedAt + threshold), gate.breakerOpenSinceNanos(),
+          "the breaker opens exactly at the threshold");
+      var at = assertThrows(SessionAcquireDeadlineExceededException.class,
+          () -> gate.seat(new Object(), queryLeg(Duration.ofSeconds(5))));
+      assertTrue(at.breakerOpen());
+      assertEquals(SessionAcquireDeadlineExceededException.Phase.RUN, at.phase());
+
+      clock.incrementAndGet();
+      OptionalLong since = gate.breakerOpenSinceNanos();
+      assertTrue(since.isPresent(), "the session's second run past stuckAfterMs opens the breaker");
+      assertEquals(seatedAt + TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs()), since.getAsLong());
+    }
   }
 
   /**
@@ -64,20 +81,21 @@ final class DeviceEncoderGateBreakerTest {
   @Test
   void releasingTheStuckRunClosesTheBreakerInTheSameStep() throws Exception {
     gate.seat(session, background()).close();
-    DeviceEncoderGate.Seat stuck = gate.seat(session, background());
-    clock.addAndGet(PAST_STUCK_NANOS);
+    try (DeviceEncoderGate.Seat stuck = gate.seat(session, background())) {
+      clock.addAndGet(PAST_STUCK_NANOS);
 
-    var turnedAway =
-        assertThrows(
-            SessionAcquireDeadlineExceededException.class,
-            () -> gate.seat(new Object(), queryLeg(Duration.ofSeconds(5))));
-    assertTrue(turnedAway.breakerOpen());
-    assertEquals(SessionAcquireDeadlineExceededException.Phase.RUN, turnedAway.phase());
+      var turnedAway =
+          assertThrows(
+              SessionAcquireDeadlineExceededException.class,
+              () -> gate.seat(new Object(), queryLeg(Duration.ofSeconds(5))));
+      assertTrue(turnedAway.breakerOpen());
+      assertEquals(SessionAcquireDeadlineExceededException.Phase.RUN, turnedAway.phase());
 
-    stuck.close();
-    assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "closed with the release, no timer");
-    try (DeviceEncoderGate.Seat _ = gate.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
-      assertEquals(0, gate.waiting());
+      stuck.close();
+      assertTrue(gate.breakerOpenSinceNanos().isEmpty(), "closed with the release, no timer");
+      try (DeviceEncoderGate.Seat _ = gate.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
+        assertEquals(0, gate.waiting());
+      }
     }
   }
 
@@ -89,30 +107,68 @@ final class DeviceEncoderGateBreakerTest {
   @Test
   void onlyForegroundLegsWithAKeywordFallbackAreTurnedAway() throws Exception {
     gate.seat(session, background()).close();
-    DeviceEncoderGate.Seat stuck = gate.seat(session, background());
-    clock.addAndGet(PAST_STUCK_NANOS);
-    assertTrue(gate.breakerOpenSinceNanos().isPresent());
+    try (DeviceEncoderGate.Seat stuck = gate.seat(session, background())) {
+      clock.addAndGet(PAST_STUCK_NANOS);
+      assertTrue(gate.breakerOpenSinceNanos().isPresent());
 
-    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(50);
-    SessionAcquisitionRequest[] queued = {
-      // VECTOR-only and the reranker: REQUIRED (may create a session, released at the deadline).
-      new SessionAcquisitionRequest(
-          SessionAcquisitionRequest.Urgency.FOREGROUND, deadline, () -> false, true, true),
-      // No semantic deadline (prewarm, NER single-text): waits for its run.
-      new SessionAcquisitionRequest(
-          SessionAcquisitionRequest.Urgency.FOREGROUND, deadline, () -> false, true, false),
-      // Bulk work.
-      new SessionAcquisitionRequest(
-          SessionAcquisitionRequest.Urgency.BACKGROUND, deadline, () -> false, false, true),
-    };
-    for (SessionAcquisitionRequest request : queued) {
-      var missed =
-          assertThrows(
-              SessionAcquireDeadlineExceededException.class, () -> gate.seat(new Object(), request));
-      assertFalse(missed.breakerOpen(), "queued behind the stuck run, not turned away: " + request);
-      assertEquals(SessionAcquireDeadlineExceededException.Phase.GATE, missed.phase());
+      List<Supplier<SessionAcquisitionRequest>> queued = List.of(
+          // VECTOR-only and the reranker: REQUIRED (may create a session, released at the deadline).
+          () -> queuedRequest(SessionAcquisitionRequest.Urgency.FOREGROUND, true, true),
+          // No semantic deadline (prewarm, NER single-text): waits for its run.
+          () -> queuedRequest(SessionAcquisitionRequest.Urgency.FOREGROUND, true, false),
+          // Bulk work.
+          () -> queuedRequest(SessionAcquisitionRequest.Urgency.BACKGROUND, false, true));
+      for (Supplier<SessionAcquisitionRequest> attempt : queued) {
+        SessionAcquisitionRequest request = attempt.get();
+        var missed =
+            assertThrows(
+                SessionAcquireDeadlineExceededException.class, () -> gate.seat(new Object(), request));
+        assertFalse(missed.breakerOpen(), "queued behind the stuck run, not turned away: " + request);
+        assertEquals(SessionAcquireDeadlineExceededException.Phase.GATE, missed.phase());
+      }
+      stuck.close();
     }
-    stuck.close();
+  }
+
+  @Test
+  void multipleSeatsKeepIndependentAgesAndReleaseClearsOnlyTheOverAgeSeat() throws Exception {
+    DeviceGatePolicy policy = new DeviceGatePolicy(2, POLICY.agingSeatings(), POLICY.agingWallMs(),
+        POLICY.recompositionWaitMs(), POLICY.stuckAfterMs(), POLICY.breakerStandingMs());
+    DeviceEncoderGate twoSeats = new DeviceEncoderGate(policy, clock::get);
+    Object otherSession = new Object();
+    twoSeats.seat(session, background()).close();
+    twoSeats.seat(otherSession, background()).close();
+    long firstSeatedAt = clock.get();
+    try (DeviceEncoderGate.Seat first = twoSeats.seat(session, background())) {
+      clock.incrementAndGet();
+      try (DeviceEncoderGate.Seat second = twoSeats.seat(otherSession, background())) {
+        clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs()) - 2);
+        assertTrue(twoSeats.breakerOpenSinceNanos().isEmpty(), "neither seat reached its threshold");
+        clock.incrementAndGet();
+        assertEquals(OptionalLong.of(firstSeatedAt + TimeUnit.MILLISECONDS.toNanos(POLICY.stuckAfterMs())),
+            twoSeats.breakerOpenSinceNanos(), "only the older seat reached its threshold");
+        first.close();
+        assertTrue(twoSeats.breakerOpenSinceNanos().isEmpty(),
+            "releasing the older seat clears the breaker while the younger seat is still held");
+        clock.incrementAndGet();
+        assertTrue(twoSeats.breakerOpenSinceNanos().isPresent(),
+            "the younger seat now reaches its threshold");
+        // Re-closing the first lease must not release the other session's seat.
+        first.close();
+        assertTrue(twoSeats.breakerOpenSinceNanos().isPresent());
+      }
+    }
+    assertTrue(twoSeats.breakerOpenSinceNanos().isEmpty(), "the last stuck seat released");
+    try (DeviceEncoderGate.Seat next = twoSeats.seat(new Object(), queryLeg(Duration.ofSeconds(5)))) {
+      assertEquals(0, twoSeats.waiting(), "a fresh query can acquire after both releases");
+    }
+  }
+
+  private static SessionAcquisitionRequest queuedRequest(
+      SessionAcquisitionRequest.Urgency urgency, boolean mayCreate, boolean releaseAtDeadline) {
+    return new SessionAcquisitionRequest(urgency,
+        System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(50), () -> false,
+        mayCreate, releaseAtDeadline);
   }
 
   private static SessionAcquisitionRequest background() {

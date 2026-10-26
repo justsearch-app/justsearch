@@ -56,9 +56,10 @@ import org.slf4j.LoggerFactory;
  * and removing a watched root left a full minute of enrichment running on documents that had
  * already been deleted (writing zero of them).
  *
- * <p>Every stub here therefore models stage DURATION. The pipeline shape is the embed-dominated one
- * the owner measured: parents pending embedding, NER already terminal, so the wall clock is the
- * embed stage and the assertions are about when control comes back.
+ * <p>The budget and no-progress cases model real stage duration. The synchronous event cases
+ * instead record the event inside the first encode call, before it returns, and pin the exact
+ * documents reached before the next unit. Together they check duration and interruption position.
+ * The pipeline is embed-dominated: parents pending embedding, NER already terminal.
  *
  * <p>Each test pins one property, and each fails against the pre-fix code for a stated reason:
  *
@@ -117,6 +118,12 @@ class BackfillSchedulerSlowBatchTest {
   private final List<String> encodedDocIds = new ArrayList<>();
 
   private final AtomicInteger embedCalls = new AtomicInteger();
+  /** Only synchronous event scenarios remove the artificial stage delay. */
+  private volatile long embedMsPerDoc = EMBED_MS_PER_DOC;
+  private final List<Integer> eventSlices = new ArrayList<>();
+  private final List<List<String>> encodedAtEvents = new ArrayList<>();
+  private final List<Long> eventElapsedNanos = new ArrayList<>();
+  private long cycleStartedNanos;
   /** Doc ids that reached a Lucene write. */
   private final Set<String> writtenDocIds = new LinkedHashSet<>();
   /** Stands in for the worker's bulk-deletion epoch; a root removal bumps it. */
@@ -212,9 +219,8 @@ class BackfillSchedulerSlowBatchTest {
               return result;
             });
 
-    // The slow stage. Sleeps in proportion to the slice it was given, then optionally fires the
-    // scenario's mid-batch event (ingest arrives / root removed) exactly as it would fire in the
-    // field: while the GPU is busy, not between batches.
+    // Fire inside the encode call, before returning its vectors or starting another unit.
+    // Budget/WARN scenarios retain the real proportional stage delay.
     lenient()
         .when(embeddingProvider.embedDocumentBatch(anyList()))
         .thenAnswer(
@@ -226,10 +232,13 @@ class BackfillSchedulerSlowBatchTest {
                   encodedDocIds.add(text.substring(text.lastIndexOf(' ') + 1));
                 }
               }
-              Thread.sleep(EMBED_MS_PER_DOC * texts.size());
+              if (embedMsPerDoc > 0) Thread.sleep(embedMsPerDoc * texts.size());
               if (call == fireEventAfterSlice) {
                 pendingIngest.set(pendingIngestScenario);
                 if (rootRemovalScenario) bulkDeleteEpoch.incrementAndGet();
+                eventSlices.add(call);
+                encodedAtEvents.add(List.copyOf(encodedDocIds));
+                eventElapsedNanos.add(System.nanoTime() - cycleStartedNanos);
               }
               if (embedReturnsNull) return null;
               List<float[]> vectors = new ArrayList<>(texts.size());
@@ -324,10 +333,20 @@ class BackfillSchedulerSlowBatchTest {
   /** Runs one idle cycle and returns its wall-clock duration in ms. */
   private long timeIdleCycle(BackfillScheduler scheduler) {
     long start = System.nanoTime();
+    cycleStartedNanos = start;
     // A ceiling only, so a regression that never returns fails as a timeout instead of hanging the
     // suite. The real assertions are on the measured elapsed time below.
     assertTimeoutPreemptively(Duration.ofSeconds(60), scheduler::runIdleCycle);
     return (System.nanoTime() - start) / 1_000_000;
+  }
+
+  private void assertEventAtSlice(int slice) {
+    assertEquals(slice, eventSlices.size(), "every cycle positively witnessed its event");
+    assertEquals(slice, eventSlices.get(slice - 1).intValue(), "event fired in its encode call");
+    assertEquals(docIds.subList(0, slice * EMBED_SLICE), encodedAtEvents.get(slice - 1),
+        "event fired after exactly the intended slice's IDs and before any later encode unit");
+    assertTrue(eventElapsedNanos.get(slice - 1) < CYCLE_BUDGET_MS * 1_000_000L,
+        "the event fired before the cycle budget was spent");
   }
 
   private boolean loggedAtLevel(ch.qos.logback.classic.Level level, String needle) {
@@ -379,18 +398,22 @@ class BackfillSchedulerSlowBatchTest {
   /**
    * PINS: ingest preemption reaches inside a running batch.
    *
-   * <p>The signal comes up while the first encode slice is in flight — the case 798's own tests
-   * cannot express, since their batches are instantaneous. Primary indexing outranks background
+   * <p>The synchronous signal comes up inside the first encode call, before it returns.
+   * The separate slow-budget case retains real duration evidence. Primary indexing outranks background
    * enrichment, so the cycle must come back after the slice it was already committed to, not after
    * the remaining 56 documents.
    */
   @Test
   @DisplayName("pending ingest arriving MID-batch preempts without finishing the batch")
   void pendingIngestArrivingMidBatch_preemptsWithoutFinishingTheBatch() {
+    embedMsPerDoc = 0;
     pendingIngestScenario = true;
     fireEventAfterSlice = 1;
 
     long elapsedMs = timeIdleCycle(scheduler());
+    assertEventAtSlice(1);
+    assertTrue(pendingIngest.get(), "the ingest event actually fired inside the encode call");
+    assertEquals(docIds.subList(0, EMBED_SLICE), List.copyOf(encodedDocIds));
 
     assertEquals(
         1,
@@ -430,10 +453,14 @@ class BackfillSchedulerSlowBatchTest {
   @Test
   @DisplayName("a root removed MID-batch: its remaining documents are neither encoded nor written")
   void rootRemovedMidBatch_remainingDocumentsAreNeitherEncodedNorWritten() {
+    embedMsPerDoc = 0;
     rootRemovalScenario = true;
     fireEventAfterSlice = 1;
 
     timeIdleCycle(scheduler());
+    assertEventAtSlice(1);
+    assertEquals(1L, bulkDeleteEpoch.get(), "the root-epoch event fired inside the encode call");
+    assertEquals(docIds.subList(0, EMBED_SLICE), List.copyOf(encodedDocIds));
 
     List<String> survivors = docIds.subList(0, EMBED_SLICE);
     List<String> removed = docIds.subList(EMBED_SLICE, BATCH_DOCS);
@@ -474,12 +501,17 @@ class BackfillSchedulerSlowBatchTest {
   @Test
   @DisplayName("documents an interrupted batch never reached are picked up by the next cycle")
   void documentsSkippedByAnAbortedBatchResumeOnTheNextCycle() {
+    embedMsPerDoc = 0;
     drainingPopulation = true;
     pendingIngestScenario = true;
     fireEventAfterSlice = 1;
 
     BackfillScheduler scheduler = scheduler();
     timeIdleCycle(scheduler);
+    assertEventAtSlice(1);
+    assertTrue(pendingIngest.get(), "the first cycle was preempted by its ingest event");
+    assertEquals(docIds.subList(EMBED_SLICE, BATCH_DOCS), List.copyOf(stillPending));
+    assertEquals(docIds.subList(0, EMBED_SLICE), List.copyOf(writtenDocIds));
 
     assertEquals(
         docIds.subList(0, EMBED_SLICE),
@@ -491,6 +523,10 @@ class BackfillSchedulerSlowBatchTest {
     pendingIngest.set(false);
     fireEventAfterSlice = 2;
     timeIdleCycle(scheduler);
+    assertEventAtSlice(2);
+    assertTrue(pendingIngest.get(), "the resumed cycle fired a fresh ingest event");
+    assertEquals(docIds.subList(2 * EMBED_SLICE, BATCH_DOCS), List.copyOf(stillPending));
+    assertEquals(docIds.subList(0, 2 * EMBED_SLICE), List.copyOf(writtenDocIds));
 
     assertEquals(
         docIds.subList(0, 2 * EMBED_SLICE),
