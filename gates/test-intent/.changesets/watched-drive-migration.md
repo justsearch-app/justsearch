@@ -375,3 +375,14 @@ exact revision, and its projection-verification refusal must appear in status.
   "note": "Verified immutable C14 c14d550f4965013ec85ef9b8cd1cbbbc01358e86. Consolidated evidence: tmp/drive-verifier-evidence/report-private-home.txt; actual private child JVM properties and native receipts/crash/restart: tmp/drive-verifier-evidence/native-cpu-private-home/actual-installed-properties.json and native-proof.json. Prior independent before/physical/module evidence retained by validated identity; exact accepted baseline descriptor failure and optional skips remain labeled."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a17602-4c68-7d73-9fe6-25f6c429c54a",
+  "verdict": "accept",
+  "digest": "sha256:3e3efc4bd3901e677077ad33cf692460e3c4816cfc6b778181c4d79582a63d69",
+  "note": "Independent audit ACCEPT for exact f8a8faf5dc445c5e7bc0d9df9c16439068932b41: reviewed all 12 watched-drive entries, flagged/exempt/script sources, D1-D9/A1-A6, both full independent C14/F8 reports, retained execution XML and source/runtime-property identities, and publication drafts. Recounted F8 161 focused plus 1 native pass; 35 source identities match. No new product execution. Retains exact descriptor FAILURE, setup histories, 54 unverified module cases, same-family session-only independence, and GUI/constructor-injection/historical-census limits."
+}
+```
