@@ -16,6 +16,7 @@ final class StatusFixtureWork {
   final Queue<Throwable> errors = new ConcurrentLinkedQueue<>();
   final Queue<Thread> threads = new ConcurrentLinkedQueue<>();
   final Queue<CountDownLatch> gates = new ConcurrentLinkedQueue<>();
+  final Map<String, StatusObservation<?>> sources = new ConcurrentHashMap<>();
   private static final List<String> RAW = List.of("worker", "disk", "inference", "power", "resume",
       "gpu", "gpu-memory", "at-rest", "conversation", "models", "agent", "telemetry",
       "device-plan", "bulk-gate", "indexing-hold", "vdu", "vdu-processing", "vision");
@@ -32,6 +33,7 @@ final class StatusFixtureWork {
   volatile boolean quiescent;
   private boolean stopped;
   private volatile boolean bootRequested;
+  private final java.util.concurrent.atomic.AtomicBoolean refreshRequested;
 
   @SuppressWarnings("unchecked")
   StatusFixtureWork(StatusLifecycleHandler original) {
@@ -50,19 +52,27 @@ final class StatusFixtureWork {
       // Keep the real map empty until its real caller creates a lane. In particular, boot's
       // observations.isEmpty()/requestSample branch must retain the original default fallback.
       field.set(handler, lanes);
+      var requested = StatusLifecycleHandler.class.getDeclaredField("refreshRequested");
+      requested.setAccessible(true);
+      refreshRequested = (java.util.concurrent.atomic.AtomicBoolean) requested.get(handler);
     } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     doAnswer(call -> {
       var done = new CompletableFuture<Void>();
       synchronized (this) {
-        if (stopped) {
+        Thread caller = Thread.currentThread();
+        boolean boot = caller.getName().equals("status-observation");
+        if (stopped && !threads.contains(caller) && !(boot && bootRequested)) {
           var failure = new AssertionError("sampler entered after fixture ingress stopped");
           errors.add(failure);
           throw failure;
         }
         quiescent = false;
-        if (Thread.currentThread().getName().equals("status-observation")) threads.add(Thread.currentThread());
+        if (boot) {
+          threads.add(caller);
+          caller.setUncaughtExceptionHandler((ignored, failure) -> errors.add(failure));
+          bootSampler.countDown();
+        }
         samplers.add(done);
-        bootSampler.countDown();
       }
       try {
         return call.callRealMethod();
@@ -72,44 +82,66 @@ final class StatusFixtureWork {
       } finally { done.complete(null); }
     }).when(handler).sampleAndBuildStatusSnapshot();
     doAnswer(call -> {
-      if (observations().isEmpty()) bootRequested = true;
-      return call.callRealMethod();
+      synchronized (this) {
+        try { return call.callRealMethod(); }
+        finally {
+          // Read the real scheduling flag AFTER the real method's decision. Holding the same
+          // monitor as sampler entry means an admitted boot cannot finish before registration.
+          if (refreshRequested.get()) { bootRequested = true; quiescent = false; }
+        }
+      }
     }).when(handler).buildStatusSnapshot();
     doAnswer(call -> {
+      Object result = call.callRealMethod();
       if (call.getArgument(0) != null) { gpuFirstRequested = true; quiescent = false; }
-      return call.callRealMethod();
+      return result;
     }).when(handler).setGpuMemoryReader(any());
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, StatusObservation<?>> observations() throws ReflectiveOperationException {
-    var field = StatusLifecycleHandler.class.getDeclaredField("observations");
-    field.setAccessible(true);
-    return (Map<String, StatusObservation<?>>) field.get(handler);
-  }
-
   private StatusObservation<?> captureLane(String name, StatusObservation<?> real) {
     // The real factory supplied this instance with its original surfacePublished callback.
-    var lane = spy(real);
+    var source = (StatusObservation<Object>) real;
+    sources.put(name, source);
+    var lane = (StatusObservation<Object>) mock(StatusObservation.class,
+        org.mockito.AdditionalAnswers.delegatesTo(source));
     var returned = new ConcurrentLinkedQueue<CompletableFuture<Void>>();
     handles.put(name, returned);
-    doAnswer(call -> {
+    org.mockito.stubbing.Answer<CompletableFuture<Void>> capture = call -> {
       Thread caller = Thread.currentThread();
       if (caller.getName().equals("status-fresh-dispatch") && dispatches.add(caller)) {
         caller.setUncaughtExceptionHandler((ignored, failure) -> errors.add(failure));
         dispatchStarted.release();
       }
       try {
-        @SuppressWarnings("unchecked")
-        var future = (CompletableFuture<Void>) call.callRealMethod();
+        // Delegate both entry points to the actual lane. Only its producer is decorated;
+        // clocks, flags and both original publication callbacks keep their real semantics.
+        CompletableFuture<Void> future;
+        if (call.getMethod().getName().equals("refresh")) {
+          future = source.refresh(call.getArgument(0), captureProducer(call.getArgument(1)),
+              call.getArgument(2), call.getArgument(3), call.getArgument(4), call.getArgument(5));
+        } else {
+          future = source.refreshProbe(call.getArgument(0), captureProducer(call.getArgument(1)),
+              call.getArgument(2), call.getArgument(3), call.getArgument(4), call.getArgument(5));
+        }
         returned.add(future); // No dependent is attached to an observation future.
         return future;
       } catch (Throwable failure) {
         errors.add(failure);
         throw failure;
       }
-    }).when(lane).refreshProbe(anyString(), any(), any(), anyLong(), nullable(Runnable.class), anyBoolean());
+    };
+    doAnswer(capture).when(lane).refresh(anyString(), any(), any(), anyLong(), nullable(Runnable.class), anyBoolean());
+    doAnswer(capture).when(lane).refreshProbe(anyString(), any(), any(), anyLong(), nullable(Runnable.class), anyBoolean());
     return lane;
+  }
+
+  private <T> java.util.function.Supplier<T> captureProducer(java.util.function.Supplier<T> producer) {
+    return () -> {
+      // Includes derived lanes with no fixture source mock, and every coalesced successor.
+      sourceEntered();
+      return producer.get();
+    };
   }
 
   void handleStatus(Context ctx) throws Exception {
@@ -124,7 +156,8 @@ final class StatusFixtureWork {
     }
   }
 
-  Thread startSampler() {
+  synchronized Thread startSampler() {
+    if (stopped) throw new IllegalStateException("fixture ingress stopped");
     var thread = Thread.ofPlatform().daemon().unstarted(handler::sampleAndBuildStatusSnapshot);
     thread.setUncaughtExceptionHandler((ignored, failure) -> errors.add(failure));
     threads.add(thread);
@@ -132,7 +165,10 @@ final class StatusFixtureWork {
     return thread;
   }
 
-  synchronized void stopIngress() { stopped = true; }
+  synchronized void stopIngress() {
+    stopped = true;
+    if (refreshRequested.get()) bootRequested = true;
+  }
 
   void sourceEntered() {
     Thread source = Thread.currentThread();
@@ -181,8 +217,8 @@ final class StatusFixtureWork {
     for (String name : handles.keySet())
       if (name.equals("operating") || name.startsWith("readiness-")) await(name, held, deadline);
     await("health-taps", held, deadline);
-    // A future can complete in finally before an uncaught source assertion reaches its handler.
-    // Join only threads positively identified by these fixtures' actual source invocations.
+    // The lane completes its future in finally even if a publication callback throws.
+    // Every actual producer, including operating/readiness, registered before executing.
     for (Thread source : Set.copyOf(sourceThreads))
       if (!held.contains(source.getName().substring("status-".length()))) join(source, deadline);
     quiescent = held.isEmpty();

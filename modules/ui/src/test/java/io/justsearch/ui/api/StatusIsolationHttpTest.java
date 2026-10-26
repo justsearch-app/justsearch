@@ -83,10 +83,8 @@ class StatusIsolationHttpTest {
       }
     }
     StatusObservation<?> lane(String name) throws Exception {
-      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
-      field.setAccessible(true);
-      var lanes = (java.util.Map<?, ?>) field.get(handler);
-      var lane = (StatusObservation<?>) lanes.get(name);
+      // Read the actual producer's state, rather than its delegating instrumentation mock.
+      var lane = work.sources.get(name);
       assertNotNull(lane, "published lane " + name);
       return lane;
     }
@@ -119,7 +117,6 @@ class StatusIsolationHttpTest {
         work.errors.removeIf(error -> error == failure);
         try { work.drain(java.util.Set.of()); }
         catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
-        if (!work.quiescent) return; // Retain resources if an owned consumer may still use them.
       }
       try { if (app != null) app.stop(); }
       catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -497,7 +494,7 @@ class StatusIsolationHttpTest {
         var stale = get(f, "");
         assertEquals(healthyAt, stale.path("meta").path("workerRpcAtMs").asLong());
         VerifierStatusIsolationTest.assertWorkerTimes(stale, healthyAt, true, projectionStartedMs,
-            f.requestStartedMs, f.requestCompletedMs, VerifierStatusIsolationTest.contactLaneAges(f.handler, clock.get()));
+            f.requestStartedMs, f.requestCompletedMs, VerifierStatusIsolationTest.contactLaneAges(f.work, clock.get()));
         assertTrue(stale.path("meta").path("workerRpcStale").asBoolean(),
             "recovery must start from a positively observed stale Worker");
       } catch (Exception | Error phaseError) { phaseFailure = phaseError; throw phaseError; } finally {

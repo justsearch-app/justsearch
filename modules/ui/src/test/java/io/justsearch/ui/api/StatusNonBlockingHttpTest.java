@@ -98,6 +98,10 @@ final class StatusNonBlockingHttpTest {
       }
       var knownBody = new ObjectMapper().readTree(fixture.get("").body());
       fixture.assertKnownPublic(knownBody);
+      String indexingSince = knownBody.path("operating").path("indexing").path("since").asText();
+      Instant indexingTransition = Instant.parse(indexingSince);
+      assertFalse(indexingTransition.isBefore(fixture.createdAt), "indexing starts in its real assembly interval");
+      assertTrue(indexingTransition.toEpochMilli() <= fixture.requestCompletedMs);
       fixture.assertCompanion(knownBody, beforeCompanion, beforeProjection, beforeProjected);
       fixture.assertPublicFreshness(knownBody, false);
       for (var entry : heldPublications.entrySet())
@@ -178,6 +182,8 @@ final class StatusNonBlockingHttpTest {
         assertTrue(elapsedMs < 1_000L, "status must fit its budget while " + source + " is held");
         assertEquals(200, response.statusCode());
         JsonNode body = new ObjectMapper().readTree(response.body());
+        assertEquals(indexingSince, body.path("operating").path("indexing").path("since").asText(),
+            "unchanged indexing state/reasons retain since despite fixture-clock aging and reprojection");
         fixture.assertPublicFreshness(body, true);
         fixture.assertHeldPublic(body);
         if (!source.endsWith("lock")) fixture.assertCompanion(body, heldCompanion,
@@ -258,6 +264,17 @@ final class StatusNonBlockingHttpTest {
       var recoveredBody = new ObjectMapper().readTree(recovered.body());
       fixture.assertNewInputConsumed();
       fixture.assertKnownPublic(recoveredBody);
+      String recoveredSince = recoveredBody.path("operating").path("indexing").path("since").asText();
+      assertNotEquals(Instant.ofEpochMilli(fixture.now.get()).toString(), recoveredSince,
+          "the advanced fixture observation clock is not the indexing transition clock");
+      if (source.equals("bulk-gate") || source.equals("power")) {
+        Instant changedAt = Instant.parse(recoveredSince);
+        assertNotEquals(indexingSince, recoveredSince, "changed indexing reasons start a new episode");
+        assertFalse(changedAt.isBefore(recoveryProjection), "indexing transition uses real assembly time");
+        assertTrue(changedAt.toEpochMilli() <= fixture.requestCompletedMs);
+      } else {
+        assertEquals(indexingSince, recoveredSince, "source recovery alone cannot reset indexing since");
+      }
       fixture.assertCompanion(recoveredBody, recoveryCompanion, recoveryProjection, recoveryProjected);
       fixture.assertPublicFreshness(recoveredBody, false);
       for (String lane : fixture.heldLanes())
@@ -332,6 +349,7 @@ final class StatusNonBlockingHttpTest {
   }
 
   private static final class Fixture implements AutoCloseable {
+    final Instant createdAt = Instant.now();
     StatusComponentFixture components;
     final AtomicBoolean block = new AtomicBoolean();
     final AtomicBoolean fail = new AtomicBoolean();
@@ -753,6 +771,13 @@ final class StatusNonBlockingHttpTest {
     }
 
     void assertRegistryTimes(JsonNode body) {
+      var chat = body.path("operating").path("chat");
+      long sampledAt = Instant.parse(chat.path("sampledAt").asText()).toEpochMilli();
+      assertTrue(sampledAt >= requestStartedMs && sampledAt <= requestCompletedMs,
+          "chat sampling uses the current real-clock HTTP projection, including while held");
+      assertEquals(body.path("observed_at").asText(), chat.path("sampledAt").asText());
+      assertEquals(registryStateSince.toString(), chat.path("since").asText(),
+          "chat since retains the generative owner's transition, even when inference changes state");
       assertEquals(registryStateSince.toString(),
           body.path("components").path("generative").path("state_since").asText());
       assertEquals(registryStateSince.toString(),
@@ -1044,10 +1069,8 @@ final class StatusNonBlockingHttpTest {
     }
 
     StatusObservation<?> lane(String name) throws Exception {
-      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
-      field.setAccessible(true);
-      var lanes = (java.util.Map<?, ?>) field.get(handler);
-      var lane = (StatusObservation<?>) lanes.get(name);
+      // Read the actual producer's state, rather than its delegating instrumentation mock.
+      var lane = work.sources.get(name);
       assertNotNull(lane, "published lane " + name);
       return lane;
     }
@@ -1153,7 +1176,6 @@ final class StatusNonBlockingHttpTest {
         work.errors.removeIf(error -> error == failure);
         try { work.drain(java.util.Set.of()); }
         catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
-        if (!work.quiescent) return; // Retain config/files/resources while a consumer may still run.
       }
       try {
         if (app != null) app.stop();
@@ -1167,7 +1189,8 @@ final class StatusNonBlockingHttpTest {
       try {
         if (components != null) components.close();
       } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
-      if (source.equals("model-file-path") && modelHome != null) {
+      // Shared config/files stay installed if a timed-out consumer may still use them.
+      if (source.equals("model-file-path") && modelHome != null && (work == null || work.quiescent)) {
         try {
           if (installedConfig != null)
             io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installedConfig, priorConfig);

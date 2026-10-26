@@ -27,6 +27,7 @@ class VerifierStatusIsolationTest {
       .embeddingReady(true).build();
   }
   static final class Fixture implements AutoCloseable {
+    final Instant createdAt = Instant.now();
     StatusComponentFixture components;
     final AtomicBoolean block = new AtomicBoolean();
     final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
@@ -75,10 +76,8 @@ class VerifierStatusIsolationTest {
       }
     }
     StatusObservation<?> lane(String name) throws Exception {
-      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
-      field.setAccessible(true);
-      var lanes = (java.util.Map<?, ?>) field.get(handler);
-      var lane = (StatusObservation<?>) lanes.get(name);
+      // Read the actual producer's state, rather than its delegating instrumentation mock.
+      var lane = work.sources.get(name);
       assertNotNull(lane, "published lane " + name);
       return lane;
     }
@@ -114,7 +113,6 @@ class VerifierStatusIsolationTest {
         work.errors.removeIf(error -> error == failure);
         try { work.drain(java.util.Set.of()); }
         catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
-        if (!work.quiescent) return; // Retain resources if an owned consumer may still use them.
       }
       try { if (app != null) app.stop(); }
       catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -134,10 +132,8 @@ class VerifierStatusIsolationTest {
     assertEquals(200,r.statusCode()); assertTrue(ms<500,"status must be cheap; latency="+ms);
     return json.readTree(r.body());
   }
-  static java.util.Map<String, Long> contactLaneAges(StatusLifecycleHandler handler, long now) throws Exception {
-    var field = StatusLifecycleHandler.class.getDeclaredField("observations");
-    field.setAccessible(true);
-    var lanes = (java.util.Map<?, ?>) field.get(handler);
+  static java.util.Map<String, Long> contactLaneAges(StatusFixtureWork work, long now) throws Exception {
+    var lanes = work.sources;
     var sampleField = StatusObservation.class.getDeclaredField("sample");
     sampleField.setAccessible(true);
     var ages = new java.util.HashMap<String, Long>();
@@ -276,7 +272,7 @@ class VerifierStatusIsolationTest {
         var stale = get(f, "");
         assertEquals(healthyAt, stale.path("meta").path("workerRpcAtMs").asLong());
         assertWorkerTimes(stale, healthyAt, true, projectionStartedMs,
-            f.requestStartedMs, f.requestCompletedMs, contactLaneAges(f.handler, clock.get()));
+            f.requestStartedMs, f.requestCompletedMs, contactLaneAges(f.work, clock.get()));
         assertTrue(stale.path("meta").path("workerRpcStale").asBoolean(),
             "recovery must start from a positively observed stale Worker");
       } catch (Exception | Error phaseError) { phaseFailure = phaseError; throw phaseError; } finally {

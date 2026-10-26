@@ -97,6 +97,10 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       var knownBody = get(f, "");
       assertHealthyWorkerAndRegistry(f, knownBody, clock.get());
       assertKnownPublic(name, knownBody, before, false);
+      String indexingSince = knownBody.path("operating").path("indexing").path("since").asText();
+      Instant indexingTransition = Instant.parse(indexingSince);
+      assertFalse(indexingTransition.isBefore(f.createdAt), "indexing starts in its real assembly interval");
+      assertTrue(indexingTransition.toEpochMilli() <= f.requestCompletedMs);
       assertCompanion(name, knownBody, beforeCompanion, false, beforeProjection, beforeProjected, companionAge(f, name, clock.get()));
       assertPublicFreshness(name, knownBody, false, false);
       long period = before.periodMs();
@@ -136,6 +140,8 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         Instant heldProjected = Instant.now();
         var s=get(f,"");
         assertHealthyWorkerAndRegistry(f, s, clock.get());
+        assertEquals(indexingSince, s.path("operating").path("indexing").path("since").asText(),
+            "unchanged indexing state/reasons retain since despite fixture-clock aging and reprojection");
         assertPublicFreshness(name, s, true, false);
         assertHeldPublic(name, s);
         boolean companionHeld = heldLane.startsWith("readiness-");
@@ -193,6 +199,17 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       var recovered=get(f,"");
       assertHealthyWorkerAndRegistry(f, recovered, clock.get());
       assertKnownPublic(name, recovered, publication, true);
+      String recoveredSince = recovered.path("operating").path("indexing").path("since").asText();
+      assertNotEquals(Instant.ofEpochMilli(clock.get()).toString(), recoveredSince,
+          "the advanced fixture observation clock is not the indexing transition clock");
+      if (name.equals("knowledgeServerLifecycleSupplier")) {
+        Instant changedAt = Instant.parse(recoveredSince);
+        assertNotEquals(indexingSince, recoveredSince, "changed indexing reasons start a new episode");
+        assertFalse(changedAt.isBefore(recoveryProjection), "indexing transition uses real assembly time");
+        assertTrue(changedAt.toEpochMilli() <= f.requestCompletedMs);
+      } else {
+        assertEquals(indexingSince, recoveredSince, "source recovery alone cannot reset indexing since");
+      }
       assertCompanion(name, recovered, recoveryCompanion, true, recoveryProjection, recoveryProjected, companionAge(f, name, clock.get()));
       assertPublicFreshness(name, recovered, false, true);
       assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
@@ -203,6 +220,13 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
   private static void assertHealthyWorkerAndRegistry(Fixture f, tools.jackson.databind.JsonNode body, long workerEpoch) {
     assertWorkerEpoch(body, workerEpoch);
     var since = f.components.handle("generative").snapshot().stateSince();
+    var chat = body.path("operating").path("chat");
+    long sampledAt = Instant.parse(chat.path("sampledAt").asText()).toEpochMilli();
+    assertTrue(sampledAt >= f.requestStartedMs && sampledAt <= f.requestCompletedMs,
+        "chat sampling uses the current real-clock HTTP projection, including while held");
+    assertEquals(body.path("observed_at").asText(), chat.path("sampledAt").asText());
+    assertEquals(since.toString(), chat.path("since").asText(),
+        "chat since retains the generative owner's transition, even when inference changes state");
     assertEquals(since.toString(), body.path("components").path("generative").path("state_since").asText());
     assertEquals(since.toString(), body.path("readiness").path("engineComponents").path("generative").path("stateSince").asText());
     var ai = body.path("readiness").path("components").path("ai");
