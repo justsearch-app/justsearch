@@ -1828,6 +1828,234 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     };
   }
 
+  private static final String WATCHER_ADMISSION = "watcher-reconcile-v1:";
+  private static final tools.jackson.databind.ObjectMapper WATCHER_JSON =
+      tools.jackson.databind.json.JsonMapper.builder().build();
+
+  /** Ownership only: fresh root/source proof is still required on every use. */
+  private record WatcherAdmission(String candidate, SwitchBufferOp root, String path, String owner,
+      SwitchBufferOp predecessor, String plannedHash, String token,
+      @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+      String scanId) {}
+
+  private static String rootOwner(String value) {
+    return value == null || value.isBlank() || IngestCollectionPolicy.DEFAULT_COLLECTION.equals(value)
+        ? null : value;
+  }
+
+  @Override
+  public Map<String, String> watcherReconciliationRow(String path) {
+    lock.lock();
+    try {
+      ensureOpen();
+      return watcherRowLocked(path);
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Watcher reconciliation row is unreadable", failure);
+    } finally { lock.unlock(); }
+  }
+
+  private Map<String, String> watcherRowLocked(String path) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT * FROM jobs WHERE path=?")) {
+      query.setString(1, path);
+      try (var result = query.executeQuery()) {
+        if (!result.next()) return null;
+        Map<String, String> row = new java.util.LinkedHashMap<>();
+        var metadata = result.getMetaData();
+        for (int i = 1; i <= metadata.getColumnCount(); i++) {
+          row.put(metadata.getColumnName(i), result.getString(i));
+        }
+        return java.util.Collections.unmodifiableMap(row);
+      }
+    }
+  }
+
+  @Override
+  public boolean reconcileWatcherFile(WatcherReconciliationFile file, Runnable freshProof,
+      Runnable removeIndex) {
+    lock.lock();
+    try {
+      ensureOpen();
+      return inTransaction(() -> {
+        var journal = switchBufferOps.listAllStrict().stream()
+            .filter(op -> op.generation().isEmpty() || file.candidate().equals(op.generation())).toList();
+        var root = file.rootReceipt();
+        var debt = WatcherRootReconciliation.decode(root.payload());
+        Path path = Path.of(file.path());
+        if (file.candidate() == null || file.candidate().isBlank()
+            || !journal.equals(file.journal()) || !journal.contains(root)
+            || !WatcherRootReconciliation.OPERATION.equals(root.op())
+            || !root.generation().isEmpty() || !debt.key().equals(root.key()) || root.acceptedOrder() <= 0
+            || file.sourceSha256() == null
+            || !file.sourceSha256().isEmpty() && !IngestionLedgerTransition.isSha256(file.sourceSha256())
+            || !path.isAbsolute() || !path.normalize().equals(path)
+            || path.equals(Path.of(debt.root())) || !path.startsWith(Path.of(debt.root()))) {
+          throw new IllegalStateException("Watcher reconciliation journal or root changed");
+        }
+        var row = watcherRowLocked(file.path());
+        if (!Objects.equals(row, file.expectedRow())) return false;
+        freshProof.run();
+        if (activeClaims.containsKey(file.path()) || row != null && STATE_PROCESSING.equals(row.get("state"))) return false;
+        if (row != null && (row.get("walk_seen_epoch") != null
+            || row.get("unit_revision") != null && row.get("unit_revision").startsWith("release030")
+            || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)
+            || recordedWatcherRow(row))) return independentWatcherEffect(file, row, debt);
+
+        SwitchBufferOp predecessor = null;
+        boolean laterAdmission = false;
+        for (var op : journal) {
+          if (!"UPSERT".equals(op.op())) continue;
+          var upsert = SwitchBufferUpsert.decode(op.payload());
+          if (!file.path().equals(upsert.path())) continue;
+          if (!("path:" + file.path()).equals(op.key())) {
+            throw new IllegalStateException("Watcher predecessor key is invalid");
+          }
+          // A later independent admission cannot be borrowed by this root receipt.
+          if (op.acceptedOrder() >= root.acceptedOrder()) laterAdmission = true;
+          else predecessor = op;
+        }
+        if (laterAdmission) return independentWatcherEffect(file, row, debt);
+        String owner = rootOwner(debt.collection());
+        boolean owned = false;
+        boolean original = false;
+        if (row != null && Objects.equals(owner, rootOwner(row.get("collection")))) {
+          if (predecessor != null) {
+            var admitted = SwitchBufferUpsert.decode(predecessor.payload());
+            original = admitted.unitRevision() != null
+                && admitted.unitRevision().equals(row.get("unit_revision"))
+                && Objects.equals(admitted.sourceSha256(), row.get("planned_source_sha256"))
+                && Objects.equals(owner, rootOwner(admitted.collection()))
+                && (admitted.provenance() == null || Objects.equals(admitted.provenance().originator(), row.get("originator"))
+                    && Objects.equals(admitted.provenance().transport(), row.get("transport")))
+                && (admitted.ingestionRoot() == null || admitted.ingestionRoot().toString().equals(row.get("ingestion_root")));
+          }
+          WatcherAdmission prior = parseWatcherAdmission(row.get("unit_revision"));
+          if (prior != null && prior.candidate().equals(file.candidate())
+              && prior.path().equals(file.path()) && Objects.equals(prior.owner(), owner)
+              && Objects.equals(prior.plannedHash(), row.get("planned_source_sha256"))
+              && "system".equals(row.get("originator")) && "WATCHER_RECONCILIATION".equals(row.get("transport"))
+              && debt.root().equals(row.get("ingestion_root")) && Objects.equals(prior.scanId(), row.get("scan_id"))
+              && Objects.equals(prior.predecessor(), predecessor)
+              && (prior.predecessor() != null || !conflictingWatcherPathReceipt(journal, prior, root))
+              && prior.root().generation().equals(root.generation()) && prior.root().key().equals(root.key())
+              && prior.root().payload().equals(root.payload())
+              && (prior.root().equals(root) || root.acceptedOrder() > prior.root().acceptedOrder())) {
+            owned = true;
+          }
+        }
+        if (row != null && !original && !owned) {
+          // An independent exact committed effect may survive without borrowing its queue owner.
+          return independentWatcherEffect(file, row, debt);
+        }
+        String source = file.sourceSha256();
+        if (row == null) {
+          if (!file.orderedApply()) return true;
+          if (source.isEmpty()) { removeIndex.run(); freshProof.run(); return true; }
+          resetWatcherFile(file, debt, predecessor);
+        } else if (source.isEmpty()) {
+          if (file.orderedApply()) {
+            if (!(STATE_PENDING.equals(row.get("state")) && eligibleWatcherWait(row))
+                && !STATE_DONE.equals(row.get("state"))) return false;
+            try (var delete = connection.prepareStatement("DELETE FROM jobs WHERE path=?")) {
+              delete.setString(1, file.path()); delete.executeUpdate();
+            }
+            removeIndex.run();
+          } else if (STATE_PENDING.equals(row.get("state")) && eligibleWatcherWait(row)) {
+            wakeWatcherFile(file.path());
+          }
+        } else if (STATE_PENDING.equals(row.get("state"))) {
+          if (eligibleWatcherWait(row)) {
+            if (!source.equals(row.get("planned_source_sha256"))) resetWatcherFile(file, debt, predecessor);
+            else wakeWatcherFile(file.path());
+          }
+        } else if (STATE_DONE.equals(row.get("state"))) {
+          if (file.orderedApply() && !file.targetMatches()) resetWatcherFile(file, debt, predecessor);
+        } else return false;
+        freshProof.run();
+        return true;
+      });
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Conditional watcher reconciliation failed", failure);
+    } finally { unlockAfterChanges(); }
+  }
+
+  private static boolean conflictingWatcherPathReceipt(List<SwitchBufferOp> journal,
+      WatcherAdmission prior, SwitchBufferOp currentRoot) {
+    return journal.stream().filter(op -> op.acceptedOrder() > prior.root().acceptedOrder()
+        && op.acceptedOrder() < currentRoot.acceptedOrder()).anyMatch(op -> switch (op.op()) {
+          case "UPSERT" -> prior.path().equals(SwitchBufferUpsert.decode(op.payload()).path());
+          case "DELETE" -> prior.path().equals(SwitchBufferDelete.decode(op.payload()).path());
+          default -> false;
+        });
+  }
+
+  private boolean independentWatcherEffect(WatcherReconciliationFile file,
+      Map<String, String> row, WatcherRootReconciliation debt) {
+    return row != null && !file.sourceSha256().isEmpty() && file.targetMatches()
+        && Objects.equals(rootOwner(debt.collection()), rootOwner(row.get("collection")))
+        && matchesAcceptedFileProjection(file.path(), row.get("unit_revision"),
+            row.get("planned_source_sha256"), file.sourceSha256());
+  }
+
+  private boolean recordedWatcherRow(Map<String, String> row) throws SQLException {
+    if (row.get("scan_id") == null) return false;
+    try (var query = connection.prepareStatement("SELECT 1 FROM ingestion_walk_progress WHERE operation_key=?")) {
+      query.setString(1, row.get("scan_id"));
+      try (var result = query.executeQuery()) { return result.next(); }
+    }
+  }
+
+  private static boolean eligibleWatcherWait(Map<String, String> row) {
+    return "ROOT_UNAVAILABLE".equals(row.get("last_reason_code"))
+            && "RETRY_UNTIL_AVAILABLE".equals(row.get("last_retry_policy"))
+        || "STALE_AFTER_EXTRACTION".equals(row.get("last_reason_code"))
+            && "DEFER_WITHOUT_ATTEMPT".equals(row.get("last_retry_policy"));
+  }
+
+  private void wakeWatcherFile(String path) throws SQLException {
+    try (var update = connection.prepareStatement("UPDATE jobs SET retry_after=NULL WHERE path=? AND retry_after IS NOT NULL")) {
+      update.setString(1, path); update.executeUpdate();
+    }
+  }
+
+  private void resetWatcherFile(WatcherReconciliationFile file, WatcherRootReconciliation debt,
+      SwitchBufferOp predecessor) throws SQLException {
+    var identity = new WatcherAdmission(file.candidate(), file.rootReceipt(), file.path(),
+        rootOwner(debt.collection()), predecessor, file.sourceSha256(), UUID.randomUUID().toString(),
+        file.expectedRow() == null ? null : file.expectedRow().get("scan_id"));
+    String revision = WATCHER_ADMISSION + java.util.Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(WATCHER_JSON.writeValueAsBytes(identity));
+    var entry = new EnqueueEntry(Path.of(file.path()), file.size(),
+        new EnqueueProvenance("system", "WATCHER_RECONCILIATION"), file.sourceSha256(), Path.of(debt.root()));
+    if (enqueueEntriesInTransaction(List.of(entry), rootOwner(debt.collection()), null,
+        System.currentTimeMillis(), true, revision) != 1) throw new SQLException("Watcher file admission refused");
+  }
+
+  private static WatcherAdmission parseWatcherAdmission(String revision) {
+    if (revision == null || !revision.startsWith(WATCHER_ADMISSION)) return null;
+    try {
+      var identity = WATCHER_JSON.readValue(java.util.Base64.getUrlDecoder().decode(
+          revision.substring(WATCHER_ADMISSION.length())), WatcherAdmission.class);
+      if (identity.candidate() == null || identity.candidate().isBlank() || identity.root() == null
+          || identity.path() == null || !Path.of(identity.path()).isAbsolute()
+          || !Path.of(identity.path()).normalize().toString().equals(identity.path())
+          || identity.token() == null || !UUID.fromString(identity.token()).toString().equals(identity.token())
+          || !IngestionLedgerTransition.isSha256(identity.plannedHash())
+          || identity.root().revision() == null || identity.root().revision().isBlank()
+          || identity.root().acceptedOrder() <= 0
+          || !WatcherRootReconciliation.OPERATION.equals(identity.root().op())
+          || !identity.root().generation().isEmpty()
+          || !WatcherRootReconciliation.decode(identity.root().payload()).key().equals(identity.root().key())
+          || !Objects.equals(rootOwner(WatcherRootReconciliation.decode(identity.root().payload()).collection()), identity.owner())
+          || identity.predecessor() != null && (!"UPSERT".equals(identity.predecessor().op())
+              || identity.predecessor().acceptedOrder() >= identity.root().acceptedOrder()
+              || !identity.path().equals(SwitchBufferUpsert.decode(identity.predecessor().payload()).path()))) return null;
+      String canonical = WATCHER_ADMISSION + java.util.Base64.getUrlEncoder().withoutPadding()
+          .encodeToString(WATCHER_JSON.writeValueAsBytes(identity));
+      return canonical.equals(revision) ? identity : null;
+    } catch (RuntimeException malformed) { return null; }
+  }
+
   @Override
   public int enqueueRefusalCleanupAdmission(
       JobQueue.EnqueueEntry entry, String collection, String admission) {

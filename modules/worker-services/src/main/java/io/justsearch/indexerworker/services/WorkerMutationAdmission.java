@@ -22,6 +22,7 @@ public final class WorkerMutationAdmission {
   private final Object replayCertificateMonitor = new Object();
   private final Object fencedOwner = new Object();
   private boolean replayUncertain;
+  private final java.util.Map<String, RootUncertainty> unavailableRoots = new java.util.HashMap<>();
   private Object owner;
 
   public WorkerMutationAdmission(Object initialOwner) {
@@ -37,7 +38,37 @@ public final class WorkerMutationAdmission {
 
   public boolean replayCertain() {
     synchronized (replayCertificateMonitor) {
-      return !replayUncertain;
+      return !replayUncertain && unavailableRoots.isEmpty();
+    }
+  }
+
+  /** Unattributed lost effects retain their permanent, runtime-wide fence. */
+  public boolean runtimeReplayCertain() {
+    synchronized (replayCertificateMonitor) { return !replayUncertain; }
+  }
+
+  public record RootUncertainty(
+      io.justsearch.indexerworker.queue.WatcherRootReconciliation debt, Object incarnation) {}
+
+  public void markRootUnavailable(RootUncertainty uncertainty) {
+    synchronized (replayCertificateMonitor) {
+      unavailableRoots.put(uncertainty.debt().root(), uncertainty);
+    }
+  }
+
+  public java.util.List<RootUncertainty> unavailableRoots() {
+    synchronized (replayCertificateMonitor) { return java.util.List.copyOf(unavailableRoots.values()); }
+  }
+
+  /** A concurrent replacement of the same root remains uncertain. */
+  public void reconciledRoot(RootUncertainty exact) {
+    synchronized (replayCertificateMonitor) { unavailableRoots.remove(exact.debt().root(), exact); }
+  }
+
+  /** A new root failure must either retain the old debt or observe its acknowledgement first. */
+  public boolean acknowledgeReconciledRoots(java.util.function.BooleanSupplier acknowledgement) {
+    synchronized (replayCertificateMonitor) {
+      return !replayUncertain && unavailableRoots.isEmpty() && acknowledgement.getAsBoolean();
     }
   }
 
@@ -196,7 +227,7 @@ public final class WorkerMutationAdmission {
       }
       synchronized (replayCertificateMonitor) {
         replayCertificateArmed = true;
-        return !replayUncertain;
+        return !replayUncertain && unavailableRoots.isEmpty();
       }
     }
 
@@ -225,7 +256,7 @@ public final class WorkerMutationAdmission {
         throw new IllegalStateException("Replay certificate has not been armed");
       }
       synchronized (replayCertificateMonitor) {
-        if (replayUncertain) return false;
+        if (replayUncertain || !unavailableRoots.isEmpty()) return false;
         certified = true;
         return true;
       }
@@ -247,7 +278,7 @@ public final class WorkerMutationAdmission {
       }
       closed = true;
       synchronized (replayCertificateMonitor) {
-        boolean released = certified && !replayUncertain;
+        boolean released = certified && !replayUncertain && unavailableRoots.isEmpty();
         if (!released) owner = fencedOwner;
         lock.writeLock().unlock();
         return released;
@@ -265,7 +296,7 @@ public final class WorkerMutationAdmission {
       }
       closed = true;
       synchronized (replayCertificateMonitor) {
-        boolean released = !replayUncertain;
+        boolean released = !replayUncertain && unavailableRoots.isEmpty();
         if (!released) owner = fencedOwner;
         lock.writeLock().unlock();
         return released;

@@ -31,12 +31,32 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       String op,
       String payload,
       long lastUpdatedMs,
-      String revision) {
+      String revision,
+      long acceptedOrder) {
+
+    public SwitchBufferOp(String generation, String key, String op, String payload,
+        long lastUpdatedMs, String revision) {
+      this(generation, key, op, payload, lastUpdatedMs, revision, 0);
+    }
 
     /** Compatibility constructor for the pre-generation switch buffer API. */
     public SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs, String revision) {
       this("", key, op, payload, lastUpdatedMs, revision);
     }
+  }
+
+  /** Full expected row, including absence, used only by fenced watcher reconciliation. */
+  default java.util.Map<String, String> watcherReconciliationRow(String path) {
+    throw new UnsupportedOperationException("Watcher reconciliation row evidence unavailable");
+  }
+
+  /**
+   * One conditional file transition. Caller holds the actual writer file fence. The queue
+   * reserves the write transaction, rechecks journal/row/ownership, then calls fresh proof.
+   */
+  default boolean reconcileWatcherFile(WatcherReconciliationFile file, Runnable freshProof,
+      Runnable removeIndex) {
+    throw new UnsupportedOperationException("Conditional watcher reconciliation unavailable");
   }
 
   /**

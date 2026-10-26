@@ -361,6 +361,7 @@ public final class KnowledgeServer implements Closeable {
   private final AtomicBoolean refusalCleanupRetrying = new AtomicBoolean();
   /** The last refusal cleanup failure logged as an error; repeats log at debug. */
   private volatile String lastRefusalCleanupFailure;
+  private volatile List<ResolvedConfig.FileSource> migrationRootSnapshot;
   private static final long EARLY_REFUSAL_FENCE_WAIT_MS = 100L;
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
   private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
@@ -1767,6 +1768,10 @@ public final class KnowledgeServer implements Closeable {
 
       }
 
+      if (buildingIndexPath != null && migrationRootSnapshot == null) {
+        migrationRootSnapshot = KnowledgeServerMigrationOps.loadMigrationRootDeclarations(
+            rc.paths().dataDir(), rc.collections(), JSON);
+      }
       // If a migration is in progress (Blue/Green), ensure the enumerator + cutover monitor are running.
       if (buildingIndexPath != null && searchLifecycle != null && ingestLifecycle != null && searchLifecycle != ingestLifecycle) {
         if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
@@ -1793,12 +1798,14 @@ public final class KnowledgeServer implements Closeable {
       // Skipped when the rebuild brake is exhausted: ingest is the READ-ONLY Blue runtime then, so
       // there is no writer to drain into.
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
+        boolean rootDebt = KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue);
         if (!(ingestLifecycle instanceof RunningRuntime)
-            || !KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(
+            || !rootDebt && !KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(
                 jobQueue, layout.activeGenerationId())) {
           throw new IOException("Promoted generation switch replay remains unresolved");
         }
-        replaySettledGeneration = layout.activeGenerationId();
+        // Root debt needs the live writer and a fresh fenced preflight below, before cleanup.
+        if (!rootDebt) replaySettledGeneration = layout.activeGenerationId();
       } else if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && !rebuildBrakeExhausted && ingestLifecycle instanceof RunningRuntime) {
         drainSwitchBufferBestEffort();
@@ -7436,21 +7443,44 @@ public final class KnowledgeServer implements Closeable {
     // Native switch-buffer receipts refer to pre-boot accepted queue revisions. Root
     // reconciliation may replace those revisions, so it cannot start until the exact receipts
     // have settled against B. This wait is scoped to the generation, never the global queue.
-    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native) {
+    boolean nativeOwner = generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native;
+    if (nativeOwner || KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue)) {
       while (true) {
         boolean paused = false;
         boolean settled;
         try {
-          if (!producer.pauseProducerForCutover(10_000)) {
-            throw new IOException("Committed native replay writer did not pause");
+          boolean watcherDebt = KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue);
+          if (!watcherDebt) {
+            if (!producer.pauseProducerForCutover(10_000)) {
+              throw new IOException("Committed native replay writer did not pause");
+            }
+            paused = true;
           }
-          paused = true;
           try (var fence = producer.mutationAdmission().beginFinalFence(
               producer.mutationOwnerToken(), 10_000)) {
             if (fence == null) {
               throw new IOException("Committed native replay mutation fence did not settle");
             }
-            settled = nativePredecessorReplaySettled(expectedActive);
+            if (watcherDebt) {
+              // A committed pointer is not evidence for a root that changed after the target
+              // commit. Re-probe and commit its current paths before exact acknowledgement.
+              settled = KnowledgeServerMigrationOps.drainSwitchBufferStrict(
+                  new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+                      jobQueue, active, signalBus, indexingPacing, indexBasePath, activeIndexPath,
+                      JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
+                      nativeOwner ? expectedActive : null, this::projectionSourceReady)
+                      .withPublisher(producer.ingestService())
+                      .withMigrationRoots(bootRootBindings.stream().map(binding ->
+                          new ResolvedConfig.FileSource(binding.path(), binding.collection())).toList()));
+              if (settled && !nativeOwner) {
+                settled = KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue, expectedActive);
+              }
+              if (settled) replaySettledGeneration = expectedActive;
+            } else {
+              settled = nativeOwner ? nativePredecessorReplaySettled(expectedActive)
+                  : KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(jobQueue, expectedActive);
+              if (settled) replaySettledGeneration = expectedActive;
+            }
           }
         } catch (InterruptedException interrupted) {
           Thread.currentThread().interrupt();
@@ -9211,6 +9241,8 @@ public final class KnowledgeServer implements Closeable {
           incumbent.mutationOwnerToken(), 10_000)) {
         if (fence == null || !incumbent.quiesceNativeProducerForHandoff(10_000)) return false;
         quiesced = true;
+        migrationRootSnapshot = KnowledgeServerMigrationOps.loadMigrationRootDeclarations(
+            startupConfiguration.paths().dataDir(), startupConfiguration.collections(), JSON);
         green = buildIndexRuntime(greenPath).withoutRecovery()
             .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open();
         migrationTransitionForPublication("migration-after-live-green-open");
@@ -9478,7 +9510,7 @@ public final class KnowledgeServer implements Closeable {
       return false;
     }
     // Unfenced pre-check: an ordinary candidate still earning its stamp never takes the fence.
-    if (observed.mutationAdmission().replayCertain() && !(refuseProvablyEmpty
+    if (observed.mutationAdmission().runtimeReplayCertain() && !(refuseProvablyEmpty
         && ingestLifecycle instanceof RunningRuntime observedGreen
         && observedGreen.indexCountOps().docCount() == 0L)) {
       return false;
@@ -9506,7 +9538,7 @@ public final class KnowledgeServer implements Closeable {
             || !recorded.sourceGeneration().equals(state.active_generation())
             || !candidate.equals(state.building_generation())) return false;
         String reason;
-        if (!producer.mutationAdmission().replayCertain()) {
+        if (!producer.mutationAdmission().runtimeReplayCertain()) {
           reason = "an unrecorded watcher mutation prevents certified promotion";
         } else if (refuseProvablyEmpty && recordedCandidateProvablyEmpty(recorded, candidate)) {
           reason = "the candidate is empty and an empty index cannot earn the embedding stamp";
@@ -9576,9 +9608,14 @@ public final class KnowledgeServer implements Closeable {
         if (ignoredFence == null) {
           throw new IllegalStateException("Migration mutation admission did not drain");
         }
-        if (!services.mutationAdmission().replayCertain()) {
+        if (!services.mutationAdmission().runtimeReplayCertain()) {
           indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
           throw new IOException("Migration has an unrecorded watcher mutation; rescan before retry");
+        }
+        // A live settlement may have acknowledged the durable row while this incarnation's
+        // uncertainty still awaits a final-fence proof. Retain that debt for this cutover.
+        for (var unavailable : services.mutationAdmission().unavailableRoots()) {
+          services.ingestService().retainUnavailableWatcherRoot(unavailable);
         }
         var state = indexGenerationManager.readStateBestEffort();
         if (state == null || !"MIGRATING".equals(state.migration_state())
@@ -9633,12 +9670,15 @@ public final class KnowledgeServer implements Closeable {
       }
       long remainingMs = MIGRATION_SWITCHING_MAX_DURATION_MS
           - Math.max(0L, System.currentTimeMillis() - switching.updated_at_ms());
+      if (KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue)) {
+        remainingMs = MIGRATION_SWITCHING_MAX_DURATION_MS;
+      }
       if (remainingMs <= 0L) return null;
       long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(remainingMs);
       try (var fence = current.mutationAdmission().beginFinalFence(
           current.mutationOwnerToken(), 10_000)) {
         if (fence == null) return null;
-        if (!current.mutationAdmission().replayCertain()) {
+        if (!current.mutationAdmission().runtimeReplayCertain()) {
           throw new IOException("Unrecorded watcher mutation prevents certified promotion");
         }
         if (recorded == null && !nativeProjectionSourcesReadyForPromotion()) return null;
@@ -9660,7 +9700,8 @@ public final class KnowledgeServer implements Closeable {
                 JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
                 buildingGeneration, this::projectionSourceReady, approvedGapVersions)
                 // Green's loop is still writing: replayed prunes take its fence.
-                .withPublisher(current.ingestService()),
+                .withPublisher(current.ingestService())
+                .withMigrationRoots(watcherReplayMigrationRoots()),
             this::migrationReplayCut, this::migrationPruneReplayCut);
         if (replay.isEmpty()) {
           if (recorded != null) {
@@ -9694,6 +9735,11 @@ public final class KnowledgeServer implements Closeable {
                     > cutoverMaxFailedJobs)
             || !finalizeEmbeddingRebuildBeforeCutover()) return null;
         migrationTransition("migration-green-drained");
+        // Failure callbacks can retain new root debt without taking the admission fence.
+        if (!current.mutationAdmission().replayCertain()
+            || !KnowledgeServerMigrationOps.promotionReplaySnapshotUnchanged(
+                jobQueue, buildingGeneration, replay.get())) return null;
+        current.ingestService().watcherReplayRefusal(null);
         current.commitActiveLexicalProjectionForCutover();
         green.commitOps().commitWithBuildState(
             LuceneRuntimeTypes.BuildState.COMPLETE,
@@ -9879,10 +9925,13 @@ public final class KnowledgeServer implements Closeable {
           runtimeSwapLock.lock();
         }
         if (result == null) return null;
-          boolean replayClean = KnowledgeServerMigrationOps.finishPromotedSwitchReplay(
-                  jobQueue, replay.orElseThrow())
-              && KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue,
-                  buildingGeneration);
+          java.util.function.BooleanSupplier acknowledge = () ->
+              KnowledgeServerMigrationOps.finishPromotedSwitchReplay(jobQueue, replay.orElseThrow())
+                  && KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue, buildingGeneration);
+          boolean rootReplay = replay.orElseThrow().versions().stream().anyMatch(op ->
+              io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION.equals(op.op()));
+          boolean replayClean = rootReplay
+              ? current.ingestService().acknowledgeWatcherReplay(acknowledge) : acknowledge.getAsBoolean();
           if (!replayClean) {
             log.warn("Promoted Green retains switch-buffer versions; ordered recovery will retry exact replay");
           } else {
@@ -10147,6 +10196,7 @@ public final class KnowledgeServer implements Closeable {
                 if (enumerateFiles) {
                   requireMigrationRootsOnRecordedVolume(roots, rc.collections());
                 }
+                if (enumerateFiles) migrationRootSnapshot = List.copyOf(roots);
                 migrationEnumeratorRootsTotal.set(roots.size());
                 int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
                 List<String> expectedSources = expectedProjectionSourceIds();
@@ -10216,6 +10266,23 @@ public final class KnowledgeServer implements Closeable {
 
   public ResolvedConfig.FileSource bundledHelpSource() {
     return startupConfiguration.collections().bundledHelp();
+  }
+
+  private List<ResolvedConfig.FileSource> watcherReplayMigrationRoots() throws IOException {
+    if (!KnowledgeServerMigrationOps.hasWatcherReconciliationDebt(jobQueue)) return List.of();
+    // A resumed native migration re-enumerates from a new complete declaration snapshot.
+    List<ResolvedConfig.FileSource> frozen = migrationRootSnapshot;
+    if (frozen == null) throw new IOException("Watcher replay waits for migration declarations");
+    try {
+      var current = loadMigrationRoots(startupConfiguration);
+      if (!new java.util.HashSet<>(frozen).equals(new java.util.HashSet<>(current))) {
+        throw new IOException("Watcher replay declarations changed since migration enumeration");
+      }
+    } catch (IOException incomplete) {
+      if (replayPublisher() != null) replayPublisher().watcherReplayRefusal(incomplete.getMessage());
+      throw incomplete;
+    }
+    return frozen;
   }
 
   private List<ResolvedConfig.FileSource> loadMigrationRoots(ResolvedConfig rc) throws IOException {
