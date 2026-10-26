@@ -166,9 +166,9 @@ final class ExtractionDropoutPdfFixturesTest {
       ExtractionArtifact artifact = extractor.extractArtifact(pdf);
       String actualContent = artifact.result().content();
       assertEquals(
-          "---\n\n" + expectedText,
+          expectedText,
           actualContent,
-          "production Tika must preserve the complete sequence and ordinary page separator");
+          "production Tika must preserve the complete sequence without a leading page separator");
       assertTrue(artifact.parserId().contains("structured"));
       var evidence = JsonMapper.builder().build().readTree(artifact.visualExtractionEvidenceJson());
       IndexDocument doc =
@@ -183,28 +183,25 @@ final class ExtractionDropoutPdfFixturesTest {
           + " storedQuality=" + doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE)
           + " method=" + doc.fields().get(SchemaFields.EXTRACTION_METHOD)
           + " marker=" + doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE));
-      // Known separate page-summary defect: preserve its independent recovery demand here.
-      // This does not establish whole-PDF sufficiency; the no-missing-page gate has its own test.
+      // A readable physical page is sufficient without a phantom missing page or recovery demand.
       assertAll(
-          () -> assertEquals(2, evidence.path("pageCount").asInt()),
-          () -> assertEquals(1, evidence.path("pagesMissingReadableText").asInt()),
-          () -> assertEquals("disabled", evidence.path("ocrSkipReason").asText()),
-          () -> assertEquals(245, evidence.path("textCharCount").asInt()),
-          () -> assertEquals(122.5, evidence.path("charsPerPage").asDouble()),
-          // 120 letters plus the five separator values: denominator uses code points.
-          () -> assertEquals(0.96, evidence.path("alphanumericRatio").asDouble()),
-          () -> assertEquals(0.8, evidence.path("textQualityScore").asDouble()),
+          () -> assertEquals(1, evidence.path("pageCount").asInt()),
+          () -> assertEquals(0, evidence.path("pagesMissingReadableText").asInt()),
+          () -> assertEquals("textual", evidence.path("ocrSkipReason").asText()),
+          () -> assertEquals(240, evidence.path("textCharCount").asInt()),
+          () -> assertEquals(240.0, evidence.path("charsPerPage").asDouble()),
+          // All 120 supplementary code points are letters.
+          () -> assertEquals(1.0, evidence.path("alphanumericRatio").asDouble()),
+          () -> assertEquals(1.0, evidence.path("textQualityScore").asDouble()),
           () -> assertEquals(
-              0.8, TextQualityAnalyzer.computeQualityScore(
+              1.0, TextQualityAnalyzer.computeQualityScore(
                   actualContent, evidence.path("pageCount").asInt())),
           () -> assertEquals(1.0, TextQualityAnalyzer.computeQualityScore(actualContent)),
           () -> assertEquals(1.0f, doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE)),
           () -> assertFalse(ExtractionDropoutPolicy.isDropout(actualContent)),
           () -> assertEquals(
-              SchemaFields.VDU_STATUS_PENDING, doc.fields().get(SchemaFields.VDU_STATUS)),
-          () -> assertEquals(
-              SchemaFields.VDU_DEMAND_KIND_BASELINE_TEXT,
-              doc.fields().get(SchemaFields.VDU_DEMAND_KIND)),
+              SchemaFields.VDU_STATUS_NOT_NEEDED, doc.fields().get(SchemaFields.VDU_STATUS)),
+          () -> assertNull(doc.fields().get(SchemaFields.VDU_DEMAND_KIND)),
           () -> assertEquals(
               SchemaFields.EXTRACTION_METHOD_TIKA_STRUCTURED,
               doc.fields().get(SchemaFields.EXTRACTION_METHOD)),
