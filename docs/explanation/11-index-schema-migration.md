@@ -838,8 +838,8 @@ Accepted limits:
 The Head exposes operator endpoints (Head never touches Lucene or `state.json` directly):
 
 Removal completion includes visibility through a fresh serving read, rather than just a queued
-delete. A buffered delete is pending, not completed. If watched-root removal cannot complete,
-the root remains registered with its retry state: retry Remove after the rebuild finishes.
+delete. A buffered delete is pending, not completed. Incomplete watched-root removal keeps
+its registration and retry state. Resolve the reported failure before retrying Remove; for a rebuilding refusal, wait for rebuild completion.
 The REST removal handler's explicit incomplete-removal response is HTTP 500 `INDEX_ERROR` with
 `retrySafe:false`; other refusals follow the normal API error mapping.
 `core.remove-watched-root` also reports failure rather than successful removal
@@ -847,7 +847,7 @@ and declares no automatic retry. A read-only serving view after a failed migrati
 removal before changing either generation. Check the operation result and current status instead
 of treating an accepted request as a completed rebuild or removal.
 
-An unreadable document count is unknown, even if an older numeric status field carries zero.
+An unreadable document count is unknown when no earlier count exists for that reader, even if a legacy numeric field carries zero.
 Read `indexedDocumentsUnknown` on the public knowledge status view (`docCountUnknown` in the
 internal status extras). Schema compatibility can be `UNAVAILABLE` when fingerprint,
 metadata or required count evidence cannot be read; uncertainty alone establishes neither
