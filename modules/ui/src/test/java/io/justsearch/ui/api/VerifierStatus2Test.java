@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Independent real-HTTP owner isolation matrix, written before reading candidate tests. */
 class VerifierStatus2Test extends VerifierStatusIsolationTest {
   static void set(Object target,String name,Object value) throws Exception {
-    var field=target.getClass().getDeclaredField(name); field.setAccessible(true); field.set(target,value);
+    var field=(target instanceof StatusLifecycleHandler ? StatusLifecycleHandler.class : target.getClass()).getDeclaredField(name); field.setAccessible(true); field.set(target,value);
   }
   @ParameterizedTest
   @ValueSource(strings={"inferenceSnapshotSupplier","conversationProtectionStateSupplier",
@@ -25,7 +25,6 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     try(var f=new Fixture(true)) {
       var clock = new AtomicLong(System.currentTimeMillis());
       f.handler.setClockForTesting(clock::get);
-      f.handler.setRefreshRequest(() -> f.freshDispatches.add(Thread.currentThread()));
       String heldLane = switch (name) {
         case "inferenceSnapshotSupplier" -> "inference";
         case "conversationProtectionStateSupplier" -> "conversation";
@@ -42,12 +41,18 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       // The lifecycle supplier is read independently by power/resume/bulk-gate/indexing-hold.
       var entered=new CountDownLatch(name.equals("knowledgeServerLifecycleSupplier") ? 4 : 1);
       var release=new CountDownLatch(1);
+      f.work.gates.add(release);
       var calls=new AtomicInteger();
-      var input = new AtomicReference<>(knownSupplierValue(name, clock.get(), false));
+      var consumedInputs = new ConcurrentLinkedQueue<Object>();
+      var consumedStatuses = new ConcurrentLinkedQueue<io.justsearch.app.api.gpl.GplJobStatus>();
+      var input = new AtomicReference<>(knownSupplierValue(name, clock.get(), false, consumedStatuses));
       Supplier<Object> supplier=()->{
+        f.work.sourceEntered();
+        Object supplied = input.get();
+        consumedInputs.add(supplied);
         calls.incrementAndGet();
-        if(block.get()){ entered.countDown(); try{release.await();}catch(InterruptedException e){throw new RuntimeException(e);} }
-        return input.get();
+        if(block.get()){ entered.countDown(); try{release.await();}catch(InterruptedException e){Thread.currentThread().interrupt();f.work.errors.add(e);throw new RuntimeException(e);} }
+        return supplied;
       };
       switch (name) {
         case "devicePlanSupplier" -> f.handler.setDevicePlanSupplier(
@@ -58,15 +63,15 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       }
       if(name.equals("gpuCapabilitiesSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
       if(name.equals("lambdamartRerankerSupplier")) {
-        Object coordinator = knownSupplierValue("gplCoordinatorSupplier", clock.get(), true);
+        Object coordinator = knownSupplierValue("gplCoordinatorSupplier", clock.get(), true, consumedStatuses);
         set(f.handler,"gplCoordinatorSupplier", (Supplier<Object>)()->coordinator);
       }
       if(name.equals("gplCoordinatorSupplier")) {
-        Object unloadedReranker = knownSupplierValue("lambdamartRerankerSupplier", clock.get(), true);
+        Object unloadedReranker = knownSupplierValue("lambdamartRerankerSupplier", clock.get(), true, consumedStatuses);
         set(f.handler,"lambdamartRerankerSupplier", (Supplier<Object>)()->unloadedReranker);
       }
       if(name.equals("rrdStoreSupplier")) {
-        Object capabilities = knownSupplierValue("gpuCapabilitiesSupplier", clock.get(), false);
+        Object capabilities = knownSupplierValue("gpuCapabilitiesSupplier", clock.get(), false, consumedStatuses);
         set(f.handler,"gpuCapabilitiesSupplier", (Supplier<Object>)()->capabilities);
         set(f.handler,"cachedGpuStatusAtMs",0L);
       }
@@ -78,16 +83,21 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       f.drainPublications(null);
       var beforeCompanion = captureCompanion(f, name);
       Instant beforeProjected = Instant.now();
-      f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
       assertTrue(calls.get() > 0, "mandatory supplier prerequisite must reach " + name);
+      assertTrue(consumedInputs.stream().anyMatch(value -> value == input.get()),
+          "the pre-hold invocation consumed the exact supplied input");
+      if (name.equals("gplCoordinatorSupplier")) assertTrue(consumedStatuses.stream()
+          .anyMatch(value -> value.status() == io.justsearch.app.api.gpl.GplJobStatus.Status.FAILED),
+          "the unloaded-reranker branch must actually consume FAILED");
       var before = f.published(heldLane);
       assertEquals(clock.get(), before.observedAtMs(), "known supplier publication before hold");
       assertFalse(before.failed());
       assertFalse(before.staleSource());
       assertNotNull(before.value(), "mandatory supplier must publish a typed value, not absence");
       var knownBody = get(f, "");
+      assertHealthyWorkerAndRegistry(f, knownBody, clock.get());
       assertKnownPublic(name, knownBody, before, false);
-      assertCompanion(name, knownBody, beforeCompanion, false, beforeProjection, beforeProjected);
+      assertCompanion(name, knownBody, beforeCompanion, false, beforeProjection, beforeProjected, companionAge(f, name, clock.get()));
       assertPublicFreshness(name, knownBody, false, false);
       long period = before.periodMs();
       assertTrue(heldLane.equals("gpu") ? period == 5_000L || period == 10_000L
@@ -102,7 +112,8 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       if(name.equals("rrdStoreSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
       Instant heldProjection = Instant.now();
       block.set(true);
-      var sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
+      var sampler=f.work.startSampler();
+      Throwable phaseFailure = null;
       try {
         assertTrue(entered.await(2,TimeUnit.SECONDS), "mandatory supplier must enter: " + name);
         sampler.join(6000);
@@ -113,23 +124,23 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         f.handler.sampleAndBuildStatusSnapshot();
         assertSame(before, f.published(heldLane), "sampling unrelated owners cannot renew the held source");
         assertTrue(f.lane(heldLane).stale(clock.get()), "the held supplier publication must actually be stale");
+        f.drainPublications(heldLane);
         for (String healthy : new String[] {"worker", "registry"}) {
-          f.lane(healthy).completion().get(2, TimeUnit.SECONDS);
           var publication = f.published(healthy);
           assertEquals(clock.get(), publication.observedAtMs(), "fresh unrelated publication: " + healthy);
           assertFalse(publication.failed(), healthy);
           assertFalse(publication.staleSource(), healthy);
           assertNotNull(publication.value(), healthy);
         }
-        f.drainPublications(heldLane);
         var heldCompanion = captureCompanion(f, name);
         Instant heldProjected = Instant.now();
         var s=get(f,"");
+        assertHealthyWorkerAndRegistry(f, s, clock.get());
         assertPublicFreshness(name, s, true, false);
         assertHeldPublic(name, s);
         boolean companionHeld = heldLane.startsWith("readiness-");
         assertCompanion(name, s, heldCompanion, false, companionHeld ? beforeProjection : heldProjection,
-            companionHeld ? beforeProjected : heldProjected);
+            companionHeld ? beforeProjected : heldProjected, companionAge(f, name, clock.get()));
         System.out.println("OWNER="+name+" calls="+calls.get());
         assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"worker independent of "+name);
         assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean(),"registry AI independent of "+name);
@@ -140,20 +151,39 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
         int heldCalls=calls.get();
         get(f,"?fresh=true");get(f,"?fresh=true");get(f,"?fresh=true");
         assertEquals(heldCalls,calls.get(),"no duplicate blocked producer");
-      } finally {block.set(false);release.countDown();sampler.join(6000);assertFalse(sampler.isAlive());}
+      } catch (Exception | Error phaseError) { phaseFailure = phaseError; throw phaseError; } finally {
+        try {block.set(false);release.countDown();sampler.join(6000);assertFalse(sampler.isAlive());
+        } catch (Exception | Error cleanupError) {
+          if (phaseFailure == null) throw cleanupError;
+          if (cleanupError != phaseFailure) phaseFailure.addSuppressed(cleanupError);
+        }
+      }
       // The released call began before aging. Drain it, then demand a post-hold source read.
-      f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
       f.drainPublications(null);
       int drainedCalls = calls.get();
-      input.set(knownSupplierValue(name, clock.get(), true));
+      int oldStatusReads = consumedStatuses.size();
+      Object oldInput = input.get();
+      input.set(knownSupplierValue(name, clock.get(), true, consumedStatuses));
       if (heldLane.equals("gpu")) set(f.handler,"cachedGpuStatusAtMs",0L);
       Instant recoveryProjection = Instant.now();
       f.handler.sampleAndBuildStatusSnapshot();
       f.drainPublications(null);
       var recoveryCompanion = captureCompanion(f, name);
       Instant recoveryProjected = Instant.now();
-      f.lane(heldLane).completion().get(2, TimeUnit.SECONDS);
       assertTrue(calls.get() > drainedCalls, "recovery must read the changed mandatory supplier");
+      assertNotSame(oldInput, input.get());
+      assertTrue(consumedInputs.stream().skip(drainedCalls).anyMatch(value -> value == input.get()),
+          "a new invocation must consume exactly the changed supplier input");
+      if (name.equals("gplCoordinatorSupplier")) {
+        var previous = consumedStatuses.stream().limit(oldStatusReads).toList();
+        var recoveredStatuses = consumedStatuses.stream().skip(oldStatusReads).toList();
+        assertFalse(recoveredStatuses.isEmpty(), "recovery must consume a new coordinator status");
+        for (var status : recoveredStatuses) {
+          assertEquals(io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED, status.status());
+          assertTrue(previous.stream().noneMatch(old -> old == status), "COMPLETED is a distinct supplied status");
+        }
+        // Positively observed recovery to intentional absence: READY/not_configured is healthy.
+      }
       var publication = f.published(heldLane);
       assertEquals(clock.get(), publication.observedAtMs(), "recovery must publish after the hold");
       assertNotSame(before, publication);
@@ -161,15 +191,28 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       assertFalse(publication.staleSource());
       assertNotNull(publication.value());
       var recovered=get(f,"");
+      assertHealthyWorkerAndRegistry(f, recovered, clock.get());
       assertKnownPublic(name, recovered, publication, true);
-      assertCompanion(name, recovered, recoveryCompanion, true, recoveryProjection, recoveryProjected);
+      assertCompanion(name, recovered, recoveryCompanion, true, recoveryProjection, recoveryProjected, companionAge(f, name, clock.get()));
       assertPublicFreshness(name, recovered, false, true);
       assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
       assertFalse(recovered.path("readiness").path("components").path("ai").path("stale").asBoolean());
       if(name.equals("inferenceSnapshotSupplier")) assertFalse(recovered.path("operating").path("freshness").path("staleSources").toString().contains("chat"),"recovered inference clears only its stale state");
     }
   }
-  private static Object knownSupplierValue(String name, long nowMs, boolean after) {
+  private static void assertHealthyWorkerAndRegistry(Fixture f, tools.jackson.databind.JsonNode body, long workerEpoch) {
+    assertWorkerEpoch(body, workerEpoch);
+    var since = f.components.handle("generative").snapshot().stateSince();
+    assertEquals(since.toString(), body.path("components").path("generative").path("state_since").asText());
+    assertEquals(since.toString(), body.path("readiness").path("engineComponents").path("generative").path("stateSince").asText());
+    var ai = body.path("readiness").path("components").path("ai");
+    long observed = Instant.parse(ai.path("observedAt").asText()).toEpochMilli();
+    assertTrue(observed >= f.requestStartedMs && observed <= f.requestCompletedMs);
+    assertEquals(0L, ai.path("stalenessMs").asLong(-1L));
+  }
+
+  private static Object knownSupplierValue(String name, long nowMs, boolean after,
+      ConcurrentLinkedQueue<io.justsearch.app.api.gpl.GplJobStatus> consumedStatuses) {
     return switch (name) {
       case "inferenceSnapshotSupplier" -> new InferenceRuntimeView("ONLINE", null, false, null,
           new LifecycleCounters(0L, 0L, 0L), true, after ? "Recovering" : "Healthy", "", "", "CHAT");
@@ -229,9 +272,10 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       }
       case "gplCoordinatorSupplier" -> {
         var coordinator = mock(io.justsearch.app.api.gpl.GplStatusProvider.class);
-        when(coordinator.getStatus()).thenReturn(new io.justsearch.app.api.gpl.GplJobStatus(
+        var status = new io.justsearch.app.api.gpl.GplJobStatus(
             after ? io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED
-                : io.justsearch.app.api.gpl.GplJobStatus.Status.FAILED, 1L, 1L, 1L, null, null));
+                : io.justsearch.app.api.gpl.GplJobStatus.Status.FAILED, 1L, 1L, 1L, null, null);
+        when(coordinator.getStatus()).thenAnswer(call -> { consumedStatuses.add(status); return status; });
         yield coordinator;
       }
       default -> throw new AssertionError("no typed value for " + name);
@@ -337,8 +381,13 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     return dimension == null ? null : (ReadinessComponentView) f.published("readiness-" + dimension).value();
   }
 
+  private static long companionAge(Fixture f, String name, long now) throws Exception {
+    String dimension = companionDimension(name);
+    return dimension == null ? 0L : Math.max(0L, now - f.published("readiness-" + dimension).observedAtMs());
+  }
+
   private static void assertCompanion(String name, tools.jackson.databind.JsonNode body,
-      ReadinessComponentView publication, boolean after, Instant started, Instant completed) {
+      ReadinessComponentView publication, boolean after, Instant started, Instant completed, long expectedAge) {
     String dimension = companionDimension(name);
     if (dimension == null) return;
     assertNotNull(publication, "capture the relevant companion before HTTP");
@@ -371,6 +420,8 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
     assertEquals(state, component.path("state").asText());
     assertEquals(reason, component.path("reasonCode").asText(null));
     assertEquals(source, component.path("source").asText());
+    assertEquals(expectedAge, component.path("stalenessMs").asLong(-1L),
+        "companion age uses its injected-clock lane, including legitimate zero-age stale projections");
     // Companion time belongs to its real projection, independent of raw fake/event time.
     Instant observed = Instant.parse(publication.observedAt());
     assertFalse(observed.isBefore(started), "companion predates its actual projection window");
@@ -432,17 +483,20 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       f.handler.setConversationProtectionSupplier(()->{if(fail.get())throw new IllegalStateException("injected failure");return state.get();});
       f.handler.sampleAndBuildStatusSnapshot();
       assertEquals("unlocked",get(f,"").path("conversationProtection").path("state").asText());
+      f.drainPublications(null);
       fail.set(true);f.handler.sampleAndBuildStatusSnapshot();
+      f.drainPublications(null);
       var failed=get(f,"");assertEquals("unknown",failed.path("conversationProtection").path("state").asText());
       assertFalse(failed.path("meta").path("workerRpcStale").asBoolean());
       state.set("locked");fail.set(false);f.handler.sampleAndBuildStatusSnapshot();
+      f.drainPublications(null);
       assertEquals("locked",get(f,"").path("conversationProtection").path("state").asText());
     }
   }
   @Test void freshImmediatelyReflectsConversationAction() throws Exception {
     try(var f=new Fixture(true)) {
       var state=new AtomicReference<>("locked");f.handler.setConversationProtectionSupplier(state::get);
-      f.handler.sampleAndBuildStatusSnapshot();get(f,"");
+      f.handler.sampleAndBuildStatusSnapshot();f.drainPublications(null);get(f,"");
       state.set("unlocked");
       assertEquals("unlocked",get(f,"?fresh=true").path("conversationProtection").path("state").asText(),"action refresh must publish post-action state in its response");
     }
@@ -453,9 +507,19 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       var field=f.components.registry().getClass().getDeclaredField("monitor");field.setAccessible(true);
       Object monitor=field.get(f.components.registry());
       var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
-      var holder=Thread.ofPlatform().daemon().start(()->{synchronized(monitor){entered.countDown();try{release.await();}catch(InterruptedException e){Thread.currentThread().interrupt();}}});
+      var holder=Thread.ofPlatform().daemon().unstarted(()->{synchronized(monitor){entered.countDown();try{release.await();}catch(InterruptedException e){Thread.currentThread().interrupt();f.work.errors.add(e);}}});
+      f.work.threads.add(holder);
+      holder.setUncaughtExceptionHandler((thread, failure) -> f.work.errors.add(failure));
+      holder.start();
+      Throwable phaseFailure = null;
       try {assertTrue(entered.await(2,TimeUnit.SECONDS));get(f,"");get(f,"?fresh=true");}
-      finally {release.countDown();holder.join(3000);assertFalse(holder.isAlive());}
+      catch (Exception | Error phaseError) { phaseFailure = phaseError; throw phaseError; } finally {
+        try {release.countDown();holder.join(3000);assertFalse(holder.isAlive());
+        } catch (Exception | Error cleanupError) {
+          if (phaseFailure == null) throw cleanupError;
+          if (cleanupError != phaseFailure) phaseFailure.addSuppressed(cleanupError);
+        }
+      }
     }
   }
 }

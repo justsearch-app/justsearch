@@ -76,15 +76,14 @@ final class StatusNonBlockingHttpTest {
       "agent", "online-ai", "gpu-saturation", "model-file-path", "power", "resume", "vision"})
   void blockedDependencyReturnsAgedSnapshot(String source) throws Exception {
     try (var fixture = new Fixture(source)) {
-      fixture.handler.setRefreshRequest(() -> fixture.freshDispatches.add(Thread.currentThread()));
       Instant beforeProjection = Instant.now();
+      fixture.projectionStartedMs = beforeProjection.toEpochMilli();
       fixture.handler.sampleAndBuildStatusSnapshot();
       fixture.drainPublications();
       var beforeCompanion = fixture.captureCompanion();
       Instant beforeProjected = Instant.now();
       var heldPublications = new java.util.LinkedHashMap<String, StatusObservation.Sample<?>>();
       for (String lane : fixture.heldLanes()) {
-        fixture.lane(lane).completion().get(2, TimeUnit.SECONDS);
         var publication = fixture.published(lane);
         assertEquals(fixture.sourceObservedAt(lane), publication.observedAtMs(), "known publication before hold: " + lane);
         assertFalse(publication.failed(), lane);
@@ -106,15 +105,20 @@ final class StatusNonBlockingHttpTest {
       // A warm HTTP request establishes that the route/serialization work before contention.
       assertEquals(200, fixture.get("").statusCode());
       Instant heldProjection = Instant.now();
+      fixture.projectionStartedMs = heldProjection.toEpochMilli();
       fixture.block.set(true);
       fixture.expireGpuReading();
-      Thread sampler = Thread.ofPlatform().daemon().start(() -> {
+      Thread sampler = Thread.ofPlatform().daemon().unstarted(() -> {
         if (source.equals("assembly-lock") || source.equals("admission-lock")) {
           synchronized (fixture.heldLock()) { fixture.pause(); }
         } else {
           fixture.handler.sampleAndBuildStatusSnapshot();
         }
       });
+      fixture.work.threads.add(sampler);
+      sampler.setUncaughtExceptionHandler((thread, failure) -> fixture.work.errors.add(failure));
+      sampler.start();
+      Throwable phaseFailure = null;
       try {
         assertTrue(fixture.entered.await(10, TimeUnit.SECONDS), "the dependency is held");
         if (!source.endsWith("lock")) {
@@ -137,15 +141,15 @@ final class StatusNonBlockingHttpTest {
         }
         if (!source.endsWith("lock")) {
           // Every other lane keeps sampling and stays current; only the held one ages.
-          Thread pass = Thread.ofPlatform().daemon().start(fixture.handler::sampleAndBuildStatusSnapshot);
+          Thread pass = fixture.work.startSampler();
           pass.join(10_000L);
           assertFalse(pass.isAlive(), "the next sampler pass is bounded while " + source + " is held");
+          fixture.drainPublications();
           for (String lane : new String[] {"worker", "registry", "disk", "conversation"}) {
             if ((source.equals("worker") && lane.equals("worker"))
                 || (source.equals("registry") && lane.equals("registry"))
                 || (source.equals("disk-pressure") && lane.equals("disk"))
                 || (source.equals("conversation") && lane.equals("conversation"))) continue;
-            fixture.lane(lane).completion().get(2, TimeUnit.SECONDS);
             var publication = fixture.published(lane);
             assertEquals(fixture.now.get(), publication.observedAtMs(), "fresh unrelated source: " + lane);
             assertFalse(publication.failed(), lane);
@@ -220,24 +224,28 @@ final class StatusNonBlockingHttpTest {
         assertIndependentComponentsFresh(body, source);
         // The subsequent fresh request retains HTTP 200 and the unchanged five-second client deadline.
         assertEquals(200, assertDoesNotThrow(() -> fixture.get("?fresh=true")).statusCode());
-      } finally {
-        fixture.release.countDown();
-        sampler.join(10_000L);
-        assertFalse(sampler.isAlive(), "the owned sampler must exit after release");
+      } catch (Exception | Error phaseError) { phaseFailure = phaseError; throw phaseError; } finally {
+        try {
+          fixture.release.countDown();
+          sampler.join(10_000L);
+          assertFalse(sampler.isAlive(), "the owned sampler must exit after release");
+        } catch (Exception | Error cleanupError) {
+          if (phaseFailure == null) throw cleanupError;
+          if (cleanupError != phaseFailure) phaseFailure.addSuppressed(cleanupError);
+        }
       }
       fixture.block.set(false);
       // A released read began at the old clock. Drain it before requiring a new source read.
-      for (String lane : fixture.heldLanes()) fixture.lane(lane).completion().get(2, TimeUnit.SECONDS);
       fixture.drainPublications();
       fixture.advanceRecoveryInput();
       fixture.expireGpuReading();
       Instant recoveryProjection = Instant.now();
+      fixture.projectionStartedMs = recoveryProjection.toEpochMilli();
       fixture.handler.sampleAndBuildStatusSnapshot();
       fixture.drainPublications();
       var recoveryCompanion = fixture.captureCompanion();
       Instant recoveryProjected = Instant.now();
       for (var entry : heldPublications.entrySet()) {
-        fixture.lane(entry.getKey()).completion().get(2, TimeUnit.SECONDS);
         var publication = fixture.published(entry.getKey());
         assertNotSame(entry.getValue(), publication, "release must permit a new source publication");
         assertEquals(fixture.sourceObservedAt(entry.getKey()), publication.observedAtMs(), "recovery publication after aging");
@@ -248,6 +256,7 @@ final class StatusNonBlockingHttpTest {
       var recovered = fixture.get("");
       assertEquals(200, recovered.statusCode());
       var recoveredBody = new ObjectMapper().readTree(recovered.body());
+      fixture.assertNewInputConsumed();
       fixture.assertKnownPublic(recoveredBody);
       fixture.assertCompanion(recoveredBody, recoveryCompanion, recoveryProjection, recoveryProjected);
       fixture.assertPublicFreshness(recoveredBody, false);
@@ -326,15 +335,32 @@ final class StatusNonBlockingHttpTest {
     StatusComponentFixture components;
     final AtomicBoolean block = new AtomicBoolean();
     final AtomicBoolean fail = new AtomicBoolean();
-    final java.util.concurrent.atomic.AtomicInteger freshRequests = new java.util.concurrent.atomic.AtomicInteger();
-    final java.util.concurrent.ConcurrentLinkedQueue<Thread> freshDispatches = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    StatusFixtureWork work;
+    record SourceRead(String dependency, boolean after) {}
+    final java.util.concurrent.ConcurrentLinkedQueue<SourceRead> sourceReads = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    int oldSourceReads;
+    int oldRerankerReads;
+    int oldCoordinatorReads;
+    int oldRegistryEvents;
+    final java.util.concurrent.ConcurrentLinkedQueue<io.justsearch.core.component.EngineComponentSnapshot> registryEvents = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    final java.util.concurrent.ConcurrentLinkedQueue<Boolean> rerankerReads = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    final java.util.concurrent.ConcurrentLinkedQueue<io.justsearch.app.api.gpl.GplJobStatus> coordinatorReads = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    final AtomicLong consumedAgentCount = new AtomicLong();
+    final AtomicLong consumedWorkerDocuments = new AtomicLong();
+    final AtomicLong consumedGpuTime = new AtomicLong();
+    final AtomicLong consumedEncryptionTime = new AtomicLong();
+    Instant registryStateSince;
+    long companionObservedAtMs;
+    long projectionStartedMs;
+    long requestStartedMs;
+    long requestCompletedMs;
     final AtomicLong now = new AtomicLong(System.currentTimeMillis());
     final AtomicLong indexedDocuments = new AtomicLong(10L);
     final long initialAtMs = now.get();
     final AtomicBoolean recovered = new AtomicBoolean();
     final AtomicLong readingAtMs = new AtomicLong(now.get() - 137L);
     java.nio.file.Path modelHome;
-    final CountDownLatch entered = new CountDownLatch(1);
+    final CountDownLatch entered;
     final CountDownLatch release = new CountDownLatch(1);
     StatusLifecycleHandler handler;
     Javalin app;
@@ -347,9 +373,11 @@ final class StatusNonBlockingHttpTest {
 
     Fixture(String source) throws Exception {
       this.source = source;
+      entered = new CountDownLatch(source.equals("bulk-gate") ? 4 : 1);
       priorConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
       try {
         components = new StatusComponentFixture();
+        registryStateSince = components.handle("generative").snapshot().stateSince();
         http = HttpClient.newHttpClient();
         if (source.equals("model-file-path")) {
           modelHome = java.nio.file.Files.createTempDirectory("status-model-contract-");
@@ -372,58 +400,76 @@ final class StatusNonBlockingHttpTest {
         var onlineAi = mock(io.justsearch.app.api.OnlineAiService.class, withSettings()
             .extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeIntrospection.class));
         when(((io.justsearch.app.api.OnlineAiRuntimeIntrospection) onlineAi).hasVisionCapability())
-            .thenAnswer(i -> { gate("vision"); return !source.equals("vision") || !recovered.get(); });
-        when(onlineAi.isAvailable()).thenAnswer(i -> { gate("online-ai"); return source.equals("online-ai") && !recovered.get(); });
+            .thenAnswer(i -> { boolean after = gate("vision"); return !source.equals("vision") || !after; });
+        when(onlineAi.isAvailable()).thenAnswer(i -> { boolean after = gate("online-ai"); return source.equals("online-ai") && !after; });
         var agent = mock(io.justsearch.agent.api.AgentService.class);
         when(agent.isAvailable()).thenAnswer(i -> { gate("agent"); return true; });
-        when(agent.activeSessionCount()).thenAnswer(i -> source.equals("agent") ? (recovered.get() ? 8 : 7) : 0);
+        when(agent.activeSessionCount()).thenAnswer(i -> {
+          int count = source.equals("agent") ? (recovered.get() ? 8 : 7) : 0;
+          consumedAgentCount.set(count);
+          return count;
+        });
         var reranker = mock(io.justsearch.app.api.gpl.RerankerService.class);
-        when(reranker.isLoaded()).thenAnswer(i -> !recovered.get());
+        when(reranker.isLoaded()).thenAnswer(i -> {
+          boolean loaded = !recovered.get();
+          rerankerReads.add(loaded);
+          return loaded;
+        });
         var coordinator = mock(io.justsearch.app.api.gpl.GplStatusProvider.class);
-        when(coordinator.getStatus()).thenReturn(new io.justsearch.app.api.gpl.GplJobStatus(
-            io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED, 1L, 1L, 1L, null, null));
+        var completedStatus = new io.justsearch.app.api.gpl.GplJobStatus(
+            io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED, 1L, 1L, 1L, null, null);
+        when(coordinator.getStatus()).thenAnswer(i -> { coordinatorReads.add(completedStatus); return completedStatus; });
         handler = new StatusLifecycleHandler(onlineAi, agent,
-            () -> { gate("inference"); return new InferenceRuntimeView("ONLINE", null, false, null,
-                new LifecycleCounters(0L, 0L, 0L), true, source.equals("inference") && recovered.get() ? "Recovering" : "Healthy", "", "", "CHAT"); },
-            null, null, null, Instant.now(), () -> { gate("disk-pressure"); return source.equals("disk-pressure") && recovered.get() ? "WARNING" : "OK"; },
+            () -> { boolean after = gate("inference"); return new InferenceRuntimeView("ONLINE", null, false, null,
+                new LifecycleCounters(0L, 0L, 0L), true, source.equals("inference") && after ? "Recovering" : "Healthy", "", "", "CHAT"); },
+            null, null, null, Instant.now(), () -> { boolean after = gate("disk-pressure"); return source.equals("disk-pressure") && after ? "WARNING" : "OK"; },
             () -> { gate("gpl"); return source.equals("gpl") ? reranker : null; },
             () -> source.equals("gpl") ? coordinator : null,
-            () -> { gate("gpu-capabilities"); return gpuService(); }, graph.worker(), graph.inference());
+            () -> { boolean after = gate("gpu-capabilities"); return gpuService(after); }, graph.worker(), graph.inference());
+        work = new StatusFixtureWork(handler);
+        handler = work.handler;
         components.attach(handler);
         if (source.equals("online-ai") || source.equals("gpu-saturation")) {
           var monitor = mock(io.justsearch.ui.observability.GpuSaturationMonitor.class);
           when(monitor.compute(anyLong())).thenAnswer(i -> {
-            gate("gpu-saturation");
+            boolean after = gate("gpu-saturation");
             // Online-AI's true value must affect the public verdict; monitor absence would be READY.
             return new io.justsearch.ui.observability.GpuSaturationMonitor.Result(95.0,
                 (source.equals("online-ai") && (long) i.getArgument(0) > 0)
-                    || (source.equals("gpu-saturation") && recovered.get()) ? "HEALTHY" : "SATURATED");
+                    || (source.equals("gpu-saturation") && after) ? "HEALTHY" : "SATURATED");
           });
           handler.setGpuSaturationMonitor(monitor);
         }
         if (source.equals("registry")) {
           var registry = mock(EngineComponentRegistry.class);
           when(registry.snapshot()).thenAnswer(i -> { gate("registry"); return components.registry().snapshot(); });
+          when(registry.subscribe(any())).thenAnswer(i -> {
+            java.util.function.Consumer<io.justsearch.core.component.EngineComponentSnapshot> listener = i.getArgument(0);
+            return components.registry().subscribe(snapshot -> {
+              listener.accept(snapshot);
+              registryEvents.add(snapshot); // Record successful consumption by the real handler callback.
+            });
+          });
           handler.setIndexComponent(registry, components.index());
         }
         handler.setClockForTesting(now::get);
-        handler.setConversationProtectionSupplier(() -> { gate("conversation"); return source.equals("conversation") && recovered.get() ? "unlocked" : "locked"; });
+        handler.setConversationProtectionSupplier(() -> { boolean after = gate("conversation"); return source.equals("conversation") && after ? "unlocked" : "locked"; });
         var telemetry = new io.justsearch.telemetry.TelemetryHealthState();
         telemetry.recordFlushFailure();
         var recoveredTelemetry = new io.justsearch.telemetry.TelemetryHealthState();
         recoveredTelemetry.recordFlushFailure();
         recoveredTelemetry.recordFlushFailure();
         recoveredTelemetry.recordDiskSpaceLowEvent();
-        handler.setTelemetryHealthSupplier(() -> { gate("telemetry"); return source.equals("telemetry") ? (recovered.get() ? recoveredTelemetry : telemetry) : null; });
-        handler.setVduCapabilitySnapshotSupplier(() -> { gate("vdu");
+        handler.setTelemetryHealthSupplier(() -> { boolean after = gate("telemetry"); return source.equals("telemetry") ? (after ? recoveredTelemetry : telemetry) : null; });
+        handler.setVduCapabilitySnapshotSupplier(() -> { boolean after = gate("vdu");
           return source.equals("vdu")
               ? new io.justsearch.app.services.vdu.VduCapabilityState.Snapshot(
-                  recovered.get() ? "vdu.missing_mmproj" : "vdu.circuit_open", now.get())
+                  after ? "vdu.missing_mmproj" : "vdu.circuit_open", now.get())
               : null; });
-        handler.setVduProcessingSupplier(() -> { gate("vdu-processing"); return source.equals("vdu-processing") && !recovered.get(); });
-        handler.setDevicePlanSupplier(() -> { gate("device-plan");
+        handler.setVduProcessingSupplier(() -> { boolean after = gate("vdu-processing"); return source.equals("vdu-processing") && !after; });
+        handler.setDevicePlanSupplier(() -> { boolean after = gate("device-plan");
           if (!source.equals("device-plan")) return null;
-          var arena = new io.justsearch.ort.GpuArenaPlan(recovered.get()
+          var arena = new io.justsearch.ort.GpuArenaPlan(after
               ? io.justsearch.ort.GpuArenaPlan.Profile.P16_PLUS : io.justsearch.ort.GpuArenaPlan.Profile.P12,
               false, new io.justsearch.ort.GpuArenaPlan.Chat(java.util.Optional.empty(),
                   java.util.OptionalInt.empty(), false, 0.0, false),
@@ -434,14 +480,16 @@ final class StatusNonBlockingHttpTest {
         var probe = mock(io.justsearch.app.services.atrest.DiskEncryptionProbe.class);
         when(probe.current()).thenReturn(io.justsearch.app.services.atrest.AtRestProtection.unknown());
         when(probe.reading()).thenAnswer(i -> {
-          gate("at-rest");
+          long readingTime = readingAtMs.get();
+          boolean after = gate("at-rest");
+          consumedEncryptionTime.set(readingTime);
           if (!source.equals("at-rest") && !source.endsWith("lock")) return null;
           return new io.justsearch.app.services.atrest.DiskEncryptionProbe.Reading(
-              source.equals("at-rest") && recovered.get()
+              source.equals("at-rest") && after
                   ? new io.justsearch.app.services.atrest.AtRestProtection(
                       io.justsearch.app.services.atrest.AtRestProtection.State.NOT_ENCRYPTED, "fixture-volume",
                       io.justsearch.app.services.atrest.AtRestProtection.Confidence.HIGH) : encrypted(),
-              readingAtMs.get(), Duration.ZERO, false);
+              readingTime, Duration.ZERO, false);
         });
         handler.setAtRestTap(null, probe);
         {
@@ -450,9 +498,11 @@ final class StatusNonBlockingHttpTest {
           var client = mock(io.justsearch.app.services.worker.KnowledgeClient.class);
           when(ks.hasClient()).thenReturn(true);
           when(client.getWorkerOperationalView(any())).thenAnswer(i -> {
+            long documents = indexedDocuments.get();
             gate("worker");
+            consumedWorkerDocuments.set(documents);
             return WorkerOperationalViewBuilder.builder(WorkerOperationalView.fallback("READY"))
-                .core(new CoreIndexView(true, indexedDocuments.get(), 0, "SERVING", 0, 0))
+                .core(new CoreIndexView(true, documents, 0, "SERVING", 0, 0))
                 .visualExtraction(new VisualExtractionView(false, false, null, null, 0L,
                     source.equals("vdu") ? 1L : 0L, null, false)).build();
           });
@@ -462,8 +512,8 @@ final class StatusNonBlockingHttpTest {
         if (source.equals("rrd")) {
           var rrd = mock(io.justsearch.telemetry.RrdMetricStore.class);
           when(rrd.query(anyString(), anyLong(), anyLong())).thenAnswer(i -> {
-            gate("rrd"); return new io.justsearch.telemetry.RrdMetricStore.TimeSeriesResult(
-                i.getArgument(0), new long[] {i.getArgument(2)}, new double[] {recovered.get() ? 42.5 : 37.5});
+            boolean after = gate("rrd"); return new io.justsearch.telemetry.RrdMetricStore.TimeSeriesResult(
+                i.getArgument(0), new long[] {i.getArgument(2)}, new double[] {after ? 42.5 : 37.5});
           });
           handler.setRrdStoreSupplier(() -> rrd);
         }
@@ -472,33 +522,36 @@ final class StatusNonBlockingHttpTest {
           var bulk = new io.justsearch.core.scheduling.BulkWorkGate();
           bulk.setGame(true);
           when(ks.bulkWork()).thenReturn(bulk);
-          handler.setKnowledgeServerLifecycleSupplier(() -> { gate("bulk-gate"); bulk.setGame(!recovered.get()); return ks; });
+          handler.setKnowledgeServerLifecycleSupplier(() -> { boolean after = gate("bulk-gate"); bulk.setGame(!after); return ks; });
         }
         if (source.equals("power") || source.equals("resume")) {
           var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
           when(ks.bulkWork()).thenReturn(new io.justsearch.core.scheduling.BulkWorkGate());
           when(ks.energyState()).thenAnswer(i -> {
-            gate("power");
-            return source.equals("power") && recovered.get()
+            boolean after = gate("power");
+            return source.equals("power") && after
                 ? new io.justsearch.app.util.EnergyState(io.justsearch.app.util.EnergyState.Intent.REDUCED,
                     io.justsearch.app.util.EnergyState.Source.BATTERY)
                 : new io.justsearch.app.util.EnergyState(io.justsearch.app.util.EnergyState.Intent.FULL,
                     io.justsearch.app.util.EnergyState.Source.AC);
           });
-          when(ks.recentlyResumed(anyLong())).thenAnswer(i -> { gate("resume"); return !source.equals("resume") || !recovered.get(); });
+          when(ks.recentlyResumed(anyLong())).thenAnswer(i -> { boolean after = gate("resume"); return !source.equals("resume") || !after; });
           handler.setKnowledgeServerLifecycleSupplier(() -> ks);
         }
         if (source.equals("gpu-memory")) {
           var reader = mock(io.justsearch.app.api.gpu.GpuMemoryReader.class);
           when(reader.sampleNow()).thenAnswer(i -> {
-            gate("gpu-memory");
+            work.gpuSampleEntered();
+            long readingTime = readingAtMs.get();
+            boolean after = gate("gpu-memory");
+            consumedGpuTime.set(readingTime);
             return new io.justsearch.app.api.gpu.GpuMemorySample(
                 io.justsearch.app.api.gpu.GpuMemorySource.NVML, java.util.Optional.empty(),
                 java.util.Optional.of(new io.justsearch.app.api.gpu.GpuDevice("luid_0x00000000_0x00000001", java.util.OptionalInt.of(0))),
-                java.util.Optional.of(recovered.get() ? "recovered GPU" : "fixture GPU"),
-                java.util.OptionalLong.of((recovered.get() ? 16L : 12L) * 1024 * 1024 * 1024),
-                java.util.OptionalLong.of((recovered.get() ? 2L : 1L) * 1024 * 1024 * 1024),
-                java.util.Map.of(), Instant.ofEpochMilli(readingAtMs.get()));
+                java.util.Optional.of(after ? "recovered GPU" : "fixture GPU"),
+                java.util.OptionalLong.of((after ? 16L : 12L) * 1024 * 1024 * 1024),
+                java.util.OptionalLong.of((after ? 2L : 1L) * 1024 * 1024 * 1024),
+                java.util.Map.of(), Instant.ofEpochMilli(readingTime));
           });
           handler.setGpuMemoryReader(reader);
           // The first native sample must have completed before we block a refresh.
@@ -508,7 +561,7 @@ final class StatusNonBlockingHttpTest {
           var method = hold.getClass().getDeclaredMethod("projection");
           method.setAccessible(true);
           var projection = (OperatingGpuProjection) method.invoke(hold);
-          projection.sampleFirst();
+          work.awaitGpuFirstSample(); // Join the actual background owner, rather than race it with a second caller.
           var at = OperatingGpuProjection.class.getDeclaredField("cachedAt");
           at.setAccessible(true);
           at.set(projection, Instant.ofEpochMilli(now.get()).minusSeconds(10));
@@ -516,7 +569,7 @@ final class StatusNonBlockingHttpTest {
         app = Javalin.create(c -> c.showJavalinBanner = false);
         new ApiSecurityFilters(false, null, null, null, null, null, admission).install(app);
         io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(
-            app, handler::handleStatus, handler::handleHealth);
+            app, work::handleStatus, handler::handleHealth);
         app.start("127.0.0.1", 0);
       } catch (Exception | Error failure) {
         cleanUp(failure);
@@ -562,6 +615,11 @@ final class StatusNonBlockingHttpTest {
     }
 
     void assertKnownPublic(JsonNode body) {
+      assertRegistryTimes(body);
+      VerifierStatusIsolationTest.assertWorkerEpoch(body, now.get());
+      if (source.equals("worker") || source.endsWith("lock"))
+        VerifierStatusIsolationTest.assertWorkerTimes(body, now.get(), false, projectionStartedMs,
+            requestStartedMs, requestCompletedMs, java.util.Map.of());
       boolean after = recovered.get();
       var dimensions = body.path("readiness").path("components");
       switch (source) {
@@ -694,7 +752,39 @@ final class StatusNonBlockingHttpTest {
       }
     }
 
+    void assertRegistryTimes(JsonNode body) {
+      assertEquals(registryStateSince.toString(),
+          body.path("components").path("generative").path("state_since").asText());
+      assertEquals(registryStateSince.toString(),
+          body.path("readiness").path("engineComponents").path("generative").path("stateSince").asText());
+      long observed = Instant.parse(body.path("readiness").path("components").path("ai").path("observedAt").asText()).toEpochMilli();
+      assertTrue(observed >= requestStartedMs && observed <= requestCompletedMs,
+          "cheap registry readiness uses the actual response projection time");
+      long age = body.path("readiness").path("components").path("ai").path("stalenessMs").asLong(-1L);
+      assertEquals(block.get() && (source.equals("registry") || source.endsWith("lock"))
+          ? now.get() - initialAtMs : 0L, age);
+    }
+
     void assertHeldPublic(JsonNode body) {
+      assertRegistryTimes(body);
+      VerifierStatusIsolationTest.assertWorkerEpoch(body,
+          source.equals("worker") || source.endsWith("lock") ? initialAtMs : now.get());
+      if (source.equals("worker") || source.endsWith("lock"))
+        VerifierStatusIsolationTest.assertWorkerTimes(body, initialAtMs, true, initialAtMs,
+            requestStartedMs, requestCompletedMs, source.endsWith("lock")
+                ? java.util.Map.of("indexServing", now.get() - initialAtMs, "embedding", now.get() - initialAtMs,
+                    "chunkEmbedding", now.get() - initialAtMs, "visualTextExtraction", now.get() - initialAtMs,
+                    "visualDocumentUnderstanding", now.get() - initialAtMs, "gpu", now.get() - initialAtMs)
+                : java.util.Map.of());
+      if (source.equals("worker")) {
+        // The fresh request may reproject healthy head companions. Bound time, do not freeze it.
+        for (String dimension : new String[] {"telemetry", "lambdamartModel"}) {
+          var component = body.path("readiness").path("components").path(dimension);
+          long observed = Instant.parse(component.path("observedAt").asText()).toEpochMilli();
+          assertTrue(observed >= projectionStartedMs && observed <= requestCompletedMs);
+          assertEquals(0L, component.path("stalenessMs").asLong(-1L));
+        }
+      }
       // Cached value assertions supplement the held raw Sample identity and freshness checks.
       switch (source) {
         case "inference" -> {
@@ -737,11 +827,18 @@ final class StatusNonBlockingHttpTest {
 
     void advanceRecoveryInput() throws Exception {
       // No changed input can leak through the released old call or its queued companions.
+      oldSourceReads = (int) sourceReads.stream().filter(read -> read.dependency().equals(witnessDependency())).count();
+      oldRerankerReads = rerankerReads.size();
+      oldCoordinatorReads = coordinatorReads.size();
+      oldRegistryEvents = registryEvents.size();
       recovered.set(true);
       readingAtMs.set(now.get() - 251L);
       if (source.equals("worker") || source.endsWith("lock")) indexedDocuments.set(11L);
-      if (source.equals("registry")) components.transition("generative",
-          io.justsearch.core.component.ComponentState.FAILED, "inference.activation_failed", "fixture recovery input");
+      if (source.equals("registry")) {
+        components.transition("generative", io.justsearch.core.component.ComponentState.FAILED,
+            "inference.activation_failed", "fixture recovery input");
+        registryStateSince = components.handle("generative").snapshot().stateSince();
+      }
       if (source.equals("model-file-path")) {
         var model = io.justsearch.configuration.model.InstallContract.InstalledModel.skipped("reranker",
             io.justsearch.configuration.model.SkipCause.USER_DECLINED, "User declined reranker");
@@ -753,33 +850,41 @@ final class StatusNonBlockingHttpTest {
     }
 
     void drainPublications() throws Exception {
-      // HTTP deadlines do not imply dispatch completion. Join only threads recorded by this fixture.
-      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
-      while (freshDispatches.size() < freshRequests.get() && System.nanoTime() < deadline) Thread.sleep(10L);
-      assertEquals(freshRequests.get(), freshDispatches.size(), "every owned fresh request must reach dispatch");
-      for (Thread dispatch : freshDispatches) {
-        dispatch.join(Math.max(1L, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
-        assertFalse(dispatch.isAlive(), "the owned fresh dispatch must finish before publication capture");
+      var held = !block.get() ? java.util.Set.<String>of()
+          : source.equals("bulk-gate") ? java.util.Set.of("power", "resume", "bulk-gate", "indexing-hold")
+          : java.util.Set.of(heldLanes());
+      work.drain(held);
+    }
+
+    String witnessDependency() {
+      return source.endsWith("lock") ? "worker" : source;
+    }
+
+    void assertNewInputConsumed() {
+      var calls = sourceReads.stream().filter(read -> read.dependency().equals(witnessDependency())).toList();
+      assertTrue(calls.size() > oldSourceReads, "recovery must invoke the actual changed source: " + source);
+      assertTrue(calls.stream().skip(oldSourceReads).allMatch(SourceRead::after),
+          "new source invocations must consume the changed fixture epoch: " + source);
+      if (source.equals("worker") || source.endsWith("lock")) assertEquals(11L, consumedWorkerDocuments.get());
+      if (source.equals("registry")) assertTrue(registryEvents.stream().skip(oldRegistryEvents)
+          .anyMatch(snapshot -> snapshot.components().stream().anyMatch(component ->
+              component.spec().name().equals("generative")
+                  && component.state() == io.justsearch.core.component.ComponentState.FAILED
+                  && component.stateSince().equals(registryStateSince))),
+          "the real subscription consumed the changed owner transition, in addition to the recovery poll");
+      if (source.equals("agent")) assertEquals(8L, consumedAgentCount.get());
+      if (source.equals("gpl")) {
+        assertTrue(rerankerReads.stream().limit(oldRerankerReads).anyMatch(Boolean::booleanValue),
+            "configured loaded-model evidence precedes the hold");
+        assertTrue(rerankerReads.size() > oldRerankerReads);
+        assertTrue(rerankerReads.stream().skip(oldRerankerReads).noneMatch(Boolean::booleanValue),
+            "recovery consumed the supplied unloaded model");
+        assertTrue(coordinatorReads.size() > oldCoordinatorReads, "intentional absence consumes a known completed coordinator");
+        assertTrue(coordinatorReads.stream().skip(oldCoordinatorReads).allMatch(status ->
+            status.status() == io.justsearch.app.api.gpl.GplJobStatus.Status.COMPLETED));
       }
-      var field = StatusLifecycleHandler.class.getDeclaredField("observations");
-      field.setAccessible(true);
-      var observations = (java.util.Map<?, ?>) field.get(handler);
-      var held = block.get() ? java.util.Set.of(heldLanes()) : java.util.Set.<String>of();
-      // Raw publications schedule registry/projection work; drain in that dependency order.
-      for (Object key : observations.keySet()) {
-        String name = (String) key;
-        boolean sameOwnerHeld = block.get() && source.equals("bulk-gate")
-            && java.util.Set.of("power", "resume", "indexing-hold").contains(name);
-        if (!held.contains(name) && !sameOwnerHeld && !name.equals("registry")
-            && !name.equals("operating") && !name.startsWith("readiness-"))
-          lane(name).completion().get(2, TimeUnit.SECONDS);
-      }
-      if (!held.contains("registry")) lane("registry").completion().get(2, TimeUnit.SECONDS);
-      for (Object key : observations.keySet()) {
-        String name = (String) key;
-        if (!held.contains(name) && (name.equals("operating") || name.startsWith("readiness-")))
-          lane(name).completion().get(2, TimeUnit.SECONDS);
-      }
+      if (source.equals("gpu-memory")) assertEquals(readingAtMs.get(), consumedGpuTime.get());
+      if (source.equals("at-rest") || source.endsWith("lock")) assertEquals(readingAtMs.get(), consumedEncryptionTime.get());
     }
 
     String companionLane() {
@@ -798,7 +903,10 @@ final class StatusNonBlockingHttpTest {
 
     ReadinessComponentView captureCompanion() throws Exception {
       String lane = companionLane();
-      return lane == null ? null : (ReadinessComponentView) published(lane).value();
+      if (lane == null) return null;
+      var sample = published(lane);
+      companionObservedAtMs = sample.observedAtMs();
+      return (ReadinessComponentView) sample.value();
     }
 
     void assertCompanion(JsonNode body, ReadinessComponentView publication, Instant started, Instant completed) {
@@ -832,6 +940,8 @@ final class StatusNonBlockingHttpTest {
       assertEquals(state, component.path("state").asText());
       assertEquals(reason, component.path("reasonCode").asText(null));
       assertEquals(provenance, component.path("source").asText());
+      assertEquals(Math.max(0L, now.get() - companionObservedAtMs), component.path("stalenessMs").asLong(-1L),
+          "companion age uses its own injected-clock lane; a stale raw input can have a zero-age companion");
       // DTO time is real projection time, independently bounded; never raw injected/event time.
       Instant observed = Instant.parse(publication.observedAt());
       assertFalse(observed.isBefore(started), "companion predates its actual projection window");
@@ -981,13 +1091,13 @@ final class StatusNonBlockingHttpTest {
       at.set(projection, Instant.ofEpochMilli(now.get()).minusSeconds(10));
     }
 
-    io.justsearch.gpu.GpuCapabilitiesService gpuService() {
+    io.justsearch.gpu.GpuCapabilitiesService gpuService(boolean after) {
       if (!source.equals("rrd") && !source.equals("gpu-capabilities")) return null;
       var service = mock(io.justsearch.gpu.GpuCapabilitiesService.class);
       var caps = mock(io.justsearch.gpu.GpuCapabilities.class);
       var nvml = mock(io.justsearch.gpu.GpuCapabilities.Nvml.class);
       when(nvml.available()).thenReturn(true);
-      when(nvml.gpuUtilizationPercent()).thenReturn(source.equals("gpu-capabilities") && recovered.get() ? 42 : 37);
+      when(nvml.gpuUtilizationPercent()).thenReturn(source.equals("gpu-capabilities") && after ? 42 : 37);
       when(caps.nvml()).thenReturn(nvml);
       when(caps.effective()).thenReturn(new io.justsearch.gpu.GpuCapabilities.Effective(
           true, "nvml", io.justsearch.gpu.GpuCapabilities.Confidence.HIGH,
@@ -998,23 +1108,34 @@ final class StatusNonBlockingHttpTest {
       return service;
     }
 
-    void gate(String dependency) {
-      if (!source.equals(dependency)) return;
+    boolean gate(String dependency) {
+      work.sourceEntered();
+      boolean after = recovered.get();
+      sourceReads.add(new SourceRead(dependency, after));
+      if (!source.equals(dependency)) return after;
       if (fail.get()) throw new IllegalStateException("status producer failed");
       if (block.get()) pause();
+      return after;
     }
     void pause() {
       entered.countDown();
       try {
         if (!release.await(30, TimeUnit.SECONDS)) throw new AssertionError("unreleased test gate");
-      } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        var failure = new AssertionError(e);
+        work.errors.add(failure);
+        throw failure;
+      } catch (Error failure) { work.errors.add(failure); throw failure; }
     }
 
     HttpResponse<String> get(String query) throws Exception {
-      if (query.equals("?fresh=true")) freshRequests.incrementAndGet();
-      return http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port()
+      requestStartedMs = System.currentTimeMillis();
+      var response = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port()
           + "/api/status" + query)).timeout(Duration.ofSeconds(5)).GET().build(),
           HttpResponse.BodyHandlers.ofString());
+      requestCompletedMs = System.currentTimeMillis();
+      return response;
     }
 
     @Override public void close() throws Exception {
@@ -1024,7 +1145,16 @@ final class StatusNonBlockingHttpTest {
     }
 
     private void cleanUp(Throwable failure) {
+      if (work != null) work.stopIngress();
+      block.set(false);
       release.countDown();
+      if (work != null) {
+        work.gates.forEach(CountDownLatch::countDown);
+        work.errors.removeIf(error -> error == failure);
+        try { work.drain(java.util.Set.of()); }
+        catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        if (!work.quiescent) return; // Retain config/files/resources while a consumer may still run.
+      }
       try {
         if (app != null) app.stop();
       } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
