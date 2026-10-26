@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -260,10 +261,15 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
   void unknownRecordedVolumeNeverCreatesReplacementOrAdoptsARecord() throws Exception {
     try (var f = new Fixture(); var unavailable = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
       Path file = f.source("private.txt"); var old = f.skipped(file);
+      var ledger = RootVolumeLedger.under(f.base);
+      var recorded = ledger.recordedFor(f.root);
+      assertTrue(recorded.isPresent(), "SETUP: the fixture recorded its actual previously known volume");
+      assertNull(RootIdentity.capture(f.root).volume(), "SETUP: the current volume lookup is actually unknown");
       var records = Files.readAllBytes(f.base.resolve(RootVolumeLedger.FILE_NAME));
       assertThrows(java.io.IOException.class, () -> f.readmit(f.policy(f.configuration("[]"), true)));
       assertEquals(List.of(old), f.queue.listSwitchBufferOpsStrict());
       assertEquals("DONE", f.queue.watcherReconciliationRow(file.toString()).get("state"));
+      assertEquals(recorded, ledger.recordedFor(f.root), "unknown current identity cannot adopt or replace a record");
       assertArrayEquals(records, Files.readAllBytes(f.base.resolve(RootVolumeLedger.FILE_NAME)));
     }
   }
@@ -380,6 +386,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     final RootWatcherRegistry registry = new RootWatcherRegistry();
     final WorkerIngestService publisher;
     final WorkerMutationAdmission mutation;
+    final ReentrantReadWriteLock publication = new ReentrantReadWriteLock();
     Fixture() throws Exception { this(false); }
     Fixture(boolean nativeTransition) throws Exception {
       data = Files.createDirectories(nativeTransition ? directory.resolve("data") : root.resolve("data"));
@@ -405,8 +412,15 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           base, runtime.openedIndexPath(), runtime, runtime, null, 0L);
       publisher.setRootWatcherRegistry(registry);
       mutation = new WorkerMutationAdmission(runtime); publisher.setMutationAdmission(mutation, runtime);
-      publisher.seedConfiguredRoots(List.of(root));
       assertNotNull(RootIdentity.capture(root).volume(), "SETUP: existing test volume convention supplies known identity");
+      // This owned positive fixture begins with a real known record. Configured-root seeding
+      // alone does not create a missing ledger; no live subscription is invented for boot.
+      String volume = RootIdentity.capture(root).volume();
+      var ledger = RootVolumeLedger.under(base);
+      ledger.record(root, volume);
+      assertEquals(volume, ledger.recordedFor(root).orElseThrow(), "SETUP: actual ledger owns the held root volume");
+      publisher.seedConfiguredRoots(List.of(root));
+      assertNull(registry.subscription(root), "SETUP: boot starts before ordinary watch registration");
     }
     Path source(String name) throws Exception { return Files.writeString(root.resolve(name), "old skipped bytes"); }
     SwitchBufferOp skipped(Path file) throws Exception {
@@ -421,8 +435,13 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       System.setProperty("justsearch.data.dir", data.toString());
       System.setProperty("justsearch.index.base_path", base.toString());
       try {
-        var result = new ConfigStore(ResolvedConfig.builder().putDefault("justsearch.ui.exclude_patterns", policy).build());
+        // Match public Save's normal resolver sources, including the scoped path properties.
+        // UI settings remain ordinal300; a real supported operator property still wins at500.
+        var result = new ConfigStore(ResolvedConfig.builder().contributeBaseSources()
+            .putSettings("justsearch.ui.exclude_patterns", policy).build(), publication);
         assertEquals(data, result.currentSnapshot().paths().dataDir(), "SETUP: bound protected physical directory");
+        assertEquals(base, result.currentSnapshot().paths().indexBasePath(), "SETUP: bound actual index base");
+        assertSame(publication, result.publicationLock(), "SETUP: policy and public Save share the fixture publication owner");
         return result;
       } finally {
         if (oldData == null) System.clearProperty("justsearch.data.dir"); else System.setProperty("justsearch.data.dir", oldData);
