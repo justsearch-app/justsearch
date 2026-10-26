@@ -100,4 +100,35 @@ final class ExtractionDropoutMarkerTest {
         doc.fields().get(SchemaFields.EXTRACTION_METHOD));
     assertNull(doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE));
   }
+
+  @Test
+  @org.junit.jupiter.api.Timeout(60)
+  void utf8SupplementaryTextKeepsItsStructuredMethodAndNoDropoutMarker(
+      @org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
+    // Real nonvisual UTF-8 bytes: no eligible visual fallback can conceal a false dropout.
+    String source = "\uD840\uDC00\uD801\uDC00".repeat(60);
+    Path file = tempDir.resolve("supplementary.txt");
+    byte[] bytes = source.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    java.nio.file.Files.write(file, bytes);
+    try (var extractor = new io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractor(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(),
+        io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults(),
+        io.justsearch.indexerworker.extract.OcrRoutingConfig.disabled())) {
+      var artifact = extractor.extractArtifact(file);
+      assertEquals(source, artifact.result().content().strip(), "establish UTF-8 parser success first");
+      var policy = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults();
+      var doc = IndexingDocumentOps.buildDocument(file, artifact.validate(policy, null),
+          null, null, null, false, null, null, (stage, elapsed, reason) -> {},
+          org.slf4j.LoggerFactory.getLogger(ExtractionDropoutMarkerTest.class), null, null,
+          "supplementary-txt");
+      assertEquals(SchemaFields.EXTRACTION_METHOD_TIKA_STRUCTURED,
+          doc.fields().get(SchemaFields.EXTRACTION_METHOD));
+      assertNull(doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE));
+      assertEquals(SchemaFields.VDU_STATUS_NOT_NEEDED, doc.fields().get(SchemaFields.VDU_STATUS));
+      assertEquals(1.0f, doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE));
+      assertEquals(artifact.result().content(), doc.fields().get(SchemaFields.CONTENT));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(bytes, java.nio.file.Files.readAllBytes(file));
+    }
+  }
+
 }

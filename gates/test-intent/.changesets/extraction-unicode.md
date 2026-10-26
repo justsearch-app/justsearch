@@ -1,0 +1,260 @@
+---
+schema: test-intent.v1
+task: extraction-unicode
+author-role: builder
+author-session: 01a17892-14c6-7dd1-b9cc-6b69726362d0
+---
+
+# Unicode extraction test intent
+
+All listed additions are durable component/integration tests; existing checks remain in place.
+Repair checks and pass-before preservation controls are listed separately, including within the same file.
+The sources below are delegated agent choices; the settled scenario wording is not represented as owner-authored words.
+
+Canonical script-produced repair/preservation evidence and non-author acceptance are outstanding.
+The evidence paths are reserved names, not assertions that those files exist. Exact commands, raw stdout
+and JUnit XML from the builder are retained under tmp/uq-builder1 for independent review.
+The independent verifier will run canonical repair/preservation batches after root commits the candidate,
+using stock run-evidence.mjs --before-root with its own Git checkout/admin area and unchanged guard/slot.
+No governance tool was modified and no script-produced evidence or acceptance record was invented.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQ1/UQ3/UQ4/UQ8/UQC1: whole supplementary Han/Deseret/decimal-digit values, independent 29/30/31/49/50/51 ratios, valid pairs beside lone units, finite long inputs, corrected quality retaining UTF-16 floors and density. An explicit reversed-unit repetition counterexample recognizes a valid pair created at concatenation, rather than classifying all reversed-input repetitions as isolated units.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQ1/UQ3/UQ4/UQ8/UQC1: whole supplementary Han/Deseret/decimal-digit values, independent 29/30/31/49/50/51 ratios, valid pairs beside lone units, finite long inputs, corrected quality retaining UTF-16 floors and density. An explicit reversed-unit repetition counterexample recognizes a valid pair created at concatenation, rather than classifying all reversed-input repetitions as isolated units.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#supplementaryLettersAndDecimalDigitsUseWholeCodePoints",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#mixedCodePointRatiosStraddleQualityBoundaries",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#validPairsBesideLoneSurrogatesRemainTotal",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#supplementaryQualityRetainsUtf16LengthAndDensityFloors",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#longSupplementaryAndInvalidInputsStayFiniteAndBounded",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#reversedSurrogateRepetitionCanCreateAValidPairAtTheBoundary"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQP1/UQP5/UQC1/UQC2: independently observable preservation of BMP 99/100 and density 49/50/199/200, isolated/reversed/separated surrogates with punctuation guarding repetition boundaries, Java categories/blankness/markers and existing normalization differences; symbol emoji remain zero and digit-bearing keycaps retain decimal digit credit.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQP1/UQP5/UQC1/UQC2: independently observable preservation of BMP 99/100 and density 49/50/199/200, isolated/reversed/separated surrogates with punctuation guarding repetition boundaries, Java categories/blankness/markers and existing normalization differences; symbol emoji remain zero and digit-bearing keycaps retain decimal digit credit.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-preservation.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#symbolEmojiAndDigitKeycapCategoryRulesRemainStable",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#isolatedReversedAndSeparatedSurrogatesRemainTotal",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#bmpLengthAndDensityNeighborsRemainUnchanged",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/text/TextQualityAnalyzerTest.java#existingCategoriesMarkersAndDecompositionRulesRemainStable"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQ2/UQ4/UQ8: supplementary threshold counts zero/one/two occurrences rather than UTF-16 units or distinct values, including BMP mixes and valid pairs beside lone units; long suffix and malformed inputs terminate under the existing default test budget.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQ2/UQ4/UQ8: supplementary threshold counts zero/one/two occurrences rather than UTF-16 units or distinct values, including BMP mixes and valid pairs beside lone units; long suffix and malformed inputs terminate under the existing default test budget.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java#supplementaryThresholdCountsOccurrencesNotUtf16UnitsOrDistinctValues",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java#validPairsBesideLoneUnitsStillReachTheOccurrenceThreshold",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java#longSuffixAndMalformedInputsTerminate"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQP1/UQP5/UQC2: punctuation, symbol emoji, isolated/reversed/separated surrogates, NBSP versus Java blankness, nondecimal numbers, combining marks/ZWJ/selectors, keycaps and BMP multilingual content retain their existing dropout category rules.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQP1/UQP5/UQC2: punctuation, symbol emoji, isolated/reversed/separated surrogates, NBSP versus Java blankness, nondecimal numbers, combining marks/ZWJ/selectors, keycaps and BMP multilingual content retain their existing dropout category rules.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-preservation.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutPolicyTest.java#surrogateAndCategoryBoundariesRetainTheExistingRules"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQ9/UQ6/UQC3: actual rounded v1 evidence producer plus routing and document-marker consumers prove all three intended OCR transitions: 2 ASCII+33 Han+65 punctuation becomes ratio .35/score .56/PENDING visual_enrichment; 100 Han becomes ratio 1/score 1/NOT_NEEDED; 40 ASCII+20 symbol emoji+20 punctuation becomes ratio .5/score .8/NOT_NEEDED. No independent confidence/layout/table/mixed-PDF signals in these three cases; content and UTF-16 evidence units remain intact.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQ9/UQ6/UQC3: actual rounded v1 evidence producer plus routing and document-marker consumers prove all three intended OCR transitions: 2 ASCII+33 Han+65 punctuation becomes ratio .35/score .56/PENDING visual_enrichment; 100 Han becomes ratio 1/score 1/NOT_NEEDED; 40 ASCII+20 symbol emoji+20 punctuation becomes ratio .5/score .8/NOT_NEEDED. No independent confidence/layout/table/mixed-PDF signals in these three cases; content and UTF-16 evidence units remain intact.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java#correctedOcrEvidenceCreatesVisualEnrichmentDemand",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java#correctedSupplementaryOcrRemovesFalseBaselineDemand",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java#correctedEmojiDenominatorRemovesOldEnrichmentDemand"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQP3/UQC3: a sufficient BMP OCR document with independent mixed-PDF evidence still queues visual_enrichment under the existing policy, using the actual evidence producer and routing/marker consumers.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQP3/UQC3: a sufficient BMP OCR document with independent mixed-PDF evidence still queues visual_enrichment under the existing policy, using the actual evidence producer and routing/marker consumers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-preservation.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecisionTest.java#independentMixedPdfSignalStillQueuesEnrichment"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutFallbackChainTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQ5: sufficient supplementary structured text with no missing-page evidence skips OCR as TEXTUAL instead of false quality-driven recovery.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQ5: sufficient supplementary structured text with no missing-page evidence skips OCR as TEXTUAL instead of false quality-driven recovery.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutFallbackChainTest.java#sufficientSupplementaryStructuredTextSkipsOcrAsTextual"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutFallbackChainTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQP3: independent missing-page evidence and spent tier budget remain enforced even alongside sufficient supplementary text; disabled OCR still reports DISABLED and spent budget reports BUDGET.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQP3: independent missing-page evidence and spent tier budget remain enforced even alongside sufficient supplementary text; disabled OCR still reports DISABLED and spent budget reports BUDGET.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-preservation.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionDropoutFallbackChainTest.java#supplementaryQualityDoesNotEraseMissingPagesOrBudgetGates"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/ExtractionDropoutMarkerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQ5/UQ6/UQP4: actual UTF-8 text bytes independently decode the complete supplementary sequence before quality/routing assertions; nonvisual text retains structured method and no unrecovered marker, score 1, unchanged raw bytes and selected content.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQ5/UQ6/UQP4: actual UTF-8 text bytes independently decode the complete supplementary sequence before quality/routing assertions; nonvisual text retains structured method and no unrecovered marker, score 1, unchanged raw bytes and selected content.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/ExtractionDropoutMarkerTest.java#utf8SupplementaryTextKeepsItsStructuredMethodAndNoDropoutMarker"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ExtractionDropoutPdfFixturesTest.java"
+      ],
+      "class": "New",
+      "behaviour": "UQ5/UQ6/UQP3/UQC3: deterministic physical one-page PDF independently decodes its complete supplementary sequence in PDFBox and production Tika, including the ordinary structured separator. Actual evidence retains the known separate phantom-page defect (reported 2 pages/1 missing), so OCR stays DISABLED and VDU stays PENDING baseline_text. The counting repair changes actual page-aware quality from 0 to .8, page-unaware/stored quality to 1 and ratio to .96, removes the false dropout reason and retains structured method, selected content and raw source bytes. Whole-Tika-PDF no-demand proof is limited by the existing page-summary defect; no-missing-pages TEXTUAL proof is separate.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly, only use codex agents",
+          "delegationLocation": "task extraction-unicode request",
+          "delegationScope": "The settled first forward-only supplementary Unicode counting repair and its proof, retaining the existing thresholds, UTF-16 length/density/offset rules, missing-page/confidence/layout/budget gates and v1 shape. No production changes beyond TextQualityAnalyzer and ExtractionDropoutPolicy; no publication/global changes.",
+          "choice": "UQ5/UQ6/UQP3/UQC3: deterministic physical one-page PDF independently decodes its complete supplementary sequence in PDFBox and production Tika, including the ordinary structured separator. Actual evidence retains the known separate phantom-page defect (reported 2 pages/1 missing), so OCR stays DISABLED and VDU stays PENDING baseline_text. The counting repair changes actual page-aware quality from 0 to .8, page-unaware/stored quality to 1 and ratio to .96, removes the false dropout reason and retains structured method, selected content and raw source bytes. Whole-Tika-PDF no-demand proof is limited by the existing page-summary defect; no-missing-pages TEXTUAL proof is separate.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-unicode-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ExtractionDropoutPdfFixturesTest.java#supplementaryPdfTextIsExtractedBeforeQualityAndRoutingAreMeasured"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```
+
+## Acceptance records
