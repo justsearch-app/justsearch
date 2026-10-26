@@ -116,7 +116,8 @@ public interface SessionHandle extends AutoCloseable {
    * Makes the CPU session of a GPU handle warm (created and run once) so that a query the device
    * cannot seat within its budget can run on it instead of falling back to keyword search. The
    * query encoders' prewarm calls this after their GPU session is warm. Handles without a GPU, or
-   * without native session state, have nothing to warm and return false.
+   * without native session state, have nothing to warm and return false. Deliberately deferred
+   * SPLADE/reranker backups are created only on actual CPU demand and return false until warm.
    *
    * @return whether the CPU session is warm for such queries afterwards
    */

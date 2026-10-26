@@ -193,14 +193,14 @@ public final class CrossEncoderReranker implements Closeable {
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs) {
     return rerank(query, documents, deadlineMs, InferenceRequest.within(
-        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false), true);
+        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false), true, true);
   }
 
   /** Lifecycle-only warm-up: session creation and GPU retries happen off request threads. */
   public boolean prewarm(String text, InferenceRequest request) {
     long budgetMs = Math.max(1L, Math.min(30_000L,
         java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(request.remainingNanos())));
-    return !rerank(text, List.of(text), budgetMs, request, true).skipped();
+    return !rerank(text, List.of(text), budgetMs, request, true, false).skipped();
   }
 
   public boolean isQueryWarm() { return sessions.isQueryWarm(); }
@@ -227,11 +227,11 @@ public final class CrossEncoderReranker implements Closeable {
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs,
       InferenceRequest request) {
-    return rerank(query, documents, deadlineMs, request, false);
+    return rerank(query, documents, deadlineMs, request, false, true);
   }
 
   private RerankedResult rerank(String query, List<String> documents, long deadlineMs,
-      InferenceRequest request, boolean mayCreateSessions) {
+      InferenceRequest request, boolean mayCreateSessions, boolean mayPrepareDeferredCpu) {
     var authority = SessionAcquisitionRequest.from(request);
     long startNanos = System.nanoTime();
     authority.remainingNanos();
@@ -243,7 +243,7 @@ public final class CrossEncoderReranker implements Closeable {
     long acquireDeadline = startNanos + Math.min(
         callerAcquireDeadline - startNanos, localDeadline - startNanos);
     var acquisition = new SessionAcquisitionRequest(authority.urgency(), acquireDeadline,
-        authority.cancellationRequested(), mayCreateSessions, false);
+        authority.cancellationRequested(), mayCreateSessions, false, mayPrepareDeferredCpu);
     // Whether the rerank's own budget, not the caller's deadline, bounds the wait for a session.
     boolean rerankBudgetBounds = localDeadline - callerAcquireDeadline <= 0;
     OptionalLong releaseAt =
