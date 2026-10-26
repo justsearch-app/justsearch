@@ -364,3 +364,14 @@ exact revision, and its projection-verification refusal must appear in status.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1759f-94df-7be2-8fea-d2d57d2d0c9c",
+  "verdict": "accept",
+  "digest": "sha256:3e3efc4bd3901e677077ad33cf692460e3c4816cfc6b778181c4d79582a63d69",
+  "note": "Verified immutable C14 c14d550f4965013ec85ef9b8cd1cbbbc01358e86. Consolidated evidence: tmp/drive-verifier-evidence/report-private-home.txt; actual private child JVM properties and native receipts/crash/restart: tmp/drive-verifier-evidence/native-cpu-private-home/actual-installed-properties.json and native-proof.json. Prior independent before/physical/module evidence retained by validated identity; exact accepted baseline descriptor failure and optional skips remain labeled."
+}
+```
