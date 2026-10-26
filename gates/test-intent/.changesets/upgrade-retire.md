@@ -7,10 +7,10 @@ author-session: 01a16e27-471b-7b13-962b-48b7ad3a8943
 
 # Test-intent entries
 
-Owner adoption is task `t-20261020-c2e24a`, agreed 2026-10-20 with the exact words “i agree, proceed accordingly”. The author is thread `01a16e27-471b-7b13-962b-48b7ad3a8943`. Orchestrator design and corrupt/budget rulings remain delegated choices, never owner words. Every original U6/U13 and must-not-break obligation and all six amendments remain in force. D4 collection is explicitly frozen-code evidence; integrated production dependencies differ and are not silently treated as a fresh recovery run.
+Owner adoption is task `t-20261020-c2e24a`, agreed 2026-10-20 with the exact words “i agree, proceed accordingly”. The author is thread `01a16e27-471b-7b13-962b-48b7ad3a8943`. Orchestrator design and corrupt/budget rulings remain delegated choices, never owner words. Every original U6/U13 and must-not-break obligation and all six amendments remain in force. Original D4 collection remains explicitly frozen-code evidence; integrated production dependencies differ and are not silently treated as a fresh recovery run. Separate R1 executions retain their actual commands and complete input manifests.
 
 U6 and U13 were delegated verbatim in the builder assignment on 2026-10-24. The
-amended PR4 design governs the implementation. No acceptance record is authored here. Verification continues under the orchestrator's rulings: corrupt-commit backup-first assertions pass on base; both base and candidate resume over-budget independent debt in MIGRATING, so the restart expectation follows base. Builder check evidence is recorded outside the repository; acceptance remains reserved for independent verifiers. The budget matrix exercises finite limits, exact limits, -1, forceSwitching and restart; it is preservation coverage, not a claimed new fail-before repair.
+amended PR4 design governs the implementation. No acceptance record is authored here. Verification continues under the orchestrator's rulings: corrupt-commit backup-first assertions pass on base; both base and candidate resume over-budget independent debt in MIGRATING, so the restart expectation follows base. Raw builder outputs are recorded outside the repository and source-bound execution envelopes are tracked; acceptance remains reserved for independent verifiers. The budget matrix exercises finite limits, exact limits, -1, forceSwitching and restart; it is preservation coverage, not a claimed new fail-before repair.
 
 ```json
 {
@@ -222,7 +222,6 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#replayRetiresObsoleteBuildAndKeepsServingIdentity",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#alreadyDoneExplicitFileOnServingGenerationSurvivesResume",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#killedRetirementResumesAndBackupCannotReviveBuild",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java#newerAcknowledgementWinsPausedReplayAndRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
@@ -235,7 +234,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       ],
       "repaired": true,
       "evidence": "gates/test-intent/evidence/upgrade-retire-recovery-repaired.json",
-      "classificationRationale": "New repaired behavior: each named check requires an actual assertion failure on 8292 and a real completed frozen-code execution. Evidence explicitly distinguishes frozen production dependencies from integrated main; no current integrated recovery pass is inferred. Reappeared DELETE is explicitly listed so all 50 repaired invocations are bound.",
+      "classificationRationale": "New repaired behavior: each named check requires an actual assertion failure on 8292 and a real completed frozen-code execution. Evidence explicitly distinguishes frozen production dependencies from integrated main; no current integrated recovery pass is inferred. Reappeared DELETE is explicitly listed so all 50 repaired invocations are bound. The unavailable-root method now has a separate fresh method-only before/current evidence entry because historical duplicate display names were ambiguous. Original frozen raw evidence remains unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
@@ -288,18 +287,192 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       ],
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#uncertifiedServingGenerationKeepsOriginalMigration",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
       ],
       "repaired": false,
       "evidence": "gates/test-intent/evidence/upgrade-retire-certificates-budgets.json",
-      "classificationRationale": "New preservation coverage: all 12 invocations pass before and on frozen code. Negative certificates and budget protections are not labelled repairs. Corrupt A keeps native backup-first behavior; restarted over-budget cases follow actual base MIGRATING while first-boot FAILED, exact/unlimited limits, overrides and completion protections remain asserted.",
+      "classificationRationale": "New preservation coverage: all 12 invocations pass before and on frozen code. Negative certificates and budget protections are not labelled repairs. Corrupt A keeps native backup-first behavior; restarted over-budget cases follow actual base MIGRATING while first-boot FAILED, exact/unlimited limits, overrides and completion protections remain asserted. Corrupt-commit attribution now uses a separate fresh method-only before/current entry; historical duplicate display names are retained without asserting unique binding.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
       "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
+      ],
+      "behaviour": "U6/amendments1–4 and U7/U11 progress: ambiguous committed model inputs cannot retire a native migration; acknowledged later walks/updates/deletes retain accepted ordering through actual writer retry, process kill and restart; repeated faults retain debt/B; supported same-acknowledgement DB replacement cannot invalidate ordered deletion/source proof; disjoint roots progress while another receipt remains uncertain.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U6",
+          "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair independently reproduced R1 certificate and ordered-scope failures while retaining all adopted PR4 scenarios and six amendments.",
+          "choice": "Require positive committed model identity; input-only unknowns retain native migration while complete digests permit determinate absence. Commit and verify exact deletions before recording their receipt versions, recognize later confirmed SYNC_ROOT scope in accepted order, preserve unresolved overlapping obligations and allow disjoint root progress. Correct only the replay fixture fault to one actual injection at the target later completed walk; retain repeated faults as pending/retained obligations without demanding completion before configured eligibility. Keep original faults/results, 100-second completion/search/restart oracles, native paths and all policies unchanged. Preserve a later exact receipt-owned DONE unit, planned source, collection and ingestion boundary during older upgrade recovery discovery; retain ordinary native certification and all uncertainty guards. Correct the named-collection fixture through real public registration and prove its queue membership. A legitimately later public sync is a distinct ownership transition; its remaining stale-receipt completion failure is reported for root rather than weakening native certification.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#unknownStoredModelCannotCertifyRetirement",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#overlappingScopesKeepTheirAcceptedOrderAcrossRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#repeatedFaultsRetainDebtAndDeletionProofAcrossRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java#completedWalkSurvivesAnActualKillAndRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java#uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation"
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/upgrade-retire-r1-repaired.json",
+      "classificationRationale": "New repaired checks, with preservation cells retained within their ordering table. The original sync-then-collection fixture had no named member and remains excluded as intended fail-before proof. Its corrected precondition uses public root registration, an actual named queue member and an ordered root receipt. The reviewed R4 exact R1 sources pass all32 new cases in the completed local run, including unchanged100s/search/A/B/restart oracles and two real process kills with full child stdout. The matching before refresh for the changed WalkOrder/WalkCrash inputs and final D4 envelopes remain pending; no compile/setup failure or invalid old fixture is counted. A separate real prefix→exact-admission→later-public-sync probe fails100s completion on both b84 and this candidate: the newer root admission replaces the file unit without replacing its old exact receipt. That remaining ownership/completion gap is not accepted or hidden by these passing cells. Original repeated-injection failed fixtures remain immutable.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
+      ],
+      "evidenceScope": "Current exact R1 working source and actual command/input manifests, with b84 unchanged-production controls plus identical new test overlay. Historical frozen81 invocations remain frozen; no acceptance inferred."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
+      ],
+      "behaviour": "Preserve complete matching committed digest without diagnostic inputs, fully resolved inputs-only identity, determinate NOT_CONFIGURED and its genuine transition to PRESENT, genuine model change/native opening and current uncertainty; ordinary ordered retry/restart and a real newer operation reusing its journal key retain their semantics.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U6",
+          "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair independently reproduced R1 certificate and ordered-scope failures while retaining all adopted PR4 scenarios and six amendments.",
+          "choice": "Require positive committed model identity; input-only unknowns retain native migration while complete digests permit determinate absence. Commit and verify exact deletions before recording their receipt versions, recognize later confirmed SYNC_ROOT scope in accepted order, preserve unresolved overlapping obligations and allow disjoint root progress. Correct only the replay fixture fault to one actual injection at the target later completed walk; retain repeated faults as pending/retained obligations without demanding completion before configured eligibility. Keep original faults/results, 100-second completion/search/restart oracles, native paths and all policies unchanged. Preserve a later exact receipt-owned DONE unit, planned source, collection and ingestion boundary during older upgrade recovery discovery; retain ordinary native certification and all uncertainty guards. Correct the named-collection fixture through real public registration and prove its queue membership. A legitimately later public sync is a distinct ownership transition; its remaining stale-receipt completion failure is reported for root rather than weakening native certification.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#completeCommittedEvidenceRetiresAcrossRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#changedCommittedModelKeepsNativeMigration",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#completeDigestCertifiesKnownAbsentModelsWithOrWithoutDiagnosticInputs",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#resolvedInputsWithoutDigestCertifyCompatibility",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#currentUncertaintyCannotBorrowACompleteStoredIdentity",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#completeNotConfiguredIdentityBecomingPresentIsAGenuineChange",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#ordinaryOrderedPrefixThenSyncSurvivesRetryAndRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#newerDeleteUsingTheSameKeyCannotBorrowTheOldReceiptProof"
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/upgrade-retire-r1-preservation.json",
+      "classificationRationale": "New preservation coverage:13 exact-source invocations must pass before and after. No blanket null rejection, native comparator change, model assets/inference, retry shortening or timeout change. Receipt revisions are fresh opaque UUID versions; accepted_order supplies ordering. The same-key check uses real admissions and restarts, never fabricated identities.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
+      ],
+      "evidenceScope": "Current exact R1 working source and actual command/input manifests, with b84 unchanged-production controls plus identical new test overlay. Historical frozen81 invocations remain frozen; no acceptance inferred."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "behaviour": "U6/U11: unavailable-root obligations and B remain while unrelated mutations proceed; a returned root resolves its debt through real boots/restarts.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U6",
+          "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair independently reproduced R1 certificate and ordered-scope failures while retaining all adopted PR4 scenarios and six amendments.",
+          "choice": "Require positive committed model identity; input-only unknowns retain native migration while complete digests permit determinate absence. Commit and verify exact deletions before recording their receipt versions, recognize later confirmed SYNC_ROOT scope in accepted order, preserve unresolved overlapping obligations and allow disjoint root progress. Correct only the replay fixture fault to one actual injection at the target later completed walk; retain repeated faults as pending/retained obligations without demanding completion before configured eligibility. Keep original faults/results, 100-second completion/search/restart oracles, native paths and all policies unchanged. Preserve a later exact receipt-owned DONE unit, planned source, collection and ingestion boundary during older upgrade recovery discovery; retain ordinary native certification and all uncertainty guards. Correct the named-collection fixture through real public registration and prove its queue membership. A legitimately later public sync is a distinct ownership transition; its remaining stale-receipt completion failure is reported for root rather than weakening native certification.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/upgrade-retire-r1-unavailable-method.json",
+      "classificationRationale": "The existing check source/assertions are unchanged. Unique method-only8292/current refresh is required to close the historical duplicate-display-name ambiguity and remains pending. Original frozen evidence/unknown historical argv are retained.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Method-only8292/current refresh remains pending; existing historical frozen81 results and missing historical argv are retained unchanged. No independent acceptance is claimed."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "behaviour": "Amendment2 preservation: corrupt A follows base backup-first boot with native migration state/B/receipts retained; uncertainty cannot certify retirement.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U6",
+          "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair independently reproduced R1 certificate and ordered-scope failures while retaining all adopted PR4 scenarios and six amendments.",
+          "choice": "Require positive committed model identity; input-only unknowns retain native migration while complete digests permit determinate absence. Commit and verify exact deletions before recording their receipt versions, recognize later confirmed SYNC_ROOT scope in accepted order, preserve unresolved overlapping obligations and allow disjoint root progress. Correct only the replay fixture fault to one actual injection at the target later completed walk; retain repeated faults as pending/retained obligations without demanding completion before configured eligibility. Keep original faults/results, 100-second completion/search/restart oracles, native paths and all policies unchanged. Preserve a later exact receipt-owned DONE unit, planned source, collection and ingestion boundary during older upgrade recovery discovery; retain ordinary native certification and all uncertainty guards. Correct the named-collection fixture through real public registration and prove its queue membership. A legitimately later public sync is a distinct ownership transition; its remaining stale-receipt completion failure is reported for root rather than weakening native certification.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/upgrade-retire-r1-corrupt-method.json",
+      "classificationRationale": "The existing check source/assertions are unchanged. Unique method-only8292/current preservation runs are required and remain pending; duplicate historical display names are never assigned by status.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Method-only8292/current refresh remains pending; existing historical frozen81 results and missing historical argv are retained unchanged. No independent acceptance is claimed."
     }
   ]
 }
@@ -345,3 +518,36 @@ code sources are inside that distribution. It does not replace the full unit sui
   "note": "F1: unknown stored model identity authorizes cancellation. F2: retirement replay loses later forced-sync admissions after an older prefix delete. See verification-report.md in a125vcwh evidence."
 }
 ```
+
+## R1 evidence scope
+
+The original frozen81 raw invocations remain frozen-code evidence with the original missing historical argv limit. The unavailable-root and corrupt-commit historical display-name assignments were ambiguous; fresh method-only entries supersede their attribution. R1 current evidence binds exact test/helper/production inputs and actual XML/binary/commands. The independent rejection above remains unchanged; no builder acceptance is authored.
+
+
+## R1 current checkpoint obligations
+
+| Check | Scenario | Current proof scope |
+| --- | --- | --- |
+| CommittedCertificateTest.unknownStoredModelCannotCertifyRetirement | U6/amendment2 | Both phases and stored null/absent forms retain native migration through two boots. |
+| CommittedCertificateTest.completeCommittedEvidenceRetiresAcrossRestart; changedCommittedModelKeepsNativeMigration | U6/amendment2 preservation | Complete digest-only/resolved-input identities retire; a genuine committed model change retains native behavior. |
+| CommittedRetirementCertificateTest (all seven cases) | U6/amendment2 | Real nonempty commits distinguish stored/current uncertainty, determinate NOT_CONFIGURED, its transition to PRESENT and complete digest without optional diagnostics. |
+| WalkOrderTest.acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry | U6/amendment3 | Exactly one fault at the target completed later walk; actual attempts1/PENDING/future deadline,100s completion and restart. |
+| WalkOrderTest.overlappingScopesKeepTheirAcceptedOrderAcrossRestart | U6/amendment3 | Six overlap cells, with a genuinely named member before collection deletion; later exact units/boundaries remain unchanged through older recovery and restart. |
+| WalkOrderTest.ordinaryOrderedPrefixThenSyncSurvivesRetryAndRestart | U6 preservation | Ordinary same-order retry and restart remain available. |
+| WalkOrderTest.repeatedFaultsRetainDebtAndDeletionProofAcrossRestart | U6/U14b | Real repeated target faults retain B/debt before eligibility; supported same-acknowledgement earlier DB replacement is exercised separately. |
+| WalkOrderTest.newerDeleteUsingTheSameKeyCannotBorrowTheOldReceiptProof | U6/amendment3 | Real replacement UUID/order prevents borrowing an older deletion checkpoint through restart. |
+| WalkCrashTest.completedWalkSurvivesAnActualKillAndRestart | U6/U14b | Both phases, actual child kills with full stdout retained, two boots, A and normalized pointers/B retirement. |
+| RootProgressTest.uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation | U7/U11; U6 | Unqueued healthy beta and unrelated acknowledged mutation progress while alpha debt/B remain. |
+| RetirementTransitiveOrderTest.transitiveDeferredCollectionCannotEraseLaterBetaSync | U6/amendment3; U7/U11 progress preservation | Real named AlphaSync→collection delete→BetaSync: reviewed R4 fails first-boot and restart visibility after retirement; propagating deferred scopes passes both. The unchanged independent-root progress check also passes. Exact method-level before/after XML and commands are retained in tmp/builder/retire-R1-repair/resume-012100/results.json; no final D4 envelope or acceptance is authored in this bounded probe phase. |
+
+The prior reviewed R4-source broader local run completed indexer-worker1784pass/0fail/30skip and the selected adapter identity checks7pass/0fail/0skip. This is builder execution evidence, not independent acceptance. The additional ignored real-system probe prefix→exact-admission→later public forced sync fails on both b84 and the candidate with current DONE content but retained B: old exact receipt ownership is stale after the newer root admission. Final before refresh, method-only Safety bindings, D4 envelopes, remaining module/caller/PMD checks and final acceptance are unfinished. No scenario or deadline is withdrawn.
+
+R7 bounded repair declaration (delegated-choice, task t-20261020-c2e24a request): `Release030RetirementPublicSyncTest.laterPublicSyncMaySupersedeAnEarlierExactAdmission` covers U6/amendment 3 prefix delete → exact public admission → later public forced sync, watched and watcherless carried named collection, unchanged and changed bytes, actual retirement and restart. It asserts refreshed exact unit/source/receipt and ordinary sibling admission without a new exact receipt. Current focused proof and remaining controls are recorded under tmp/builder/retire-R1-repair/resume-020458; this declaration is not an acceptance record. Existing b84/R4 triple-operation failures remain original evidence; this source adds admission assertions and requires its own before binding before final D4.
+
+R8 bounded repair declarations (delegated-choice, task t-20261020-c2e24a request; no acceptance):
+
+- `Release030RetirementSurvivorProgressTest.unavailableExactUnderDeleteDoesNotStarveUnrelatedBeta`: U7/U11 with U6 ordered scope preservation. A public Alpha prefix delete precedes an exact Alpha admission; Alpha becomes genuinely unavailable. After two real attempts, independently unqueued Beta work and an unrelated acknowledgement proceed, unaffected Beta content remains searchable and the Alpha obligation/B stay. The corrected R7 producer fails for Beta starvation before this repair; the invalid Alpha old-content oracle remains separate setup evidence.
+- `Release030RetirementSyncPolicyTest.liveSyncKeepsItsOrdinaryRetryPolicy`: preserve normal public API MAINTENANCE/DEFAULT behavior across retirement routing. Real IO_FAILED/PARSER_TIMEOUT deadlines on ordinary and retained-exact members remain unchanged under maintenance, including unit and receipts; explicit DEFAULT resets retry metadata as before. Genuine b84 control and current-before/after evidence use the same corrected public-service producer; initial invalid provenance is retained as setup failure.
+- `Release030RetirementSyncPolicyTest.legacyHashEntryStillReadsOnAnInterruptedThread`: legacy source hashing remains usable on an already interrupted caller as on b84; the live caller alone supplies interruption/cancellation to the new overload. Existing cancellable hash and transactional rollback controls remain required.
+
+Raw focused source-bound output is under tmp/builder/retire-R1-repair/resume-023511 and sibling r8-* labels. Full suites, final D4/acceptance and the distinct later-uncertain-root-image hypothesis are not covered by these declarations.

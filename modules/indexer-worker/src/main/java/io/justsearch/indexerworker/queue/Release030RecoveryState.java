@@ -22,12 +22,19 @@ public final class Release030RecoveryState {
   public static final String RETIREMENT_ROOT_KEY_PREFIX = "release030-root:";
   private static final String RETIRE = "retire|";
   private static final String RETIRE_PATH = "retire-path|";
+  private static final tools.jackson.databind.ObjectMapper JSON = tools.jackson.databind.json.JsonMapper.builder().build();
+  private static final String RECEIPT = RETIRE + "root-receipt|";
+  private static final String HEAD = RETIRE + "root-head|";
+  private static final String NEXT = RETIRE + "root-next|";
+  private static final String REPLACING = RETIRE + "root-replacing|";
+  private String openedSession;
   private final Path file;
   private final Properties state;
 
   private Release030RecoveryState(Path file, Properties state) {
     this.file = file;
     this.state = state;
+    this.openedSession = state.getProperty(RETIRE + "queue-session");
   }
 
   static void capture(Path database) throws IOException {
@@ -84,6 +91,118 @@ public final class Release030RecoveryState {
     return recovery;
   }
 
+  /** One shared instance belongs to the opened queue; reopening never inherits CURRENT Q proof. */
+  public synchronized void openedSession(String session) { openedSession = session; }
+  public synchronized String session() { return openedSession; }
+  public synchronized boolean currentSession() {
+    return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "queue-session"));
+  }
+  public synchronized void queuePrepared() throws IOException {
+    state.setProperty(RETIRE + "queue-session", java.util.Objects.requireNonNull(openedSession));
+    save();
+  }
+  public synchronized boolean rootsInventoried() { return "true".equals(state.getProperty(RETIRE + "root-inventory")); }
+  public synchronized java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> rootReceipts() throws IOException {
+    var receipts = new java.util.ArrayList<SwitchBufferCapableQueue.AcceptedReceipt>();
+    for (String key : state.stringPropertyNames()) if (key.startsWith(RECEIPT)) {
+      var receipt = decodeReceipt(state.getProperty(key));
+      if (!"SYNC_ROOT".equals(receipt.operation().op()) || !key.equals(RECEIPT + receipt.uuid()))
+        throw new IOException("Invalid retained ROOT receipt");
+      receipts.add(receipt);
+    }
+    receipts.sort(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.AcceptedReceipt::acceptedOrder));
+    return java.util.List.copyOf(receipts);
+  }
+  public synchronized java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> committedDeletes() throws IOException {
+    var result = new java.util.ArrayList<SwitchBufferCapableQueue.AcceptedReceipt>();
+    for (String key : state.stringPropertyNames()) if (key.startsWith(RETIRE + "delete|") && !key.endsWith("|queue"))
+      result.add(decodeReceipt(state.getProperty(key)));
+    return java.util.List.copyOf(result);
+  }
+  private static SwitchBufferCapableQueue.AcceptedReceipt decodeReceipt(String value) throws IOException {
+    try { return JSON.readValue(value, SwitchBufferCapableQueue.AcceptedReceipt.class); }
+    catch (RuntimeException invalid) { throw new IOException("Unbound or invalid retirement receipt", invalid); }
+  }
+  private static String headKey(String generation, String key) {
+    return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+        (generation + "\0" + key).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+  /** Save the predecessor BEFORE the queue transaction can replace its coalesced SQL head. */
+  public synchronized void replacingRoot(String generation, String key,
+      SwitchBufferCapableQueue.AcceptedReceipt predecessor) throws IOException {
+    if (predecessor != null) retainRoot(predecessor);
+    state.setProperty(REPLACING + headKey(generation, key), predecessor == null ? "new" : predecessor.uuid());
+    save();
+  }
+  public synchronized void retainRootCollection(SwitchBufferCapableQueue.AcceptedReceipt root,String collection) throws IOException {
+    if (!rootReceipts().contains(root)) throw new IOException("ROOT collection lacks retained intent");
+    if (collection != null && !collection.isBlank()) {
+      state.setProperty(RETIRE + "root-collection|" + root.uuid(),collection);save();
+    }
+  }
+  public synchronized String rootCollection(SwitchBufferCapableQueue.AcceptedReceipt root) {
+    return state.getProperty(RETIRE + "root-collection|" + root.uuid());
+  }
+  private void retainRoot(SwitchBufferCapableQueue.AcceptedReceipt receipt) {
+    state.setProperty(RECEIPT + receipt.uuid(), JSON.writeValueAsString(receipt));
+  }
+  public synchronized void retainRootHead(SwitchBufferCapableQueue.AcceptedReceipt receipt) throws IOException {
+    String key = headKey(receipt.operation().generation(), receipt.operation().key());
+    String previous = state.getProperty(HEAD + key);
+    retainRoot(receipt);
+    if (previous != null && !previous.equals(receipt.uuid())) state.setProperty(NEXT + previous, receipt.uuid());
+    state.setProperty(HEAD + key, receipt.uuid());
+    state.remove(REPLACING + key);
+    save();
+  }
+  public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> roots) throws IOException {
+    if (rootsInventoried()) throw new IOException("ROOT inventory already exists");
+    for (var root : roots) {
+      retainRoot(root);
+      state.setProperty(HEAD + headKey(root.operation().generation(), root.operation().key()), root.uuid());
+    }
+    state.setProperty(RETIRE + "root-inventory", "true");
+    save();
+  }
+  /** A crash may leave exactly the committed replacement after a saved predecessor intent. */
+  public synchronized void validateRootHeads(java.util.List<SwitchBufferCapableQueue.AcceptedReceipt> actual) throws IOException {
+    if (!rootsInventoried()) throw new IOException("Missing retirement ROOT inventory");
+    var heads = new java.util.HashMap<String,SwitchBufferCapableQueue.AcceptedReceipt>();
+    for (var root : actual) heads.put(headKey(root.operation().generation(),root.operation().key()),root);
+    for (String key : java.util.List.copyOf(state.stringPropertyNames())) if (key.startsWith(REPLACING)) {
+      String head = key.substring(REPLACING.length());var surviving = heads.get(head);
+      if (surviving == null) throw new IOException("Missing interrupted ROOT replacement");
+      String predecessor = state.getProperty(key);
+      if (!predecessor.equals("new") && !predecessor.equals(surviving.uuid())) {
+        var prior = decodeReceipt(state.getProperty(RECEIPT + predecessor));
+        if (prior.acceptedOrder() >= surviving.acceptedOrder()) throw new IOException("Stale ROOT replacement");
+      }
+      retainRootHead(surviving);
+    }
+    for (String key : state.stringPropertyNames()) if (key.startsWith(HEAD)) {
+      String head = key.substring(HEAD.length());String required = state.getProperty(key);
+      var current = heads.get(head);
+      if (current == null || !current.uuid().equals(required)
+          || !current.equals(decodeReceipt(state.getProperty(RECEIPT + required))))
+        throw new IOException("Required latest ROOT receipt missing or changed");
+    }
+    var byUuid = new java.util.HashMap<String,SwitchBufferCapableQueue.AcceptedReceipt>();
+    for (var root : rootReceipts()) byUuid.put(root.uuid(),root);
+    for (var root : byUuid.values()) {
+      String required = state.getProperty(HEAD + headKey(root.operation().generation(),root.operation().key()));
+      var seen = new java.util.HashSet<String>();var cursor = root;
+      while (!cursor.uuid().equals(required)) {
+        if (!seen.add(cursor.uuid())) throw new IOException("Cyclic ROOT receipt history");
+        var next = byUuid.get(state.getProperty(NEXT + cursor.uuid()));
+        if (next == null || next.acceptedOrder() <= cursor.acceptedOrder()
+            || !next.operation().key().equals(root.operation().key())
+            || !next.operation().generation().equals(root.operation().generation()))
+          throw new IOException("Incomplete ROOT successor chain");
+        cursor = next;
+      }
+    }
+  }
+
   public boolean prepared() {
     return "true".equals(state.getProperty("prepared"));
   }
@@ -94,7 +213,7 @@ public final class Release030RecoveryState {
   }
 
   /** Called after the atomic boundary backfill/retry repair and before the first job claim. */
-  public void prepared(Collection<Path> roots, String databaseIdentity) throws IOException {
+  public synchronized void prepared(Collection<Path> roots, String databaseIdentity) throws IOException {
     boolean uncertain = "true".equals(state.getProperty("uncertain"));
     var quarantine = new Properties();
     for (String key : state.stringPropertyNames()) {
@@ -121,18 +240,18 @@ public final class Release030RecoveryState {
   }
 
   /** The directory walk has durably admitted its work and committed confirmed deletions. */
-  public void completed(Path root) throws IOException {
+  public synchronized void completed(Path root) throws IOException {
     state.setProperty(ROOT + PathNormalizer.normalizeKey(root), "done");
     save();
   }
 
   /** Failed evidence is durable debt, with a cooldown across ticks and process restarts. */
-  public void deferred(Path root, long now) throws IOException {
+  public synchronized void deferred(Path root, long now) throws IOException {
     state.setProperty("retry|" + PathNormalizer.normalizeKey(root), Long.toString(now + 60_000L));
     save();
   }
 
-  public boolean ready(Path root, long now) throws IOException {
+  public synchronized boolean ready(Path root, long now) throws IOException {
     String key = PathNormalizer.normalizeKey(root);
     if (!"pending".equals(state.getProperty(ROOT + key))) {
       state.setProperty(ROOT + key, "pending");
@@ -151,7 +270,7 @@ public final class Release030RecoveryState {
     }
   }
 
-  public boolean finish() throws IOException {
+  public synchronized boolean finish() throws IOException {
     if (retiringBuild() || !prepared() || !pendingRoots().isEmpty()
         || state.stringPropertyNames().stream().anyMatch(key -> key.startsWith(QUARANTINED))) return false;
     Files.deleteIfExists(file);
@@ -163,28 +282,60 @@ public final class Release030RecoveryState {
   public String retiringBuilding() { return state.getProperty(RETIRE + "building"); }
   public boolean rootsJournaled() { return "true".equals(state.getProperty(RETIRE + "roots-journaled")); }
 
-  public void markRootsJournaled() throws IOException {
+  public synchronized void markRootsJournaled() throws IOException {
     state.setProperty(RETIRE + "roots-journaled", "true");
     save();
   }
 
   /** Publish completed root walks before acknowledging their ordered journal versions. */
-  public void completeRetirementRoots() throws IOException {
+  public synchronized void completeRetirementRoots() throws IOException {
     for (Path root : pendingRoots()) state.setProperty(ROOT + PathNormalizer.normalizeKey(root), "done");
     save();
   }
 
-  public boolean replayComplete() { return "true".equals(state.getProperty(RETIRE + "replayed")); }
+  public boolean replayComplete() { return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "replayed")); }
   public boolean differencesComplete() { return "true".equals(state.getProperty(RETIRE + "differences")); }
 
+  public boolean rootEnumerated(SwitchBufferCapableQueue.AcceptedReceipt root) {
+    return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "root-enum|" + root.uuid()));
+  }
+  public synchronized void markRootEnumerated(SwitchBufferCapableQueue.AcceptedReceipt root) throws IOException {
+    state.setProperty(RETIRE + "root-enum|" + root.uuid(),java.util.Objects.requireNonNull(openedSession));save();
+  }
   public boolean rootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) {
-    return "true".equals(state.getProperty(rootWalkKey(op)));
+    return openedSession != null && openedSession.equals(state.getProperty(rootWalkKey(op)));
   }
 
   /** The exact walk has committed its prune and durably admitted its files, before their writer runs. */
-  public void markRootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
-    state.setProperty(rootWalkKey(op), "true");
+  public synchronized void markRootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
+    state.setProperty(rootWalkKey(op), java.util.Objects.requireNonNull(openedSession));
     save();
+  }
+
+  public boolean deletionCommitted(SwitchBufferCapableQueue.SwitchBufferOp op) {
+    String value = state.getProperty(deletionKey(op));
+    if (value == null) return false;
+    try { return decodeReceipt(value).operation().equals(op); }
+    catch (IOException invalid) { throw new IllegalStateException("Unbound historical delete proof", invalid); }
+  }
+
+  public boolean deletionQueueComplete(SwitchBufferCapableQueue.SwitchBufferOp op) {
+    return deletionCommitted(op) && openedSession != null
+        && openedSession.equals(state.getProperty(deletionKey(op) + "|queue"));
+  }
+
+  /** Historical A effect and CURRENT Q removal are separate even after supported DB replacement. */
+  public synchronized void markDeletionCommitted(SwitchBufferCapableQueue.AcceptedReceipt receipt) throws IOException {
+    state.setProperty(deletionKey(receipt.operation()), JSON.writeValueAsString(receipt));
+    markDeletionQueueComplete(receipt.operation());
+  }
+  public synchronized void markDeletionQueueComplete(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
+    state.setProperty(deletionKey(op) + "|queue", java.util.Objects.requireNonNull(openedSession));
+    save();
+  }
+
+  private static String deletionKey(SwitchBufferCapableQueue.SwitchBufferOp op) {
+    return rootWalkKey(op).replace(RETIRE + "walk|", RETIRE + "delete|");
   }
 
   private static String rootWalkKey(SwitchBufferCapableQueue.SwitchBufferOp op) {
@@ -198,13 +349,13 @@ public final class Release030RecoveryState {
     }
   }
 
-  public void markDifferencesComplete() throws IOException {
+  public synchronized void markDifferencesComplete() throws IOException {
     state.setProperty(RETIRE + "differences", "true");
     save();
   }
 
   /** Written before changing state.json; all A/B differences remain obligations until commit. */
-  public void beginRetirement(String active, String building, java.util.Map<Path, String> paths)
+  public synchronized void beginRetirement(String active, String building, java.util.Map<Path, String> paths)
       throws IOException {
     if (retiringBuild()) throw new IOException("Release retirement already checkpointed");
     state.setProperty(RETIRE + "active", active);
@@ -229,12 +380,12 @@ public final class Release030RecoveryState {
     return java.util.Map.copyOf(paths);
   }
 
-  public void markReplayComplete() throws IOException {
-    state.setProperty(RETIRE + "replayed", "true");
+  public synchronized void markReplayComplete() throws IOException {
+    state.setProperty(RETIRE + "replayed", java.util.Objects.requireNonNull(openedSession));
     save();
   }
 
-  public void finishRetirement() throws IOException {
+  public synchronized void finishRetirement() throws IOException {
     for (String key : List.copyOf(state.stringPropertyNames())) {
       if (key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH)) state.remove(key);
     }

@@ -39,8 +39,65 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
+  /** Exact SQL admission position, retained only by release retirement's existing owner. */
+  record AcceptedReceipt(SwitchBufferOp operation, long acceptedOrder) {
+    public AcceptedReceipt {
+      if (operation == null || acceptedOrder <= 0 || operation.revision() == null
+          || !operation.revision().replace("-", "").matches("[0-9a-f]{32}")) {
+        throw new IllegalArgumentException("Incomplete ordered retirement receipt");
+      }
+    }
+    public String uuid() { return operation.revision().replace("-", ""); }
+    public String rootUnit() {
+      if (!"SYNC_ROOT".equals(operation.op())) throw new IllegalStateException("Not a ROOT receipt");
+      return "root1:" + uuid() + ":" + acceptedOrder + ":"
+          + java.util.UUID.randomUUID().toString().replace("-", "");
+    }
+  }
+
+  /** The opaque root1 unit keeps its original receipt position across later walks and restarts. */
+  record RootOrigin(String uuid, long acceptedOrder) {
+    public static RootOrigin fromUnit(String unit) {
+      if (unit == null || !unit.startsWith("root1:")) return null;
+      String[] parts = unit.split(":", -1);
+      if (parts.length != 4 || !parts[1].matches("[0-9a-f]{32}")
+          || !parts[3].matches("[0-9a-f]{32}") || !parts[2].matches("[1-9][0-9]{0,18}")) {
+        throw new IllegalArgumentException("Invalid ROOT unit identity");
+      }
+      long order = Long.parseLong(parts[2]);
+      return new RootOrigin(parts[1], order);
+    }
+  }
+
+  default AcceptedReceipt retirementRootReceipt(String generation, String key) {
+    throw new UnsupportedOperationException("Ordered ROOT receipt unavailable");
+  }
+
+  default void retainRetirementRootCollection(AcceptedReceipt root,String collection) {
+    throw new UnsupportedOperationException("ROOT collection evidence unavailable");
+  }
+  default String retirementRootCollection(AcceptedReceipt root) { return null; }
+
+  default int enqueueRetirementRootEntries(AcceptedReceipt root, List<EnqueueEntry> entries,
+      String collection, boolean maintenance, boolean replay,
+      java.util.function.BooleanSupplier cancelled) {
+    throw new UnsupportedOperationException("Receipt-owned ROOT admissions unavailable");
+  }
+
   /** Exact candidate whose retained release-recovery journal still orders new admissions. */
   default String release030RetirementGeneration() { return null; }
+
+  /** Live retirement sync refreshes only retained exact receipts in the job admission transaction. */
+  default int enqueueRelease030LiveSyncEntries(List<EnqueueEntry> entries, String collection,
+      java.util.function.BooleanSupplier cancelled) {
+    return enqueueRelease030LiveSyncEntries(entries, collection, false, cancelled);
+  }
+
+  /** Policy-preserving form: maintenance may cover an existing waiting row without replacing it. */
+  default int enqueueRelease030LiveSyncEntries(List<EnqueueEntry> entries, String collection,
+      boolean maintenance, java.util.function.BooleanSupplier cancelled) {
+    throw new UnsupportedOperationException("Atomic retirement sync admissions are unavailable");
+  }
 
   /**
    * Inserts or replaces an operation in the durable switch buffer.

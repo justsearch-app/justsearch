@@ -571,7 +571,25 @@ final class SyncDirectoryOps {
     return execute(rootPath, force, provenance, cancelled, collection, AdmissionMode.DEFAULT);
   }
 
-  enum AdmissionMode { DEFAULT, MAINTENANCE, UPGRADE_RECOVERY }
+  /** Admission only: rebuilding CURRENT Q membership never publishes a prune/walk certificate. */
+  SyncDirectoryResponse enumerateRetirementRoot(String rootPath,String collection,
+      java.util.function.BooleanSupplier cancelled,boolean automatic,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt original) {
+    Path root=resolveSyncRoot(rootPath);
+    if(root==null)return syncDirectoryErrorResponse("ROOT enumeration unavailable");
+    try {
+      var result=walkAndEnqueueMissingFiles(root,true,java.util.Set.of(),
+          io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.operation().payload()).provenance(),
+          cancelled,collection,automatic?AdmissionMode.UPGRADE_RECOVERY:AdmissionMode.RETIREMENT_REPLAY,
+          recoveryAdmission,original);
+      if(result.walkInterrupted()||cancelled.getAsBoolean())return syncDirectoryErrorResponse("ROOT enumeration cancelled");
+      return SyncDirectoryResponse.newBuilder().setFilesAdded(result.filesAdded())
+          .setDeleteDetectionUnverified(result.walkIncomplete()).build();
+    }catch(IOException|RuntimeException incomplete){return syncDirectoryErrorResponse("ROOT enumeration incomplete: "+incomplete.getMessage());}
+  }
+
+  enum AdmissionMode { DEFAULT, MAINTENANCE, UPGRADE_RECOVERY, RETIREMENT_LIVE, RETIREMENT_MAINTENANCE, RETIREMENT_REPLAY }
 
   SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
@@ -584,6 +602,20 @@ final class SyncDirectoryOps {
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode,
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission) {
+    return execute(rootPath,force,provenance,cancelled,collection,admissionMode,recoveryAdmission,null);
+  }
+
+  SyncDirectoryResponse execute(String rootPath,boolean force,JobQueue.EnqueueProvenance provenance,
+      java.util.function.BooleanSupplier cancelled,String collection,AdmissionMode admissionMode,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
+    return execute(rootPath,force,provenance,cancelled,collection,admissionMode,
+        java.util.function.IntSupplier::getAsInt,originalRoot);
+  }
+
+  SyncDirectoryResponse execute(String rootPath,boolean force,JobQueue.EnqueueProvenance provenance,
+      java.util.function.BooleanSupplier cancelled,String collection,AdmissionMode admissionMode,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt originalRoot) {
     boolean upgradeRecovery = admissionMode == AdmissionMode.UPGRADE_RECOVERY;
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
@@ -632,7 +664,7 @@ final class SyncDirectoryOps {
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
           walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection,
-              admissionMode, recoveryAdmission);
+              admissionMode, recoveryAdmission, originalRoot);
       filesAdded = walk.filesAdded();
       // A recovery checkpoint cannot certify a tree whose unreadable entries were skipped.
       pruneIncomplete |= walk.walkIncomplete();
@@ -771,7 +803,8 @@ final class SyncDirectoryOps {
       Path root, boolean force, Set<String> indexedPaths,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode,
-      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission) throws IOException {
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.AcceptedReceipt originalRoot) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {
@@ -881,6 +914,30 @@ final class SyncDirectoryOps {
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();
+            if (originalRoot != null) {
+              var queue=(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue)jobQueue;
+              java.util.function.IntSupplier admit=()->queue.enqueueRetirementRootEntries(originalRoot,admitted,collection,
+                  admissionMode==AdmissionMode.RETIREMENT_MAINTENANCE,
+                  admissionMode==AdmissionMode.RETIREMENT_REPLAY || admissionMode==AdmissionMode.UPGRADE_RECOVERY,
+                  ()->cancelled.getAsBoolean()||Thread.currentThread().isInterrupted());
+              int accepted=admissionMode==AdmissionMode.UPGRADE_RECOVERY?recoveryAdmission.applyAsInt(admit):admit.getAsInt();
+              if(accepted!=admitted.size())throw new IllegalStateException("Incomplete original ROOT admission");
+              return accepted;
+            }
+            if (admissionMode == AdmissionMode.RETIREMENT_LIVE
+                || admissionMode == AdmissionMode.RETIREMENT_MAINTENANCE) {
+              int accepted = ((io.justsearch.indexerworker.queue.SwitchBufferCapableQueue) jobQueue)
+                  .enqueueRelease030LiveSyncEntries(admitted, collection,
+                      admissionMode == AdmissionMode.RETIREMENT_MAINTENANCE,
+                      () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
+              if (accepted != admitted.size()) throw new IllegalStateException("Incomplete retirement sync admission");
+              return accepted;
+            }
+            if (admissionMode == AdmissionMode.RETIREMENT_REPLAY) {
+              int accepted = jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection);
+              if (accepted != admitted.size()) throw new IllegalStateException("Incomplete retirement replay admission");
+              return accepted;
+            }
             if (admissionMode == AdmissionMode.UPGRADE_RECOVERY) {
               return recoveryAdmission.applyAsInt(() -> jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection));
             }

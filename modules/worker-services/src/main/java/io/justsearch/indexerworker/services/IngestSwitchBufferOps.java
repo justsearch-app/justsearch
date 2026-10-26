@@ -188,7 +188,7 @@ final class IngestSwitchBufferOps {
 
   // ==================== Per-endpoint buffer methods ====================
 
-  void journalSyncRootForGeneration(String generation, String rootPath, boolean force,
+  SwitchBufferCapableQueue.AcceptedReceipt journalSyncRootForGeneration(String generation, String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance) {
     String root = resolveNormalizedPathPrefix(rootPath);
     if (!(jobQueue instanceof SwitchBufferCapableQueue queue)
@@ -196,6 +196,7 @@ final class IngestSwitchBufferOps {
             new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(root, force, provenance))) {
       throw switchBufferUnavailable();
     }
+    return ((SwitchBufferCapableQueue) jobQueue).retirementRootReceipt(generation,switchBufferSyncRootKey(root));
   }
 
   SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(

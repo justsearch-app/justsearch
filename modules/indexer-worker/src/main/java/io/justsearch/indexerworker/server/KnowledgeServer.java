@@ -1376,7 +1376,7 @@ public final class KnowledgeServer implements Closeable {
       IndexGenerationManager.State state = layout.state();
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && jobQueue instanceof SqliteJobQueue) {
-        release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
+        release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();
         if (release030Recovery != null) {
           try {
             var expected = expectedCommitMetadataSource(() -> embeddingFingerprintSupplier.get().get());
@@ -7300,7 +7300,7 @@ public final class KnowledgeServer implements Closeable {
     if (!bootRootBindingsBound || !(jobQueue instanceof SqliteJobQueue queue)
         || !(appServices instanceof DefaultWorkerAppServices)) return;
     if (release030Recovery == null)
-      release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
+      release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();
     if (release030Recovery == null) return;
     // Boundaries and the selective jobs repair do not depend on the index migration phase.
     // Preparing before claims lets native cutover drain; directory recovery still waits for IDLE.
@@ -7333,9 +7333,11 @@ public final class KnowledgeServer implements Closeable {
       if (!release030Recovery.rootsJournaled()) {
         queue.journalRelease030Roots(release030Recovery.retiringBuilding(), release030Recovery.pendingRoots());
         release030RetirementCut("release030-roots-journaled");
+        queue.inventoryRetirementRoots();
         release030Recovery.markRootsJournaled();
       }
       Release030MigrationRetirement.retainAuthority(queue, release030Recovery, release030RetirementRoots());
+      queue.prepareRetirementClaims();
     }
   }
 
@@ -7449,7 +7451,7 @@ public final class KnowledgeServer implements Closeable {
                     release030RetirementCut("release030-replay-committed");
                   } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
                 }, new KnowledgeServerMigrationOps.Release030Roots(
-                    recoveryRoots, this::replayRelease030Root, () -> closeStarted));
+                    recoveryRoots, this::replayRelease030Root, () -> closeStarted, checkpoint));
             if (!replayed) return;
             release030RetirementCut("release030-journal-acknowledged");
             checkpoint.markReplayComplete();

@@ -186,7 +186,13 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
       var stored = reader.getIndexCommit().getUserData();
       if (ParityDiagnostics.storedShapeUnreadable(stored, expected)
           || (!IndexFingerprint.isWellFormedDigest(stored.get("index_fingerprint"))
-              && !IndexFingerprint.isReadableInputs(stored.get("index_fingerprint_inputs")))) return false;
+              && (!IndexFingerprint.isReadableInputs(stored.get("index_fingerprint_inputs"))
+                  || !IndexFingerprint.nullModelInputs(stored.get("index_fingerprint_inputs")).isEmpty()))) {
+        // Without a committed digest, a null/missing model input cannot distinguish an
+        // unconfigured model from an unreadable one. The ordinary open comparison deliberately
+        // tolerates that uncertainty; it cannot authorize discarding a migration.
+        return false;
+      }
       for (var leaf : reader.leaves()) leaf.reader().checkIntegrity();
       return !ParityDiagnostics.requiresRebuild(
           ParityDiagnostics.diff(stored, expected, Math.max(1, reader.numDocs()), unresolvedInputs));
