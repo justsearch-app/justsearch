@@ -168,22 +168,48 @@ class VerifierStatusIsolationTest {
   }
   @Test void healthyGpuMustStayFreshWithinIdleSamplingPeriod() throws Exception {
     try(var f=new Fixture(true)) {
+      var clock = new AtomicLong(System.currentTimeMillis());
+      f.handler.setClockForTesting(clock::get);
       var reader=mock(io.justsearch.app.api.gpu.GpuMemoryReader.class);
       when(reader.sampleNow()).thenAnswer(a -> new io.justsearch.app.api.gpu.GpuMemorySample(
         io.justsearch.app.api.gpu.GpuMemorySource.NVML,java.util.Optional.empty(),
         java.util.Optional.of(new io.justsearch.app.api.gpu.GpuDevice("luid_0x00000000_0x00000001",java.util.OptionalInt.of(0))),
         java.util.Optional.of("verifier GPU"),java.util.OptionalLong.of(12L*1024*1024*1024),
-        java.util.OptionalLong.of(1024*1024*1024),java.util.Map.of(),Instant.now()));
-      f.handler.setGpuMemoryReader(reader);
-      Thread.sleep(100);
-      f.handler.sampleAndBuildStatusSnapshot();
-      assertFalse(get(f,"").path("operating").path("gpu").path("stale").asBoolean());
-      assertEquals(10000L,f.handler.samplingPeriodMs());
-      Thread.sleep(7100);
-      assertFalse(get(f,"").path("operating").path("gpu").path("stale").asBoolean(),
-        "healthy GPU must not turn stale before the next scheduled idle sample");
-      f.handler.closeGpuMemoryReader();
+        java.util.OptionalLong.of(1024*1024*1024),java.util.Map.of(),Instant.ofEpochMilli(clock.get())));
+      try {
+        f.handler.setGpuMemoryReader(reader);
+        var published = waitForGpuPublication(f, clock.get());
+        assertFalse(published.path("stale").asBoolean());
+        assertEquals(10000L,f.handler.samplingPeriodMs());
+        String sampledAt = published.path("sampledAt").asText();
+        // Age the published reading without asking any producer to refresh it.
+        clock.addAndGet(7100L);
+        var aged = get(f, "").path("operating").path("gpu");
+        assertEquals(sampledAt, aged.path("sampledAt").asText());
+        assertEquals(7100L, aged.path("ageMs").asLong());
+        assertFalse(aged.path("stale").asBoolean(),
+          "healthy GPU must not turn stale before the next scheduled idle sample");
+      } finally {
+        f.handler.closeGpuMemoryReader();
+      }
     }
+  }
+
+  private tools.jackson.databind.JsonNode waitForGpuPublication(Fixture f, long sampledAtMs)
+      throws Exception {
+    String expected = Instant.ofEpochMilli(sampledAtMs).toString();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    tools.jackson.databind.JsonNode gpu;
+    do {
+      f.handler.sampleAndBuildStatusSnapshot();
+      gpu = get(f, "").path("operating").path("gpu");
+      if ("NVML".equals(gpu.path("source").asText())
+          && expected.equals(gpu.path("sampledAt").asText())) break;
+      Thread.sleep(10);
+    } while (System.nanoTime() < deadline);
+    assertEquals("NVML", gpu.path("source").asText(), "known GPU reading must reach HTTP");
+    assertEquals(expected, gpu.path("sampledAt").asText(), "expected GPU sample must be published");
+    return gpu;
   }
   /**
    * Status reads have their own bounded observation pool (b75 integration decision): a saturated
