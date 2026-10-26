@@ -86,4 +86,42 @@ final class ExtractionDropoutPolicyTest {
     assertTrue(ExtractionDropoutPolicy.isDropout(""));
     assertEquals(0.0d, TextQualityAnalyzer.computeQualityScore(""));
   }
+
+  @org.junit.jupiter.params.ParameterizedTest(
+      name = "supplementaryThresholdCountsOccurrencesNotUtf16UnitsOrDistinctValues({index})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"\uD840\uDC00", "\uD801\uDC00", "\uD835\uDFCE"})
+  void supplementaryThresholdCountsOccurrencesNotUtf16UnitsOrDistinctValues(String value) {
+    assertEquals(2, value.length());
+    assertEquals(Dropout.TRIVIAL, ExtractionDropoutPolicy.classify(value));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify(value + value));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify("A" + value));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify(value + "7"));
+    assertFalse(ExtractionDropoutPolicy.isDropout(value + value));
+  }
+
+  @Test
+  void surrogateAndCategoryBoundariesRetainTheExistingRules() {
+    for (String text : new String[] {"\uDC00\uD840", "\uD840!\uDC00", "\uD840", "\uDC00",
+        "\u00A0", "\u0301\u200D\uFE0F", "²Ⅷ①", "\uD83D\uDE00"}) {
+      assertEquals(Dropout.TRIVIAL, ExtractionDropoutPolicy.classify(text));
+    }
+    assertEquals(Dropout.EMPTY, ExtractionDropoutPolicy.classify("\u2003\t\n"));
+    assertEquals(Dropout.TRIVIAL, ExtractionDropoutPolicy.classify("1\uFE0F\u20E3"));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify("1\uFE0F\u20E32\uFE0F\u20E3"));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify("é漢가９"));
+  }
+
+  @Test
+  void validPairsBesideLoneUnitsStillReachTheOccurrenceThreshold() {
+    assertEquals(Dropout.TRIVIAL, ExtractionDropoutPolicy.classify("\uD840\uDC00\uD840!\uDC00"));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify("A\uD840\uDC00\uD840!\uDC00"));
+  }
+
+  @Test
+  void longSuffixAndMalformedInputsTerminate() {
+    String suffix = "\uD840!\uDC00".repeat(300_000);
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify("\uD840\uDC00\uD840\uDC00" + suffix));
+    assertEquals(Dropout.TRIVIAL, ExtractionDropoutPolicy.classify(suffix));
+    assertEquals(Dropout.NONE, ExtractionDropoutPolicy.classify(suffix + "\uD840\uDC00\uD840\uDC00"));
+  }
 }

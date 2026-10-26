@@ -116,4 +116,34 @@ final class ExtractionDropoutFallbackChainTest {
     return new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(),
         TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), OcrMetricCatalog.noop(), budget);
   }
+
+  @Test
+  void sufficientSupplementaryStructuredTextSkipsOcrAsTextual() throws Exception {
+    String text = "\uD840\uDC00".repeat(100);
+    try (var extractor = extractorWithBudget(ExtractionFallbackBudget.defaults())) {
+      var summary = new StructuredDocumentSummary(1, 200, 1, 0, 0, 1, 0, 0, 0);
+      var decision = extractor.evaluateOcrAttemptForTesting(
+          Path.of("supplementary.pdf"), "application/pdf", text, summary, 0L);
+      assertEquals(OcrSkipReason.TEXTUAL, decision.skipReason());
+      assertFalse(decision.shouldAttempt());
+    }
+  }
+
+  @Test
+  void supplementaryQualityDoesNotEraseMissingPagesOrBudgetGates() throws Exception {
+    String text = "\uD840\uDC00".repeat(100);
+    var missing = new StructuredDocumentSummary(2, 200, 1, 1, 0, 1, 0, 0, 0);
+    try (var extractor = extractorWithBudget(ExtractionFallbackBudget.defaults())) {
+      var decision = extractor.evaluateOcrAttemptForTesting(
+          Path.of("missing-page.pdf"), "application/pdf", text, missing, 0L);
+      assertEquals(OcrSkipReason.DISABLED, decision.skipReason());
+      assertFalse(decision.shouldAttempt());
+    }
+    try (var extractor = extractorWithBudget(new ExtractionFallbackBudget(0, 30_000L))) {
+      var decision = extractor.evaluateOcrAttemptForTesting(
+          Path.of("supplementary.pdf"), "application/pdf", text, missing, 0L);
+      assertEquals(OcrSkipReason.BUDGET, decision.skipReason());
+    }
+  }
+
 }
