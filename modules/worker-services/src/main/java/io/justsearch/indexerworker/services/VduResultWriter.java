@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.services;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
+import io.justsearch.indexerworker.text.TextQualityAnalyzer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import io.justsearch.ipc.UpdateVduResultRequest;
@@ -66,6 +67,7 @@ public final class VduResultWriter {
     if (replaceContent) {
       String preview = LanguageUtils.contentPreview(content, ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS);
       updates.put(SchemaFields.CONTENT, content);
+      updates.put(SchemaFields.EXTRACTION_QUALITY_SCORE, TextQualityAnalyzer.computeQualityScore(content));
       updates.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(content));
       updates.put(SchemaFields.CONTENT_PREVIEW, preview);
       updates.put(SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview));

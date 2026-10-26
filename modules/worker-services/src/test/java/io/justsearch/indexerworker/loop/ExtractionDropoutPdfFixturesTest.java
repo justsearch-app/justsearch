@@ -197,7 +197,7 @@ final class ExtractionDropoutPdfFixturesTest {
               1.0, TextQualityAnalyzer.computeQualityScore(
                   actualContent, evidence.path("pageCount").asInt())),
           () -> assertEquals(1.0, TextQualityAnalyzer.computeQualityScore(actualContent)),
-          () -> assertEquals(1.0f, doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE)),
+          () -> assertEquals(1.0, doc.fields().get(SchemaFields.EXTRACTION_QUALITY_SCORE)),
           () -> assertFalse(ExtractionDropoutPolicy.isDropout(actualContent)),
           () -> assertEquals(
               SchemaFields.VDU_STATUS_NOT_NEEDED, doc.fields().get(SchemaFields.VDU_STATUS)),

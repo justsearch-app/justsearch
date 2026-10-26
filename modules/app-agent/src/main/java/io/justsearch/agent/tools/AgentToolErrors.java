@@ -28,7 +28,7 @@ import tools.jackson.core.JacksonException;
  * <p><b>Fact two: the typed fields.</b> {@code OperationResult} has carried
  * {@code errorCode}/{@code errorDetails}/{@code retryable} since slice 3a-2-c and no agent tool
  * used any of them, so every tool failure reached consumers as an untyped string. The mapping is
- * deliberately narrow — three causes, three existing {@link ApiErrorCode} values, no new enum
+ * deliberately narrow — typed causes, existing {@link ApiErrorCode} values, no new enum
  * constants (a new code would also require an {@code errorMessages.ts} entry per that enum's
  * contract test, and this change has nothing new to say to a user).
  *
@@ -102,7 +102,7 @@ public final class AgentToolErrors {
   }
 
   /**
-   * The three causes, in priority order. Anything not recognised is {@code INTERNAL_ERROR} — the
+   * The recognised causes, in priority order. Anything not recognised is {@code INTERNAL_ERROR} — the
    * conservative end, because an unrecognised failure is exactly the one worth a stack trace.
    */
   private static ApiErrorCode codeFor(Throwable cause) {
@@ -111,6 +111,10 @@ public final class AgentToolErrors {
     }
     if (cause instanceof TimeoutException) {
       return ApiErrorCode.TIMEOUT;
+    }
+    if (cause instanceof KnowledgeClientException failure
+        && failure.status() == KnowledgeClientException.Status.INVALID_ARGUMENT) {
+      return ApiErrorCode.INVALID_REQUEST;
     }
     if (isWorkerUnreachable(cause)) {
       return ApiErrorCode.SERVICE_UNAVAILABLE;
