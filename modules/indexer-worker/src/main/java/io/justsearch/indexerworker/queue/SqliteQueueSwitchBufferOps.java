@@ -34,9 +34,12 @@ final class SqliteQueueSwitchBufferOps {
   private Runnable admissionChanged = () -> {};
   private Supplier<List<SwitchBufferCapableQueue.SwitchBufferOp>> retainedReceipts = List::of;
 
+  private java.util.function.Consumer<SwitchBufferCapableQueue.SwitchBufferOp> beforeReplacement = ignored -> {};
+
   void retirementAdmissions(java.util.function.LongSupplier floor, Runnable changed,
-      Supplier<List<SwitchBufferCapableQueue.SwitchBufferOp>> retained) {
-    retainedOrderFloor = floor; admissionChanged = changed; retainedReceipts = retained;
+      Supplier<List<SwitchBufferCapableQueue.SwitchBufferOp>> retained,
+      java.util.function.Consumer<SwitchBufferCapableQueue.SwitchBufferOp> replacing) {
+    retainedOrderFloor = floor; admissionChanged = changed; retainedReceipts = retained; beforeReplacement = replacing;
   }
 
   void attachAdmissionWitness(MigrationJournalWitness witness) throws SQLException {
@@ -304,6 +307,14 @@ final class SqliteQueueSwitchBufferOps {
 
   private boolean writeForGeneration(
       Connection conn, String generation, String key, String op, String payload) throws SQLException {
+    try (var query = conn.prepareStatement(
+        "SELECT op,payload,last_updated,revision,accepted_order FROM switch_buffer WHERE generation=? AND key=?")) {
+      query.setString(1,generation); query.setString(2,key);
+      try (var row = query.executeQuery()) {
+        if (row.next()) beforeReplacement.accept(new SwitchBufferCapableQueue.SwitchBufferOp(
+            generation,key,row.getString(1),row.getString(2),row.getLong(3),row.getString(4),row.getLong(5)));
+      }
+    }
     long floor = retainedOrderFloor.getAsLong();
     long highest;
     try (var query = conn.createStatement(); var row = query.executeQuery("SELECT COALESCE(MAX(accepted_order),0) FROM switch_buffer")) {

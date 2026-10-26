@@ -718,6 +718,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try { return releaseRecovery != null && releaseRecovery.retiringBuild()
             ? releaseRecovery.retirementReceipts(List.of()) : List.of(); }
         catch (IOException invalid) { throw new IllegalStateException("Retained projection admission unavailable",invalid); }
+      }, predecessor -> {
+        if (releaseRecovery != null && releaseRecovery.retiringBuild()
+            && "UPSERT".equals(predecessor.op()) && !predecessor.payload().stripLeading().startsWith("{")) {
+          try { releaseRecovery.retainRawHistory(predecessor); }
+          catch (IOException invalid) { throw new IllegalStateException("Original raw receipt was not retained",invalid); }
+        }
       });
 
       // Run integrity check on existing databases (throws SQLException on corruption)
@@ -1267,13 +1273,32 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private long latestDelete(List<RetirementDelete> deletes, String path, String collection) {
     return deletes.stream().filter(d -> d.matches(path,collection)).mapToLong(RetirementDelete::order).max().orElse(0);
   }
+  private record RetirementRoot(io.justsearch.adapters.lucene.runtime.PathPrefixScope scope,
+      JobQueue.EnqueueProvenance provenance, String collection) {}
   private record RetirementOrders(Map<String,Long> roots, Map<String,Long> files, Map<String,Long> fileWinners,
-      Map<String,List<SwitchBufferUpsert>> filesByPath) {}
+      Map<String,List<SwitchBufferUpsert>> filesByPath, Map<String,RetirementRoot> rootIntents) {}
 
   private RetirementOrders retirementOrders(List<SwitchBufferOp> journal) throws IOException {
     var roots = new HashMap<String,Long>();
-    for (var receipt : releaseRecovery.rootReceipts())
+    var receipts = releaseRecovery.rootReceipts();
+    var declarations = new java.util.HashSet<>(
+        io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(dbPath.getParent()));
+    for (var receipt : receipts) if (receipt.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX))
+      declarations.add(Path.of(SwitchBufferSyncRoot.decode(receipt.payload()).rootPath()).toAbsolutePath().normalize());
+    var intents = new HashMap<String,RetirementRoot>();
+    for (var receipt : receipts) {
+      var intent = SwitchBufferSyncRoot.decode(receipt.payload());
+      Path boundary = Path.of(intent.rootPath()).toAbsolutePath().normalize();
+      String canonical = PathNormalizer.normalizeKey(boundary);
+      if (!canonical.equals(intent.rootPath())
+          && !PathNormalizer.normalizePathPrefix(canonical).equals(intent.rootPath())) continue;
+      var scope = new io.justsearch.adapters.lucene.runtime.PathPrefixScope(intent.rootPath(),
+          declarations.stream().filter(root -> !root.equals(boundary) && root.startsWith(boundary))
+              .map(Path::toString).toList());
       roots.put(receipt.retirementUuid(), receipt.acceptedOrder());
+      intents.put(receipt.retirementUuid(), new RetirementRoot(scope,
+          intent.provenance(), retirementRootCollection(receipt)));
+    }
     var files = new HashMap<String,Long>();
     var winners = new HashMap<String,Long>();
     var filesByPath = new HashMap<String,List<SwitchBufferUpsert>>();
@@ -1285,7 +1310,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         filesByPath.computeIfAbsent(file.path(),ignored->new ArrayList<>()).add(file);
       }
     }
-    return new RetirementOrders(Map.copyOf(roots), Map.copyOf(files), Map.copyOf(winners), Map.copyOf(filesByPath));
+    return new RetirementOrders(Map.copyOf(roots), Map.copyOf(files), Map.copyOf(winners), Map.copyOf(filesByPath), Map.copyOf(intents));
   }
 
   private long actualUnitOrder(String path, String unit, RetirementOrders orders) throws IOException {
@@ -1298,6 +1323,43 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     Long exact = orders.files().get(path + "\0" + unit);
     return exact != null ? exact : unit != null && unit.startsWith("release030/") ? 0 : -1;
   }
+  /** Receipt position alone never authorizes a changed row, even within one admission binding. */
+  private long validatedUnitOrder(ClaimCandidate row, RetirementOrders orders) throws IOException {
+    String path = row.key().path();
+    if (!path.equals(PathNormalizer.normalizeKey(Path.of(path)))) return -1;
+    long order = actualUnitOrder(path, row.revision(), orders);
+    var origin = RootOrigin.fromUnit(row.revision());
+    if (origin != null) {
+      var intent = orders.rootIntents().get(origin.uuid());
+      String boundary = PathNormalizer.normalizeKey(Path.of(intent.scope().prefix()));
+      var provenance = intent.provenance();
+      if (!intent.scope().contains(path) || !Objects.equals(boundary, row.ingestionRoot())
+          || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path), Path.of(boundary))
+          || !Objects.equals(provenance == null ? null : provenance.originator(), row.originator())
+          || !Objects.equals(provenance == null ? null : provenance.transport(), row.transport())
+          || !Objects.equals(normalizedRetirementCollection(intent.collection()), normalizedRetirementCollection(row.collection()))
+          || row.plannedHash() != null) return -1;
+      return order;
+    }
+    if (order > 0) {
+      for (var file : orders.filesByPath().getOrDefault(path, List.of())) {
+        if (!Objects.equals(file.unitRevision(), row.revision())) continue;
+        var provenance = file.provenance();
+        if (Objects.equals(file.sourceSha256(), row.plannedHash())
+            && Objects.equals(file.collection(), row.collection())
+            && Objects.equals(PathNormalizer.normalizeKey(file.ingestionRoot()), row.ingestionRoot())
+            && Objects.equals(provenance == null ? null : provenance.originator(), row.originator())
+            && Objects.equals(provenance == null ? null : provenance.transport(), row.transport())) return order;
+      }
+      return -1;
+    }
+    return order;
+  }
+
+  private static String normalizedRetirementCollection(String collection) {
+    return collection == null || collection.isBlank() ? "default" : collection;
+  }
+
   public void removeRetirementCollection(String collection, List<String> survivors) {
     lockTimed();
     try {
@@ -1362,11 +1424,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (rootClaimsPrepared && Objects.equals(retirementClaimsBinding, binding)) return;
       var orders = retirementOrders(journal);
       var deletes = retirementDeletes(journal);
+      var historical = releaseRecovery.committedDeletes();
+      var retained = retainedRootScopes(journal);
       inTransaction(() -> {
-        reconcileRetirementClaimsInTransaction(orders, deletes);
+        reconcileRetirementClaimsInTransaction(orders, deletes, retained);
         return null;
       });
+      // The SQL owner has committed. A retained recorded row is either a later validated
+      // owner or is fenced by the same full-row predicate used at every actual claim.
+      if (!Objects.equals(binding, releaseRecovery.admissionBinding()))
+        throw new IOException("Retirement admissions changed during reconciliation");
       releaseRecovery.queuePrepared();
+      for (var deletion : historical) releaseRecovery.markDeletionQueueComplete(deletion);
       retirementClaimsBinding = binding;
       rootClaimsPrepared = true;
       claimCursor = null;
@@ -1374,44 +1443,76 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } finally { unlockAfterChanges(); }
   }
 
-  private void reconcileRetirementClaimsInTransaction(RetirementOrders orders,
-      List<RetirementDelete> deletes) throws SQLException {
-    String cursor = "";
-    while (true) {
-      var page = new ArrayList<String[]>();
-      try (var query = connection.prepareStatement(
-          "SELECT path,unit_revision,collection FROM jobs WHERE path>? ORDER BY path LIMIT 256")) {
-        query.setString(1, cursor);
-        try (var rows = query.executeQuery()) {
-          while (rows.next()) page.add(new String[] {rows.getString(1), rows.getString(2), rows.getString(3)});
+  private List<ClaimCandidate> retirementRowsAfter(String cursor, String end) throws SQLException {
+    var page = new ArrayList<ClaimCandidate>();
+    try (var query = connection.prepareStatement(
+        "SELECT path,last_updated,collection,originator,transport,scan_id,unit_revision,"
+            + "walk_seen_epoch,planned_source_sha256,ingestion_root FROM jobs WHERE path>?"
+            + (end == null ? " ORDER BY path LIMIT 256" : " AND path<=? ORDER BY path"))) {
+      query.setString(1, cursor);
+      if (end != null) query.setString(2, end);
+      try (var row = query.executeQuery()) {
+        while (row.next()) {
+          long epoch = row.getLong(8); Long walkEpoch = row.wasNull() ? null : epoch;
+          page.add(new ClaimCandidate(new ClaimKey(row.getLong(2),row.getString(1)),
+              row.getString(3),row.getString(4),row.getString(5),row.getString(6),row.getString(7),
+              walkEpoch,row.getString(9),row.getString(10)));
         }
       }
+    }
+    return page;
+  }
+
+  private void reconcileRetirementClaimsInTransaction(RetirementOrders orders,
+      List<RetirementDelete> deletes, java.util.function.BiPredicate<String,String> retained) throws SQLException {
+    String cursor = "";
+    while (true) {
+      var page = retirementRowsAfter(cursor, null);
       if (page.isEmpty()) return;
       for (var row : page) {
         long order;
-        try { order = actualUnitOrder(row[0], row[1], orders); }
-        catch (IOException unknown) { continue; } // Unknown ownership stays claim-held.
-        if (order >= 0 && Math.max(latestDelete(deletes, row[0], row[2]),
-            orders.fileWinners().getOrDefault(row[0], 0L)) > order) {
-          // Keep recorded coverage/acknowledgement rules under their administrative owner.
-          // Full observed identity is checked under the same write-reserving transaction.
-          removeJobsAdministrativelyInTransaction("path=? AND unit_revision IS ? AND collection IS ?",
-              java.util.Arrays.asList(row[0], row[1], row[2]), true, Set.of());
+        try { order = validatedUnitOrder(row, orders); }
+        catch (IOException | RuntimeException unknown) { continue; } // Unknown ownership stays claim-held.
+        // A legacy cohort prefix establishes age, not its original full metadata. Without
+        // a validated exact/ROOT owner it remains claim-held under any overriding delete.
+        if (order > 0 && Math.max(latestDelete(deletes, row.key().path(), row.collection()),
+            orders.fileWinners().getOrDefault(row.key().path(), 0L)) > order) {
+          removeJobsAdministrativelyInTransaction("path=? AND unit_revision IS ? AND collection IS ?"
+                  + " AND originator IS ? AND transport IS ? AND planned_source_sha256 IS ? AND ingestion_root IS ?",
+              java.util.Arrays.asList(row.key().path(), row.revision(), row.collection(), row.originator(),
+                  row.transport(), row.plannedHash(), row.ingestionRoot()), true, Set.of());
         }
       }
-      cursor = page.getLast()[0];
+      String last = page.getLast().key().path();
+      // Administrative coverage can retain DONE members or sealed unacknowledged rows.
+      // Classify actual survivors, rather than treating affected-row counts as absence.
+      for (var row : retirementRowsAfter(cursor, last)) {
+        long deleted = latestDelete(deletes, row.key().path(), row.collection());
+        if (deleted == 0) continue;
+        try {
+          long order = validatedUnitOrder(row, orders);
+          if (order > deleted && order >= orders.fileWinners().getOrDefault(row.key().path(), 0L)) continue;
+        } catch (IOException | RuntimeException unknown) { /* Must be claim-held below. */ }
+        if (retirementAllowsClaim(row, orders, deletes, retained, true))
+          throw new SQLException("Unreconciled retirement member remains claimable");
+      }
+      cursor = last;
     }
   }
   private boolean retirementAllowsClaim(ClaimCandidate row, RetirementOrders orders,
       List<RetirementDelete> deletes, java.util.function.BiPredicate<String,String> retained) {
+    return retirementAllowsClaim(row, orders, deletes, retained, rootClaimsPrepared);
+  }
+  private boolean retirementAllowsClaim(ClaimCandidate row, RetirementOrders orders,
+      List<RetirementDelete> deletes, java.util.function.BiPredicate<String,String> retained, boolean prepared) {
     if (orders == null) return true;
     try {
       long deleted = latestDelete(deletes, row.key().path(), row.collection());
       long newerFile = orders.fileWinners().getOrDefault(row.key().path(),0L);
       if (!retained.test(row.key().path(),row.revision()) && deleted == 0 && newerFile == 0) return true;
-      if (!rootClaimsPrepared) return false;
-      long order = actualUnitOrder(row.key().path(), row.revision(), orders);
-      return (deleted == 0 || order > deleted) && (newerFile == 0 || order >= newerFile);
+      if (!prepared) return false;
+      long order = validatedUnitOrder(row, orders);
+      return order >= 0 && (deleted == 0 || order > deleted) && (newerFile == 0 || order >= newerFile);
     } catch (IOException | RuntimeException unavailable) { return false; }
   }
 
@@ -2041,6 +2142,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String generation = release030RetirementGeneration();
       if (generation == null) throw new IllegalStateException("Retirement changed during sync");
       return inTransaction(() -> {
+        var refreshable = refreshableRetirementFiles(retirementReplayOps(), generation, !maintenance);
         int accepted = 0;
         for (var entry : entries) {
           if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
@@ -2050,15 +2152,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             accepted++; // Existing policy coverage, not a new admission or source witness.
             continue;
           }
-          boolean exact = false;
-          try (var query = connection.prepareStatement(
-              "SELECT payload FROM switch_buffer WHERE generation=? AND key=? AND op='UPSERT'")) {
-            query.setString(1, generation);
-            query.setString(2, "path:" + normalizePath(entry.path()));
-            try (var row = query.executeQuery()) {
-              if (row.next()) exact = SwitchBufferUpsert.decode(row.getString(1)).unitRevision() != null;
-            }
-          }
+          boolean exact = refreshable.contains(PathNormalizer.normalizeKey(entry.path()));
           JobQueue.EnqueueEntry admitted = entry;
           if (exact) {
             try {
@@ -2104,6 +2198,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           var journal = retirementReplayOps();
           var orders = retirementOrders(journal);
           var deletes=retirementDeletes(journal);int covered=0;
+          boolean live = !replay && !maintenance
+              && root.generation().equals(release030RetirementGeneration())
+              && root.key().equals("sync_root:" + PathNormalizer.normalizePathPrefix(
+                  SwitchBufferSyncRoot.decode(root.payload()).rootPath()));
+          var refreshable = refreshableRetirementFiles(journal, root.generation(), live);
           for(var entry:entries) {
             if(cancelled.getAsBoolean()||Thread.currentThread().isInterrupted())throw new IllegalStateException("ROOT admission cancelled");
             String path=normalizePath(entry.path());String unit=null,oldCollection=null,state=null,hash=null;
@@ -2118,11 +2217,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 || state!=null && !"DONE".equals(state))) {covered++;continue;}
             var completed = completedRows.get(path);
             if (replay && completed != null && completed.equals(watcherRowLocked(path))) { covered++; continue; }
-            boolean exact=false;
-            var priorReceipt=journal.stream().filter(op -> root.generation().equals(op.generation())
-                && ("path:"+path).equals(op.key())).findFirst().orElse(null);
-            if(priorReceipt!=null&&"UPSERT".equals(priorReceipt.op()))
-              exact=SwitchBufferUpsert.decode(priorReceipt.payload()).unitRevision()!=null;
+            boolean exact=refreshable.contains(path);
             JobQueue.EnqueueEntry admitted=entry;
             if(exact&&!replay) {
               String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),cancelled);
@@ -2138,6 +2233,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       });
     } catch(SQLException|IOException invalid){throw new IllegalStateException("ROOT admission incomplete",invalid);}
     finally{unlockAfterChanges();}
+  }
+
+  private Set<String> refreshableRetirementFiles(List<SwitchBufferOp> journal,
+      String generation, boolean live) {
+    var seen = new java.util.HashSet<String>();
+    var result = new java.util.HashSet<String>();
+    for (var op : journal.reversed()) {
+      if (!"UPSERT".equals(op.op()) || op.generation() != null && !op.generation().isBlank()
+          && !generation.equals(op.generation())) continue;
+      var prior = SwitchBufferUpsert.decode(op.payload());
+      String path = PathNormalizer.normalizeKey(Path.of(prior.path()));
+      if (!seen.add(path)) continue;
+      if (generation.equals(op.generation()) && prior.unitRevision() != null) result.add(path);
+      else if (live && !op.payload().stripLeading().startsWith("{")) {
+        try { if (releaseRecovery != null && releaseRecovery.legacyExpectation(op) != null) result.add(path); }
+        catch (IOException invalid) { throw new IllegalStateException("Original raw expectation unavailable",invalid); }
+      }
+    }
+    return Set.copyOf(result);
   }
 
   private void bufferAdmittedFile(String generation, JobQueue.EnqueueEntry entry) throws SQLException {

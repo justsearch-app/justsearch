@@ -1208,7 +1208,10 @@ public final class KnowledgeServerMigrationOps {
             context.publisher(), context.indexingPacing(), context.migrationRoots(), admittedPaths,
             () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos()));
       }
-      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes,
+      var physicalDeletes = recoveryRoots == null ? fileAuthorizingDeletes
+          : fileAuthorizingDeletes.stream().filter(op -> !recoveryRoots.checkpoint().deletionQueueComplete(op))
+              .collect(java.util.stream.Collectors.toSet());
+      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, physicalDeletes,
           deleteOrder, reconciliations, recoveryRoots == null ? null : deferredSurvivorDeletes);
       if (recoveryRoots != null) fileSurvivorExclusions = ordinaryRootSurvivors(context, ops,
           fileSurvivorExclusions, deferredSurvivorDeletes);
@@ -1276,11 +1279,9 @@ public final class KnowledgeServerMigrationOps {
       boolean appliedProjection = false;
       if(recoveryRoots!=null && List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(kind)
           && recoveryRoots.checkpoint().deletionCommitted(op)) {
-        try {
-          removeRetirementQueueScope(context,op,fileSurvivorExclusions.getOrDefault(op,List.of()));
-          recoveryRoots.checkpoint().markDeletionQueueComplete(op);
-          continue; // A's committed historical effect is never blindly re-applied after DB reopen.
-        }catch(IOException|RuntimeException uncertain){releaseDeferred=true;blockedReleaseScopes.add(op);continue;}
+        // Only queue-owned full-row reconciliation can renew this proof. Broad scope
+        // removal here could erase an unknown owner and can never repeat A's effect.
+        releaseDeferred=true;blockedReleaseScopes.add(op);continue;
       }
       switch (kind) {
         case WatcherRootReconciliation.OPERATION -> {
@@ -2006,7 +2007,8 @@ public final class KnowledgeServerMigrationOps {
       var page=queue.rootMembersAfter(cursor);if(page.isEmpty())break;
       for(var member:page) {
         for(var deletion:ops) {
-          if(!List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(deletion.op()))continue;
+          if(!List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(deletion.op())
+              || queue.release030RecoveryState().deletionQueueComplete(deletion))continue;
           var ordered=deletion;
           if(ordered.acceptedOrder()>=member.root().acceptedOrder()
               ||deleteOrders.applyAsLong(member.path(),member.collection())>member.root().acceptedOrder())continue;
@@ -2331,7 +2333,7 @@ public final class KnowledgeServerMigrationOps {
           if (finalEffects) {
             if (hasLaterAcceptedDelete(context, deleteOrder, reconciliationPosition, upsert.path(),
                 upsert.path(), upsert.collection(), op.generation())) {
-              if (context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) != 0) return false;
+              if (!verifyDeletedReleaseFile(context, orderedOps, deleteOrder, reconciliationPosition, upsert, reconciliations)) return false;
             } else if (!reconciled.verifies(upsert.path(), upsert.collection())) return false;
           }
           continue; // Earlier UPSERT evidence waits for the root receipt's committed path outcomes.
@@ -2340,8 +2342,8 @@ public final class KnowledgeServerMigrationOps {
             upsert.path(), upsert.path(), upsert.collection(), retirement ? context.replayGeneration() : op.generation())) {
           // Live broad deletion may already have removed this exact admission on B. Await
           // the queue before crossing the boundary, then prove final absence after all writes.
-          if (finalEffects && context.ingestLifecycle().indexCountOps()
-              .countByIdAndChunksStrict(upsert.path()) != 0) {
+          if (finalEffects && !verifyDeletedReleaseFile(context, orderedOps, deleteOrder,
+              deleteOrder.positions().get(op), upsert, reconciliations)) {
             context.log().warn("Superseded file still has an indexed image: path={} expectedCollection={} indexedCollection={} laterSync={}",
                 upsert.path(),upsert.collection(),context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(upsert.path(),SchemaFields.COLLECTION),laterSync);
             return false;
@@ -2957,6 +2959,36 @@ public final class KnowledgeServerMigrationOps {
       position = entry.getValue();
     }
     return latest;
+  }
+
+  private static boolean verifyDeletedReleaseFile(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops, ReplayDeleteOrder order, int earlier,
+      SwitchBufferUpsert file, Map<SwitchBufferCapableQueue.SwitchBufferOp, WatcherReplay> reconciliations)
+      throws IOException {
+    if (release030Retirement(context)) {
+      // Only the last matching deletion determines whether absence is namespace-scoped.
+      for (var deletion : ops.reversed()) {
+        if (order.positions().get(deletion) <= earlier
+            || !Objects.equals(context.replayGeneration(), deletion.generation())
+            || context.approvedGapVersions().contains(deletion)) continue;
+        if ("DELETE".equals(deletion.op())
+            && SwitchBufferDelete.decode(deletion.payload()).path().equals(file.path())) break;
+        if ("DELETE_PREFIX".equals(deletion.op())
+            && PathPrefixScope.decode(deletion.payload()).contains(file.path())) break;
+        if (!"DELETE_COLLECTION".equals(deletion.op()) || !deletion.payload().equals(file.collection())) continue;
+        var survivors = new ArrayList<>(reconciledSurvivorsAfterDelete(context, ops, order, deletion, reconciliations));
+        for (var later : ops) if ("UPSERT".equals(later.op())
+            && order.positions().get(later) > order.positions().get(deletion)) {
+          var accepted = resolveReleaseUpsert(context,later);
+          if (deletion.payload().equals(accepted.collection())
+              && !hasLaterAcceptedDelete(context,order,order.positions().get(later),accepted.path(),
+                  accepted.path(),accepted.collection(),context.replayGeneration())) survivors.add(accepted.path());
+        }
+        return order.releaseRecovery().checkpoint().deletionQueueComplete(deletion)
+            && certifyReleaseDeletion(context,deletion,survivors);
+      }
+    }
+    return context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(file.path()) == 0;
   }
 
   /** Only later, applied accepted deletes can explain the final absence of an admission. */

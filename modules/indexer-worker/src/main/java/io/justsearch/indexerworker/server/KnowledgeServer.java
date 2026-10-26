@@ -7498,7 +7498,7 @@ public final class KnowledgeServer implements Closeable {
         boolean admitted = result.getFilesAdded() > 0 || result.getFilesDeleted() > 0;
         if (admitted) release030RetirementCut("release030-root-admitted");
         release030Recovery.markRootWalked(op);
-        if (admitted) release030RetirementCut("release030-root-walked");
+        release030RetirementCut("release030-root-walked");
       } else if (checkpointedRoot) release030Recovery.deferred(root, System.currentTimeMillis());
       return result;
     } catch (IOException failure) {

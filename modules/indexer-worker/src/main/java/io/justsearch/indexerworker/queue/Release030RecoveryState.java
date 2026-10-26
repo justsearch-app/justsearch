@@ -28,6 +28,7 @@ public final class Release030RecoveryState {
   private static final String NEXT = RETIRE + "root-next|";
   private static final String REPLACING = RETIRE + "root-replacing|";
   private static final String REMOVAL = RETIRE + "removal|";
+  private static final String RAW_HISTORY = RETIRE + "raw-history|";
   private static final String EXPECTATION = RETIRE + "legacy-file|";
   private static final String CONVERSION = RETIRE + "prefix-conversion|";
   private String openedSession;
@@ -153,6 +154,32 @@ public final class Release030RecoveryState {
     } catch (IOException | RuntimeException failed) { state.clear(); state.putAll(previousState); throw failed; }
   }
 
+  /** Passive original receipts, never permission to remove SQL or acknowledge replay. */
+  private List<SwitchBufferCapableQueue.SwitchBufferOp> rawHistory() throws IOException {
+    var result = new java.util.ArrayList<SwitchBufferCapableQueue.SwitchBufferOp>();
+    for (String key : state.stringPropertyNames()) if (key.startsWith(RAW_HISTORY)) {
+      var op = decodeReceipt(state.getProperty(key));
+      if (!"UPSERT".equals(op.op()) || op.payload().stripLeading().startsWith("{")
+          || !key.equals(RAW_HISTORY + op.retirementUuid())) throw new IOException("Invalid raw receipt history");
+      result.add(op);
+    }
+    return List.copyOf(result);
+  }
+
+  /** Persist the complete old fact before its coalesced SQL slot can be replaced. */
+  public synchronized void retainRawHistory(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
+    if (!"UPSERT".equals(op.op()) || op.payload().stripLeading().startsWith("{"))
+      throw new IOException("Only raw UPSERT receipts belong in passive history");
+    retirementReceipts(List.of(op));
+    String key = RAW_HISTORY + op.retirementUuid();
+    if (state.containsKey(key)) return;
+    var previousState = new Properties(); previousState.putAll(state);
+    try {
+      state.setProperty(key, JSON.writeValueAsString(op));
+      save();
+    } catch (IOException | RuntimeException failed) { state.clear(); state.putAll(previousState); throw failed; }
+  }
+
   public record PrefixConversion(SwitchBufferCapableQueue.SwitchBufferOp predecessor,
       SwitchBufferCapableQueue.SwitchBufferOp successor) {}
 
@@ -204,7 +231,7 @@ public final class Release030RecoveryState {
       List<SwitchBufferCapableQueue.SwitchBufferOp> actual) throws IOException {
     var conversions = prefixConversions();
     var all = new java.util.ArrayList<>(rootReceipts());
-    all.addAll(removalPackets()); all.addAll(committedDeletes()); all.addAll(actual);
+    all.addAll(removalPackets()); all.addAll(rawHistory()); all.addAll(committedDeletes()); all.addAll(actual);
     for (var pair : conversions) { all.add(pair.predecessor()); all.add(pair.successor()); }
     var byUuid = new java.util.HashMap<String,SwitchBufferCapableQueue.SwitchBufferOp>();
     for (var op : all) {

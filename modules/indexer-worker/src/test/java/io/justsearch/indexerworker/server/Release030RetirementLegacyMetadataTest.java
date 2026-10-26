@@ -77,6 +77,11 @@ final class Release030RetirementLegacyMetadataTest {
           assertEquals(op, raw(queue(server).listSwitchBufferOpsStrict(), file));
           assertEquals(0, count(root, "path='" + key(file) + "'"), "unknown namespace cannot invent a writer job");
           assertNull(queue(server).release030RecoveryState().legacyExpectation(op));
+          assertTrue(search(server, "copper").contains(key(file)),
+              "original indexed content remains searchable on each running boot");
+          assertEquals("mcp-ingest", server.lifecycleManagerForTests().documentFieldOps()
+              .getDocumentFieldOrThrow(key(file), io.justsearch.indexing.SchemaFields.COLLECTION),
+              "unknown original receipt retains the original indexed namespace on both boots");
           assertEquals(original.active_generation(), state(root).active_generation());
           Release030RetirementSafetyTest.assertRetained(root, original.building_generation());
         }
