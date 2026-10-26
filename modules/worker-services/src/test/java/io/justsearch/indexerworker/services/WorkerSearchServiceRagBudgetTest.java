@@ -77,16 +77,16 @@ final class WorkerSearchServiceRagBudgetTest
         "Hello first passage", "Hello second passage", "Hello third passage");
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
-    var nativeSession = org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.class);
-    org.mockito.Mockito.when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+    var nativeSession = mock(ai.onnxruntime.OrtSession.class);
+    when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
       entered.countDown();
       release.await(10, java.util.concurrent.TimeUnit.SECONDS);
-      return org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.Result.class);
+      return mock(ai.onnxruntime.OrtSession.Result.class);
     });
     try (var handle = gpuHandle("rag-rerank", nativeSession)) {
-      var tokenizer = org.mockito.Mockito.mock(io.justsearch.reranker.RerankerTokenizer.class);
-      org.mockito.Mockito.when(tokenizer.encodePairs(org.mockito.ArgumentMatchers.anyString(),
-          org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(
+      var tokenizer = mock(io.justsearch.reranker.RerankerTokenizer.class);
+      when(tokenizer.encodePairs(anyString(),
+          any(String[].class))).thenReturn(
           new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
               new long[][] {{1}, {1}, {1}}, new long[][] {{1}, {1}, {1}},
               new long[][] {{0}, {0}, {0}}, 3, 1, 0, 3));
@@ -144,15 +144,15 @@ final class WorkerSearchServiceRagBudgetTest
         "Hello first passage", "Hello second passage", "Hello third passage");
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
-    var nativeSession = org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.class);
-    org.mockito.Mockito.when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+    var nativeSession = mock(ai.onnxruntime.OrtSession.class);
+    when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
       entered.countDown();
       release.await(10, java.util.concurrent.TimeUnit.SECONDS);
-      return org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.Result.class);
+      return mock(ai.onnxruntime.OrtSession.Result.class);
     });
     try (var handle = gpuHandle("bm25-mmr", nativeSession)) {
-      var provider = org.mockito.Mockito.mock(EmbeddingProvider.class);
-      org.mockito.Mockito.when(provider.availability()).thenReturn(EmbeddingProvider.Availability.READY);
+      var provider = mock(EmbeddingProvider.class);
+      when(provider.availability()).thenReturn(EmbeddingProvider.Availability.READY);
       org.mockito.stubbing.Answer<float[]> encode = call -> {
         InferenceRequest authority = call.getArgument(1);
         try (var lease = handle.acquire(SessionAcquisitionRequest.from(authority));
@@ -161,14 +161,14 @@ final class WorkerSearchServiceRagBudgetTest
         }
       };
       if (passage) {
-        org.mockito.Mockito.when(provider.embedQuery(org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any())).thenReturn(new float[] {1f, 0f, 0f, 0f});
+        when(provider.embedQuery(anyString(),
+            any())).thenReturn(new float[] {1f, 0f, 0f, 0f});
       } else {
-        org.mockito.Mockito.when(provider.embedQuery(org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any())).thenAnswer(encode);
+        when(provider.embedQuery(anyString(),
+            any())).thenAnswer(encode);
       }
-      org.mockito.Mockito.when(provider.embedDocument(org.mockito.ArgumentMatchers.anyString(),
-          org.mockito.ArgumentMatchers.any())).thenAnswer(encode);
+      when(provider.embedDocument(anyString(),
+          any())).thenAnswer(encode);
       var service = new WorkerSearchService(lifecycle, provider);
       var result = new java.util.concurrent.CompletableFuture<RetrieveContextResponse>();
       Thread caller = new Thread(() -> {
