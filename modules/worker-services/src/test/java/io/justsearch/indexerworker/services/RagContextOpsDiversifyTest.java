@@ -244,7 +244,8 @@ final class RagContextOpsDiversifyTest {
     };
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "anyFailureUsesPositionEvenAfterKOrKPlusOneSuccesses({arguments}) [{index}]")
   @ValueSource(ints = {0, 1, 2, 3, 4})
   void anyFailureUsesPositionEvenAfterKOrKPlusOneSuccesses(int successes) {
     var hits = List.of(chunkHit("h0", "dup-0"), chunkHit("h1", "dup-1"),
@@ -263,7 +264,7 @@ final class RagContextOpsDiversifyTest {
     assertEquals(successes + 1, calls.get(), "stop at the first failure, without a partial selection");
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "invalidCandidateAtAnyPositionUsesTextPool({arguments}) [{index}]")
   @CsvSource({"null,0", "null,1", "null,3", "empty,0", "empty,1", "empty,3",
       "throw,0", "throw,1", "throw,3", "zero,0", "zero,1", "zero,3",
       "nan,0", "nan,1", "nan,3", "infinity,0", "infinity,1", "infinity,3",
@@ -283,7 +284,7 @@ final class RagContextOpsDiversifyTest {
     assertEquals(badIndex + 1, calls.get());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "invalidSuppliedQueryDoesNotEncodeAnything({arguments}) [{index}]")
   @ValueSource(strings = {"zero", "nan", "infinity", "dimension"})
   void invalidSuppliedQueryDoesNotEncodeAnything(String kind) {
     var provider = controlledProvider();
@@ -295,7 +296,8 @@ final class RagContextOpsDiversifyTest {
     verify(provider, never()).embedDocument(anyString(), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "unusableAcquiredQueryStopsBeforePassageInference({arguments}) [{index}]")
   @ValueSource(strings = {"null", "empty", "zero", "nan", "infinity", "dimension", "throw"})
   void unusableAcquiredQueryStopsBeforePassageInference(String kind) {
     var provider = controlledProvider();
@@ -308,7 +310,7 @@ final class RagContextOpsDiversifyTest {
     verify(provider, never()).embedDocument(anyString(), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "validQueryIsReusedOrAcquiredExactlyOnce({arguments}) [{index}]")
   @ValueSource(strings = {"supplied", "null", "empty"})
   void validQueryIsReusedOrAcquiredExactlyOnce(String supplied) {
     var provider = controlledProvider();
@@ -324,7 +326,7 @@ final class RagContextOpsDiversifyTest {
     assertFalse(acquisition.mayCreateSessions(), "the same no-creation authority reaches each call");
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "nonpositiveProviderDimensionIsUndeclared({arguments}) [{index}]")
   @ValueSource(ints = {0, -1, 2})
   void nonpositiveProviderDimensionIsUndeclared(int declaredDimension) {
     var provider = controlledProvider();
@@ -361,7 +363,7 @@ final class RagContextOpsDiversifyTest {
     verify(provider, times(3)).embedDocument(anyString(), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "finiteNonzeroVectorsAtFloatExtremesAreUsable({arguments}) [{index}]")
   @ValueSource(floats = {Float.MIN_VALUE, Float.MAX_VALUE})
   void finiteNonzeroVectorsAtFloatExtremesAreUsable(float magnitude) {
     var provider = controlledProvider();
@@ -400,7 +402,8 @@ final class RagContextOpsDiversifyTest {
     verify(provider, never()).embedDocument(org.mockito.ArgumentMatchers.eq("diverse"), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "everyFallbackUsesTheFullNonblankPoolBeyondTheCap({arguments}) [{index}]")
   @ValueSource(strings = {"unavailable", "starting", "failed", "disallowed", "query-failure",
       "invalid-query", "invalid-document", "expired"})
   void everyFallbackUsesTheFullNonblankPoolBeyondTheCap(String cause) {
@@ -439,7 +442,8 @@ final class RagContextOpsDiversifyTest {
         SchemaFields.CHUNK_TOTAL, "10"));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "emptyOrNoSelectionNeededRemovesBlanksWithoutInference({arguments}) [{index}]")
   @ValueSource(ints = {-1, 0, 2, 10})
   void emptyOrNoSelectionNeededRemovesBlanksWithoutInference(int k) {
     var provider = controlledProvider();
@@ -479,7 +483,8 @@ final class RagContextOpsDiversifyTest {
     assertEquals(6f, second.score());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference({arguments}) [{index}]")
   @ValueSource(strings = {"position", "unknown", "default"})
   void positionAndUnknownModesKeepTheirExistingBlankRowsWithoutInference(String mode) {
     var provider = controlledProvider();
@@ -490,7 +495,8 @@ final class RagContextOpsDiversifyTest {
     verifyNoInteractions(provider);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "normallyReturningProviderCannotStartMoreWorkAfterSemanticExpiry({arguments}) [{index}]")
   @ValueSource(strings = {"query", "first-document", "last-document"})
   void normallyReturningProviderCannotStartMoreWorkAfterSemanticExpiry(String expiresAt) {
     var provider = controlledProvider();
@@ -520,7 +526,8 @@ final class RagContextOpsDiversifyTest {
     while (!authority.deadlinePassed()) LockSupport.parkNanos(1_000_000);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback({arguments}) [{index}]")
   @ValueSource(strings = {"NONE", "REQUIRED"})
   void newExpiryPollingDoesNotAddThrowingAuthorityChecksOutsideFallback(String budget) {
     var provider = controlledProvider();

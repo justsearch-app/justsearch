@@ -57,7 +57,8 @@ final class RagContextOpsQualityTest
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "rawQualityUsesOnlyAppendedHitsRegardlessOfAssemblyOrder({arguments}) [{index}]")
   @CsvSource({"0, false", "10000, false", "0, true", "10000, true"})
   void rawQualityUsesOnlyAppendedHitsRegardlessOfAssemblyOrder(int tokens, boolean negative) {
     var omitted = hit("missing", "missing", 0, 1, "", negative ? -1 : 9);
@@ -77,7 +78,8 @@ final class RagContextOpsQualityTest
         && result.qualitySignals().retrievalCoverage() <= 1f);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "rawQualityFindsTheMaximumAfterPositionSelectionReordersHits({arguments}) [{index}]")
   @ValueSource(ints = {0, 10000})
   void rawQualityFindsTheMaximumAfterPositionSelectionReordersHits(int tokens) {
     var high = hit("intro", "intro", 0, 10, "intro passage", 9);
@@ -90,7 +92,8 @@ final class RagContextOpsQualityTest
     assertEquals(4f, result.qualitySignals().scoreGap());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "ceBeforeSelectionKeepsScoresWithExactSameParentPassages({arguments}) [{index}]")
   @ValueSource(ints = {0, 10000})
   void ceBeforeSelectionKeepsScoresWithExactSameParentPassages(int tokens) {
     // Synthetic passages share docId and parentId; their index/span/content identities differ.
@@ -112,7 +115,8 @@ final class RagContextOpsQualityTest
         anyLong(), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "ceQualityDropsUnappendedTopScoreAndSurvivesParentBackfill({arguments}) [{index}]")
   @CsvSource({"BEFORE_DIVERSIFY, 0", "BEFORE_DIVERSIFY, 10000",
       "AFTER_DIVERSIFY, 0", "AFTER_DIVERSIFY, 10000"})
   void ceQualityDropsUnappendedTopScoreAndSurvivesParentBackfill(RerankOrder order, int tokens) {
@@ -130,7 +134,7 @@ final class RagContextOpsQualityTest
     assertEquals(List.of(20f, 40f, 60f), result.usedHits().stream().map(SearchHit::score).toList());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "skippedCeUsesIncludedRawScores({arguments}) [{index}]")
   @ValueSource(strings = {"BEFORE_DIVERSIFY", "AFTER_DIVERSIFY"})
   void skippedCeUsesIncludedRawScores(RerankOrder order) {
     var lower = hit("low", "low", 0, 1, "lower", -8);
@@ -144,7 +148,8 @@ final class RagContextOpsQualityTest
     verify(reranker).rerank(anyString(), anyList(), anyLong(), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "nonfiniteScoresAreExcludedWithoutDroppingTheirPassages({arguments}) [{index}]")
   @ValueSource(booleans = {false, true})
   void nonfiniteScoresAreExcludedWithoutDroppingTheirPassages(boolean ce) {
     var hits = List.of(hit("nan", "nan", 0, 1, "nan", Float.NaN),
@@ -162,7 +167,7 @@ final class RagContextOpsQualityTest
     assertEquals(5f, result.qualitySignals().scoreGap());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "noFiniteIncludedScoresGivesZeroQuality({arguments}) [{index}]")
   @ValueSource(booleans = {false, true})
   void noFiniteIncludedScoresGivesZeroQuality(boolean ce) {
     var ops = ops(List.of(hit("nan", "nan", 0, 1, "nan", Float.NaN),
@@ -175,7 +180,8 @@ final class RagContextOpsQualityTest
     assertEquals(0f, result.qualitySignals().scoreGap());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "oneFiniteScoreKeepsNegativeSingletonGapAmongNonfinitePassages({arguments}) [{index}]")
   @ValueSource(booleans = {false, true})
   void oneFiniteScoreKeepsNegativeSingletonGapAmongNonfinitePassages(boolean ce) {
     var ops = ops(List.of(hit("inf", "inf", 0, 1, "inf", Float.POSITIVE_INFINITY),
@@ -188,7 +194,7 @@ final class RagContextOpsQualityTest
     assertEquals(-3f, result.qualitySignals().scoreGap());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "emptyAssemblyGivesZeroQuality({arguments}) [{index}]")
   @CsvSource({"0, false", "10000, false", "0, true", "10000, true"})
   void emptyAssemblyGivesZeroQuality(int tokens, boolean ce) {
     var ops = ops(List.of(hit("blank", "blank", 0, 1, " ", 9)));
@@ -200,7 +206,8 @@ final class RagContextOpsQualityTest
     assertEquals(1, result.qualitySignals().chunksConsidered());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "singletonAndSortedNegativeScoresKeepLegacyConvention({arguments}) [{index}]")
   @ValueSource(booleans = {false, true})
   void singletonAndSortedNegativeScoresKeepLegacyConvention(boolean ce) {
     var high = hit("high", "high", 0, 1, "high", -3);
@@ -217,7 +224,7 @@ final class RagContextOpsQualityTest
     assertEquals(0f, empty.qualitySignals().scoreGap());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "autoOrderKeepsItsExistingDevicePolicy({arguments}) [{index}]")
   @ValueSource(booleans = {false, true})
   void autoOrderKeepsItsExistingDevicePolicy(boolean gpu) {
     var first = hit("a", "a", 0, 1, "a", 30);
@@ -234,7 +241,8 @@ final class RagContextOpsQualityTest
         anyLong(), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "ceCandidateCapStillDiscardsTailWithoutChangingCitationScores({arguments}) [{index}]")
   @ValueSource(strings = {"BEFORE_DIVERSIFY", "AFTER_DIVERSIFY"})
   void ceCandidateCapStillDiscardsTailWithoutChangingCitationScores(RerankOrder order) {
     var first = hit("a", "a", 0, 1, "a", 30);

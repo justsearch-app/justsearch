@@ -264,7 +264,7 @@ final class WorkerSearchServiceRagBudgetTest
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "partialMmrEmbeddingsKeepAFullWorkerContext({arguments}) [{index}]")
   @CsvSource({"null,0", "null,1", "empty,2", "throw,1", "nan,1", "dimension,1"})
   void partialMmrEmbeddingsKeepAFullWorkerContext(String failure, int successes) throws Exception {
     String[] contents = {"Hello first passage", "Hello second passage", "Hello third passage",
@@ -303,7 +303,8 @@ final class WorkerSearchServiceRagBudgetTest
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "denseQueryFailureAllowsOnlyTheExistingOneMmrRetry({arguments}) [{index}]")
   @ValueSource(strings = {"null", "empty", "throw", "valid"})
   void denseQueryFailureAllowsOnlyTheExistingOneMmrRetry(String firstResult) throws Exception {
     lifecycle = openIndex("mmr", "Hello first passage", "Hello second passage", "Hello third passage");
@@ -332,7 +333,8 @@ final class WorkerSearchServiceRagBudgetTest
     assertAlignedLiteralSections(response);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(
+      name = "workerParentCheckStillObservesCancellationAfterNormallyReturningProviders({arguments}) [{index}]")
   @ValueSource(strings = {"query", "document"})
   void workerParentCheckStillObservesCancellationAfterNormallyReturningProviders(String cancelAt)
       throws Exception {

@@ -34,7 +34,7 @@ final class MmrSelectorTest {
     assertTrue(selected.isEmpty());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "relevanceEndpointRanksUnsortedInputs({arguments}) [{index}]")
   @ValueSource(doubles = {1.0, 0.999, 0.9989, 2.0})
   void relevanceEndpointRanksUnsortedInputs(double lambda) {
     assertEquals(
@@ -43,7 +43,7 @@ final class MmrSelectorTest {
             List.of(new float[] {1, 0}, new float[] {1, 0}, new float[] {1, 0}), 2));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "belowOneRetainsNoveltyEvenNearEndpoint({arguments}) [{index}]")
   @ValueSource(doubles = {0.999, 0.9989, 0.999999})
   void belowOneRetainsNoveltyEvenNearEndpoint(double lambda) {
     var vectors = List.of(new float[] {1, 0}, new float[] {1, 0}, new float[] {0, 1});
