@@ -301,3 +301,13 @@ and budgetTripWithNoProgress_stillLogsTheWarn
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1796a-2a06-7b31-8dd3-f035ab00adcd",
+  "verdict": "accept",
+  "digest": "sha256:f507e31c754379f0f7a919a3ee9c3a9ca456ffd628c555a81b3c3a24bc7b7e27"
+}
+```
