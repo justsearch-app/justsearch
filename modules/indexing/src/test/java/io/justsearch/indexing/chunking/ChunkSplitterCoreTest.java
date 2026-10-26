@@ -24,6 +24,96 @@ import org.junit.jupiter.api.Test;
 @DisplayName("ChunkSplitter Core")
 class ChunkSplitterCoreTest {
 
+  @Test
+  void supplementaryCharactersKeepWholeCodePointsInEveryMode() {
+    for (var mode : ChunkSplitter.Mode.values()) {
+      for (String symbol : List.of("\uD83D\uDE00", "\uD840\uDC00")) {
+        for (String prefix : List.of("", "a")) {
+          for (int target : new int[] {100, 500, 501}) {
+            assertSafeChunks(prefix + symbol.repeat(3000), target, 50, mode);
+            assertSafeChunks(prefix + symbol.repeat(3000), target, 0, mode);
+          }
+          for (int[] budget : new int[][] {
+              {-1, 0}, {0, 0}, {1, 0}, {1, 1}, {1, Integer.MAX_VALUE},
+              {2, 50}, {3, 0}, {99, 100}, {500, Integer.MAX_VALUE},
+              {Integer.MAX_VALUE, Integer.MAX_VALUE}}) {
+            assertSafeChunks(prefix + symbol.repeat(31), budget[0], budget[1], mode);
+          }
+        }
+      }
+    }
+  }
+
+  private static void assertSafeChunks(String source, int target, int overlap, ChunkSplitter.Mode mode) {
+    var chunks = ChunkSplitter.splitWithMetadata(source, target, overlap, mode);
+    assertFalse(chunks.isEmpty());
+    assertTrue(chunks.size() <= source.codePointCount(0, source.length()));
+    int previousStart = -1;
+    int previousEnd = 0;
+    for (var chunk : chunks) {
+      assertEquals(source.substring(chunk.startChar(), chunk.endChar()), chunk.content());
+      assertSafeBoundary(source, chunk.startChar());
+      assertSafeBoundary(source, chunk.endChar());
+      assertTrue(chunk.startChar() > previousStart, "windows must advance");
+      assertTrue(chunk.startChar() <= previousEnd, "alignment must not open a gap");
+      assertTrue(chunk.endChar() > previousEnd, "no contained suffix");
+      previousStart = chunk.startChar();
+      previousEnd = chunk.endChar();
+    }
+    assertEquals(source.length(), previousEnd);
+    var plain = ChunkSplitter.split(source, target, overlap, mode);
+    assertEquals(chunks.stream().map(ChunkSplitter.Chunk::content).toList(), plain);
+    for (String chunk : plain) {
+      assertFalse(Character.isLowSurrogate(chunk.charAt(0)));
+      assertFalse(Character.isHighSurrogate(chunk.charAt(chunk.length() - 1)));
+    }
+  }
+
+  private static void assertSafeBoundary(String source, int offset) {
+    assertFalse(offset > 0 && offset < source.length()
+        && Character.isHighSurrogate(source.charAt(offset - 1))
+        && Character.isLowSurrogate(source.charAt(offset)), "split surrogate pair at " + offset);
+  }
+
+  @Test
+  void malformedSourceRemainsUnmodifiedAndTrimDefinitionsStayDistinct() {
+    String source = "\u0000\u2003x\uD800y\uDC00z\u2003\u0000";
+    for (var mode : ChunkSplitter.Mode.values()) {
+      assertEquals(List.of(source.trim()), ChunkSplitter.split(source, 500, 50, mode));
+      var chunks = ChunkSplitter.splitWithMetadata(source, 500, 50, mode);
+      assertEquals(1, chunks.size());
+      assertEquals(source.strip(), chunks.get(0).content());
+      assertEquals(source.substring(chunks.get(0).startChar(), chunks.get(0).endChar()),
+          chunks.get(0).content());
+      assertEquals(List.of("x"), ChunkSplitter.split("\u0000x\u0000", 500, 50, mode));
+      assertEquals("\u0000x\u0000", ChunkSplitter.splitWithMetadata("\u0000x\u0000", 500, 50, mode)
+          .get(0).content());
+      assertEquals(List.of("\u2003x\u2003"), ChunkSplitter.split("\u2003x\u2003", 500, 50, mode));
+      assertEquals("x", ChunkSplitter.splitWithMetadata("\u2003x\u2003", 500, 50, mode).get(0).content());
+    }
+  }
+
+  @Test
+  void asciiAndBmpHardCutOffsetsRemainInUtf16Units() {
+    for (String symbol : List.of("a", "é", "漢")) {
+      String source = symbol.repeat(6000);
+      int target = symbol.equals("漢") ? 500 : 1923;
+      int overlap = symbol.equals("漢") ? 50 : 192;
+      for (var mode : ChunkSplitter.Mode.values()) {
+        var chunks = ChunkSplitter.splitWithMetadata(source, 500, 50, mode);
+        int start = 0;
+        for (var chunk : chunks) {
+          int end = Math.min(start + target, source.length());
+          assertEquals(start, chunk.startChar());
+          assertEquals(end, chunk.endChar());
+          assertEquals(source.substring(start, end), chunk.content());
+          start = end - overlap;
+        }
+        assertEquals(source.length(), chunks.get(chunks.size() - 1).endChar());
+      }
+    }
+  }
+
   @Nested
   @DisplayName("Overlap Mechanism")
   class OverlapMechanismTests {

@@ -56,6 +56,36 @@ final class PreOpenSchemaMismatchBootTest {
     return new IndexGenerationManager(layout.indexBase()).initializeOrLoad().state();
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "compatibleV1ReleaseDoesNotStartChunkRepairMigration({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"BLUE_GREEN_MIGRATE", "FAIL_CLOSED", "REBUILD_BACKUP_FIRST"})
+  @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
+  void compatibleV1ReleaseDoesNotStartChunkRepairMigration(String policy, @TempDir Path tempDir)
+      throws Exception {
+    Path root = Release030Fixture.unpack("small", tempDir);
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    WorkerBootFixture.publishConfig(root.resolve("data"), root.resolve("data/index/default"), policy,
+        java.util.Map.of("justsearch.ai.disabled", "true", "justsearch.ai.embed.enabled", "false",
+            "justsearch.splade.enabled", "false", "justsearch.ner.enabled", "false"));
+    var installed = io.justsearch.configuration.resolved.ConfigStore.global();
+    try {
+      var original = Release030UpgradeCharacterizationTest.state(root).active_generation();
+      // The authentic archive and the existing strict released-model identity guard are unchanged.
+      var identities = new Release030UpgradeCharacterizationTest.ReleasedModelIdentities(root);
+      try (identities; var executors = new io.justsearch.core.execution.TestEngineExecutors();
+          var running = Release030UpgradeCharacterizationTest.boot(root, executors)) {
+        assertNotNull(running.appServices());
+        var state = Release030UpgradeCharacterizationTest.state(root);
+        assertEquals("IDLE", state.migration_state());
+        assertEquals(original, state.active_generation());
+        assertNull(state.building_generation());
+        assertTrue(Release030UpgradeCharacterizationTest.search(running, "nebula")
+            .contains(Release030UpgradeCharacterizationTest.key(root.resolve("roots/alpha/file-01.txt"))));
+      }
+    } finally {
+      io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installed, previous);
+    }
+  }
+
   /** (a) The headline case: segments present, shape changed, production policy. */
   @Test
   void aChangedShapeOnAnIndexWithSegmentsStartsTheMigrationAtBoot(@TempDir Path tempDir)
