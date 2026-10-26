@@ -91,7 +91,7 @@ final class MmrFailureInterfacesIntegrationTest extends MmrEngineFixture {
     };
     worker.setEmbeddingProvider(provider);
     var request = RetrieveContextRequest.newBuilder().setQuestion(QUESTION)
-        .addDocIds(article.toString()).setPathPrefix(article.toString()).setTopK(K)
+        .addDocIds(article.toString()).setPathPrefix(article.getParent().toString()).setTopK(K)
         .setMaxContextTokens(6000).setAutoEntityExtract(false).build();
     java.util.function.Supplier<CallContext> call = () -> new CallContext(null,
         "mmr-cancelled-supplier", cancelled::get, TestRequestContexts.browser(),
