@@ -130,6 +130,16 @@ final class RagContextOps {
     boolean wasReranked() {
       return !ceScores.isEmpty();
     }
+
+    float scoreFor(LuceneRuntimeTypes.SearchHit hit) {
+      if (!wasReranked()) return hit.score();
+      // Selection and assembly retain the original objects. Parent/doc IDs are not unique:
+      // distinct synthetic passages of one parent deliberately share them.
+      for (int i = 0; i < hits.size(); i++) {
+        if (hits.get(i) == hit) return ceScores.get(i);
+      }
+      throw new IllegalArgumentException("Included hit was not scored by this rerank");
+    }
   }
 
   /** Quality signals computed during retrieval for CRAG-style confidence assessment. */
@@ -667,13 +677,13 @@ final class RagContextOps {
     // CPU path: Diversify first (bounds work) -> then rerank bounded set
     List<LuceneRuntimeTypes.SearchHit> finalHits;
     int chunksConsidered = candidateHits.size();
-    List<Float> ceScores = List.of();
+    ChunkRerankResult scoredHits = ChunkRerankResult.unchanged(candidateHits);
     if (shouldRerankChunks(effectiveMode)) {
       boolean rerankBeforeDiversify = determineRerankOrder();
       if (rerankBeforeDiversify) {
         // GPU path: rerank full set, then diversify
         var rerankResult = rerankChunks(question, candidateHits, acquisition);
-        ceScores = rerankResult.ceScores();
+        scoredHits = rerankResult;
         finalHits =
             diversifyChunks(question, queryVector, rerankResult.hits(), topK, allowQueryEmbeddings,
                 semanticRequest);
@@ -687,7 +697,7 @@ final class RagContextOps {
             diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings,
                 semanticRequest);
         var rerankResult = rerankChunks(question, diversifiedHits, acquisition);
-        ceScores = rerankResult.ceScores();
+        scoredHits = rerankResult;
         finalHits = rerankResult.hits();
         log.debug(
             "Chunk retrieval: diversify->rerank (CPU path), {} diversified -> {} final",
@@ -726,7 +736,7 @@ final class RagContextOps {
       float coverage = maxContextTokens > 0
           ? (float) tokenBudgeter.estimatedTokens() / maxContextTokens : 0f;
       var quality = computeQualitySignals(
-          ceScores, finalHits, chunksConsidered, used.size(), coverage);
+          scoredHits, used, chunksConsidered, coverage);
       log.info(
           "RAG context assembly (token-aware): ~{}/{} tokens, {} sections, mode={}, bestScore={}",
           tokenBudgeter.estimatedTokens(),
@@ -754,7 +764,7 @@ final class RagContextOps {
         (label, content) -> mapAppendResult(budgeter.appendSection(label, content)));
 
     var quality = computeQualitySignals(
-        ceScores, finalHits, chunksConsidered, used.size(), 0f);
+        scoredHits, used, chunksConsidered, 0f);
     log.info(
         "RAG context assembly (char-based): {} sections, {} hits, mode={}, bestScore={}",
         budgeter.sections().size(),
@@ -773,30 +783,35 @@ final class RagContextOps {
         quality);
   }
 
-  /** Compute quality signals from CE scores (if reranked) or fusion scores. */
+  /**
+   * Project finite scores of passages actually appended, independent of selection/assembly order.
+   * CE scores stay in their own domain; otherwise retain native retrieval scores (the union may
+   * mix chunk and parent-document raw scores). Neither domain is calibrated confidence.
+   */
   private static RagQualitySignals computeQualitySignals(
-      List<Float> ceScores,
-      List<LuceneRuntimeTypes.SearchHit> finalHits,
+      ChunkRerankResult scoredHits,
+      List<LuceneRuntimeTypes.SearchHit> usedHits,
       int chunksConsidered,
-      int chunksIncluded,
       float retrievalCoverage) {
-    float bestScore;
-    float scoreGap;
-    if (!ceScores.isEmpty()) {
-      // CE scores are already sorted (highest first from rerankChunks)
-      bestScore = ceScores.getFirst();
-      scoreGap = ceScores.size() >= 2 ? ceScores.get(0) - ceScores.get(1) : bestScore;
-    } else if (!finalHits.isEmpty()) {
-      // Fall back to fusion/BM25 scores from hits
-      bestScore = finalHits.getFirst().score();
-      scoreGap = finalHits.size() >= 2
-          ? finalHits.get(0).score() - finalHits.get(1).score() : bestScore;
-    } else {
-      bestScore = 0f;
-      scoreGap = 0f;
+    float bestScore = Float.NEGATIVE_INFINITY;
+    float secondScore = Float.NEGATIVE_INFINITY;
+    int finiteScores = 0;
+    for (var hit : usedHits) {
+      float score = scoredHits.scoreFor(hit);
+      if (!Float.isFinite(score)) continue;
+      finiteScores++;
+      if (score > bestScore) {
+        secondScore = bestScore;
+        bestScore = score;
+      } else if (score > secondScore) {
+        secondScore = score;
+      }
     }
+    if (finiteScores == 0) bestScore = 0f;
+    // Keep the legacy singleton gap=best, including negative scores.
+    float scoreGap = finiteScores >= 2 ? bestScore - secondScore : bestScore;
     return new RagQualitySignals(bestScore, scoreGap, retrievalCoverage,
-        chunksConsidered, chunksIncluded);
+        chunksConsidered, usedHits.size());
   }
 
   // ==================== Doc-level union leg (tempdoc 749, option B) ====================
