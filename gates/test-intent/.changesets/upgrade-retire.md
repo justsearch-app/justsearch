@@ -308,7 +308,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
       ],
-      "behaviour": "U6/amendments1–4 and U7/U11 progress: ambiguous committed model inputs cannot retire a native migration; acknowledged later walks/updates/deletes retain accepted ordering through actual writer retry, process kill and restart; repeated faults retain debt/B; supported same-acknowledgement DB replacement cannot invalidate ordered deletion/source proof; disjoint roots progress while another receipt remains uncertain.",
+      "behaviour": "U6/amendments1\u20134 and U7/U11 progress: ambiguous committed model inputs cannot retire a native migration; acknowledged later walks/updates/deletes retain accepted ordering through actual writer retry, process kill and restart; repeated faults retain debt/B; supported same-acknowledgement DB replacement cannot invalidate ordered deletion/source proof; disjoint roots progress while another receipt remains uncertain.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -339,7 +339,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       ],
       "repaired": true,
       "evidence": "gates/test-intent/evidence/upgrade-retire-r1-repaired.json",
-      "classificationRationale": "New repaired checks, with preservation cells retained within their ordering table. The original sync-then-collection fixture had no named member and remains excluded as intended fail-before proof. Its corrected precondition uses public root registration, an actual named queue member and an ordered root receipt. The reviewed R4 exact R1 sources pass all32 new cases in the completed local run, including unchanged100s/search/A/B/restart oracles and two real process kills with full child stdout. The matching before refresh for the changed WalkOrder/WalkCrash inputs and final D4 envelopes remain pending; no compile/setup failure or invalid old fixture is counted. A separate real prefix→exact-admission→later-public-sync probe fails100s completion on both b84 and this candidate: the newer root admission replaces the file unit without replacing its old exact receipt. That remaining ownership/completion gap is not accepted or hidden by these passing cells. Original repeated-injection failed fixtures remain immutable.",
+      "classificationRationale": "New repaired checks, with preservation cells retained within their ordering table. The original sync-then-collection fixture had no named member and remains excluded as intended fail-before proof. Its corrected precondition uses public root registration, an actual named queue member and an ordered root receipt. The reviewed R4 exact R1 sources pass all32 new cases in the completed local run, including unchanged100s/search/A/B/restart oracles and two real process kills with full child stdout. The matching before refresh for the changed WalkOrder/WalkCrash inputs and final D4 envelopes remain pending; no compile/setup failure or invalid old fixture is counted. A separate real prefix\u2192exact-admission\u2192later-public-sync probe fails100s completion on both b84 and this candidate: the newer root admission replaces the file unit without replacing its old exact receipt. That remaining ownership/completion gap is not accepted or hidden by these passing cells. Original repeated-injection failed fixtures remain immutable.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
@@ -473,6 +473,145 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
       "evidenceScope": "Method-only8292/current refresh remains pending; existing historical frozen81 results and missing historical argv are retained unchanged. No independent acceptance is claimed."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementContinuationTest.java"
+      ],
+      "behaviour": "U6/U14b: real child kills before/after exact SQL ACK through both captured phases and two verified boots; real failed physical cleanup followed by higher-order public admissions, same-key ROOT, exact C1-to-C2 unit/retry preservation, newer projection DELETE and eventual normalized physical retirement.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Complete the settled PR4 retirement ACK/reopen/original-ROOT ownership repair; no publishing, schema, option or policy changes.",
+          "choice": "Retain exact verified removal packets in the existing checkpoint before SQL ACK, bind current queue proofs to open session and accepted versions, freeze legacy scope metadata before losing Q, retain actual ROOT owners, preserve configured retry policy and use existing targeted writer forcing for positively changed members. Keep native watcher reconciliation and generic certificates strict.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "classificationRationale": "New running-system/queue/Lucene regression coverage. Existing assertions, faults, deadlines and policy checks are retained; no historical duplicate XML is assigned by status. R12 raw commands/source manifests distinguish initial/intermediate/final source and setup failures; final D4 envelopes and independent acceptance remain pending.",
+      "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java"
+      ],
+      "behaviour": "U6/U11 ordered-scope preservation: actual available Alpha registration before uncertainty, later ordinary ROOT image and named live collection metadata, genuinely unrelated acknowledged content, real retention pins/release, confirmed-source convergence and restart.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Complete the settled PR4 retirement ACK/reopen/original-ROOT ownership repair; no publishing, schema, option or policy changes.",
+          "choice": "Retain exact verified removal packets in the existing checkpoint before SQL ACK, bind current queue proofs to open session and accepted versions, freeze legacy scope metadata before losing Q, retain actual ROOT owners, preserve configured retry policy and use existing targeted writer forcing for positively changed members. Keep native watcher reconciliation and generic certificates strict.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "classificationRationale": "New running-system/queue/Lucene regression coverage. Existing assertions, faults, deadlines and policy checks are retained; no historical duplicate XML is assigned by status. R12 raw commands/source manifests distinguish initial/intermediate/final source and setup failures; final D4 envelopes and independent acceptance remain pending.",
+      "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#acknowledgedImageSurvivesUncertaintyThenConverges"
+      ]
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPrefixRestoreTest.java"
+      ],
+      "behaviour": "U6/U14b: changed same-stamp ROOT bytes require actual targeted writer work while ordinary unchanged siblings keep the normal skip/no-planned-hash/no-exact-receipt path. Authentic SAMEACK VACUUM before legacy prefix conversion is restored offline with A/B/checkpoint intact; normal two boots must reuse the frozen full typed receipt UUID/payload/order/count, retain uncertain Alpha/A/B and never mint another conversion admission.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Complete the settled PR4 retirement ACK/reopen/original-ROOT ownership repair; no publishing, schema, option or policy changes.",
+          "choice": "Retain exact verified removal packets in the existing checkpoint before SQL ACK, bind current queue proofs to open session and accepted versions, freeze legacy scope metadata before losing Q, retain actual ROOT owners, preserve configured retry policy and use existing targeted writer forcing for positively changed members. Keep native watcher reconciliation and generic certificates strict.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "classificationRationale": "New running-system/queue/Lucene regression coverage. Existing assertions, faults, deadlines and policy checks are retained; no historical duplicate XML is assigned by status. R12 raw commands/source manifests distinguish initial/intermediate/final source and setup failures; final D4 envelopes and independent acceptance remain pending.",
+      "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#sameStampedPublicSyncTargetsOnlyChangedMember",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPrefixRestoreTest.java#restoredRawPrefixReusesTheExactFrozenSuccessor"
+      ]
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java"
+      ],
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The private checkpoint reader now uses the existing Release030RecoveryState.differencesComplete() API instead of comparing retire|differences to the literal true. The settled session/admission-set binding changed this unshipped marker representation; all source permissions, partial-response assertion, counts, receipt/B/search, two restarts and 90/100-second oracles remain unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Complete the settled PR4 retirement ACK/reopen/original-ROOT ownership repair; no publishing, schema, option or policy changes.",
+          "choice": "Retain exact verified removal packets in the existing checkpoint before SQL ACK, bind current queue proofs to open session and accepted versions, freeze legacy scope metadata before losing Q, retain actual ROOT owners, preserve configured retry policy and use existing targeted writer forcing for positively changed members. Keep native watcher reconciliation and generic certificates strict.",
+          "label": "agent choice"
+        }
+      ],
+      "classificationRationale": "A representation reader adaptation, not an assertion or scenario relaxation. The adapted same real method/class passes on f081; candidate narrow refresh is recorded separately. Genuine transitive and primary retry failures remain open and are not reclassified by this adaptation."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java"
+      ],
+      "behaviour": "The genuine released v13 DONE/SUCCESS_FULL mcp-ingest row outside every root preserves its named collection and exact-file boundary through raw UPSERT recovery and restart. A missing original Q row with no frozen original namespace retains B/journal and admits no guessed job across changed root collection configurations. Only raw receipt fixture input is seeded; DONE is the captured release writer result.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request; bounded R14 builder assignment",
+          "delegationScope": "Finish positively obsolete live metadata reconciliation, diagnose the four ordering failures with real Q/A collection evidence, and minimally preserve original legacy metadata; no broader D4 or cost trial.",
+          "choice": "Keep an existing raw legacy row collection (null means default), fill only its missing boundary with its exact file, freeze this original metadata during initial inventory, and refuse missing Q without original frozen namespace. Correct named-delete fixture preconditions only through real public registration and writer completion; preserve substantive ordering, content, restart and timeout assertions.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#namedDoneRawReceiptKeepsCollectionAndExactBoundary",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#missingOriginalQueueNamespaceStaysHeldAcrossChangedConfig"
+      ],
+      "classificationRationale": "New real-boot regressions. Source-bound before execution fails the intended namespace assertions on all CI attempts; the repaired production passes both recovery/hold cases. Author evidence only; no D4 completion or independent acceptance.",
+      "evidenceScope": "R14 ignored command/source/raw-store manifests; the first run with a snapshot-name collision is separately marked, and the corrected helper has its own before run."
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
+      ],
+      "behaviour": "Named collection deletion starts only after public watch/sync and the real writer establish Q and A membership in that named collection. Boot bindings alone did not register the live watcher or move released default-collection A images. Existing final per-path, ordering, source uncertainty, retention, restart, B and pointer checks keep their original requirements and deadlines. A diagnostic line records the primary callback pending predicate before its unchanged assertion.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request; bounded R14 builder assignment",
+          "delegationScope": "Finish positively obsolete live metadata reconciliation, diagnose the four ordering failures with real Q/A collection evidence, and minimally preserve original legacy metadata; no broader D4 or cost trial.",
+          "choice": "Keep an existing raw legacy row collection (null means default), fill only its missing boundary with its exact file, freeze this original metadata during initial inventory, and refuse missing Q without original frozen namespace. Correct named-delete fixture preconditions only through real public registration and writer completion; preserve substantive ordering, content, restart and timeout assertions.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java#transitiveDeferredCollectionCannotEraseLaterBetaSync",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+      ],
+      "classificationRationale": "New fixture preconditions via real public interfaces, not a product oracle waiver. The original wrong-namespace raw observations remain preserved. Current corrected results and any primary callback contradiction are recorded in the R14 handback.",
+      "evidenceScope": "Focused author diagnostics; preservation against the integrated base and final D4 envelopes remain pending."
     }
   ]
 }
@@ -551,3 +690,5 @@ R8 bounded repair declarations (delegated-choice, task t-20261020-c2e24a request
 - `Release030RetirementSyncPolicyTest.legacyHashEntryStillReadsOnAnInterruptedThread`: legacy source hashing remains usable on an already interrupted caller as on b84; the live caller alone supplies interruption/cancellation to the new overload. Existing cancellable hash and transactional rollback controls remain required.
 
 Raw focused source-bound output is under tmp/builder/retire-R1-repair/resume-023511 and sibling r8-* labels. Full suites, final D4/acceptance and the distinct later-uncertain-root-image hypothesis are not covered by these declarations.
+
+R12 declarations: ACK packets are removal authorization, not current queue or ACK-won bits. Opaque ROOT ownership is distinct from complete membership. New RootImage fixture setup normalizes only the historical default/null collection equivalence and proves a real unrelated acknowledgement rather than expecting a member explicitly deleted by collection C to remain. Its named-C oracle remains exact. All original rejection records, evidence and scenario obligations remain; no independent acceptance is authored.

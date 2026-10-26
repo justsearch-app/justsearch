@@ -39,7 +39,9 @@ final class Release030RetirementWalkOrderTest {
      // Keep actual walk admissions waiting for their real writer, as a transient I/O failure does.
      if(target.get()!=null && Release030RecoveryState.load(root.resolve("data/jobs.db")).rootWalked(target.get())
          && injected.compareAndSet(false,true)) {
-      assertTrue(q.hasNonterminalJobsByPathPrefixStrict(key(alpha)),"target later walk durably admitted pending writer work");
+      boolean pendingAtCheckpoint = q.hasNonterminalJobsByPathPrefixStrict(key(alpha));
+      System.out.println("R14_PRIMARY_CHECKPOINT pending="+pendingAtCheckpoint+" row="+q.watcherReconciliationRow(key(later)));
+      assertTrue(pendingAtCheckpoint,"target later walk durably admitted pending writer work");
       q.markFailed(later,IngestionOutcome.of(IngestionOutcomeClass.IO_FAILED,IngestionReasonCodes.SOURCE_UNREADABLE,IngestionRetryPolicy.RETRY_UNTIL_AVAILABLE,"independent transient writer wait"));
       walked.incrementAndGet();
       observeRetry(root,later,target.get(),walked.get());
@@ -136,6 +138,15 @@ final class Release030RetirementWalkOrderTest {
       case "prefix" -> prefix(service,nested);
       case "collection" -> {
        assertNamedSyncAdmission(root,file,queue(server));
+       producer.resumeProducerAfterCutover();
+       await(()->"DONE".equals(queue(server).watcherReconciliationRow(key(file)).get("state"))
+           &&"walk-order".equals(server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(
+               key(file),io.justsearch.indexing.SchemaFields.COLLECTION))
+           &&"walk-order".equals(server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(
+               key(alpha.resolve("pending.txt")),io.justsearch.indexing.SchemaFields.COLLECTION)),
+           "public named sync commits Q and A membership before collection deletion",30);
+       Release030RetirementRootImageTest.capture(root,server,"named-sync-before-delete",List.of(file,alpha.resolve("pending.txt")));
+       assertTrue(producer.pauseProducerForCutover(10000));
        collection(service);
       }
       case "sync" -> sync(service,alpha);

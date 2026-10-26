@@ -267,6 +267,7 @@ public final class WorkerIngestService {
         // Read through a supplier: the identity store is wired by setDocumentIdentityStore AFTER
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
         confirmedDeletionMarker);
+    this.syncOps.setForcedPathSink(paths -> this.forcedPathSink.accept(paths));
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
     this.syncOps.setUserExclusions(this::isUserExcluded);
@@ -493,6 +494,7 @@ public final class WorkerIngestService {
    */
   public void prunesUnder(WorkerIngestService publisher) {
     java.util.Objects.requireNonNull(publisher, "publisher");
+    syncOps.setForcedPathSink(paths -> publisher.forcedPathSink.accept(paths));
     syncOps.setPruneGuardFactory(publisher::pruneGuard);
     syncOps.setPruneWriterFence(publisher.pruneWriterFence);
     syncOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));

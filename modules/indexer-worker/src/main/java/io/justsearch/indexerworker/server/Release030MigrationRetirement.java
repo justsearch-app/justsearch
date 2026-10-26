@@ -76,7 +76,7 @@ final class Release030MigrationRetirement {
     for (Path file : recovery.retirementPaths().keySet()) {
       if (boundary(file, roots).equals(file)) exact.add(file);
     }
-    for (var op : queue.listSwitchBufferOpsStrict()) {
+    for (var op : queue.retirementReplayOps()) {
       if (op.generation() != null && !op.generation().isBlank()
           && !recovery.retiringBuilding().equals(op.generation())) continue;
       Path file = null;

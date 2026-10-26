@@ -27,14 +27,21 @@ public final class Release030RecoveryState {
   private static final String HEAD = RETIRE + "root-head|";
   private static final String NEXT = RETIRE + "root-next|";
   private static final String REPLACING = RETIRE + "root-replacing|";
+  private static final String REMOVAL = RETIRE + "removal|";
+  private static final String EXPECTATION = RETIRE + "legacy-file|";
+  private static final String CONVERSION = RETIRE + "prefix-conversion|";
   private String openedSession;
+  private String admissionSet;
   private final Path file;
   private final Properties state;
 
   private Release030RecoveryState(Path file, Properties state) {
     this.file = file;
     this.state = state;
-    this.openedSession = state.getProperty(RETIRE + "queue-session");
+    String proof = state.getProperty(RETIRE + "queue-session");
+    if (proof != null && proof.contains(":")) {
+      int split = proof.lastIndexOf(':'); openedSession = proof.substring(0,split); admissionSet = proof.substring(split+1);
+    }
   }
 
   static void capture(Path database) throws IOException {
@@ -92,13 +99,146 @@ public final class Release030RecoveryState {
   }
 
   /** One shared instance belongs to the opened queue; reopening never inherits CURRENT Q proof. */
-  public synchronized void openedSession(String session) { openedSession = session; }
+  public synchronized void openedSession(String session) { openedSession = session; admissionSet = null; }
+  /** In-memory freshness is derived only by the queue owner under its mutation lock. */
+  public synchronized void admissionsChanged() { admissionSet = null; }
+
+  public synchronized void bindAdmissions(List<SwitchBufferCapableQueue.SwitchBufferOp> receipts) {
+    try {
+      byte[] bytes = JSON.writeValueAsString(receipts).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      admissionSet = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+  }
+
+  public synchronized String admissionBinding() { return currentProof(); }
+
+  private String currentProof() {
+    return openedSession == null || admissionSet == null ? null : openedSession + ":" + admissionSet;
+  }
+
+  public synchronized List<SwitchBufferCapableQueue.SwitchBufferOp> removalPackets() throws IOException {
+    var result = new java.util.ArrayList<SwitchBufferCapableQueue.SwitchBufferOp>();
+    for (String key : state.stringPropertyNames()) if (key.startsWith(REMOVAL)) {
+      var op = decodeReceipt(state.getProperty(key));
+      if (!key.equals(REMOVAL + op.retirementUuid())) throw new IOException("Invalid removal packet identity");
+      result.add(op);
+    }
+    return List.copyOf(result);
+  }
+
+  public synchronized SwitchBufferUpsert legacyExpectation(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
+    String value = state.getProperty(EXPECTATION + op.retirementUuid());
+    return value == null ? null : SwitchBufferUpsert.decode(value);
+  }
+
+  /** One atomic sidecar replacement precedes SQL removal; a packet is never an ACK-won bit. */
+  public synchronized void retainRemovalPackets(List<SwitchBufferCapableQueue.SwitchBufferOp> verified,
+      java.util.Map<String,SwitchBufferUpsert> legacyFiles) throws IOException {
+    // Validate the union before replacing any previously retained representation.
+    var combined = new java.util.ArrayList<>(removalPackets()); combined.addAll(verified);
+    retirementReceipts(combined);
+    var previousState = new Properties(); previousState.putAll(state);
+    try {
+    for (var op : verified) {
+      state.setProperty(REMOVAL + op.retirementUuid(), JSON.writeValueAsString(op));
+      var expectation = legacyFiles.get(op.retirementUuid());
+      if (expectation != null) {
+        String previous = state.getProperty(EXPECTATION + op.retirementUuid());
+        if (previous != null && !SwitchBufferUpsert.decode(previous).equals(expectation))
+          throw new IOException("Legacy UPSERT expectation changed");
+        state.setProperty(EXPECTATION + op.retirementUuid(), expectation.encode());
+      }
+    }
+    save();
+    } catch (IOException | RuntimeException failed) { state.clear(); state.putAll(previousState); throw failed; }
+  }
+
+  public record PrefixConversion(SwitchBufferCapableQueue.SwitchBufferOp predecessor,
+      SwitchBufferCapableQueue.SwitchBufferOp successor) {}
+
+  public synchronized List<PrefixConversion> prefixConversions() throws IOException {
+    var result = new java.util.ArrayList<PrefixConversion>();
+    for (String key : state.stringPropertyNames()) if (key.startsWith(CONVERSION)) {
+      var pair = JSON.readValue(state.getProperty(key), PrefixConversion.class);
+      validateConversion(pair);
+      if (!key.equals(CONVERSION + pair.predecessor().retirementUuid())) throw new IOException("Invalid prefix conversion key");
+      result.add(pair);
+    }
+    return List.copyOf(result);
+  }
+
+  private static void validateConversion(PrefixConversion pair) throws IOException {
+    var before = pair.predecessor(); var after = pair.successor();
+    before.retirementUuid(); after.retirementUuid();
+    if (!"DELETE_PREFIX".equals(before.op()) || !before.op().equals(after.op())
+        || !before.generation().equals(after.generation()) || !before.key().equals(after.key())
+        || before.lastUpdatedMs()!=after.lastUpdatedMs() || before.acceptedOrder()!=after.acceptedOrder()
+        || before.revision().equals(after.revision())
+        || !io.justsearch.adapters.lucene.runtime.PathPrefixScope.isLegacy(before.payload())
+        || io.justsearch.adapters.lucene.runtime.PathPrefixScope.isLegacy(after.payload())
+        || !PathNormalizer.normalizePathPrefix(before.payload()).equals(
+            io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(after.payload()).prefix()))
+      throw new IOException("Unbound legacy prefix conversion");
+  }
+
+  public synchronized SwitchBufferCapableQueue.SwitchBufferOp conversionSuccessor(
+      SwitchBufferCapableQueue.SwitchBufferOp predecessor) throws IOException {
+    for (var pair : prefixConversions()) if (pair.predecessor().retirementUuid().equals(predecessor.retirementUuid())) {
+      if (!pair.predecessor().equals(predecessor)) throw new IOException("Legacy prefix predecessor changed");
+      return pair.successor();
+    }
+    return null;
+  }
+
+  public synchronized void retainPrefixConversion(SwitchBufferCapableQueue.SwitchBufferOp predecessor,
+      SwitchBufferCapableQueue.SwitchBufferOp successor) throws IOException {
+    var pair = new PrefixConversion(predecessor,successor); validateConversion(pair);
+    var prior = conversionSuccessor(predecessor);
+    if (prior != null && !prior.equals(successor)) throw new IOException("Prefix conversion changed");
+    state.setProperty(CONVERSION + predecessor.retirementUuid(), JSON.writeValueAsString(pair));
+    save();
+  }
+
+  /** Ordered UUID union; only an explicitly bound legacy conversion may share a position. */
+  public synchronized List<SwitchBufferCapableQueue.SwitchBufferOp> retirementReceipts(
+      List<SwitchBufferCapableQueue.SwitchBufferOp> actual) throws IOException {
+    var conversions = prefixConversions();
+    var all = new java.util.ArrayList<>(rootReceipts());
+    all.addAll(removalPackets()); all.addAll(committedDeletes()); all.addAll(actual);
+    for (var pair : conversions) { all.add(pair.predecessor()); all.add(pair.successor()); }
+    var byUuid = new java.util.HashMap<String,SwitchBufferCapableQueue.SwitchBufferOp>();
+    for (var op : all) {
+      op.retirementUuid();
+      var previous = byUuid.putIfAbsent(op.retirementUuid(), op);
+      if (previous != null && !previous.equals(op)) throw new IOException("Conflicting retirement receipt UUID");
+    }
+    for (var pair : conversions) byUuid.remove(pair.predecessor().retirementUuid());
+    var result = new java.util.ArrayList<>(byUuid.values());
+    result.sort(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder));
+    long previous = 0;
+    for (var op : result) {
+      if (op.acceptedOrder()<=previous) throw new IOException("Conflicting retirement admission order");
+      previous = op.acceptedOrder();
+    }
+    return List.copyOf(result);
+  }
+
+  public synchronized long retainedOrderFloor() throws IOException {
+    var receipts = retirementReceipts(List.of());
+    return receipts.isEmpty() ? 0 : receipts.getLast().acceptedOrder();
+  }
+
+  public synchronized SwitchBufferCapableQueue.SwitchBufferOp requiredRootHead(String generation,String key) throws IOException {
+    String uuid = state.getProperty(HEAD + headKey(generation,key));
+    return uuid == null ? null : decodeReceipt(state.getProperty(RECEIPT + uuid));
+  }
+
   public synchronized String session() { return openedSession; }
   public synchronized boolean currentSession() {
-    return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "queue-session"));
+    return currentProof() != null && currentProof().equals(state.getProperty(RETIRE + "queue-session"));
   }
   public synchronized void queuePrepared() throws IOException {
-    state.setProperty(RETIRE + "queue-session", java.util.Objects.requireNonNull(openedSession));
+    state.setProperty(RETIRE + "queue-session", java.util.Objects.requireNonNull(currentProof(), "Unbound current queue proof"));
     save();
   }
   public synchronized boolean rootsInventoried() { return "true".equals(state.getProperty(RETIRE + "root-inventory")); }
@@ -159,12 +299,14 @@ public final class Release030RecoveryState {
     state.remove(REPLACING + key);
     save();
   }
-  public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> roots) throws IOException {
+  public synchronized void inventoryRoots(java.util.List<SwitchBufferCapableQueue.SwitchBufferOp> roots,
+      java.util.Map<String,SwitchBufferUpsert> legacyFiles) throws IOException {
     if (rootsInventoried()) throw new IOException("ROOT inventory already exists");
     for (var root : roots) {
       retainRoot(root);
       state.setProperty(HEAD + headKey(root.generation(), root.key()), root.retirementUuid());
     }
+    for (var entry : legacyFiles.entrySet()) state.setProperty(EXPECTATION + entry.getKey(),entry.getValue().encode());
     state.setProperty(RETIRE + "root-inventory", "true");
     save();
   }
@@ -190,10 +332,13 @@ public final class Release030RecoveryState {
     for (String key : state.stringPropertyNames()) if (key.startsWith(HEAD)) {
       String head = key.substring(HEAD.length());String required = state.getProperty(key);
       var current = heads.get(head);
-      if (current == null || !current.retirementUuid().equals(required)
-          || !current.equals(decodeReceipt(state.getProperty(RECEIPT + required))))
-        throw new IOException("Required latest ROOT receipt missing or changed");
+      var expected = decodeReceipt(state.getProperty(RECEIPT + required));
+      if (current == null) {
+        if (!removalPackets().contains(expected)) throw new IOException("Required latest ROOT receipt missing or changed");
+      } else if (!current.equals(expected)) throw new IOException("Required latest ROOT receipt missing or changed");
     }
+    for (var root : actual) if (!state.containsKey(HEAD + headKey(root.generation(),root.key())))
+      throw new IOException("ROOT head has no retained inventory or replacement intent");
     var byUuid = new java.util.HashMap<String,SwitchBufferCapableQueue.SwitchBufferOp>();
     for (var root : rootReceipts()) byUuid.put(root.retirementUuid(),root);
     for (var root : byUuid.values()) {
@@ -301,22 +446,22 @@ public final class Release030RecoveryState {
     save();
   }
 
-  public boolean replayComplete() { return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "replayed")); }
-  public boolean differencesComplete() { return "true".equals(state.getProperty(RETIRE + "differences")); }
+  public boolean replayComplete() { return currentProof() != null && currentProof().equals(state.getProperty(RETIRE + "replayed")); }
+  public boolean differencesComplete() { return currentProof()!=null && currentProof().equals(state.getProperty(RETIRE + "differences")); }
 
   public boolean rootEnumerated(SwitchBufferCapableQueue.SwitchBufferOp root) {
-    return openedSession != null && openedSession.equals(state.getProperty(RETIRE + "root-enum|" + root.retirementUuid()));
+    return currentProof() != null && currentProof().equals(state.getProperty(RETIRE + "root-enum|" + root.retirementUuid()));
   }
   public synchronized void markRootEnumerated(SwitchBufferCapableQueue.SwitchBufferOp root) throws IOException {
-    state.setProperty(RETIRE + "root-enum|" + root.retirementUuid(),java.util.Objects.requireNonNull(openedSession));save();
+    state.setProperty(RETIRE + "root-enum|" + root.retirementUuid(),java.util.Objects.requireNonNull(currentProof(), "Unbound current queue proof"));save();
   }
   public boolean rootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) {
-    return openedSession != null && openedSession.equals(state.getProperty(rootWalkKey(op)));
+    return currentProof() != null && currentProof().equals(state.getProperty(rootWalkKey(op)));
   }
 
   /** The exact walk has committed its prune and durably admitted its files, before their writer runs. */
   public synchronized void markRootWalked(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
-    state.setProperty(rootWalkKey(op), java.util.Objects.requireNonNull(openedSession));
+    state.setProperty(rootWalkKey(op), java.util.Objects.requireNonNull(currentProof(), "Unbound current queue proof"));
     save();
   }
 
@@ -328,8 +473,8 @@ public final class Release030RecoveryState {
   }
 
   public boolean deletionQueueComplete(SwitchBufferCapableQueue.SwitchBufferOp op) {
-    return deletionCommitted(op) && openedSession != null
-        && openedSession.equals(state.getProperty(deletionKey(op) + "|queue"));
+    return deletionCommitted(op) && currentProof() != null
+        && currentProof().equals(state.getProperty(deletionKey(op) + "|queue"));
   }
 
   /** Historical A effect and CURRENT Q removal are separate even after supported DB replacement. */
@@ -338,7 +483,7 @@ public final class Release030RecoveryState {
     markDeletionQueueComplete(receipt);
   }
   public synchronized void markDeletionQueueComplete(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
-    state.setProperty(deletionKey(op) + "|queue", java.util.Objects.requireNonNull(openedSession));
+    state.setProperty(deletionKey(op) + "|queue", java.util.Objects.requireNonNull(currentProof(), "Unbound current queue proof"));
     save();
   }
 
@@ -358,7 +503,7 @@ public final class Release030RecoveryState {
   }
 
   public synchronized void markDifferencesComplete() throws IOException {
-    state.setProperty(RETIRE + "differences", "true");
+    state.setProperty(RETIRE + "differences", java.util.Objects.requireNonNull(currentProof()));
     save();
   }
 
@@ -389,7 +534,7 @@ public final class Release030RecoveryState {
   }
 
   public synchronized void markReplayComplete() throws IOException {
-    state.setProperty(RETIRE + "replayed", java.util.Objects.requireNonNull(openedSession));
+    state.setProperty(RETIRE + "replayed", java.util.Objects.requireNonNull(currentProof(), "Unbound current queue proof"));
     save();
   }
 

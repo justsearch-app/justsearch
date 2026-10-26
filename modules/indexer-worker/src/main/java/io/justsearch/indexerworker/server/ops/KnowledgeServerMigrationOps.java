@@ -1132,6 +1132,12 @@ public final class KnowledgeServerMigrationOps {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return new ReplayOutcome(false, List.of());
     }
+    if (recoveryRoots != null) {
+      try {
+        scopeLegacyPrefixes(sbq,context.ingestLifecycle(),context.publisher());
+        ((SqliteJobQueue)context.jobQueue()).retirementReplayOps();
+      } catch (RuntimeException invalid) { context.log().warn("Retirement receipt union is unavailable",invalid); return new ReplayOutcome(false,List.of()); }
+    }
     if (recoveryRoots != null && !enumerateRetirementMembership(context,recoveryRoots)) {
       return new ReplayOutcome(false,List.of());
     }
@@ -1139,7 +1145,9 @@ public final class KnowledgeServerMigrationOps {
     List<SwitchBufferCapableQueue.SwitchBufferOp> allOps;
     try {
       scopeLegacyPrefixes(sbq, context.ingestLifecycle(), context.publisher());
-      allOps = exactRead ? strictReplayOps(sbq, context.replayGeneration()).stream()
+      allOps = recoveryRoots != null ? ((SqliteJobQueue)context.jobQueue()).retirementReplayOps().stream()
+          .filter(op -> includeUnscoped && op.generation().isBlank() || context.replayGeneration().equals(op.generation())).toList()
+          : exactRead ? strictReplayOps(sbq, context.replayGeneration()).stream()
               .filter(op -> includeUnscoped || context.replayGeneration().equals(op.generation()))
               .toList()
           : sbq.listSwitchBufferOps().stream()
@@ -1171,14 +1179,13 @@ public final class KnowledgeServerMigrationOps {
     Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> fileSurvivorExclusions;
     ReplayDeleteOrder deleteOrder;
     Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededLegacyFiles;
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededProjections;
     try {
       deleteOrder = replayDeleteOrder(context, ops, exactRead, recoveryRoots);
       supersededLegacyFiles = supersededLegacyFiles(context, ops);
+      supersededProjections = supersededRetirementProjections(context,ops);
       fileAuthorizingDeletes = exactRead ? fileRelatedBroadDeletes(context, ops, deleteOrder) : Set.of();
-      if (recoveryRoots != null) {
-        fileAuthorizingDeletes = fileAuthorizingDeletes.stream()
-            .filter(op -> !recoveryRoots.checkpoint().deletionCommitted(op)).collect(java.util.stream.Collectors.toSet());
-      }
+
     } catch (RuntimeException invalid) {
       context.log().warn("Buffered file/delete receipts cannot certify replay", invalid);
       return new ReplayOutcome(false, List.of());
@@ -1225,7 +1232,7 @@ public final class KnowledgeServerMigrationOps {
     AtomicReference<RuntimeException> pruneCutFailure = new AtomicReference<>();
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
-      if (supersededLegacyFiles.contains(op)) continue;
+      if (supersededLegacyFiles.contains(op) || supersededProjections.contains(op)) continue;
       if (recoveryRoots != null && recoveryRoots.checkpoint().deletionQueueComplete(op)) continue;
       if (recoveryRoots != null && deferredSurvivorDeletes.contains(op)) {
         blockedReleaseScopes.add(op);
@@ -1885,6 +1892,15 @@ public final class KnowledgeServerMigrationOps {
     if (allApplied && removeAfterReplay) {
       try {
         BooleanSupplier acknowledge = () -> {
+          if (recoveryRoots != null) {
+            var legacyFiles = new HashMap<String,SwitchBufferUpsert>();
+            try {
+              for (var op : ops) if ("UPSERT".equals(op.op()) && !op.payload().stripLeading().startsWith("{")
+                  && !supersededLegacyFiles.contains(op))
+                legacyFiles.put(op.retirementUuid(), resolveReleaseUpsert(context,op));
+            } catch (IOException unavailable) { throw new IllegalStateException("Legacy replay expectation unavailable",unavailable); }
+            return ((SqliteJobQueue)context.jobQueue()).acknowledgeRetirementReplay(ops,legacyFiles);
+          }
           int cleared = sbq.removeReplayedSwitchBufferOps(ops);
           context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
           return cleared == ops.size();
@@ -1984,6 +2000,7 @@ public final class KnowledgeServerMigrationOps {
       Map<SwitchBufferCapableQueue.SwitchBufferOp,List<String>> existing,
       Set<SwitchBufferCapableQueue.SwitchBufferOp> deferred) throws IOException {
     var queue=(SqliteJobQueue)context.jobQueue();var result=new HashMap<SwitchBufferCapableQueue.SwitchBufferOp,List<String>>(existing);
+    var deleteOrders = queue.retirementDeleteOrders();
     String cursor="";
     while(true) {
       var page=queue.rootMembersAfter(cursor);if(page.isEmpty())break;
@@ -1992,7 +2009,7 @@ public final class KnowledgeServerMigrationOps {
           if(!List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(deletion.op()))continue;
           var ordered=deletion;
           if(ordered.acceptedOrder()>=member.root().acceptedOrder()
-              ||queue.latestAcceptedDelete(member.path(),member.collection())>member.root().acceptedOrder())continue;
+              ||deleteOrders.applyAsLong(member.path(),member.collection())>member.root().acceptedOrder())continue;
           boolean matches=switch(deletion.op()) {
             case "DELETE" -> io.justsearch.indexerworker.queue.SwitchBufferDelete.decode(deletion.payload()).path().equals(member.path());
             case "DELETE_PREFIX" -> PathPrefixScope.decode(deletion.payload()).contains(member.path());
@@ -2142,6 +2159,47 @@ public final class KnowledgeServerMigrationOps {
     }
   }
 
+  private static Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededRetirementProjections(
+      DrainSwitchBufferContext context,List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+    if (!release030Retirement(context)) return Set.of();
+    var latest = new HashMap<String,AcceptedProjection>();
+    var superseded = new java.util.HashSet<SwitchBufferCapableQueue.SwitchBufferOp>();
+    for (var op : ops.reversed()) if ("PROJECTION".equals(op.op())) {
+      var projection = AcceptedProjection.decode(op.payload());
+      if (!op.key().equals(projection.journalKey())) throw new IllegalStateException("Projection identity mismatch");
+      var newer = latest.putIfAbsent(op.generation()+"\0"+op.key(),projection);
+      if (newer != null) {
+        if (!newer.sourceId().equals(projection.sourceId()) || !newer.indexId().equals(projection.indexId())
+            || newer.sourceRevision()<projection.sourceRevision()
+            || newer.sourceRevision()==projection.sourceRevision() && !newer.sameEffect(projection))
+          throw new IllegalStateException("Conflicting retained projection succession");
+        superseded.add(op);
+      }
+    }
+    return Set.copyOf(superseded);
+  }
+
+  private static SwitchBufferUpsert resolveReleaseUpsert(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
+    var queue = (SqliteJobQueue)context.jobQueue();
+    var checkpoint = queue.release030RecoveryState();
+    var frozen = checkpoint.legacyExpectation(op);
+    if (frozen != null) return frozen;
+    var upsert = SwitchBufferUpsert.decode(op.payload());
+    if (upsert.sourceSha256()==null && !op.payload().stripLeading().startsWith("{")) {
+      // Only initial original-Q inventory can supply the missing legacy namespace.
+      // A later row/configuration or the A image under verification cannot reconstruct it.
+      throw new IOException("Legacy admission lacks its original collection/boundary evidence");
+    }
+    if (upsert.ingestionRoot()==null) {
+      Path file=Path.of(upsert.path());
+      Path boundary=context.publisher().bufferedDeleteRoot(new SwitchBufferDelete(upsert.path(),SwitchBufferDelete.Origin.LEGACY,null));
+      if (queue.isRelease030RetirementFile(file)) boundary=file;
+      upsert=new SwitchBufferUpsert(upsert.path(),upsert.collection(),upsert.provenance(),upsert.unitRevision(),upsert.sourceSha256(),boundary);
+    }
+    return upsert;
+  }
+
   /** Older unscoped work must not renew the revision of a later accepted file admission. */
   private static Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededLegacyFiles(
       DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
@@ -2156,13 +2214,15 @@ public final class KnowledgeServerMigrationOps {
             && op.generation().equals(context.replayGeneration())
             && op.key().equals("path:" + upsert.path())
             && Path.of(upsert.path()).normalize().toString().equals(upsert.path())) {
-          laterAccepted.add(upsert.path());
-        } else if (upsert.sourceSha256() == null && legacy
+          if (!laterAccepted.add(upsert.path()) && release030Retirement(context)) superseded.add(op);
+        } else if ((release030Retirement(context) || upsert.sourceSha256() == null && legacy)
             && laterAccepted.contains(upsert.path())) {
           superseded.add(op);
         }
-      } else if (legacy && "DELETE".equalsIgnoreCase(op.op())) {
+      } else if ("DELETE".equalsIgnoreCase(op.op())) {
         var deletion = SwitchBufferDelete.decode(op.payload());
+        if (release030Retirement(context) && deletion.origin()==SwitchBufferDelete.Origin.EXPLICIT)
+          laterAccepted.add(deletion.path());
         if (deletion.origin() == SwitchBufferDelete.Origin.LEGACY
             && laterAccepted.contains(deletion.path())) superseded.add(op);
       }
@@ -2248,25 +2308,9 @@ public final class KnowledgeServerMigrationOps {
       var superseded = supersededLegacyFiles(context, orderedOps);
       for (var op : upserts) {
         if (superseded.contains(op)) continue;
-        var upsert = SwitchBufferUpsert.decode(op.payload());
         boolean retirement = release030Retirement(context);
-        if (upsert.sourceSha256() == null && !retirement) continue; // Historical unscoped cutover payload.
-        if (retirement && upsert.sourceSha256() == null && !op.payload().stripLeading().startsWith("{")) {
-          String collection = context.jobQueue() instanceof SqliteJobQueue sqlite
-              ? sqlite.release030RetirementCollection(Path.of(upsert.path())) : null;
-          if (collection == null) collection = context.ingestLifecycle().documentFieldOps()
-              .getDocumentFieldOrThrow(upsert.path(), SchemaFields.COLLECTION);
-          upsert = new SwitchBufferUpsert(upsert.path(), collection, upsert.provenance());
-        }
-        if (retirement && upsert.ingestionRoot() == null) {
-          Path file = Path.of(upsert.path());
-          Path root = context.publisher().bufferedDeleteRoot(new SwitchBufferDelete(
-              upsert.path(), SwitchBufferDelete.Origin.LEGACY, null));
-          // A parent inferred for an explicit file is evidence only for this admitted path.
-          if (context.jobQueue() instanceof SqliteJobQueue sqlite && sqlite.isRelease030RetirementFile(file)) root = file;
-          upsert = new SwitchBufferUpsert(upsert.path(), upsert.collection(), upsert.provenance(),
-              upsert.unitRevision(), upsert.sourceSha256(), root);
-        }
+        var upsert = retirement ? resolveReleaseUpsert(context,op) : SwitchBufferUpsert.decode(op.payload());
+        if (upsert.sourceSha256() == null && !retirement) continue;
         boolean scoped = op.generation() != null && !op.generation().isBlank()
             && op.generation().equals(context.replayGeneration());
         var laterSync = latestConfirmedReleaseSync(context, deleteOrder, upsert.path(),
@@ -2274,7 +2318,9 @@ public final class KnowledgeServerMigrationOps {
         if (laterSync != null) {
           Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot
               .decode(laterSync.payload()).rootPath()).toAbsolutePath().normalize();
-          upsert = new SwitchBufferUpsert(upsert.path(), deleteOrder.releaseRecovery().currentRoots().get(root),
+          String collection = ((SqliteJobQueue)context.jobQueue()).retirementRootCollection(laterSync);
+          if (collection == null) collection = context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(upsert.path(),SchemaFields.COLLECTION);
+          upsert = new SwitchBufferUpsert(upsert.path(), collection,
               upsert.provenance(), upsert.unitRevision(), upsert.sourceSha256(), root);
         }
         var rootReplay = laterWatcherReplay(upsert.path(), upsert.collection(),
@@ -2295,7 +2341,11 @@ public final class KnowledgeServerMigrationOps {
           // Live broad deletion may already have removed this exact admission on B. Await
           // the queue before crossing the boundary, then prove final absence after all writes.
           if (finalEffects && context.ingestLifecycle().indexCountOps()
-              .countByIdAndChunksStrict(upsert.path()) != 0) return false;
+              .countByIdAndChunksStrict(upsert.path()) != 0) {
+            context.log().warn("Superseded file still has an indexed image: path={} expectedCollection={} indexedCollection={} laterSync={}",
+                upsert.path(),upsert.collection(),context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(upsert.path(),SchemaFields.COLLECTION),laterSync);
+            return false;
+          }
           continue;
         }
         String indexed = context.ingestLifecycle().documentFieldOps()
@@ -2369,6 +2419,15 @@ public final class KnowledgeServerMigrationOps {
         && sqlite.hasUnownedModernAdmission(Path.of(upsert.path()))) return false;
     CleanupPathState now = observeForCleanup(context.publisher(), Path.of(upsert.path()),
         upsert.ingestionRoot());
+    if (release030Retirement(context) && upsert.unitRevision()!=null && now.kind()==CleanupPathKind.REGULAR) {
+      var sqlite=(SqliteJobQueue)context.jobQueue();
+      var row=sqlite.watcherReconciliationRow(upsert.path());
+      if (row==null || !upsert.unitRevision().equals(row.get("unit_revision"))) {
+        if (upsert.sourceSha256().equals(now.sha256())) sqlite.recoverRetirementExact(upsert);
+        return false;
+      }
+      if (!"DONE".equals(row.get("state"))) return false;
+    }
     switch (now.kind()) {
       case UNCERTAIN -> {
         return false; // Fail-closed: Green and the journal stay until the path can be judged.
@@ -2664,7 +2723,10 @@ public final class KnowledgeServerMigrationOps {
 
   private static List<CommittedNativeEffect> replayAcceptedEffects(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps) {
+    var superseded = supersededLegacyFiles(context,orderedOps);
+    var supersededProjection = supersededRetirementProjections(context,orderedOps);
     var scopedOps = orderedOps.stream()
+        .filter(op -> !superseded.contains(op) && !supersededProjection.contains(op))
         .filter(op -> context.replayGeneration().equals(op.generation())
             && !context.approvedGapVersions().contains(op)).toList();
     // Pre-pointer source ownership comes from validated ready markers in this exact snapshot.
@@ -2783,10 +2845,11 @@ public final class KnowledgeServerMigrationOps {
     try {
       context.ingestLifecycle().commitOps().maybeRefreshBlocking();
       var fields = context.ingestLifecycle().documentFieldOps();
+      var superseded = supersededRetirementProjections(context,ops);
       for (int index = 0; index < ops.size(); index++) {
         var op = ops.get(index);
         if (!"PROJECTION".equalsIgnoreCase(op.op())) continue;
-        if (context.approvedGapVersions().contains(op)) continue;
+        if (context.approvedGapVersions().contains(op) || superseded.contains(op)) continue;
         var projection = AcceptedProjection.decode(op.payload());
         if (!projection.journalKey().equals(op.key())) return false;
         String currentId = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.DOC_ID);

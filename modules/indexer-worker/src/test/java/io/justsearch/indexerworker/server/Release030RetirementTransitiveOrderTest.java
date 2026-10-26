@@ -44,6 +44,15 @@ final class Release030RetirementTransitiveOrderTest {
     try {
      var service=server.appServices().ingestService();watch(service,alpha,C);watch(service,beta,C);
      sync(service,alpha);assertCollection(root,alpha.resolve("file-01.txt"),C);
+     // The released A image predates this live collection registration. Establish its
+     // real named writer effect before testing a named delete while Alpha is absent.
+     producer.resumeProducerAfterCutover();
+     await(()->"DONE".equals(queue(server).watcherReconciliationRow(key(alpha.resolve("pending.txt"))).get("state"))
+         &&C.equals(server.lifecycleManagerForTests().documentFieldOps().getDocumentFieldOrThrow(
+             key(alpha.resolve("pending.txt")),io.justsearch.indexing.SchemaFields.COLLECTION)),
+         "public Alpha named registration commits in Q and A before named deletion",30);
+     capture(root,server,"transitive-named-before-delete",List.of(alpha.resolve("pending.txt"),alpha.resolve("file-01.txt")));
+     assertTrue(producer.pauseProducerForCutover(10000));
      Files.move(alpha,held);assertFalse(Files.exists(alpha));assertTrue(Files.isDirectory(held));
      var del=service.deleteByCollection(DeleteByCollectionRequest.newBuilder().setCollection(C).build(),CallContext.none());assertTrue(del.getError().isBlank(),del.getError());
      sync(service,beta);assertCollection(root,target,C);

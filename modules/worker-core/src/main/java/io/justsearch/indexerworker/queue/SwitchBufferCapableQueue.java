@@ -89,6 +89,13 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     throw new UnsupportedOperationException("Receipt-owned ROOT admissions unavailable");
   }
 
+  /** Completed rows are preserved only after the live owner proved current source and A outside Q. */
+  default int enqueueRetirementRootEntries(SwitchBufferOp root, List<EnqueueEntry> entries,
+      String collection, boolean maintenance, boolean replay,
+      java.util.function.BooleanSupplier cancelled, java.util.Map<String,java.util.Map<String,String>> completedRows) {
+    throw new UnsupportedOperationException("Current ROOT completion proof unavailable");
+  }
+
   /** Exact candidate whose retained release-recovery journal still orders new admissions. */
   default String release030RetirementGeneration() { return null; }
 

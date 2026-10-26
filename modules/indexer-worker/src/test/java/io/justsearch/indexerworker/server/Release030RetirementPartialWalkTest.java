@@ -11,7 +11,6 @@ import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
 import io.justsearch.indexerworker.services.CallContext;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -128,10 +127,7 @@ final class Release030RetirementPartialWalkTest {
   }
 
   private static boolean differencesComplete(Path root) throws Exception {
-    var checkpoint = new Properties();
-    Path path = root.resolve("data/upgrade-030-recovery.properties");
-    if (!Files.exists(path)) return false;
-    try (var input = Files.newInputStream(path)) { checkpoint.load(input); }
-    return "true".equals(checkpoint.getProperty("retire|differences"));
+    var checkpoint = io.justsearch.indexerworker.queue.Release030RecoveryState.load(root.resolve("data/jobs.db"));
+    return checkpoint != null && checkpoint.differencesComplete();
   }
 }

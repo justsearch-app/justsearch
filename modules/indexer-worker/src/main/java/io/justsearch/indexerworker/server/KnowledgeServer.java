@@ -7418,16 +7418,18 @@ public final class KnowledgeServer implements Closeable {
         if (fence == null) return;
         try {
           if (!producer.pauseProducerForCutover(1_000)) return;
+          try { queue.prepareRetirementClaims(); }
+          catch (SQLException invalid) { throw new IOException("Current retirement ownership cannot be reconciled", invalid); }
           if (queue.jobStateCountsStrict().processingCount() != 0) return;
           var checkpoint = release030Recovery;
-          if (!checkpoint.replayComplete() || !queue.listSwitchBufferOpsStrict().isEmpty()) {
+          if (!queue.retirementReplayComplete()) {
             producer.commitActiveLexicalProjectionForCutover();
             var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 queue, active, signalBus, indexingPacing, indexBasePath, activeIndexPath,
                 JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
                 System.nanoTime() + TimeUnit.SECONDS.toNanos(1), checkpoint.retiringBuilding(), ignored -> true)
                 .withPublisher(producer.ingestService());
-            var journal = queue.listSwitchBufferOpsStrict().stream()
+            var journal = queue.retirementReplayOps().stream()
                 .filter(op -> op.generation() == null || op.generation().isBlank()
                     || checkpoint.retiringBuilding().equals(op.generation())).toList();
             boolean reconciled = true;
