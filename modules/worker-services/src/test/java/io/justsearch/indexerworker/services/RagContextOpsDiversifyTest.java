@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -292,8 +293,9 @@ final class RagContextOpsDiversifyTest {
         chunkHit("h2", "diverse"));
     assertEquals(List.of("h0", "h1"), ids(opsWith(config("mmr"), provider)
         .diversifyChunks(Q, invalidVector(kind), hits, 2, true, InferenceRequest.foreground())));
-    verify(provider, never()).embedQuery(anyString(), any());
-    verify(provider, never()).embedDocument(anyString(), any());
+    assertAll("An invalid supplied query must not trigger query or passage inference",
+        () -> verify(provider, never()).embedQuery(anyString(), any()),
+        () -> verify(provider, never()).embedDocument(anyString(), any()));
   }
 
   @ParameterizedTest(
@@ -306,8 +308,9 @@ final class RagContextOpsDiversifyTest {
         chunkHit("h2", "diverse"));
     assertEquals(List.of("h0", "h1"), ids(opsWith(config("mmr"), provider)
         .diversifyChunks(Q, null, hits, 2, true, InferenceRequest.foreground())));
-    verify(provider, times(1)).embedQuery(anyString(), any());
-    verify(provider, never()).embedDocument(anyString(), any());
+    assertAll("An unusable acquired query must stop after one query call and before passage inference",
+        () -> verify(provider, times(1)).embedQuery(anyString(), any()),
+        () -> verify(provider, never()).embedDocument(anyString(), any()));
   }
 
   @ParameterizedTest(name = "validQueryIsReusedOrAcquiredExactlyOnce({arguments}) [{index}]")
@@ -449,11 +452,17 @@ final class RagContextOpsDiversifyTest {
     var provider = controlledProvider();
     var ops = opsWith(config("mmr"), provider);
     var good = chunkHit("good", "text");
-    assertEquals(List.of(), ops.diversifyChunks(Q, null, List.of(), k, true,
-        InferenceRequest.foreground()));
-    assertEquals(k > 0 ? List.of(good) : List.of(), ops.diversifyChunks(Q, null,
-        List.of(chunkHit("blank", " "), good), k, true, InferenceRequest.foreground()));
-    verifyNoInteractions(provider);
+    var empty = assertDoesNotThrow(() -> ops.diversifyChunks(Q, null, List.of(), k, true,
+        InferenceRequest.foreground()),
+        "An empty pool needs no selection and must not throw, including nonpositive K (k=" + k + ")");
+    assertEquals(List.of(), empty);
+    var selected = assertDoesNotThrow(() -> ops.diversifyChunks(Q, null,
+        List.of(chunkHit("blank", " "), good), k, true, InferenceRequest.foreground()),
+        "Nonpositive K or a nonblank pool no larger than K needs no selection and must not throw (k="
+            + k + ")");
+    assertEquals(k > 0 ? List.of(good) : List.of(), selected);
+    assertAll("No-selection-needed calls must not interact with the embedding provider",
+        () -> verifyNoInteractions(provider));
   }
 
   @Test
