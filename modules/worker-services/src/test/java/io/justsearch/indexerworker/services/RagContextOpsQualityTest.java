@@ -284,6 +284,109 @@ final class RagContextOpsQualityTest
     assertEquals(2f, result.qualitySignals().scoreGap());
   }
 
+  @ParameterizedTest(name = "emptyUnicodePrefixStopsPrimaryAndBackfill({arguments})[{index}]")
+  @ValueSource(booleans = {false, true})
+  void emptyUnicodePrefixStopsPrimaryAndBackfill(boolean backfill) {
+    String text = "x".repeat(199_980);
+    var first = hit("first", "a", 0, 3, text, 2);
+    String parent = backfill ? "a" : "b";
+    var rejected = hit("emoji", parent, 1, 3, "😀", 9);
+    var smaller = hit("smaller", backfill ? "a" : "c", 2, 3, "y", 8);
+    var hits = List.of(first, rejected, smaller);
+    var ops = ops(hits);
+
+    // Record actual append attempts: a smaller later candidate must not be packed after rejection.
+    ContextBudgeter budgeter = new ContextBudgeter(200_000);
+    List<SearchHit> used = new ArrayList<>();
+    List<String> attempts = new ArrayList<>();
+    assertTrue(ops.runBudgetLoop(hits, used, Map.of(), 1, (label, content) -> {
+      attempts.add(content);
+      return RagContextOps.mapAppendResult(budgeter.appendSection(label, content));
+    }));
+    assertEquals(List.of(text, "😀"), attempts);
+    assertEquals(List.of(first), used);
+    assertEquals(List.of(new ContextBudgeter.Section("a", text, false, 0)), budgeter.sections());
+
+    // Also traverse real selection, assembly and S9 projection with the fixed 200k worker cap.
+    var result = retrieve(ops, 3, 0);
+    assertUsed(result, first);
+    assertEquals(ContextBudgeter.sectionHeader(1, "a") + text, result.context());
+    assertEquals(199_986, result.context().length());
+    assertTrue(result.contextTruncated());
+    assertEquals(3, result.qualitySignals().chunksConsidered());
+    assertEquals(2f, result.qualitySignals().bestChunkScore());
+    assertEquals(2f, result.qualitySignals().scoreGap());
+  }
+
+  @ParameterizedTest(name = "duplicateFiniteMaximaKeepZeroGapAndRawCitations({arguments})[{index}]")
+  @CsvSource({"false, 0", "false, 10000", "true, 0", "true, 10000"})
+  void duplicateFiniteMaximaKeepZeroGapAndRawCitations(boolean ce, int tokens) {
+    var first = hit("a", "a", 0, 1, "first", 6);
+    var second = hit("b", "b", 0, 1, "second", 6);
+    var third = hit("c", "c", 0, 1, "third", 2);
+    var ops = ops(List.of(first, second, third));
+    if (ce) wireCe(ops, RerankOrder.AFTER_DIVERSIFY, 10,
+        Map.of("first", 9f, "second", 9f, "third", 4f), false);
+    var result = retrieve(ops, 3, tokens);
+    assertUsed(result, first, second, third);
+    assertEquals(ce ? 9f : 6f, result.qualitySignals().bestChunkScore());
+    assertEquals(0f, result.qualitySignals().scoreGap());
+    assertEquals(List.of(6f, 6f, 2f), result.usedHits().stream().map(SearchHit::score).toList());
+  }
+
+  @Test
+  void publicWorkerResponseOmitsTheRejectedUnicodeParent() {
+    String text = "word ".repeat(39_996); // Exactly 199980 UTF-16 units.
+    var first = hit("first", "a", 0, 1, text, 2);
+    var rejected = hit("emoji", "b", 0, 1, "😀", 9);
+    var config = new ResolvedConfigBuilder();
+    config.putDefault("rag.retrieve.mode", "bm25");
+    config.putDefault("rag.union.enabled", "false");
+    config.putDefault("rag.max_chunks_per_article", "1");
+    var stubRuntime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+    when(stubRuntime.resolvedConfig()).thenReturn(config.build());
+    var result = new SearchResult(List.of(first, rejected), 2, 0);
+    when(stubRuntime.chunkSearchOps().searchChunksFiltered(anyString(), anySet(), anyInt(), any()))
+        .thenReturn(result);
+    when(stubRuntime.chunkSearchOps().searchChunksForDocs(anyString(), anySet(), anyInt()))
+        .thenReturn(result);
+    when(stubRuntime.documentFieldOps().getDocumentFieldsBatch(anyList(), anySet()))
+        .thenReturn(Map.of());
+
+    var response = new WorkerSearchService(stubRuntime, NoOpEmbeddingProvider.INSTANCE)
+        .retrieveContext(RetrieveContextRequest.newBuilder().setQuestion("question")
+            .addAllDocIds(List.of("a", "b")).setTopK(2).setMaxContextTokens(0).build(),
+            CallContext.none());
+
+    assertTrue(response.getUsedChunks());
+    assertEquals("BM25", response.getRetrievalMode());
+    assertEquals(2, response.getChunksFound());
+    assertTrue(response.getContextTruncated());
+    assertEquals(1, response.getChunksCount());
+    assertEquals(1, response.getSectionsCount());
+    assertEquals(1, response.getQuality().getChunksIncluded());
+    assertEquals(2, response.getQuality().getChunksConsidered());
+    assertEquals(2f, response.getQuality().getBestChunkScore());
+    assertEquals(2f, response.getQuality().getScoreGap());
+    assertTrue(response.getChunksList().stream().noneMatch(c -> c.getParentDocId().equals("b")));
+    assertTrue(response.getSectionsList().stream().noneMatch(s -> s.getSourceLabel().equals("b")));
+    assertEquals(ContextBudgeter.sectionHeader(1, "a") + text, response.getContext());
+    assertAligned(response); // Contiguous ordinals and section-to-citation positions.
+    var citation = response.getChunks(response.getSections(0).getChunkIndex());
+    assertEquals("a", citation.getParentDocId());
+    assertEquals(0, citation.getChunkIndex());
+    assertEquals(1, citation.getChunkTotal());
+    assertEquals(0, citation.getStartChar());
+    assertEquals(text.length(), citation.getEndChar());
+    assertEquals(2f, citation.getScore());
+    String literal = text.substring(citation.getStartChar(), citation.getEndChar());
+    assertEquals(literal, response.getSections(0).getContent());
+    assertFalse(response.getSections(0).getTruncated());
+    assertLiteralPreview(literal, citation.getExcerpt());
+    assertAll(() -> verify(stubRuntime.chunkSearchOps())
+        .searchChunksFiltered(eq("question"), eq(Set.of("a", "b")), anyInt(), any()));
+  }
+
   @Test
   void realIndexCeProjectionMatchesIncludedSyntheticPassageAndKeepsRawCitation() throws Exception {
     openRealIndex();
