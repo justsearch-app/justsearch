@@ -74,6 +74,16 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
+  record RetirementSourceObservation(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      java.util.Map<String,String> observedRow, String sourceState, String sourceSha256,
+      long size, boolean targetMatches) {}
+
+  /** Targeted recovery only; source and complete rows are observed before Q's batch reservation. */
+  default java.util.List<Integer> correctRetirementSources(java.util.List<RetirementSourceObservation> observations,
+      java.util.function.BooleanSupplier cancelled) {
+    throw new UnsupportedOperationException("Conditional retirement source correction unavailable");
+  }
+
   default SwitchBufferOp retirementRootReceipt(String generation, String key) {
     throw new UnsupportedOperationException("Ordered ROOT receipt unavailable");
   }

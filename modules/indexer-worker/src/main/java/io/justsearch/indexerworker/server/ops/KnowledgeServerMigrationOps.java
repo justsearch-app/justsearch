@@ -619,13 +619,39 @@ public final class KnowledgeServerMigrationOps {
 
   public static boolean reconcileRelease030Path(DrainSwitchBufferContext context, Path file,
       Path boundary, String collection) throws IOException {
+    return reconcileRelease030Path(context,file,boundary,collection,
+        context.jobQueue() instanceof SqliteJobQueue sqlite ? sqlite.retirementReplayOps() : List.of());
+  }
+
+  public static boolean reconcileRelease030Path(DrainSwitchBufferContext context, Path file,
+      Path boundary, String collection, List<SwitchBufferCapableQueue.SwitchBufferOp> journal) throws IOException {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
     String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
-    var upsert = new SwitchBufferUpsert(key, collection.isBlank() ? null : collection,
-        null, null, null, boundary);
-    return sourceHoldsAdmission(context, queue, upsert,
+    var owner = applicableReleaseRoot(context,journal,key,0);
+    var upsert = owner == null ? new SwitchBufferUpsert(key,collection,
+        null,null,null,file) : releaseRootScope(queue,owner,key);
+    return sourceHoldsAdmission(context, queue, owner, upsert,
         context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(
             key, SchemaFields.SOURCE_SHA256));
+  }
+
+  private static SwitchBufferUpsert releaseRootScope(SwitchBufferCapableQueue queue,
+      SwitchBufferCapableQueue.SwitchBufferOp owner, String path) throws IOException {
+    String collection = queue.retirementRootCollection(owner);
+    if (collection == null) throw new IOException("Current ROOT creator namespace is unknown");
+    var root = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(owner.payload());
+    return new SwitchBufferUpsert(path,collection,root.provenance(),null,null,Path.of(root.rootPath()));
+  }
+
+  private static SwitchBufferCapableQueue.SwitchBufferOp applicableReleaseRoot(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> journal, String path, long after) {
+    SwitchBufferCapableQueue.SwitchBufferOp result = null;
+    for (var op : journal) if ("SYNC_ROOT".equals(op.op()) && op.acceptedOrder() > after) {
+      var root = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload());
+      if (context.publisher().prefixScope(root.rootPath()).contains(path)
+          && (result == null || result.acceptedOrder() < op.acceptedOrder())) result = op;
+    }
+    return result;
   }
 
   /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
@@ -2317,7 +2343,7 @@ public final class KnowledgeServerMigrationOps {
             && op.generation().equals(context.replayGeneration());
         var laterSync = latestConfirmedReleaseSync(context, deleteOrder, upsert.path(),
             deleteOrder.positions().get(op));
-        if (laterSync != null) {
+        if (laterSync != null && upsert.unitRevision() == null) {
           Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot
               .decode(laterSync.payload()).rootPath()).toAbsolutePath().normalize();
           String collection = ((SqliteJobQueue)context.jobQueue()).retirementRootCollection(laterSync);
@@ -2354,7 +2380,11 @@ public final class KnowledgeServerMigrationOps {
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
         if (refusedSourceRecovery) {
           // Judge every admission, so each one A lacks gets its A job in this attempt.
-          if (!sourceHoldsAdmission(context, queue, upsert, indexed)) {
+          var owner = upsert.unitRevision() == null
+              ? applicableReleaseRoot(context,orderedOps,upsert.path(),op.acceptedOrder()) : null;
+          if (owner != null) upsert = releaseRootScope(queue,owner,upsert.path());
+          else owner = op;
+          if (!sourceHoldsAdmission(context, queue, owner, upsert, indexed)) {
             if (awaited++ == 0) firstAwaited = upsert.path();
           }
           continue;
@@ -2415,7 +2445,9 @@ public final class KnowledgeServerMigrationOps {
    * admission of a state this cleanup has not admitted.
    */
   private static boolean sourceHoldsAdmission(DrainSwitchBufferContext context,
-      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed) throws IOException {
+      SwitchBufferCapableQueue queue, SwitchBufferCapableQueue.SwitchBufferOp owner,
+      SwitchBufferUpsert upsert, String indexed) throws IOException {
+    if (release030Retirement(context)) return retirementSourceHoldsAdmission(context,queue,owner,upsert,indexed);
     if (release030Retirement(context) && context.jobQueue() instanceof SqliteJobQueue sqlite
         && sqlite.isRelease030RetirementFile(Path.of(upsert.path()))
         && sqlite.hasUnownedModernAdmission(Path.of(upsert.path()))) return false;
@@ -2469,6 +2501,46 @@ public final class KnowledgeServerMigrationOps {
           upsert.path());
     }
     return false;
+  }
+
+  private static boolean retirementSourceHoldsAdmission(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue queue, SwitchBufferCapableQueue.SwitchBufferOp owner,
+      SwitchBufferUpsert scope, String indexed) throws IOException {
+    var sqlite = (SqliteJobQueue)queue;
+    Path file = Path.of(scope.path());
+    if (sqlite.hasUnownedModernAdmission(file)) return false;
+    var observedRow = sqlite.watcherReconciliationRow(scope.path());
+    if (Thread.currentThread().isInterrupted()) throw new IOException("Retirement source proof cancelled");
+    var source = observeForCleanup(context.publisher(),file,scope.ingestionRoot());
+    if (Thread.currentThread().isInterrupted()) throw new IOException("Retirement source proof cancelled");
+    if (source.kind() == CleanupPathKind.UNCERTAIN
+        || source.kind() == CleanupPathKind.REGULAR && source.sha256() == null) return false;
+    // Modern exact receipts keep the real accepted source witness. Automatic repair cannot
+    // renew their acceptance or reinterpret a worker's policy outcome.
+    if (scope.unitRevision() != null) {
+      if (source.kind() != CleanupPathKind.REGULAR || !scope.sourceSha256().equals(source.sha256())) return false;
+      if (observedRow == null || !scope.unitRevision().equals(observedRow.get("unit_revision"))) {
+        sqlite.recoverRetirementExact(scope);
+        return false;
+      }
+      return queue.matchesAcceptedFileProjection(scope.path(),scope.unitRevision(),scope.sourceSha256(),indexed)
+          && releaseCollection(scope.collection()).equals(releaseCollection(context.ingestLifecycle()
+              .documentFieldOps().getDocumentFieldOrThrow(scope.path(),SchemaFields.COLLECTION)));
+    }
+    boolean targetMatches;
+    if (source.kind() == CleanupPathKind.REGULAR) {
+      var fields = context.ingestLifecycle().documentFieldOps();
+      targetMatches = source.sha256().equals(indexed)
+          && scope.path().equals(fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.DOC_ID))
+          && scope.path().equals(fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.PATH))
+          && releaseCollection(scope.collection()).equals(releaseCollection(
+              fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.COLLECTION)));
+    } else targetMatches = indexed == null
+        && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(scope.path()) == 0;
+    int result = sqlite.correctRetirementSources(List.of(new SwitchBufferCapableQueue.RetirementSourceObservation(
+        owner,scope,observedRow,source.fileState(),source.sha256(),JobQueue.EnqueueEntry.stat(file).sizeBytes(),
+        targetMatches)),() -> Thread.currentThread().isInterrupted()).getFirst();
+    return result == 2;
   }
 
   /** Released rows use both a null tag and the explicit default tag for the same collection. */

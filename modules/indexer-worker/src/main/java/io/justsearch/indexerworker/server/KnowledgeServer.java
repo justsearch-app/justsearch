@@ -3514,6 +3514,7 @@ public final class KnowledgeServer implements Closeable {
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
+    svc.ingestService().useCreatorRootCollection(this::release030Collection);
     if (svc instanceof DefaultWorkerAppServices producer) {
       // Configured roots belong to every replacement producer, including the deferred writer.
       var configuration = producer.resolvedConfig();
@@ -7438,7 +7439,7 @@ public final class KnowledgeServer implements Closeable {
               for (var path : checkpoint.retirementPaths().entrySet()) {
                 if (Release030MigrationRetirement.covered(path.getKey(), path.getValue(), journal)) continue;
                 reconciled &= KnowledgeServerMigrationOps.reconcileRelease030Path(context, path.getKey(),
-                    Release030MigrationRetirement.boundary(path.getKey(), roots), path.getValue());
+                    Release030MigrationRetirement.boundary(path.getKey(), roots), path.getValue(), journal);
               }
               if (reconciled) {
                 checkpoint.markDifferencesComplete();

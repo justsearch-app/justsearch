@@ -31,6 +31,7 @@ public final class Release030RecoveryState {
   private static final String RAW_HISTORY = RETIRE + "raw-history|";
   private static final String EXPECTATION = RETIRE + "legacy-file|";
   private static final String CONVERSION = RETIRE + "prefix-conversion|";
+  private static final String CORRECTION = RETIRE + "correction|";
   private String openedSession;
   private String admissionSet;
   private final Path file;
@@ -135,6 +136,44 @@ public final class Release030RecoveryState {
   public synchronized SwitchBufferUpsert legacyExpectation(SwitchBufferCapableQueue.SwitchBufferOp op) throws IOException {
     String value = state.getProperty(EXPECTATION + op.retirementUuid());
     return value == null ? null : SwitchBufferUpsert.decode(value);
+  }
+
+  /** Passive immutable versions; neither an ACK nor evidence that SQL installed the replacement. */
+  public record Correction(SwitchBufferCapableQueue.SwitchBufferOp owner,
+      String active, String building, SwitchBufferUpsert scope,
+      java.util.Map<String,String> predecessor, String sourceState, SwitchBufferUpsert replacement) {}
+
+  public synchronized List<Correction> corrections() throws IOException {
+    var result = new java.util.ArrayList<Correction>();
+    for (String key : state.stringPropertyNames()) if (key.startsWith(CORRECTION)) {
+      var version = JSON.readValue(state.getProperty(key), Correction.class);
+      if (version.scope() == null || version.sourceState() == null || version.replacement() == null
+          || !version.scope().path().equals(version.replacement().path())
+          || !key.equals(CORRECTION + version.replacement().unitRevision())
+          || !java.util.Objects.equals(retiringActive(), version.active())
+          || !java.util.Objects.equals(retiringBuilding(), version.building()))
+        throw new IOException("Unbound retirement correction version");
+      result.add(version);
+    }
+    return List.copyOf(result);
+  }
+
+  /** Save before the full-row SQL transition. All predecessors survive until retirement ends. */
+  public synchronized void retainCorrection(Correction version) throws IOException {
+    String key = CORRECTION + version.replacement().unitRevision();
+    String encoded = JSON.writeValueAsString(version);
+    String previous = state.getProperty(key);
+    if (previous != null) {
+      if (!previous.equals(encoded)) throw new IOException("Correction version changed");
+      return;
+    }
+    try {
+      state.setProperty(key, encoded);
+      save();
+    } catch (IOException | RuntimeException failed) {
+      state.remove(key);
+      throw failed;
+    }
   }
 
   /** One atomic sidecar replacement precedes SQL removal; a packet is never an ACK-won bit. */
@@ -331,11 +370,20 @@ public final class Release030RecoveryState {
   public synchronized void captureFreshRootCollection(SwitchBufferCapableQueue.SwitchBufferOp receipt, String collection) throws IOException {
     String key = RETIRE + "root-collection|" + receipt.retirementUuid();
     String normalized = normalizedCollection(collection);
-    if (state.containsKey(key) && !normalized.equals(state.getProperty(key)))
-      throw new IOException("Conflicting ROOT creator collection");
-    state.setProperty(key, normalized);
-    admissionsChanged();
-    save();
+    if (state.containsKey(key)) {
+      if (!normalized.equals(state.getProperty(key))) throw new IOException("Conflicting ROOT creator collection");
+      return;
+    }
+    String previousAdmissions = admissionSet;
+    try {
+      state.setProperty(key, normalized);
+      save();
+      admissionsChanged();
+    } catch (IOException | RuntimeException failed) {
+      state.remove(key);
+      admissionSet = previousAdmissions;
+      throw failed;
+    }
   }
   private void retainRoot(SwitchBufferCapableQueue.SwitchBufferOp receipt) {
     state.setProperty(RECEIPT + receipt.retirementUuid(), JSON.writeValueAsString(receipt));

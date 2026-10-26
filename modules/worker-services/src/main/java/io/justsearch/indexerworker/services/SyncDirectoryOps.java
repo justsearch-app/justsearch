@@ -921,35 +921,63 @@ final class SyncDirectoryOps {
               boolean replay = admissionMode==AdmissionMode.RETIREMENT_REPLAY || admissionMode==AdmissionMode.UPGRADE_RECOVERY;
               var completedRows = new java.util.HashMap<String,java.util.Map<String,String>>();
               var changedPaths = new java.util.ArrayList<String>();
+              var corrections = new java.util.ArrayList<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation>();
               if (replay) for (var entry : admitted) {
                 if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new java.io.UncheckedIOException(new IOException("ROOT proof cancelled"));
                 String path = PathNormalizer.normalizeKey(entry.path());
                 var row = queue.watcherReconciliationRow(path);
-                if (row == null || !("DONE".equals(row.get("state")) || "PENDING".equals(row.get("state")))) continue;
+                if (row == null || "PROCESSING".equals(row.get("state"))) continue;
                 var origin = io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RootOrigin.fromUnit(row.get("unit_revision"));
                 if (origin == null || origin.acceptedOrder()!=originalRoot.acceptedOrder()
                     || !origin.uuid().equals(originalRoot.retirementUuid())) continue;
                 // The necessary current-byte/A proof is shared with repeat admission. It runs
                 // before Q's write reservation; only the exact observed row may be preserved.
                 String source;
-                try { source = io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),
-                    () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()); }
+                String sourceState;
+                try {
+                  var before = Files.readAttributes(entry.path(), java.nio.file.attribute.BasicFileAttributes.class,
+                      java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                  source = io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),
+                      () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
+                  var after = Files.readAttributes(entry.path(), java.nio.file.attribute.BasicFileAttributes.class,
+                      java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                  if (!before.isRegularFile() || !after.isRegularFile() || before.size()!=after.size()
+                      || !before.lastModifiedTime().equals(after.lastModifiedTime())
+                      || !java.util.Objects.equals(before.fileKey(),after.fileKey()))
+                    throw new IOException("ROOT source changed during proof");
+                  sourceState = "file/" + before.size() + "/" + before.lastModifiedTime().toMillis()
+                      + "/" + before.fileKey() + "/" + source;
+                }
                 catch (IOException incomplete) { throw new java.io.UncheckedIOException(incomplete); }
                 var result = readPathOps.search(new org.apache.lucene.search.TermQuery(
                     new org.apache.lucene.index.Term(SchemaFields.DOC_ID,path)), 2,
                     Set.of(SchemaFields.DOC_ID,SchemaFields.PATH,SchemaFields.SOURCE_SHA256,SchemaFields.COLLECTION),
                     LuceneRuntimeTypes.RuntimeSearchSort.RELEVANCE,null);
-                if (result.hits().size()!=1) { changedPaths.add(path); continue; }
+                var intent = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(originalRoot.payload());
+                var scope = new io.justsearch.indexerworker.queue.SwitchBufferUpsert(path,collection,
+                    intent.provenance(),null,null,root);
+                if (result.hits().size()!=1) {
+                  changedPaths.add(path);
+                  corrections.add(new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation(
+                      originalRoot,scope,row,sourceState,source,entry.sizeBytes(),false));
+                  continue;
+                }
                 var fields = result.hits().getFirst().fields();
-                String owner = row.get("collection");
+                String owner = collection;
                 if (owner==null || owner.isBlank()) owner="default";
                 String indexedOwner = fields.get(SchemaFields.COLLECTION);
                 if (indexedOwner==null || indexedOwner.isBlank()) indexedOwner="default";
-                if (!source.equals(fields.get(SchemaFields.SOURCE_SHA256)) || !owner.equals(indexedOwner)) changedPaths.add(path);
+                if (!path.equals(fields.get(SchemaFields.PATH)) || !source.equals(fields.get(SchemaFields.SOURCE_SHA256)) || !owner.equals(indexedOwner)) {
+                  changedPaths.add(path);
+                  corrections.add(new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation(
+                      originalRoot,scope,row,sourceState,source,entry.sizeBytes(),false));
+                }
                 if ("DONE".equals(row.get("state")) && path.equals(fields.get(SchemaFields.PATH)) && source.equals(fields.get(SchemaFields.SOURCE_SHA256))
                     && owner.equals(indexedOwner) && (row.get("content_hash")==null || source.equals(row.get("content_hash"))))
                   completedRows.put(path,row);
               }
+              if (!corrections.isEmpty()) queue.correctRetirementSources(corrections,
+                  () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
               java.util.function.IntSupplier admit=()->queue.enqueueRetirementRootEntries(originalRoot,admitted,collection,
                   admissionMode==AdmissionMode.RETIREMENT_MAINTENANCE,
                   replay, ()->cancelled.getAsBoolean()||Thread.currentThread().isInterrupted(),completedRows);

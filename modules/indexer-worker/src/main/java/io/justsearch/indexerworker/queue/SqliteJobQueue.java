@@ -1285,7 +1285,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private record RetirementRoot(io.justsearch.adapters.lucene.runtime.PathPrefixScope scope,
       JobQueue.EnqueueProvenance provenance, String collection) {}
   private record RetirementOrders(Map<String,Long> roots, Map<String,Long> files, Map<String,Long> fileWinners,
-      Map<String,List<SwitchBufferUpsert>> filesByPath, Map<String,RetirementRoot> rootIntents) {}
+      Map<String,List<SwitchBufferUpsert>> filesByPath, Map<String,RetirementRoot> rootIntents,
+      Map<String,Release030RecoveryState.Correction> corrections,
+      Map<String,List<Release030RecoveryState.Correction>> predecessors) {}
 
   private RetirementOrders retirementOrders(List<SwitchBufferOp> journal) throws IOException {
     var roots = new HashMap<String,Long>();
@@ -1319,7 +1321,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         filesByPath.computeIfAbsent(file.path(),ignored->new ArrayList<>()).add(file);
       }
     }
-    return new RetirementOrders(Map.copyOf(roots), Map.copyOf(files), Map.copyOf(winners), Map.copyOf(filesByPath), Map.copyOf(intents));
+    var corrections = new HashMap<String,Release030RecoveryState.Correction>();
+    var predecessors = new HashMap<String,List<Release030RecoveryState.Correction>>();
+    for (var version : releaseRecovery.corrections()) {
+      if (corrections.put(version.replacement().unitRevision(),version) != null)
+        throw new IOException("Duplicate correction identity");
+      if (version.predecessor() != null) predecessors.computeIfAbsent(
+          Objects.toString(version.predecessor().get("unit_revision"),""), ignored -> new ArrayList<>()).add(version);
+    }
+    return new RetirementOrders(Map.copyOf(roots), Map.copyOf(files), Map.copyOf(winners), Map.copyOf(filesByPath), Map.copyOf(intents),
+        Map.copyOf(corrections), Map.copyOf(predecessors));
   }
 
   private long actualUnitOrder(String path, String unit, RetirementOrders orders) throws IOException {
@@ -1336,6 +1347,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private long validatedUnitOrder(ClaimCandidate row, RetirementOrders orders) throws IOException {
     String path = row.key().path();
     if (!path.equals(PathNormalizer.normalizeKey(Path.of(path)))) return -1;
+    var correction = orders.corrections().get(row.revision());
+    if (correction != null) {
+      // Check the complete immutable packet before consulting its original owner. In particular,
+      // a planned-hash ROOT never falls back to the ordinary null-plan ROOT predicate.
+      if (!matchesCorrection(row,correction.replacement())) return -1;
+      return correctionOwnerOrder(correction.owner(),correction.scope(),orders);
+    }
+    for (var pending : orders.predecessors().getOrDefault(Objects.toString(row.revision(),""),List.of())) {
+      if (matchesPredecessor(row,pending.predecessor())) return -1;
+    }
     long order = actualUnitOrder(path, row.revision(), orders);
     var origin = RootOrigin.fromUnit(row.revision());
     if (origin != null) {
@@ -1367,6 +1388,76 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private static String normalizedRetirementCollection(String collection) {
     return collection == null || collection.isBlank() ? "default" : collection;
+  }
+
+  private static boolean matchesCorrection(ClaimCandidate row, SwitchBufferUpsert file) {
+    var provenance = file.provenance();
+    return file.path().equals(row.key().path()) && Objects.equals(file.unitRevision(),row.revision())
+        && Objects.equals(file.sourceSha256(),row.plannedHash()) && Objects.equals(file.collection(),row.collection())
+        && Objects.equals(PathNormalizer.normalizeKey(file.ingestionRoot()),row.ingestionRoot())
+        && Objects.equals(provenance == null ? null : provenance.originator(),row.originator())
+        && Objects.equals(provenance == null ? null : provenance.transport(),row.transport())
+        && row.scanId() == null && row.walkEpoch() == null;
+  }
+
+  private static boolean matchesPredecessor(ClaimCandidate row, Map<String,String> predecessor) {
+    return predecessor != null && row.key().path().equals(predecessor.get("path"))
+        && Objects.equals(row.revision(),predecessor.get("unit_revision"))
+        && Objects.equals(row.collection(),predecessor.get("collection"))
+        && Objects.equals(row.originator(),predecessor.get("originator"))
+        && Objects.equals(row.transport(),predecessor.get("transport"))
+        && Objects.equals(row.plannedHash(),predecessor.get("planned_source_sha256"))
+        && Objects.equals(row.ingestionRoot(),predecessor.get("ingestion_root"))
+        && Objects.equals(row.scanId(),predecessor.get("scan_id"))
+        && Objects.equals(row.walkEpoch() == null ? null : row.walkEpoch().toString(),predecessor.get("walk_seen_epoch"));
+  }
+
+  private long correctionOwnerOrder(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      RetirementOrders orders) throws IOException {
+    if (owner != null && "SYNC_ROOT".equals(owner.op())) {
+      if (!releaseRecovery.rootReceipts().contains(owner)) return -1;
+      var intent = orders.rootIntents().get(owner.retirementUuid());
+      if (intent == null || intent.collection() == null || !intent.scope().contains(scope.path())
+          || !Objects.equals(intent.collection(),scope.collection())
+          || !Objects.equals(intent.provenance(),scope.provenance())
+          || !Objects.equals(PathNormalizer.normalizeKey(Path.of(intent.scope().prefix())),
+              PathNormalizer.normalizeKey(scope.ingestionRoot()))
+          || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+              Path.of(scope.path()),scope.ingestionRoot())) return -1;
+      return owner.acceptedOrder();
+    }
+    if (owner != null) {
+      var frozen = releaseRecovery.legacyExpectation(owner);
+      if (!"UPSERT".equals(owner.op()) || owner.payload().stripLeading().startsWith("{")
+          || !Objects.equals(frozen,scope)) return -1;
+      return owner.acceptedOrder();
+    }
+    return Path.of(scope.path()).equals(scope.ingestionRoot())
+        && Objects.equals(releaseRecovery.retirementPaths().get(Path.of(scope.path())),scope.collection())
+        && scope.provenance() == null ? 0 : -1;
+  }
+
+  private boolean currentCorrectionOwner(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      RetirementOrders orders, List<RetirementDelete> deletes) throws IOException {
+    long order = correctionOwnerOrder(owner,scope,orders);
+    if (order < 0 || orders.fileWinners().getOrDefault(scope.path(),0L) > order
+        || latestDelete(deletes,scope.path(),scope.collection()) > order) return false;
+    for (var root : orders.rootIntents().entrySet())
+      if (root.getValue().scope().contains(scope.path()) && orders.roots().get(root.getKey()) > order) return false;
+    return true;
+  }
+
+  /** Current applicable retained ROOT, including a successor whose walk is still pending. */
+  public SwitchBufferOp retirementCorrectionRoot(String path) {
+    lockTimed();
+    try {
+      var orders = retirementOrders(retirementReplayOps());
+      return releaseRecovery.rootReceipts().stream().filter(root -> {
+        var intent = orders.rootIntents().get(root.retirementUuid());
+        return intent != null && intent.scope().contains(path);
+      }).max(java.util.Comparator.comparingLong(SwitchBufferOp::acceptedOrder)).orElse(null);
+    } catch (IOException invalid) { throw new IllegalStateException("Current ROOT ownership unavailable",invalid); }
+    finally { unlockAfterChanges(); }
   }
 
   public void removeRetirementCollection(String collection, List<String> survivors) {
@@ -1520,6 +1611,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       long newerFile = orders.fileWinners().getOrDefault(row.key().path(),0L);
       if (!retained.test(row.key().path(),row.revision()) && deleted == 0 && newerFile == 0) return true;
       if (!prepared) return false;
+      var correction = orders.corrections().get(row.revision());
+      if (correction != null && !currentCorrectionOwner(correction.owner(),correction.scope(),orders,deletes)) return false;
       long order = validatedUnitOrder(row, orders);
       return order >= 0 && (deleted == 0 || order > deleted) && (newerFile == 0 || order >= newerFile);
     } catch (IOException | RuntimeException unavailable) { return false; }
@@ -1571,6 +1664,138 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       });
     } catch (SQLException invalid) { throw new IllegalStateException("Accepted exact recovery failed",invalid); }
     finally { unlockAfterChanges(); }
+  }
+
+  private static final List<String> CORRECTION_PREDECESSOR_IDENTITY = List.of("path", "unit_revision",
+      "collection", "originator", "transport", "scan_id", "walk_seen_epoch", "planned_source_sha256",
+      "ingestion_root", "size_bytes");
+
+  private static boolean sameCorrectionPredecessor(Map<String,String> left, Map<String,String> right) {
+    if (left == null || right == null) return left == right;
+    return CORRECTION_PREDECESSOR_IDENTITY.stream().allMatch(key -> Objects.equals(left.get(key),right.get(key)));
+  }
+
+  private static ClaimCandidate correctionCandidate(Map<String,String> row) {
+    return new ClaimCandidate(new ClaimKey(Long.parseLong(row.get("last_updated")),row.get("path")),
+        row.get("collection"),row.get("originator"),row.get("transport"),row.get("scan_id"),row.get("unit_revision"),
+        row.get("walk_seen_epoch") == null ? null : Long.valueOf(row.get("walk_seen_epoch")),
+        row.get("planned_source_sha256"),row.get("ingestion_root"));
+  }
+
+  private boolean correctionHasRecordedOwner(String path, Map<String,String> row) throws SQLException {
+    if (row != null && (row.get("scan_id") != null || row.get("walk_seen_epoch") != null)) return true;
+    try (var query = connection.prepareStatement(
+        "SELECT 1 FROM ingestion_ledger WHERE path_hash=? AND operation_key IS NOT NULL LIMIT 1")) {
+      query.setString(1,sha256(path));
+      try (var result = query.executeQuery()) { return result.next(); }
+    }
+  }
+
+  @Override public List<Integer> correctRetirementSources(List<RetirementSourceObservation> observations,
+      java.util.function.BooleanSupplier cancelled) {
+    if (observations.isEmpty()) return List.of();
+    lockTimed();
+    try {
+      ensureOpen();
+      if (releaseRecovery == null || !releaseRecovery.retiringBuild()
+          || !Objects.equals(release030RetirementGeneration(),releaseRecovery.retiringBuilding()))
+        return java.util.Collections.nCopies(observations.size(),0);
+      return inTransaction(() -> {
+        try {
+          var journal = retirementReplayOps();
+          var orders = retirementOrders(journal);
+          var deletes = retirementDeletes(journal);
+          var results = new ArrayList<Integer>();
+          for (var observation : observations)
+            results.add(correctRetirementSourceInTransaction(observation,journal,orders,deletes,cancelled));
+          return List.copyOf(results);
+        } catch (IOException invalid) { throw new SQLException("Correction ownership unavailable",invalid); }
+      });
+    } catch (SQLException invalid) { throw new IllegalStateException("Conditional retirement correction failed",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  private int correctRetirementSourceInTransaction(RetirementSourceObservation observation,
+      List<SwitchBufferOp> journal, RetirementOrders orders, List<RetirementDelete> deletes,
+      java.util.function.BooleanSupplier cancelled) throws SQLException, IOException {
+    var owner = observation.owner();
+    var scope = observation.scope();
+    var observedRow = observation.observedRow();
+    var sourceState = observation.sourceState();
+    var sourceSha256 = observation.sourceSha256();
+    long size = observation.size();
+    boolean targetMatches = observation.targetMatches();
+    if (sourceState == null || !targetMatches && !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256)) return 0;
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
+    var row = watcherRowLocked(scope.path());
+    if (!Objects.equals(row,observedRow) || activeClaims.containsKey(scope.path())
+        || row != null && STATE_PROCESSING.equals(row.get("state"))
+        || correctionHasRecordedOwner(scope.path(),row)) return 0;
+    if (owner != null && !journal.contains(owner)
+        || !currentCorrectionOwner(owner,scope,orders,deletes)) return 0;
+    var versions = orders.corrections().values();
+    Release030RecoveryState.Correction installed = row == null ? null : orders.corrections().get(row.get("unit_revision"));
+    if (installed != null && (!Objects.equals(installed.owner(),owner) || !installed.scope().equals(scope)
+        || !matchesCorrection(correctionCandidate(row),installed.replacement()))) return 0;
+    // Stable source retries and terminal POLICY remain the same work. The packet does not
+    // prove which bytes the extractor observed before a policy skip.
+    boolean retainedPredecessor = versions.stream().anyMatch(version -> Objects.equals(version.owner(),owner)
+        && version.scope().equals(scope) && Objects.equals(version.predecessor(),row));
+    if (row != null && installed == null && !retainedPredecessor) {
+      if (!STATE_DONE.equals(row.get("state"))) return 0;
+      var provenance = scope.provenance();
+      if (!Objects.equals(normalizedRetirementCollection(row.get("collection")),normalizedRetirementCollection(scope.collection()))
+          || !Objects.equals(row.get("originator"),provenance == null ? null : provenance.originator())
+          || !Objects.equals(row.get("transport"),provenance == null ? null : provenance.transport())) return 0;
+      String boundary = PathNormalizer.normalizeKey(scope.ingestionRoot());
+      if (!Objects.equals(boundary,row.get("ingestion_root"))) {
+        // A prefix alone cannot establish bootstrap provenance. Only this database's
+        // retained preparation receipt plus its actual v13 unit permits a missing FILE.
+        if (owner != null && "SYNC_ROOT".equals(owner.op()) || row.get("ingestion_root") != null
+            || !scope.path().equals(boundary) || hasUnownedModernAdmission(Path.of(scope.path()))
+            || !releaseRecovery.preparedFor(release030RecoveryIdentity())) return 0;
+      }
+      if (row.get("planned_source_sha256") != null) return 0;
+      if (owner != null && "SYNC_ROOT".equals(owner.op())) {
+        var origin = RootOrigin.fromUnit(row.get("unit_revision"));
+        if (origin == null || !origin.uuid().equals(owner.retirementUuid())
+            || origin.acceptedOrder() != owner.acceptedOrder()) return 0;
+      }
+    }
+    if (targetMatches) return 2;
+    if (installed != null && sourceState.equals(installed.sourceState())) return 0;
+    Release030RecoveryState.Correction version = versions.stream()
+        .filter(v -> Objects.equals(v.owner(),owner) && v.scope().equals(scope)
+            && sameCorrectionPredecessor(v.predecessor(),row) && sourceState.equals(v.sourceState()))
+        .findFirst().orElse(null);
+    if (version == null) {
+      String unit = owner != null && "SYNC_ROOT".equals(owner.op()) ? owner.retirementRootUnit()
+          : UUID.randomUUID().toString().replace("-", "");
+      var replacement = new SwitchBufferUpsert(scope.path(),scope.collection(),scope.provenance(),unit,
+          sourceSha256,scope.ingestionRoot());
+      version = new Release030RecoveryState.Correction(owner,releaseRecovery.retiringActive(),
+          releaseRecovery.retiringBuilding(),scope,row,sourceState,replacement);
+      releaseRecovery.retainCorrection(version); // Durable intent precedes SQL CAS.
+    }
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
+    if (row != null) {
+      String predicate = String.join(" AND ",row.keySet().stream().map(key -> key + " IS ?").toList());
+      try (var remove = connection.prepareStatement("DELETE FROM jobs WHERE " + predicate)) {
+        int parameter = 1;
+        for (String value : row.values()) remove.setString(parameter++,value);
+        if (remove.executeUpdate() != 1) throw new SQLException("Correction predecessor changed");
+      }
+    }
+    var replacement = version.replacement();
+    if (enqueueEntriesInTransaction(List.of(new JobQueue.EnqueueEntry(Path.of(scope.path()),size,
+        replacement.provenance(),replacement.sourceSha256(),replacement.ingestionRoot())),
+        replacement.collection(),null,System.currentTimeMillis(),true,replacement.unitRevision()) != 1)
+      throw new SQLException("Short corrective admission");
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
+    rootClaimsPrepared = false;
+    claimCursor = null;
+    claimOrderVersion++;
+    return 1;
   }
 
   /** Queue-owned union is validated before claims and every replay; no checkpoint leaf calls Q. */

@@ -2556,9 +2556,16 @@ public final class WorkerIngestService {
     }
   }
 
+  private java.util.function.Function<Path,String> creatorRootCollection = root -> null;
+
+  /** The composition root supplies its boot/configuration policy for fresh public ROOTs. */
+  public void useCreatorRootCollection(java.util.function.Function<Path,String> policy) {
+    creatorRootCollection = java.util.Objects.requireNonNull(policy);
+  }
+
   private String creatorRootCollection(String rootPath) {
     var binding=rootWatcherRegistry.subscription(parsedRoot(rootPath));
-    return binding==null?null:binding.collection();
+    return binding==null?creatorRootCollection.apply(parsedRoot(rootPath)):binding.collection();
   }
 
   /**
