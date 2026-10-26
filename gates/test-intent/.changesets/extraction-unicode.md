@@ -14,7 +14,7 @@ The sources below are delegated agent choices; the settled scenario wording is n
 The independent verifier ran the unchanged canonical producer on committed candidate a588476ad3:
 15 repaired methods (24 cases) fail the intended assertions before the change and pass after;
 seven preservation methods (seven cases) pass on both revisions. The referenced JSON files are
-unedited stock producer outputs. Independent acceptance of this final record is pending.
+unedited stock producer outputs. Independent judgments are recorded in the acceptance section below.
 
 The component checks inspect the constructed IndexDocument score; they do not prove that scalar
 is persisted. Real Engine verification found the unchanged Lucene mapper ignores catalog type
@@ -262,3 +262,14 @@ is distinct from the absent scalar. Existing PDF phantom-page behavior also rema
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a178c5-becd-7d60-88aa-eebb5f61f6f1",
+  "verdict": "accept",
+  "digest": "sha256:7949f64706ce8f1cd809e8cefb6a90a2e45a7336f8b8daf92f36d960529edc99",
+  "note": "Accept declared test-intent/component expectations and stock proof only. Full UQ6 FAIL: stored scalar absent (d0f5c2). Retain PDF no-demand limit 43e7a2, split-offset503 6aa9d4, unverified positive chunk/embedding proof, model availability-only/incomplete historical exit census, and all three original unit failures. No full-scenario or publication approval."
+}
+```
