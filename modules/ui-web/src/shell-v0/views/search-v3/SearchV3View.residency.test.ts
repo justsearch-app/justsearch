@@ -402,12 +402,26 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
     const previous = sessionStorage.getItem(attachmentKey);
     if (variant === 'scope-count') parkSearchV3Handoff({ query: 'incoming A', mode: 'ask', docIds: Array.from({ length: 129 }, (_, i) => '/file-' + i) });
     if (variant === 'scope-id-UTF8') parkSearchV3Handoff({ query: 'incoming A', mode: 'ask', docIds: ['/' + '界'.repeat(1366)] });
-    if (variant === 'serialized-UTF8') parkSearchV3Handoff({ query: '界'.repeat(21000), mode: 'ask', docIds: Array.from({ length: 128 }, (_, i) => '/' + i + '界'.repeat(600)) });
+    if (variant === 'serialized-UTF8') {
+      const query = '界'.repeat(21000);
+      const docIds = Array.from({ length: 128 }, (_, i) => '/' + i + '界'.repeat(600));
+      const bytes = (value: string) => new TextEncoder().encode(value).length;
+      expect(bytes(query)).toBeLessThanOrEqual(65536); expect(docIds).toHaveLength(128);
+      expect(docIds.every(id => bytes(id) <= 4096)).toBe(true);
+      expect(bytes(JSON.stringify({ query, docIds }))).toBeGreaterThan(262144);
+      parkSearchV3Handoff({ query, mode: 'ask', docIds });
+    }
     if (variant === 'schema-UTF8') {
       emit(el, 'sv3-tier-change', { tier: 'structured' }); await settle(el);
       const beforeSchema = sessionStorage.getItem(attachmentKey);
       const input = composer(el).shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-schema]')!;
-      input.value = JSON.stringify({ description: '界'.repeat(5500) }); input.dispatchEvent(new Event('input')); await settle(el);
+      const authoredSchema = JSON.stringify({ description: '界'.repeat(5500) });
+      input.value = authoredSchema; input.dispatchEvent(new Event('input')); await settle(el);
+      expect(input.value).toBe(authoredSchema);
+      expect(new TextEncoder().encode(authoredSchema).length).toBeGreaterThan(16384);
+      expect(sessionStorage.getItem(attachmentKey)).toBe(beforeSchema);
+      composer(el).shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-composer-send]')!.click(); await settle(el);
+      expect(dispatches()).toHaveLength(0); expect(input.value).toBe(authoredSchema);
       expect(sessionStorage.getItem(attachmentKey)).toBe(beforeSchema);
     }
     await settle(el);
@@ -415,6 +429,15 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
     if (variant !== 'schema-UTF8') expect(sessionStorage.getItem(attachmentKey)).toBe(previous);
     expect(localStorage.getItem('justsearch.draft.search-v3.composer')).toBe('raw survivor');
     expect(el.shadowRoot!.textContent).toContain('could not be saved safely');
+    if (variant !== 'schema-UTF8') {
+      // Refused incoming A does not revoke the known, in-bound current B.
+      composer(el).shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-composer-send]')!.click(); await settle(el);
+      expect(dispatches()).toHaveLength(1);
+      expect(body()).toMatchObject({ shapeId: 'core.rag-ask', question: 'current B', allowLoad: true });
+      expect((body().docIds as string[] | undefined) ?? []).toEqual([]);
+      expect(JSON.stringify(body())).not.toContain('incoming A');
+      expect(JSON.stringify(body())).not.toContain('/file-');
+    }
   });
   it.each(['task-field', 'draft-field', 'payload-field', 'scope-type', 'scope-count', 'raw-type', 'raw-UTF8',
     'draft-UTF8', 'schema-type', 'schema-UTF8', 'place-type', 'record-type', 'reselection-type', 'effort-value',
@@ -554,6 +577,8 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
       expect(dispatches()).toHaveLength(action === 'retry' ? 1 : 2);
       expect(body(action === 'retry' ? 0 : 1)).toMatchObject({ shapeId: shape, allowLoad: true, conversationId: 'child',
         [shape === 'core.free-chat' ? 'prompt' : 'question']: action === 'retry' ? 'saved A' : 'edited B' });
+      restoreActiveConversation('saved'); await settle(el);
+      expect(field(el).value).toBe('unrelated B');
     }
   });
   it('an explicit force retains its lock through the follow-up dispatch', async () => {

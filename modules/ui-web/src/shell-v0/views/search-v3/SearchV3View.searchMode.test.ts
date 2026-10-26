@@ -885,6 +885,39 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
     expect((await fieldOf(el)).value).toBe('unrelated B');
   });
 
+  it('DS1 known live chosen-file Ask Edit forks its own exact inputs while unrelated review-required B remains recoverable', async () => {
+    backend.corpus.lease = [wireHit('a', 'docs/a.md'), wireHit('b', 'docs/b.md'), wireHit('decoy', 'docs/decoy.md')];
+    aiOnline(); const el = await mount(); await searchFor(el, 'lease');
+    await clickRow(el, 'a.md', { ctrlKey: true }); await clickRow(el, 'b.md', { ctrlKey: true });
+    await askAboutChosen(el); await askNow(el, 'original chosen question'); await answerLatest(el);
+    const original = el.sessions.activeId;
+    await chooseTier(el, 'delegate'); await type(el, 'unrelated B');
+    const { createNavigationHandler } = await import('../../router/navigationHandler.js');
+    await createNavigationHandler({ isKnownSurface: () => true, setActiveSurface: () => {} }).handle(
+      { kind: 'navigate', target: 'core.search-v3-surface', state: { query: 'old journal A' } },
+      { push: false, taskOrigin: 'restore' });
+    await settle(el);
+    expect((await fieldOf(el)).value).toBe('unrelated B');
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
+    const main = await region(el, 'jf-sv3-main');
+    const turn = main.shadowRoot!.querySelector('[data-testid=sv3-turn]')!;
+    await press(turn.querySelector('[data-testid=sv3-turn-edit]')); await settle(el);
+    const editor = main.shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-turn-edit-input]');
+    expect(editor).not.toBeNull(); editor!.value = 'exact rewritten chosen question';
+    editor!.dispatchEvent(new Event('input')); await settle(el);
+    await press(main.shadowRoot!.querySelector('[data-testid=sv3-turn-edit-send]')); await settle(el);
+    expect(backend.branches).toHaveLength(1); expect(backend.branches[0]!.parent).toBe(original);
+    expect(backend.branches[0]!.fromMsgId).toEqual(expect.any(String));
+    expect(backend.streams).toHaveLength(2);
+    expect(backend.streams[1]!.body).toMatchObject({ shapeId: 'core.rag-ask', question: 'exact rewritten chosen question',
+      conversationId: `${original}-branch-${backend.minted}`, allowLoad: true });
+    expect([...(backend.streams[1]!.body.docIds as string[])].sort()).toEqual(['docs/a.md', 'docs/b.md']);
+    expect(ctrl.send).not.toHaveBeenCalled();
+    await answerLatest(el); restoreActiveConversation(original); await settle(el);
+    expect((await fieldOf(el)).value).toBe('unrelated B');
+    expect(backend.streams).toHaveLength(2);
+  });
+
   it('DS1 after reload Retry/Edit say the original Ask inputs are unknown', async () => {
     recordTurn('uc-old', 'when does it end?', 'In May.');
     aiOnline();

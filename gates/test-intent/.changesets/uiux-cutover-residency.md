@@ -7,13 +7,7 @@ author-session: codex-residency-builder-7-fendcaap
 
 # Test-intent entries
 
-NR15/RR15 choices are agent-adopted under the separately quoted delegation, not owner-verbatim scenarios. This grouping adds to the existing historical uiux-cutover changeset and does not accept or replace its missing d5 acceptance. Final official producer ran in an owned shared clone, without source commits, against exact baseline 12c8644475714846a23cb4b8ebe736b972d57cba with final fixtures. It records 404 candidate passes, 122 assertion failures before and 282 preservation passes before, zero skips and no exception/compile/environment failures. Producer exits 1 because named preservation controls intentionally pass before. Earlier attempts and the intermediate two-case outcome producer are excluded from final evidence and retained under tmp/wp1.5a/. The final producer includes the late forced Structured scope repair and all outcome/Ask preservation checks on the exact final production source.
-
-Changed old expectations are explicit: the branch successful-terminal and two external-lock transcript fixtures are instrumentation corrections; the 11 context cases gain RR15 slot retirement/review requirements. They are not described as signature-only adaptations. The Structured error announcement case also explicitly reviews/discards unknown delivery before a fresh repeated submission; its done case remains preservation. No old branch/context/honesty/Structured announcement oracle was deleted. The two honesty fixtures are directly affected lock-preservation checks, not an unrelated expectation change. Storage faults are injected instance-method write failures, not native quota evidence. Two Storage realms are unit isolation, not browser tab/runtime proof. Real production UI-to-HTTP/controller/model proof and the full final gates belong to the fresh verifier.
-
-IR15 initial-lifecycle repair (builder initial-8): the additional file and entries below use their own genuine final producer against a47f7c47d25164c69a8f1e833bc59b316b1babb2. The original whole-feature producer/evidence and all existing tests are unchanged. The historical 1a026 acceptance record remains as recorded; it does not accept these new entries and is stale for the changed changeset. Official d5 acceptance in the separate uiux-cutover changeset is preserved. Fresh independent expected-value review and committed-candidate runtime verification remain required.
-
-GA15 adds only the real store-to-availability preservation cases below. Their separate official producer uses exact baseline 54035be4431245ffbe3b3c65c12cccedbb13f114; before passes are intentional preservation. An initial author-only READY/failure expectation was corrected to preserve actual existing precedence before the producer ran; its first negative output remains scratch evidence, not a repaired behavior claim. Existing acceptances remain historical and require fresh independent review.
+NR15/RR15 choices are agent-adopted under the quoted delegation, not owner-verbatim scenarios. Earlier full-feature counts, outputs and acceptances remain historical; they do not certify current selectors after DS1. Phase17 splits superseded saved-input expectations from retained model/fork/context/stream/lock obligations. Exact current producer evidence is required for every named check. The terminal-before-EOF Adaptation below covers only instrumentation; DS1 changes are separately sourced. Historical acceptance records are retained verbatim and need independent review.
 
 ```json
 {
@@ -26,21 +20,17 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Correct the successful dispatch fake to emit done BEFORE EOF, as its existing terminal comment intended. The previous EOF produced STREAM_INCOMPLETE; a late event after EOF could not repair it. All existing assertions remain, including the two forks of the same base, child identities and 3 / 3 pager. EOF without terminal is separately tested as unknown delivery blocking a second submission in the new residency file. This changes the wire fixture to represent its intended successful completion, not the branch oracle.",
+      "whatMoved": "Correct only successful-dispatch instrumentation to emit done BEFORE EOF, as its existing terminal comment intended. EOF without terminal remains unknown delivery. This Adaptation covers terminal instrumentation only; the separate DS1 entries account for changed unknown saved-Ask expected outcomes and admissible model fixtures. Original fork points, child/sibling identities, inherited-prefix/version/pager mechanics and refusal/editor predicates are preserved on admissible own inputs.",
       "sources": [
         {
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "Preserve existing branches/pager and accepted streaming behavior. RR15: unknown transport delivery cannot authorize blind resend; only a successful terminal or CANCELLED retires the unresolved task.",
           "label": "agent choice"
         }
-      ],
-      "evidence": "gates/test-intent/evidence/uiux-cutover-residency.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts"
       ]
     },
     {
@@ -57,15 +47,11 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "NR15/RR15: Preserve the existing 423 terminal, lock adoption and inaccessible-history behavior. Explicit human requests retain conversation write/context guards. A known locked history cannot create a successful new answer; these fixtures establish the readable answer before the external lock while retaining every original remedy/navigation and sticky-lock assertion.",
           "label": "agent choice"
         }
-      ],
-      "evidence": "gates/test-intent/evidence/uiux-cutover-residency.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts"
       ]
     },
     {
@@ -79,7 +65,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "RR15: Reserveinslotbeforefirstdependentawait/fork; ACKretentionanduncertaindeliveryBEFOREissuance/destructiveclear. Failedwritesmustnotclaimsuccessorremoveonlycopy. Secondunresolvedsubmissionrequiresvisibleexplicitreplacement/blocks, notoverwrite. Retiringtaskmustretainanynewerunsavedcompanions (attachmentmaykeepbounded draft-only recoveryuntilrestored/discarded); acknowledgecompaniondraftwritebeforeclear. Onlyconfirmedpre-admissionrefusalshowsQuestionnotsent andordinaryRetry/taskboundLoadanyway. UnknowntransportdeliveryshowsDeliveryunknown/checksavedconversation, noblindresend. Everyreload/duplicatedtabfreshowner/reviewonly.",
           "label": "agent choice"
@@ -112,7 +98,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "NR15: New typing/IME/programmatic same-text assignment, conversation switch, handoff, New/removal/navigation/reload during refusal/load must not be overwritten or sent by an older callback. Retain the refused question and newer draft according to ownership. Accepted streaming/stop/late-stop/context/record persistence remains. All original C4/A1/FC15 and CD3/TD10a safeguards remain.",
           "label": "agent choice"
@@ -190,13 +176,13 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts"
       ],
       "class": "New",
-      "behaviour": "NR15/RR15 human demand, correct shape and scope, zero-document model/typed Structured/passage Summarize, typed refusal rollback, authoritative true/false force and dwell, exactly one 200/202 continuation, duplicate lock, assignment/IME/context/scope/lifecycle revocation, strict whitelist and UTF8 caps, reserve/uncertain-delivery/retirement ACK failures, stale writers and isolated/copy Storage realms, input precedence and tab-session review-only recovery. No backend policy, history store, force permission or excerpts are persisted. Forced Structured completion consumes its own original one-send scope; copied outbound paths confer no ownership over newer file preparation.",
+      "behaviour": "NR15/RR15 human demand, correct shape and scope, zero-document model/typed Structured/passage Summarize, typed refusal rollback, authoritative true/false force and dwell, exactly one 200/202 continuation, duplicate lock, assignment/IME/context/scope/lifecycle revocation, strict whitelist and UTF8 caps, reserve/uncertain-delivery/retirement ACK failures, stale writers and isolated/copy Storage realms, input precedence and tab-session review-only recovery. No backend policy, history store, force permission or excerpts are persisted. Forced Structured completion consumes its own original one-send scope; copied outbound paths confer no ownership over newer file preparation. DS1 strengthens the four cap checks: oversized incoming scope/count/serialized proposal preserves current B/settings and exact stored copies before replacement; deliberate Send then positively issues valid B, never refused A/truncated scope. Oversized authored Structured schema remains exact live, last ACK/raw copies survive and explicit Send stays blocked. The model-only saved Retry/Edit positive still forks with exact text/human marker and returns to original B. Unknown Ask and raw/incoming capacity distinctions are separately classified.",
       "sources": [
         {
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "## NR15: preserve human Send and residency behavior before cutover (agent-adopted 2026-10-25)\n\nIndependent source challenge and running policy/HTTP triage identify this as C1/S2 preservation, not lower-tier polish. Old main marks explicit human dispatch; Search omitted it, treated typed residency refusals as generic answer failures and gates unloaded chat as offline. No backend auth/residency-policy weakening, new durable force preference or changed chat-enable defaults is authorized.\n\n1. Human Ask/Structured/model-only/compatibility/Retry/Edit requests retain human demand semantics when installed chat is transiently unloaded; exact supported text/files/shape/context once, no silent scope widening. Model-only and typed Structured must not inherit unrelated indexed-document/agent-tool prerequisites; grounded Ask retains its own prerequisites. Explicit off/uninstalled/failed states stay honestly unavailable.\n2. Pre-admission pressure/loading/refusal creates no message presented as sent/answered/saved. Preserve recoverable original unsent question and newer user input under existing ownership/save points; end busy truthfully. No new force permission inferred from stale UI.\n3. Ordinary retry respects current reason/retry interval. Explicit Load anyway is offered only when returned/authoritative forceAllowed permits, including allowed dwell; false/absent never authorizes force. Server revalidation remains authoritative.\n4. An unchanged, still-owned refused task may load and retry exactly once after one explicit activation, even with202/pending readiness. A load action without a refused task loads only. Failure/transport loss keeps input recoverable; repeated activation cannot duplicate send.\n5. New typing/IME/programmatic same-text assignment, conversation switch, handoff, New/removal/navigation/reload during refusal/load must not be overwritten or sent by an older callback. Retain the refused question and newer draft according to ownership; never silently resend newer contents as the old task. If no existing owner can durably retain both necessary inputs, return a bounded explicit retention proposal before building new state.\n6. Stop before admission versus leaving/unmount retains existing distinct meaning and backend stop semantics; later load cannot start an abandoned/stopped question or duplicate it after return. Accepted streaming/stop/late-stop/context/record persistence remains.\n7. Delegate/Ctrl-Cmd-Enter remain agent semantics; automatic titles/viewing/polling/reload/background work never receive human loading/force authority. No automatic force or sticky permission.\n8. Ready→unloaded→loading→ready, explicit off, failure/holds/stopping updates reason/actions correctly. No new always-ready flag, fabricated successful response or physical-GPU/Windows claim. Real controlled production HTTP/gate fixtures are labeled as such.\n\nAll original C4/A1/FC15 and CD3/TD10a safeguards remain. These outcomes clarify already shipped human Send/refusal preservation; fresh builder/committed independent real boundary proof required. Native physical residency transitions remain explicit verification limits when unavailable.",
           "label": "agent choice"
@@ -205,9 +191,18 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "settled refusal recovery protocol (agent-adopted after independent design review)\n\nAdopt source design with ALL five reviewer corrections. Human intent only atsv3Ask; typedrefusal/no fake savedturn; humanreadiness distinctgrounded/model/typedStructuredvsDelegate; capturedtaskforce200/202once; noauto-bypass/backgroundhumanload. PreserveC4/FC15/CD3/TD10a andexistingStop/423/unknownstreamsemantics.\n\nPersistedwhitelistONLYuserauthoredraw/edit text,schema,minimaltypedrequest/record/shape/place/scopeidentifiers. No outboundquestiontransformedwithrankingtrace,selectedtext/fileexcerpt,resolvedhistory,backendtrace,secrets,forcepermission,callback/progress. In-memorycapturedtaskcanretaintransformedbody; restoremustreview/reselectwhencannotreconstructexactscope,never substitutehistory/currentselection/fullfile. Savedturnactionsstoreidentityratherthancopybackendcontent.\n\nUseDraftPersistence's opt-in ACKNOWLEDGED SESSIONSTORAGE attachment, rawlocaldraftkeyandlegacyprotocolUNCHANGED. Fixedversion1 namespace, main or fixedsupportedcompatibility-shape discriminator; oneunresolvedtaskperdeclaredowner, maxcurrent+originatingplace drafts, no keysbymount/CID/visitedhistory. Strictversion/type/unknownfieldvalidation; opaqueattachmentincarnationandexpectedstoredbytesrejectstaleoverlappingwriters. StoredIDsnevercallbackauthority; everyreload/duplicatedtabfreshowner/reviewonly, nocross-tabexactly-oncepromise. Incomingtaskwinscurrentcomposer; invalid/mismatchedattachmentnevererasesrawdraft. Rawdraft/newattachmentprecedenceexplicitlytested.\n\nBounds: serializedJSON UTF8<=262144bytes; eachusertext/draftsnapshot<=65536UTF8bytes; schema<=16384UTF8bytes; max128scopeIDs, each<=4096UTF8bytes; max2distinctdraftplaces; oneunresolvedtask. Excessrefusebeforeissuancewithouttruncation, preserveexistingraw/live/storedcopies. Reserveinslotbeforefirstdependentawait/fork; ACKretentionanduncertaindeliveryBEFOREissuance/destructiveclear. Failedwritesmustnotclaimsuccessorremoveonlycopy. Secondunresolvedsubmissionrequiresvisibleexplicitreplacement/blocks, notoverwrite. Retiringtaskmustretainanynewerunsavedcompanions (attachmentmaykeepbounded draft-only recoveryuntilrestored/discarded); acknowledgecompaniondraftwritebeforeclear.\n\nAttachmentrecoveryissurvivingTABSESSIONonly, notpermanenthistory/fulltaborappclosure/olderclients. Exposeextra-copy sessionlimit plainlywhenretained, preservecurrentrawdraftunderitsnormaldurablerules. This is an explicit bounded-retention decision; no claimbothA+Bsurvivefullclosure. Same-tabreload/hide/disconnectarecovered; no newlocalhistory/store/framework.\n\nOnlyconfirmedpre-admissionrefusalshowsQuestionnotsent andordinaryRetry/taskboundLoadanyway. UnknowntransportdeliveryshowsDeliveryunknown/checksavedconversation, noblindresend; emptyfailedlookup/textmatch/StopUUIDarenotdeduplicationproof. Ifunresolved,newsubmissionrequiresfreshclearreview; no backendidempotencystore. Restoredcopiesneverforce/sendautomatically.\n\nStop/revocationlatchedsynchronouslythroughlateLOADING/refusal/transportloss/loadsuccess; nonecanreinstatecontinuation. OnlybackendCANCELLEDprovesstopped savedturn. Stopped/restoredtasksneedfreshreviewednewsubmission/newdispatchUUID. ExistingearlyStopregistryentrybound/noageexpiryunchanged. BeforefollowupissuanceStoponlyrevokeslocalcontinuation, no claimloadcancelled. Sourcecaps/whitelist/ownership/recoverylimitsaretestedsaved-statecontract, notimplementationoptional.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "DS1 adopted restoration/capacity/saved-action contract: automatic restored tasks cannot replace current raw work or confer scope. Known exact live Ask/model actions remain independent of unrelated B review. Unknown saved Ask refuses before fork. Bounds refuse incoming proposals before replacement/fork/request, preserving existing copies; a later explicit operation may send surviving valid B. Oversized authored Structured schema remains visible and blocked, with last acknowledged bytes intact. A/B/C plus unresolved task fit only the existing fixed capacities; refuse a third incoming snapshot. Retain model fork/lifecycle and original source/migration/stream/lock positives. These are agent choices under the delegation, not owner-verbatim scenario wording.",
           "label": "agent choice"
         }
       ],
@@ -275,10 +270,6 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#free-chat compatibility sends subsequent turns with zero documents and preserves newer input",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#a model-answer turn action never clears or restores unrelated composer text on success",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#a model-answer turn action never clears or restores unrelated composer text on refusal",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#scope-count cap blocks issuance without truncating live inputs or old copies",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#scope-id-UTF8 cap blocks issuance without truncating live inputs or old copies",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#schema-UTF8 cap blocks issuance without truncating live inputs or old copies",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#serialized-UTF8 cap blocks issuance without truncating live inputs or old copies",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#invalid task-field attachment fails closed and leaves exact durable bytes and raw text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#invalid draft-field attachment fails closed and leaves exact durable bytes and raw text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#invalid payload-field attachment fails closed and leaves exact durable bytes and raw text",
@@ -297,14 +288,10 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#invalid three-places attachment fails closed and leaves exact durable bytes and raw text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#invalid typed-version attachment fails closed and leaves exact durable bytes and raw text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#invalid incarnation-type attachment fails closed and leaves exact durable bytes and raw text",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#raw takes composer precedence while the session draft remains recoverable",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#incoming takes composer precedence while the session draft remains recoverable",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#tab-isolated Storage realms retain distinct tasks and a copied attachment restores only for review",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#summarize preserves its exact live passage but persists no excerpt, history or force authority",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#Explain retention excludes the embedded backend ranking trace and preserves user instructions",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#an overlapping stale owner cannot retire a task after its live owner retries back to the same inputs",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#human Retry/Edit of saved core.rag-ask keep the intended shape and exact text",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#human Retry/Edit of saved core.free-chat keep the intended shape and exact text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#an explicit force retains its lock through the follow-up dispatch",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#a stale force control cannot load or dispatch after explicit retirement",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#a transport load failure retains A and newer input without a follow-up dispatch",
@@ -323,7 +310,12 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#confirmed deletion during force revokes the old target without sending Stop",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#ordinary Retry becomes available after its interval but the timer never submits",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#context that changes during the follow-up confirmation cannot replace the captured force context",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#a forced Structured success consumes only its original one-send file preparation"
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#a forced Structured success consumes only its original one-send file preparation",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 scope-count cap refuses before replacing current text/settings or any request",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 scope-id-UTF8 cap refuses before replacing current text/settings or any request",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 schema-UTF8 cap refuses before replacing current text/settings or any request",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 serialized-UTF8 cap refuses before replacing current text/settings or any request",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 saved core.free-chat Retry/Edit require their own exact scope and preserve B"
       ]
     },
     {
@@ -337,7 +329,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "NR15: Model-only and typed Structured must not inherit unrelated indexed-document/agent-tool prerequisites; grounded Ask retains its own prerequisites. Explicit off/uninstalled/failed states stay honestly unavailable. New typing/IME/programmatic same-text assignment, conversation switch, handoff, New/removal/navigation/reload during refusal/load must not be overwritten or sent by an older callback. Stop before admission versus leaving/unmount retains existing distinct meaning and backend stop semantics. Accepted streaming/stop/late-stop/context/record persistence remains.",
           "label": "agent choice"
@@ -365,7 +357,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "RR15: Reserveinslotbeforefirstdependentawait/fork; ACKretentionanduncertaindeliveryBEFOREissuance/destructiveclear. Failedwritesmustnotclaimsuccessorremoveonlycopy. Secondunresolvedsubmissionrequiresvisibleexplicitreplacement/blocks, notoverwrite. Retiringtaskmustretainanynewerunsavedcompanions (attachmentmaykeepbounded draft-only recoveryuntilrestored/discarded); acknowledgecompaniondraftwritebeforeclear. Onlyconfirmedpre-admissionrefusalshowsQuestionnotsent andordinaryRetry/taskboundLoadanyway. UnknowntransportdeliveryshowsDeliveryunknown/checksavedconversation, noblindresend. Everyreload/duplicatedtabfreshowner/reviewonly.",
           "label": "agent choice"
@@ -388,7 +380,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted NR15/RR15 in the supplied agreed design and scenarios, 2026-10-25",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "RR15: Reserveinslotbeforefirstdependentawait/fork; ACKretentionanduncertaindeliveryBEFOREissuance/destructiveclear. Failedwritesmustnotclaimsuccessorremoveonlycopy. Secondunresolvedsubmissionrequiresvisibleexplicitreplacement/blocks, notoverwrite. Retiringtaskmustretainanynewerunsavedcompanions (attachmentmaykeepbounded draft-only recoveryuntilrestored/discarded); acknowledgecompaniondraftwritebeforeclear. Onlyconfirmedpre-admissionrefusalshowsQuestionnotsent andordinaryRetry/taskboundLoadanyway. UnknowntransportdeliveryshowsDeliveryunknown/checksavedconversation, noblindresend. Everyreload/duplicatedtabfreshowner/reviewonly.",
           "label": "agent choice"
@@ -411,7 +403,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted IR15 in supplied wp1.5a-initial-lifecycle/scenarios-agreed.md, 2026-10-25T23:38:25Z",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "IR15: Initial captured A may issue after input-only changes while preserving newer B and captured parameters. Explicit lifecycle or placement abandonment before issuance must latch through visible/connected/same-place return. Existing force ownership remains stricter. Preserve accepted streams and Stop semantics, raw/session recovery, bounds and whitelist; no persistent callback authority.",
           "label": "agent choice"
@@ -435,13 +427,13 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts"
       ],
       "class": "New",
-      "behaviour": "IR15 preservation: initial captured A/newer B, same-text/IME/empty assignments and future parameters; context failure/loss; placement ABA/New/handoff/discard/disconnect/removal; initial Retry/Edit fork abandonment and normal controls; already-issued Ask/model/Structured streams. Thirty checks pass before a47 and after. Controlled HTTP component tests only, not product/runtime acceptance.",
+      "behaviour": "IR15 preservation of the thirty exact named initial Send/context/lifecycle/fork controls. Five previously unknown saved-Ask fixtures now use admissible model inputs to reach a genuinely held fork; this is not early-refusal lifecycle evidence. Unchanged normal controls dispatch exactly once with original B recoverable; hide/pagehide/ABA/discard controls release the held fork without late dispatch/Stop. Actual named results beforea47 and current are required, not an obsolete run count.",
       "sources": [
         {
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted IR15 in supplied wp1.5a-initial-lifecycle/scenarios-agreed.md, 2026-10-25T23:38:25Z",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "IR15: Initial captured A may issue after input-only changes while preserving newer B and captured parameters. Explicit lifecycle or placement abandonment before issuance must latch through visible/connected/same-place return. Existing force ownership remains stricter. Preserve accepted streams and Stop semantics, raw/session recovery, bounds and whitelist; no persistent callback authority.",
           "label": "agent choice"
@@ -471,15 +463,15 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask already issued Send keeps its stream on hide and sends no Stop or replacement",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat already issued Send keeps its stream on hide and sends no Stop or replacement",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.extract already issued Send keeps its stream on hide and sends no Stop or replacement",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with unchanged while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with unchanged while the fork waits cannot issue an abandoned task",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with unchanged while the fork waits cannot issue an abandoned task",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with pagehide-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with pagehide-return while the fork waits cannot issue an abandoned task",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with pagehide-return while the fork waits cannot issue an abandoned task",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with hidden-return while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with hidden-return while the fork waits cannot issue an abandoned task",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with hidden-return while the fork waits cannot issue an abandoned task",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask retry with navigation-ABA while the fork waits cannot issue an abandoned task",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat retry with navigation-ABA while the fork waits cannot issue an abandoned task",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.rag-ask edit with discard while the fork waits cannot issue an abandoned task"
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts#core.free-chat edit with discard while the fork waits cannot issue an abandoned task"
       ]
     },
     {
@@ -493,7 +485,7 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
           "kind": "delegated-choice",
           "task": "t-20261019-bd718f",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request; agent-adopted GA15 scenarios and design, 2026-10-26",
+          "delegationLocation": "task t-20261019-bd718f agreement",
           "delegationScope": "Design and implement the remaining JustSearch UI/UX work, including Search v3 cutover compatibility and preservation of human Send.",
           "choice": "GA15 preserves exact false/true/absent legacy semantics, live/unreachable/starting/failure precedence, human UNLOADED admission and captured 200/202 continuation, and agent/background gates while consuming the existing AI authority.",
           "label": "agent choice"
@@ -502,6 +494,279 @@ GA15 adds only the real store-to-availability preservation cases below. Their se
       "evidence": "gates/test-intent/evidence/uiux-cutover-gate-alignment.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/aiStateStore.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "DS1 changes ONLY unknown saved grounded Ask replay: shape/text without own scope is not permission to search all files. The old unconditional saved Ask Retry/Edit oracle is superseded by pre-fork refusal preserving B. Known live chosen/all-files Ask, model-only actions, branch/version/pager/lifecycle mechanics remain required.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "DS1 fixed snapshot capacity supersedes ONLY unconditional incoming D-wins while unresolved A plus session B/raw C already consume necessary slots. Refuse D before mutation/request and preserve A/B/C. Ordinary in-capacity incoming success remains required. Raw-C precedence has no incoming D stimulus and is retained rather than obsoleted.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "DS1 unknown saved Ask refuses before fork/dispatch preserving B, third incoming D cannot replace exact raw C/session B/unresolved A, and restored journal/reload work cannot overwrite current raw text or revive legacy task semantics. These exact checks use supported public setup; no v2-only unsupported-before setup is converted into assertion evidence.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "DS1 adopted restoration/capacity/saved-action contract: automatic restored tasks cannot replace current raw work or confer scope. Known exact live Ask/model actions remain independent of unrelated B review. Unknown saved Ask refuses before fork. Bounds refuse incoming proposals before replacement/fork/request, preserving existing copies; a later explicit operation may send surviving valid B. Oversized authored Structured schema remains visible and blocked, with last acknowledged bytes intact. A/B/C plus unresolved task fit only the existing fixed capacities; refuse a third incoming snapshot. Retain model fork/lifecycle and original source/migration/stream/lock positives. These are agent choices under the delegation, not owner-verbatim scenario wording.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-ds1-intent-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 incoming preserves raw C and session B before refusing a third incoming snapshot",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 FC15 a restored journal task cannot replace legacy text or issue it",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Retain raw-C composer precedence and exact existing A/task/session-B/raw-C bytes. This raw variant offers no incoming D and makes no third-intake claim. Known-good9f supports its original attachment and required preservation.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "DS1 adopted restoration/capacity/saved-action contract: automatic restored tasks cannot replace current raw work or confer scope. Known exact live Ask/model actions remain independent of unrelated B review. Unknown saved Ask refuses before fork. Bounds refuse incoming proposals before replacement/fork/request, preserving existing copies; a later explicit operation may send surviving valid B. Oversized authored Structured schema remains visible and blocked, with last acknowledged bytes intact. A/B/C plus unresolved task fit only the existing fixed capacities; refuse a third incoming snapshot. Retain model fork/lifecycle and original source/migration/stream/lock positives. These are agent choices under the delegation, not owner-verbatim scenario wording.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-intent-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#DS1 raw preserves raw C and session B before refusing a third incoming snapshot"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve each exact existing handoff/migration/arrival/focus/stream/locked-controller, branch/fork/child/sibling/inherited-prefix/version/pager/editor/refusal and fresh cold-ingress/control case on matching known-good9f. Later DS1 additions cannot make whole older files into repair or preservation proof. The actual ordinary incoming two-arrival positive is included.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "Promote Search to USER/RAIL, preserve canonical TRUST adjacency/ordering and legacy migration, compatibility, reader and focus behaviors. Granular genuine assertion proof replaces unsupported whole-file repair claims. Preserve all remaining old positives on a meaningful matching known-good. Saved-state ownership and DS1 limits outrank unconditional old restored-input precedence.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-intent-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Search query' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid selection' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid mode' preserves legacy until routing has prepared the task",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold conversation address outranks the pointer without disposing of the old draft",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold incoming edits survive leave return reload and restart while legacy stays saved",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold native link is settled before ordinary boot can transfer legacy",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold queued native delivery waits for the initial drain before draft disposition",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold no-ingress transfer waits for native absence then remains one time after Clear",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold rapid arrivals before hydration preserve only the latest prepared scope",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold stale native startup cannot replace a newer task after Shell reconnects",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring successor collision keeps its text and the exact old value after restart",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring destination write refusal keeps the old copy for a later clean mount",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring two pending Shell mounts retain the durable transfer when the last tab closes",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring a tab closing before its ingress settles cannot erase another tab transfer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forks at the turn’s OWN answer, opens the branch, and loads both of its records",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#says so and changes nothing when the store refuses the branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#closes the pane once \"Branch\" claims the child conversation (route #4 -> openBranch)",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#shows the base as version 1 of the fork and pages forward into the branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#shows a branch as version 2 once it has a turn of its own",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#renders NO pager on a root conversation nothing forked from",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses to step past the first version",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forks BEFORE the question, not after its answer, and re-sends into the branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forks a THIRD turn at the turn before it, not at the conversation’s first answer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forks the FIRST question at the empty-prefix sentinel",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#keeps the rewrite in the editor when the branch is refused",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#holds the rewrite and says why when a stream starts under the open editor",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#retries a turn by re-sending its ORIGINAL question from the same fork point",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#offers neither Edit nor Retry on a turn whose fork point is a run-plane id",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#runs even when no documents are indexed — the Ask-only gate does not apply",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses while the model is unavailable, keeps the edited text, and forks nothing",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#keeps the edited text and says why when the agent becomes unavailable during the fork",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses while another run is active, and says so",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#says the branch failed and runs nothing when the store refuses the fork",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#asks about the branches, names them, and deletes them with it on consent",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#TD1 TD7 does not invent a creation date for an incomplete deletion record",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#leaves everything when the reader declines, and says nothing",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#reports which branch failed after a partially completed cascade",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#displays a refusal from another client without asking to delete branches",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#says so when the store refuses the delete outright",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#discards the SUPERSEDED /history answer however late it arrives",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets the open deleted child and cached turns when the next cascade child fails",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets a cached open conversation when a refreshed list confirms its deletion",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#a deletion refresh clears this window without claiming another windows active conversation",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets cached turns after restart when the missing server row is confirmed absent",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 discovers every old version on both sides after reload without enlarging recents",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#BF2a refreshes base and branch versions after existing list reads without typing reads",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 hides counts while pending and failed and preserves typing",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 refreshes old fork membership on creation and deletion",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 restores the neutral immediate-parent control for an old locked branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.3 uses a neutral name for a hidden parent on an empty branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 pages an empty continuation at the last answer from base and branch",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 ignores a stale successful read after a newer deletion refresh",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#BN1 S16.2 Retry sends while complete fork reads are still pending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#S16.1 S16.2 waits for branch lineage before presenting a fork count",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO1 HO2 a cold address query arrives intact and is consumed from the address",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO4 HO5 core.extract prepares the chosen files and waits",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 HO9 a selection is local to its prepared turn",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 two arrivals replace preparation without sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 an incoming query replaces typed Search without creating a conversation place",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO11 an answer link ignores agent affordance and conversation and waits",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 an empty file hand-off cannot widen to the whole index",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 an outgoing conversation keeps its unsent draft and files one click away",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 abandoning a prepared selection cannot attach it to another mode send",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO9 leaving the window retires prepared context while a layout reparent keeps it",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO10 unavailable chat still shows the prepared task and chosen files",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO12 an incoming task puts keyboard focus in the composer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 malformed selection data is refused visibly without a crash",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a held real controller keeps its decision and reopens from the sidebar",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO8 a locked conversation is left intact by incoming preparation",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO13 a refused unreadable-document hand-off keeps the instruction and files",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO12 keyboard palette search after a hand-off returns focus to the composer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#merge an unscoped Summarize input failure is not a no-matching-files result",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'inline trace'",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'shortened'",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'different question'",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 edited Explain keeps selection identity before send: 'emptied'",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a failed durable write leaves the legacy draft recoverable",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 a compatibility mount for core.rag-ask prepares its mode without sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 a compatibility mount for core.free-chat prepares its mode without sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 a compatibility mount for core.extract prepares its mode without sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 a workflow compatibility mount announces its unavailable disposition",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"mode\":[\"ask\",\"search\"]} without losing its text or widening scope",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"forceShapeId\":[]} without losing its text or widening scope",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"docIds\":[\"\",\"chosen.md\"]} without losing its text or widening scope",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C9 A3 changing the address place keeps the shared reader until explicitly closed",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Keep later DS1 restored summary/Explain unknown-input refusals, two-slot/third-slot preparation controls and origin/bare-history capacity cases separate from original cutover positives. Matching known-good9f preservation coverage only; no unsupported v2-before or whole-file exception is claimed as repair proof.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261019-bd718f",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Design and implement remaining JustSearch UI/UX cutover work while preserving human Send, exact own inputs, current work and unrelated retained proposals.",
+          "choice": "DS1 adopted restoration/capacity/saved-action contract: automatic restored tasks cannot replace current raw work or confer scope. Known exact live Ask/model actions remain independent of unrelated B review. Unknown saved Ask refuses before fork. Bounds refuse incoming proposals before replacement/fork/request, preserving existing copies; a later explicit operation may send surviving valid B. Oversized authored Structured schema remains visible and blocked, with last acknowledged bytes intact. A/B/C plus unresolved task fit only the existing fixed capacities; refuse a third incoming snapshot. Retain model fork/lifecycle and original source/migration/stream/lock positives. These are agent choices under the delegation, not owner-verbatim scenario wording.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-cutover-intent-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 FC15 a restored journal task cannot replace legacy text or issue it",
+        "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 HO8 cold third-snapshot intake refuses without replacing the raw or typed draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary Retry menu names the original summary inputs",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#HO5 a reloaded Explain Retry menu states its actual restoration limit",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 HO5 a reloaded Explain retry refuses before fork and preserves unrelated B",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 HO5 a reloaded Explain edit refuses before fork and preserves unrelated B",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 allows two whole same-text proposals, refusing a third before replacement or a request",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 ordinary compatibility model tier changes retain the actual no-retrieval proposal before any leave",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 rejected fresh hash intake preserves live conversation B and both snapshots before traversal clearing",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 bare history restoration cannot retire live B when both existing recovery slots are needed",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 bare history restoration cannot retire review B when both existing recovery slots are needed",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#DS1 one-slot automatic hero navigation retains B at its origin while explicit New retires current B"
       ]
     }
   ]
