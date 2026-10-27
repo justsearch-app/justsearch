@@ -82,6 +82,7 @@ public final class ApiErrorHandler {
         String message = sanitizeMessage(e != null ? e.getMessage() : null);
         var response = buildTypedResponse(message, code);
         if (executorRefusal(e) != null || admissionRefusal(e) != null) response.put("retrySafe", false);
+        if (servingUnavailable(e) != null) response.put("retrySafe", true);
         return response;
     }
 
@@ -95,6 +96,14 @@ public final class ApiErrorHandler {
     public static io.justsearch.app.api.EngineAdmissionException admissionRefusal(Throwable failure) {
         failure = unwrapAsyncFailure(failure);
         return failure instanceof io.justsearch.app.api.EngineAdmissionException refused
+            ? refused : null;
+    }
+
+    /** A capture refused before the request ran: no serving view or verified client yet. */
+    public static io.justsearch.app.api.ServingUnavailableException servingUnavailable(
+            Throwable failure) {
+        failure = unwrapAsyncFailure(failure);
+        return failure instanceof io.justsearch.app.api.ServingUnavailableException refused
             ? refused : null;
     }
 
@@ -117,12 +126,20 @@ public final class ApiErrorHandler {
         }
     }
 
+    /** Writes any refusal that happened before the request ran: admission, serving, executor. */
     public static boolean writeExecutorRefusal(io.javalin.http.Context ctx, Exception failure,
             Telemetry telemetry) {
         var admission = admissionRefusal(failure);
         if (admission != null) {
             recordError(telemetry, resolve(admission), routeOf(ctx));
             RequestEngineWork.writeRefusal(ctx, admission);
+            return true;
+        }
+        var unavailable = servingUnavailable(failure);
+        if (unavailable != null) {
+            ctx.status(httpStatusFor(ApiErrorCode.SERVICE_UNAVAILABLE));
+            ctx.header("Retry-After", Integer.toString(unavailable.retryAfterSeconds()));
+            ctx.json(toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, unavailable, telemetry, routeOf(ctx)));
             return true;
         }
         var refused = executorRefusal(failure);
@@ -310,6 +327,12 @@ public final class ApiErrorHandler {
                 case INFERENCE_BUSY -> ApiErrorCode.ADMISSION_INFERENCE_BUSY;
                 case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
             };
+        }
+
+        // Refused at capture while nothing can serve it yet; checked before the general
+        // IllegalStateException mapping below, which stays INVALID_STATE for everything else.
+        if (e instanceof io.justsearch.app.api.ServingUnavailableException) {
+            return ApiErrorCode.SERVICE_UNAVAILABLE;
         }
 
         // IndexRuntimeIOException: surface the specific reason

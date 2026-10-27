@@ -98,6 +98,8 @@ testing {
         // C1 real HTTP disconnect proof reads the Engine's actual pacing gauge. Test-only:
         // the frontend production layer still cannot depend on Worker service internals.
         implementation(project(":modules:worker-services"))
+        // Serving-view refusal tests take the real refusal from an unpublished Knowledge Server.
+        implementation(project(":modules:indexer-worker"))
         implementation(testFixtures(project(":modules:configuration")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
