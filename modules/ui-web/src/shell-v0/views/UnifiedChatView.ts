@@ -2509,6 +2509,7 @@ export class UnifiedChatView extends JfElement {
         <div>
           <strong>Search</strong> — ask anything
           <jf-conversation-history
+            .apiBase=${this.apiBase}
             @conversation-select=${(e: CustomEvent) => this.onConversationSelect(e)}
           ></jf-conversation-history>
           ${/* Search Thread S5b — the affordance-bar row retired; Activity (the retrospective drawer:
