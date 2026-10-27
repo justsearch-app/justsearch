@@ -1,0 +1,1472 @@
+{
+  "status": "partial; HO8a contract decision and final native browser validation outstanding",
+  "baseline": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+  "sandboxProbe": {
+    "pass": false,
+    "error": "Error: browserType.launchPersistentContext: Target page, context or browser has been closed\nBrowser logs:\nChromium sandboxing failed!\n================================\nTo avoid the sandboxing issue, do either of the following:\n  - (preferred): Configure your environment to support sandboxing\n  - (alternative): Launch Chromium without sandbox using 'chromiumSandbox: false' option\n================================\n\nCall log:\n\u001b[2m  - <launching> /home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --disable-gpu --user-data-dir=/tmp/jsv-jE10Kc/p --remote-debugging-pipe about:blank\u001b[22m\n\u001b[2m  - <launched> pid=754\u001b[22m\n\u001b[2m  - [pid=754][err] [754:754:1027/054817.552576:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:130] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.\u001b[22m\n\u001b[2m  - [pid=754][err] Received signal 6\u001b[22m\n\u001b[2m  - [pid=754][err] #0 0x62b932f57e33 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x6e7ce32)\u001b[22m\n\u001b[2m  - [pid=754][err] #1 0x62b937f7bd34 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbea0d33)\u001b[22m\n\u001b[2m  - [pid=754][err] #2 0x7eb22fa45cb0 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45caf)\u001b[22m\n\u001b[2m  - [pid=754][err] #3 0x7eb22fa45b7e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45b7d)\u001b[22m\n\u001b[2m  - [pid=754][err] #4 0x7eb22fa288ec (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288eb)\u001b[22m\n\u001b[2m  - [pid=754][err] #5 0x62b937f72205 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbe97204)\u001b[22m\n\u001b[2m  - [pid=754][err] #6 0x62b937f30ecd (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbe55ecc)\u001b[22m\n\u001b[2m  - [pid=754][err] #7 0x62b937f30e1d (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbe55e1c)\u001b[22m\n\u001b[2m  - [pid=754][err] #8 0x62b930f09cf2 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x4e2ecf1)\u001b[22m\n\u001b[2m  - [pid=754][err] #9 0x62b93295fb99 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x6884b98)\u001b[22m\n\u001b[2m  - [pid=754][err] #10 0x62b931e16548 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x5d3b547)\u001b[22m\n\u001b[2m  - [pid=754][err] #11 0x62b9373f65c5 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xb31b5c4)\u001b[22m\n\u001b[2m  - [pid=754][err] #12 0x62b931ec65dc (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x5deb5db)\u001b[22m\n\u001b[2m  - [pid=754][err] #13 0x62b931ec306f (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x5de806e)\u001b[22m\n\u001b[2m  - [pid=754][err] #14 0x7eb22fa2a601 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a600)\u001b[22m\n\u001b[2m  - [pid=754][err] #15 0x7eb22fa2a718 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a717)\u001b[22m\n\u001b[2m  - [pid=754][err] #16 0x62b9331e738a (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x710c389)\u001b[22m\n\u001b[2m  - [pid=754][err]   r8: 0000000000000016  r9: 0000000000000001 r10: 00002598000dc4e1 r11: 0000000000000246\u001b[22m\n\u001b[2m  - [pid=754][err]  r12: 0000000000000006 r13: 0000000000000262 r14: 0000000000000261 r15: 00007ffdbaa31e38\u001b[22m\n\u001b[2m  - [pid=754][err]   di: 00000000000002f2  si: 00000000000002f2  bp: 00007ffdbaa317a0  bx: 00000000000002f2\u001b[22m\n\u001b[2m  - [pid=754][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007eb22faa61ac  sp: 00007ffdbaa31760\u001b[22m\n\u001b[2m  - [pid=754][err]   ip: 00007eb22faa61ac efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000\u001b[22m\n\u001b[2m  - [pid=754][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000\u001b[22m\n\u001b[2m  - [pid=754][err] [end of stack trace]\u001b[22m\n\u001b[2m  - [pid=754] <gracefully close start>\u001b[22m\n\u001b[2m  - [pid=754] <kill>\u001b[22m\n\u001b[2m  - [pid=754] <will force kill>\u001b[22m\n\u001b[2m  - [pid=754] <process did exit: exitCode=null, signal=SIGABRT>\u001b[22m\n\u001b[2m  - [pid=754] starting temporary directories cleanup\u001b[22m\n\u001b[2m  - [pid=754] finished temporary directories cleanup\u001b[22m\n\u001b[2m  - [pid=754] <gracefully close end>\u001b[22m\n"
+  },
+  "harnessAdaptations": [
+    "Supplied defect bundle lacks ui-helpers.mjs, proxy.mjs and vite-start.mjs; helpers reconstructed and existing S67 direct Engine/Vite launcher reused.",
+    "new-tab-identity uses genuine conversation authored in this own ec41 UI instead of missing main fixture/switch-tree dependencies. The shared-journal/empty-session/no-opener and assertion sequence are retained. No previous-version upgrade claim.",
+    "stream-origin-access is the supplied script with hardcoded switchTree removed; one private candidate used."
+  ],
+  "harnessSources": {
+    "runtime.py": "import os,sys,subprocess,tempfile,time,json,signal,shutil,urllib.request,urllib.error,hashlib,socket\nfrom pathlib import Path\nE=Path(__file__).parent;label=sys.argv[1];R=Path(sys.argv[2]).resolve();O=E/('runtime-'+label);O.mkdir(exist_ok=True);jobs=O/'jobs';jobs.mkdir(exist_ok=True)\nP=Path(tempfile.mkdtemp(prefix='jsv-eng-',dir='/tmp'))\nfor d in ['home','data','index','corpus','config','cache','state','xdgdata','tmp']: (P/d).mkdir()\n(P/'corpus/chosen-alpha.txt').write_text('Cedar dossier\\nLine one\\nLine two\\nLine three\\nLine four\\nLine five\\nCedar budget is 17 million.\\nCedar owner is Alice.\\nCedar launch is Monday.\\nThe chosen answer code is CEDAR-CHOSEN-731.\\nThe unchosen answer code is not present in this file.\\n')\n(P/'corpus/unchosen-decoy.txt').write_text('Zulu code dossier. The Zulu code is ZULU-DECOY-999. This unchosen file holds the Zulu answer code, and is separate from the chosen Cedar file. What is the Zulu code? The exact answer is ZULU-DECOY-999. The project code for Zulu is ZULU-DECOY-999. No chosen Cedar file contains this Zulu code. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. \\n')\nenv={k:v for k,v in os.environ.items() if not k.startswith('JUSTSEARCH_') and k not in ['JAVA_OPTS','JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS','UI_OPTS','DISPLAY','WAYLAND_DISPLAY']}\nenv.update(CUDA_VISIBLE_DEVICES='-1',HOME=str(P/'home'),XDG_CONFIG_HOME=str(P/'config'),XDG_DATA_HOME=str(P/'xdgdata'),XDG_CACHE_HOME=str(P/'cache'),XDG_STATE_HOME=str(P/'state'),TMPDIR=str(P/'tmp'),UI_OPTS='-Duser.home='+str(P/'home'),JUSTSEARCH_HOME=str(P/'data'),JUSTSEARCH_DATA_DIR=str(P/'data'),JUSTSEARCH_INDEX_BASE_PATH=str(P/'index'),JUSTSEARCH_API_PORT='0',JUSTSEARCH_REPO_ROOT=str(R),JUSTSEARCH_SERVER_EXE='/home/elias/dev/llama.cpp-b8571/build/bin/llama-server',JUSTSEARCH_LLM_MODEL_PATH='/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf',JUSTSEARCH_CONTEXT_SIZE='16384',JUSTSEARCH_GPU_LAYERS='0',JUSTSEARCH_REASONING_BUDGET='0',JUSTSEARCH_DEV_HOTRELOAD='false',JUSTSEARCH_AI_EMBED_ENABLED='false',JUSTSEARCH_NER_ENABLED='false',JUSTSEARCH_SPLADE_ENABLED='false',JUSTSEARCH_BGE_M3_ENABLED='false',JUSTSEARCH_RERANK_ENABLED='false',JUSTSEARCH_RERANK_CHUNKS_ENABLED='false',JUSTSEARCH_POLICY_GPU_ACCELERATION_ENABLED='false',JUSTSEARCH_EXTRACTION_SANDBOX_MODE='in_process')\nengine=None;vite=None;child=None;seen={}\ndef cohort():\n rows={}\n for p in Path('/proc').iterdir():\n  if not p.name.isdecimal():continue\n  try:\n   f=p.joinpath('stat').read_text().rsplit(') ',1)[1].split();rows[int(p.name)]=(int(f[1]),f[19])\n  except OSError:pass\n ids={p.pid for p in [engine,vite,child] if p and p.poll() is None}\n for _ in range(15):\n  more={pid for pid,(ppid,_) in rows.items() if ppid in ids}\n  if more<=ids:break\n  ids |= more\n result=[]\n for pid in ids:\n  try:\n   p=Path('/proc',str(pid));r=dict(pid=pid,startticks=rows[pid][1],argv=p.joinpath('cmdline').read_bytes().decode().split('\\0'),cwd=os.readlink(p/'cwd'),executable=os.readlink(p/'exe'))\n   result.append(r);seen[str(pid)+'/'+r['startticks']]=r\n  except OSError:pass\n (O/'processes.json').write_text(json.dumps(seen,indent=2));return result\n\ndef request(name,path,body=None):\n req=urllib.request.Request(base+path,data=None if body is None else json.dumps(body).encode(),headers={'X-JustSearch-Session':token,'Content-Type':'application/json'})\n try:r=urllib.request.urlopen(req,timeout=30)\n except urllib.error.HTTPError as e:r=e\n raw=r.read();x=json.loads(raw);(O/(name+'.json')).write_text(json.dumps(dict(path=path,status=r.status,request=body,body=x),indent=2));return r.status,x\ntry:\n script=R/'modules/ui/build/install/ui/bin/ui';install={str(p.relative_to(script.parent.parent)):hashlib.sha256(p.read_bytes()).hexdigest() for p in script.parent.parent.rglob('*') if p.is_file()};(O/'install-hashes.json').write_text(json.dumps(install,indent=2))\n engine=subprocess.Popen([str(script)],cwd=P,env=env,stdout=(O/'engine.log').open('w'),stderr=subprocess.STDOUT,start_new_session=True)\n manifest=P/'data/runtime/manifest.json';m=None\n for _ in range(180):\n  cohort()\n  if engine.poll() is not None:raise RuntimeError('Engine exited; see log')\n  try:\n   m=json.loads(manifest.read_text())\n   if m.get('head',{}).get('apiPort') and m.get('worker',{}).get('state')=='ready':break\n  except (OSError,ValueError):pass\n  time.sleep(.5)\n else:raise RuntimeError('Engine readiness timeout; no retry')\n base='http://127.0.0.1:'+str(m['head']['apiPort']);token=m['head'].get('sessionToken','');redacted=json.loads(json.dumps(m));redacted['head']['sessionToken']='[redacted]';(O/'manifest.json').write_text(json.dumps(redacted,indent=2))\n for name,path in [('health','/api/health'),('status','/api/status'),('settings','/api/settings/v2'),('catalog','/api/registry/surfaces')]:request(name,path)\n st,x=request('add-root','/api/indexing/roots',{'path':str(P/'corpus'),'collection':'flip-verifier'})\n if st!=200:raise RuntimeError('Private corpus admission refused')\n s=socket.socket();s.bind(('127.0.0.1',0));port=s.getsockname()[1];s.close()\n ve={k:v for k,v in env.items() if not k.startswith('JUSTSEARCH_')};ve['VITE_API_PORT']=str(m['head']['apiPort'])\n vite=subprocess.Popen(['node','node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',str(port),'--strictPort'],cwd=R/'modules/ui-web',env=ve,stdout=(O/'vite.log').open('w'),stderr=subprocess.STDOUT,start_new_session=True)\n for _ in range(60):\n  if vite.poll() is not None:raise RuntimeError('Private Vite exited')\n  try:urllib.request.urlopen('http://127.0.0.1:'+str(port),timeout=1);break\n  except OSError:time.sleep(.5)\n else:raise RuntimeError('Private Vite startup timeout')\n info=dict(label=label,head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip(),tree=str(R),port=port,enginePort=m['head']['apiPort'],profile=str(P),corpus=str(P/'corpus'),chosen=str(P/'corpus/chosen-alpha.txt'),decoy=str(P/'corpus/unchosen-decoy.txt'),scope='Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture')\n (O/'ready.json').write_text(json.dumps(info,indent=2));print('READY',label,port,flush=True)\n end=time.monotonic()+18000\n while not (O/'STOP').exists() and time.monotonic()<end:\n  cohort()\n  if engine.poll() is not None or vite.poll() is not None:raise RuntimeError('Own service exited')\n  for j in sorted(jobs.glob('*.json')):\n   if not j.exists() or j.with_suffix('.done').exists():continue\n   job=json.loads(j.read_text());name=j.stem;cmd=job['command'];ce={k:v for k,v in os.environ.items() if not k.startswith('JUSTSEARCH_') and k not in ['JAVA_OPTS','JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS','UI_OPTS','DISPLAY','WAYLAND_DISPLAY']};ce.update(CUDA_VISIBLE_DEVICES='-1',RUNTIME_INFO=str(O/'ready.json'),RUNTIME_OUT=str(O),RUNTIME_TOKEN=token)\n   with (O/(name+'.log')).open('w') as f:\n    child=subprocess.Popen(cmd,cwd=R,env=ce,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)\n    while child.poll() is None:\n     cohort()\n     if (O/'STOP').exists():os.killpg(child.pid,signal.SIGTERM)\n     time.sleep(.5)\n   j.with_suffix('.done').write_text(json.dumps(dict(command=cmd,exit=child.returncode)));print(name,child.returncode,flush=True);child=None\n  time.sleep(.5)\nfinally:\n rows=cohort()\n for p in [child,vite,engine]:\n  if p and p.poll() is None:\n   os.killpg(p.pid,signal.SIGTERM)\n   try:p.wait(15)\n   except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()\n for r in rows:\n  try:\n   p=Path('/proc',str(r['pid']))\n   if p.joinpath('stat').read_text().split()[21]==r['startticks']:os.kill(r['pid'],signal.SIGTERM)\n  except (OSError,ProcessLookupError):pass\n shutil.rmtree(P)\n (O/'cleanup.json').write_text(json.dumps(dict(profileRemoved=not P.exists(),engineExit=engine.returncode if engine else None,viteExit=vite.returncode if vite else None,ownedProcessIds=rows),indent=2))\n",
+    "browser-lib.mjs": "import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';\nexport const info=JSON.parse(fs.readFileSync(process.env.RUNTIME_INFO,'utf8')),out=process.env.RUNTIME_OUT;\nexport const {chromium}=await import(pathToFileURL(info.tree+'/modules/ui-web/node_modules/playwright-core/index.mjs'));\nexport async function switchTree(tree){const nonce=JSON.stringify({tree,time:Date.now()});fs.writeFileSync(path.join(out,'UPGRADE'),nonce);for(let i=0;i<240;i++){const f=path.join(out,'UPGRADE-DONE');if(fs.existsSync(f)&&fs.readFileSync(f,'utf8')===nonce){Object.assign(info,JSON.parse(fs.readFileSync(process.env.RUNTIME_INFO,'utf8')));const cipher=path.join(out,'OWN_CIPHER_FIXTURE');if(fs.existsSync(cipher)){const u=await fetch('http://127.0.0.1:'+info.port+'/api/conversations/encryption/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passphrase:fs.readFileSync(cipher,'utf8')})});const body=await u.json();fs.appendFileSync(path.join(out,'fixture-unlocks.jsonl'),JSON.stringify({at:new Date().toISOString(),tree,status:u.status,body})+'\\n');assert(u.ok&&body.state==='unlocked','explicit own fixture unlock after source transition');}return;}await new Promise(r=>setTimeout(r,500));}throw Error('switch tree timeout');}\nexport const origin='http://127.0.0.1:'+info.port;\nexport const deep=(state={},target='core.search-v3-surface')=>'#justsearch://surface/'+target+(Object.keys(state).length?'?'+new URLSearchParams(state):'');\nexport const assert=(v,msg)=>{if(!v)throw Error('ASSERTION: '+msg)};\nexport async function snapshot(page,dir,name){let x=await page.evaluate(()=>{const all=r=>[...r.querySelectorAll('*')].flatMap(e=>[e,...(e.shadowRoot?all(e.shadowRoot):[])]);const a=all(document);const text=r=>[...r.childNodes].map(n=>n.nodeType===3?n.textContent:n.nodeType===1&&!['STYLE','SCRIPT'].includes(n.tagName)?text(n)+(n.shadowRoot?text(n.shadowRoot):''):'').join(' ');return {url:location.href,text:text(document.body??document.documentElement),inputs:a.filter(e=>['INPUT','TEXTAREA'].includes(e.tagName)).map(e=>({tag:e.tagName,testid:e.getAttribute('data-testid'),placeholder:e.getAttribute('placeholder'),value:e.value,aria:e.getAttribute('aria-label')})),buttons:a.filter(e=>e.tagName==='BUTTON').map(e=>({text:e.textContent,aria:e.getAttribute('aria-label'),testid:e.getAttribute('data-testid'),disabled:e.disabled,visible:e.getBoundingClientRect().height>0})),localStorage:Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)])),sessionStorage:Object.fromEntries(Object.keys(sessionStorage).map(k=>[k,sessionStorage.getItem(k)])),composer:a.find(e=>e.localName==='jf-sv3-composer')?.outerHTML,view:a.filter(e=>['jf-sv3-window','jf-unified-chat-view'].includes(e.localName)).map(e=>e.localName),historyLength:history.length};});fs.writeFileSync(path.join(dir,name+'.json'),JSON.stringify(x,null,2));return x}\nexport async function ownBrowser(name,fn,options={}){console.log('START',name);if(process.env.RESTART_EACH==='1'){const nonce=String(Date.now());fs.writeFileSync(path.join(out,'RESTART'),nonce);let ok=false;for(let i=0;i<180;i++){if(fs.existsSync(path.join(out,'RESTART-DONE'))&&fs.readFileSync(path.join(out,'RESTART-DONE'),'utf8')===nonce){ok=true;break}await new Promise(r=>setTimeout(r,500))}assert(ok,'fresh own Engine ready before browser case')}const baseName=name;let attempt=1;while(fs.existsSync(path.join(out,name)))name=baseName+'-attempt-'+(++attempt);const dir=path.join(out,name);fs.mkdirSync(dir,{recursive:true});const short=fs.mkdtempSync('/tmp/jsv-');const profile=path.join(short,'p');const wire=[],errors=[];let ctx,page;const env={...process.env,CUDA_VISIBLE_DEVICES:'-1',HOME:info.profile+'/home',XDG_CONFIG_HOME:info.profile+'/config',XDG_CACHE_HOME:info.profile+'/cache',XDG_DATA_HOME:info.profile+'/xdgdata',TMPDIR:short};delete env.RUNTIME_TOKEN;let result={name,head:info.head,scope:info.scope,sandbox:false,short,profile};const save=()=>fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));\ntry{ctx=await chromium.launchPersistentContext(profile,{headless:true,executablePath:'/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome',chromiumSandbox:false,args:['--disable-gpu','--no-sandbox'],env,viewport:options.viewport??{width:1440,height:1000},colorScheme:options.colorScheme??'light',forcedColors:options.forcedColors??'none'});ctx.setDefaultTimeout(15000);page=ctx.pages()[0]??await ctx.newPage();page.on('pageerror',e=>errors.push(String(e)));page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/')){wire.push({event:'request',at:Date.now(),method:r.method(),path:new URL(r.url()).pathname,body:r.postData()});fs.writeFileSync(path.join(dir,'wire.json'),JSON.stringify(wire,null,2))}});page.on('response',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/api/')){wire.push({event:'response',at:Date.now(),path:u.pathname,status:r.status()});fs.writeFileSync(path.join(dir,'wire.json'),JSON.stringify(wire,null,2))}});\nconst cipherFixture=path.join(out,'OWN_CIPHER_FIXTURE');if(fs.existsSync(cipherFixture)){const unlock=await page.request.post(origin+'/api/conversations/encryption/unlock',{data:{passphrase:fs.readFileSync(cipherFixture,'utf8')}});const body=await unlock.json();fs.writeFileSync(path.join(dir,'fixture-native-unlock.json'),JSON.stringify({status:unlock.status(),body},null,2));assert(unlock.ok()&&body.state==='unlocked','explicitly unlock own encrypted fixture after Engine restart');}const snap=n=>snapshot(page,dir,n);const ops=()=>wire.filter(x=>x.event==='request'&&x.method!=='GET'&&/\\/api\\/(knowledge\\/search|search|chat\\/(dispatch|agent\\/(?!virtual-operations)|.*branch|.*interject))/.test(x.path));await fn({page,ctx,wire,errors,dir,snap,ops,profile,short,env});result.pass=true;\n}catch(e){result.pass=false;result.failure=e.stack??String(e);if(page){try{await snapshot(page,dir,'failure-state');await page.screenshot({path:path.join(dir,'failure.png')});}catch{}}}\nfinally{if(ctx)await ctx.close();result.errors=errors;result.operations=wire.filter(x=>x.event==='request'&&x.method!=='GET'&&/\\/api\\/(knowledge\\/search|search|chat\\/(dispatch|agent\\/(?!virtual-operations)|.*branch|.*interject))/.test(x.path));save();fs.rmSync(short,{recursive:true,force:true});fs.writeFileSync(path.join(dir,'cleanup.json'),JSON.stringify({closed:true,profileRemoved:!fs.existsSync(short)}));}\nconsole.log(name,result.pass,result.failure?.split('\\n')[0]??'');return result;\n}\nexport async function boot(page,state={},target='core.search-v3-surface'){await page.goto(origin+'/?api_port='+info.port+deep(state,target),{waitUntil:'domcontentloaded'});await page.getByTestId('sv3-composer-input').waitFor({state:'visible',timeout:60000});const d=page.getByRole('button',{name:'Dismiss',exact:true});if(await d.isVisible())await d.click();}\n",
+    "ui-helpers.mjs": "import {origin,info,deep,assert} from './browser-lib.mjs';\nexport const newInput=p=>p.getByTestId('sv3-composer-input');\nexport const oldInput=p=>p.locator('jf-unified-chat-view textarea').first();\nexport async function until(fn,label,timeout=60000){const end=Date.now()+timeout;while(Date.now()<end){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,100));}throw Error('Timeout: '+label);}\nexport async function open(p,state={},target='core.unified-chat-surface'){await p.goto(origin+'/?api_port='+info.port+deep(state,target));await newInput(p).waitFor({timeout:60000});}\nexport const dispatches=wire=>wire.filter(x=>x.event==='request'&&x.path==='/api/chat/dispatch');\nexport async function get(p,path){const r=await p.request.get(origin+path);return {status:r.status(),body:await r.json()};}\n",
+    "new-tab-identity.mjs": "import fs from 'node:fs';import path from 'node:path';import {ownBrowser,snapshot,origin,info,assert,deep} from './browser-lib.mjs';import {open,newInput,until,dispatches} from './ui-helpers.mjs';\nconst r=await ownBrowser('new-tab-identity',async({page,ctx,wire,dir,snap})=>{\n await open(page,{query:'IDENTITY_FIXTURE Ask only for the code in this chosen file.',mode:'ask',docIds:info.chosen});\n await newInput(page).waitFor();await newInput(page).fill('IDENTITY_FIXTURE Ask only for the code in this chosen file.');\n await page.getByTestId('sv3-composer-send').click();\n const req=JSON.parse((await until(()=>dispatches(wire)[0],'real identity request')).body);\n await until(async()=>{const r=await page.request.get(origin+'/api/chat/conversations/'+req.conversationId+'/history');const b=await r.json();return b.messages?.some(m=>m.role==='assistant'&&!m.errorCode)},'genuine saved answer',180000);\n await open(page,{conversationId:req.conversationId});await page.getByTestId('sv3-turn').first().waitFor();await snap('original-tab-explicit');\n let fresh;try{\n fresh=await ctx.newPage();await fresh.goto(origin+'/favicon.svg');const initial=await snapshot(fresh,dir,'new-tab-before-boot');const opener=await fresh.evaluate(()=>window.opener===null);assert(opener&&initial.sessionStorage['justsearch.lastViewedConversation.v1']===undefined,'new tab has no opener and no retained identity');\n await fresh.goto(origin+'/?api_port='+info.port);await newInput(fresh).waitFor();await fresh.waitForTimeout(800);const after=await snapshot(fresh,dir,'new-tab-after-bare-boot');const count=await fresh.getByTestId('sv3-turn').count();\n fs.writeFileSync(path.join(dir,'outcome.json'),JSON.stringify({candidateTurnCount:count,initialPointer:initial.sessionStorage['justsearch.lastViewedConversation.v1']??null,afterPointer:after.sessionStorage['justsearch.lastViewedConversation.v1']??null,afterUrl:after.url,openerNull:opener,originalId:req.conversationId},null,2));\n assert(dispatches(wire).length===1,'opening another tab never issues another model question');assert(count===0&&after.sessionStorage['justsearch.lastViewedConversation.v1']===undefined,'C3/A6 new tab must not adopt a conversation owned only by another tab');\n }finally{if(fresh)await fresh.close();}\n});if(!r.pass)process.exitCode=1;\n",
+    "stream-origin-access.mjs": "import fs from 'node:fs';import path from 'node:path';import {ownBrowser,info,origin,deep,assert,switchTree} from './browser-lib.mjs';import {open,newInput,until,dispatches,get} from './ui-helpers.mjs';\nconst phase=process.argv[2],before=phase==='before-dev';\nconst r=await ownBrowser(phase+'-C7-origin-one-click-after-two-arrivals-2',async({page,wire,snap,dir})=>{const q='What is Cedar? Then write a numbered list of 400 creative city names.';await open(page,{mode:'ask',docIds:info.chosen},before?'core.search-v3-surface':'core.unified-chat-surface');await newInput(page).waitFor();await page.getByTestId('sv3-composer-effort').click();await page.getByTestId('sv3-composer-effort-option').filter({hasText:'Quick'}).click();await newInput(page).fill(q);await page.getByTestId('sv3-composer-send').click();const req=JSON.parse((await until(()=>dispatches(wire)[0],'real original model request')).body);assert(JSON.stringify(req.docIds)===JSON.stringify([info.chosen]),'original real Ask exact chosen scope');await until(async()=>{const h=await get(page,'/api/chat/conversations/'+req.conversationId+'/history');return h.body.messages?.some(m=>m.role==='user')&&!h.body.messages.some(m=>m.role==='assistant'&&m.errorCode!=='INCOMPLETE_TURN')},'original still accepted and streaming');\n await page.evaluate(h=>location.hash=h,deep({query:'FIRST PREPARED HANDOFF A',mode:'ask',docIds:info.decoy},'core.search-v3-surface'));await page.evaluate(h=>location.hash=h,deep({query:'LATEST PREPARED HANDOFF B',mode:'ask',docIds:info.chosen},'core.search-v3-surface'));await until(async()=>await newInput(page).inputValue()==='LATEST PREPARED HANDOFF B','second incoming task prepared');await snap('latest-B-before-origin-click');const rows=await page.locator('jf-sv3-sidebar').evaluate(e=>e.groups.flatMap(g=>g.rows).map(r=>r.id));assert(rows.includes(req.conversationId),'original session row remains rendered');await page.getByTestId('sv3-session-row-button').nth(rows.indexOf(req.conversationId)).click();await page.waitForTimeout(600);const x=await snap('after-single-origin-row-click');const visible=await page.getByTestId('sv3-transcript').getByText(q,{exact:false}).first().isVisible();fs.writeFileSync(path.join(dir,'one-click-outcome.json'),JSON.stringify({originalId:req.conversationId,originalVisible:visible,url:x.url,currentText:await newInput(page).inputValue(),recovery:x.text.includes('could not')||x.text.includes('limits')||x.text.includes('kept')},null,2));assert(dispatches(wire).length===1,'arrivals and origin click never append or re-submit');assert(!wire.some(x=>x.event==='request'&&/\\/stop$/.test(x.path)),'handoff does not Stop original work');assert(visible,'HO8a original accepted conversation must be one click away through its sidebar row');});if(!r.pass)process.exitCode=1;\n",
+    "identity-controls.mjs": "import fs from 'node:fs';import path from 'node:path';import {ownBrowser,origin,info,assert,deep} from './browser-lib.mjs';import {open,newInput,until,dispatches,get} from './ui-helpers.mjs';\nconst fixture=JSON.parse(fs.readFileSync(path.join(process.env.RUNTIME_OUT,'new-tab-identity/outcome.json'),'utf8'));const id=fixture.originalId;\nconst r=await ownBrowser('identity-controls',async({page,wire,snap,dir})=>{\n await open(page,{conversationId:id});await page.getByTestId('sv3-turn').first().waitFor();\n assert(await page.evaluate(()=>sessionStorage.getItem('justsearch.lastViewedConversation.v1'))===id,'explicit conversation claims the pointer');\n await page.goto(origin+'/?api_port='+info.port);await newInput(page).waitFor();await page.getByTestId('sv3-turn').first().waitFor();assert(page.url().includes(encodeURIComponent(id)),'same-tab bare launch restores its pointer');await page.reload();await page.getByTestId('sv3-turn').first().waitFor();await snap('same-tab-reload');\n await page.evaluate(h=>location.hash=h,deep({query:'Explicit # & \u65e5\u672c\u8a9e query',mode:'ask'}));await until(async()=>await newInput(page).inputValue()==='Explicit # & \u65e5\u672c\u8a9e query','explicit query');assert(await page.getByTestId('sv3-turn').count()===0,'explicit query outranks old identity');await snap('explicit-query');\n // Remove the preparation through the public New action before navigation controls.\n await open(page,{conversationId:id});await page.getByTestId('sv3-turn').first().waitFor();\n await page.evaluate(()=>location.hash='#justsearch://surface/core.library-surface');await page.locator('jf-library-surface').waitFor({state:'attached',timeout:15000});await page.waitForTimeout(300);\n await page.goBack();await page.getByTestId('sv3-turn').first().waitFor();assert(page.url().includes(id),'Back returns to the explicit conversation');await snap('back');\n await page.goForward();await page.locator('jf-library-surface').waitFor({state:'attached'});await page.waitForTimeout(300);await snap('forward');\n await page.getByRole('button',{name:'Recent views',exact:true}).click();await page.getByRole('menuitem').filter({hasText:'Search'}).first().click();await page.getByTestId('sv3-turn').first().waitFor();assert(page.url().includes(id),'Recents intentionally restores its conversation');await snap('recents');\n const pass='own-builder-fixture-passphrase';\n let state=await get(page,'/api/conversations/encryption');\n if(state.body.state==='not_configured'||state.body.state==='uninitialized'||state.body.state==='unconfigured'){\n  const setup=await page.request.post(origin+'/api/conversations/encryption/setup',{data:{passphrase:pass}});assert(setup.ok(),'own encryption setup');\n }\n const lock=await page.request.post(origin+'/api/conversations/encryption/lock',{data:{}});assert(lock.ok(),'own store lock');\n await page.reload();await newInput(page).waitFor();await page.waitForTimeout(500);const locked=await get(page,'/api/chat/conversations/'+id+'/history');assert(locked.status===423,'native store is actually locked');assert(page.url().includes(id),'locked explicit identity is retained');await snap('locked-record');\n const unlock=await page.request.post(origin+'/api/conversations/encryption/unlock',{data:{passphrase:pass}});assert(unlock.ok(),'unlock own fixture');\n await page.reload();await page.getByTestId('sv3-turn').first().waitFor();\n const del=await page.request.delete(origin+'/api/chat/conversations/'+id);assert(del.ok(),'delete own fixture conversation');\n await page.reload();await newInput(page).waitFor();await page.waitForTimeout(500);assert(page.url().includes(id),'deleted record retains intended address');assert(await page.getByTestId('sv3-turn').count()===0,'deleted record never borrows another transcript');await snap('deleted-record');\n assert(dispatches(wire).length===0,'preservation controls send nothing');\n});if(!r.pass)process.exitCode=1;\n",
+    "s67-controls.mjs": "import fs from 'node:fs';import path from 'node:path';import {ownBrowser,origin,info,assert,deep} from './browser-lib.mjs';import {open,newInput,until,dispatches} from './ui-helpers.mjs';\nconst results=[];for(const target of ['core.ask-surface','core.search-v3-surface'])results.push(await ownBrowser('S67-'+target,async({page,wire,snap,dir})=>{\n const old='Old task on unrelated decoy',query='  Explain # & % \u65e5\u672c\u8a9e\\nexactly  ';\n await open(page,{query:old,docIds:info.decoy},'core.ask-surface');await until(async()=>await newInput(page).inputValue()===old,'old draft prepared');await snap('old-preparation');\n await page.goto(origin+'/?api_port='+info.port+deep({query,docIds:info.chosen},target));await newInput(page).waitFor();await until(async()=>await newInput(page).inputValue()===query,'cold incoming exact preparation');const x=await snap('incoming-preparation');\n assert(x.text.includes('chosen-alpha.txt'),'incoming chosen scope');assert(!x.text.includes('could not be saved safely'),'no false recovery limit');assert(x.text.includes(old),'old retained draft remains reviewable');\n await page.getByRole('button',{name:'Review this draft',exact:true}).click();await until(async()=>await newInput(page).inputValue()===old,'old review reachable');const review=await snap('old-reviewed');assert(review.text.includes(query),'incoming text retained through old review');assert(dispatches(wire).length===0,'nothing sent');\n}));fs.writeFileSync(path.join(process.env.RUNTIME_OUT,'s67-results.json'),JSON.stringify(results,null,2));if(results.some(r=>!r.pass))process.exitCode=1;\n",
+    "sandbox-probe.mjs": "import fs from 'node:fs';import {chromium,info,out} from './browser-lib.mjs';const short=fs.mkdtempSync('/tmp/jsv-');let ctx;try{ctx=await chromium.launchPersistentContext(short+'/p',{headless:true,chromiumSandbox:true,executablePath:'/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome',env:{...process.env,CUDA_VISIBLE_DEVICES:'-1',TMPDIR:short,HOME:info.profile+'/home'},args:['--disable-gpu']});fs.writeFileSync(out+'/sandbox-probe.json',JSON.stringify({pass:true}));}catch(e){fs.writeFileSync(out+'/sandbox-probe.json',JSON.stringify({pass:false,error:String(e)}));console.log(String(e).slice(0,1400));}finally{if(ctx)await ctx.close();fs.rmSync(short,{recursive:true,force:true});}",
+    "cpu-settings.py": "import os,json,uuid,time,urllib.request,urllib.error\nfrom pathlib import Path\nO=Path(os.environ['RUNTIME_OUT']);info=json.loads(Path(os.environ['RUNTIME_INFO']).read_text());base='http://127.0.0.1:'+str(info['enginePort']);token=os.environ['RUNTIME_TOKEN'];D=O/'cpu-settings';D.mkdir(exist_ok=True)\ndef request(name,path,body=None):\n (D/(name+'.request.json')).write_text(json.dumps({'path':path,'body':body},indent=2))\n req=urllib.request.Request(base+path,data=None if body is None else json.dumps(body).encode(),headers={'Content-Type':'application/json',**({'X-JustSearch-Session':token}if token else {})})\n try:r=urllib.request.urlopen(req,timeout=120)\n except urllib.error.HTTPError as e:r=e\n x=json.loads(r.read());(D/(name+'.json')).write_text(json.dumps(dict(path=path,request=body,status=r.status,body=x),indent=2));print(name,r.status,flush=True);return r.status,x\nst,before=request('before','/api/settings/v2');assert st==200\npatch={'ui':{'chatEnabled':True},'llm':{'serverExecutable':'/home/elias/dev/llama.cpp-b8571/build/bin/llama-server','modelPath':'/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf','contextWindow':16384,'gpuLayers':0},'rerankerModelPath':'','citationScorerModelPath':'','witness':before['witness'],'operationKey':str(uuid.uuid7())}\nst,x=request('write','/api/settings/v2',patch);assert st in [200,202],x\nfor i in range(60):\n if st==200 and x.get('state')=='COMPLETE':break\n time.sleep(.5);st,x=request('receipt-'+str(i),'/api/settings/v2',patch)\nelse:raise RuntimeError('settings attempt did not complete')\nst,after=request('after','/api/settings/v2');assert after['ui']['chatEnabled'] is True and after['llm']['gpuLayers']==0\nrequest('runtime','/api/ai/runtime/status')\nst,inf=request('inference','/api/inference/status')\nif not inf.get('available'):\n st,a=request('activate','/api/ai/runtime/activate',{'variantId':'default'});assert st in [200,202],a\n for i in range(180):\n  st,inf=request('readiness-'+str(i),'/api/inference/status')\n  if inf.get('available'):break\n  time.sleep(1)\n else:raise RuntimeError('CPU model did not become available; no retry')\n(D/'result.json').write_text(json.dumps(dict(pass_=True,model='Qwen3.5-4B-Q4_K_M.gguf',gpuLayers=0)))\n"
+  },
+  "runs": {
+    "before": {
+      "cpu-settings": {
+        "result": {
+          "pass_": true,
+          "model": "Qwen3.5-4B-Q4_K_M.gguf",
+          "gpuLayers": 0
+        },
+        "snapshots": {}
+      },
+      "new-tab-identity": {
+        "result": {
+          "name": "new-tab-identity",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-GEM1oq",
+          "profile": "/tmp/jsv-GEM1oq/p",
+          "pass": false,
+          "failure": "Error: ASSERTION: C3/A6 new tab must not adopt a conversation owned only by another tab\n    at assert (file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:7:43)\n    at file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/new-tab-identity.mjs:13:96\n    at async ownBrowser (file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/new-tab-identity.mjs:2:9",
+          "errors": [],
+          "operations": [
+            {
+              "event": "request",
+              "at": 1793076522106,
+              "method": "POST",
+              "path": "/api/chat/dispatch",
+              "body": "{\"shapeId\":\"core.rag-ask\",\"question\":\"IDENTITY_FIXTURE Ask only for the code in this chosen file.\",\"docIds\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"],\"selection\":{\"kind\":\"result-set\",\"items\":[{\"id\":\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\",\"kind\":\"doc\"}]},\"conversationId\":\"uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"turnId\":\"7b6c1eb5-afa2-457b-8401-3d2c282379ab\",\"allowLoad\":true}"
+            }
+          ]
+        },
+        "outcome.json": {
+          "candidateTurnCount": 1,
+          "initialPointer": null,
+          "afterPointer": "uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+          "afterUrl": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.search-v3-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+          "openerNull": true,
+          "originalId": "uc-626465fe-19b9-45fe-8dd1-684e0d098918"
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "new-tab-after-bare-boot": {
+            "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.search-v3-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-4",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+            "recovery": null,
+            "journal": "{\"entries\":[{\"id\":\"562d566c-fd56-4b7c-9f64-d151e300cb6e\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076521630},{\"id\":\"9b5ab821-fa6f-46b3-a436-9b1f82fe2044\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"label\":\"Search v3\",\"transport\":\"URL_BAR\",\"timestamp\":1793076528951}],\"cursor\":1}",
+            "recoveryRefusal": false
+          },
+          "original-tab-explicit": {
+            "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.unified-chat-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+            "recovery": "{\"version\":1,\"incarnation\":\"cfbf125a-214d-4f8e-8b02-c09a5c10cf94\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"562d566c-fd56-4b7c-9f64-d151e300cb6e\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076521630},{\"id\":\"9b5ab821-fa6f-46b3-a436-9b1f82fe2044\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076527872}],\"cursor\":1}",
+            "recoveryRefusal": false
+          },
+          "new-tab-before-boot": {
+            "url": "http://127.0.0.1:58755/favicon.svg",
+            "inputs": [],
+            "view": [],
+            "pointer": null,
+            "recovery": null,
+            "journal": "{\"entries\":[{\"id\":\"562d566c-fd56-4b7c-9f64-d151e300cb6e\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076521630},{\"id\":\"9b5ab821-fa6f-46b3-a436-9b1f82fe2044\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076527872}],\"cursor\":1}",
+            "recoveryRefusal": false
+          },
+          "failure-state": {
+            "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.unified-chat-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-626465fe-19b9-45fe-8dd1-684e0d098918",
+            "recovery": "{\"version\":1,\"incarnation\":\"cfbf125a-214d-4f8e-8b02-c09a5c10cf94\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"562d566c-fd56-4b7c-9f64-d151e300cb6e\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076521630},{\"id\":\"9b5ab821-fa6f-46b3-a436-9b1f82fe2044\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-626465fe-19b9-45fe-8dd1-684e0d098918\",\"label\":\"Search v3\",\"transport\":\"URL_BAR\",\"timestamp\":1793076528951}],\"cursor\":1}",
+            "recoveryRefusal": false
+          }
+        }
+      },
+      "before-C7-origin-one-click-after-two-arrivals-2": {
+        "result": {
+          "name": "before-C7-origin-one-click-after-two-arrivals-2",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-NRk8vP",
+          "profile": "/tmp/jsv-NRk8vP/p",
+          "pass": false,
+          "failure": "Error: ASSERTION: HO8a original accepted conversation must be one click away through its sidebar row\n    at assert (file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:7:43)\n    at file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/stream-origin-access.mjs:4:1377\n    at async ownBrowser (file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/stream-origin-access.mjs:3:9",
+          "errors": [],
+          "operations": [
+            {
+              "event": "request",
+              "at": 1793076532227,
+              "method": "POST",
+              "path": "/api/chat/dispatch",
+              "body": "{\"shapeId\":\"core.rag-ask\",\"question\":\"What is Cedar? Then write a numbered list of 400 creative city names.\",\"docIds\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"],\"selection\":{\"kind\":\"result-set\",\"items\":[{\"id\":\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\",\"kind\":\"doc\"}]},\"conversationId\":\"uc-0f322eb5-4ad6-43cf-9231-436818595f5a\",\"enableThinking\":false,\"maxTokens\":512,\"turnId\":\"102b0a3f-37de-4ddc-bbca-474595901548\",\"allowLoad\":true}"
+            }
+          ]
+        },
+        "one-click-outcome.json": {
+          "originalId": "uc-0f322eb5-4ad6-43cf-9231-436818595f5a",
+          "originalVisible": false,
+          "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.search-v3-surface",
+          "currentText": "LATEST PREPARED HANDOFF B",
+          "recovery": true
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "after-single-origin-row-click": {
+            "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.search-v3-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "LATEST PREPARED HANDOFF B",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-4",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": null,
+            "recovery": "{\"version\":1,\"incarnation\":\"acd8907d-7c45-40f4-a0bc-50195b786e91\",\"payload\":{\"version\":2,\"task\":{\"id\":\"14d8b3a2-805a-4fd0-a2d1-ffa68d43c940\",\"place\":null,\"target\":\"uc-0f322eb5-4ad6-43cf-9231-436818595f5a\",\"raw\":\"What is Cedar? Then write a numbered list of 400 creative city names.\",\"schema\":null,\"shape\":\"core.rag-ask\",\"scope\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"],\"record\":null,\"needsReselection\":true,\"effort\":\"quick\",\"delivery\":\"unknown\"},\"drafts\":[{\"place\":null,\"text\":\"LATEST PREPARED HANDOFF B\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"]}}},{\"place\":null,\"text\":\"FIRST PREPARED HANDOFF A\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/unchosen-decoy.txt\"]}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"903f630e-da65-41fc-b74c-c1f6840154fa\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-0t8ti8q6%2Fcorpus%2Funchosen-decoy.txt&mode=ask&query=FIRST%20PREPARED%20HANDOFF%20A\",\"label\":\"Search v3: FIRST PREPARED HANDOFF A\",\"transport\":\"URL_BAR\",\"timestamp\":1793076532285},{\"id\":\"b9ea7f79-015e-4783-b4bc-993a4114a787\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-0t8ti8q6%2Fcorpus%2Fchosen-alpha.txt&mode=ask&query=LATEST%20PREPARED%20HANDOFF%20B\",\"label\":\"Search v3: LATEST PREPARED HANDOFF B\",\"transport\":\"URL_BAR\",\"timestamp\":1793076532319}],\"cursor\":1}",
+            "recoveryRefusal": true
+          },
+          "failure-state": {
+            "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.search-v3-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "LATEST PREPARED HANDOFF B",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-4",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": null,
+            "recovery": "{\"version\":1,\"incarnation\":\"acd8907d-7c45-40f4-a0bc-50195b786e91\",\"payload\":{\"version\":2,\"task\":{\"id\":\"14d8b3a2-805a-4fd0-a2d1-ffa68d43c940\",\"place\":null,\"target\":\"uc-0f322eb5-4ad6-43cf-9231-436818595f5a\",\"raw\":\"What is Cedar? Then write a numbered list of 400 creative city names.\",\"schema\":null,\"shape\":\"core.rag-ask\",\"scope\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"],\"record\":null,\"needsReselection\":true,\"effort\":\"quick\",\"delivery\":\"unknown\"},\"drafts\":[{\"place\":null,\"text\":\"LATEST PREPARED HANDOFF B\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"]}}},{\"place\":null,\"text\":\"FIRST PREPARED HANDOFF A\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/unchosen-decoy.txt\"]}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"903f630e-da65-41fc-b74c-c1f6840154fa\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-0t8ti8q6%2Fcorpus%2Funchosen-decoy.txt&mode=ask&query=FIRST%20PREPARED%20HANDOFF%20A\",\"label\":\"Search v3: FIRST PREPARED HANDOFF A\",\"transport\":\"URL_BAR\",\"timestamp\":1793076532285},{\"id\":\"b9ea7f79-015e-4783-b4bc-993a4114a787\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-0t8ti8q6%2Fcorpus%2Fchosen-alpha.txt&mode=ask&query=LATEST%20PREPARED%20HANDOFF%20B\",\"label\":\"Search v3: LATEST PREPARED HANDOFF B\",\"transport\":\"URL_BAR\",\"timestamp\":1793076532319}],\"cursor\":1}",
+            "recoveryRefusal": true
+          },
+          "latest-B-before-origin-click": {
+            "url": "http://127.0.0.1:58755/?api_port=58755#justsearch://surface/core.search-v3-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "LATEST PREPARED HANDOFF B",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-4",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": null,
+            "recovery": "{\"version\":1,\"incarnation\":\"acd8907d-7c45-40f4-a0bc-50195b786e91\",\"payload\":{\"version\":2,\"task\":{\"id\":\"14d8b3a2-805a-4fd0-a2d1-ffa68d43c940\",\"place\":null,\"target\":\"uc-0f322eb5-4ad6-43cf-9231-436818595f5a\",\"raw\":\"What is Cedar? Then write a numbered list of 400 creative city names.\",\"schema\":null,\"shape\":\"core.rag-ask\",\"scope\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"],\"record\":null,\"needsReselection\":true,\"effort\":\"quick\",\"delivery\":\"unknown\"},\"drafts\":[{\"place\":null,\"text\":\"LATEST PREPARED HANDOFF B\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/chosen-alpha.txt\"]}}},{\"place\":null,\"text\":\"FIRST PREPARED HANDOFF A\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/tmp/jsv-eng-0t8ti8q6/corpus/unchosen-decoy.txt\"]}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"903f630e-da65-41fc-b74c-c1f6840154fa\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-0t8ti8q6%2Fcorpus%2Funchosen-decoy.txt&mode=ask&query=FIRST%20PREPARED%20HANDOFF%20A\",\"label\":\"Search v3: FIRST PREPARED HANDOFF A\",\"transport\":\"URL_BAR\",\"timestamp\":1793076532285},{\"id\":\"b9ea7f79-015e-4783-b4bc-993a4114a787\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-0t8ti8q6%2Fcorpus%2Fchosen-alpha.txt&mode=ask&query=LATEST%20PREPARED%20HANDOFF%20B\",\"label\":\"Search v3: LATEST PREPARED HANDOFF B\",\"transport\":\"URL_BAR\",\"timestamp\":1793076532319}],\"cursor\":1}",
+            "recoveryRefusal": false
+          }
+        }
+      }
+    },
+    "identity-after": {
+      "cpu-settings": {
+        "result": {
+          "pass_": true,
+          "model": "Qwen3.5-4B-Q4_K_M.gguf",
+          "gpuLayers": 0
+        },
+        "snapshots": {}
+      },
+      "S67-core.ask-surface": {
+        "result": {
+          "name": "S67-core.ask-surface",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-K1dkOX",
+          "profile": "/tmp/jsv-K1dkOX/p",
+          "pass": false,
+          "failure": "locator.waitFor: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - waiting for getByTestId('sv3-composer-input') to be visible\u001b[22m\n\n    at open (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/ui-helpers.mjs:5:157)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/s67-controls.mjs:4:2\n    at async ownBrowser (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/s67-controls.mjs:2:97",
+          "errors": [],
+          "operations": []
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {}
+      },
+      "identity-controls-attempt-3": {
+        "result": {
+          "name": "identity-controls-attempt-3",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-jthuUj",
+          "profile": "/tmp/jsv-jthuUj/p",
+          "pass": false,
+          "failure": "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByTestId('sv3-turn').first() to be visible\u001b[22m\n\n    at /home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/identity-controls.mjs:6:124\n    at async ownBrowser (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/identity-controls.mjs:3:9",
+          "errors": [],
+          "operations": []
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "failure-state": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "recovery": "{\"version\":1,\"incarnation\":\"bdd1e000-a114-4515-a7f1-d86a28ee7001\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"32905cc0-49ce-46a2-a99c-a78cf417fa36\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search v3\",\"transport\":\"URL_BAR\",\"timestamp\":1793076967277}],\"cursor\":0}",
+            "recoveryRefusal": false
+          }
+        }
+      },
+      "S67-core.search-v3-surface": {
+        "result": {
+          "name": "S67-core.search-v3-surface",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-lUANmt",
+          "profile": "/tmp/jsv-lUANmt/p",
+          "pass": false,
+          "failure": "locator.waitFor: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - waiting for getByTestId('sv3-composer-input') to be visible\u001b[22m\n\n    at open (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/ui-helpers.mjs:5:157)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/s67-controls.mjs:4:2\n    at async ownBrowser (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/s67-controls.mjs:2:97",
+          "errors": [],
+          "operations": []
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {}
+      },
+      "new-tab-identity-attempt-2": {
+        "result": {
+          "name": "new-tab-identity-attempt-2",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-ekNJVW",
+          "profile": "/tmp/jsv-ekNJVW/p",
+          "pass": false,
+          "failure": "locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByTestId('sv3-composer-input') to be visible\u001b[22m\n\n    at open (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/ui-helpers.mjs:5:157)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/new-tab-identity.mjs:3:2\n    at async ownBrowser (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/new-tab-identity.mjs:2:9",
+          "errors": [],
+          "operations": []
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "failure-state": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.unified-chat-surface?query=IDENTITY_FIXTURE+Ask+only+for+the+code+in+this+chosen+file.&mode=ask&docIds=%2Ftmp%2Fjsv-eng-d94tmgk2%2Fcorpus%2Fchosen-alpha.txt",
+            "inputs": [],
+            "view": [],
+            "pointer": null,
+            "recovery": null,
+            "journal": null,
+            "recoveryRefusal": false
+          }
+        }
+      },
+      "identity-controls": {
+        "result": {
+          "name": "identity-controls",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-I0qTSW",
+          "profile": "/tmp/jsv-I0qTSW/p",
+          "pass": false,
+          "failure": "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByTestId('sv3-turn').first() to be visible\u001b[22m\n\n    at /home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/identity-controls.mjs:6:124\n    at async ownBrowser (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/identity-controls.mjs:3:9",
+          "errors": [],
+          "operations": []
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "failure-state": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.search-v3-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "recovery": "{\"version\":1,\"incarnation\":\"7607e48c-b614-44e1-b9d3-2f89f8630dcc\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"530906bf-6a95-4fff-bdd3-5f1fd1044e99\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076804616},{\"id\":\"21c66603-84cf-4a4a-ab2f-8f500914dbed\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search v3\",\"transport\":\"URL_BAR\",\"timestamp\":1793076805458}],\"cursor\":1}",
+            "recoveryRefusal": false
+          }
+        }
+      },
+      "identity-controls-attempt-2": {
+        "result": {
+          "name": "identity-controls-attempt-2",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-Jyv2Kb",
+          "profile": "/tmp/jsv-Jyv2Kb/p",
+          "pass": false,
+          "failure": "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('jf-library-surface') to be visible\u001b[22m\n\u001b[2m    33 \u00d7 locator resolved to hidden <jf-library-surface api-base=\"http://127.0.0.1:33539\"></jf-library-surface>\u001b[22m\n\n    at /home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/identity-controls.mjs:10:127\n    at async ownBrowser (/home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/browser-lib.mjs:11:708)\n    at async file:///home/elias/.cache/am/rsx7hibs/tmp/builder-cutover/identity-controls.mjs:3:9",
+          "errors": [],
+          "operations": []
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "failure-state": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.library-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": null,
+                "placeholder": "**/node_modules/**",
+                "value": "",
+                "aria": "Exclude patterns"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-5",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-4",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [],
+            "pointer": "uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "recovery": "{\"version\":1,\"incarnation\":\"a1a8e738-efea-46b5-b8dd-306a81c894c8\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}},{\"place\":null,\"text\":\"Explicit # & \u65e5\u672c\u8a9e query\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"dcc94120-fd0b-416d-a060-1da819c5873a\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076905577},{\"id\":\"a0e9f2a4-9fcb-4097-bcb5-f632d7e68d2f\",\"surfaceId\":\"core.library-surface\",\"url\":\"justsearch://surface/core.library-surface\",\"label\":\"Library\",\"transport\":\"URL_BAR\",\"timestamp\":1793076905642}],\"cursor\":1}",
+            "recoveryRefusal": false
+          },
+          "explicit-query": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.search-v3-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "Explicit # & \u65e5\u672c\u8a9e query",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": null,
+            "recovery": "{\"version\":1,\"incarnation\":\"34468a11-cc4c-43c4-8c75-142a72b6aca4\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":null,\"text\":\"Explicit # & \u65e5\u672c\u8a9e query\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"dcc94120-fd0b-416d-a060-1da819c5873a\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?mode=ask&query=Explicit%20%23%20%26%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20query\",\"label\":\"Search v3: Explicit # & \u65e5\u672c\u8a9e query\",\"transport\":\"URL_BAR\",\"timestamp\":1793076905524}],\"cursor\":0}",
+            "recoveryRefusal": false
+          },
+          "same-tab-reload": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "recovery": "{\"version\":1,\"incarnation\":\"b09f4c69-7db2-46f1-9063-acfc91dfc839\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"dcc94120-fd0b-416d-a060-1da819c5873a\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search v3\",\"transport\":\"URL_BAR\",\"timestamp\":1793076903195}],\"cursor\":0}",
+            "recoveryRefusal": false
+          }
+        }
+      },
+      "new-tab-identity": {
+        "result": {
+          "name": "new-tab-identity",
+          "head": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+          "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture",
+          "sandbox": false,
+          "short": "/tmp/jsv-IYSInO",
+          "profile": "/tmp/jsv-IYSInO/p",
+          "pass": true,
+          "errors": [],
+          "operations": [
+            {
+              "event": "request",
+              "at": 1793076708961,
+              "method": "POST",
+              "path": "/api/chat/dispatch",
+              "body": "{\"shapeId\":\"core.rag-ask\",\"question\":\"IDENTITY_FIXTURE Ask only for the code in this chosen file.\",\"docIds\":[\"/tmp/jsv-eng-d94tmgk2/corpus/chosen-alpha.txt\"],\"selection\":{\"kind\":\"result-set\",\"items\":[{\"id\":\"/tmp/jsv-eng-d94tmgk2/corpus/chosen-alpha.txt\",\"kind\":\"doc\"}]},\"conversationId\":\"uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"turnId\":\"5dce4bf9-3782-498a-91be-2ba94da025d7\",\"allowLoad\":true}"
+            }
+          ]
+        },
+        "outcome.json": {
+          "candidateTurnCount": 0,
+          "initialPointer": null,
+          "afterPointer": null,
+          "afterUrl": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.search-v3-surface",
+          "openerNull": true,
+          "originalId": "uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e"
+        },
+        "cleanup.json": {
+          "closed": true,
+          "profileRemoved": true
+        },
+        "snapshots": {
+          "new-tab-after-bare-boot": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.search-v3-surface",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-4",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": null,
+            "recovery": null,
+            "journal": "{\"entries\":[{\"id\":\"3086a53e-10d7-48e9-b22b-40cdfc8dc807\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076708442},{\"id\":\"4fa3d65b-1f24-41b3-9c9a-4d2728113a55\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076715264},{\"id\":\"a41b0475-bc03-42a9-b49f-66fc02559e44\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search v3\",\"transport\":\"URL_BAR\",\"timestamp\":1793076715988}],\"cursor\":2}",
+            "recoveryRefusal": false
+          },
+          "original-tab-explicit": {
+            "url": "http://127.0.0.1:33539/?api_port=33539#justsearch://surface/core.unified-chat-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "inputs": [
+              {
+                "tag": "TEXTAREA",
+                "testid": "sv3-composer-input",
+                "placeholder": null,
+                "value": "",
+                "aria": "Ask or search\u2026"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": "Search settings",
+                "value": "",
+                "aria": "Search settings"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Density"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "1",
+                "aria": "Chat width"
+              },
+              {
+                "tag": "INPUT",
+                "testid": null,
+                "placeholder": null,
+                "value": "",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-3",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-2",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              },
+              {
+                "tag": "INPUT",
+                "testid": "entry-select-1",
+                "placeholder": null,
+                "value": "on",
+                "aria": null
+              }
+            ],
+            "view": [
+              "jf-sv3-window"
+            ],
+            "pointer": "uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e",
+            "recovery": "{\"version\":1,\"incarnation\":\"e49960b6-f8c3-40b8-bc1b-6281be023e26\",\"payload\":{\"version\":2,\"task\":null,\"drafts\":[{\"place\":\"uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"text\":\"\",\"preparation\":{\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}}]}}",
+            "journal": "{\"entries\":[{\"id\":\"3086a53e-10d7-48e9-b22b-40cdfc8dc807\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076708442},{\"id\":\"4fa3d65b-1f24-41b3-9c9a-4d2728113a55\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076715264}],\"cursor\":1}",
+            "recoveryRefusal": false
+          },
+          "new-tab-before-boot": {
+            "url": "http://127.0.0.1:33539/favicon.svg",
+            "inputs": [],
+            "view": [],
+            "pointer": null,
+            "recovery": null,
+            "journal": "{\"entries\":[{\"id\":\"3086a53e-10d7-48e9-b22b-40cdfc8dc807\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface\",\"label\":\"Search: IDENTITY_FIXTURE Ask only for ...\",\"transport\":\"URL_BAR\",\"timestamp\":1793076708442},{\"id\":\"4fa3d65b-1f24-41b3-9c9a-4d2728113a55\",\"surfaceId\":\"core.search-v3-surface\",\"url\":\"justsearch://surface/core.search-v3-surface?conversationId=uc-b9f28d7f-cf38-4248-8bb8-cc3fa4f1e32e\",\"label\":\"Search\",\"transport\":\"URL_BAR\",\"timestamp\":1793076715264}],\"cursor\":1}",
+            "recoveryRefusal": false
+          }
+        }
+      }
+    }
+  },
+  "sourceHashes": {
+    "modules/ui-web/src/shell-v0/chrome/Shell.ts": "a57e30659e5a5250bb06e760a855d0bc77eda8f7429addc1c5c5e1f933077d90",
+    "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts": "984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts": "ba55fc2759e9ace0eb6e887bccb91bf126c812695b794caacb091cbda97ea7ad"
+  },
+  "cleanup": {
+    "before": {
+      "profileRemoved": true,
+      "engineExit": 1,
+      "viteExit": 143,
+      "ownedProcessIds": [
+        {
+          "pid": 818,
+          "startticks": "15213490",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "40411",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "cwd": "/home/elias/dev/llama.cpp-b8571/build/bin",
+          "executable": "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server"
+        },
+        {
+          "pid": 3,
+          "startticks": "15211195",
+          "argv": [
+            "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+            "-XX:TrimNativeHeapInterval=30000",
+            "--sun-misc-unsafe-memory-access=warn",
+            "--enable-native-access=ALL-UNNAMED",
+            "-Duser.home=/tmp/jsv-eng-0t8ti8q6/home",
+            "-classpath",
+            "/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ui-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-engine-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-services-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/indexer-worker-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/worker-services-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/reranker-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/worker-core-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ort-common-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-inference-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-agent-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/gpu-bridge-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-observability-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ipc-common-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ai-backend-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-api-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-agent-api-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/adapters-lucene-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/telemetry-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/indexing-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/core-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-config-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-util-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/configuration-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/core-contracts-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/javalin-6.7.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-jetty-server-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-webapp-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-servlet-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-servlet-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-security-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-core-server-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-server-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-jakarta-servlet-api-5.0.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/kotlin-stdlib-jdk8-1.9.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/kotlin-stdlib-jdk7-1.9.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-otlp-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-sender-okhttp-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/okhttp-jvm-5.3.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/okio-jvm-3.16.4.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/kotlin-stdlib-2.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/api-contract-projection-java-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/logstash-logback-encoder-9.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/infra-core-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/json-schema-validator-3.0.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/prompt-support-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-core-3.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-dataformat-yaml-3.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-databind-3.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jul-to-slf4j-2.0.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/logback-classic-1.5.32.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lightgbm4j-4.6.0-2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-core-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/directory-watcher-0.19.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tokenizers-0.36.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/api-0.36.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/log4j-to-slf4j-2.24.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-jetty-common-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-core-common-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-http-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-io-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/handlebars-4.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parsers-standard-package-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-cad-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-microsoft-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jcl-over-slf4j-2.0.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-news-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-xml-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-util-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-code-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/parso-2.0.14.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jmatio-1.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/rome-2.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/rome-utils-2.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/slf4j-api-2.0.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-logback-mdc-1.0-2.26.0-alpha.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-otlp-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-extension-autoconfigure-spi-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-metrics-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-trace-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-logs-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-instrumentation-api-incubator-2.26.0-alpha.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-instrumentation-api-2.26.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-api-incubator-1.60.1-alpha.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-api-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/annotations-13.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackcess-4.0.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-ocr-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/runtime-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/compiler-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/protobuf-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/common-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-miscoffice-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-xml-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/guava-33.5.0-jre.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackcess-encrypt-4.0.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-text-1.15.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-webarchive-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-apple-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-pkg-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-zip-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-ooxml-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-compress-1.28.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-lang3-3.20.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/sqlite-jdbc-3.51.2.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/java-libpst-0.9.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-pdf-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jaxb-runtime-4.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jaxb-core-4.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/txw2-4.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/threeten-extra-1.8.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-context-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-mail-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-text-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jhighlight-1.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-csv-1.14.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-core-2.20.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-databind-2.20.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-font-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/juniversalchardet-2.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commonmark-ext-gfm-tables-0.27.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-annotations-2.21.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/auto-value-annotations-1.11.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-image-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-xmp-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/istack-commons-runtime-4.1.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-analysis-icu-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-scratchpad-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-html-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/pdfbox-tools-3.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/dd-plist-1.28.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-math3-3.6.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/failureaccess-1.0.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jempbox-1.8.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-crypto-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-digest-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcjmail-jdk18on-1.81.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcpkix-jdk18on-1.81.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcutil-jdk18on-1.81.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcprov-jdk18on-1.81.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/itu-1.14.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-queryparser-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-sandbox-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-facet-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jakarta.xml.bind-api-4.0.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/angus-activation-2.0.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jakarta.activation-api-2.1.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/protovalidate-0.7.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commonmark-ext-task-list-items-0.27.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commonmark-0.27.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/log4j-api-2.24.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/pdfbox-3.0.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/fontbox-3.0.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/pdfbox-io-3.0.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xmpbox-3.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-logging-1.3.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-ooxml-lite-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xmlbeans-5.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-audiovideo-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/metadata-extractor-2.19.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xmpcore-6.1.11.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/gson-2.13.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jdom2-2.0.6.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jspecify-1.0.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jwarc-0.32.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/j2objc-annotations-3.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-mail-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jcip-annotations-1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jna-5.18.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/cel-core-0.5.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-collections4-4.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/cel-generated-antlr-0.5.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/apache-mime4j-dom-0.8.13.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-semconv-1.40.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/vorbis-java-core-0.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/error_prone_annotations-2.47.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/antlr4-runtime-4.13.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/cel-generated-pb-0.5.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/protobuf-java-4.33.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/HdrHistogram-2.2.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/icu4j-77.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jbig2-imageio-3.0.4.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/SparseBitSet-1.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/logback-core-1.5.32.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/onnxruntime_gpu-1.24.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-analysis-common-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jsoup-1.21.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/apache-mime4j-core-0.8.13.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-io-2.21.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/rrd4j-3.10.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-queries-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-codec-1.21.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-memory-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/re2j-1.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/dec-0.1.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xz-1.10.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/agrona-1.22.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-core-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/picocli-4.7.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/snakeyaml-engine-3.0.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-exec-1.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/curvesapi-1.08.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/vorbis-java-tika-0.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/asm-9.9.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jai-imageio-core-1.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-jetty-api-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/extension-substrate-0.3.0.jar",
+            "io.justsearch.ui.HeadlessApp",
+            ""
+          ],
+          "cwd": "/tmp/jsv-eng-0t8ti8q6",
+          "executable": "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java"
+        },
+        {
+          "pid": 566,
+          "startticks": "15211510",
+          "argv": [
+            "node",
+            "node_modules/vite/bin/vite.js",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "58755",
+            "--strictPort",
+            ""
+          ],
+          "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+          "executable": "/usr/bin/node"
+        }
+      ],
+      "remainingRecordedShortProfiles": []
+    },
+    "identity-after": {
+      "profileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "ownedProcessIds": [
+        {
+          "pid": 3,
+          "startticks": "15230203",
+          "argv": [
+            "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+            "-XX:TrimNativeHeapInterval=30000",
+            "--sun-misc-unsafe-memory-access=warn",
+            "--enable-native-access=ALL-UNNAMED",
+            "-Duser.home=/tmp/jsv-eng-d94tmgk2/home",
+            "-classpath",
+            "/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ui-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-engine-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-services-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/indexer-worker-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/worker-services-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/reranker-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/worker-core-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ort-common-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-inference-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-agent-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/gpu-bridge-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-observability-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ipc-common-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/ai-backend-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-api-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-agent-api-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/adapters-lucene-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/telemetry-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/indexing-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/core-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-config-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/app-util-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/configuration-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/core-contracts-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/javalin-6.7.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-jetty-server-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-webapp-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-servlet-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-servlet-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-security-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-core-server-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-server-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-jakarta-servlet-api-5.0.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/kotlin-stdlib-jdk8-1.9.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/kotlin-stdlib-jdk7-1.9.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-otlp-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-sender-okhttp-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/okhttp-jvm-5.3.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/okio-jvm-3.16.4.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/kotlin-stdlib-2.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/api-contract-projection-java-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/logstash-logback-encoder-9.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/infra-core-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/json-schema-validator-3.0.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/prompt-support-0.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-core-3.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-dataformat-yaml-3.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-databind-3.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jul-to-slf4j-2.0.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/logback-classic-1.5.32.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lightgbm4j-4.6.0-2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-core-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/directory-watcher-0.19.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tokenizers-0.36.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/api-0.36.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/log4j-to-slf4j-2.24.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-jetty-common-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-core-common-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-http-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-io-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/handlebars-4.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parsers-standard-package-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-cad-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-microsoft-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jcl-over-slf4j-2.0.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-news-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-xml-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jetty-util-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-code-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/parso-2.0.14.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jmatio-1.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/rome-2.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/rome-utils-2.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/slf4j-api-2.0.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-logback-mdc-1.0-2.26.0-alpha.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-otlp-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-exporter-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-extension-autoconfigure-spi-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-metrics-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-trace-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-logs-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-sdk-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-instrumentation-api-incubator-2.26.0-alpha.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-instrumentation-api-2.26.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-api-incubator-1.60.1-alpha.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-api-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/annotations-13.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackcess-4.0.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-ocr-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/runtime-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/compiler-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/protobuf-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/common-0.12.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-miscoffice-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-xml-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/guava-33.5.0-jre.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackcess-encrypt-4.0.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-text-1.15.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-webarchive-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-apple-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-pkg-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-zip-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-ooxml-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-compress-1.28.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-lang3-3.20.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/sqlite-jdbc-3.51.2.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/java-libpst-0.9.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-pdf-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jaxb-runtime-4.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jaxb-core-4.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/txw2-4.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/threeten-extra-1.8.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-context-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-mail-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-text-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jhighlight-1.1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-csv-1.14.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-core-2.20.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-databind-2.20.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-font-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/juniversalchardet-2.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commonmark-ext-gfm-tables-0.27.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jackson-annotations-2.21.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/auto-value-annotations-1.11.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-image-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-xmp-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/istack-commons-runtime-4.1.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-analysis-icu-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-scratchpad-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-html-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/pdfbox-tools-3.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/dd-plist-1.28.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-math3-3.6.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/failureaccess-1.0.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jempbox-1.8.17.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-crypto-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-digest-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcjmail-jdk18on-1.81.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcpkix-jdk18on-1.81.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcutil-jdk18on-1.81.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/bcprov-jdk18on-1.81.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/itu-1.14.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-queryparser-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-sandbox-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-facet-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jakarta.xml.bind-api-4.0.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/angus-activation-2.0.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jakarta.activation-api-2.1.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/protovalidate-0.7.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commonmark-ext-task-list-items-0.27.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commonmark-0.27.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/log4j-api-2.24.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/pdfbox-3.0.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/fontbox-3.0.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/pdfbox-io-3.0.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xmpbox-3.0.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-logging-1.3.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/poi-ooxml-lite-5.4.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xmlbeans-5.3.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-audiovideo-module-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/metadata-extractor-2.19.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xmpcore-6.1.11.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/gson-2.13.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jdom2-2.0.6.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jspecify-1.0.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jwarc-0.32.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/j2objc-annotations-3.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/tika-parser-mail-commons-3.2.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jcip-annotations-1.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jna-5.18.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/cel-core-0.5.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-collections4-4.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/cel-generated-antlr-0.5.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/apache-mime4j-dom-0.8.13.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-semconv-1.40.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/vorbis-java-core-0.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/error_prone_annotations-2.47.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/antlr4-runtime-4.13.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/cel-generated-pb-0.5.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/protobuf-java-4.33.5.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/HdrHistogram-2.2.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/icu4j-77.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jbig2-imageio-3.0.4.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/SparseBitSet-1.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/logback-core-1.5.32.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/onnxruntime_gpu-1.24.3.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-analysis-common-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jsoup-1.21.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/apache-mime4j-core-0.8.13.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-io-2.21.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/rrd4j-3.10.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-queries-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-codec-1.21.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-memory-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/re2j-1.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/opentelemetry-common-1.60.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/dec-0.1.2.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/xz-1.10.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/agrona-1.22.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/lucene-core-10.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/picocli-4.7.6.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/snakeyaml-engine-3.0.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/commons-exec-1.5.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/curvesapi-1.08.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/vorbis-java-tika-0.8.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/asm-9.9.1.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/jai-imageio-core-1.4.0.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/websocket-jetty-api-11.0.25.jar:/home/elias/dev/js-uiux-compat-ingress/modules/ui/build/install/ui/lib/extension-substrate-0.3.0.jar",
+            "io.justsearch.ui.HeadlessApp",
+            ""
+          ],
+          "cwd": "/tmp/jsv-eng-d94tmgk2",
+          "executable": "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java"
+        },
+        {
+          "pid": 558,
+          "startticks": "15230627",
+          "argv": [
+            "node",
+            "node_modules/vite/bin/vite.js",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "33539",
+            "--strictPort",
+            ""
+          ],
+          "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+          "executable": "/usr/bin/node"
+        },
+        {
+          "pid": 911,
+          "startticks": "15234031",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "40025",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "cwd": "/home/elias/dev/llama.cpp-b8571/build/bin",
+          "executable": "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server"
+        }
+      ],
+      "remainingRecordedShortProfiles": []
+    }
+  },
+  "modelProcesses": [
+    {
+      "phase": "before",
+      "pid": 818,
+      "startticks": "15213490",
+      "argv": [
+        "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+        "-m",
+        "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+        "--cache-ram",
+        "1024",
+        "--jinja",
+        "--reasoning-format",
+        "deepseek",
+        "--reasoning-budget",
+        "0",
+        "--host",
+        "127.0.0.1",
+        "--metrics",
+        "--port",
+        "40411",
+        "-c",
+        "16384",
+        "-ngl",
+        "0",
+        "--device",
+        "none",
+        "-np",
+        "2",
+        "-kvu",
+        "-ctk",
+        "q8_0",
+        "-ctv",
+        "q8_0",
+        "-fa",
+        "on",
+        "-fit",
+        "off",
+        ""
+      ],
+      "cwd": "/home/elias/dev/llama.cpp-b8571/build/bin",
+      "executable": "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server"
+    },
+    {
+      "phase": "identity-after",
+      "pid": 911,
+      "startticks": "15234031",
+      "argv": [
+        "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+        "-m",
+        "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+        "--cache-ram",
+        "1024",
+        "--jinja",
+        "--reasoning-format",
+        "deepseek",
+        "--reasoning-budget",
+        "0",
+        "--host",
+        "127.0.0.1",
+        "--metrics",
+        "--port",
+        "40025",
+        "-c",
+        "16384",
+        "-ngl",
+        "0",
+        "--device",
+        "none",
+        "-np",
+        "2",
+        "-kvu",
+        "-ctk",
+        "q8_0",
+        "-ctv",
+        "q8_0",
+        "-fa",
+        "on",
+        "-fit",
+        "off",
+        ""
+      ],
+      "cwd": "/home/elias/dev/llama.cpp-b8571/build/bin",
+      "executable": "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server"
+    }
+  ],
+  "interpretation": {
+    "before": "Both reported regressions reproduced with actual model-backed records and headless Chromium.",
+    "firstIdentityPatch": "New-tab regression passed; first same-tab control exposed an additional ordering gap, fixed by supplying the retained tab pointer to boot navigation.",
+    "finalIdentityPatch": "All ten DOM tests pass. Same-tab reload and explicit-query snapshots passed in control attempt 2. Later controls and final new-tab rerun hit native API 429 (including manifest/catalog/thread), preventing final matched browser validation. Not reported as a pass.",
+    "HO8a": "No production repair. Pending decision because existing DS1 requires retaining untouched handoffs.",
+    "S67": "Existing twelve component checks passed within full suite. New browser preservation campaign did not complete successfully; not a browser pass.",
+    "Gradle": "Source and baseline installDist commands stayed queued; both were canceled by Ctrl-C (130) at handback. No 75 observed; neither build counted as passing. Existing installed ec41 Engine with matching source Vite was used."
+  }
+}

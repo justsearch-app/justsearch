@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T04:55:51.367Z",
+  "revision": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+  "tree": "8ca1347c1b1066c9f9017d97a25fc1808db1f307",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.tabIdentity.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/rsx7hibs/tmp/test-intent-vitest-200-1793076945678.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5687
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation restart from an old bare journal opens fresh",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A6 preservation restart from an old bare journal opens fresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation an explicit conversation address outranks the pointer and journal",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A6 preservation an explicit conversation address outranks the pointer and journal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation an explicit query outranks the pointer and journal",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A6 preservation an explicit query outranks the pointer and journal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation same-tab reload with a pointer and a bare journal restores that tab",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A6 preservation same-tab reload with a pointer and a bare journal restores that tab",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation a 404 record pointer never borrows the shared journal identity",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A6 preservation a 404 record pointer never borrows the shared journal identity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation a 423 record pointer never borrows the shared journal identity",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:984fcfde3910f80d53640bc82823319931e65c5e20c73546eb6b225e1b40faa2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A6 preservation a 423 record pointer never borrows the shared journal identity",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:dd52a30c54d0372b559aec450c878227d53721971d194142067b81ff67fcb0a3"
+}

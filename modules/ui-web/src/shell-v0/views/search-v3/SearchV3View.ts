@@ -1234,6 +1234,14 @@ export class SearchV3View extends JfElement {
 
   private saveRecoveryPayload(payload: Sv3Recovery): boolean {
     this.recoveryWriteUnconfirmed = false;
+    // The live payload keeps the current composer first, even when it is empty.
+    // Returning to that place needs no third persisted slot beside two retained inputs.
+    // Keep the live ordering so callers still retain every companion after this ACK.
+    const current = payload.drafts[0];
+    if (payload.drafts.length > 2 && current?.place != null && current.place !== RESULTS_PLACE
+      && !this.draftHasInputs(current)) {
+      payload = { ...payload, drafts: payload.drafts.slice(1) };
+    }
     const drafts = payload.drafts;
     if (!isSv3Recovery(payload)) {
       const preparations = drafts.map(d => d.preparation);

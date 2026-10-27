@@ -1,4 +1,5 @@
 import { canonicalSurfaceId } from '../router/surfaceIdentity.js';
+import { readLastViewedConversation } from '../controllers/lastViewedConversation.js';
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Shell — Lit-side chrome root (slice 449 phase 10).
@@ -1842,6 +1843,15 @@ export class Shell extends JfElement {
           target = last.surfaceId;
           const parsed = parseUrl(last.url);
           if (parsed && parsed.kind === 'navigate') state = parsed.state;
+          // The journal is shared across tabs; only this tab's reload pointer may
+          // restore a conversation on a bare launch. Explicit URLs and traversal
+          // still keep their identity through the normal navigation path.
+          if (canonicalSurfaceId(target) === INTERACTION_SURFACE_ID) {
+            state = { ...state };
+            const conversationId = readLastViewedConversation();
+            if (conversationId === null) delete state.conversationId;
+            else state.conversationId = conversationId;
+          }
         }
         if (target) {
           dispatch(

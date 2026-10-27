@@ -176,6 +176,105 @@ worktree registration, shared node_modules or source object writes are needed.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 preservation same raw bytes at a different place do not merge draft ownership",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 preservation old text-only recovery loads without an incoming task and requires review"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A6 new-tab and per-tab pointer restore regression checks through the real Shell, router and Search component, including a sidebar list arriving before startup settles.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md (A6 amendment)",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving per-tab identity and explicit navigation.",
+          "choice": "Agent-adopted A6: a bare launch restores only this tab's actual retained conversation pointer; shared journal identity and global recency confer no identity. Explicit addresses, history traversal and Recents retain their existing navigation semantics. Deleted and locked identities never become another conversation.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-compat-tab-identity-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 a new tab ignores conversation identity in the shared core.search-v3-surface journal",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 a new tab ignores conversation identity in the shared core.unified-chat-surface journal",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 the surviving tab pointer outranks another tabs shared journal conversation",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 the tab pointer restores even when its sidebar row arrives before startup settles"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A6 preservation: bare old journal restart, same-tab pointer, explicit conversation/query and unavailable record identity. These DOM fixtures are controlled state/HTTP, not genuine previous-version browser upgrade evidence.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md (A6 amendment)",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving per-tab identity and explicit navigation.",
+          "choice": "Agent-adopted A6: a bare launch restores only this tab's actual retained conversation pointer; shared journal identity and global recency confer no identity. Explicit addresses, history traversal and Recents retain their existing navigation semantics. Deleted and locked identities never become another conversation.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-compat-tab-identity-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation restart from an old bare journal opens fresh",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation an explicit conversation address outranks the pointer and journal",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation an explicit query outranks the pointer and journal",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation same-tab reload with a pointer and a bare journal restores that tab",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation a 404 record pointer never borrows the shared journal identity",
+        "modules/ui-web/src/shell-v0/chrome/Shell.tabIdentity.test.ts#A6 preservation a 423 record pointer never borrows the shared journal identity"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "New HO8a regression checks: two hand-offs during a controlled chosen-file stream keep that conversation one navigation away by sidebar and the conversation-address route used by Back. Both retained texts and file preparations survive the return, pagehide save and stream completion; no extra dispatch, abort or Stop.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in supplied WP1.3b / WP1.5 agreements; bounded finish-HO8a builder brief, orchestrator decision",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving running work, draft recovery and explicit human Send.",
+          "choice": "Agent-adopted HO8a: existing running work remains reachable by sidebar or conversation navigation after two hand-offs. An empty destination composer needs no extra recovery slot. Keep DS1 exactly: two retained input-bearing proposals, third new proposal refused, no silent drops, unchanged limit, validator and persisted format. Retain every edited draft; genuine third unretained inputs and failed storage acknowledgements still refuse departure.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-compat-stream-return-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a two hand-offs keep the running Ask one sidebar navigation away",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a two hand-offs keep the running Ask one Back navigation away"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "New HO8a preservation checks: an already-retained edited follow-up restores without another slot; newer raw text beside two acknowledged proposals refuses a departure that needs three input-bearing snapshots; storage write failure refuses even an empty-destination return. Existing DS1 and S67 test files remain byte-identical.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in supplied WP1.3b / WP1.5 agreements; bounded finish-HO8a builder brief, orchestrator decision",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving running work, draft recovery and explicit human Send.",
+          "choice": "Agent-adopted HO8a: existing running work remains reachable by sidebar or conversation navigation after two hand-offs. An empty destination composer needs no extra recovery slot. Keep DS1 exactly: two retained input-bearing proposals, third new proposal refused, no silent drops, unchanged limit, validator and persisted format. Retain every edited draft; genuine third unretained inputs and failed storage acknowledgements still refuse departure.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-compat-stream-return-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation one hand-off restores a streaming follow-up and chosen files",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation a third unretained edited draft still blocks departure without losing inputs",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation an empty destination still requires an acknowledged recovery write"
+      ]
     }
   ]
 }
@@ -347,3 +446,171 @@ GRADLE_OPTS retained. No custom logs were written into /tmp/js-linux-port.
 The only required check not satisfied by this builder is independent test-intent acceptance,
 which is reserved for the separate verifier/acceptor. The final gate still reports that one
 expected problem and the non-failing 2/19 reconsider-rate finding. No other work is left open.
+
+
+## A6 / HO8a cutover regression assignment (agent-adopted, delegated-choice)
+
+A6 cause on ec41e49283: `chrome/Shell.ts:1844–1846` takes the last shared localStorage
+journal's parsed state as automatic boot state, including another tab's conversation id.
+It bypasses the per-tab ownership rule in `controllers/lastViewedConversation.ts:10–12`.
+The bounded fix uses that existing pointer at the automatic bare Search boot only.
+An absent pointer removes the shared conversation id; a present pointer supplies that
+tab's id before navigation hydration, including when its sidebar row arrived first.
+Explicit addresses and journal traversal/Recents do not use this automatic-boot branch.
+No new store, option or persisted format is added.
+
+New checks live only in `Shell.tabIdentity.test.ts`. Four assertions fail on ec41e49283
+and pass after; six preservation checks pass after and are paired separately against
+ec41e49283. Official evidence uses the unchanged producer and the existing shared-clone
+Git adapter/private object-directory method described above, with plain npm ci per clone.
+
+The earlier HO8a contract question is resolved by the supplied orchestrator decision:
+retain A and B exactly, and avoid reserving a slot for the empty destination composer.
+The completion evidence and checks are recorded below. The following partial handback
+is historical evidence from the previous builder, not the current completion status.
+
+
+Partial builder handback, 2026-10-27 (work remains uncommitted):
+
+- `chrome/Shell.ts` imports the existing per-tab pointer and substitutes it for the shared journal's conversation id only during automatic bare Search boot. A missing pointer removes shared identity. Four repair assertions fail before/pass after; six preservation assertions pass before/after. New `Shell.tabIdentity.test.ts` contains all ten; no existing test file changed.
+- New `SearchV3View.streamReturn.test.ts` has two controlled streaming component cases: two arrivals reproduce the one-click failure; the one-arrival follow-up control passes. No production recovery changes were made pending the DS1/HO8a contract clarification.
+- Official A6 evidence files contain four fail-before assertion classifications and ten passing candidate checks. Browser observations, exact harness sources/adaptations, private CPU process arguments, hashes, failure evidence and cleanup are archived in `gates/test-intent/evidence/uiux-compat-cutover-regressions-browser.json`. No independent acceptance or general completion claim.
+
+Observed command results for this assignment:
+
+| Command | Result |
+| --- | --- |
+| `.agents/preflight` existence check | Absent; no preflight command available |
+| `git clone --quiet --shared --no-checkout . "$TMPDIR/before"` and detached ec41e49283 checkout | Exit 0; private baseline clone |
+| Same shared clone recipe at ebf79183 into `$TMPDIR/known-good` | Exit 0; created for possible old-UI control, never built/run; no known-good pass claimed |
+| Plain `npm ci` in source, baseline and known-good `modules/ui-web` | Three own dependency trees, 283 packages each, no linked/shared node_modules |
+| `npm run test:unit:run -- src/shell-v0/chrome/Shell.tabIdentity.test.ts --configLoader runner --maxWorkers=4 --reporter=json --outputFile=<private report>` | Final baseline exit 1: 4 intended assertion failures / 6 pass. Final source exit 0: all 10 pass |
+| Same focused command with both new test files before the final extra A6 ordering check | Baseline exit 1: 4 intended assertion failures / 7 pass; the final additional ordering check independently fails before/passes after |
+| `npm run typecheck` | Final exit 0; initial new-test typing errors were corrected |
+| `npm run lint` | Final exit 0; initial unused diagnostic key was removed |
+| `npm run test:unit:run -- --configLoader runner --maxWorkers=4` | Exit 1: 645 files pass / 1 fails, 8,237 tests pass / 1 fails, no skips. Sole failure is the new unresolved HO8a reproduction. Existing S67 checks pass |
+| `node scripts/ci/run-ui-web-gates.mjs` | Exit 0, 28/28 pass |
+| Official `run-evidence.mjs --out gates/test-intent/evidence/uiux-compat-tab-identity-repair.json --before ec41e49283 --check <four ids>` | Exit 0, four candidate passes and four baseline assertion failures |
+| Official `run-evidence.mjs --out gates/test-intent/evidence/uiux-compat-tab-identity-preservation.json --check <six ids>` | Exit 0, six passes; separately paired baseline also six passes |
+| `node scripts/governance/gates/test-intent/cli.mjs check --base f17b988e2f` | Exit 1: exactly missing independent acceptance. Non-failing finding: reconsider rate 2/19 (10.5%) |
+| In source and baseline, `env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:installDist` | Both queued; canceled with Ctrl-C on handback, exit 130. No exit 75 observed; neither is a build pass |
+| Own direct `modules/ui/build/install/ui/bin/ui`, plus own loopback Vite | Before and after private campaigns used existing unchanged installed ec41 Engine and corresponding source UI; both campaigns exited and removed their private data/HOME |
+| `node sandbox-probe.mjs` | Native Chromium sandbox failed to launch; zero product cases tested. Own loopback checks used permitted headless `--no-sandbox`; short profiles removed |
+| Adapted verifier `node new-tab-identity.mjs` on ec41 | Exit 1: genuine own UI record, no-opener new tab with empty sessionStorage adopted its conversation, one transcript turn and new pointer |
+| Adapted verifier `node stream-origin-access.mjs before` on ec41 | Exit 1: B remains after one original-sidebar click, false accessibility due to two-draft refusal; one real chosen-file dispatch, no extra dispatch or Stop |
+| Adapted new-tab browser check on first identity patch | Exit 0: no borrowed transcript or pointer, existing own record authored through UI |
+| Browser identity controls | Initial patch exposed missing pointer restoration when sidebar data arrived early; fixed using that existing pointer at startup. Revised patch captured passing same-tab reload and explicit-query snapshots; a Library `display:contents` visibility assumption was corrected in harness. Later/final matched controls could not finish: native manifest/catalog/thread/history requests returned 429, and final new-tab rerun could not boot UI. These are not passes |
+| S67 browser controls | Did not complete successfully after native API 429; no browser preservation pass claimed |
+| `git diff --check` | Exit 0 |
+
+Still unverified in the final real browser: matched final new-tab rerun, Back/Forward,
+Recents, deleted/locked controls, a genuine old-version bare-journal full restart,
+one-hand-off live return and S67. The final DOM suite covers identity and existing
+S67 preservation, but does not substitute for these missing browser checks.
+
+All processes used CUDA_VISIBLE_DEVICES=-1; inherited JUSTSEARCH_* and JVM option
+variables were removed, GRADLE_OPTS retained. Actual permitted model argv included
+`--device none -ngl 0` and the specified compact Qwen model. Only own processes
+were stopped by their recorded campaign identity (or the two specific command
+sessions for queued Gradle clients). Shared resources touched: CPU, npm cache,
+Gradle queue/cache, installed Chromium and the permitted local llama executable/model.
+No dev stack, owner app/data/display, GPU, downloads, GitHub actions, commits or
+publication. No custom logs were written under /tmp/js-linux-port.
+
+
+HO8a completion, 2026-10-27 (agent-adopted, delegated-choice; uncommitted):
+
+The exact third snapshot on ec41e49283 is `{ place: <original conversation id>,
+text: "", preparation: { kind: "ask", scope: { kind: "all" } } }`. `swapPlace`
+(SearchV3View.ts:3787 after this repair; :3779 before) unconditionally passes it to
+`persistDraft` (:1121). A and B already occupy both slots. `saveRecoveryPayload`
+(:1235) previously submitted the empty current plus both retained inputs to the unchanged
+`isSv3Recovery` two-draft validator (sv3-recovery.ts:55).
+
+`SearchV3View.ts` now omits only that empty current conversation snapshot from the
+serialized payload when it would occupy a third slot. The live payload retains current-first
+ordering, so callers' existing companion-copy bookkeeping keeps both A and B after the
+acknowledged write, later saves and stream completion. Empty hero/results departures,
+input-bearing preparations, DS1 limits, sameDraft deduplication, validator and persisted
+format are unchanged. The exact snapshot and classification were observed with a temporary
+spy before production edits; no diagnostic instrumentation remains.
+
+`SearchV3View.streamReturn.test.ts` now has two repair cases and three preservation
+cases. The address-route case exercises the same handler as Back; browser Back/Forward
+is checked separately. The third-input fixture models a raw draft newer than its two
+acknowledged preparation copies after an interrupted save. Its actual navigation must
+refuse without changing raw text or either retained copy. The storage-failure case
+requires a write acknowledgement even when omitting an empty destination snapshot.
+Existing `SearchV3View.handoffs.test.ts` (including DS1 :699) and
+`SearchV3View.coldArrival.test.ts` are unchanged. The previous builder's A6 changes in
+`chrome/Shell.ts` and ten checks in `Shell.tabIdentity.test.ts` are kept.
+
+
+Final browser evidence is `gates/test-intent/evidence/uiux-compat-stream-return-browser.json`.
+It archives reproducible harness versions, native HTTP observations, snapshots of visible
+inputs and draft/journal storage, exact model/Engine/Chromium process identities and argv,
+per-case cleanup, baseline unit assertions, final unit/gate logs and build logs. This is
+builder evidence, not independent acceptance. The earlier
+`uiux-compat-cutover-regressions-browser.json` remains historical: its missing controls
+and pending HO8a decision are superseded by this completed campaign.
+
+Browser outcomes (each group has fresh own HOME/data/index/corpus; only the full-restart
+control preserves its own data/origin while changing frontend):
+
+| Case / command in private runtime | Before / known-good | Candidate |
+| --- | --- | --- |
+| `node stream-origin-access.mjs before` / `after` | ec41 exit 1, intended HO8a assertion: original transcript absent after one row click; B remains, capacity refusal; one chosen-file dispatch, no Stop | exit 0, original transcript visible after one row click; A/B and issued task remain in attachment; one dispatch, no Stop |
+| `node stream-origin-access.mjs before-dev` on ebf79183 | exit 0 on genuine old developer Search; known-good one-click return | Same check passed above |
+| `node new-tab-identity.mjs` (encrypted record authored through actual UI) | Four A6 unit assertions fail on ec41; prior builder's actual browser reproduction retained | exit 0, no-opener new tab initially has empty per-tab identity and stays empty, no new dispatch |
+| `node identity-controls.mjs` with that encrypted record | Six A6 preservation unit assertions pass on ec41 | exit 0: explicit conversation, same-tab bare boot/reload, explicit query outranking identity, actual Back/Forward, Recents, native 423 locked record, unlock/reload, deleted record without borrowing; zero dispatch |
+| `node stream-one-arrival.mjs before` / `after` | ec41 exit 0 | exit 0: edited follow-up restored; original Ask still streaming after one row click; exact original chosen-file request; one dispatch, no Stop |
+| `node s67-controls.mjs` | All twelve existing S67 component checks pass on ec41 | exit 0, 2/2 browser cases: compatibility and canonical full-document arrival, exact special-character/whitespace text and chosen file, earlier draft reviewable, zero dispatch |
+| `node old-bare-restart.mjs` | Genuine ebf79183 UI authored real record, then wrote a bare old-main journal through explicit bare navigation | exit 0: full Chromium close/reopen using same own profile; candidate bare boot with no tab pointer stays fresh; old real record remains in sidebar; no extra dispatch |
+
+Two exploratory control failures were harness-fixture defects, not passes. A conversation
+written before enabling encryption stays readable as legacy plaintext even with the key
+locked; configuring encryption before authoring the replacement fixture gives real HTTP
+423 and the final full identity campaign passes. The old UI's New chat clears its pointer
+without projecting a bare URL; the restart harness now performs explicit bare navigation
+in that old UI, verifies its actual bare journal, and then really restarts Chromium.
+Both failed attempts and the corrected passing ones are retained. No browser case remains
+unverified. No native Tauri or pressure/load behavior is claimed.
+
+Observed validation commands (all changes remain uncommitted):
+
+| Command | Actual result |
+| --- | --- |
+| `.agents/preflight` existence check | Absent; no preflight executable to run |
+| `git clone --quiet --shared --no-checkout . "$TMPDIR/before"`; detached ec41e49283 checkout | exit 0; final new test files overlaid, production baseline unchanged |
+| Same shared clone / detached checkout recipe for ebf79183 known-good | exit 0; separate dependencies and build directory; genuine old UI exercised |
+| Plain `npm ci` in source and baseline `modules/ui-web` | exit 0 each, 283 packages each; own dependency trees; npm reports one moderate dependency vulnerability with unchanged lockfile |
+| Plain `npm ci` in known-good `modules/ui-web` | exit 0, 283 packages, own dependency tree |
+| Plain `npm ci` at source repository root | exit 0, 386 packages, zero audit vulnerabilities; lockfiles unchanged |
+| Initial `npm run test:unit:run -- src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts --configLoader runner --maxWorkers=4` before production edit | exit 1: intended original HO8a assertion fails, one-arrival control passes (1 fail / 1 pass). Temporary spy rerun gives the exact empty Ask/all destination above, also 1 fail / 1 pass |
+| Focused four-file run (A6, HO8a, S67 and unchanged handoffs), initial general empty-snapshot omission | exit 1: 87 pass / 2 fail. Existing DS1 bare-hero departure exposed over-broad omission; narrowed to conversation places. New storage fault fixture was corrected to spy on actual sessionStorage instance |
+| Same focused run after narrowing | exit 0: 89/89 pass. New third-input preservation fixture was subsequently refined to model interrupted raw/attachment persistence directly |
+| Exploratory paired baseline runs | Existing handoffs/S67: 74/74 pass. Intermediate new fixtures: 8 pass / 7 fail out of 15, then 82 pass / 7 fail out of 89; extra fixture failure was a supposed third input that actually replaced its current proposal. Final interrupted-save fixture uses the real navigation handler, rather than an ignored unknown sidebar id |
+| Final baseline four-file command `npm run test:unit:run -- src/shell-v0/chrome/Shell.tabIdentity.test.ts src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts --configLoader runner --maxWorkers=4 --reporter=json --outputFile=<private report>` | exit 1: exactly 6 intended repair assertion failures (4 A6 + 2 HO8a), 83 pass, zero skips. All 3 final HO8a preservation checks, all existing DS1 and all 12 S67 checks pass |
+| Final focused HO8a five-case command with JSON reporter | exit 0: 5/5 pass, zero skips. During fixture refinement, the unknown sidebar id caused no navigation/error; corrected to actual address navigation and checked before/after |
+| `node scripts/governance/gates/test-intent/run-evidence.mjs --out gates/test-intent/evidence/uiux-compat-stream-return-repair.json --before ec41e49283 --before-root <private temp> --check <two HO8a ids>` | exit 0: 2 candidate passes; both fail-before classifications are assertion. Unchanged producer; Git adapter makes only shared clones, runs plain npm ci and removes them; private Git objects/index, no source commit or worktree registration |
+| Same official producer `--out gates/test-intent/evidence/uiux-compat-stream-return-preservation.json --check <three preservation ids>` | exit 0: 3/3 candidate passes; final paired baseline above also passes all 3 |
+| `npm run typecheck` | exit 0, including final new test fixture |
+| `npm run lint` | exit 0, including final new test fixture |
+| First full `npm run test:unit:run -- --configLoader runner --maxWorkers=4` | exit 1: 645 files pass / 1 fails; 8,240 tests pass / 1 fails. Sole failure was the new fixture's ignored unknown sidebar id; corrected to real navigation, no product failure masked |
+| Final full `npm run test:unit:run -- --configLoader runner --maxWorkers=4` | exit 0: 646/646 files and 8,241/8,241 tests pass, zero skips; duration 110.66s. Full log archived |
+| `npm run build` in source / ec41 baseline / ebf known-good `modules/ui-web` | all exit 0, separate dist folders; source and baseline transform 1,061 modules, known-good 1,058. Existing SES bigint-target and chunk-size warnings retained |
+| `node scripts/ci/run-ui-web-gates.mjs` | exit 0, 28/28 pass (initial and final logs) |
+| `node scripts/governance/gates/test-intent/cli.mjs check --base f17b988e2f` | exit 1 only for missing independent acceptance. Non-failing finding: reconsider rate 2/19 (10.5%); deliver to orchestrator |
+| `git diff --check` | exit 0 |
+
+Only independent verification/acceptance remains for the orchestrator. No scenario/design
+change, DS1 retirement, limit/validator/format change, existing test-file edit, commit,
+GitHub action, publication, dev-stack use, owner-data access, desktop/display use or model
+download was made. Only owned processes were stopped by Popen/recorded PID/start identity;
+all ten private runtime groups have cleanup records with removed data/HOME, and all short
+Chromium profiles are removed. Shared resources touched: CPU, npm cache, installed Engine,
+Chromium and the permitted read-only llama executable/model. No Gradle command or Gradle
+build pass is claimed in this continuation; the unchanged preinstalled backend serves both
+frontend versions. All test/service launchers strip inherited JUSTSEARCH/JVM option variables
+and set CUDA_VISIBLE_DEVICES=-1. Actual model argv records CPU flags; a late /proc probe
+found no live model and is explicitly not positive process-environment evidence.
