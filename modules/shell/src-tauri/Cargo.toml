@@ -2,7 +2,7 @@
 name = "shell"
 default-run = "shell"
 version = "0.3.0"
-description = "A Tauri App"
+description = "Private desktop search and AI answers over your files"
 authors = ["JustSearch Contributors"]
 license = "Apache-2.0"
 edition = "2021"
