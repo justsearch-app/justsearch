@@ -93,6 +93,7 @@ for (const [label, body, status] of [
   ['missing lock state', { memories: [] }, 200],
   ['malformed provenance', { locked: false, memories: [memory('ok', 'Root'), memory('bad', 7 as never)] }, 200],
   ['malformed list', { locked: false, memories: [null] }, 200],
+  ['repeated memory identity', { locked: false, memories: [memory('same', 'Root'), memory('same', 'Root')] }, 200],
 ] as const) {
   it(`CD3 ${label} memory count is explained as unknown and still permits consent`, async () => {
     payload = body; httpStatus = status;

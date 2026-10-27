@@ -117,6 +117,7 @@ CD3/TD10a remain: recovered or ambiguous saved drafts are retained, and only pro
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CD3 missing lock state memory count is explained as unknown and still permits consent",
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CD3 malformed provenance memory count is explained as unknown and still permits consent",
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CD3 malformed list memory count is explained as unknown and still permits consent",
+        "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CD3 repeated memory identity memory count is explained as unknown and still permits consent",
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 validates the entire response including malformed id after a nonexact source",
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 validates the entire response including malformed content after a nonexact source",
         "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 validates the entire response including malformed revision after a nonexact source",

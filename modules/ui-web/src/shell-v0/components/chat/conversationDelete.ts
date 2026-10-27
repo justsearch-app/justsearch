@@ -63,7 +63,7 @@ async function countMemoryLinks(tree: readonly DeleteTreeEntry[], apiBase: strin
       return typeof record.id !== 'string' || typeof record.content !== 'string'
         || typeof record.revision !== 'string' || !/^"[0-9a-f]{64}"$/.test(record.revision)
         || (record.sourceConversationId != null && typeof record.sourceConversationId !== 'string');
-    })) return 'Recorded memory link count is unknown because the Memory response could not be read.';
+    }) || new Set(data.memories.map((row: { id: string }) => row.id)).size !== data.memories.length) return 'Recorded memory link count is unknown because the Memory response could not be read.';
     const ids = new Set(tree.map(row => row.id));
     // Empty snapshots and nonexact source IDs cannot establish a total from this read.
     if (data.memories.length === 0) return 'Recorded memory link count could not be confirmed.';
