@@ -14,7 +14,7 @@ import { runUpdaterHold } from '../updater-hold.mjs';
  * this executable proof.
  *
  * The binary is built by the CI step that precedes this one (`cargo build --bin
- * supervisor-conformance --locked`); locally, run that first. If it is missing this adapter reports
+ * supervisor-conformance --features supervisor-conformance --locked`); locally, run that first. If it is missing this adapter reports
  * itself UNAVAILABLE with the command â€” it does not build on demand, because a harness that
  * silently compiles a several-minute dependency graph in the middle of a case list is a harness
  * whose timings mean nothing.
@@ -49,7 +49,7 @@ export async function available({ io }) {
     ok: false,
     reason:
       'the supervisor-conformance binary is not built. Run, in modules/shell/src-tauri:\n'
-      + '          cargo build --bin supervisor-conformance --locked',
+      + '          cargo build --bin supervisor-conformance --features supervisor-conformance --locked',
   };
 }
 
