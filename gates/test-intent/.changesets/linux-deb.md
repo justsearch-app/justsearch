@@ -23,14 +23,12 @@ handler remains part of the independent Ubuntu VM qualification.
       "behaviour": "The real deep-link plugin retains a Linux desktop URI passed through argv; LaunchRequest keeps its destination and requests the window without a search-focus override. The frontend dispatches the cold-launch URI and the same destination from the existing running-instance event, and releases its listener on teardown. These tests exercise the existing readers and event adapter; they do not establish real desktop registration or interprocess delivery.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Deep links on Linux: a `justsearch://` URL given as the launch argument opens it in a fresh instance and is handed to the already-running instance",
-          "location": "task linux-deb user turn 2 item 4 (2026-10-27)"
-        },
-        {
-          "kind": "owner-words",
-          "quote": "If the Linux path already works from argv, only add a test proving it; change code only where it does not.",
-          "location": "task linux-deb user turn 2 item 4 (2026-10-27)"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package and its desktop integration",
+          "choice": "A justsearch:// URL given as the launch argument on Linux opens it in a fresh instance and is handed to the already-running instance; where the existing argv reader already does this, prove it with tests and change no production code.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/linux-deb.json",
