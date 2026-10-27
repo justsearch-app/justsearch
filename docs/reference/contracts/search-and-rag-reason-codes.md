@@ -265,7 +265,23 @@ data: {"retrieval_mode":"BM25","retrieval_mode_reason":"SEMANTIC_BUDGET_EXCEEDED
 ```
 
 The payload also includes retrieval quality signals: `best_chunk_score`, `score_gap`,
-`retrieval_coverage` and `chunks_considered`. `RAGDoneEnricher` contributes
+`retrieval_coverage` and `chunks_considered`. Best and gap describe the passages actually appended
+to the worker context after selection, optional cross-encoder (CE) reranking, and token/character
+assembly, regardless of their final order. Best is the maximum finite included score; gap is
+highest minus second highest for two or more finite scores. The legacy singleton convention is
+gap = best, including negative scores; no finite included scores gives zero best/gap.
+
+When CE ran, each score belongs to its exact scored passage through selection and assembly;
+otherwise these are the included hits' raw retrieval scores. Citation hit scores remain raw.
+Without CE, the existing chunk/whole-document union can combine native chunk scores with parent
+document scores copied onto synthetic passages. These raw domains are uncalibrated and are not
+probabilities or a comparable confidence scale. The full-document emitter retains its separate
+term-overlap domain. Included counts and token coverage describe the worker context; later
+conversation trimming has its own text/citation ownership. Existing saved conversations and
+metadata remain literal historical measurements: no rewrite, migration, normalization or
+recalculation applies these corrected aggregates to old records.
+
+`RAGDoneEnricher` contributes
 `usedRag`, `chunksUsed`, `chunksFound`, `citations`, and available `calibration` to `done`;
 the mode and reason fields remain in `rag.meta`. Batch summarization instead enriches `done`
 with `fileCount`, `docIds`, and `fullCoverage`.
