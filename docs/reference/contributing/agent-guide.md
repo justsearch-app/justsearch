@@ -608,10 +608,12 @@ requires a new enqueue. After enqueue, run its printed command in the background
 `node scripts/dev/run-gh.mjs merge-wait N --head <validated-head-sha> --timeout-sec 5400`
 (include `--repo owner/repo` if enqueue used it). The 40-hex `--head` binds observation to
 the enqueued head; omitting it watches the first poll's head. The observer polls every
-60 seconds and reads the base branch's required contexts once at start. Its 10-minute
-stall timer runs only while every required context has reported a passing result. If
-the rules cannot be read or contain no required contexts, it warns once and disables
-stall detection; the timeout still applies and names missing contexts when known.
+60 seconds and reads classic branch protection and all pages of rulesets once at start,
+using the union of their required contexts. Its 10-minute stall timer runs only while
+every required context has reported a passing result. If classic protection cannot be
+read because of permissions, or both sources contain no required contexts, it warns once
+and disables stall detection; the timeout still applies and names missing contexts when
+known. Other read failures or invalid responses exit 2.
 Exit 0 means merged. Exit 1 means follow-up
 work on the same task; the message says what needs attention and when to enqueue again.
 Exit 3 means inspect the PR, then start observing again; enqueue again only if the message

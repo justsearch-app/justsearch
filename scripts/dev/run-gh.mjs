@@ -164,13 +164,42 @@ export function classifyWorkflowRun(run) {
   return { verdict: 'fail', key: `${run.databaseId}:${conclusion || 'unknown'}`, message: `run ${run.databaseId} concluded ${conclusion || 'unknown'}` };
 }
 
+/** gh versions emit either one merged array or consecutive JSON arrays for --paginate. */
+function parsePaginatedArrays(text) {
+  const rows = [];
+  let start = 0; let depth = 0; let inString = false; let escaped = false; let pages = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (depth === 0) {
+      if (/\s/.test(char)) continue;
+      if (char !== '[') throw new Error('expected branch rules array');
+      start = i;
+    }
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === '[' || char === '{') depth += 1;
+    else if (char === ']' || char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        rows.push(...JSON.parse(text.slice(start, i + 1)));
+        pages += 1;
+      }
+    }
+  }
+  if (depth || !pages) throw new Error('incomplete branch rules JSON');
+  return rows;
+}
+
 function capturedJson(bin, args) {
   const result = runGhCaptured(bin, args);
   if (args[0] === 'pr' && args[1] === 'checks') return parseRequiredChecksResult(result);
   if (result.error) return { error: result.error };
-  if (result.status !== 0) return { error: new Error(`${result.stderr || result.stdout || `gh exited ${result.status}`}`.trim()) };
+  if (result.status !== 0) return { error: new Error(`${result.stderr || result.stdout || `gh exited ${result.status}`}`.trim()), stderr: result.stderr };
   try {
-    return { value: JSON.parse(result.stdout) };
+    return { value: args.includes('--paginate') ? parsePaginatedArrays(result.stdout) : JSON.parse(result.stdout) };
   } catch (error) {
     return { error: new Error(`invalid gh JSON: ${error.message}`) };
   }
@@ -290,27 +319,45 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
     }
     if (watchedHead === null) watchedHead = before.value.headRefOid;
     if (requiredContexts === null) {
-      const rules = loadJson(bin, ['api', `repos/${repo || '{owner}/{repo}'}/rules/branches/${encodeURIComponent(before.value.baseRefName)}`]);
-      requiredContexts = [];
-      let reason = rules.error?.message;
-      if (!reason) {
-        try {
-          if (!Array.isArray(rules.value)) throw new Error('invalid branch rules JSON');
-          const contexts = rules.value.filter((rule) => rule?.type === 'required_status_checks')
-            .flatMap((rule) => {
-              const checks = rule.parameters?.required_status_checks;
-              if (!Array.isArray(checks) || checks.some((check) => typeof check?.context !== 'string' || !check.context)) {
-                throw new Error('invalid required status check contexts');
-              }
-              return checks.map((check) => check.context);
-            });
-          requiredContexts = [...new Set(contexts)];
-          if (!requiredContexts.length) reason = 'branch rules returned no required contexts';
-        } catch (error) {
-          reason = error.message;
+      const base = encodeURIComponent(before.value.baseRefName);
+      const repository = `repos/${repo || '{owner}/{repo}'}`;
+      const classic = loadJson(bin, ['api', `${repository}/branches/${base}/protection/required_status_checks`]);
+      const rules = loadJson(bin, ['api', `${repository}/rules/branches/${base}`, '--paginate']);
+      // gh reports API failures as "gh: <message> (HTTP <status>)" on stderr.
+      const classicStatus = classic.error ? /\bHTTP (403|404)\b/.exec(classic.stderr || '')?.[1] : null;
+      const unprotected = classicStatus === '404' && /Branch not protected/i.test(classic.stderr);
+      const unknown = classicStatus && !unprotected && !/rate limit|abuse detection/i.test(classic.stderr);
+      try {
+        if (classic.error && !unprotected && !unknown) throw classic.error;
+        if (rules.error) throw rules.error;
+        const contexts = [];
+        if (!classic.error) {
+          const protection = classic.value;
+          if (!Array.isArray(protection?.contexts) || !Array.isArray(protection?.checks) ||
+              protection.contexts.some((context) => typeof context !== 'string' || !context) ||
+              protection.checks.some((check) => typeof check?.context !== 'string' || !check.context)) {
+            throw new Error('invalid gh JSON: incomplete classic required status checks');
+          }
+          contexts.push(...protection.contexts, ...protection.checks.map((check) => check.context));
         }
+        if (!Array.isArray(rules.value) || rules.value.some((rule) => typeof rule?.type !== 'string' || !rule.type)) {
+          throw new Error('invalid gh JSON: incomplete branch rules');
+        }
+        for (const rule of rules.value.filter((rule) => rule.type === 'required_status_checks')) {
+          const checks = rule.parameters?.required_status_checks;
+          if (!Array.isArray(checks) || checks.some((check) => typeof check?.context !== 'string' || !check.context)) {
+            throw new Error('invalid gh JSON: incomplete required status check contexts');
+          }
+          contexts.push(...checks.map((check) => check.context));
+        }
+        requiredContexts = unknown ? [] : [...new Set(contexts)];
+        const reason = unknown ? 'classic required checks unknown: protection cannot be read' :
+          !requiredContexts.length ? 'branch protection and rulesets returned no required contexts' : null;
+        if (reason) process.stderr.write(`run-gh merge-wait: stall detection disabled: ${reason}; timeout still applies\n`);
+      } catch (error) {
+        process.stderr.write(`run-gh merge-wait: ${error.message}\n`);
+        return 2;
       }
-      if (reason) process.stderr.write(`run-gh merge-wait: stall detection disabled: ${reason}; timeout still applies\n`);
     }
     const checks = loadJson(bin, checksArgs);
     const after = readSnapshot();

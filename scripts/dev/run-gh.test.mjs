@@ -216,7 +216,7 @@ run('parseValueFlag extracts a named value without swallowing a following flag',
 await runAsync('merge-wait times out deterministically while a PR stays pending', async () => {
   let clock = 0;
   const code = await mergeWait('gh', 7, 1, {
-    loadJson: (_bin, args) => ({ value: args[0] === 'api' || args[1] === 'checks' ? [] : {
+    loadJson: (_bin, args) => ({ value: args[0] === 'api' ? (args[1].includes('/protection/') ? { contexts: [], checks: [] } : []) : args[1] === 'checks' ? [] : {
       state: 'OPEN', headRefOid: 'a'.repeat(40), baseRefName: 'main', isDraft: false,
       mergeStateStatus: 'QUEUED', autoMergeRequest: {},
     } }),
@@ -365,6 +365,7 @@ const requiredRules = (...contexts) => [{
 async function observeMerge(polls, {
   timeoutSec = 1, step = 15_000, repo = null, head = null,
   rules = requiredRules('required'), rulesError = null,
+  classic = { contexts: [], checks: [] }, classicError = null,
 } = {}) {
   let clock = 0; let poll = 0; let views = 0;
   const calls = []; const pauses = []; let stderr = '';
@@ -375,7 +376,11 @@ async function observeMerge(polls, {
       repo, head,
       loadJson: (bin, args) => {
         assert.equal(bin, 'fake-gh'); calls.push(args);
-        if (args[0] === 'api') return rulesError ? { error: new Error(rulesError) } : { value: rules };
+        if (args[0] === 'api') {
+          const protection = args[1].includes('/protection/');
+          const stderr = protection ? classicError : rulesError;
+          return stderr ? { error: new Error(stderr), stderr } : { value: protection ? classic : rules };
+        }
         const current = polls[Math.min(poll, polls.length - 1)];
         if (args[1] === 'checks') return current.checkError
           ? { error: new Error(current.checkError) } : { value: current.checks ?? [requiredRow('PENDING', 'pending')] };
@@ -603,23 +608,21 @@ await runAsync('required contexts are the union across rules, including duplicat
   assert.match(result.stderr, /not reported yet: late/);
 });
 for (const [label, options] of [
-  ['API failure', { rulesError: 'forbidden' }],
   ['no rules', { rules: [] }],
   ['no required contexts', { rules: [{ type: 'pull_request' }] }],
   ['empty required set', { rules: requiredRules() }],
-  ['malformed rules', { rules: {} }],
-  ['malformed required contexts', { rules: [...requiredRules('required'), { type: 'required_status_checks', parameters: {} }] }],
 ]) await runAsync(`unavailable required contexts disable only stall detection (${label})`, async () => {
   const result = await observeMerge([{ checks: [requiredRow()] }], { timeoutSec: 900, step: 60_000, ...options });
   assert.equal(result.code, 3);
   assert.equal(result.stderr.split('\n').filter((line) => /stall detection disabled/.test(line)).length, 1);
   assert.match(result.stderr, /TIMEOUT/);
-  assert.equal(result.calls.filter((args) => args[0] === 'api').length, 1);
+  assert.equal(result.calls.filter((args) => args[0] === 'api').length, 2);
 });
 for (const repo of [null, 'owner/repo']) await runAsync(`rules are read once for the initial base (${repo})`, async () => {
   const result = await observeMerge([{ before: { baseRefName: 'release/v1' } }], { repo });
   assert.deepEqual(result.calls.filter((args) => args[0] === 'api'), [
-    ['api', `repos/${repo ?? '{owner}/{repo}'}/rules/branches/release%2Fv1`],
+    ['api', `repos/${repo ?? '{owner}/{repo}'}/branches/release%2Fv1/protection/required_status_checks`],
+    ['api', `repos/${repo ?? '{owner}/{repo}'}/rules/branches/release%2Fv1`, '--paginate'],
   ]);
   for (const args of result.calls.filter((args) => args[1] === 'view')) assert.match(args[4], /baseRefName/);
 });
@@ -647,24 +650,28 @@ await runAsync('run-wait-sha retains its 15 second poll interval', async () => {
 });
 
 // Exercise the CLI parser with every child gh call replaced in the subprocess.
-const cliGhStub = `
+const cliGhStub = (apiResults) => `
   import childProcess from 'node:child_process';
   import { syncBuiltinESMExports } from 'node:module';
   let clock = 0;
   Date.now = () => clock++ * 1000;
-  childProcess.spawnSync = (_bin, args) => ({ status: 0, stdout: JSON.stringify(
-    args[0] === 'api' ? ${JSON.stringify(requiredRules('required'))} :
+  const apiResults = ${JSON.stringify(apiResults)};
+  childProcess.spawnSync = (_bin, args) => {
+    if (args[0] === 'api' && apiResults) return apiResults[args[1].includes('/protection/') ? 'classic' : 'rules'];
+    return { status: 0, stdout: JSON.stringify(
+    args[0] === 'api' ? (args[1].includes('/protection/') ? { contexts: [], checks: [] } : ${JSON.stringify(requiredRules('required'))}) :
     args[1] === 'checks' ? [] : ${JSON.stringify({ ...openMergePr, headRefOid: 'b'.repeat(40) })}
-  ) });
+  ) };
+  };
   syncBuiltinESMExports();
 `;
-function mergeWaitCli(args) {
+function mergeWaitCli(args, apiResults = null) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'run-gh-cli-'));
   const stderrPath = path.join(directory, 'stderr');
   const stderrFd = fs.openSync(stderrPath, 'w');
   try {
     const result = spawnSync(process.execPath, [
-      '--import', `data:text/javascript,${encodeURIComponent(cliGhStub)}`,
+      '--import', `data:text/javascript,${encodeURIComponent(cliGhStub(apiResults))}`,
       path.join(import.meta.dirname, 'run-gh.mjs'), 'merge-wait', '7', '--timeout-sec', '0.000001', ...args,
     ], { stdio: ['ignore', 'ignore', stderrFd], timeout: 2000 });
     assert.ifError(result.error);
@@ -689,6 +696,101 @@ for (const head of ['a'.repeat(40), 'ABCDEF'.repeat(6) + '1234']) run(`CLI watch
 run('CLI normalizes uppercase hex for the matching watched head', () => {
   const result = mergeWaitCli(['--head', 'B'.repeat(40)]);
   assert.equal(result.status, 3); assert.doesNotMatch(result.stderr, /new head/);
+});
+
+// Classic protection and rulesets both contribute to the complete required set.
+for (const classic of [
+  { contexts: ['required'], checks: [] },
+  { contexts: [], checks: [{ context: 'required', app_id: 42 }] },
+]) await runAsync('classic protection alone enables the ten-minute stall timer', async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], {
+    classic, rules: [], timeoutSec: 900, step: 60_000,
+  });
+  assert.equal(result.code, 1); assert.equal(result.poll, 10);
+  assert.match(result.stderr, /stalled/); assert.doesNotMatch(result.stderr, /disabled/);
+});
+await runAsync('union includes contexts, checks and rulesets and deduplicates missing names', async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], {
+    classic: { contexts: ['required', 'classic'], checks: [{ context: 'app' }, { context: 'classic' }] },
+    rules: requiredRules('ruleset', 'classic', 'required'), timeoutSec: 900, step: 60_000,
+  });
+  assert.equal(result.code, 3);
+  assert.match(result.stderr, /not reported yet: classic, app, ruleset\n/);
+  assert.doesNotMatch(result.stderr, /stalled|disabled/);
+});
+await runAsync('HTTP 404 Branch not protected permits ruleset stall detection', async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], {
+    classicError: 'gh: Branch not protected (HTTP 404)', timeoutSec: 900, step: 60_000,
+  });
+  assert.equal(result.code, 1); assert.match(result.stderr, /stalled/);
+  assert.doesNotMatch(result.stderr, /disabled/);
+});
+for (const classicError of [
+  'gh: Resource not accessible by integration (HTTP 403)',
+  'gh: Not Found (HTTP 404)',
+]) await runAsync(`unknown classic protection disables stalls once: ${classicError}`, async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], {
+    classicError, timeoutSec: 900, step: 60_000,
+  });
+  assert.equal(result.code, 3); assert.match(result.stderr, /TIMEOUT/);
+  assert.doesNotMatch(result.stderr, /stalled/);
+  assert.equal(result.stderr.split('stall detection disabled').length - 1, 1);
+  assert.equal(result.calls.filter((args) => args[0] === 'api').length, 2);
+});
+for (const options of [
+  ...['network unavailable', 'gh: Bad credentials (HTTP 401)', 'gh: API rate limit exceeded (HTTP 403)',
+    'gh: You have exceeded a secondary rate limit (HTTP 403)', 'gh: Too Many Requests (HTTP 429)',
+    'gh: Internal Server Error (HTTP 500)', 'HTTP 4040'].flatMap((message) => [
+      { classicError: message }, { rulesError: message },
+    ]),
+  { rulesError: 'gh: Not Found (HTTP 404)' },
+  { rulesError: 'gh: Resource not accessible by integration (HTTP 403)' },
+  { classicError: 'gh: Not Found (HTTP 404)', rulesError: 'network unavailable' },
+  ...[null, {}, [], { contexts: [] }, { checks: [] }, { contexts: [''], checks: [] },
+    { contexts: [3], checks: [] }, { contexts: [], checks: [{}] },
+    { contexts: [], checks: [{ context: '' }] }].map((classic) => ({ classic })),
+  ...[{}, null, [null], [{}], [{ type: 'required_status_checks', parameters: {} }],
+    requiredRules('')].map((rules) => ({ rules })),
+]) await runAsync(`required-set read fails closed: ${JSON.stringify(options)}`, async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], options);
+  assert.equal(result.code, 2); assert.doesNotMatch(result.stderr, /disabled|TIMEOUT/);
+});
+
+// Go through capturedJson and the CLI; every child gh call is replaced before import.
+const apiSuccess = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: '' });
+const emptyClassic = apiSuccess({ contexts: [], checks: [] });
+const trickyContext = 'quoted "context" with ][ and \\ slash';
+for (const separator of ['', '\n']) run(`CLI decodes concatenated ruleset pages (${JSON.stringify(separator)})`, () => {
+  const result = mergeWaitCli([], {
+    classic: apiSuccess({ contexts: ['classic'], checks: [{ context: 'app', app_id: null }] }),
+    rules: { status: 0, stdout: [requiredRules('first'), [], requiredRules(trickyContext)].map(JSON.stringify).join(separator), stderr: '' },
+  });
+  assert.equal(result.status, 3);
+  assert.ok(result.stderr.includes(`not reported yet: classic, app, first, ${trickyContext}`));
+  assert.doesNotMatch(result.stderr, /disabled/);
+});
+for (const stdout of ['', '[', '[]junk', '[]\n{}', '[]\n[', '[{}]']) run(`CLI rejects invalid paginated rules JSON ${JSON.stringify(stdout)}`, () => {
+  const result = mergeWaitCli([], { classic: emptyClassic, rules: { status: 0, stdout, stderr: '' } });
+  assert.equal(result.status, 2); assert.doesNotMatch(result.stderr, /disabled/);
+});
+run('CLI rejects malformed classic JSON', () => {
+  const result = mergeWaitCli([], { classic: { status: 0, stdout: '{', stderr: '' }, rules: apiSuccess([]) });
+  assert.equal(result.status, 2); assert.match(result.stderr, /invalid gh JSON/);
+});
+for (const [stderr, expected] of [
+  ['gh: Branch not protected (HTTP 404)', /no required contexts/],
+  ['gh: Not Found (HTTP 404)', /classic.*unknown/i],
+  ['gh: Resource not accessible by integration (HTTP 403)', /classic.*unknown/i],
+]) run(`CLI recognizes gh stderr format: ${stderr}`, () => {
+  const result = mergeWaitCli([], { classic: { status: 1, stdout: '{}', stderr }, rules: apiSuccess([]) });
+  assert.equal(result.status, 3); assert.match(result.stderr, expected);
+  assert.equal(result.stderr.split('stall detection disabled').length - 1, 1);
+});
+run('CLI does not treat HTTP text in stdout as a classic permission error', () => {
+  const result = mergeWaitCli([], {
+    classic: { status: 1, stdout: 'gh: Not Found (HTTP 404)', stderr: 'connection failed' }, rules: apiSuccess([]),
+  });
+  assert.equal(result.status, 2); assert.match(result.stderr, /connection failed/);
 });
 
 // --- Report ---
