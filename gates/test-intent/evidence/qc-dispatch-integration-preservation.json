@@ -1,0 +1,376 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T05:00:17.950Z",
+  "revision": "c24cb38cb9b28f01581fbdd5b409b200fa07aa0a",
+  "tree": "3d13a93bce8ffa1474a64fe2a89eb0a0f634383c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.simplePresetsKeepRawPolicyAndActualDispatch\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.simpleQuKeepsItsIndependentAuthorities\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.luceneFiltersAndFieldSortRemainOwnedByCaller\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.actualQuMayDispatchWithoutSurfacedExtraction\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.capturedEnabledClassificationDoesNotFollowLaterGlobalDisable\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.pairedSimpleTextStillDispatchesQu\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetQuBudgetAndOwnershipMatchControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetExpansionBudgetAndOwnershipMatchControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetTerminationMatchesControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceInformationalQuestionSkipsUnconsumedExpansion\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceQuotedExactKeepsQueryTypeReasonPrecedence\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 27958
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/qc-final/tmp/agent-tmp/test-intent-vitest-2091338-1793077216710.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1237
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#simplePresetsKeepRawPolicyAndActualDispatch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa0a00cee9ce8f324238e3edc0ee71603fba94fb4b07a75e46605496c5ecfd83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(report.pdf,null)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(src/main/java,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(src/main/java,hybrid)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(\"src/main/java\",text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(\"report.pdf\",null)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(\"report.pdf,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(\"foo\" OR \"bar\",hybrid)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(report.pdf quarterly,null)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(why src/main/java,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(C:\\My Files\\notes,hybrid)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(climate policy,hybrid)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(optimization,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(report.pdf?,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch( ,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch(,text)",
+          "status": "passed"
+        },
+        {
+          "name": "simplePresetsKeepRawPolicyAndActualDispatch( ,text)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#simpleQuKeepsItsIndependentAuthorities",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa0a00cee9ce8f324238e3edc0ee71603fba94fb4b07a75e46605496c5ecfd83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "simpleQuKeepsItsIndependentAuthorities(cursor)",
+          "status": "passed"
+        },
+        {
+          "name": "simpleQuKeepsItsIndependentAuthorities(filters)",
+          "status": "passed"
+        },
+        {
+          "name": "simpleQuKeepsItsIndependentAuthorities(boosts)",
+          "status": "passed"
+        },
+        {
+          "name": "simpleQuKeepsItsIndependentAuthorities(qu-disabled)",
+          "status": "passed"
+        },
+        {
+          "name": "simpleQuKeepsItsIndependentAuthorities(ai-unavailable)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#luceneFiltersAndFieldSortRemainOwnedByCaller",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa0a00cee9ce8f324238e3edc0ee71603fba94fb4b07a75e46605496c5ecfd83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "luceneFiltersAndFieldSortRemainOwnedByCaller(simple)",
+          "status": "passed"
+        },
+        {
+          "name": "luceneFiltersAndFieldSortRemainOwnedByCaller(lucene)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#actualQuMayDispatchWithoutSurfacedExtraction",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa0a00cee9ce8f324238e3edc0ee71603fba94fb4b07a75e46605496c5ecfd83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualQuMayDispatchWithoutSurfacedExtraction()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#capturedEnabledClassificationDoesNotFollowLaterGlobalDisable",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa0a00cee9ce8f324238e3edc0ee71603fba94fb4b07a75e46605496c5ecfd83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedEnabledClassificationDoesNotFollowLaterGlobalDisable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#pairedSimpleTextStillDispatchesQu",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa0a00cee9ce8f324238e3edc0ee71603fba94fb4b07a75e46605496c5ecfd83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pairedSimpleTextStillDispatchesQu(title:report)",
+          "status": "passed"
+        },
+        {
+          "name": "pairedSimpleTextStillDispatchesQu(title:\"quarterly report\")",
+          "status": "passed"
+        },
+        {
+          "name": "pairedSimpleTextStillDispatchesQu(*:*)",
+          "status": "passed"
+        },
+        {
+          "name": "pairedSimpleTextStillDispatchesQu(climate policy)",
+          "status": "passed"
+        },
+        {
+          "name": "pairedSimpleTextStillDispatchesQu(report.pdf?)",
+          "status": "passed"
+        },
+        {
+          "name": "pairedSimpleTextStillDispatchesQu(meta_source:x OR climate)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#presetQuBudgetAndOwnershipMatchControl",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:87654850d5af2ab1a226f1664a158bd2193cdcebce32e40f2934db9656f4d003",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presetQuBudgetAndOwnershipMatchControl(climate policy)",
+          "status": "passed"
+        },
+        {
+          "name": "presetQuBudgetAndOwnershipMatchControl(why does search return zero)",
+          "status": "passed"
+        },
+        {
+          "name": "presetQuBudgetAndOwnershipMatchControl(how to configure search)",
+          "status": "passed"
+        },
+        {
+          "name": "presetQuBudgetAndOwnershipMatchControl(what is search used for)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#presetExpansionBudgetAndOwnershipMatchControl",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:87654850d5af2ab1a226f1664a158bd2193cdcebce32e40f2934db9656f4d003",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presetExpansionBudgetAndOwnershipMatchControl(climate policy)",
+          "status": "passed"
+        },
+        {
+          "name": "presetExpansionBudgetAndOwnershipMatchControl(why does search return zero)",
+          "status": "passed"
+        },
+        {
+          "name": "presetExpansionBudgetAndOwnershipMatchControl(how to configure search)",
+          "status": "passed"
+        },
+        {
+          "name": "presetExpansionBudgetAndOwnershipMatchControl(what is search used for)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#presetTerminationMatchesControl",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:87654850d5af2ab1a226f1664a158bd2193cdcebce32e40f2934db9656f4d003",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presetTerminationMatchesControl(qu-cancel)",
+          "status": "passed"
+        },
+        {
+          "name": "presetTerminationMatchesControl(qu-interrupt)",
+          "status": "passed"
+        },
+        {
+          "name": "presetTerminationMatchesControl(qu-refusal)",
+          "status": "passed"
+        },
+        {
+          "name": "presetTerminationMatchesControl(expansion-cancel)",
+          "status": "passed"
+        },
+        {
+          "name": "presetTerminationMatchesControl(expansion-interrupt)",
+          "status": "passed"
+        },
+        {
+          "name": "presetTerminationMatchesControl(expansion-refusal)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceInformationalQuestionSkipsUnconsumedExpansion",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:87654850d5af2ab1a226f1664a158bd2193cdcebce32e40f2934db9656f4d003",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "perSourceInformationalQuestionSkipsUnconsumedExpansion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceQuotedExactKeepsQueryTypeReasonPrecedence",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:87654850d5af2ab1a226f1664a158bd2193cdcebce32e40f2934db9656f4d003",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "perSourceQuotedExactKeepsQueryTypeReasonPrecedence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts#does not reinterpret a legacy reasonless classifier row as disabled or LLM dispatch",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cfa7c11e2966a44e0844a75215816890663b7a508235be8e5ccaa82b2bfa8b7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) does not reinterpret a legacy reasonless classifier row as disabled or LLM dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts#renders disabled classification without inventing a detected value",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cfa7c11e2966a44e0844a75215816890663b7a508235be8e5ccaa82b2bfa8b7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) renders disabled classification without inventing a detected value",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:02dfea8f98b26a6d6845c982308b352fab75e002447f28853ffd6fefd02d2b8b"
+}

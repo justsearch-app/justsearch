@@ -112,7 +112,7 @@ const MODE_WORDING: Record<string, string> = {
 
 /** User-tier wording for the expansion stage's skip reasons (emitted live today). */
 const EXPANSION_SKIP_WORDING: Record<string, string> = {
-  TIMEOUT: 'AI expansion timed out — keyword results only',
+  TIMEOUT: 'AI expansion timed out',
   AI_UNAVAILABLE: 'AI expansion unavailable',
   FAILED: 'AI expansion failed',
 };
@@ -232,6 +232,20 @@ function stageById(trace: SearchTrace, id: string): TraceStage | undefined {
   return (trace.stages ?? []).find((s) => s.id === id);
 }
 
+/** Classifier bypasses stay beside the raw type in the diagnostic disclosure. */
+function stageDetail(stage: TraceStage): string {
+  let reason = stage.reason;
+  if (stage.id === 'query-understanding') {
+    if (reason === 'EXPLICIT_PIPELINE') reason = 'classifier policy bypassed: explicit pipeline';
+    else if (reason === 'LUCENE_SYNTAX') reason = 'classifier policy bypassed: Lucene syntax';
+    return [stage.detail, reason].filter(Boolean).join('; ');
+  }
+  if (stage.id === 'expansion' && reason === 'PER_SOURCE_RETRIEVAL') {
+    reason = 'per-source retrieval uses separate queries';
+  }
+  return stage.detail || reason || '';
+}
+
 /**
  * The user-tier summary parts, in a human grammar — one short phrase per
  * user-altitude facet that has something to say. Exported for the test that
@@ -337,11 +351,9 @@ export const searchTraceExplainStrategy: AggregateStrategy<'SearchTrace', 'searc
                   >
                     <span class="search-explain-stage-label">${stageLabel(s)}</span>
                     <span class="search-explain-stage-status"
-                      >${s.status ?? 'unknown'}${s.detail
-                        ? ` (${s.detail})`
-                        : s.reason
-                          ? ` (${s.reason})`
-                          : ''}${typeof s.cardinality === 'number'
+                      >${s.status ?? 'unknown'}${stageDetail(s)
+                        ? ` (${stageDetail(s)})`
+                        : ''}${typeof s.cardinality === 'number'
                         ? ` · ${s.cardinality.toLocaleString()} docs`
                         : ''}${typeof s.ms === 'number' ? ` · ${s.ms}ms` : ''}</span
                     >
