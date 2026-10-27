@@ -2,12 +2,17 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+    "scriptDigest": "sha256:2d1969b6b8353f3ec6c85ce8147b82ce96f4300a9d8dc2b78184a9acf18592a4",
+    "adapterPatch": "gates/test-intent/evidence/http-lifetime/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
   },
-  "createdAt": "2026-10-27T03:35:21.372Z",
-  "revision": "8451af1da417c8d13521bbeeab59562970ae9473",
-  "tree": "d82a8185d17c29d6ca389eaf8ce3e214066bc939",
+  "createdAt": "2026-10-27T06:31:15.001Z",
+  "revision": "ee92a253a795b7a49a3bcf374042edc12fadbf9b",
+  "tree": "212625f8d2fcba9177360b5e4d54016479bd468d",
   "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
     "platform": "linux",
     "arch": "x64",
     "osRelease": "7.0.0-38-generic",
@@ -18,10 +23,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/apiProxyLifetime.test.js\" --reporter=json --outputFile=\"/home/elias/.cache/am/lm17zlr_/tmp/test-intent-vitest-10-1793072119397.json\"",
+      "command": "npx vitest run \"src/apiProxyLifetime.test.js\" --reporter=json --outputFile=\"/home/elias/.cache/am/disz7fi7/tmp/test-intent-vitest-6-1793082656867.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1972
+      "durationMs": 1084
     }
   ],
   "checks": [
@@ -146,6 +151,62 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:fb540b6191e95d9cc28e9fc239560944a617ddbe3b7b3ed838587dbd06f24e79"
+  "failBefore": {
+    "ref": "784f94fd04",
+    "revision": "784f94fd049b9b2c39708437fa262c32a58c32b1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/apiProxyLifetime.test.js\" --reporter=json --outputFile=\"/home/elias/.cache/am/disz7fi7/tmp/test-intent-vitest-6-1793082657975.json\"",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 17022,
+        "output": "JSON report written to /home/elias/.cache/am/disz7fi7/tmp/test-intent-vitest-6-1793082657975.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange complete GET departure before response headers cancels its exact upstream; later request works",
+        "classification": "assertion",
+        "detail": "dev: actual API proxy owns only the departed exchange complete GET departure before response headers cancels its exact upstream; later request works:  AssertionError [ERR_ASSERTION]: downstream departure closes held upstream before headers\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:100:5"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange incremental SSE remains alive after completed GET; one observer closure leaves another live",
+        "classification": "assertion",
+        "detail": "dev: actual API proxy owns only the departed exchange incremental SSE remains alive after completed GET; one observer closure leaves another live:  AssertionError [ERR_ASSERTION]: only departed SSE upstream closes\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:119:5\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange incomplete upload departure closes upstream without completing its body",
+        "classification": "assertion",
+        "detail": "dev: actual API proxy owns only the departed exchange incomplete upload departure closes upstream without completing its body:  AssertionError [ERR_ASSERTION]: incomplete upload closes upstream\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:131:5\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange upstream failure before headers is502; late failure terminates started response",
+        "classification": "assertion",
+        "detail": "dev: actual API proxy owns only the departed exchange upstream failure before headers is502; late failure terminates started response:  AssertionError [ERR_ASSERTION]: late failure closes downstream after headers\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:147:5\n    at file://"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange complete GET departure before response headers cancels its exact upstream; later request works",
+        "classification": "assertion",
+        "detail": "preview: actual API proxy owns only the departed exchange complete GET departure before response headers cancels its exact upstream; later request works:  AssertionError [ERR_ASSERTION]: downstream departure closes held upstream before headers\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:100:5"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange incremental SSE remains alive after completed GET; one observer closure leaves another live",
+        "classification": "assertion",
+        "detail": "preview: actual API proxy owns only the departed exchange incremental SSE remains alive after completed GET; one observer closure leaves another live:  AssertionError [ERR_ASSERTION]: only departed SSE upstream closes\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:119:5\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange incomplete upload departure closes upstream without completing its body",
+        "classification": "assertion",
+        "detail": "preview: actual API proxy owns only the departed exchange incomplete upload departure closes upstream without completing its body:  AssertionError [ERR_ASSERTION]: incomplete upload closes upstream\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:131:5\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange upstream failure before headers is502; late failure terminates started response",
+        "classification": "assertion",
+        "detail": "preview: actual API proxy owns only the departed exchange upstream failure before headers is502; late failure terminates started response:  AssertionError [ERR_ASSERTION]: late failure closes downstream after headers\n    at deadline (/home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:20:10)\n    at /home/elias/.cache/am/disz7fi7/tmp/before/modules/ui-web/src/apiProxyLifetime.test.js:147:5\n    at file://"
+      }
+    ]
+  },
+  "digest": "sha256:ef01497cfc5e9077fe85fc8d4663cc7449bfad8fa8decb09add5c9bac2b8c6dc"
 }
