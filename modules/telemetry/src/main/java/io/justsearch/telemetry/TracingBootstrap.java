@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,36 +173,41 @@ public final class TracingBootstrap implements AutoCloseable {
 	private void flush(long deadline) {
 		try {
 			if (shutdown || Thread.currentThread().isInterrupted()) return;
-			var first = requestLocalFlush();
-			if (first == null || !awaitFlush(first, deadline)) return;
-			// BatchSpanProcessor 1.60.1:270-271 completes before retiring the request;
-			// :300-310 can return that stale identity or the shared success sentinel.
-			// A fresh generation covers pre-close ends, except the accepted SDK accounting
-			// residual at :213-216 when another producer is between offer and increment.
-			while (!shutdown && !Thread.currentThread().isInterrupted()) {
-				long remaining = flushTimeRemaining(deadline);
-				if (remaining <= 0) return;
-				var next = requestLocalFlush();
-				if (next == null) return;
-				if (next != first && next != CompletableResultCode.ofSuccess()) {
-					if (!awaitFlush(next, deadline)) return;
-					// Preserve flushing of the other processors, including batched OTLP.
-					if (shutdown || Thread.currentThread().isInterrupted()
-							|| flushTimeRemaining(deadline) <= 0) return;
-					if (awaitFlush(tracerProvider.forceFlush(), deadline)) {
-						log.debug("Explicit span flush completed");
-					}
-					return;
-				}
-				remaining = flushTimeRemaining(deadline);
-				if (remaining <= 0) return;
-				TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MICROSECONDS.toNanos(100)));
+			if (!awaitFreshLocalFlush(this::requestLocalFlush, deadline)) return;
+			// Preserve flushing of the other processors, including batched OTLP.
+			if (shutdown || Thread.currentThread().isInterrupted()
+					|| flushTimeRemaining(deadline) <= 0) return;
+			if (awaitFlush(tracerProvider.forceFlush(), deadline)) {
+				log.debug("Explicit span flush completed");
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		} catch (Exception e) {
 			log.warn("Explicit span flush failed", e);
 		}
+	}
+
+	boolean awaitFreshLocalFlush(Supplier<CompletableResultCode> request, long deadline)
+			throws InterruptedException {
+		var first = request.get();
+		if (first == null || !awaitFlush(first, deadline)) return false;
+		// BatchSpanProcessor 1.60.1:270-271 completes before retiring the request;
+		// :300-310 can return that stale identity or the shared success sentinel.
+		// A fresh generation covers pre-close ends, except the accepted SDK accounting
+		// residual at :213-216 when another producer is between offer and increment.
+		while (!shutdown && !Thread.currentThread().isInterrupted()) {
+			long remaining = flushTimeRemaining(deadline);
+			if (remaining <= 0) return false;
+			var next = request.get();
+			if (next == null) return false;
+			if (next != first && next != CompletableResultCode.ofSuccess()) {
+				return awaitFlush(next, deadline);
+			}
+			remaining = flushTimeRemaining(deadline);
+			if (remaining <= 0) return false;
+			TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MICROSECONDS.toNanos(100)));
+		}
+		return false;
 	}
 
 	private long flushTimeRemaining(long deadline) {
@@ -214,6 +220,8 @@ public final class TracingBootstrap implements AutoCloseable {
 		while (!shutdown && !Thread.currentThread().isInterrupted()) {
 			long remaining = flushTimeRemaining(deadline);
 			if (remaining <= 0) return false;
+			// SDK 1.60.1 isDone()/join() take an untimed monitor held by completion callbacks;
+			// blocking callbacks can exceed this deadline (SDK 1.67 moves them outside, #8773).
 			if (result.isDone()) {
 				if (!result.isSuccess()) log.warn("Explicit span flush failed");
 				return result.isSuccess();
