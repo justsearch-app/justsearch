@@ -30,8 +30,8 @@ they are not listed in newChecks.
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
-          "delegationLocation": "task t-20261018-6108b0 user turns 2026-10-18 and 2026-10-19",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18",
           "delegationScope": "Repair durable-file open denial on every platform, matching AtomicFileWrites, while preserving callers, atomic writes, saved formats and all other retry boundaries.",
           "choice": "Exercise retry transitions, channel ownership, shared budget and cancellation through the existing Path and Duration entry point using a test-only FileSystemProvider. Run all four checks on every OS; each must fail before the repair with an assertion failure.",
           "label": "agent choice"
@@ -55,8 +55,8 @@ they are not listed in newChecks.
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
-          "delegationLocation": "task t-20261018-6108b0 user turns 2026-10-18 and 2026-10-19",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18",
           "delegationScope": "Repair durable-file open denial on every platform, matching AtomicFileWrites, while preserving callers, atomic writes, saved formats and all other retry boundaries.",
           "choice": "Probe permission enforcement on an owned temporary file, then assert original last denial identity, its path, repeated opens and elapsed budget. This pins the all-platform rule that matches AtomicFileWrites and handles Windows delete-pending replacements.",
           "label": "agent choice"
@@ -77,8 +77,8 @@ they are not listed in newChecks.
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
-          "delegationLocation": "task t-20261018-6108b0 user turns 2026-10-18 and 2026-10-19",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18",
           "delegationScope": "Repair durable-file open denial on every platform, matching AtomicFileWrites, while preserving callers, atomic writes, saved formats and all other retry boundaries.",
           "choice": "Keep the three all-OS preservation checks and every pre-existing test unchanged. Check exception identity and a single attempt for failures outside the open-only repair.",
           "label": "agent choice"
