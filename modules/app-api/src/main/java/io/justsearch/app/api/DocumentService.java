@@ -307,6 +307,10 @@ public interface DocumentService {
    * Supports entity filters, temporal filters, content filters, auto entity
    * extraction, and context format selection.
    *
+   * <p>An implementation receiving caller-chosen doc ids handles its own retrieval deadline (for
+   * example with a labelled whole-document fallback), so a deadline it throws means that fallback
+   * also ran out.
+   *
    * @param params retrieval parameters
    * @return result containing context string, chunk metadata, and quality signals
    */

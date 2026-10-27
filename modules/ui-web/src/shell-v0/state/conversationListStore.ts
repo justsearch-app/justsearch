@@ -404,7 +404,10 @@ export async function loadConversations(): Promise<void> {
       serverConversations.delete(id);
       confirmedExisting.delete(id);
     }
-    for (const id of deletedIds) forgetRecentSession(id);
+    for (const id of deletedIds) {
+      forgetRecentSession(id);
+      forgetLegacyTitle(id);
+    }
     state = { ...state, conversations: conversations.filter(c => !deletedIds.includes(c.id)), deletedIds,
       activeId: state.activeId !== null && deletedIds.includes(state.activeId) ? null : state.activeId,
       loading: false };
@@ -429,6 +432,7 @@ export async function loadConversations(): Promise<void> {
       serverConversations.delete(id);
       confirmedExisting.delete(id);
       forgetRecentSession(id);
+      forgetLegacyTitle(id);
       state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
         deletedIds: [...new Set([...state.deletedIds, id])],
         activeId: state.activeId === id ? null : state.activeId };
@@ -1361,6 +1365,7 @@ export async function deleteConversation(sessionId: string): Promise<boolean> {
     });
     if (!res.ok) return false;
     forgetRecentSession(sessionId);
+    forgetLegacyTitle(sessionId);
     // An older in-flight list cannot undo this successful deletion.
     listShown = ++listRequests;
     state = {
@@ -1446,6 +1451,7 @@ async function readDeleteTree(root: string): Promise<{ tree: DeleteTreeEntry[]; 
 
 function rememberDeletedConversation(id: string): void {
   forgetRecentSession(id);
+  forgetLegacyTitle(id);
   listShown = ++listRequests;
   state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
     deletedIds: [...new Set([...state.deletedIds, id])], loading: false,

@@ -36,6 +36,7 @@ export class ConfirmDialog extends JfElement {
     variant: { type: String },
     typedConfirmWord: { type: String, attribute: 'typed-confirm-word' },
     typedInput: { state: true },
+    pending: { state: true },
   };
 
   declare open: boolean;
@@ -46,6 +47,7 @@ export class ConfirmDialog extends JfElement {
   declare variant: Variant;
   declare typedConfirmWord?: string;
   declare typedInput: string;
+  declare pending: boolean;
 
   private keyPress?: { key: string; target: EventTarget | null };
   private boundKey = (e: KeyboardEvent) => this.onKey(e);
@@ -59,6 +61,7 @@ export class ConfirmDialog extends JfElement {
     this.cancelLabel = 'Cancel';
     this.variant = 'danger';
     this.typedInput = '';
+    this.pending = false;
   }
 
   static styles = css`
@@ -192,7 +195,7 @@ export class ConfirmDialog extends JfElement {
           this.shadowRoot?.querySelector<HTMLInputElement>('.typed-row input')?.focus();
         } else {
           // jf-button delegates focus() to its composed native <button>.
-          (this.shadowRoot?.querySelector('jf-button.confirm') as HTMLElement | null)?.focus();
+          (this.shadowRoot?.querySelector(this.pending ? 'jf-button.cancel' : 'jf-button.confirm') as HTMLElement | null)?.focus();
         }
       });
     },
@@ -239,6 +242,7 @@ export class ConfirmDialog extends JfElement {
   }
 
   private confirmDisabled(): boolean {
+    if (this.pending) return true;
     if (this.typedConfirmWord) {
       return this.typedInput.trim() !== this.typedConfirmWord;
     }
@@ -246,6 +250,7 @@ export class ConfirmDialog extends JfElement {
   }
 
   private confirm(): void {
+    if (this.confirmDisabled()) return;
     this.dispatchEvent(
       new CustomEvent('confirm', { bubbles: true, composed: true }),
     );
@@ -340,6 +345,9 @@ if (typeof customElements !== 'undefined' && !customElements.get('jf-confirm-dia
 export interface ConfirmAsyncOptions {
   title: string;
   message: string | TemplateResult;
+  /** Keep cancellation available while a disclosure is being read. */
+  readyMessage?: Promise<string | TemplateResult>;
+  signal?: AbortSignal;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: Variant;
@@ -351,23 +359,36 @@ export interface ConfirmAsyncOptions {
  * appends to body, resolves with true/false on user action.
  */
 export function confirmAsync(opts: ConfirmAsyncOptions): Promise<boolean> {
+  if (opts.signal?.aborted) return Promise.resolve(false);
   return new Promise<boolean>((resolve) => {
     const el = document.createElement('jf-confirm-dialog') as ConfirmDialog;
     el.title = opts.title;
     el.message = opts.message;
+    el.pending = opts.readyMessage !== undefined;
     if (opts.confirmLabel) el.confirmLabel = opts.confirmLabel;
     if (opts.cancelLabel) el.cancelLabel = opts.cancelLabel;
     el.variant = opts.variant ?? 'danger';
     if (opts.typedConfirmWord) el.typedConfirmWord = opts.typedConfirmWord;
     el.open = true;
+    let settled = false;
+    const abort = () => cleanup(false);
     const cleanup = (result: boolean) => {
+      if (settled || (result && el.pending)) return;
+      settled = true;
+      opts.signal?.removeEventListener('abort', abort);
       el.open = false;
       // Allow CSS transition out before removing.
       setTimeout(() => el.remove(), 200);
       resolve(result);
     };
-    el.addEventListener('confirm', () => cleanup(true), { once: true });
+    el.addEventListener('confirm', () => cleanup(true));
     el.addEventListener('cancel', () => cleanup(false), { once: true });
+    opts.signal?.addEventListener('abort', abort, { once: true });
     document.body.appendChild(el);
+    void opts.readyMessage?.then(message => {
+      if (settled) return;
+      el.message = message;
+      el.pending = false;
+    }, () => cleanup(false));
   });
 }

@@ -1409,6 +1409,8 @@ export class SearchV3View extends JfElement {
     // Reserve before context waits or forks. A failed ACK never sacrifices live input or old bytes.
     if (!this.saveRecovery(task)) return null;
     this.humanTask = task;
+    // A reserved submission retains its input independently of its conversation's lifetime.
+    if (ownsComposer) { this.liveDraftOwner = null; this.removalDraft = null; }
     this.recoveryError = '';
     this.requestUpdate();
     return task;
@@ -1649,6 +1651,13 @@ export class SearchV3View extends JfElement {
    */
   private readonly placeDrafts = new Map<string, { text: string; preparation: Sv3Preparation | null; review: boolean }>();
 
+  /** Only a live edit establishes ownership; restored text and equal strings do not. */
+  private liveDraftOwner: { id: string; composer: Sv3Composer; version: number } | null = null;
+  private removalDraft: { id: string; composer: Sv3Composer; version: number } | null = null;
+  private removalConfirmation: AbortController | null = null;
+  private removing = false;
+  private readonly onOtherWindowStorage = () => { this.removalDraft = null; this.liveDraftOwner = null; };
+
   private rememberPlace(place: string, text: string): void {
     this.placeDrafts.set(place, { text, preparation: this.currentPreparation(), review: this.draftReview || this.retiredHandoffText !== null });
   }
@@ -1718,6 +1727,7 @@ export class SearchV3View extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    window.addEventListener('storage', this.onOtherWindowStorage);
     this.mountDraftPending = !this.recoveryOpened;
     this.mountHasIncoming = false;
     adoptSv3MorphSheet();
@@ -1861,6 +1871,10 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.removalConfirmation?.abort();
+    this.removalDraft = null;
+    this.liveDraftOwner = null;
+    window.removeEventListener('storage', this.onOtherWindowStorage);
     this.retireRefusedHandoff();
     this.revokeHumanTask(true);
     this.saveRecovery();
@@ -2176,6 +2190,7 @@ export class SearchV3View extends JfElement {
       if (peekSearchV3Handoff()?.origin !== 'fresh') this.retireRefusedHandoff();
       this.departureBlocked = false; return;
     }
+    this.removalConfirmation?.abort();
     if (storeActiveId === null && this.draftReview && this.currentDraft().trim()) {
       const leaving = this.humanPlace();
       if (!this.persistDraft({ place: null, text: this.recoveryText(this.currentDraft()), preparation: this.currentPreparation() }, true)) { this.blockDeparture(); return; }
@@ -3716,6 +3731,11 @@ export class SearchV3View extends JfElement {
   private onComposerDraft(event: Event): void {
     const detail = (event as CustomEvent<Sv3ComposerDraft>).detail;
     if (detail === undefined) return;
+    const composer = this.composer;
+    if (composer !== null) {
+      const id = this.search.showing ? null : this.sessions.activeId;
+      this.liveDraftOwner = id === null ? null : { id, composer, version: composer.draftVersion };
+    }
     if (this.retiredHandoffText !== null && detail.text !== this.retiredHandoffText) {
       this.clearRetiredHandoff();
       this.saveRecovery();
@@ -3775,6 +3795,7 @@ export class SearchV3View extends JfElement {
    * for when the reader goes back. The address moves to the bare surface, so Back returns to it.
    */
   private enterResults(leftDraft: string, query = this.search.query): boolean {
+    this.removalConfirmation?.abort();
     if (!this.search.showing) {
       this.revokeHumanTask(true);
       const leaving = this.sessions.activeId;
@@ -3802,6 +3823,7 @@ export class SearchV3View extends JfElement {
 
   /** Back/Forward onto the bare address while this window has a result list. */
   private returnToResults(): boolean {
+    this.removalConfirmation?.abort();
     this.revokeHumanTask(true);
     const saved = this.placeDrafts.get(RESULTS_PLACE);
     const preparation = saved?.preparation ?? (this.search.pendingScope !== null
@@ -3830,6 +3852,7 @@ export class SearchV3View extends JfElement {
    * Leaving the hero is not leaving a place: its draft travels, as it always has.
    */
   private swapPlace(to: string, task?: HumanTask): boolean {
+    if (this.sessions.activeId !== to) this.removalConfirmation?.abort();
     if (!this.recoveryOpened) this.openRecovery();
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
     if (from === to) return true;
@@ -4084,6 +4107,7 @@ export class SearchV3View extends JfElement {
       // transition below must validate its whole target/origin capacity before writing.
       return true;
     }
+    this.removalConfirmation?.abort();
     this.mountHasIncoming = true;
     this.openRecovery();
     const { state, selection } = incoming;
@@ -5247,6 +5271,7 @@ export class SearchV3View extends JfElement {
    * also retires the restore-by-re-list dance the optimistic version needed for every refusal.
    */
   private onSessionRemove(event: Event): void {
+    if (this.removing) return;
     const id = (event as CustomEvent<Sv3SessionRemove>).detail?.id ?? '';
     const gate = this.runGate();
     // The DECISION, taken now and carried into the write: an unchanged list is the refusal (work in
@@ -5259,6 +5284,14 @@ export class SearchV3View extends JfElement {
 
   /** Discover, confirm once, and remove only identities the Engine confirms are gone. */
   private async deleteThroughStore(id: string): Promise<void> {
+    this.removing = true;
+    const consent = new AbortController();
+    this.removalConfirmation = consent;
+    // Capture before discovery, not when its reads eventually return.
+    const owner = this.liveDraftOwner;
+    const originalDraft = owner !== null && owner.id === this.sessions.activeId
+      && owner.composer === this.composer && owner.version === owner.composer.draftVersion ? owner : null;
+    this.removalDraft = null;
     let tree: DeleteTreeEntry[] = [];
     const report = (result: DeleteCascadeResult) => {
       this.forgetDeletedConversations(result.deletedIds ?? []);
@@ -5266,16 +5299,35 @@ export class SearchV3View extends JfElement {
         emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
       }
     };
-    const result = await deleteConversationWithCascade(id, (children, preview) => {
-      tree = preview;
-      return confirmConversationTree(children, preview);
-    }, report);
-    report(result);
+    try {
+      const result = await deleteConversationWithCascade(id, async (children, preview) => {
+        tree = preview;
+        const confirmed = await confirmConversationTree(children, preview, this.apiBase || '', consent.signal);
+        if (!confirmed || consent.signal.aborted) return false;
+        if (originalDraft !== null && this.liveDraftOwner === originalDraft
+          && preview.some(row => row.id === originalDraft.id)) this.removalDraft = originalDraft;
+        // Once accepted, navigation cancels neither the Engine write nor its truthful reports.
+        this.removalConfirmation = null;
+        return true;
+      }, report);
+      report(result);
+      // Only an unresolved identity can still be confirmed by this operation's later reconciliation.
+      if (originalDraft === null || !result.unconfirmedIds?.includes(originalDraft.id)) this.removalDraft = null;
+    } finally {
+      if (this.removalConfirmation === consent) this.removalConfirmation = null;
+      this.removing = false;
+    }
   }
 
   /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
   private forgetDeletedConversations(ids: readonly string[]): void {
     for (const gone of ids) {
+      const owned = this.removalDraft;
+      if (owned?.id === gone) {
+        if (this.isConnected && this.sessions.activeId === gone && this.composer === owned.composer
+          && owned.composer.draftVersion === owned.version) owned.composer.clearDraft();
+        this.removalDraft = null;
+      }
       this.placeScopes.delete(gone);
       this.placeTiers.delete(gone);
       this.recordReads.get(gone)?.abort();
@@ -5345,6 +5397,7 @@ export class SearchV3View extends JfElement {
    * guarantee, so the fix is to not make the write at all.
    */
   private resetToHero(clearDraft = false, retainLeaving = false): boolean {
+    this.removalConfirmation?.abort();
     this.revokeHumanTask(true);
     const preparation = clearDraft ? { kind: 'search' as const } : this.currentPreparation();
     const text = clearDraft ? '' : this.currentDraft();
