@@ -406,6 +406,11 @@ await runAsync('M1 second snapshot merge wins even over a checks query error', a
   const result = await observeMerge([{ after: { state: 'MERGED', mergeCommit: { oid: 'landed' } }, checkError: 'network' }]);
   assert.equal(result.code, 0);
 });
+for (const failure of [{ rulesError: 'gh: API rate limit exceeded (HTTP 403)' }, { classicError: 'gh: Server Error (HTTP 502)' }]) await runAsync('M1 merged wins before required-set reads can fail', async () => {
+  const result = await observeMerge([{ before: { state: 'MERGED', mergeCommit: { oid: 'landed' } } }], failure);
+  assert.equal(result.code, 0); assert.match(result.stderr, /merged at landed/);
+  assert.equal(result.calls.some((args) => args[0] === 'api'), false);
+});
 await runAsync('M2 stable closed PR fails without merging', async () => {
   const result = await observeMerge([{ before: { state: 'CLOSED', autoMergeRequest: null } }]);
   assert.equal(result.code, 1); assert.match(result.stderr, /closed without merging/);
@@ -567,7 +572,7 @@ await runAsync('M1 first-snapshot merge wins over subsequent checks and snapshot
     checkError: 'network', afterError: 'network',
   }]);
   assert.equal(result.code, 0); assert.match(result.stderr, /merged at landed/);
-  assert.deepEqual(result.calls.filter((args) => args[0] === 'pr').map((args) => args[1]), ['view', 'checks', 'view']);
+  assert.deepEqual(result.calls.filter((args) => args[0] === 'pr').map((args) => args[1]), ['view']);
 });
 await runAsync('M11 second PR snapshot error exits 2', async () => {
   const result = await observeMerge([{ afterError: 'network' }]);

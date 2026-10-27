@@ -318,6 +318,11 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
       return 2;
     }
     if (watchedHead === null) watchedHead = before.value.headRefOid;
+    const mergedBefore = classifyMergeSnapshot(before.value);
+    if (mergedBefore.verdict === 'pass') {
+      emit(`run-gh merge-wait PR #${prNumber}`, mergedBefore, previousKey);
+      return 0;
+    }
     if (requiredContexts === null) {
       const base = encodeURIComponent(before.value.baseRefName);
       const repository = `repos/${repo || '{owner}/{repo}'}`;
