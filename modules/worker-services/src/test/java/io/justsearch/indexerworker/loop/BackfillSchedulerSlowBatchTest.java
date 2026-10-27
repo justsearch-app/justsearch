@@ -599,6 +599,9 @@ class BackfillSchedulerSlowBatchTest {
     BackfillScheduler scheduler = scheduler(monotonicNanos::get);
     int unitsPerCycle = encodeNanos < 5_000_000_000L ? 2 : 1;
     for (int cycle = 1; cycle <= 2; cycle++) {
+      // Each cycle must publish and log on its own, so drop the previous cycle's observations.
+      writtenDocIds.clear();
+      logAppender.list.clear();
       timeIdleCycle(scheduler);
       assertEquals(cycle * unitsPerCycle, embedCalls.get(),
           "each cycle samples a fresh deadline; the spent probe cannot start a tight-loop batch");
