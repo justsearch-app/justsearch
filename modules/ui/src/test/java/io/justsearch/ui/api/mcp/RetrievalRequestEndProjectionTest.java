@@ -31,8 +31,11 @@ import org.mockito.ArgumentCaptor;
 
 /** D7/D8: projections are local to retrieve-context and justsearch_answer. */
 final class RetrievalRequestEndProjectionTest {
+  @org.junit.jupiter.api.AfterEach
+  void clearInterrupt() { Thread.interrupted(); }
+
   static Stream<Arguments> endings() {
-    return Stream.of("raw", "reason", "port", "deadline", "nullDeadline", "local")
+    return Stream.of("raw", "reason", "port", "interrupted", "deadline", "nullDeadline", "local")
         .flatMap(kind -> Stream.of("direct", "completion", "execution")
             .map(wrapper -> Arguments.of(kind, wrapper)));
   }
@@ -41,6 +44,7 @@ final class RetrievalRequestEndProjectionTest {
     Exception end = switch (kind) {
       case "raw" -> new CancellationException();
       case "reason" -> new EngineWorkCancelledException("CONTEXT_CLOSED");
+      case "interrupted" -> new InterruptedException();
       case "port" -> new KnowledgeClientException(KnowledgeClientException.Status.CANCELLED, "cancelled");
       case "deadline" -> new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED, "neutral");
       case "nullDeadline" -> new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED, null);
@@ -77,6 +81,10 @@ final class RetrievalRequestEndProjectionTest {
     assertEquals(expected, rest.get("errorCode"));
     verify(ctx).status(deadline ? 504 : 503);
     if (kind.equals("reason")) assertEquals("CONTEXT_CLOSED", rest.get("reasonCode"));
+    if (kind.equals("interrupted")) {
+      assertEquals("caller_interrupted", rest.get("reasonCode"));
+      assertTrue(Thread.currentThread().isInterrupted());
+    }
   }
 
   @ParameterizedTest @MethodSource("endings")
@@ -93,5 +101,16 @@ final class RetrievalRequestEndProjectionTest {
     assertEquals(expected, ((Map<?, ?>) mcp.get("structuredContent")).get("errorCode"));
     assertTrue(mcp.get("content").toString().contains(expected));
     assertFalse(mcp.get("content").toString().contains("No relevant passages found"));
+    var structured = (Map<?, ?>) mcp.get("structuredContent");
+    if (kind.equals("reason")) assertEquals("CONTEXT_CLOSED", structured.get("reasonCode"));
+    if (kind.equals("interrupted")) {
+      assertEquals("caller_interrupted", structured.get("reasonCode"));
+      assertTrue(Thread.currentThread().isInterrupted());
+    }
+    if (kind.equals("nullDeadline")) {
+      String wording = "Answer failed: KnowledgeClientException: no additional detail.";
+      assertTrue(structured.get("error").toString().startsWith(wording), structured.toString());
+      assertTrue(mcp.get("content").toString().contains(wording));
+    }
   }
 }

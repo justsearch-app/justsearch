@@ -23,6 +23,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /** D1/D2/D6/D10, P2/P3: classify types, and retain chosen-file deadline fallback. */
 final class RAGContextRequestEndTest {
+  @org.junit.jupiter.api.AfterEach
+  void clearInterrupt() { Thread.interrupted(); }
+
   @org.junit.jupiter.api.Test
   void remoteFallbackDeadlineMustNotStartAnotherBatchFetch() {
     var client = mock(io.justsearch.app.services.worker.KnowledgeClient.class);
@@ -47,7 +50,7 @@ final class RAGContextRequestEndTest {
 
   static Stream<Arguments> cases() {
     return Stream.of("open", "chosen", "fallback", "wrappedFallback")
-        .flatMap(path -> Stream.of("raw", "reason", "port", "deadline", "nullDeadline", "local", "ordinary", "empty")
+        .flatMap(path -> Stream.of("raw", "reason", "port", "interrupted", "deadline", "nullDeadline", "local", "ordinary", "empty")
             .flatMap(kind -> Stream.of("direct", "completion", "execution")
                 .map(wrapper -> Arguments.of(path, kind, wrapper))));
   }
@@ -55,6 +58,7 @@ final class RAGContextRequestEndTest {
   @ParameterizedTest @MethodSource("cases")
   void everyRetrievalAndBatchCatchPreservesRequestEnd(String path, String kind, String wrapper) {
     Exception end = switch (kind) {
+      case "interrupted" -> new InterruptedException();
       case "raw" -> new CancellationException();
       case "reason" -> new EngineWorkCancelledException("CONTEXT_CLOSED");
       case "port" -> new KnowledgeClientException(KnowledgeClientException.Status.CANCELLED, "cancelled");
@@ -89,6 +93,13 @@ final class RAGContextRequestEndTest {
     when(ctx.attributes()).thenReturn(new HashMap<>());
     when(ctx.engineContext()).thenReturn(TestEngineContexts.internal());
     var rag = new RAGContext(docs, Duration.ofMillis(1));
+    if (kind.equals("interrupted")) {
+      var cancelled = assertThrows(EngineWorkCancelledException.class, () -> rag.inject(ctx));
+      assertEquals("caller_interrupted", cancelled.reasonCode());
+      assertTrue(Thread.currentThread().isInterrupted());
+      if (!fallback) verify(docs, never()).fetchBatch(anyList(), any());
+      return;
+    }
     if (kind.equals("raw") || kind.equals("reason") || kind.equals("port")) {
       assertSame(end, assertThrows(RuntimeException.class, () -> rag.inject(ctx)));
       if (!fallback) verify(docs, never()).fetchBatch(anyList(), any());
@@ -110,6 +121,33 @@ final class RAGContextRequestEndTest {
       assertTrue(result.messages().toString().contains("whole document"));
       assertTrue(result.events().stream().noneMatch(event -> event.name().equals("rag.citations")));
     }
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"open", "chosen", "fallback"})
+  void interruptedFutureWaitCancelsInsteadOfFetchingOrReportingEmpty(String path) {
+    var docs = mock(DocumentService.class);
+    var empty = new DocumentService.ContextResult("", 0, 0, 0, List.of(), "", "", false, List.of());
+    when(docs.retrieveContext(any(RetrieveContextParams.class), any())).thenAnswer(ignored -> {
+      if (path.equals("fallback")) return CompletableFuture.completedFuture(empty);
+      Thread.currentThread().interrupt();
+      return new CompletableFuture<>();
+    });
+    when(docs.fetchBatch(anyList(), any())).thenAnswer(ignored -> {
+      Thread.currentThread().interrupt();
+      return new CompletableFuture<>();
+    });
+    var ctx = mock(ConversationContext.class);
+    when(ctx.requestBody()).thenReturn(path.equals("open") ? Map.of("question", "q")
+        : Map.of("question", "q", "docIds", List.of("doc")));
+    when(ctx.attributes()).thenReturn(new HashMap<>());
+    when(ctx.engineContext()).thenReturn(TestEngineContexts.internal());
+
+    var cancelled = assertThrows(EngineWorkCancelledException.class, () -> new RAGContext(docs).inject(ctx));
+
+    assertEquals("caller_interrupted", cancelled.reasonCode());
+    assertTrue(Thread.currentThread().isInterrupted());
+    if (!path.equals("fallback")) verify(docs, never()).fetchBatch(anyList(), any());
   }
 
   @ParameterizedTest

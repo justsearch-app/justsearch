@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.app.api.EngineWorkCancelledException;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -23,6 +24,10 @@ public final class EngineRequestEnds {
 
   public static RuntimeException cancellation(Throwable failure) {
     Throwable cause = cause(failure);
+    if (cause instanceof InterruptedException) {
+      Thread.currentThread().interrupt();
+      return new EngineWorkCancelledException("caller_interrupted");
+    }
     if (cause instanceof CancellationException cancelled) return cancelled;
     if (cause instanceof KnowledgeClientException port
         && port.status() == KnowledgeClientException.Status.CANCELLED) return port;

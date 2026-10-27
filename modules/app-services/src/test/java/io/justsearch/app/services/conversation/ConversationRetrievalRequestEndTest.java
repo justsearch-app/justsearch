@@ -29,8 +29,11 @@ final class ConversationRetrievalRequestEndTest {
   @TempDir Path temp;
   private static final ConversationShapeRef ID = new ConversationShapeRef("core.test-request-end");
 
+  @org.junit.jupiter.api.AfterEach
+  void clearInterrupt() { Thread.interrupted(); }
+
   static Stream<Arguments> endings() {
-    return Stream.of("raw", "reason", "port", "deadline", "fallbackDeadline", "fallbackRaw",
+    return Stream.of("raw", "messageLess", "blank", "reason", "port", "interrupted", "deadline", "fallbackDeadline", "fallbackRaw",
         "fallbackReason", "fallbackPort", "stop", "fallbackStop")
         .flatMap(kind -> Stream.of(false, true).flatMap(chosen -> Stream.of("direct", "completion", "execution")
             .filter(wrapper -> !(kind.equals("deadline") && chosen || kind.startsWith("fallback") && !chosen))
@@ -39,13 +42,16 @@ final class ConversationRetrievalRequestEndTest {
 
   @ParameterizedTest @MethodSource("endings")
   void terminalRetrievalOutcomeIsSavedOnceAndSurvivesReload(String kind, boolean chosen, String wrapper) {
-    RuntimeException end = switch (kind) {
+    Exception end = switch (kind) {
+      case "interrupted" -> new InterruptedException();
+      case "messageLess" -> new CancellationException();
+      case "blank" -> new CancellationException(" \t");
       case "raw", "fallbackRaw" -> new CancellationException("cancelled");
       case "reason", "stop", "fallbackReason", "fallbackStop" -> new EngineWorkCancelledException("CONTEXT_CLOSED");
       case "port", "fallbackPort" -> new KnowledgeClientException(KnowledgeClientException.Status.CANCELLED, "cancelled");
       default -> new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED, "neutral");
     };
-    RuntimeException failure = switch (wrapper) {
+    Exception failure = switch (wrapper) {
       case "completion" -> new CompletionException(end);
       case "execution" -> new CompletionException(new ExecutionException(end));
       default -> end;
@@ -89,7 +95,8 @@ final class ConversationRetrievalRequestEndTest {
     Map<String, Object> body = chosen
         ? Map.of("question", "q", "docIds", List.of("doc"), "conversationId", "thread", "turnId", "turn")
         : Map.of("question", "q", "conversationId", "thread", "turnId", "turn");
-    engine.run(ID, body, Audience.USER, events::add, TestEngineContexts.internal());
+    assertDoesNotThrow(() -> engine.run(ID, body, Audience.USER, events::add, TestEngineContexts.internal()));
+    if (kind.equals("interrupted")) assertTrue(Thread.currentThread().isInterrupted());
     var terminals = events.stream().filter(event -> event.name().equals("error") || event.name().equals("done")).toList();
     assertEquals(1, terminals.size(), events.toString());
     var history = new FileConversationStore(temp).loadHistory("thread");
@@ -106,6 +113,17 @@ final class ConversationRetrievalRequestEndTest {
       assertEquals(true, saved.get("terminalError"));
       assertEquals(terminals.getFirst().payload().get("error"), saved.get("content"));
       assertFalse(saved.containsKey("disposition"));
+      if (kind.equals("messageLess") || kind.equals("blank")) {
+        assertEquals("Engine work cancelled", terminals.getFirst().payload().get("message"));
+        assertEquals("Engine work cancelled", terminals.getFirst().payload().get("error"));
+        assertEquals("Engine work cancelled", saved.get("content"));
+      }
+      if (code.equals("SERVICE_UNAVAILABLE")) {
+        assertEquals("errors.SERVICE_UNAVAILABLE", terminals.getFirst().payload().get("i18nKey"));
+      }
+      if (kind.equals("interrupted")) {
+        assertEquals("caller_interrupted", terminals.getFirst().payload().get("reasonCode"));
+      }
       if (kind.equals("reason") || kind.equals("fallbackReason")) {
         assertEquals("CONTEXT_CLOSED", terminals.getFirst().payload().get("reasonCode"));
       }

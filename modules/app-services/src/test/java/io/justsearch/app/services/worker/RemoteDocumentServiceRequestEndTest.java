@@ -31,11 +31,14 @@ final class RemoteDocumentServiceRequestEndTest {
     TestResolvedConfigHelper.storeWithDefaults();
   }
 
-  @AfterEach void restore() { TestResolvedConfigHelper.restoreGlobal(previous); }
+  @AfterEach void restore() {
+    Thread.interrupted();
+    TestResolvedConfigHelper.restoreGlobal(previous);
+  }
 
   static Stream<Arguments> endings() {
     return Stream.of("preSearch", "open", "rich", "legacy", "openFallback", "richFallback", "legacyFallback")
-        .flatMap(path -> Stream.of("raw", "reason", "port", "deadline", "nullDeadline", "local", "ordinary")
+        .flatMap(path -> Stream.of("raw", "reason", "port", "interrupted", "deadline", "nullDeadline", "local", "ordinary")
             .flatMap(kind -> Stream.of("direct", "completion", "execution")
                 .map(wrapper -> Arguments.of(path, kind, wrapper))));
   }
@@ -43,6 +46,7 @@ final class RemoteDocumentServiceRequestEndTest {
   @ParameterizedTest @MethodSource("endings")
   void requestEndSurvivesEveryOptionalCatch(String path, String kind, String wrapper) {
     Throwable end = switch (kind) {
+      case "interrupted" -> new InterruptedException();
       case "raw" -> new CancellationException();
       case "reason" -> new EngineWorkCancelledException("CONTEXT_CLOSED");
       case "port" -> new KnowledgeClientException(KnowledgeClientException.Status.CANCELLED, "cancelled");
@@ -109,7 +113,13 @@ final class RemoteDocumentServiceRequestEndTest {
       Throwable thrown = stage.handle((ignored, failureCause) -> failureCause).toCompletableFuture().join();
       assertNotNull(thrown, "request ending must not become a successful fallback");
       while (thrown instanceof CompletionException || thrown instanceof ExecutionException) thrown = thrown.getCause();
-      assertSame(end, thrown);
+      if (kind.equals("interrupted")) {
+        var cancelled = assertInstanceOf(EngineWorkCancelledException.class, thrown);
+        assertEquals("caller_interrupted", cancelled.reasonCode());
+        assertTrue(Thread.currentThread().isInterrupted());
+      } else {
+        assertSame(end, thrown);
+      }
       if (!fallback) verify(client, never()).fetchDocuments(anyList(), any());
       if (path.equals("preSearch")) verify(client, never()).retrieveContext(any(RetrieveContextParams.class), any());
     }
