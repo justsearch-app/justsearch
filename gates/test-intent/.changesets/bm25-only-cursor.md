@@ -137,3 +137,14 @@ The execution-evidence generator runs in an isolated shared clone with byte-iden
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-75da3b3d-20261027-013215",
+  "verdict": "accept",
+  "digest": "sha256:e320fa92a08023618e105a89f20f2edd4c6f8e3d6b5fcc01dd722af5b0a93441",
+  "note": "Owner words match supplied delegation and expectations remain delegated choices. Own runs: eight repaired cases fail at baseline for repeated page-2 IDs or HTTP 200 instead of CURSOR_INVALID; all eighteen added cases pass on candidate, and ten preservation cases pass on both. Full-suite failures are recorded separately."
+}
+```
