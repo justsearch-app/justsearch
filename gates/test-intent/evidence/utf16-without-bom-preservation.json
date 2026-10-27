@@ -1,0 +1,496 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T16:20:21.273Z",
+  "revision": "481d8c121cede60f987024466b12557df9dea247",
+  "tree": "8800e85137b039dcdea9239f0ce5951d7a271409",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.highSurrogateEndingFileUsesDefault\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf8WithoutBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf8WithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf16LeWithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf16BeWithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.asciiKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.windows1252KeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.shiftJisKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.gb18030KeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.eucKrKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.koi8RKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.interiorByteOrderMarkKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.htmlWithDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.htmlWithoutDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.xmlWithDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.largeUtf16KeepsFinalMarker\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.oneTrailingNulKeepsExistingReplacement\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.sparseNulsKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPaddingAfterUtf8KeepsExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPaddingAfterWindows1252KeepsExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf32LeKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPairsKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulsOnlyAfterWindowKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.shortCjkWithoutEnoughNulsKeepsExistingText\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.sparseNulsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.oppositeLaneNulsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.nulUnitsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.disallowedC0ControlsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.malformedSurrogatesDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.byteOrderMarksStayWithDefaultDetectors\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.unsupportedMarkSkipsRuleWithoutReading\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3689
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#highSurrogateEndingFileUsesDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "highSurrogateEndingFileUsesDefault()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf8WithoutBomKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8WithoutBomKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf8WithBomKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8WithBomKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf16LeWithBomKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf16LeWithBomKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf16BeWithBomKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf16BeWithBomKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#asciiKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "asciiKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#windows1252KeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "windows1252KeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#shiftJisKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shiftJisKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#gb18030KeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gb18030KeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#eucKrKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eucKrKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#koi8RKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "koi8RKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#interiorByteOrderMarkKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interiorByteOrderMarkKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#htmlWithDeclarationKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlWithDeclarationKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#htmlWithoutDeclarationKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlWithoutDeclarationKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#xmlWithDeclarationKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "xmlWithDeclarationKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#largeUtf16KeepsFinalMarker",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "largeUtf16KeepsFinalMarker()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#oneTrailingNulKeepsExistingReplacement",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oneTrailingNulKeepsExistingReplacement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#sparseNulsKeepExistingReplacements",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseNulsKeepExistingReplacements()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulPaddingAfterUtf8KeepsExistingReplacements",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nulPaddingAfterUtf8KeepsExistingReplacements()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulPaddingAfterWindows1252KeepsExistingReplacements",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nulPaddingAfterWindows1252KeepsExistingReplacements()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf32LeKeepsText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf32LeKeepsText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulPairsKeepExistingReplacements",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nulPairsKeepExistingReplacements()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulsOnlyAfterWindowKeepExistingReplacements",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nulsOnlyAfterWindowKeepExistingReplacements()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#shortCjkWithoutEnoughNulsKeepsExistingText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe46ee8bc71ca1b4b9d07dd9528027dbe4948d548154db4467adab90fdc3d14f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shortCjkWithoutEnoughNulsKeepsExistingText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#sparseNulsDoNotOverrideDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseNulsDoNotOverrideDefault()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#oppositeLaneNulsDoNotOverrideDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oppositeLaneNulsDoNotOverrideDefault()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#nulUnitsDoNotOverrideDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nulUnitsDoNotOverrideDefault()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#disallowedC0ControlsDoNotOverrideDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disallowedC0ControlsDoNotOverrideDefault()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#malformedSurrogatesDoNotOverrideDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedSurrogatesDoNotOverrideDefault()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#byteOrderMarksStayWithDefaultDetectors",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "byteOrderMarksStayWithDefaultDetectors()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#unsupportedMarkSkipsRuleWithoutReading",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58bbee12c6eddebd1af8b8f98c4c970ec3daf1e7a41f5da8b2c516a233be620b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unsupportedMarkSkipsRuleWithoutReading()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:956ea874b79871a723634486018358ef149733f9b791465669ad6c2475aa9160"
+}
