@@ -2,26 +2,25 @@
 schema: test-intent.v1
 task: t-20261026-query-classification-budget
 author-role: builder
-author-session: codex-expansion-cutoff-builder-20261027
+author-session: codex-expansion-ownership-builder-20261027
 ---
 
 # Test-intent entries
 
-The original optional-budget repair and its preservation checks remain, with the preset inputs
-using existing INFORMATIONAL classifier rules. The final cutoff repair additionally bounds the
-original expansion completion at submission, even while QU or base retrieval is pending. Queued
-work is abandoned at its cutoff before dispatch; running producers retain ownership until exit.
-The submission-time cutoff uses the JDK delayed executor and `cancel(true)` to interrupt running
-expansion producers. Cutoff cancellation inside the collector wait returns `TIMEOUT` with base
-results; caller cancellation still propagates. Timer, collector and final cleanup claim
-cancellation once, retaining `cancel(true)` and one producer abandonment. Successful expanded re-search keeps its independent
-`min(now + 1500 ms, D)` deadline and base-result fallback.
+The original optional-budget repair and its preservation checks remain. Expansion cancellation now
+uses one atomic ownership state: PENDING becomes CUTOFF, COLLECTING or CLOSED. The armed JDK timer
+cancels only if it owns CUTOFF. A collector that owns COLLECTING uses its existing timed get and
+cancel(true) timeout path; every cancellation observed inside get is foreign and propagates.
+Cleanup claims CLOSED when collection never ran, or abandons unfinished collector-owned work.
+Queued expansion still cannot dispatch after the cutoff while QU or base retrieval is pending.
+Successful expanded re-search retains min(now + 1500 ms, D) and its base-result fallback.
 
-Historical repair evidence retains fail-before ref b1462152. The new delayed-collection regression
-uses 8afa15d777 as its fail-before state. Evidence is refreshed for the final test-source digest.
-The controlled-completion checks do not calibrate the fixed reserve for real profiles. Classifier
-rules and SIMPLE classification policy are preserved; assistance dispatch changes as described.
-No independent acceptance is claimed.
+Historical repair evidence retains fail-before ref b1462152. Delayed-collection E1 evidence retains
+8afa15d777; E4/E5 ownership evidence fails on c24cb38cb9. Evidence is refreshed for the final test
+source. The former cutoffCancellationDuringCollectorWaitReturnsBaseResultsWithTimeout test is
+replaced: its assertion that the timer cancels a waiting collector contradicts the new ownership
+contract. The controlled-completion checks do not calibrate the fixed reserve for real profiles.
+Classifier policy and QU behavior are preserved. No independent acceptance is claimed.
 
 ```json
 {
@@ -97,28 +96,49 @@ No independent acceptance is claimed.
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "E1/E2: while QU or base retrieval is held pending, the original expansion completion times out at its own cutoff before releasing the held stage; queued work never dispatches afterward and running work retains its owner until actual exit. Delayed collection returns base results with TIMEOUT and no re-search. Four durable schedules exercise both held stages and producer states. Cutoff, collector and cleanup claim cancellation once and retain cancel(true) interruption. A deterministic collector-wait race returns TIMEOUT with base results; caller cancellation still propagates. Existing expansion/QU budget and ownership checks remain.",
+      "behaviour": "E1/E2: while QU or base retrieval is held pending, the original expansion completion is cancelled at its own cutoff before releasing the held stage; queued work never dispatches afterward and running work retains its owner until actual exit. Delayed collection returns base results with TIMEOUT and no re-search. Four durable schedules exercise both held stages and producer states. Cutoff ownership retains cancel(true) interruption. Existing expansion/QU budget and ownership checks remain.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "open a task register accordingly for query classification, consider that you will be the orchestrator for this task. firstly proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
           "delegationLocation": "task query-classification user turn owner-delegation (quoted verbatim in the final expansion-cutoff builder assignment, 2026-10-27); follow-up: proceed accordingly",
           "delegationScope": "Implement the assigned expansion-completion cutoff repair, its regression checks, and merge-safe budget documentation. Technical fixtures and test oracles are delegated agent choices; independent acceptance remains pending.",
-          "choice": "Bound the original expansion future immediately after submission by min(searchStart+1500ms,D-500ms), recomputing remaining time after setup. Arm cancel(true) with the JDK delayed executor: queued work cannot dispatch after cutoff, running producers are interrupted and retain ownership until actual exit. Distinguish cutoff cancellation during the collector wait from caller cancellation, and claim abandonment once across timer, collector and cleanup to avoid duplicate producer callbacks. Preserve explicit collector cancel(true), final cleanup, TIMEOUT/FAILED/AI_UNAVAILABLE reasons, successful independent re-search budget and base fallback, and QU behavior.",
+          "choice": "Bound the original expansion future immediately after submission by min(searchStart+1500ms,D-500ms), recomputing remaining time after setup. Arm cancel(true) with the JDK delayed executor: queued work cannot dispatch after cutoff, running producers are interrupted and retain ownership until actual exit. Timer and collector acquire exclusive ownership before cancellation or waiting. Preserve TIMEOUT/FAILED/AI_UNAVAILABLE reasons, successful independent re-search budget and base fallback, and QU behavior.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/qc-expansion-cutoff-repair.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#cutoffCancellationDuringCollectorWaitReturnsBaseResultsWithTimeout"
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java"
+      ],
+      "class": "New",
+      "behaviour": "E4/E5: a foreign cancellation after the old timer has checked pending state propagates with the original cancellation retained in its cause chain even when the timer then fires; once the collector owns expansion the timer does nothing and the collector timed get returns TIMEOUT, base results and exactly one cancel(true) abandonment. Controlled timer execution and latches make both schedules deterministic. The removed cutoffCancellationDuringCollectorWaitReturnsBaseResultsWithTimeout asserted timer cancellation inside get, which the ownership contract forbids.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task register accordingly for query classification, consider that you will be the orchestrator for this task. firstly proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
+          "delegationLocation": "task query-classification user turn owner-delegation (quoted verbatim in the final expansion-cutoff builder assignment, 2026-10-27); follow-up: proceed accordingly",
+          "delegationScope": "Implement the assigned expansion ownership repair and deterministic E4/E5 regressions. Technical fixtures and test oracles are delegated agent choices; independent acceptance remains pending.",
+          "choice": "Replace cancellation attribution with one atomic PENDING to CUTOFF, COLLECTING or CLOSED ownership transition. Only a timer owning CUTOFF cancels; a collector owning COLLECTING times out through its existing timed get and cancel(true). Foreign cancellation always propagates through EngineFutures.rethrowCancellation. Cleanup claims CLOSED only if collection never ran, or abandons still-pending collector-owned work. Replace the old timer-cancels-waiting-collector assertion with independent cancellation and collector timeout oracles.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/qc-expansion-ownership-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#foreignCancellationAfterTimerCheckStillPropagatesFromCollector",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#timerLeavesWaitingCollectorToTimeoutAndAbandonExactlyOnce"
       ],
       "repaired": true
     }
   ]
 }
 ```
-
 ## Acceptance records
 
 Pending independent acceptance of the final candidate.

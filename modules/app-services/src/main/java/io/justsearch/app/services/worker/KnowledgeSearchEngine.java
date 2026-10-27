@@ -60,12 +60,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +82,8 @@ final class KnowledgeSearchEngine {
 
   /** Target length for query-focused snippets passed to the reranker (~512 tokens). */
   private static final int RERANK_SNIPPET_LENGTH = 1500;
+
+  private enum ExpansionOwnership { PENDING, CUTOFF, COLLECTING, CLOSED }
 
   /** Max tokens the LLM may generate for query expansion. */
   private static final int EXPANSION_MAX_TOKENS = 64;
@@ -824,9 +825,8 @@ final class KnowledgeSearchEngine {
     // 256-I4: structured skip reason tracking for pipeline execution report.
     // Fires before base search so LLM latency overlaps with index operation.
     CompletableFuture<String> expansionFuture = null;
-    var expansionCutoffReached = new AtomicBoolean();
-    // Timer, collector and cleanup must not enter the producer's abandonment hook concurrently.
-    var expansionCancellationClaimed = new AtomicBoolean();
+    // Claim ownership before waiting or cancelling; timer cancellation never reaches a collector.
+    var expansionOwnership = new AtomicReference<>(ExpansionOwnership.PENDING);
     CompletableFuture<QueryUnderstandingService.QuResult> quFuture = null;
     QueryUnderstandingService.QuResult quResultForResponse = null;
     FilterNormalizationService.NormResult normResultForResponse = null;
@@ -850,10 +850,8 @@ final class KnowledgeSearchEngine {
             var submittedExpansion = expansionFuture;
             CompletableFuture.delayedExecutor(
                 expansionCompletionBy - System.nanoTime(), TimeUnit.NANOSECONDS).execute(() -> {
-                  if (!submittedExpansion.isDone()
-                      && expansionCancellationClaimed.compareAndSet(false, true)) {
-                    // Publish the origin before cancellation wakes a collector inside get().
-                    expansionCutoffReached.set(true);
+                  if (expansionOwnership.compareAndSet(
+                      ExpansionOwnership.PENDING, ExpansionOwnership.CUTOFF)) {
                     submittedExpansion.cancel(true);
                   }
                 });
@@ -1009,8 +1007,10 @@ final class KnowledgeSearchEngine {
       // Falls back to base results on timeout or error — user always gets a result.
       // Per-source retrieval declines expansion before submission because it cannot consume it.
       if (expansionFuture != null) {
+        boolean collecting = expansionOwnership.compareAndSet(
+            ExpansionOwnership.PENDING, ExpansionOwnership.COLLECTING);
         long remainingNs = expansionCompletionBy - System.nanoTime();
-        if (remainingNs > 0) {
+        if (collecting && remainingNs > 0) {
           try {
             String expansionText = expansionFuture.get(remainingNs, TimeUnit.NANOSECONDS);
             String expandedQuery = mergeExpansion(queryText, expansionText);
@@ -1043,16 +1043,13 @@ final class KnowledgeSearchEngine {
               }
             }
           } catch (TimeoutException e) {
-            if (expansionCancellationClaimed.compareAndSet(false, true)) expansionFuture.cancel(true);
+            expansionFuture.cancel(true);
             expansionSkipReason = "TIMEOUT";
             log.debug(
                 "LLM expansion timed out ({}ms budget), using base results", EXPANSION_BUDGET_MS);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new java.util.concurrent.CompletionException(e);
-          } catch (CancellationException e) {
-            if (!expansionCutoffReached.get() || !expansionFuture.isCancelled()) throw e;
-            expansionSkipReason = "TIMEOUT";
           } catch (ExecutionException e) {
             io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
             io.justsearch.core.execution.EngineFutures.rethrowCancellation(e);
@@ -1074,7 +1071,7 @@ final class KnowledgeSearchEngine {
             log.warn("LLM expansion re-search failed, using base results: {}", e.getMessage());
           }
         } else {
-          if (expansionCancellationClaimed.compareAndSet(false, true)) expansionFuture.cancel(true);
+          if (collecting) expansionFuture.cancel(true);
           expansionSkipReason = "TIMEOUT";
         }
       }
@@ -1084,8 +1081,10 @@ final class KnowledgeSearchEngine {
       try {
         if (quFuture != null && !quFuture.isDone()) quFuture.cancel(false);
       } finally {
-        if (expansionFuture != null && !expansionFuture.isDone()
-            && expansionCancellationClaimed.compareAndSet(false, true)) expansionFuture.cancel(true);
+        if (expansionFuture != null
+            && (expansionOwnership.compareAndSet(ExpansionOwnership.PENDING, ExpansionOwnership.CLOSED)
+                || (expansionOwnership.get() == ExpansionOwnership.COLLECTING
+                    && !expansionFuture.isDone()))) expansionFuture.cancel(true);
       }
     }
 

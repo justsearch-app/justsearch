@@ -213,34 +213,106 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   }
 
   @Test
-  void cutoffCancellationDuringCollectorWaitReturnsBaseResultsWithTimeout() {
+  void foreignCancellationAfterTimerCheckStillPropagatesFromCollector() throws Exception {
+    checkCollectorCutoff(true);
+  }
+
+  @Test
+  void timerLeavesWaitingCollectorToTimeoutAndAbandonExactlyOnce() throws Exception {
+    checkCollectorCutoff(false);
+  }
+
+  private void checkCollectorCutoff(boolean foreignCancellation) throws Exception {
     optionalConfig(false);
-    var cancellationsDuringWait = new AtomicInteger();
-    var root = new CompletableFuture<String>() {
-      @Override
-      public String get(long timeout, TimeUnit unit)
-          throws InterruptedException, java.util.concurrent.ExecutionException,
-              java.util.concurrent.TimeoutException {
-        // Keep the collector inside get until the armed cutoff cancels the original future,
-        // rather than racing the collector's own timed get against the cutoff task.
-        try {
-          return super.get(3, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.CancellationException cancelled) {
-          cancellationsDuringWait.incrementAndGet();
-          throw cancelled;
+    try (var completion = new OwnedCompletion(false)) {
+      var cutoff = new AtomicReference<Runnable>();
+      var timerThread = new AtomicReference<Thread>();
+      var timerCheckedOrFinished = new CountDownLatch(1);
+      var resumeTimer = new CountDownLatch(1);
+      var timerFailure = new AtomicReference<Throwable>();
+      var cancellations = new AtomicInteger();
+      var root = new CompletableFuture<String>() {
+        @Override public boolean isDone() {
+          boolean done = completion.root.isDone();
+          if (Thread.currentThread() == timerThread.get()) {
+            // On c24cb38cb9 pause after the timer observed "pending", before it claims
+            // cancellation. The ownership design never consults the future from the timer
+            // once the collector owns it, so that timer simply exits instead.
+            timerCheckedOrFinished.countDown();
+            try { assertTrue(resumeTimer.await(3, TimeUnit.SECONDS)); }
+            catch (InterruptedException interrupted) { throw new AssertionError(interrupted); }
+          }
+          return done;
+        }
+
+        @Override public boolean cancel(boolean interrupt) {
+          assertTrue(interrupt, "expansion abandonment retains cancel(true)");
+          cancellations.incrementAndGet();
+          return completion.root.cancel(interrupt);
+        }
+
+        @Override public boolean isCancelled() { return completion.root.isCancelled(); }
+
+        @Override public String get(long timeout, TimeUnit unit)
+            throws InterruptedException, java.util.concurrent.ExecutionException,
+                java.util.concurrent.TimeoutException {
+          assertTrue(timeout > 0, "collector receives its remaining cutoff budget");
+          assertTrue(cutoff.get() != null, "the JDK cutoff was armed before collection");
+          Thread timer = new Thread(() -> {
+            try { cutoff.get().run(); }
+            catch (Throwable failure) { timerFailure.set(failure); }
+            finally { timerCheckedOrFinished.countDown(); }
+          }, "controlled-expansion-cutoff");
+          timerThread.set(timer);
+          timer.start();
+          try {
+            assertTrue(timerCheckedOrFinished.await(3, TimeUnit.SECONDS));
+            // This is an independent cancellation origin, bypassing the search's wrapper.
+            if (foreignCancellation) completion.root.cancel(false);
+          } finally {
+            resumeTimer.countDown();
+            timer.join(3000);
+            assertFalse(timer.isAlive(), "the controlled timer has exited");
+          }
+          assertNull(timerFailure.get(), "the controlled cutoff completed normally");
+          if (foreignCancellation) return completion.root.get(timeout, unit);
+          assertEquals(0, cancellations.get(), "timer must not cancel a waiting collector");
+          assertFalse(completion.root.isDone(), "the collector still owns pending expansion");
+          // The controllable timed wait reaches its own cutoff after the timer has fired.
+          throw new java.util.concurrent.TimeoutException("collector cutoff");
+        }
+      };
+      var searches = new AtomicInteger();
+      var engine = engineOver(responsiveClient(searches, 0), aiReturning(root),
+          mock(SearchPerSourceExecutor.class));
+      try (var futures = org.mockito.Mockito.mockStatic(
+          CompletableFuture.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        futures.when(() -> CompletableFuture.delayedExecutor(
+            org.mockito.ArgumentMatchers.anyLong(), any(TimeUnit.class)))
+            .thenReturn((java.util.concurrent.Executor) cutoff::set);
+        if (foreignCancellation) {
+          var expected = new AtomicReference<java.util.concurrent.CancellationException>();
+          completion.root.whenComplete((value, failure) -> expected.set(
+              assertInstanceOf(java.util.concurrent.CancellationException.class, failure)));
+          var failure = assertThrows(java.util.concurrent.CancellationException.class,
+              () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+          Throwable representedCause = failure;
+          while (representedCause != expected.get() && representedCause.getCause() != null) {
+            representedCause = representedCause.getCause();
+          }
+          assertSame(expected.get(), representedCause,
+              "the original foreign cancellation remains in the cause chain");
+          assertEquals(0, cancellations.get(), "search never cancels after foreign termination");
+        } else {
+          var response = engine.search(optionalRequest(true), TestEngineContexts.internal());
+          assertEquals(List.of("/base.txt"), ids(response));
+          assertEquals("TIMEOUT", expansionReason(response));
+          assertEquals(1, cancellations.get(), "only the collector abandons expansion");
         }
       }
-    };
-    var searches = new AtomicInteger();
-    var engine = engineOver(responsiveClient(searches, 0), aiReturning(root),
-        mock(SearchPerSourceExecutor.class));
-
-    var response = engine.search(optionalRequest(true), TestEngineContexts.internal());
-
-    assertEquals(1, cancellationsDuringWait.get(), "cutoff cancellation reached the waiting collector");
-    assertEquals(List.of("/base.txt"), ids(response));
-    assertEquals("TIMEOUT", expansionReason(response));
-    assertEquals(1, searches.get(), "abandoned expansion never starts a re-search");
+      assertEquals(1, searches.get(), "abandoned expansion never starts a re-search");
+      completion.assertAbandoned(false, !foreignCancellation);
+    }
   }
 
   private void checkExpansionDeadline(boolean running) throws Exception {
