@@ -624,7 +624,7 @@ public class LocalApiServer {
 
     Javalin starting = this.app;
     try {
-      starting.start("127.0.0.1", bindPort);
+      this.app.start("127.0.0.1", bindPort);
     } catch (RuntimeException | Error failure) {
       try { stopHttpTransport(starting); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
