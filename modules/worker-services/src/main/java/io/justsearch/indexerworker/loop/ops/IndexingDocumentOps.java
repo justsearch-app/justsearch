@@ -582,7 +582,7 @@ public final class IndexingDocumentOps {
    * chunk-merge on a short corpus is hybrid-neutral, F-036; skipping it on a long one halves
    * quality). The exact SPLADE count is still used whenever the encoder is ready.
    */
-  static long estimateTokenCount(String content) {
+  public static long estimateTokenCount(String content) {
     if (content == null || content.isBlank()) {
       return 0L;
     }

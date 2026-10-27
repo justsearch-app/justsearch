@@ -433,6 +433,21 @@ class FieldMapperTest {
   }
 
   @Test
+  void storedNumericBooleanStringsKeepBooleanMeaningWithoutChangingOtherInputs() {
+    var mapper = new FieldMapper(createVduTestCatalog());
+    for (var entry : Map.<Object, String>ofEntries(
+        Map.entry("1", "1"), Map.entry("0", "0"), Map.entry("true", "1"),
+        Map.entry("false", "0"), Map.entry(true, "1"), Map.entry(false, "0"),
+        Map.entry(7, "1"), Map.entry(0, "0"), Map.entry("2", "0")).entrySet()) {
+      var document = mapper.toDocument(Map.of(SchemaFields.DOC_ID, "bool",
+          SchemaFields.DOC_UID, "bool", SchemaFields.VDU_PROCESSED, entry.getKey()), null);
+      assertEquals(entry.getValue(), document.get(SchemaFields.VDU_PROCESSED), entry.getKey().toString());
+    }
+    assertNull(mapper.toDocument(Map.of(SchemaFields.DOC_ID, "absent",
+        SchemaFields.DOC_UID, "absent"), null).get(SchemaFields.VDU_PROCESSED));
+  }
+
+  @Test
   void mapsVduEnrichmentText() {
     FieldMapper fm = new FieldMapper(createVduTestCatalog());
     String enrichmentJson = "{\"summary\":\"Invoice document\",\"doc_type\":\"invoice\"}";

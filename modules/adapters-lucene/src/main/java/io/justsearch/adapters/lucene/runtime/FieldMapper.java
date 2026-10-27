@@ -702,7 +702,9 @@ public final class FieldMapper {
   private static Boolean asBoolean(Object v) {
     if (v instanceof Boolean b) return b;
     if (v instanceof Number n) return n.longValue() != 0L;
-    if (v != null) return Boolean.parseBoolean(String.valueOf(v).toLowerCase(Locale.ROOT));
+    // Stored numeric booleans are reconstructed as strings during read-modify-write.
+    if (v != null) return "1".equals(String.valueOf(v))
+        || Boolean.parseBoolean(String.valueOf(v).toLowerCase(Locale.ROOT));
     return null;
   }
 

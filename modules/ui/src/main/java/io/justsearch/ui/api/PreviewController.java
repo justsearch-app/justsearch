@@ -307,7 +307,8 @@ public final class PreviewController {
       // Add textProvenance and VDU status fields
       response.put("textProvenance", textProvenance);
       response.put("vduStatus", vduStatus instanceof String ? vduStatus : null);
-      response.put("vduProcessed", "true".equalsIgnoreCase(String.valueOf(vduProcessed)));
+      response.put("vduProcessed", "1".equals(String.valueOf(vduProcessed))
+          || "true".equalsIgnoreCase(String.valueOf(vduProcessed)));
       if (vduPageCount instanceof String s) {
         try {
           response.put("vduPageCount", Integer.parseInt(s));
