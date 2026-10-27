@@ -5,6 +5,7 @@
   },
   "bundle": {
     "category": "Utility",
+    "longDescription": "JustSearch indexes local files and lets you search their contents from a desktop app. Your files and search index stay on your computer.",
     "homepage": "https://github.com/justsearch-app/justsearch",
     "targets": [
       "deb"

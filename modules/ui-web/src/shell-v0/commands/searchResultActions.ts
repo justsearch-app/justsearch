@@ -50,7 +50,7 @@ export function registerSearchResultActions(): void {
   registerContextAction({
     id: 'search-result.reveal',
     context: SEARCH_RESULT_CONTEXT,
-    label: 'Reveal in Explorer',
+    label: /Linux/i.test(navigator.userAgent) ? 'Show in folder' : 'Reveal in Explorer',
     icon: 'folder',
     priority: 20,
     source: 'core',

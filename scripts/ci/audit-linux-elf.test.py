@@ -35,7 +35,8 @@ class ElfAuditTest(unittest.TestCase):
 
     def test_version_needs_above_each_ceiling_fail_and_supported_versions_pass(self):
         for symbol, expected in [("GLIBC_2.39", 0), ("GLIBC_2.40", 1),
-                                 ("GLIBCXX_3.4.33", 0), ("GLIBCXX_3.4.34", 1)]:
+                                 ("GLIBCXX_3.4.33", 0), ("GLIBCXX_3.4.34", 1),
+                                 ("CXXABI_1.3.15", 0), ("CXXABI_1.3.16", 1)]:
             with self.subTest(symbol=symbol):
                 code, report = self.audit(self.library(symbol))
                 self.assertEqual(code, expected, report)

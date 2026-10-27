@@ -19,8 +19,8 @@ import tempfile
 import zipfile
 
 
-LIMITS = {"GLIBC": "2.39", "GLIBCXX": "3.4.33"}
-# Noble ships GCC 14's libstdc++6 (GLIBCXX_3.4.33):
+LIMITS = {"GLIBC": "2.39", "GLIBCXX": "3.4.33", "CXXABI": "1.3.15"}
+# Noble ships GCC 14's libstdc++6 (GLIBCXX_3.4.33, CXXABI_1.3.15):
 # https://packages.ubuntu.com/noble/libstdc++6
 # https://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html
 GPU_LIBRARY = re.compile(
