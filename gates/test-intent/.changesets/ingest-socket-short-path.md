@@ -107,3 +107,13 @@ cases passed. The candidate runs all 11 cases with no skips.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17be9-1009-72f3-900e-f3b2f4f7a558",
+  "verdict": "accept",
+  "digest": "sha256:19770b1d21b2afa8c49897da0833e7ca46df3e8e9be1115e7144b0ee72305356"
+}
+```
