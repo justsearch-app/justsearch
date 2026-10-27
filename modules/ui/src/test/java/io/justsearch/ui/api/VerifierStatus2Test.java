@@ -12,7 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Independent real-HTTP owner isolation matrix, written before reading candidate tests. */
-class VerifierStatus2Test extends VerifierStatusIsolationTest {
+class VerifierStatus2Test extends StatusIsolationFixtureSupport {
   static void set(Object target,String name,Object value) throws Exception {
     var field=(target instanceof StatusLifecycleHandler ? StatusLifecycleHandler.class : target.getClass()).getDeclaredField(name); field.setAccessible(true); field.set(target,value);
   }

@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-class StatusPublicationCompletenessTest extends VerifierStatusIsolationTest {
+class StatusPublicationCompletenessTest extends StatusIsolationFixtureSupport {
   public record FutureProducer(boolean available, String newStatusField, boolean stale, long ageMs) {}
 
   private static Class<?> backstop() {
