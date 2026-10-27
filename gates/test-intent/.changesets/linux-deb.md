@@ -42,3 +42,14 @@ handler remains part of the independent Ubuntu VM qualification.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-206d63b4-cbcf-4161-b1a0-e1235b92a20b",
+  "verdict": "accept",
+  "digest": "sha256:94c30e7df0820e163983bc373980dad842c97272fa3101051cbf1fe362ea6f01",
+  "note": "Class New confirmed. delegated-choice within the 2026-10-27 delegation (Linux release incl. desktop integration); conflict search repeated over docs/decisions: none (ADR-0024 'Windows-only' is a listed consequence, superseded in scope by the newer owner words). Both named checks ran and passed on ca873e83a5 and also on baseline 82f9c9c0d2 (preservation; no production change). Mutations of argv reader, configured scheme, event name, cold dispatch, history flag and unlisten each make a check fail. Weakness noted: the vitest check pins cold/warm intent equality, not the parsed destination; parser mapping is covered by parser tests."
+}
+```
