@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:99e5af5803d9c574b8cd5168a7d314dedf271e5293720500d3caf21bb6975bff"
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-26T23:34:17.728Z",
-  "revision": "c4ca2dcaf6a7a3bac50eddc47113c19e16087b26",
-  "tree": "7a870197757be1fc345a37655228b1125b98459f",
+  "createdAt": "2026-10-27T02:29:48.999Z",
+  "revision": "8afa15d7775fca37c3937482fd591b968fb1a97d",
+  "tree": "6ab594fafa60442fa442d325335f43397aa2f448",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "./gradlew --no-daemon :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.simplePresetsKeepRawPolicyAndActualDispatch\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.simpleQuKeepsItsIndependentAuthorities\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.luceneFiltersAndFieldSortRemainOwnedByCaller\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.actualQuMayDispatchWithoutSurfacedExtraction\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.capturedEnabledClassificationDoesNotFollowLaterGlobalDisable\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.pairedSimpleTextStillDispatchesQu\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetQuBudgetAndOwnershipMatchControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetExpansionBudgetAndOwnershipMatchControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetTerminationMatchesControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceInformationalQuestionSkipsUnconsumedExpansion\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceQuotedExactKeepsQueryTypeReasonPrecedence\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.simplePresetsKeepRawPolicyAndActualDispatch\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.simpleQuKeepsItsIndependentAuthorities\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.luceneFiltersAndFieldSortRemainOwnedByCaller\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.actualQuMayDispatchWithoutSurfacedExtraction\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.capturedEnabledClassificationDoesNotFollowLaterGlobalDisable\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineClassificationDispatchTest.pairedSimpleTextStillDispatchesQu\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetQuBudgetAndOwnershipMatchControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetExpansionBudgetAndOwnershipMatchControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.presetTerminationMatchesControl\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceInformationalQuestionSkipsUnconsumedExpansion\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceQuotedExactKeepsQueryTypeReasonPrecedence\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 29825
+      "durationMs": 21552
     },
     {
-      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/qc-rescope/tmp/agent-tmp/rescope-builder/test-intent-vitest-2904083-1793057656173.json\"",
+      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/yc70_qkr/tmp/test-intent-vitest-5038-1793068187712.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1553
+      "durationMs": 1283
     }
   ],
   "checks": [
@@ -225,7 +225,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#presetQuBudgetAndOwnershipMatchControl",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
+      "contentDigest": "sha256:b1332e5b05e1679d47eeddba02893c139731b7bf7192ab3cdf3861b734a896f4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -252,7 +252,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#presetExpansionBudgetAndOwnershipMatchControl",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
+      "contentDigest": "sha256:b1332e5b05e1679d47eeddba02893c139731b7bf7192ab3cdf3861b734a896f4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -279,7 +279,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#presetTerminationMatchesControl",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
+      "contentDigest": "sha256:b1332e5b05e1679d47eeddba02893c139731b7bf7192ab3cdf3861b734a896f4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -314,7 +314,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceInformationalQuestionSkipsUnconsumedExpansion",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
+      "contentDigest": "sha256:b1332e5b05e1679d47eeddba02893c139731b7bf7192ab3cdf3861b734a896f4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -329,7 +329,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceQuotedExactKeepsQueryTypeReasonPrecedence",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
+      "contentDigest": "sha256:b1332e5b05e1679d47eeddba02893c139731b7bf7192ab3cdf3861b734a896f4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -372,5 +372,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:effeadcd3812781fcce51a675fc0d5cdfdf0e2aa0e2a2f4a164da96432b3b3b8"
+  "digest": "sha256:a592137da4cd5cd153df1f3ba4669a144cb4be174053dc8631f209e1788cf22b"
 }

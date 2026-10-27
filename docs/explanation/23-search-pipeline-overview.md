@@ -147,8 +147,13 @@ actual exit; neither proves native termination. These rules are implemented in
 [`QueryUnderstandingService`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/QueryUnderstandingService.java)
 and [`EngineFutures`](../../modules/core/src/main/java/io/justsearch/core/execution/EngineFutures.java).
 
-Expansion completion has cutoff `min(search start + 1500 ms, D - 500 ms)` and
-cancels the original future with `cancel(true)` when abandoned. The branch for two
+The original expansion completion is bounded at submission by
+`min(search start + 1500 ms, D - 500 ms)`, even while QU or base retrieval is
+pending. The JDK delayed executor arms `cancel(true)` at that cutoff: queued work
+is abandoned before dispatch, and running producers are interrupted while retaining
+ownership until actual exit. Cutoff cancellation during the collector wait returns
+base results with `TIMEOUT`; caller cancellation still propagates. The collector
+retains `cancel(true)` and final cleanup. The branch for two
 or more known sources never launches expansion it cannot consume;
 `PER_SOURCE_RETRIEVAL` is diagnostic, not a degradation warning. A successful
 expanded re-search retains its independent `min(now + 1500 ms, D)` deadline and
@@ -159,8 +164,9 @@ base route: a HYBRID base is not keyword-only. See the
 
 The fixed 1500 ms reserve has a qualified finite warmed calibration; it is not a
 universal latency guarantee. A finite real-model comparison rejected broader
-multi-token classification after a target-rank regression; this branch preserves
-SIMPLE classification and routing. Aggregate ranking remains undecided because
+multi-token classification after a target-rank regression. The assistance dispatch
+and budget changes described above preserve the existing classifier rules and
+SIMPLE classification policy. Aggregate ranking remains undecided because
 expansion varied between runs; see the measurements and limits in the
 [quality register](../reference/search-quality-register.md#query-classification-budgets-diagnostics-and-open-gates).
 

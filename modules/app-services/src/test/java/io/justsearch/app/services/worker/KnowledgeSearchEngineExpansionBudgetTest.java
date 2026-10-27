@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -153,6 +154,93 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   @Test
   void stalledExpansionRetainsRunningProducerUntilActualExit() throws Exception {
     checkExpansionDeadline(true);
+  }
+
+  @ParameterizedTest(name = "expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere({0})")
+  @ValueSource(strings = {"qu-queued", "qu-running", "base-queued", "base-running"})
+  void expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere(String schedule) throws Exception {
+    boolean qu = schedule.startsWith("qu-");
+    boolean running = schedule.endsWith("-running");
+    optionalConfig(qu);
+    try (var completion = new OwnedCompletion(running)) {
+      var waiting = new CountDownLatch(1);
+      var releaseBase = new CountDownLatch(1);
+      var terminal = new CountDownLatch(1);
+      completion.root.whenComplete((value, failure) -> terminal.countDown());
+      var quRoot = new CompletableFuture<String>();
+      OnlineAiService ai = mock(OnlineAiService.class);
+      when(ai.isAvailable()).thenReturn(true);
+      var calls = new AtomicInteger();
+      when(ai.chatCompletion(any(), anyInt(), any(), any())).thenAnswer(ignored -> {
+        if (calls.incrementAndGet() == 1) return completion.root;
+        waiting.countDown();
+        return quRoot;
+      });
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      when(client.search(any(SearchRequest.class), any())).thenAnswer(ignored -> {
+        if (!qu) {
+          waiting.countDown();
+          assertTrue(releaseBase.await(5, TimeUnit.SECONDS));
+        }
+        return hits("/base.txt");
+      });
+      var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
+      var result = new CompletableFuture<KnowledgeSearchResponse>();
+      Thread search = new Thread(() -> {
+        try { result.complete(engine.search(optionalRequest(true), TestEngineContexts.internal())); }
+        catch (Throwable failure) { result.completeExceptionally(failure); }
+      }, "expansion-cutoff-search");
+      search.start();
+      try {
+        assertTrue(waiting.await(3, TimeUnit.SECONDS), "search reached the held QU or base retrieval");
+        assertTrue(terminal.await(3, TimeUnit.SECONDS),
+            "original expansion completion must be abandoned before releasing QU or base retrieval");
+        assertFalse(result.isDone(), "search is still waiting elsewhere at the expansion cutoff");
+        assertThrows(java.util.concurrent.CancellationException.class, completion.root::get);
+        completion.assertAbandoned(running, true);
+      } finally {
+        quRoot.complete("{\"query\":\"climate policy\"}");
+        releaseBase.countDown();
+        search.join(3000);
+        assertFalse(search.isAlive(), "the test's search thread exits after release");
+      }
+      var response = result.get(3, TimeUnit.SECONDS);
+      assertEquals(List.of("/base.txt"), ids(response));
+      assertEquals("TIMEOUT", expansionReason(response));
+      assertEquals(qu ? 2 : 1, calls.get());
+      org.mockito.Mockito.verify(client).search(any(SearchRequest.class), any());
+    }
+  }
+
+  @Test
+  void cutoffCancellationDuringCollectorWaitReturnsBaseResultsWithTimeout() {
+    optionalConfig(false);
+    var cancellationsDuringWait = new AtomicInteger();
+    var root = new CompletableFuture<String>() {
+      @Override
+      public String get(long timeout, TimeUnit unit)
+          throws InterruptedException, java.util.concurrent.ExecutionException,
+              java.util.concurrent.TimeoutException {
+        // Keep the collector inside get until the armed cutoff cancels the original future,
+        // rather than racing the collector's own timed get against the cutoff task.
+        try {
+          return super.get(3, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.CancellationException cancelled) {
+          cancellationsDuringWait.incrementAndGet();
+          throw cancelled;
+        }
+      }
+    };
+    var searches = new AtomicInteger();
+    var engine = engineOver(responsiveClient(searches, 0), aiReturning(root),
+        mock(SearchPerSourceExecutor.class));
+
+    var response = engine.search(optionalRequest(true), TestEngineContexts.internal());
+
+    assertEquals(1, cancellationsDuringWait.get(), "cutoff cancellation reached the waiting collector");
+    assertEquals(List.of("/base.txt"), ids(response));
+    assertEquals("TIMEOUT", expansionReason(response));
+    assertEquals(1, searches.get(), "abandoned expansion never starts a re-search");
   }
 
   private void checkExpansionDeadline(boolean running) throws Exception {

@@ -2,20 +2,26 @@
 schema: test-intent.v1
 task: t-20261026-query-classification-budget
 author-role: builder
-author-session: codex-rescope-builder-20261026
+author-session: codex-expansion-cutoff-builder-20261027
 ---
 
 # Test-intent entries
 
-These tests and production budget behavior were already present on the rescope baseline d036a07a9b9.
-The rescope preserves the original optional-budget and cancellation assertions. Only preset inputs
-that depended on rejected classifier rules are replaced with baseline-INFORMATIONAL questions.
-The mixed-filename NAVIGATIONAL reason-precedence test is restored, alongside the additional quoted
-EXACT_MATCH control. This is preservation of the prior budget repair, not a new budget change.
+The original optional-budget repair and its preservation checks remain, with the preset inputs
+using existing INFORMATIONAL classifier rules. The final cutoff repair additionally bounds the
+original expansion completion at submission, even while QU or base retrieval is pending. Queued
+work is abandoned at its cutoff before dispatch; running producers retain ownership until exit.
+The submission-time cutoff uses the JDK delayed executor and `cancel(true)` to interrupt running
+expansion producers. Cutoff cancellation inside the collector wait returns `TIMEOUT` with base
+results; caller cancellation still propagates. Timer, collector and final cleanup claim
+cancellation once, retaining `cancel(true)` and one producer abandonment. Successful expanded re-search keeps its independent
+`min(now + 1500 ms, D)` deadline and base-result fallback.
 
-Evidence files are refreshed for the changed test-source digest. Their historical fail-before ref
-b1462152 remains the pre-budget implementation, not the rescope baseline. The provisional reserve
-is not calibrated by these controlled-completion tests. No independent acceptance is claimed.
+Historical repair evidence retains fail-before ref b1462152. The new delayed-collection regression
+uses 8afa15d777 as its fail-before state. Evidence is refreshed for the final test-source digest.
+The controlled-completion checks do not calibrate the fixed reserve for real profiles. Classifier
+rules and SIMPLE classification policy are preserved; assistance dispatch changes as described.
+No independent acceptance is claimed.
 
 ```json
 {
@@ -85,6 +91,29 @@ is not calibrated by these controlled-completion tests. No independent acceptanc
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceQuotedExactKeepsQueryTypeReasonPrecedence",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#fastCompletionMayUseExistingReSearchBudgetBeyondCompletionCutoffWithBaseFallback"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java"
+      ],
+      "class": "New",
+      "behaviour": "E1/E2: while QU or base retrieval is held pending, the original expansion completion times out at its own cutoff before releasing the held stage; queued work never dispatches afterward and running work retains its owner until actual exit. Delayed collection returns base results with TIMEOUT and no re-search. Four durable schedules exercise both held stages and producer states. Cutoff, collector and cleanup claim cancellation once and retain cancel(true) interruption. A deterministic collector-wait race returns TIMEOUT with base results; caller cancellation still propagates. Existing expansion/QU budget and ownership checks remain.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task register accordingly for query classification, consider that you will be the orchestrator for this task. firstly proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
+          "delegationLocation": "task query-classification user turn owner-delegation (quoted verbatim in the final expansion-cutoff builder assignment, 2026-10-27); follow-up: proceed accordingly",
+          "delegationScope": "Implement the assigned expansion-completion cutoff repair, its regression checks, and merge-safe budget documentation. Technical fixtures and test oracles are delegated agent choices; independent acceptance remains pending.",
+          "choice": "Bound the original expansion future immediately after submission by min(searchStart+1500ms,D-500ms), recomputing remaining time after setup. Arm cancel(true) with the JDK delayed executor: queued work cannot dispatch after cutoff, running producers are interrupted and retain ownership until actual exit. Distinguish cutoff cancellation during the collector wait from caller cancellation, and claim abandonment once across timer, collector and cleanup to avoid duplicate producer callbacks. Preserve explicit collector cancel(true), final cleanup, TIMEOUT/FAILED/AI_UNAVAILABLE reasons, successful independent re-search budget and base fallback, and QU behavior.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/qc-expansion-cutoff-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#cutoffCancellationDuringCollectorWaitReturnsBaseResultsWithTimeout"
+      ],
+      "repaired": true
     }
   ]
 }
