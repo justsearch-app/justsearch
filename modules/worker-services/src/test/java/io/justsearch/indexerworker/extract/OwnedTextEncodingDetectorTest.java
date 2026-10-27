@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -22,7 +23,7 @@ class OwnedTextEncodingDetectorTest {
   void acceptedByteOrdersSetMetadataAndRestoreStream() throws Exception {
     for (Charset encoding : List.of(StandardCharsets.UTF_16LE, StandardCharsets.UTF_16BE)) {
       byte[] bytes = "A readable sentence in either byte order.".getBytes(encoding);
-      var input = new ByteArrayInputStream(bytes);
+      var input = markLimited(bytes);
       var metadata = new Metadata();
       assertEquals(encoding, detector().detect(input, metadata));
       assertEquals(encoding.name(), metadata.get(TikaCoreProperties.DETECTED_ENCODING));
@@ -157,13 +158,21 @@ class OwnedTextEncodingDetectorTest {
   }
 
   private static void assertUsesDefault(byte[] bytes) throws Exception {
-    var input = new ByteArrayInputStream(bytes);
+    var input = markLimited(bytes);
     assertEquals(StandardCharsets.UTF_8, detector().detect(input, new Metadata()));
     assertArrayEquals(bytes, input.readAllBytes());
   }
 
   private static Charset detect(byte[] bytes) throws IOException {
-    return detector().detect(new ByteArrayInputStream(bytes), new Metadata());
+    var input = markLimited(bytes);
+    Charset charset = detector().detect(input, new Metadata());
+    assertArrayEquals(bytes, input.readAllBytes());
+    return charset;
+  }
+
+  /** Small reads, and a reset past the mark limit fails, unlike a bare byte-array stream. */
+  private static InputStream markLimited(byte[] bytes) {
+    return new BufferedInputStream(new ByteArrayInputStream(bytes), 16);
   }
 
   private static OwnedTextEncodingDetector detector() {
