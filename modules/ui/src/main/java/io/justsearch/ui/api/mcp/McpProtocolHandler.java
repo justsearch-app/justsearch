@@ -144,6 +144,7 @@ public final class McpProtocolHandler {
       }
 
       if (admission != null) {
+        io.justsearch.ui.api.RequestEngineWork.requireLiveOwner(ctx);
         var operation = "tools/call".equals(method) && params.has("name")
             ? surface.admissionOperation(params.get("name").asText()) : java.util.Optional.<io.justsearch.agent.api.registry.Operation>empty();
         if (operation.isPresent()) {

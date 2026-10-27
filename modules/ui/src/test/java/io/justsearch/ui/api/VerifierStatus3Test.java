@@ -2,7 +2,7 @@ package io.justsearch.ui.api;
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
-class VerifierStatus3Test extends VerifierStatusIsolationTest {
+class VerifierStatus3Test extends StatusIsolationFixtureSupport {
   static long statusThreads(){return Thread.getAllStackTraces().keySet().stream().filter(t->t.isAlive() && t.getName().startsWith("status-")).count();}
   @Test void persistentHungWorkerDoesNotGrowProducerThreadsAndClearsAfterRelease() throws Exception {
     try(var f=new Fixture(true)){

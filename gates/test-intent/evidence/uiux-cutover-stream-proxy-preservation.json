@@ -1,0 +1,92 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:2d1969b6b8353f3ec6c85ce8147b82ce96f4300a9d8dc2b78184a9acf18592a4",
+    "adapterPatch": "gates/test-intent/evidence/http-lifetime/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-27T06:31:40.820Z",
+  "revision": "ee92a253a795b7a49a3bcf374042edc12fadbf9b",
+  "tree": "e06c1f87d0d59b55d802b7ad3a6358d9ea897baf",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/apiProxyLifetime.test.js\" --reporter=json --outputFile=\"/home/elias/.cache/am/disz7fi7/tmp/test-intent-vitest-294-1793082681913.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1273
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+      "file": "modules/ui-web/src/apiProxyLifetime.test.js",
+      "runner": "vitest",
+      "contentDigest": "sha256:141de6cc053d494c6978774925169d55f54d22cc98bfda1b55e63d51d603bac5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "dev: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+      "file": "modules/ui-web/src/apiProxyLifetime.test.js",
+      "runner": "vitest",
+      "contentDigest": "sha256:141de6cc053d494c6978774925169d55f54d22cc98bfda1b55e63d51d603bac5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preview: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "784f94fd04",
+    "revision": "784f94fd049b9b2c39708437fa262c32a58c32b1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/apiProxyLifetime.test.js\" --reporter=json --outputFile=\"/home/elias/.cache/am/disz7fi7/tmp/test-intent-vitest-294-1793082683205.json\"",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 17610,
+        "output": "JSON report written to /home/elias/.cache/am/disz7fi7/tmp/test-intent-vitest-294-1793082683205.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d81c68eec009bbf7385c1b12845b071901d06c6f27d5abe1a6a662b42c00d89d"
+}

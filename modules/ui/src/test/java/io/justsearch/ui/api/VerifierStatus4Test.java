@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.mockito.Mockito.*;
-class VerifierStatus4Test extends VerifierStatusIsolationTest {
+class VerifierStatus4Test extends StatusIsolationFixtureSupport {
  @ParameterizedTest @ValueSource(strings={"at-rest","agent","vision"})
  void additionalProducersCannotHoldRealStatusHttp(String owner) throws Exception {
   try(var f=new Fixture(true)){

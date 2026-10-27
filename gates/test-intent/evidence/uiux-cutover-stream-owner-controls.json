@@ -1,0 +1,171 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:2d1969b6b8353f3ec6c85ce8147b82ce96f4300a9d8dc2b78184a9acf18592a4",
+    "adapterPatch": "gates/test-intent/evidence/http-lifetime/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-27T07:04:09.168Z",
+  "revision": "ee92a253a795b7a49a3bcf374042edc12fadbf9b",
+  "tree": "59317e5e330110df0e7f8bf49fd385055bdea31d",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RequestReleaseTransportTest.blockedProjectionLeavesTerminalCallbackAndAnotherAfterFreeToProgress\" --tests \"io.justsearch.ui.api.RequestReleaseTransportTest.registryClosureBeforeExceptionalTerminalDoesNotRetireTheReleaseOwner\" --tests \"io.justsearch.ui.api.RequestReleaseTransportTest.liveBodyAndStillRunningStopAttemptRemainOwnedAcrossBoundedRetry\" --tests \"io.justsearch.ui.api.RequestReleaseTransportTest.genuineInterruptedTransportStopRemainsUncleanWithoutFabricatedDrain\" --tests \"io.justsearch.ui.api.RequestReleaseOwnerTest.blockedReleaseRetainsItsRecordWhileTerminalCaptureAndAnotherAfterProgress\" --tests \"io.justsearch.ui.api.RequestReleaseOwnerTest.oldAfterCannotReadNewRegistrationOnTheRecycledRequest\" --tests \"io.justsearch.ui.api.RequestReleaseOwnerTest.firstNegativeAcknowledgementBoundsFailedRecordsWithoutStoppingExistingCleanup\" --tests \"io.justsearch.ui.api.RequestReleaseOwnerTest.laterStartupListenerFailureDrainsWorkerWithoutAnAcceptingTransport\" --tests \"io.justsearch.ui.api.RequestReleaseOwnerTest.failedBindDrainsOldWorkerAndFreshEphemeralServerOwnsItsOwnWorker\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 136677
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java#blockedProjectionLeavesTerminalCallbackAndAnotherAfterFreeToProgress",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d283b2f30bc15eb3cb72a950a1aa4445f17392ac05055d07c622a48f595c1e8d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedProjectionLeavesTerminalCallbackAndAnotherAfterFreeToProgress()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java#registryClosureBeforeExceptionalTerminalDoesNotRetireTheReleaseOwner",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d283b2f30bc15eb3cb72a950a1aa4445f17392ac05055d07c622a48f595c1e8d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "registryClosureBeforeExceptionalTerminalDoesNotRetireTheReleaseOwner()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java#liveBodyAndStillRunningStopAttemptRemainOwnedAcrossBoundedRetry",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d283b2f30bc15eb3cb72a950a1aa4445f17392ac05055d07c622a48f595c1e8d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "liveBodyAndStillRunningStopAttemptRemainOwnedAcrossBoundedRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java#genuineInterruptedTransportStopRemainsUncleanWithoutFabricatedDrain",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d283b2f30bc15eb3cb72a950a1aa4445f17392ac05055d07c622a48f595c1e8d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "genuineInterruptedTransportStopRemainsUncleanWithoutFabricatedDrain(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java#blockedReleaseRetainsItsRecordWhileTerminalCaptureAndAnotherAfterProgress",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:074de40d54dfb87db49b51e9f76926f1bb3ec9c4a72ceeebdb6d0cf45617fbf2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedReleaseRetainsItsRecordWhileTerminalCaptureAndAnotherAfterProgress()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java#oldAfterCannotReadNewRegistrationOnTheRecycledRequest",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:074de40d54dfb87db49b51e9f76926f1bb3ec9c4a72ceeebdb6d0cf45617fbf2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oldAfterCannotReadNewRegistrationOnTheRecycledRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java#firstNegativeAcknowledgementBoundsFailedRecordsWithoutStoppingExistingCleanup",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:074de40d54dfb87db49b51e9f76926f1bb3ec9c4a72ceeebdb6d0cf45617fbf2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstNegativeAcknowledgementBoundsFailedRecordsWithoutStoppingExistingCleanup()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java#laterStartupListenerFailureDrainsWorkerWithoutAnAcceptingTransport",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:074de40d54dfb87db49b51e9f76926f1bb3ec9c4a72ceeebdb6d0cf45617fbf2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterStartupListenerFailureDrainsWorkerWithoutAnAcceptingTransport()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java#failedBindDrainsOldWorkerAndFreshEphemeralServerOwnsItsOwnWorker",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestReleaseOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:074de40d54dfb87db49b51e9f76926f1bb3ec9c4a72ceeebdb6d0cf45617fbf2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedBindDrainsOldWorkerAndFreshEphemeralServerOwnsItsOwnWorker()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ed5e6a4dc785a01fac2a2a4871e3466ffff843a281e5ce2e775d17efa381d69d"
+}
