@@ -55,8 +55,8 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
       assertTrue(scheduler(runtime, embedding).runIdleCycle());
       assertEquals(8, encodes.get());
       assertEquals(List.of(CommitReason.BACKFILL_COMBINED, CommitReason.BACKFILL_COMBINED_FINAL), reasons);
-      assertEquals(List.of(6, 8), committedAfterEncodes,
-          "the probe has its existing separate counter; five tight batches commit, then the tail");
+      assertEquals(List.of(5, 8), committedAfterEncodes,
+          "the probe's writing batch counts toward the five-batch cadence; the tail commits at the end");
       for (int i = 0; i < 64; i++) assertDurable("parent-" + i, "COMPLETED", true);
     }
   }
