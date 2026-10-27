@@ -1,0 +1,554 @@
+{
+  "purpose": "Builder paired native Engine/headless Chromium evidence for agent-adopted S67 and genuine capacity refusal. Not independent acceptance.",
+  "baseline": "b8312014746ce698335d8cceedee15ddaaf18636",
+  "observedAtUtc": "2026-10-27 04:08:07 UTC",
+  "checks": [
+    {
+      "revision": "before",
+      "name": "cold-replacement-core.ask-surface",
+      "status": "fail",
+      "finalUrl": "http://127.0.0.1:40857/#justsearch://surface/core.search-v3-surface",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "query": "  Explain # & % 日本語\nexactly  ",
+      "old": "Old task on unrelated decoy",
+      "value": "Old task on unrelated decoy",
+      "incomingUrl": "http://127.0.0.1:40857/#justsearch://surface/core.ask-surface?query=++Explain+%23+%26+%25+%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly++&docIds=%2Ftmp%2Fjsv-eng-2k0ght4x%2Fcorpus%2Fchosen-alpha.txt",
+      "checks": {
+        "text": false,
+        "noAutomaticModelWork": true,
+        "chosen": true
+      },
+      "modelState": "fresh own Engine; chat not configured or activated",
+      "first": {
+        "url": "http://127.0.0.1:40857/?api_port=46183#justsearch://surface/core.search-v3-surface",
+        "text": "Old task on unrelated decoy"
+      },
+      "recoveryRefusal": "Recovery could not be saved safely: this preparation does not fit the limits. Review or discard retained drafts, or reduce the text/settings, before continuing. Existing copies are kept.",
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "Old task on unrelated decoy",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-2k0ght4x/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "before",
+      "name": "cold-replacement-core.search-v3-surface",
+      "status": "fail",
+      "finalUrl": "http://127.0.0.1:40857/#justsearch://surface/core.search-v3-surface",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "query": "  Explain # & % 日本語\nexactly  ",
+      "old": "Old task on unrelated decoy",
+      "value": "Old task on unrelated decoy",
+      "incomingUrl": "http://127.0.0.1:40857/#justsearch://surface/core.search-v3-surface?query=++Explain+%23+%26+%25+%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly++&docIds=%2Ftmp%2Fjsv-eng-2k0ght4x%2Fcorpus%2Fchosen-alpha.txt",
+      "checks": {
+        "text": false,
+        "noAutomaticModelWork": true,
+        "chosen": true
+      },
+      "modelState": "fresh own Engine; chat not configured or activated",
+      "first": {
+        "url": "http://127.0.0.1:40857/?api_port=46183#justsearch://surface/core.search-v3-surface",
+        "text": "Old task on unrelated decoy"
+      },
+      "recoveryRefusal": "Recovery could not be saved safely: this preparation does not fit the limits. Review or discard retained drafts, or reduce the text/settings, before continuing. Existing copies are kept.",
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "Old task on unrelated decoy",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-2k0ght4x/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "before",
+      "name": "cold-capacity-core.ask-surface",
+      "status": "fail",
+      "finalUrl": "http://127.0.0.1:40857/#justsearch://surface/core.search-v3-surface",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "checks": {
+        "oldComposer": true,
+        "incomingAddress": false,
+        "realReason": false,
+        "noAutomaticWork": true
+      },
+      "recoveryRefusal": "Recovery could not be saved safely: this preparation does not fit the limits. Review or discard retained drafts, or reduce the text/settings, before continuing. Existing copies are kept.",
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "current B",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-2k0ght4x/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "retained A",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-2k0ght4x/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "before",
+      "name": "cold-capacity-core.search-v3-surface",
+      "status": "fail",
+      "finalUrl": "http://127.0.0.1:40857/#justsearch://surface/core.search-v3-surface",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "checks": {
+        "oldComposer": true,
+        "incomingAddress": false,
+        "realReason": false,
+        "noAutomaticWork": true
+      },
+      "recoveryRefusal": "Recovery could not be saved safely: this preparation does not fit the limits. Review or discard retained drafts, or reduce the text/settings, before continuing. Existing copies are kept.",
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "current B",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-2k0ght4x/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "retained A",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-2k0ght4x/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "candidate",
+      "name": "cold-replacement-core.ask-surface",
+      "status": "pass",
+      "finalUrl": "http://127.0.0.1:43431/#justsearch://surface/core.search-v3-surface",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "query": "  Explain # & % 日本語\nexactly  ",
+      "old": "Old task on unrelated decoy",
+      "value": "  Explain # & % 日本語\nexactly  ",
+      "incomingUrl": "http://127.0.0.1:43431/#justsearch://surface/core.ask-surface?query=++Explain+%23+%26+%25+%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly++&docIds=%2Ftmp%2Fjsv-eng-bj8y4e3l%2Fcorpus%2Fchosen-alpha.txt",
+      "checks": {
+        "text": true,
+        "noAutomaticModelWork": true,
+        "chosen": true
+      },
+      "modelState": "fresh own Engine; chat not configured or activated",
+      "first": {
+        "url": "http://127.0.0.1:43431/?api_port=35061#justsearch://surface/core.search-v3-surface",
+        "text": "Old task on unrelated decoy"
+      },
+      "recoveryRefusal": null,
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "  Explain # & % 日本語\nexactly  ",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "Old task on unrelated decoy",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "previousDraftReviewable": true,
+      "incomingStillRetained": true,
+      "recoveryAfterReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "Old task on unrelated decoy",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "  Explain # & % 日本語\nexactly  ",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "candidate",
+      "name": "cold-replacement-core.search-v3-surface",
+      "status": "pass",
+      "finalUrl": "http://127.0.0.1:43431/#justsearch://surface/core.search-v3-surface",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "query": "  Explain # & % 日本語\nexactly  ",
+      "old": "Old task on unrelated decoy",
+      "value": "  Explain # & % 日本語\nexactly  ",
+      "incomingUrl": "http://127.0.0.1:43431/#justsearch://surface/core.search-v3-surface?query=++Explain+%23+%26+%25+%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly++&docIds=%2Ftmp%2Fjsv-eng-bj8y4e3l%2Fcorpus%2Fchosen-alpha.txt",
+      "checks": {
+        "text": true,
+        "noAutomaticModelWork": true,
+        "chosen": true
+      },
+      "modelState": "fresh own Engine; chat not configured or activated",
+      "first": {
+        "url": "http://127.0.0.1:43431/?api_port=35061#justsearch://surface/core.search-v3-surface",
+        "text": "Old task on unrelated decoy"
+      },
+      "recoveryRefusal": null,
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "  Explain # & % 日本語\nexactly  ",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "Old task on unrelated decoy",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "previousDraftReviewable": true,
+      "incomingStillRetained": true,
+      "recoveryAfterReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "Old task on unrelated decoy",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "  Explain # & % 日本語\nexactly  ",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "candidate",
+      "name": "cold-capacity-core.ask-surface",
+      "status": "pass",
+      "finalUrl": "http://127.0.0.1:43431/#justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-bj8y4e3l%2Fcorpus%2Fchosen-alpha.txt&forceShapeId=core.rag-ask&query=%20%20Incoming%20C%20%23%20%26%20%25%20%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly%20%20",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "checks": {
+        "oldComposer": true,
+        "incomingAddress": true,
+        "realReason": true,
+        "noAutomaticWork": true
+      },
+      "value": "current B",
+      "recoveryRefusal": "Recovery could not be saved safely: Only two draft preparations can be retained. Review or discard a retained draft before continuing. Existing copies are kept.",
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "current B",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "retained A",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    },
+    {
+      "revision": "candidate",
+      "name": "cold-capacity-core.search-v3-surface",
+      "status": "pass",
+      "finalUrl": "http://127.0.0.1:43431/#justsearch://surface/core.search-v3-surface?docIds=%2Ftmp%2Fjsv-eng-bj8y4e3l%2Fcorpus%2Fchosen-alpha.txt&query=%20%20Incoming%20C%20%23%20%26%20%25%20%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly%20%20",
+      "sandbox": false,
+      "browserProfileRemoved": true,
+      "pageErrors": [],
+      "checks": {
+        "oldComposer": true,
+        "incomingAddress": true,
+        "realReason": true,
+        "noAutomaticWork": true
+      },
+      "value": "current B",
+      "recoveryRefusal": "Recovery could not be saved safely: Only two draft preparations can be retained. Review or discard a retained draft before continuing. Existing copies are kept.",
+      "recoveryBeforeReview": {
+        "version": 2,
+        "task": null,
+        "drafts": [
+          {
+            "place": null,
+            "text": "current B",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/chosen-alpha.txt"
+                ]
+              }
+            }
+          },
+          {
+            "place": null,
+            "text": "retained A",
+            "preparation": {
+              "kind": "ask",
+              "scope": {
+                "kind": "files",
+                "paths": [
+                  "/tmp/jsv-eng-bj8y4e3l/corpus/unchosen-decoy.txt"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "automaticChatWorkCount": 0
+    }
+  ],
+  "runtime": {
+    "before": {
+      "buildCommand": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:installDist",
+      "buildResult": [
+        "gradle-slot: slot 2 after 1158s",
+        "BUILD SUCCESSFUL in 17s",
+        "88 actionable tasks: 57 executed, 31 from cache"
+      ],
+      "enginePort": 46183,
+      "workerState": "ready",
+      "privateProfileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "ownedProcessIdentities": [
+        {
+          "pid": 6,
+          "startticks": "14852682"
+        },
+        {
+          "pid": 559,
+          "startticks": "14852944"
+        }
+      ]
+    },
+    "candidate": {
+      "buildCommand": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:installDist",
+      "buildResult": [
+        "gradle-slot: slot 2 after 2112s",
+        "BUILD SUCCESSFUL in 16s",
+        "88 actionable tasks: 57 executed, 31 from cache"
+      ],
+      "enginePort": 35061,
+      "workerState": "ready",
+      "privateProfileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "ownedProcessIdentities": [
+        {
+          "pid": 2603,
+          "startticks": "14968618"
+        },
+        {
+          "pid": 2044,
+          "startticks": "14968353"
+        }
+      ]
+    }
+  },
+  "harness": {
+    "cold-case.mjs": {
+      "sha256": "1549c3b17e206270a10f1a2d2196fd7bc7eb5d2dbfa317b57d11a67209a44060",
+      "source": "import {run,boot,text,work,sleep,assert,info,E,surfaceUrl} from './browser-lib.mjs';import fs from 'node:fs';\nconst results=[];for(const target of ['core.ask-surface','core.search-v3-surface']){\nconst r=await run('cold-replacement-'+target,async({p,wire,dir,snap})=>{\n const old='Old task on unrelated decoy';await boot(p,{query:old,docIds:[info.decoy]},'core.ask-surface');const first={url:p.url(),text:await p.getByTestId('sv3-composer-input').inputValue(),ui:await text(p)};await snap('first');\n const query='  Explain # & % 日本語\\nexactly  ';const incomingUrl='http://127.0.0.1:'+info.port+'/'+surfaceUrl(target,{query,docIds:[info.chosen]});await p.goto(incomingUrl,{waitUntil:'domcontentloaded'});await p.getByTestId('sv3-composer-input').waitFor({timeout:60000});await sleep(1200);const value=await p.getByTestId('sv3-composer-input').inputValue();const ui=await text(p);await snap('second');const checks={text:value===query,noAutomaticModelWork:work(wire).length===0,chosen:ui.includes('chosen-alpha.txt')};const o={old,query,first,incomingUrl,finalUrl:p.url(),value,ui,checks,modelState:'fresh own Engine; chat not configured or activated'};fs.writeFileSync(dir+'/observations.json',JSON.stringify(o,null,2));assert.ok(Object.values(checks).every(Boolean),JSON.stringify(checks));\n const key='justsearch.draft.attachment.v1.search-v3.main';\n const recovered=await p.evaluate(k=>JSON.parse(sessionStorage.getItem(k)).payload,key);\n assert.equal(recovered.drafts.length,2);assert.ok(recovered.drafts.some(d=>d.text===old));\n await p.getByTestId('sv3-recovery-review-copy').click();await sleep(300);\n assert.equal(await p.getByTestId('sv3-composer-input').inputValue(),old);\n assert.ok(await p.getByTestId('sv3-draft-review').isVisible());assert.equal(work(wire).length,0);\n const swapped=await p.evaluate(k=>JSON.parse(sessionStorage.getItem(k)).payload,key);\n assert.ok(swapped.drafts.some(d=>d.text===query));await snap('review-previous');\n o.previousDraftReviewable=true;o.incomingStillRetained=true;o.preReviewRecovery=recovered;return o;\n});results.push(r);if(r.status!=='pass')process.exitCode=1;}fs.writeFileSync(E+'/'+info.label+'/cold-summary.json',JSON.stringify(results,null,2));\n"
+    },
+    "cold-refusal.mjs": {
+      "sha256": "c97dcc13eea6488ca2a2314103957b8191a718ddc27ad9d60063f5638c960f58",
+      "source": "import {run,boot,text,work,sleep,assert,info,E,surfaceUrl} from './browser-lib.mjs';import fs from 'node:fs';\nconst results=[];\nfor(const target of ['core.ask-surface','core.search-v3-surface']){\nconst r=await run('cold-capacity-'+target,async({p,wire,snap})=>{\n await boot(p,{query:'retained A',docIds:[info.decoy]},'core.ask-surface');\n await p.evaluate(hash=>{window.location.hash=hash},surfaceUrl('core.ask-surface',{query:'current B',docIds:[info.chosen]}));await sleep(700);\n assert.equal(await p.getByTestId('sv3-composer-input').inputValue(),'current B');\n const query='  Incoming C # & % 日本語\\nexactly  ';\n await p.goto('http://127.0.0.1:'+info.port+'/'+surfaceUrl(target,{query,docIds:[info.chosen]}),{waitUntil:'domcontentloaded'});\n await p.getByTestId('sv3-composer-input').waitFor({timeout:60000});await sleep(1200);\n const value=await p.getByTestId('sv3-composer-input').inputValue(),ui=await text(p),url=p.url();await snap('refused');\n const checks={oldComposer:value==='current B',incomingAddress:new URLSearchParams(new URL(url).hash.split('?')[1]).get('query')===query,realReason:ui.includes('Only two draft preparations can be retained'),noAutomaticWork:work(wire).length===0};\n assert.ok(Object.values(checks).every(Boolean),JSON.stringify(checks));return {checks,url,value,ui};\n});results.push(r);if(r.status!=='pass')process.exitCode=1;\n}fs.writeFileSync(E+'/'+info.label+'/capacity-summary.json',JSON.stringify(results,null,2));\n"
+    },
+    "browser-lib.mjs": {
+      "sha256": "f50c7bc0e589996e63dad5d0d125992c623209d68cf941c1d9b469e6d2e58d61",
+      "source": "import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';import assert from 'node:assert/strict';export {assert};\nexport const E=path.dirname(new URL(import.meta.url).pathname);\nexport const info=JSON.parse(fs.readFileSync(process.env.RUNTIME_INFO,'utf8'));\nexport const {chromium}=await import(pathToFileURL(info.tree+'/modules/ui-web/node_modules/playwright-core/index.mjs'));\nexport const sleep=ms=>new Promise(r=>setTimeout(r,ms));\nexport async function eventually(fn,ms=30000){let e;const end=Date.now()+ms;while(Date.now()<end){try{return await fn()}catch(x){e=x}await sleep(200)}throw e}\nexport function surfaceUrl(target,state={}){const s=new URLSearchParams();for(const[k,v]of Object.entries(state))for(const x of Array.isArray(v)?v:[v])s.append(k,x);return '#justsearch://surface/'+target+(s.size?'?'+s:'')}\nexport async function text(p,selector='jf-shell'){return p.locator(selector).first().evaluate(e=>{function t(n){if(n.nodeType===3)return n.textContent;if(n.nodeType===1&&['SCRIPT','STYLE'].includes(n.tagName))return '';return [...n.childNodes].map(t).join(' ')+(n.shadowRoot?t(n.shadowRoot):'')}return t(e)})}\nexport async function dismiss(p){const b=p.getByRole('button',{name:'Dismiss',exact:true});if(await b.isVisible())await b.click()}\nexport async function type(input,s){await input.click();await input.press('Control+A');await input.press('Backspace');await input.pressSequentially(s,{delay:1})}\nexport async function boot(p,state={},target='core.search-v3-surface'){await p.goto('http://127.0.0.1:'+info.port+'/?api_port='+info.enginePort+surfaceUrl(target,state),{waitUntil:'domcontentloaded'});await p.getByTestId('sv3-composer-input').waitFor({state:'visible',timeout:90000});await dismiss(p);await sleep(600)}\nexport async function run(name,fn,options={}){\n const dir=path.join(E,info.label,name);fs.mkdirSync(dir,{recursive:true});const short=fs.mkdtempSync('/tmp/jsv-');const wire=[],errors=[],consoleLines=[];let ctx,p,result={name,commit:info.head};\n const env={...process.env,TMPDIR:short,HOME:short,XDG_CONFIG_HOME:short+'/config',XDG_CACHE_HOME:short+'/cache',CUDA_VISIBLE_DEVICES:'-1'};for(const k of Object.keys(env))if(k.startsWith('JUSTSEARCH_')||['JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','JAVA_OPTS','_JAVA_OPTIONS','DISPLAY','WAYLAND_DISPLAY','RUNTIME_TOKEN'].includes(k))delete env[k];\n try{ctx=await chromium.launchPersistentContext(short+'/p',{executablePath:'/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome',headless:true,chromiumSandbox:false,args:['--disable-gpu','--no-sandbox'],env,viewport:options.viewport??{width:1600,height:1000}});p=ctx.pages()[0];p.setDefaultTimeout(15000);\n p.on('pageerror',e=>errors.push(String(e)));p.on('console',m=>consoleLines.push(m.text()));\n p.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))wire.push({at:Date.now(),method:r.method(),url:r.url(),body:r.postData()})});\n const snap=async n=>{fs.writeFileSync(dir+'/'+n+'.txt',await p.locator('body').ariaSnapshot());fs.writeFileSync(dir+'/'+n+'.json',JSON.stringify({url:p.url(),text:await text(p),storage:await p.evaluate(()=>({local:{...localStorage},session:{...sessionStorage}}))},null,2));await p.screenshot({path:dir+'/'+n+'.png'})};\n result.detail=await fn({p,ctx,wire,errors,consoleLines,dir,snap});result.status='pass';\n }catch(e){result.status='fail';result.error=e.stack;if(p){try{fs.writeFileSync(dir+'/failure.txt',await p.locator('body').ariaSnapshot());await p.screenshot({path:dir+'/failure.png'});fs.writeFileSync(dir+'/failure-ui.txt',await text(p))}catch{}}}\n finally{if(ctx)await ctx.close();fs.rmSync(short,{recursive:true,force:true});result.errors=errors;result.console=consoleLines;result.sandbox=false;result.profileRemoved=!fs.existsSync(short);fs.writeFileSync(dir+'/requests.json',JSON.stringify(wire,null,2));fs.writeFileSync(dir+'/result.json',JSON.stringify(result,null,2));}\n console.log(name,result.status,result.error?.split('\\n')[0]??'');return result;\n}\nexport const work=wire=>wire.filter(x=>x.method!=='GET'&&/\\/api\\/chat\\/(dispatch|agent\\/(?!virtual-operations))/.test(x.url));\n"
+    },
+    "runtime.py": {
+      "sha256": "b2cfa9b06763cc8b40c91c5d8a4031038bb4373b5f01c918721ab74ad5a6c439",
+      "source": "import os,sys,subprocess,tempfile,time,json,signal,shutil,urllib.request,urllib.error,hashlib,socket\nfrom pathlib import Path\nE=Path(__file__).parent;label=sys.argv[1];R=Path(sys.argv[2]).resolve();O=E/('runtime-'+label);O.mkdir(exist_ok=True);jobs=O/'jobs';jobs.mkdir(exist_ok=True)\nP=Path(tempfile.mkdtemp(prefix='jsv-eng-',dir='/tmp'))\nfor d in ['home','data','index','corpus','config','cache','state','xdgdata','tmp']: (P/d).mkdir()\n(P/'corpus/chosen-alpha.txt').write_text('Flip verifier paired corpus. Chosen alpha answer is ALPHA_CEDAR_731. Project codename Cedar.\\n')\n(P/'corpus/unchosen-decoy.txt').write_text('Flip verifier paired corpus. Unchosen decoy answer is DECOY_ZULU_942. Project codename Zulu.\\n')\nenv={k:v for k,v in os.environ.items() if not k.startswith('JUSTSEARCH_') and k not in ['JAVA_OPTS','JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS','UI_OPTS','DISPLAY','WAYLAND_DISPLAY']}\nenv.update(CUDA_VISIBLE_DEVICES='-1',HOME=str(P/'home'),XDG_CONFIG_HOME=str(P/'config'),XDG_DATA_HOME=str(P/'xdgdata'),XDG_CACHE_HOME=str(P/'cache'),XDG_STATE_HOME=str(P/'state'),TMPDIR=str(P/'tmp'),UI_OPTS='-Duser.home='+str(P/'home'),JUSTSEARCH_HOME=str(P/'data'),JUSTSEARCH_DATA_DIR=str(P/'data'),JUSTSEARCH_INDEX_BASE_PATH=str(P/'index'),JUSTSEARCH_API_PORT='0',JUSTSEARCH_REPO_ROOT=str(R),JUSTSEARCH_AI_DISABLED='true',JUSTSEARCH_AI_EMBED_ENABLED='false',JUSTSEARCH_NER_ENABLED='false',JUSTSEARCH_SPLADE_ENABLED='false',JUSTSEARCH_BGE_M3_ENABLED='false',JUSTSEARCH_RERANK_ENABLED='false',JUSTSEARCH_RERANK_CHUNKS_ENABLED='false',JUSTSEARCH_POLICY_GPU_ACCELERATION_ENABLED='false',JUSTSEARCH_EXTRACTION_SANDBOX_MODE='in_process')\nengine=None;vite=None;child=None;seen={}\ndef cohort():\n rows={}\n for p in Path('/proc').iterdir():\n  if not p.name.isdecimal():continue\n  try:\n   f=p.joinpath('stat').read_text().rsplit(') ',1)[1].split();rows[int(p.name)]=(int(f[1]),f[19])\n  except OSError:pass\n ids={p.pid for p in [engine,vite,child] if p and p.poll() is None}\n for _ in range(15):\n  more={pid for pid,(ppid,_) in rows.items() if ppid in ids}\n  if more<=ids:break\n  ids |= more\n result=[]\n for pid in ids:\n  try:\n   p=Path('/proc',str(pid));r=dict(pid=pid,startticks=rows[pid][1],argv=p.joinpath('cmdline').read_bytes().decode().split('\\0'),cwd=os.readlink(p/'cwd'),executable=os.readlink(p/'exe'))\n   result.append(r);seen[str(pid)+'/'+r['startticks']]=r\n  except OSError:pass\n (O/'processes.json').write_text(json.dumps(seen,indent=2));return result\n\ndef request(name,path,body=None):\n req=urllib.request.Request(base+path,data=None if body is None else json.dumps(body).encode(),headers={'X-JustSearch-Session':token,'Content-Type':'application/json'})\n try:r=urllib.request.urlopen(req,timeout=30)\n except urllib.error.HTTPError as e:r=e\n raw=r.read();x=json.loads(raw);(O/(name+'.json')).write_text(json.dumps(dict(path=path,status=r.status,request=body,body=x),indent=2));return r.status,x\ntry:\n script=R/'modules/ui/build/install/ui/bin/ui';install={str(p.relative_to(script.parent.parent)):hashlib.sha256(p.read_bytes()).hexdigest() for p in script.parent.parent.rglob('*') if p.is_file()};(O/'install-hashes.json').write_text(json.dumps(install,indent=2))\n engine=subprocess.Popen([str(script)],cwd=P,env=env,stdout=(O/'engine.log').open('w'),stderr=subprocess.STDOUT,start_new_session=True)\n manifest=P/'data/runtime/manifest.json';m=None\n for _ in range(180):\n  cohort()\n  if engine.poll() is not None:raise RuntimeError('Engine exited; see log')\n  try:\n   m=json.loads(manifest.read_text())\n   if m.get('head',{}).get('apiPort') and m.get('worker',{}).get('state')=='ready':break\n  except (OSError,ValueError):pass\n  time.sleep(.5)\n else:raise RuntimeError('Engine readiness timeout; no retry')\n base='http://127.0.0.1:'+str(m['head']['apiPort']);token=m['head'].get('sessionToken','');redacted=json.loads(json.dumps(m));redacted['head']['sessionToken']='[redacted]';(O/'manifest.json').write_text(json.dumps(redacted,indent=2))\n for name,path in [('health','/api/health'),('status','/api/status'),('settings','/api/settings/v2'),('catalog','/api/registry/surfaces')]:request(name,path)\n st,x=request('add-root','/api/indexing/roots',{'path':str(P/'corpus'),'collection':'flip-verifier'})\n if st!=200:raise RuntimeError('Private corpus admission refused')\n s=socket.socket();s.bind(('127.0.0.1',0));port=s.getsockname()[1];s.close()\n ve={k:v for k,v in env.items() if not k.startswith('JUSTSEARCH_')};ve['VITE_API_PORT']=str(m['head']['apiPort'])\n vite=subprocess.Popen(['node','node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',str(port),'--strictPort'],cwd=R/'modules/ui-web',env=ve,stdout=(O/'vite.log').open('w'),stderr=subprocess.STDOUT,start_new_session=True)\n for _ in range(60):\n  if vite.poll() is not None:raise RuntimeError('Private Vite exited')\n  try:urllib.request.urlopen('http://127.0.0.1:'+str(port),timeout=1);break\n  except OSError:time.sleep(.5)\n else:raise RuntimeError('Private Vite startup timeout')\n info=dict(label=label,head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip(),tree=str(R),port=port,enginePort=m['head']['apiPort'],profile=str(P),corpus=str(P/'corpus'),chosen=str(P/'corpus/chosen-alpha.txt'),decoy=str(P/'corpus/unchosen-decoy.txt'),scope='Own native Engine, actual registry/status/store/index; model disabled; in_process extraction fixture')\n (O/'ready.json').write_text(json.dumps(info,indent=2));print('READY',label,port,flush=True)\n end=time.monotonic()+18000\n while not (O/'STOP').exists() and time.monotonic()<end:\n  cohort()\n  if engine.poll() is not None or vite.poll() is not None:raise RuntimeError('Own service exited')\n  for j in sorted(jobs.glob('*.json')):\n   if j.with_suffix('.done').exists():continue\n   job=json.loads(j.read_text());name=j.stem;cmd=job['command'];ce={k:v for k,v in os.environ.items() if not k.startswith('JUSTSEARCH_') and k not in ['JAVA_OPTS','JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS','UI_OPTS','DISPLAY','WAYLAND_DISPLAY']};ce.update(CUDA_VISIBLE_DEVICES='-1',RUNTIME_INFO=str(O/'ready.json'),RUNTIME_OUT=str(O),RUNTIME_TOKEN=token)\n   with (O/(name+'.log')).open('w') as f:\n    child=subprocess.Popen(cmd,cwd=R,env=ce,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)\n    while child.poll() is None:\n     cohort()\n     if (O/'STOP').exists():os.killpg(child.pid,signal.SIGTERM)\n     time.sleep(.5)\n   j.with_suffix('.done').write_text(json.dumps(dict(command=cmd,exit=child.returncode)));print(name,child.returncode,flush=True);child=None\n  time.sleep(.5)\nfinally:\n rows=cohort()\n for p in [child,vite,engine]:\n  if p and p.poll() is None:\n   os.killpg(p.pid,signal.SIGTERM)\n   try:p.wait(15)\n   except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()\n for r in rows:\n  try:\n   p=Path('/proc',str(r['pid']))\n   if p.joinpath('stat').read_text().split()[21]==r['startticks']:os.kill(r['pid'],signal.SIGTERM)\n  except (OSError,ProcessLookupError):pass\n shutil.rmtree(P)\n (O/'cleanup.json').write_text(json.dumps(dict(profileRemoved=not P.exists(),engineExit=engine.returncode if engine else None,viteExit=vite.returncode if vite else None,ownedProcessIds=rows),indent=2))\n"
+    },
+    "browser-pair.py": {
+      "sha256": "91966989ada256c84bfc74f95d4911025e14b36fb3c6b7211b0c0e7016d3e11b",
+      "source": "import json,os,subprocess,time,sys\nfrom pathlib import Path\nP=Path(__file__).parent\npairs=[('before',str(P.parent/'before')),('candidate','/home/elias/dev/js-uiux-compat-ingress')]\nfor label,tree in pairs:\n log=P/('gradle-'+label+'.log');end=time.monotonic()+10800\n while True:\n  text=log.read_text() if log.exists() else ''\n  if 'BUILD SUCCESSFUL' in text:break\n  if 'BUILD FAILED' in text or 'gradle-slot: no slot' in text:raise RuntimeError('Build unavailable: '+label+'; inspect build result before launching')\n  if time.monotonic()>end:raise RuntimeError('Build wait deadline: '+label)\n  time.sleep(5)\n O=P/('runtime-'+label);(O/'jobs').mkdir(parents=True,exist_ok=True)\n runtime=None\n try:\n  with (P/('runtime-'+label+'-launch.log')).open('w') as f:\n   runtime=subprocess.Popen([sys.executable,str(P/'runtime.py'),label,tree],stdout=f,stderr=subprocess.STDOUT)\n   deadline=time.monotonic()+180\n   while not (O/'ready.json').exists():\n    if runtime.poll() is not None:raise RuntimeError('Own runtime failed to start: '+label)\n    if time.monotonic()>deadline:raise RuntimeError('Own runtime readiness deadline: '+label)\n    time.sleep(.5)\n   print('Ready for browser:',label,flush=True)\n   for index,script in enumerate(['cold-case.mjs','cold-refusal.mjs'],1):\n    job=O/'jobs'/('0'+str(index)+'-'+script.replace('.mjs','')+'.json')\n    job.write_text(json.dumps({'command':['node',str(P/script)]}))\n    deadline=time.monotonic()+180\n    while not job.with_suffix('.done').exists():\n     if runtime.poll() is not None:raise RuntimeError('Own runtime exited: '+label)\n     if time.monotonic()>deadline:raise RuntimeError('Browser check deadline: '+label+'/'+script)\n     time.sleep(.5)\n    result=json.loads(job.with_suffix('.done').read_text());print(label,script,'exit',result['exit'],flush=True)\n    if label=='candidate' and result['exit']!=0:raise RuntimeError('Candidate browser check failed; no retry: '+script)\n finally:\n  if runtime and runtime.poll() is None:\n   (O/'STOP').write_text('Done with own paired browser checks. Stop only owned processes.\\n')\n   try:runtime.wait(45)\n   except subprocess.TimeoutExpired:runtime.terminate();runtime.wait(20)\n  if not (O/'cleanup.json').exists():raise RuntimeError('Runtime cleanup missing: '+label)\n  cleanup=json.loads((O/'cleanup.json').read_text());assert cleanup['profileRemoved']\n print('Private runtime cleaned:',label,flush=True)\nprint('Paired checks complete',flush=True)\n"
+    }
+  },
+  "candidateFileSha256": {
+    "modules/ui-web/src/shell-v0/router/URLProjector.ts": "380ce38a12b058371ad92ed48c91478442ff17ed1c74bf3d63bccf64ca174bc1",
+    "modules/ui-web/src/shell-v0/router/navigationHandler.ts": "d2152ccb569ff3d5deb855f9f700fd0a10411faa3d6da938c8996d122734c4f7",
+    "modules/ui-web/src/shell-v0/utils/compose.ts": "c22bf7ca37dedb2b21d053b055e0680950f27482fcfeeee7369a11ceffb21023",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts": "4c1e0d99bcd3b0109be17ae51e6ebcaca16347b2c040a30750ac5ff2398c483f",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts": "5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916"
+  },
+  "sandboxProbe": "Error: browserType.launchPersistentContext: Target page, context or browser has been closed\nBrowser logs:\nChromium sandboxing failed!\n================================\nTo avoid the sandboxing issue, do either of the following:\n  - (preferred): Configure your environment to support sandboxing\n  - (alternative): Launch Chromium without sandbox using 'chromiumSandbox: false' option\n================================\n\nCall log:\n\u001b[2m  - <launching> /home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --disable-gpu --user-data-dir=/tmp/jsv-Wn21vK/p --remote-debugging-pipe about:blank\u001b[22m\n\u001b[2m  - <launched> pid=15\u001b[22m\n\u001b[2m  - [pid=15][err] [15:15:1027/043619.201055:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:130] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.\u001b[22m\n\u001b[2m  - [pid=15][err] Received signal 6\u001b[22m\n\u001b[2m  - [pid=15][err] #0 0x5de418d27e33 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x6e7ce32)\u001b[22m\n\u001b[2m  - [pid=15][err] #1 0x5de41dd4bd34 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbea0d33)\u001b[22m\n\u001b[2m  - [pid=15][err] #2 0x7725ee645cb0 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45caf)\u001b[22m\n\u001b[2m  - [pid=15][err] #3 0x7725ee645b7e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45b7d)\u001b[22m\n\u001b[2m  - [pid=15][err] #4 0x7725ee6288ec (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288eb)\u001b[22m\n\u001b[2m  - [pid=15][err] #5 0x5de41dd42205 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbe97204)\u001b[22m\n\u001b[2m  - [pid=15][err] #6 0x5de41dd00ecd (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbe55ecc)\u001b[22m\n\u001b[2m  - [pid=15][err] #7 0x5de41dd00e1d (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xbe55e1c)\u001b[22m\n\u001b[2m  - [pid=15][err] #8 0x5de416cd9cf2 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x4e2ecf1)\u001b[22m\n\u001b[2m  - [pid=15][err] #9 0x5de41872fb99 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x6884b98)\u001b[22m\n\u001b[2m  - [pid=15][err] #10 0x5de417be6548 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x5d3b547)\u001b[22m\n\u001b[2m  - [pid=15][err] #11 0x5de41d1c65c5 (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0xb31b5c4)\u001b[22m\n\u001b[2m  - [pid=15][err] #12 0x5de417c965dc (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x5deb5db)\u001b[22m\n\u001b[2m  - [pid=15][err] #13 0x5de417c9306f (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x5de806e)\u001b[22m\n\u001b[2m  - [pid=15][err] #14 0x7725ee62a601 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a600)\u001b[22m\n\u001b[2m  - [pid=15][err] #15 0x7725ee62a718 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a717)\u001b[22m\n\u001b[2m  - [pid=15][err] #16 0x5de418fb738a (/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome+0x710c389)\u001b[22m\n\u001b[2m  - [pid=15][err]   r8: 0000000000000016  r9: 0000000000000001 r10: 000024e0000dc4df r11: 0000000000000246\u001b[22m\n\u001b[2m  - [pid=15][err]  r12: 0000000000000006 r13: 0000000000000260 r14: 000000000000025f r15: 00007ffffed74db8\u001b[22m\n\u001b[2m  - [pid=15][err]   di: 000000000000000f  si: 000000000000000f  bp: 00007ffffed74720  bx: 000000000000000f\u001b[22m\n\u001b[2m  - [pid=15][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007725ee6a61ac  sp: 00007ffffed746e0\u001b[22m\n\u001b[2m  - [pid=15][err]   ip: 00007725ee6a61ac efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000\u001b[22m\n\u001b[2m  - [pid=15][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000\u001b[22m\n\u001b[2m  - [pid=15][err] [end of stack trace]\u001b[22m\n\u001b[2m  - [pid=15] <gracefully close start>\u001b[22m\n\u001b[2m  - [pid=15] <kill>\u001b[22m\n\u001b[2m  - [pid=15] <will force kill>\u001b[22m\n\u001b[2m  - [pid=15] <process did exit: exitCode=null, signal=SIGABRT>\u001b[22m\n\u001b[2m  - [pid=15] starting temporary directories cleanup\u001b[22m\n\u001b[2m  - [pid=15] finished temporary directories cleanup\u001b[22m\n\u001b[2m  - [pid=15] <gracefully close end>\u001b[22m\n\nprofile removed true\n",
+  "isolation": "Own single Engine at a time, private HOME/data/index/corpus and loopback ports; own headless Chromium with short /tmp/jsv-* TMPDIR and profile; sandbox probe failed so permitted --no-sandbox fallback. CUDA_VISIBLE_DEVICES=-1, inherited JUSTSEARCH_* and JVM option variables removed, GRADLE_OPTS retained. No owner app, display, data, desktop, dev stack, GPU or another session service touched. Shared resources: Gradle slot queue/cache, npm cache, Chromium executable, machine CPU."
+}

@@ -1095,6 +1095,7 @@ export class Sv3Composer extends JfElement {
     steerable: { type: Boolean, reflect: true },
     unavailableReason: { type: String, attribute: 'unavailable-reason' },
     delegateUnavailableReason: { type: String, attribute: 'delegate-unavailable-reason' },
+    structuredUnavailableReason: { type: String, attribute: 'structured-unavailable-reason' },
     degradation: { attribute: false },
     detailed: { type: Boolean, reflect: true },
     corpus: { attribute: false },
@@ -1102,7 +1103,7 @@ export class Sv3Composer extends JfElement {
     tier: { type: String, reflect: true },
     scopeLabel: { type: String, attribute: 'scope-label' },
     modelLabel: { type: String, reflect: true, attribute: 'model-label' },
-    draft: { state: true },
+    draft: { state: true, noAccessor: true },
     effortMenuOpen: { state: true },
     tierMenuOpen: { state: true },
     schemaDraft: { type: String, attribute: false },
@@ -1152,6 +1153,7 @@ export class Sv3Composer extends JfElement {
    * that, and Ctrl+Enter still works while the notice explains why Enter does not.
    */
   declare delegateUnavailableReason: string;
+  declare structuredUnavailableReason: string;
   /**
    * Reduced capability, from the shared readiness authority (inventory E1) — already projected by
    * `sv3-degradation.ts`, so the composer neither reads the verdict nor words a cause. `null` is the
@@ -1205,7 +1207,17 @@ export class Sv3Composer extends JfElement {
    * the duplicate the F-series audit measured zero of.
    */
   declare modelLabel: string;
-  declare draft: string;
+  private draftText = '';
+  /** Every assignment is a new owner, including identical text and a new IME composition. */
+  draftVersion = 0;
+  get draft(): string { return this.draftText; }
+  set draft(value: string) {
+    const previous = this.draftText;
+    this.draftText = value;
+    this.draftVersion += 1;
+    this.requestUpdate('draft', previous);
+    this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true }));
+  }
   /** Every input, including IME edits: a delayed send may clear only its original draft. */
   draftRevision = 0;
   /**
@@ -1240,6 +1252,7 @@ export class Sv3Composer extends JfElement {
     this.steerable = false;
     this.unavailableReason = '';
     this.delegateUnavailableReason = '';
+    this.structuredUnavailableReason = '';
     this.degradation = null;
     this.detailed = false;
     this.corpus = SV3_CORPUS_UNKNOWN;
@@ -1479,6 +1492,7 @@ export class Sv3Composer extends JfElement {
                 aria-label=${COMPOSER_PLACEHOLDER}
                 data-testid="sv3-composer-input"
                 @input=${this.onInput}
+                @compositionstart=${() => { this.draftVersion += 1; this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true })); }}
                 @compositionend=${this.onCompositionEnd}
                 @keydown=${this.onKeydown}
               ></textarea>
@@ -1721,7 +1735,7 @@ export class Sv3Composer extends JfElement {
   private tierReason(tier: Sv3ComposerTier): string {
     if (tier === 'delegate') return this.delegateUnavailableReason;
     if (tier === 'ask') return this.unavailableReason;
-    if (tier === 'structured') return this.delegateUnavailableReason;
+    if (tier === 'structured') return this.structuredUnavailableReason;
     return '';
   }
 
@@ -1789,7 +1803,7 @@ export class Sv3Composer extends JfElement {
   private chooseTier(tier: Sv3ComposerTier): void {
     this.tierMenuOpen = false;
     this.focusTrigger('sv3-composer-tier');
-    if (tier === this.tier) return;
+    // Choosing even the displayed mode is explicit intent (for example after task context retired).
     this.dispatchEvent(
       new CustomEvent<Sv3TierChange>(SV3_TIER_CHANGE, {
         detail: { tier },

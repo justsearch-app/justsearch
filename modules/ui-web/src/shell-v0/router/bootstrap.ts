@@ -91,18 +91,9 @@ export function registerCoreStores(): void {
 }
 
 /**
- * Tempdoc 864 PR C — schemas for surfaces the WIRE cannot declare.
- *
- * {@link fetchAndRegisterSurfaceSchemas} sources every other schema from `GET /api/registry/surfaces`,
- * which works because every other URL-addressable surface has a backend catalog entry. Search v3 does
- * not: it is declared frontend-only in `plugin-api/CorePlugin.ts` and `search-v3` appears in no Java
- * source. With no wire entry it had no stateSchema, so `URLProjector.activateProjection` returned
- * early for the whole surface and NOTHING inside it could reach the URL — not the conversation, not
- * the transcript arm (§2.7a). That is why a conversation swap left the hash verbatim unchanged and
- * Back did nothing, confirmed live by PR-0 leg L6/L8.
- *
- * Registered before the fetch so a wire entry, if one is ever added, wins: `registerSurfaceStateSchema`
- * replaces by surfaceId and the fetch runs second (`Shell.connectedCallback` order).
+ * Conversation projection fallback when the Engine catalog is unavailable. Registered before the
+ * fetch, whose authoritative Search schema replaces it. WP1.5a keeps the same sv3.conversation
+ * binding in Java: hand-off state is consumed once by NavigationHandler and never projected.
  */
 export function registerFrontendSurfaceSchemas(): void {
   registerSurfaceStateSchema(SV3_SURFACE_ID, {
@@ -117,7 +108,7 @@ export function registerFrontendSurfaceSchemas(): void {
   });
 }
 
-/** The frontend-only Search v3 window (`plugin-api/CorePlugin.ts`). */
+/** The canonical Search window, also declared in CoreSurfaceCatalog. */
 const SV3_SURFACE_ID = 'core.search-v3-surface';
 
 /** Abstract storeId the sv3 schema binds — resolved through {@link registerStore} like any other. */

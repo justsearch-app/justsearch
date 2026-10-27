@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T09:50:37.657Z",
+  "revision": "963d1f63ee625509336795a1c8d9d3cd494aeea5",
+  "tree": "9093386ee810eacd1f84a2c6f66dc58d2530af3b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-vitest-3543734-1793008229729.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3105
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C2 settles the accepted New address before an immediate reload can read it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C2 settles the accepted New address before an immediate reload can read it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement throw refuses without losing B or another writer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement throw refuses without losing B or another writer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement nonack refuses without losing B or another writer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement nonack refuses without losing B or another writer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement read refuses without losing B or another writer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement read refuses without losing B or another writer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement successor refuses without losing B or another writer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement successor refuses without losing B or another writer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C4 pointer retirement throw refuses and retains recoverable current settings",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C4 pointer retirement throw refuses and retains recoverable current settings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C4 pointer retirement nonack refuses and retains recoverable current settings",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C4 pointer retirement nonack refuses and retains recoverable current settings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C8 refused history departure names the moved address and blocks ambient Send and Search",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C8 refused history departure names the moved address and blocks ambient Send and Search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C5 C6 retained empty-schema proposal stays manual through New and fresh mount",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C5 C6 retained empty-schema proposal stays manual through New and fresh mount",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C10 readback retains live work and distinguishes post-write uncertainty",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C10 readback retains live work and distinguishes post-write uncertainty",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C10 schema-only retains live work and distinguishes post-write uncertainty",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New retirement at the public boundary N14 C10 schema-only retains live work and distinguishes post-write uncertainty",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 DS1 every nonempty raw string requires review before an edit can stage Search",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N14 DS1 every nonempty raw string requires review before an edit can stage Search",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9f7686e4c4be74fc7344ac6a853f5324bbba21c4",
+    "revision": "9f7686e4c4be74fc7344ac6a853f5324bbba21c4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-vitest-3543734-1793008234369.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2938,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-vitest-3543734-1793008234369.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C2 settles the accepted New address before an immediate reload can read it",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C2 settles the accepted New address before an immediate reload can read it:  AssertionError: expected '#justsearch://surface/core.search-v3-…' to be '#justsearch://surface/core.search-v3-…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/Sear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement throw refuses without losing B or another writer",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C3 raw retirement throw refuses without losing B or another writer:  AssertionError: expected '' to be 'current prepared B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:355:27\n    at file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement nonack refuses without losing B or another writer",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C3 raw retirement nonack refuses without losing B or another writer:  AssertionError: expected '' to be 'current prepared B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:355:27\n    at file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement read refuses without losing B or another writer",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C3 raw retirement read refuses without losing B or another writer:  AssertionError: expected '' to be 'current prepared B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:355:27\n    at file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C3 raw retirement successor refuses without losing B or another writer",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C3 raw retirement successor refuses without losing B or another writer:  AssertionError: expected '' to be 'current prepared B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:355:27\n    at file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C4 pointer retirement throw refuses and retains recoverable current settings",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C4 pointer retirement throw refuses and retains recoverable current settings:  AssertionError: expected '' to be 'current prepared B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:503:27\n    at file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C4 pointer retirement nonack refuses and retains recoverable current settings",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C4 pointer retirement nonack refuses and retains recoverable current settings:  AssertionError: expected '' to be 'current prepared B' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:503:27\n    at file:///hom"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C8 refused history departure names the moved address and blocks ambient Send and Search",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C8 refused history departure names the moved address and blocks ambient Send and Search:  AssertionError: expected '\\n      \\n      \\n      \\n      Recov…' to match /address.*moved.*view.*not/i\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C5 C6 retained empty-schema proposal stays manual through New and fresh mount",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C5 C6 retained empty-schema proposal stays manual through New and fresh mount:  AssertionError: expected [ { place: null, text: '', …(1) } ] to deeply equal ArrayContaining{…}\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts:473:69"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C10 readback retains live work and distinguishes post-write uncertainty",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C10 readback retains live work and distinguishes post-write uncertainty:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' to match /Partial, unconfirmed retirement/\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 C10 schema-only retains live work and distinguishes post-write uncertainty",
+        "classification": "assertion",
+        "detail": "New retirement at the public boundary N14 C10 schema-only retains live work and distinguishes post-write uncertainty:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' to match /Partial, unconfirmed retirement/\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts#N14 DS1 every nonempty raw string requires review before an edit can stage Search",
+        "classification": "assertion",
+        "detail": "N14 DS1 every nonempty raw string requires review before an edit can stage Search:  AssertionError: expected [ [ '/api/knowledge/search', …(1) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/new-15/scratch/test-intent-before-DjGQZP/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389"
+      }
+    ]
+  },
+  "digest": "sha256:e3271d1844d3ed05d18ff3a0444de27df77125470f99764863c1066194ff6343"
+}

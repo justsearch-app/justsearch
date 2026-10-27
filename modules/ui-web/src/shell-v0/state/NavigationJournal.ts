@@ -18,6 +18,7 @@
 
 import type { Intent } from '../router/types.js';
 import type { DispatchOptions } from '../router/intentRouter.js';
+import { canonicalSurfaceId, canonicalSurfaceUrl } from '../router/surfaceIdentity.js';
 import { parseUrl } from '../router/parser.js';
 // Tempdoc 543 §13.2.2 — NavigationJournal is the first production
 // consumer of the Effect Journal substrate: every navigation in main
@@ -69,7 +70,9 @@ function ensureInitialized(): void {
     if (raw) {
       const parsed: PersistedJournal = JSON.parse(raw);
       if (Array.isArray(parsed.entries) && typeof parsed.cursor === 'number') {
-        entries = parsed.entries.slice(-CAPACITY);
+        entries = parsed.entries.slice(-CAPACITY).map(entry => ({
+          ...entry, surfaceId: canonicalSurfaceId(entry.surfaceId), url: canonicalSurfaceUrl(entry.url),
+        }));
         cursor = Math.min(Math.max(parsed.cursor, -1), entries.length - 1);
         return;
       }
@@ -121,10 +124,10 @@ function snapshotCurrentEntry(): void {
   if (typeof window === 'undefined') return;
   const hash = window.location.hash;
   if (!hash || !hash.startsWith('#justsearch://')) return;
-  const currentUrl = hash.slice(1);
+  const currentUrl = canonicalSurfaceUrl(hash.slice(1));
   // On boot/popstate the URL already names the incoming surface, not the departing one.
   const address = parseUrl(currentUrl);
-  if (address?.kind !== 'navigate' || address.target !== entries[cursor]!.surfaceId) return;
+  if (address?.kind !== 'navigate' || canonicalSurfaceId(address.target) !== entries[cursor]!.surfaceId) return;
   if (entries[cursor]!.url !== currentUrl) {
     entries[cursor] = { ...entries[cursor]!, url: currentUrl };
   }
@@ -145,6 +148,8 @@ export function recordNavigation(
   transport: string,
 ): void {
   ensureInitialized();
+  surfaceId = canonicalSurfaceId(surfaceId);
+  url = canonicalSurfaceUrl(url);
   if (isNavigatingHistory) return;
 
   // A browser traversal/reload already moved to an existing view. Its browser-state marker

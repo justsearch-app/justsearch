@@ -1,0 +1,447 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T11:50:16.949Z",
+  "revision": "5b8ec276a0c71138b8c99f9aa94b95e439eedf7b",
+  "tree": "17b62ab5b3cb626d1124a026935bdb5fc1612fde",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3801486-1793015406621.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4367
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Search query' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'retired Search query' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid selection' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'invalid selection' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid mode' preserves legacy until routing has prepared the task",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'invalid mode' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold conversation address outranks the pointer without disposing of the old draft",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold conversation address outranks the pointer without disposing of the old draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold incoming edits survive leave return reload and restart while legacy stays saved",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold incoming edits survive leave return reload and restart while legacy stays saved",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold native link is settled before ordinary boot can transfer legacy",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold native link is settled before ordinary boot can transfer legacy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold queued native delivery waits for the initial drain before draft disposition",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold queued native delivery waits for the initial drain before draft disposition",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold no-ingress transfer waits for native absence then remains one time after Clear",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold no-ingress transfer waits for native absence then remains one time after Clear",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold rapid arrivals before hydration preserve only the latest prepared scope",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold rapid arrivals before hydration preserve only the latest prepared scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold stale native startup cannot replace a newer task after Shell reconnects",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold stale native startup cannot replace a newer task after Shell reconnects",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring successor collision keeps its text and the exact old value after restart",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 neighboring successor collision keeps its text and the exact old value after restart",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring destination write refusal keeps the old copy for a later clean mount",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 neighboring destination write refusal keeps the old copy for a later clean mount",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring two pending Shell mounts retain the durable transfer when the last tab closes",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 neighboring two pending Shell mounts retain the durable transfer when the last tab closes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring a tab closing before its ingress settles cannot erase another tab transfer",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 neighboring a tab closing before its ingress settles cannot erase another tab transfer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "19f1fc10239bf5e3b2d686beedfd8d090cbefe0b",
+    "revision": "19f1fc10239bf5e3b2d686beedfd8d090cbefe0b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3801486-1793015412568.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4048,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3801486-1793015412568.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Search query' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'retired Search query' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid selection' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'invalid selection' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold 'invalid mode' preserves legacy until routing has prepared the task",
+        "classification": "assertion",
+        "detail": "FC15 cold 'invalid mode' preserves legacy until routing has prepared the task:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold conversation address outranks the pointer without disposing of the old draft",
+        "classification": "assertion",
+        "detail": "FC15 cold conversation address outranks the pointer without disposing of the old draft:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold incoming edits survive leave return reload and restart while legacy stays saved",
+        "classification": "assertion",
+        "detail": "FC15 cold incoming edits survive leave return reload and restart while legacy stays saved:  AssertionError: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts:153:43\n    at file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold native link is settled before ordinary boot can transfer legacy",
+        "classification": "assertion",
+        "detail": "FC15 cold native link is settled before ordinary boot can transfer legacy:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold queued native delivery waits for the initial drain before draft disposition",
+        "classification": "assertion",
+        "detail": "FC15 cold queued native delivery waits for the initial drain before draft disposition:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold no-ingress transfer waits for native absence then remains one time after Clear",
+        "classification": "assertion",
+        "detail": "FC15 cold no-ingress transfer waits for native absence then remains one time after Clear:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold rapid arrivals before hydration preserve only the latest prepared scope",
+        "classification": "assertion",
+        "detail": "FC15 cold rapid arrivals before hydration preserve only the latest prepared scope:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle",
+        "classification": "assertion",
+        "detail": "FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle:  AssertionError: the sole old draft remains exact: expected null to be 'Legacy draft — punctuation & 日本' // Object.is equality\n    at retained (/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.col"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 cold stale native startup cannot replace a newer task after Shell reconnects",
+        "classification": "assertion",
+        "detail": "FC15 cold stale native startup cannot replace a newer task after Shell reconnects:  AssertionError: expected 'obsolete' to be '# & % \"日本語\" — سؤال' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-LezfNx/modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts:244:30\n    at file:///home/elias/dev"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring successor collision keeps its text and the exact old value after restart",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring destination write refusal keeps the old copy for a later clean mount",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring two pending Shell mounts retain the durable transfer when the last tab closes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts#FC15 neighboring a tab closing before its ingress settles cannot erase another tab transfer",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:60cdd0dff99c261f0f1caea2252939b640e8f1324c8e158b089dd6f2d55d5eb6"
+}

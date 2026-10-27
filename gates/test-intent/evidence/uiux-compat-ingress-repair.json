@@ -1,0 +1,327 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T02:19:22.513Z",
+  "revision": "f17b988e2fe64dea04cbc7ec2f82f297dd89f4ab",
+  "tree": "6b0fb7cad388234b86508d6daa596150eb434e38",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/co7vs_gn/tmp/test-intent-vitest-3-1793067548007.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5499
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation CORE keeps a valid 0-based inclusive passage",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation CORE keeps a valid 0-based inclusive passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation TRUSTED_PLUGIN keeps a valid 0-based inclusive passage",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation TRUSTED_PLUGIN keeps a valid 0-based inclusive passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation UNTRUSTED_PLUGIN keeps a valid 0-based inclusive passage",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation UNTRUSTED_PLUGIN keeps a valid 0-based inclusive passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 900 paints valid range 6 to 8 only",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector at width 900 paints valid range 6 to 8 only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 1568 paints valid range 6 to 8 only",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector at width 1568 paints valid range 6 to 8 only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 900 paints valid range 0 to 1 only",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector at width 900 paints valid range 0 to 1 only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 1568 paints valid range 0 to 1 only",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector at width 1568 paints valid range 0 to 1 only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 W3 A7 compatibility address core.ask-surface keeps text and files until Send",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 W3 A7 compatibility address core.ask-surface keeps text and files until Send",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 W3 A7 compatibility address core.free-chat-surface keeps text and files until Send",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 W3 A7 compatibility address core.free-chat-surface keeps text and files until Send",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 W3 A7 compatibility address core.extract-surface keeps text and files until Send",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 W3 A7 compatibility address core.extract-surface keeps text and files until Send",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 a warm compatibility address replaces preparation and still waits",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A7 a warm compatibility address replaces preparation and still waits",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A2 an invalid file scope through core.ask-surface keeps text and refuses Send",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A2 an invalid file scope through core.ask-surface keeps text and refuses Send",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 file link through core.ask-surface with missing file refuses without widening scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A7 file link through core.ask-surface with missing file refuses without widening scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 file link through core.ask-surface with unreadable file refuses without widening scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A7 file link through core.ask-surface with unreadable file refuses without widening scope",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f17b988e2f",
+    "revision": "f17b988e2fe64dea04cbc7ec2f82f297dd89f4ab",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/co7vs_gn/tmp/test-intent-vitest-3-1793067557943.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3836,
+        "output": "JSON report written to /home/elias/.cache/am/co7vs_gn/tmp/test-intent-vitest-3-1793067557943.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation CORE keeps a valid 0-based inclusive passage",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector passage validation CORE keeps a valid 0-based inclusive passage:  AssertionError: expected { id: 'read', title: 'Read', …(2) } to deeply equal { id: 'read', title: 'Read', …(4) }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:46:42\n    at file:///home/elias/.cache/am/co7v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation TRUSTED_PLUGIN keeps a valid 0-based inclusive passage",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector passage validation TRUSTED_PLUGIN keeps a valid 0-based inclusive passage:  AssertionError: expected { id: 'read', title: 'Read', …(2) } to deeply equal { id: 'read', title: 'Read', …(4) }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:46:42\n    at file:///home/elias/.cache/am/co7v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation UNTRUSTED_PLUGIN keeps a valid 0-based inclusive passage",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector passage validation UNTRUSTED_PLUGIN keeps a valid 0-based inclusive passage:  AssertionError: expected { id: 'read', title: 'Read', …(2) } to deeply equal { id: 'read', title: 'Read', …(4) }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:46:42\n    at file:///home/elias/.cache/am/co7v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 900 paints valid range 6 to 8 only",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector at width 900 paints valid range 6 to 8 only:  AssertionError: expected null to deeply equal { startLine: 6, endLine: 8 }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:91:33\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 1568 paints valid range 6 to 8 only",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector at width 1568 paints valid range 6 to 8 only:  AssertionError: expected null to deeply equal { startLine: 6, endLine: 8 }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:91:33\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 900 paints valid range 0 to 1 only",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector at width 900 paints valid range 0 to 1 only:  AssertionError: expected null to deeply equal { startLine: +0, endLine: 1 }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:91:33\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 1568 paints valid range 0 to 1 only",
+        "classification": "assertion",
+        "detail": "C9 A3 public inspector at width 1568 paints valid range 0 to 1 only:  AssertionError: expected null to deeply equal { startLine: +0, endLine: 1 }\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts:91:33\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 W3 A7 compatibility address core.ask-surface keeps text and files until Send",
+        "classification": "assertion",
+        "detail": "C8 W3 A7 compatibility address core.ask-surface keeps text and files until Send:  AssertionError: expected '' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts:121:66\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-inten"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 W3 A7 compatibility address core.free-chat-surface keeps text and files until Send",
+        "classification": "assertion",
+        "detail": "C8 W3 A7 compatibility address core.free-chat-surface keeps text and files until Send:  AssertionError: expected '' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts:121:66\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-inten"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 W3 A7 compatibility address core.extract-surface keeps text and files until Send",
+        "classification": "assertion",
+        "detail": "C8 W3 A7 compatibility address core.extract-surface keeps text and files until Send:  AssertionError: expected '' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts:121:66\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-inten"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 a warm compatibility address replaces preparation and still waits",
+        "classification": "assertion",
+        "detail": "C8 A7 a warm compatibility address replaces preparation and still waits:  AssertionError: expected 'old task' to be 'new task' // Object.is equality\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts:153:85\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A2 an invalid file scope through core.ask-surface keeps text and refuses Send",
+        "classification": "assertion",
+        "detail": "C8 A2 an invalid file scope through core.ask-surface keeps text and refuses Send:  AssertionError: expected '' to be 'Keep this text' // Object.is equality\n    at /home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts:161:66\n    at file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 file link through core.ask-surface with missing file refuses without widening scope",
+        "classification": "assertion",
+        "detail": "C8 A7 file link through core.ask-surface with missing file refuses without widening scope:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 file link through core.ask-surface with unreadable file refuses without widening scope",
+        "classification": "assertion",
+        "detail": "C8 A7 file link through core.ask-surface with unreadable file refuses without widening scope:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent-before-9A0R4l/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/co7vs_gn/tmp/test-intent"
+      }
+    ]
+  },
+  "digest": "sha256:5d03ca9e83f03cd79db617314cfe0ee81a4b0709fdd7389722d71a9c24eac84a"
+}

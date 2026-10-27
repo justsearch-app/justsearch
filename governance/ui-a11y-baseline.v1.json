@@ -65,42 +65,42 @@
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-proportion",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-occlusion",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-bands",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-bands-detailed",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-composer-small",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-spine-single",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "compatibility-chat-component",
       "uiShotStep": "chat-spine-multi",
       "knownRules": []
     },
     {
-      "surface": "chat",
+      "surface": "search",
       "uiShotStep": "chat-chip-yield",
       "knownRules": []
     },

@@ -168,6 +168,7 @@ describe('S1.7 — a re-send says what it will search', () => {
     expect(sv3ResendScopeNote({ paths: ['a.md', 'b.md'] })).toBe('Uses the same 2 files');
     expect(sv3ResendScopeNote({ paths: ['a.md'] })).toBe('Uses the same file');
     expect(sv3ResendScopeNote(null)).toBe('Searches all your files');
+    expect(sv3ResendScopeNote(undefined)).toBe('Original Ask inputs are unknown. Prepare a new Ask and review its files.');
   });
 });
 

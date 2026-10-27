@@ -287,10 +287,13 @@ describe('a lock taken ELSEWHERE reaches this window, and locks the transcript',
   });
 
   it('gives the reader the cause\'s own remedy, and navigates through the one seam', async () => {
-    feed({ lock: 'locked' });
+    feed();
     const stream = stubStream();
     const el = await mount();
     await askGrounded(el, stream);
+    // The existing transcript predates the external lock; a known locked store takes no new Ask.
+    feed({ lock: 'locked' });
+    await settle(el);
     const main = await region(el, 'jf-sv3-main');
     const navigations: string[] = [];
     document.addEventListener(NAVIGATE_TO_SURFACE_EVENT, (e) =>
@@ -324,10 +327,12 @@ describe('a lock taken ELSEWHERE reaches this window, and locks the transcript',
   });
 
   it('does not unlock itself on a snapshot that never mentions the lock', async () => {
-    feed({ lock: 'locked' });
+    feed();
     const stream = stubStream();
     const el = await mount();
     await askGrounded(el, stream);
+    feed({ lock: 'locked' });
+    await settle(el);
     const main = await region(el, 'jf-sv3-main');
     expect(q(main, 'sv3-history-locked')).not.toBeNull();
 

@@ -43,15 +43,15 @@
   "shell-v0/views/search-v3/Sv3Pane.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/views/search-v3/SearchV3View.ts": [
     "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
-    "sv3-search-results"
+    "sv3-search-results", "chat-chip-yield"
   ],
-  "shell-v0/views/search-v3/Sv3Composer.ts": ["sv3-composer-occlusion", "sv3-search-results"],
+  "shell-v0/views/search-v3/Sv3Composer.ts": ["sv3-composer-occlusion", "sv3-search-results", "chat-chip-yield"],
   "shell-v0/views/search-v3/Sv3ContextBar.ts": ["sv3-composer-occlusion"],
   "shell-v0/components/chat/evidenceProjection.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/views/UnifiedChatView.ts": [
-    "chat-mode", "qa-response", "chat-proportion",
+    "chat-mode", "qa-response", "chat-proportion", "chat-occlusion",
     "chat-bands", "chat-bands-detailed", "chat-composer-small",
-    "chat-spine-single", "chat-spine-multi", "chat-chip-yield",
+    "chat-spine-single", "chat-spine-multi",
     "chat-evidence-rail", "chat-activity-rail-open", "chat-wide-docked"
   ],
   "shell-v0/views/unifiedChatStyles.ts": [

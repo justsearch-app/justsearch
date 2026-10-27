@@ -1,0 +1,334 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T01:51:15.377Z",
+  "revision": "54035be4431245ffbe3b3c65c12cccedbb13f114",
+  "tree": "ffff06611f9c97fef3b0c1d5029936ec840e645d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/aiStateStore.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/gate-10/scratch/test-intent-vitest-2852519-1792979471300.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1017
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/aiStateStore.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/aiStateStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:940522038d73fe1d0f57afb941d55c7dc4d1779cc5c767adf04b257c74738fff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aiStateStore — R1a signal-core conversion getAiState() reflects mutations synchronously (computed, no manual notify)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion delivers the current value synchronously on subscribe",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion fans out subsequent changes via the watcher (async, batched to latest)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion derived statusLabel recomputes from activity (computed dependency)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion Design pass 3 — statusLabel gains install-awareness: known \"not installed\" now reads \"Not Installed\", not a generic/lowercase \"offline\" fallback",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion §2.B: with no stream data, state is Unknown/connecting — never a concrete default",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion §2.B / B4 + 649: poll stale then truly unreachable — staged \"Catching up…\" → \"Reconnecting…\", last-known retained",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion 649: a stale poll stays calm \"Catching up…\" while an SSE frame keeps contact fresh",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion 601 §19: model-load `starting` shows a live measured elapsed (>2s gate, minute-aware, clears on leave)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — R1a signal-core conversion unsubscribe stops delivery",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — runtime-authority engine axis (tempdoc 737 §12b/§12c) engineState is preferred over the legacy mode when resolving runtime.mode",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — runtime-authority engine axis (tempdoc 737 §12b/§12c) soft-off: Healthy + chatEnabledSpec=false + procedure → aiEngine \"background\", chat capability OFF",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — runtime-authority engine axis (tempdoc 737 §12b/§12c) engineState Down + gpu-yielded-to-indexing → runtime.mode \"indexing\"",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — runtime-authority engine axis (tempdoc 737 §12b/§12c) absent authority fields → legacy mode fallback still resolves runtime.mode",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: fresh NOT_READY index.failed reaches an unavailable notice",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: fresh NOT_READY index.corrupt reaches an unavailable notice",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: fresh NOT_READY index.schema_open_refused reaches an unavailable notice",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: fresh NOT_READY component.start_deadline reaches an unavailable notice",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: fresh NOT_READY component.recovery_exhausted reaches an unavailable notice",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: NOT_READY startup does not become a terminal search failure",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: optional AI component.start_deadline cannot turn index startup into a terminal index failure",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: optional AI component.recovery_exhausted cannot turn index startup into a terminal index failure",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) D1-15: an optional AI deadline does not reclassify a dense retrieval gap as search unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §10.1 fix: the status-bar tier reflects readiness — impairing degraded ⇒ degraded tier",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) 600 Design A: a compat reindex code carries through to a degraded verdict (the specific cause)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §10.3 fix: a COSMETIC degraded (LambdaMART) stays calm — verdict info, tier NOT degraded",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) a worker-down fallback (indexState UNAVAILABLE) ⇒ transitioning, \"Restarting…\"",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) exact index recovery wins over the Worker fallback and uses recovery wording",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) optional AI recovery does not become retrieval recovery",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) a rebuild (migration MIGRATING) ⇒ transitioning, \"Rebuilding…\"",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) a healthy settled system ⇒ operational/ok",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) 806: for a degraded verdict the dot tone and the label beside it come from the SAME verdict",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) 649: AI activity does NOT flatten statusTone — it follows the underlying health",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) 649: indexing/starting keep the prior amber \"in-flux\" tone (connection-only scope)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) 649: a fresh never-connected store reads calm \"Connecting…\" (info), not a false alarm",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) E2: lastSettledIndex is null before any settled poll",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) E2: a settled poll stamps lastSettledIndex; a provisional poll keeps it",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) E2: a later settled poll refreshes lastSettledIndex",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) E2: a settled poll with a doc count but NO size stamps indexSizeBytes=null (honesty)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) C-4: index.searchableDocumentCount is UNKNOWN when the backend omits the field",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) C-4: index.searchableDocumentCount carries the reported value, including a real 0",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) C-4: a settled poll retains searchableDocumentCount; 0 is retained as 0, not as null",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) W2: episodeMaxPendingJobs is 0 before any poll",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) W2: it rises to the episode PEAK and holds it while the queue drains",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) W2: a genuine drain to 0 ENDS the episode, so the next spike measures itself",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) W2: a hard-zeroed fallback snapshot is absence, not a drain — the mark survives it",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §20: the settle trail is empty before any poll",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §20: an enriching poll stamps the blend SETTLED sum against the wall clock",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §20: the trail is bounded — only the most recent samples are kept",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §20: leaving the enriching phase CLEARS the trail — a fresh episode measures itself",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §20: a hard-zeroed fallback snapshot clears the trail rather than stamping its zeros",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — system-health verdict (595) §20: four stamped polls are enough for the selector to render an estimate",
+          "status": "passed"
+        },
+        {
+          "name": "computeRealized — tempdoc 644 realized engine projection projects loaded + accelerator + failure per engine from worker.gpu",
+          "status": "passed"
+        },
+        {
+          "name": "computeRealized — tempdoc 644 realized engine projection reports an absent reranker as not loaded (the silent CE-off worktree trap)",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — derived context window (tempdoc 883 decision 1 / ADR-0047) projects the wire rung/reason/slots/kvType beside the OBSERVED llmContextTokens",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — derived context window (tempdoc 883 decision 1 / ADR-0047) no contextWindow block (adopted/external engine) → null, with the observation untouched",
+          "status": "passed"
+        },
+        {
+          "name": "aiStateStore — derived context window (tempdoc 883 decision 1 / ADR-0047) a rung of 0 is NOT a derived window — it is the absent block, and must not render as \"0\"",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state permits unloaded human admission with config true, retaining agent and document gates",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state permits unloaded human admission with config undefined, retaining agent and document gates",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state permits only captured human load continuation through LOADING with config true",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state permits only captured human load continuation through LOADING with config undefined",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state explicit off blocks human continuation in UNLOADED",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state explicit off blocks human continuation in LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state explicit off blocks human continuation in READY",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state classified failure blocks human continuation in UNLOADED",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state classified failure blocks human continuation in LOADING",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state READY remains available when a retained classified failure no longer owns admission",
+          "status": "passed"
+        },
+        {
+          "name": "human residency availability from observed AI state contact loss outranks retained unloaded/load-continuation state",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "54035be4431245ffbe3b3c65c12cccedbb13f114",
+    "revision": "54035be4431245ffbe3b3c65c12cccedbb13f114",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/aiStateStore.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/gate-10/scratch/test-intent-vitest-2852519-1792979473987.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1042
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/aiStateStore.test.ts",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:9cbd88f0f7389e8219a391bab8363e93e26f0ebc6cf770d6b3e84b7e187f9cf0"
+}

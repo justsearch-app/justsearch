@@ -113,6 +113,7 @@ function routeToSurfaceId(target: string): string {
 // use the mechanical id fallback below; Search is the sole compatibility-id exception today.
 const SURFACE_FALLBACK_LABELS: Readonly<Record<string, string>> = {
   'core.unified-chat-surface': 'Search',
+  'core.search-v3-surface': 'Search',
 };
 
 /**

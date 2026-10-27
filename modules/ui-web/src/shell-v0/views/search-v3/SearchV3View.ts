@@ -40,12 +40,17 @@
  *     projections and issue nothing. What is still window-local — the pin and the unread bit — and
  *     why, is stated in `sv3-sessions.ts`'s persistence-boundary note.
  *
- * Mounted as a hidden DEEPLINK surface, dev audience, no rail entry:
+ * Mounted as the main USER/RAIL Search surface, keeping its established address:
  * `#justsearch://surface/core.search-v3-surface`.
  *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
-import { takeSearchV3Handoff } from '../../utils/compose.js';
+import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
+import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
+import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
+import { subscribeInspector, setOpen as setInspectorOpen } from '../../state/inspectorState.js';
+import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
+import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import type { ShapeId } from '../unifiedChatRequest.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -257,7 +262,10 @@ import {
   setLastViewedConversation,
 } from '../../controllers/lastViewedConversation.js';
 // Tempdoc 609 §R — the shared reload-durable draft controller (T2.1) and its one-shot leave hint (T1.4).
+import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
+import { requestLoadAnyway, retryWording, type ChatRefusalDetail } from '../../state/chatResidency.js';
+import { isSv3Recovery, isSv3Preparation, type Sv3Preparation, type Sv3RecoveryDraft, type Sv3Recovery, type Sv3RecoveryTask, type RecoveryShape } from './sv3-recovery.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
 import { discoverLiveAgentRun, type LiveRunRow } from '../../controllers/liveRuns.js';
@@ -435,6 +443,24 @@ const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
   messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
   locked: history.locked,
 });
+
+interface HumanTask {
+  saved: Sv3RecoveryTask;
+  question: string;
+  scope: Sv3AskScope | null;
+  scopeOwner: Sv3AskScope | null;
+  selection: SelectionPayload | null;
+  composer: Sv3Composer | null;
+  version: number | undefined;
+  epoch: number;
+  ownsComposer: boolean;
+  revoked: boolean;
+  abandoned: boolean;
+  restored: boolean;
+  context: ReturnType<typeof sv3FollowUpContext> | null;
+  refusal: ChatRefusalDetail | null;
+  retryAt: number;
+}
 
 export class SearchV3View extends JfElement {
   static styles = [
@@ -623,11 +649,41 @@ export class SearchV3View extends JfElement {
          collapse the centred landing into a bottom-anchored strip. In hero the dock is a plain flow
          wrapper and hero resolves against .column exactly as before. */
       .dock {
-        /* Click-through everywhere except the two centred content columns inside it (.band in the
-           composer, .bar in the context bar), so the transcript underneath stays wheel-scrollable
-           right up to the glass edge. */
+        /* Click-through except the two centred content columns inside it
+           (.band in the composer, .bar in the context bar), so the transcript underneath stays
+           wheel-scrollable right up to the glass edge. */
         pointer-events: none;
       }
+      /* Recovery has its own bounded row, like indexing/origin notices. It must not
+         share the hero's absolute positioning or the transcript's floating dock. */
+      .column > .recovery-notice {
+        box-sizing: border-box;
+        flex: 0 0 auto;
+        min-block-size: 0;
+        max-block-size: 20%;
+        overflow: auto;
+        overflow-wrap: anywhere;
+        padding: var(--space-3) var(--floating-content-inset);
+        border-block-end: 1px solid var(--border);
+        background: var(--background);
+        user-select: text;
+      }
+      .column > .recovery-notice p, .column > .recovery-notice pre { margin: 0 0 var(--space-2); }
+      .column > .recovery-notice pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .column > .recovery-notice button {
+        max-inline-size: 100%;
+        white-space: normal;
+        margin: 0 var(--space-1) var(--space-2) 0;
+        padding: var(--space-1) var(--space-2);
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--background);
+        color: var(--foreground);
+        font: inherit;
+        cursor: pointer;
+      }
+      .column > .recovery-notice button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
       :host([composer-state='docked']) .dock {
         position: absolute;
         inset-inline: 0;
@@ -772,6 +828,8 @@ export class SearchV3View extends JfElement {
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
     sidebarNarrow: { type: Boolean, reflect: true, attribute: 'sidebar-narrow' },
     resizing: { type: Boolean, reflect: true },
+    shapeId: { type: String, attribute: 'shape-id' },
+    paneHighlight: { state: true },
     paneDocPath: { state: true },
     paneCitation: { state: true },
     paneCitationHeader: { state: true },
@@ -786,6 +844,7 @@ export class SearchV3View extends JfElement {
     tier: { state: true },
     compacting: { state: true },
     conversations: { state: true },
+    initialNavigationPending: { type: Boolean, attribute: false },
   };
 
   declare composerState: Sv3ComposerState;
@@ -803,6 +862,10 @@ export class SearchV3View extends JfElement {
   declare theme: AppearanceMode;
   /** Set by the shell on every render of a mounted surface (`chrome/Shell.ts:2945-2949`). */
   declare apiBase: string;
+  /** Shell settles cold ingress before this mount may dispose of the legacy draft. */
+  declare initialNavigationPending: boolean;
+  private mountDraftPending = false;
+  private mountHasIncoming = false;
   /**
    * The window's session list — a PROJECTION and a per-render cache of the app-wide conversation
    * store plus the canonical thread record, not an authority of its own (Phase F6; the exact split
@@ -834,6 +897,11 @@ export class SearchV3View extends JfElement {
    * {@link onCitationOpen}. That is the scope guard: no search result, no browse row and no typed
    * path can reach the reading surface from this window, because nothing else assigns here.
    */
+  declare shapeId: string | undefined;
+  declare paneHighlight: DocumentLineRange | null;
+  private sharedInspectorPath: string | null = null;
+  private inspectorUnsubscribe: (() => void) | null = null;
+  private readonly draftPersistence: DraftPersistence;
   declare paneDocPath: string | null;
   /**
    * The cited passage in CHARACTER coordinates, handed to the reader as its anchor (tempdoc 849 §3).
@@ -945,6 +1013,554 @@ export class SearchV3View extends JfElement {
   private contextWrites = new Map<string, Promise<void>>();
   private contextNotices = new Map<string, string>();
   /** A refused send outlives context recovery: the reader may have typed a different draft. */
+  private humanTask: HumanTask | null = null;
+  private humanEpoch = 0;
+  private recoveryOpened = false;
+  private recoveryDrafts: Sv3Recovery['drafts'] = [];
+  private recoveryError = '';
+  private refusedHandoff: { text: string; files: number } | null = null;
+
+  /** A later accepted navigation leaves this refusal, rather than retrying it elsewhere. */
+  private retireRefusedHandoff(): boolean {
+    if (this.refusedHandoff === null) return false;
+    if (peekSearchV3Handoff()?.refused) takeSearchV3Handoff();
+    this.refusedHandoff = null;
+    this.recoveryError = '';
+    return true;
+  }
+  /** Diagnostic phase of the synchronous session write, never issuance authority. */
+  private recoveryWriteUnconfirmed = false;
+  /** Address/store moved, but this view could not safely leave its retained work. */
+  private departureBlocked = false;
+  private humanLoad: AbortController | null = null;
+  private humanRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private assigningHumanDraft = false;
+  private draftReview = false;
+  /** Separately known saved settings; equality with the raw string never binds their owner. */
+  private draftProposal: Sv3Preparation | null = null;
+  private reviewConfigured = false;
+  private preparationRevision = 0;
+  /** HO9 retires one-shot context, but its unchanged text is not an all-files choice. */
+  private retiredHandoffText: string | null = null;
+
+  private get retiredHandoffNotice(): string {
+    return this.retiredHandoffText === null ? ''
+      : 'The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending.';
+  }
+
+  private clearRetiredHandoff(): void {
+    if (this.retiredHandoffText === null) return;
+    this.retiredHandoffText = null;
+    this.requestUpdate();
+  }
+
+  private markDraftReview(proposal: Sv3Preparation | null = null): void {
+    this.draftReview = true;
+    this.draftProposal = proposal;
+    this.reviewConfigured = false;
+    this.preparationRevision += 1;
+    this.requestUpdate();
+  }
+
+  private livePreparation(tier = this.tier, shape: string | null | undefined = this.preparedHandoff?.shapeId ?? this.shapeId,
+    paths = [...(this.search.pendingScope?.paths ?? [])], selection = this.preparedHandoff?.selection,
+    blocked = this.handoffBlocked): Sv3Preparation {
+    if (tier === 'search') return { kind: 'search' };
+    if (tier === 'delegate') return { kind: 'delegate' };
+    const effectiveShape = shape ?? this.activeSession?.turns.at(-1)?.shapeId;
+    if (effectiveShape === SV3_MODEL_SHAPE_ID && tier !== 'structured') return { kind: 'model' };
+    const needsReselection = blocked || selection != null
+      && ['text-range', 'citation', 'search-trace', 'health-condition'].includes(selection.kind);
+    paths = [...new Set(paths)];
+    const scope = needsReselection ? { kind: 'reselect' as const, paths }
+      : paths.length > 0 ? { kind: 'files' as const, paths } : null;
+    if (tier === 'structured') return { kind: 'structured', schema: this.schemaDraft,
+      scope: scope ?? { kind: 'typed' } };
+    if (shape === 'core.summarize') return { kind: 'summarize', scope: scope ?? { kind: 'reselect', paths: [] } };
+    return { kind: 'ask', scope: scope ?? { kind: 'all' } };
+  }
+
+  private currentPreparation(): Sv3Preparation | null {
+    // Existing recovery already represents unknown input without granting all-files authority.
+    if (this.retiredHandoffText !== null) return { kind: 'ask', scope: { kind: 'reselect', paths: [] } };
+    return this.draftReview ? this.reviewConfigured ? this.draftProposal : null : this.livePreparation();
+  }
+
+  private preparationSummary(preparation: Sv3Preparation | null): string {
+    if (preparation === null) return 'The original mode, files and schema are unknown.';
+    if (preparation.kind === 'search') {
+      const filters = this.search.view({ kind: 'available' }).filters.map(f => f.label);
+      return filters.length === 0 ? 'Search: all files, with no active filters.' : `Search with current filters: ${filters.join('; ')}.`;
+    }
+    if (preparation.kind === 'delegate') return 'Delegate: the agent chooses its actions; no chosen-file Ask restriction is applied.';
+    if (preparation.kind === 'model') return 'Model answer: no file retrieval.';
+    const input = preparation.scope.kind === 'all' ? 'all files'
+      : preparation.scope.kind === 'typed' ? 'typed input, no files'
+      : preparation.scope.kind === 'reselect' ? 'original input must be reselected'
+      : `chosen files: ${preparation.scope.paths.join(', ')}`;
+    return `${preparation.kind === 'structured' ? 'Structured' : preparation.kind === 'summarize' ? 'Summarize' : 'Ask'}: ${input}.${preparation.kind === 'structured' ? ` Schema: ${preparation.schema}` : ''}`;
+  }
+
+  private preparationUsable(preparation: Sv3Preparation | null): preparation is Sv3Preparation {
+    if (!isSv3Preparation(preparation)) return false;
+    if ('scope' in preparation && preparation.scope.kind === 'reselect') return false;
+    if (preparation.kind === 'structured') {
+      try {
+        const schema: unknown = JSON.parse(preparation.schema);
+        if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) return false;
+      } catch { return false; }
+    }
+    return true;
+  }
+
+  private applyPreparation(preparation: Sv3Preparation): void {
+    this.search.clearScope();
+    this.preparedHandoff = null;
+    this.handoffNotice = ''; this.handoffBlocked = false;
+    this.tierFollowsPlace = false;
+    this.tier = preparation.kind === 'search' ? 'search' : preparation.kind === 'delegate' ? 'delegate'
+      : preparation.kind === 'structured' ? 'structured' : 'ask';
+    if (preparation.kind === 'model') this.preparedHandoff = { shapeId: SV3_MODEL_SHAPE_ID, selection: null };
+    if ('scope' in preparation) {
+      if (preparation.scope.kind === 'files') this.search.prepare({ paths: [...preparation.scope.paths] });
+      if (preparation.kind === 'structured') this.schemaDraft = preparation.schema;
+      else this.preparedHandoff = { shapeId: preparation.kind === 'summarize' ? 'core.summarize' : SV3_ASK_SHAPE_ID,
+        selection: preparation.scope.kind === 'files'
+          ? { kind: 'result-set', items: preparation.scope.paths.map(id => ({ id, kind: 'doc' as const })) } : null };
+    }
+  }
+
+  private sameDraft(a: Sv3RecoveryDraft, b: Sv3RecoveryDraft): boolean {
+    return a.place === b.place && a.text === b.text
+      && JSON.stringify(a.preparation ?? null) === JSON.stringify(b.preparation ?? null);
+  }
+
+  private draftHasInputs(draft: Sv3RecoveryDraft): boolean {
+    const preparation = draft.preparation;
+    return draft.text !== '' || preparation?.kind === 'structured' && preparation.schema !== ''
+      || preparation != null && 'scope' in preparation
+        && (preparation.scope.kind === 'files' || preparation.scope.kind === 'reselect');
+  }
+
+  /** ACK the next current snapshot before replacement/retirement; never grow a third slot. */
+  private persistDraft(next: Sv3RecoveryDraft, keepCurrent = false, leaving?: Sv3RecoveryDraft, retired?: Sv3RecoveryDraft): boolean {
+    if (!this.recoveryOpened) this.openRecovery();
+    const composer = this.composer, version = composer?.draftVersion;
+    const revision = this.preparationRevision, place = this.humanPlace(), text = this.currentDraft();
+    const previous = this.recoveryPayload();
+    const retained = keepCurrent ? [leaving ?? previous.drafts[0]!, ...previous.drafts.slice(1)] : previous.drafts.slice(1);
+    const drafts = [next];
+    for (const draft of retained) {
+      const snapshot = { ...draft, preparation: draft.preparation ?? null };
+      if (this.draftHasInputs(snapshot) && !(retired && this.sameDraft(snapshot, retired))
+        && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
+    }
+    const payload: Sv3Recovery = { version: 2, task: previous.task, drafts };
+    if (!this.saveRecoveryPayload(payload)) return false;
+    if (!this.isConnected || this.composer !== composer || composer?.draftVersion !== version
+      || this.preparationRevision !== revision || this.humanPlace() !== place || this.currentDraft() !== text) {
+      this.recoveryError = 'The draft or its settings changed while recovery was being saved. Current text is kept; review again.';
+      this.requestUpdate(); return false;
+    }
+    this.recoveryDrafts = payload.drafts.slice(1);
+    return true;
+  }
+
+  private reviewDraft(search: boolean): void {
+    const preparation = search ? { kind: 'search' as const } : this.draftProposal;
+    if (!this.draftReview || !this.preparationUsable(preparation)) return;
+    const composer = this.composer;
+    const version = composer?.draftVersion;
+    const revision = this.preparationRevision;
+    const place = this.humanPlace();
+    const summary = this.preparationSummary(preparation);
+    if (!this.persistDraft({ place, text: this.recoveryText(this.currentDraft()), preparation })) return;
+    if (!this.isConnected || this.composer !== composer || composer?.draftVersion !== version
+      || this.preparationRevision !== revision || this.humanPlace() !== place
+      || this.preparationSummary(preparation) !== summary) return;
+    this.revokeHumanTask();
+    this.clearRetiredHandoff();
+    this.applyPreparation(preparation);
+    this.draftReview = false;
+    this.draftProposal = null;
+    this.reviewConfigured = false;
+    this.recoveryError = '';
+    this.requestUpdate();
+  }
+
+  private acknowledgePreparation(preparation: Sv3Preparation): boolean {
+    const composer = this.composer;
+    const version = composer?.draftVersion;
+    const revision = this.preparationRevision;
+    const place = this.humanPlace();
+    if (!this.persistDraft({ place, text: this.recoveryText(this.currentDraft()), preparation })) return false;
+    return this.isConnected && this.composer === composer && composer?.draftVersion === version
+      && this.preparationRevision === revision && this.humanPlace() === place;
+  }
+
+  private configureDraft(): void {
+    this.clearRetiredHandoff();
+    this.preparationRevision += 1;
+    if (this.draftReview) { this.reviewConfigured = true; this.draftProposal = this.livePreparation(); }
+    this.requestUpdate();
+  }
+
+  private draftMayIssue(retain = true): boolean {
+    if (this.departureBlocked || this.draftReview || this.handoffBlocked || this.retiredHandoffText !== null) { this.requestUpdate(); return false; }
+    return !retain || this.saveRecovery();
+  }
+
+  private mayForkDraft(): boolean {
+    const payload = this.recoveryPayload();
+    // The backend chooses the new place id. Budget its full accepted bound rather than
+    // guessing a future id or storing a placeholder as callback authority.
+    // Every accepted id byte may require a six-byte JSON escape. The future target
+    // appears in both the current draft and (for a saved action) the submitted task.
+    const futurePlace = '\u0000'.repeat(4096);
+    const drafts: Sv3RecoveryDraft[] = [{ place: futurePlace, text: '', preparation: null }];
+    for (const draft of payload.drafts) {
+      if (this.draftHasInputs(draft) && !drafts.some(d => this.sameDraft(d, draft))) drafts.push(draft);
+    }
+    const planned = { ...payload, task: payload.task === null ? null : { ...payload.task, target: futurePlace }, drafts };
+    if (!isSv3Recovery(planned) || new TextEncoder().encode(JSON.stringify({ version: 1,
+      incarnation: 'x'.repeat(128), payload: planned })).length > 262144) {
+      this.recoveryError = 'Review or discard a retained draft before opening another place. Existing text and settings are kept.';
+      this.requestUpdate(); return false;
+    }
+    return this.saveRecovery();
+  }
+
+  private humanPlace(): string | null { return this.search.showing ? RESULTS_PLACE : this.sessions.activeId; }
+
+  private recoveryText(text: string, selection = this.humanTask?.selection ?? this.preparedHandoff?.selection): string {
+    // Explain's sender embeds this backend-owned block in its prepared draft. Keep only the
+    // instructions in the extra copy; the live request keeps the exact trace and needs reselection.
+    return selection?.kind === 'search-trace' && typeof selection.summary === 'string' && selection.summary
+      ? text.replaceAll(`\n\nRanking trace:\n${selection.summary}`, '') : text;
+  }
+
+  private recoveryPayload(task = this.humanTask): Sv3Recovery {
+    const place = this.humanPlace();
+    const drafts: Sv3RecoveryDraft[] = [{ place,
+      text: this.recoveryText(this.currentDraft(), task?.selection ?? this.preparedHandoff?.selection),
+      preparation: this.currentPreparation() }];
+    // A composer submission can create a conversation. New input then belongs to that target;
+    // a saved-turn action instead leaves its unrelated composer at the original place.
+    const origin = task?.saved.record === null ? task.saved.target ?? task.saved.place : task?.saved.place;
+    if (origin !== undefined && origin !== place) {
+      const saved = this.placeDrafts.get(origin ?? '') ?? this.recoveryDrafts.find(d => d.place === origin);
+      if (saved !== undefined && this.draftHasInputs({ place: origin, ...saved })) drafts.push({ place: origin, text: this.recoveryText(saved.text, task?.selection),
+        preparation: saved.preparation ?? null });
+    }
+    for (const draft of this.recoveryDrafts) {
+      const snapshot = { ...draft, preparation: draft.preparation ?? null };
+      if (this.draftHasInputs(snapshot) && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
+    }
+    return { version: 2, task: task?.saved ?? null, drafts };
+  }
+
+  private saveRecoveryPayload(payload: Sv3Recovery): boolean {
+    this.recoveryWriteUnconfirmed = false;
+    // The live payload keeps the current composer first, even when it is empty.
+    // Returning to that place needs no third persisted slot beside two retained inputs.
+    // Keep the live ordering so callers still retain every companion after this ACK.
+    const current = payload.drafts[0];
+    if (payload.drafts.length > 2 && current?.place != null && current.place !== RESULTS_PLACE
+      && !this.draftHasInputs(current)) {
+      payload = { ...payload, drafts: payload.drafts.slice(1) };
+    }
+    const drafts = payload.drafts;
+    if (!isSv3Recovery(payload)) {
+      const preparations = drafts.map(d => d.preparation);
+      let reason = 'This preparation contains invalid or over-limit settings. Review the mode, files and schema before continuing.';
+      if (drafts.length > 2) reason = 'Only two draft preparations can be retained. Review or discard a retained draft before continuing.';
+      else if (drafts.some(d => new TextEncoder().encode(d.text).length > 65536)) {
+        reason = 'Draft text exceeds the 65536-byte recovery limit. Reduce the text before continuing.';
+      } else if (preparations.some(p => p != null && 'scope' in p && 'paths' in p.scope && p.scope.paths.length > 128)) {
+        reason = 'Chosen files exceed the 128-file recovery limit. Reduce the file selection before continuing.';
+      } else if (preparations.some(p => p != null && 'scope' in p && 'paths' in p.scope
+        && p.scope.paths.some(path => new TextEncoder().encode(path).length > 4096))) {
+        reason = 'A chosen file path exceeds the 4096-byte recovery limit. Review the file selection before continuing.';
+      } else if (preparations.some(p => p?.kind === 'structured' && new TextEncoder().encode(p.schema).length > 16384)) {
+        reason = 'Structured schema exceeds the 16384-byte recovery limit. Reduce the schema before continuing.';
+      }
+      this.recoveryError = `Recovery could not be saved safely: ${reason} Existing copies are kept.`;
+      this.requestUpdate();
+      return false;
+    }
+    const result = this.draftPersistence.saveSessionAttachment(payload);
+    this.recoveryWriteUnconfirmed = result === 'unconfirmed';
+    return result === 'saved';
+  }
+
+  private saveRecovery(task = this.humanTask): boolean {
+    if (!this.recoveryOpened) return false;
+    const payload = this.recoveryPayload(task);
+    if (!this.saveRecoveryPayload(payload)) return false;
+    this.recoveryDrafts = payload.drafts.slice(1);
+    return true;
+  }
+
+  private openRecovery(): void {
+    if (this.recoveryOpened) return;
+    this.recoveryOpened = true;
+    const supported = ['core.rag-ask', 'core.free-chat', 'core.extract', 'core.summarize'];
+    const owner = this.shapeId && supported.includes(this.shapeId) ? this.shapeId : 'main';
+    const payload = this.draftPersistence.openSessionAttachment(`search-v3.${owner}`, isSv3Recovery,
+      () => this.recoveryPayload(), () => {
+        this.recoveryError ||= 'Recovery could not be saved safely. Keep or copy your text and settings before leaving. No new question will be sent.';
+        this.requestUpdate();
+      });
+    if (!isSv3Recovery(payload)) return;
+    this.recoveryDrafts = payload.drafts.slice(1);
+    for (const draft of payload.drafts) {
+      if (draft.place !== null && draft.place !== this.humanPlace()) this.placeDrafts.set(draft.place,
+        { text: draft.text, preparation: draft.preparation ?? null, review: true });
+    }
+    // Incoming work wins. A different nonempty raw draft may have been saved AFTER a failed
+    // attachment write: keep it in the composer and expose the extra session copy for review.
+    const current = payload.drafts[0];
+    if (current !== undefined && current.place === this.humanPlace()) {
+      const hadRaw = this.currentDraft() !== '';
+      if (!this.mountHasIncoming && (this.currentDraft() || this.draftHasInputs(current))) {
+        this.markDraftReview(current.preparation ?? null);
+        if (!hadRaw) {
+          this.reviewConfigured = current.preparation != null;
+          this.writeDraft(current.text);
+        }
+      }
+      // A typed snapshot remains a separate proposal even when an old raw writer returned
+      // to identical bytes. Only a person's review can apply it to the current text.
+      if (this.draftHasInputs(current) && (hadRaw && current.preparation != null || current.text !== this.currentDraft() || this.mountHasIncoming)
+        && !this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDrafts.push(current);
+    } else if (current !== undefined && this.draftHasInputs(current)) {
+      if (!this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDrafts.push(current);
+      if (!this.mountHasIncoming && this.currentDraft().trim()) this.markDraftReview(current.preparation ?? null);
+    }
+    if (payload.task !== null) {
+      this.humanTask = {
+        saved: payload.task, question: '', scope: null, scopeOwner: null, selection: null, composer: null,
+        version: undefined, epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
+        restored: true, context: null, refusal: null, retryAt: 0,
+      };
+    }
+    this.requestUpdate();
+  }
+
+  private readonly onHumanAssignment = (): void => {
+    this.preparationRevision += 1;
+    if (this.assigningHumanDraft) return;
+    if (this.humanTask !== null) this.revokeHumanTask();
+  };
+
+  /** Revocation is latched before any callback can arrive. Leaving never sends Stop. */
+  private revokeHumanTask(abandonInitial = false): void {
+    this.humanEpoch += 1;
+    if (this.humanTask !== null) {
+      this.humanTask.revoked = true;
+      // Input changes revoke force continuation, but an initial captured A may still send.
+      // Leaving its placement/lifecycle latches abandonment even after an ABA return.
+      this.humanTask.abandoned ||= abandonInitial;
+    }
+    this.humanLoad?.abort();
+    this.humanLoad = null;
+    if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
+    this.humanRetryTimer = null;
+    this.requestUpdate();
+  }
+
+  private readonly leaveHumanTask = (): void => { this.revokeHumanTask(true); this.saveRecovery(); };
+
+  private readonly hideHumanTask = (): void => {
+    if (document.visibilityState === 'hidden') this.leaveHumanTask();
+  };
+
+  private humanOwned(task: HumanTask): boolean {
+    return this.isConnected && this.humanTask === task && !task.revoked && !task.restored
+      && this.humanEpoch === task.epoch && this.sessions.activeId === task.saved.target
+      && this.composer === task.composer && this.composer?.draftVersion === task.version;
+  }
+
+  private humanUnavailable(shape: RecoveryShape, continuation = false): string {
+    if (this.departureBlocked) return 'The address moved but this view did not leave safely. Return to this conversation before sending or changing its task.';
+    if (this.historyLocked) return reasonFor('conversations.locked').wording;
+    const availability = projectAvailability(shape === 'core.rag-ask' ? 'documents' : 'extract', this.aiSnapshot, true, continuation);
+    return availability.kind === 'unavailable' ? availability.reason : '';
+  }
+
+  private reserveHumanTask(question: string, scope: Sv3AskScope | null, schema: string | undefined,
+    shape: RecoveryShape, selection: SelectionPayload | null, ownsComposer: boolean,
+    record: string | null = null, authored?: string): HumanTask | null {
+    if (this.humanTask !== null) {
+      this.recoveryError = 'Review the retained question, then explicitly discard it before starting another submission.';
+      this.requestUpdate(); return null;
+    }
+    const task: HumanTask = {
+      saved: { id: crypto.randomUUID(), place: this.humanPlace(), target: this.sessions.activeId,
+        raw: this.recoveryText(authored ?? (ownsComposer ? this.currentDraft() : record === null ? question : ''), selection), schema: schema ?? null,
+        shape, scope: [...(scope?.paths ?? [])], record, needsReselection: selection !== null,
+        effort: this.effort, delivery: 'unaccepted' },
+      question, scope: scope === null ? null : { paths: [...scope.paths] }, scopeOwner: scope,
+      selection: selection === null ? null : structuredClone(selection), composer: this.composer,
+      version: this.composer?.draftVersion, epoch: this.humanEpoch, ownsComposer,
+      revoked: false, abandoned: false, restored: false, context: null, refusal: null, retryAt: 0,
+    };
+    // Reserve before context waits or forks. A failed ACK never sacrifices live input or old bytes.
+    if (!this.saveRecovery(task)) return null;
+    this.humanTask = task;
+    this.recoveryError = '';
+    this.requestUpdate();
+    return task;
+  }
+
+  private retireHumanTask(task: HumanTask): void {
+    if (this.humanTask !== task) return;
+    // Preserve companion drafts in the bounded attachment, even after acceptance/discard.
+    const payload = this.recoveryPayload(task);
+    payload.task = null;
+    if (!this.saveRecoveryPayload(payload)) { task.revoked = true; return; }
+    this.recoveryDrafts = payload.drafts.slice(1);
+    this.humanTask = null;
+    this.recoveryError = '';
+    this.requestUpdate();
+  }
+
+  private discardHumanTask(): void {
+    this.revokeHumanTask(true);
+    if (this.humanTask !== null) {
+      const task = this.humanTask;
+      this.retireHumanTask(task);
+      if (this.humanTask === null) {
+        if (task.saved.place !== null) this.refusedQuestions.delete(task.saved.place);
+        if (task.saved.target !== null) this.refusedQuestions.delete(task.saved.target);
+      }
+    }
+  }
+
+  private discardRecoveryDraft(draft: Sv3RecoveryDraft): void {
+    const payload = this.recoveryPayload();
+    payload.drafts = payload.drafts.filter((d, index) => index === 0 || !this.sameDraft(d, draft));
+    if (!this.saveRecoveryPayload(payload)) return;
+    this.recoveryDrafts = payload.drafts.slice(1);
+    const saved = draft.place === null ? undefined : this.placeDrafts.get(draft.place);
+    if (saved && this.sameDraft({ place: draft.place, ...saved }, draft)) this.placeDrafts.delete(draft.place!);
+    this.recoveryError = '';
+    const pending = peekSearchV3Handoff();
+    if (pending?.refused) {
+      pending.refused = false;
+      this.receiveHandoff();
+    }
+    this.requestUpdate();
+  }
+
+  private reviewRecoveryDraft(draft: Sv3RecoveryDraft): void {
+    const next = { ...draft, place: this.humanPlace(), preparation: draft.preparation ?? null };
+    if (!this.persistDraft(next, true, undefined, draft)) return;
+    this.clearRetiredHandoff();
+    if (this.retireRefusedHandoff()) refreshProjection();
+    this.revokeHumanTask();
+    this.markDraftReview(next.preparation);
+    this.reviewConfigured = next.preparation !== null;
+    this.writeDraft(next.text);
+    this.requestUpdate();
+  }
+
+  private async continueHumanTask(force: boolean): Promise<void> {
+    const task = this.humanTask;
+    if (task === null || this.humanLoad !== null || this.streaming || !this.humanOwned(task)
+      || task.saved.delivery !== 'unaccepted' || task.refusal === null
+      || (force ? task.refusal.forceAllowed !== true : Date.now() < task.retryAt)) return;
+    const operation = new AbortController();
+    this.humanLoad = operation;
+    this.requestUpdate();
+    try {
+      if (force) {
+        const result = await requestLoadAnyway(this.apiBase,
+          (input, init) => authorizedFetch(input, { ...init, signal: operation.signal }, { retry: false }));
+        if (!this.humanOwned(task) || operation.signal.aborted) return;
+        if (!result.ok) {
+          task.refusal = result.refusal;
+          task.retryAt = Date.now() + (result.refusal?.retryAfterMs ?? 0);
+          this.scheduleHumanRetry(task);
+          this.recoveryError = result.refusal?.message ?? 'Chat could not be loaded. The question is retained.';
+          return;
+        }
+      }
+      if (!this.humanOwned(task) || operation.signal.aborted) return;
+      const reason = this.humanUnavailable(task.saved.shape, force);
+      const session = task.saved.target === null ? null : sessionById(this.sessions, task.saved.target);
+      const context = task.saved.shape === SV3_MODEL_SHAPE_ID || session === null ? []
+        : session.history === null && task.saved.place === null && session.turns.length === 0 ? []
+        : session.history === null ? null : sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
+      if (reason || (task.saved.target !== null && this.contextWrites.has(task.saved.target))
+        || JSON.stringify(context) !== JSON.stringify(task.context)) {
+        task.revoked = true;
+        this.recoveryError = reason || 'Saved context changed. Review the retained question before a new submission.';
+        return;
+      }
+      await this.runAsk(task.question, task.scope, task.saved.schema ?? undefined,
+        task.saved.shape === SV3_MODEL_SHAPE_ID, { task, continuation: force });
+    } catch {
+      if (!operation.signal.aborted) this.recoveryError = 'Chat could not be loaded. The question is retained.';
+    } finally {
+      if (this.humanLoad === operation) this.humanLoad = null;
+      this.requestUpdate();
+    }
+  }
+
+  private scheduleHumanRetry(task: HumanTask): void {
+    if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
+    // A timer only refreshes the affordance. It never issues a request.
+    this.humanRetryTimer = setTimeout(() => { this.humanRetryTimer = null; this.requestUpdate(); }, Math.min(2147483647, Math.max(0, task.retryAt - Date.now())));
+  }
+
+  private recoveryNotice(): TemplateResult | typeof nothing {
+    const task = this.humanTask;
+    const current = { place: this.humanPlace(), text: this.currentDraft(), preparation: this.currentPreparation() };
+    const companions = this.recoveryDrafts.filter(d => this.draftHasInputs(d) && !this.sameDraft(d, current));
+    if (!this.departureBlocked && !this.draftPersistence.restoreUnavailable && !this.draftReview && task === null && !this.recoveryError && this.refusedHandoff === null && companions.length === 0 && this.aiSnapshot?.chatUnloadedReason == null) return nothing;
+    const eligible = task !== null && this.humanOwned(task) && task.saved.delivery === 'unaccepted' && task.refusal !== null;
+    return html`<div class="notice recovery-notice" role="status" data-testid="sv3-residency-notice">
+      ${this.recoveryError ? html`<p role="alert">${this.recoveryError}</p>` : nothing}
+      ${this.refusedHandoff === null ? nothing : html`<section data-testid="sv3-refused-handoff" aria-label="Incoming task not prepared">
+        <p>Incoming task not prepared (${this.refusedHandoff.files} files). Nothing sent.</p>
+        <pre>${this.refusedHandoff.text}</pre>
+      </section>`}
+      ${this.departureBlocked ? html`<p role="alert" data-testid="sv3-departure-notice">The address has moved, but this view did not leave safely. Text and settings are kept here. Use Forward or select this conversation to return before sending; no new task will be issued from this mismatched view.</p>` : nothing}
+      ${this.draftPersistence.restoreUnavailable ? html`<p role="alert">A raw draft could not be read or safely retired. Saved text may remain; raw draft saving is unavailable in this view. Keep or copy current text and settings before closing.</p>` : nothing}
+      ${this.draftReview ? html`<section data-testid="sv3-draft-review" aria-label="Review restored draft">
+        <p><strong>Review restored draft</strong></p>
+        <p>Your text is editable. Its previous mode and inputs are not permission to search or send.</p>
+        <p>${this.preparationSummary(this.draftProposal)}</p>
+        ${this.draftProposal !== null ? html`<p>Use reviewed settings applies this proposal to the text currently in the composer. Requested files are checked by the backend; missing inputs are never replaced with all files.</p>` : nothing}
+        <button type="button" data-testid="sv3-draft-review-confirm" ?disabled=${!this.preparationUsable(this.draftProposal)}
+          @click=${() => this.reviewDraft(false)}>Use reviewed settings</button>
+        <p>${this.preparationSummary({ kind: 'search' })}</p>
+        <button type="button" data-testid="sv3-draft-review-search" @click=${() => this.reviewDraft(true)}>Use Search with current filters</button>
+        <p>Choose a valid mode, schema and inputs before confirming. Confirmation does not search or send. Extra task details last only for this tab session; your current text uses normal draft saving when storage is available.</p>
+      </section>` : nothing}
+      ${task === null ? nothing : html`<p>${task.saved.delivery === 'unknown'
+        ? 'Delivery unknown—check the saved conversation before making a new submission.'
+        : task.saved.delivery === 'unaccepted' ? 'Question not sent.' : 'Review the retained question before a new submission.'}</p>
+        <pre>${task.saved.raw || (task.saved.record ? 'Saved question: ' + task.saved.record : '')}</pre>
+        <p>${task.refusal?.message ?? ''} ${task.refusal ? retryWording(task.refusal) : ''}</p>
+        ${task.saved.needsReselection || task.restored ? html`<p>Review the original mode, schema and files. Reselect any passage before sending. Restored copies never send automatically.</p>` : nothing}
+        ${eligible ? html`<button type="button" data-testid="sv3-residency-retry" ?disabled=${this.humanLoad !== null || this.streaming || Date.now() < task.retryAt}
+          @click=${() => { void this.continueHumanTask(false); }}>Retry</button>
+          ${task.refusal?.forceAllowed === true ? html`<button type="button" data-testid="sv3-residency-force" ?disabled=${this.humanLoad !== null || this.streaming}
+            @click=${() => { void this.continueHumanTask(true); }}>Load anyway</button>` : nothing}` : nothing}
+        ${this.humanLoad !== null ? html`<button type="button" data-testid="sv3-residency-stop" @click=${() => { this.revokeHumanTask(); this.saveRecovery(); }}>Stop waiting</button>` : nothing}
+        <button type="button" data-testid="sv3-residency-discard" ?disabled=${this.streaming}
+          @click=${this.discardHumanTask}>Discard retained task; allow a new submission</button>`}
+      ${companions.map(draft => html`<p>Recovered draft (${draft.place ?? 'new conversation'}):</p><pre>${draft.text}</pre>
+        <p>${this.preparationSummary(draft.preparation ?? null)}</p>
+        <button type="button" data-testid="sv3-recovery-review-copy" @click=${() => this.reviewRecoveryDraft(draft)}>Review this draft</button>
+        <button type="button" data-testid="sv3-recovery-discard-copy" @click=${() => this.discardRecoveryDraft(draft)}>Discard this extra recovery copy</button>`)}
+      ${task !== null || companions.length > 0 ? html`<p>Extra recovery copies last only for this tab session. They are not permanent history and may be lost when the tab or app closes. Your current draft uses normal draft saving when storage is available.</p>` : nothing}
+      ${task === null && this.aiSnapshot?.chatUnloadedReason ? html`<p>${reasonFor(this.aiSnapshot.chatUnloadedReason).wording}</p>` : nothing}
+    </div>`;
+  }
+
   private refusedQuestions = new Map<string, string>();
   private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private contextRetryDelay = 1000;
@@ -1030,7 +1646,11 @@ export class SearchV3View extends JfElement {
    * WP1.1 S1.13 — each place's own unsent draft: a conversation's follow-up, or the result list's
    * query. Window-local, like the result list itself; the one persisted draft is still the composer's.
    */
-  private readonly placeDrafts = new Map<string, string>();
+  private readonly placeDrafts = new Map<string, { text: string; preparation: Sv3Preparation | null; review: boolean }>();
+
+  private rememberPlace(place: string, text: string): void {
+    this.placeDrafts.set(place, { text, preparation: this.currentPreparation(), review: this.draftReview || this.retiredHandoffText !== null });
+  }
   /**
    * WP1.1 — the mode is Ask only because a conversation was opened from Search, not because the
    * reader chose it. A New session undoes exactly that switch and keeps a mode the reader chose.
@@ -1050,6 +1670,7 @@ export class SearchV3View extends JfElement {
     // pre-paint script exists to avoid.
     this.theme = getAppearanceMode();
     this.apiBase = '';
+    this.initialNavigationPending = false;
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
     this.streaming = false;
@@ -1060,6 +1681,7 @@ export class SearchV3View extends JfElement {
     this.sidebarNarrow = false;
     this.resizing = false;
     this.paneDocPath = null;
+    this.paneHighlight = null;
     this.paneCitation = null;
     this.paneSource = null;
     this.paneCitationHeader = null;
@@ -1076,13 +1698,13 @@ export class SearchV3View extends JfElement {
     // Constructed HERE rather than on connect: a Lit controller added before connection still gets
     // its `hostConnected`, and adding it inside `connectedCallback` would add a second one on every
     // re-attach of this retained instance.
-    new DraftPersistence(
+    this.draftPersistence = new DraftPersistence(
       this,
       SV3_DRAFT_KEY,
       () => this.currentDraft(),
       (value) => {
-        this.draftSeed = value;
-        this.draftSeedPending = true;
+        if (value !== '') this.markDraftReview();
+        this.writeDraft(value);
         this.requestUpdate();
       },
     );
@@ -1095,6 +1717,8 @@ export class SearchV3View extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.mountDraftPending = !this.recoveryOpened;
+    this.mountHasIncoming = false;
     adoptSv3MorphSheet();
     this.restoreBoundaryPreferences();
     this.observeWindowBox();
@@ -1139,11 +1763,29 @@ export class SearchV3View extends JfElement {
       // the active-conversation pointer is app-wide and another window claiming it is that
       // window's business, which is exactly what `SearchV3View.record.test.ts`'s companion-load
       // case asserts. Following only restores keeps that line where it was.
-      if (change === 'restore') this.followStoreConversation(state.activeId);
+      if (change === 'restore') {
+        if (state.activeId !== null) this.mountHasIncoming = true;
+        this.followStoreConversation(state.activeId);
+      }
     });
     void loadConversations();
     window.addEventListener('sv3-handoff', this.receiveHandoff);
-    if (!this.receiveHandoff()) this.restoreLastViewed();
+    if (!this.receiveHandoff()) {
+      if (this.shapeId) this.prepareCompatibilityShape();
+    }
+    this.settleMountDraft();
+    document.addEventListener('visibilitychange', this.hideHumanTask);
+    window.addEventListener('pagehide', this.leaveHumanTask);
+    this.inspectorUnsubscribe = subscribeInspector(state => {
+      if (state.isOpen && state.selected?.path) {
+        this.openPane({ docPath: state.selected.path, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT, anchor: null });
+        this.paneSource = null;
+        this.paneCitationHeader = null;
+        this.sharedInspectorPath = state.selected.path;
+        this.paneHighlight = typeof state.selected.highlightStartLine === 'number' && typeof state.selected.highlightEndLine === 'number'
+          ? { startLine: state.selected.highlightStartLine, endLine: state.selected.highlightEndLine } : null;
+      } else if (this.sharedInspectorPath !== null) this.clearPane();
+    });
     // Cold-load reattach, started here and NOT awaited: discovery is a network round-trip now
     // (tempdoc 834 §15.3) and mount must not block on it. The ordering it used to buy — the run
     // already on the controller before the first presence look — is instead carried by the
@@ -1218,6 +1860,11 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.retireRefusedHandoff();
+    this.revokeHumanTask(true);
+    this.saveRecovery();
+    document.removeEventListener('visibilitychange', this.hideHumanTask);
+    window.removeEventListener('pagehide', this.leaveHumanTask);
     // BEFORE `super`, which is what tears the shadow tree's controllers down: the reassurance has to
     // read the draft while the composer still holds it (tempdoc 609 §R T1.4 — instance retention
     // keeps the draft, and this is what makes that invisible guarantee legible, once per session).
@@ -1227,6 +1874,8 @@ export class SearchV3View extends JfElement {
     if (this.streaming) this.settleAiActivity();
     super.disconnectedCallback();
     releaseSv3MorphSheet();
+    this.inspectorUnsubscribe?.();
+    this.inspectorUnsubscribe = null;
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
     this.clearForkReads();
@@ -1300,9 +1949,15 @@ export class SearchV3View extends JfElement {
     queueMicrotask(() => {
       this.movedRatherThanEntered = false;
       if (!this.isConnected && this.preparedHandoff !== null) {
+        if (this.currentDraft() !== '' && (this.search.pendingScope !== null || this.handoffBlocked
+          || this.preparedHandoff.shapeId !== null && this.preparedHandoff.shapeId !== SV3_ASK_SHAPE_ID)) {
+          this.retiredHandoffText = this.currentDraft();
+          this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+        }
         this.preparedHandoff = null;
         this.handoffNotice = ''; this.handoffBlocked = false;
         this.search.clearScope();
+        this.requestUpdate();
       }
     });
   }
@@ -1427,6 +2082,7 @@ export class SearchV3View extends JfElement {
   }
 
   protected override updated(changed: Map<string, unknown>): void {
+    this.settleMountDraft();
     if (changed.has('apiBase')) {
       setSearchApiBase(this.apiBase || '');
       setConversationApiBase(this.apiBase || '');
@@ -1453,6 +2109,20 @@ export class SearchV3View extends JfElement {
   }
 
   /* ── The conversation record (tempdoc 822 Phase F6) ───────────────────────────────────────── */
+
+  private settleMountDraft(): void {
+    if (!this.isConnected || !this.mountDraftPending || this.initialNavigationPending) return;
+    this.mountDraftPending = false;
+    if (!this.shapeId && !this.mountHasIncoming) {
+      this.draftPersistence.adoptLegacy('unified-chat.composer');
+      this.restoreLastViewed();
+    }
+    this.openRecovery();
+    if (this.draftPersistence.restoreUnavailable) {
+      this.markDraftReview();
+      this.recoveryError = 'A saved draft could not be read. Keep or copy your current text and review its settings; unreadable storage is not an empty draft.';
+    }
+  }
 
   /**
    * A3 (tempdoc 609 Phase 3) — restore the conversation THIS TAB was reading. The pointer is per-tab
@@ -1501,11 +2171,27 @@ export class SearchV3View extends JfElement {
    * being shown a different conversation either way.
    */
   private followStoreConversation(storeActiveId: string | null): void {
-    if (storeActiveId === this.sessions.activeId) return;
+    if (storeActiveId === this.sessions.activeId) {
+      if (peekSearchV3Handoff()?.origin !== 'fresh') this.retireRefusedHandoff();
+      this.departureBlocked = false; return;
+    }
+    if (storeActiveId === null && this.draftReview && this.currentDraft().trim()) {
+      const leaving = this.humanPlace();
+      if (!this.persistDraft({ place: null, text: this.recoveryText(this.currentDraft()), preparation: this.currentPreparation() }, true)) { this.blockDeparture(); return; }
+      if (leaving !== null) this.rememberPlace(leaving, this.currentDraft());
+      this.revokeHumanTask(true);
+      this.search.hide();
+      this.sessions = startNewSession(this.sessions);
+      this.departureBlocked = false;
+      clearLastViewedConversation();
+      this.requestUpdate();
+      return;
+    }
     if (storeActiveId === null && this.search.hasPlace) {
       // WP1.1 S1.13 — the bare address is the result list when this window has one: Back/Forward
       // between results and a conversation returns to the list, its query and its chosen files.
-      this.returnToResults();
+      if (!this.returnToResults()) { this.blockDeparture(); return; }
+      this.departureBlocked = false;
       clearLastViewedConversation();
       return;
     }
@@ -1514,8 +2200,8 @@ export class SearchV3View extends JfElement {
       // New session does — minus the focus move, which belongs to the affordance, and minus the
       // CLAIM, which would push a history entry for a move the browser already made and truncate
       // the forward tail with it. See {@link resetToHero}.
-      this.resetToHero();
-      this.composer?.clearDraft();
+      if (!this.resetToHero(true, true)) { this.blockDeparture(); return; }
+      this.departureBlocked = false;
       // The pointer still follows: the tab is on the hero now, so a reload must not resurrect the
       // conversation the reader just left. This one is a browser-local write with no emission, so
       // it cannot reach the projector.
@@ -1525,7 +2211,8 @@ export class SearchV3View extends JfElement {
     // An edit in another row is DROPPED rather than committed, the same rule every other move
     // between conversations applies.
     this.renamingId = null;
-    this.swapPlace(storeActiveId);
+    if (!this.swapPlace(storeActiveId)) { this.blockDeparture(); return; }
+    this.departureBlocked = false;
     const now = Date.now();
     if (sessionById(this.sessions, storeActiveId) === null) {
       this.sessions = mergeStoreConversations(this.sessions, [
@@ -1541,6 +2228,22 @@ export class SearchV3View extends JfElement {
     void this.setComposerState('docked');
     void this.refreshRecord(storeActiveId);
     void this.refreshHistory(storeActiveId);
+  }
+
+  private revealRecoveryOutcome(): void {
+    const warning = this.recoveryError, departure = this.departureBlocked;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      if (!this.isConnected || this.recoveryError !== warning || this.departureBlocked !== departure) return;
+      const row = this.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-residency-notice"]');
+      if (row) row.scrollTop = 0;
+    });
+  }
+
+  private blockDeparture(): void {
+    this.departureBlocked = true;
+    this.revokeHumanTask(true);
+    this.revealRecoveryOutcome();
   }
 
   /**
@@ -1762,7 +2465,7 @@ export class SearchV3View extends JfElement {
       : shapeId === 'core.extract' ? this.structuredNote(detail.turnId)
       : shapeId === 'core.summarize'
         ? this.summaryInputs.has(detail.turnId) ? 'Summarize with the original inputs.' : 'Opens Summarize; choose the original inputs before sending.'
-        : sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId));
+        : sv3ResendScopeNote(this.search.scopesByTurn.get(detail.turnId));
     const chosen = await openContextMenu({
       // The branch acts lead: they fork the conversation, and the context acts change what the next
       // prompt carries within it. The reference window orders them the same way.
@@ -1770,7 +2473,7 @@ export class SearchV3View extends JfElement {
         ...branch.map((item) => ({
           id: item.id,
           // WP1.1 S1.7 — a Retry says what it will search before it is pressed: the same chosen
-          // files when this window limited the turn, otherwise all files (a reloaded turn included).
+          // files when this window limited the turn, known unrestricted files, or a truthful unknown-input remedy after reload.
           label:
             item.id === 'retry'
               ? `${item.label} · ${retryNote}`
@@ -1811,6 +2514,7 @@ export class SearchV3View extends JfElement {
       this.openContextInspector();
       return Promise.resolve();
     }
+    this.revokeHumanTask();
     const turn = detail.turnId === undefined ? null : sv3TurnContextFor(this.turnContexts(), detail.turnId);
     const previous = this.contextWrites.get(session.id) ?? Promise.resolve();
     const pending = previous.then(() => this.writeContext(session.id, detail, turn)).finally(() => {
@@ -2071,11 +2775,48 @@ export class SearchV3View extends JfElement {
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
     const tier: Sv3ComposerTier | 'model' = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
+    const summary = turn?.shapeId === 'core.summarize';
+    const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
+    if (detail.action !== 'branch' && tier === 'ask' && !summary && !this.search.hasTurnScope(detail.turnId)) {
+      this.recoveryError = 'The original Ask inputs are not known after reload. Prepare a new Ask and choose or review its files before sending.';
+      this.requestUpdate();
+      emitEphemeralToast({ message: this.recoveryError, severity: 'warning' });
+      return;
+    }
+    if (detail.action !== 'branch' && (summary && !this.summaryInputs.has(detail.turnId)
+      || tier === 'structured' && !this.structuredInputs.has(detail.turnId))) {
+      this.recoveryError = summary && turn && sv3ExplainsRankingTrace(turn)
+        ? 'Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.'
+        : 'The original schema or summary input is not available. Prepare a new task and review its inputs before sending.';
+      this.requestUpdate();
+      emitEphemeralToast({ message: this.recoveryError, severity: 'warning' });
+      return;
+    }
+    if (!this.mayForkDraft()) return;
+    let humanTask: HumanTask | undefined;
+    if (detail.action !== 'branch' && tier !== 'delegate') {
+      const shape: RecoveryShape = summary ? 'core.summarize' : tier === 'structured' ? 'core.extract' : tier === 'model' ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID;
+      const reason = this.humanUnavailable(shape);
+      if (reason) { emitEphemeralToast({ message: reason, severity: 'warning' }); return; }
+      if (lineage.forkKey === null || text === '' || (detail.action === 'edit' && !lineage.canEdit)) return;
+      const inputs = summary ? this.summaryInputs.get(detail.turnId) : this.structuredInputs.get(detail.turnId);
+      // Missing schema/passage already has an explicit review path below, with no dispatch.
+      if ((!summary && tier !== 'structured') || inputs !== undefined) {
+        const task = this.reserveHumanTask(text,
+          summary ? this.summaryInputs.get(detail.turnId)?.scope ?? null
+            : tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.scope ?? null : this.search.scopeOfTurn(detail.turnId),
+          tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.schema : undefined,
+          shape, summary ? this.summaryInputs.get(detail.turnId)?.selection ?? null : null,
+          false, lineage.forkKey, detail.action === 'edit' ? detail.text : undefined);
+        if (task === null) return;
+        humanTask = task;
+      }
+    }
     if (turn?.shapeId === 'core.summarize' && detail.action !== 'branch') {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn.question;
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
       const inputs = this.summaryInputs.get(turn.id);
-      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask')) return;
+      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask', null, humanTask)) return;
       this.tier = 'ask';
       this.preparedHandoff = { shapeId: 'core.summarize', selection: inputs?.selection ?? null };
       if (inputs === undefined) {
@@ -2086,7 +2827,7 @@ export class SearchV3View extends JfElement {
         this.writeDraft(text);
         this.requestUpdate();
       } else {
-        await this.runAsk(text, inputs.scope);
+        await this.runAsk(text, inputs.scope, undefined, false, { task: humanTask, turnAction: true });
       }
       return;
     }
@@ -2094,14 +2835,14 @@ export class SearchV3View extends JfElement {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
       const inputs = this.structuredInputs.get(detail.turnId);
-      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier)) return;
+      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier, null, humanTask)) return;
       this.tier = 'structured';
       this.tierFollowsPlace = false;
       if (inputs === undefined) {
         this.writeDraft(text);
         this.requestUpdate();
       } else {
-        await this.runAsk(text, inputs.scope, inputs.schema);
+        await this.runAsk(text, inputs.scope, inputs.schema, false, { task: humanTask, turnAction: true });
       }
       return;
     }
@@ -2125,6 +2866,7 @@ export class SearchV3View extends JfElement {
           question,
           tier,
           this.search.scopeOfTurn(detail.turnId),
+          humanTask,
         );
         return;
       }
@@ -2138,6 +2880,7 @@ export class SearchV3View extends JfElement {
           text,
           tier,
           this.search.scopeOfTurn(detail.turnId),
+          humanTask,
         );
         return;
       }
@@ -2153,8 +2896,8 @@ export class SearchV3View extends JfElement {
    * and no other run in flight on the one shared controller.
    */
   private canRerun(tier: Sv3ComposerTier | 'model'): boolean {
-    if (tier !== 'delegate' && tier !== 'model') return true;
-    const unavailable = tier === 'model' ? this.modelAnswerUnavailableReason : this.delegateUnavailableReason;
+    const unavailable = tier === 'delegate' ? this.delegateUnavailableReason
+      : this.humanUnavailable(tier === 'model' ? SV3_MODEL_SHAPE_ID : tier === 'structured' ? 'core.extract' : SV3_ASK_SHAPE_ID);
     if (unavailable !== '') {
       emitEphemeralToast({ message: unavailable, severity: 'warning' });
       return false;
@@ -2184,7 +2927,9 @@ export class SearchV3View extends JfElement {
     resend: string | null,
     tier: Sv3ComposerTier | 'model',
     scope: Sv3AskScope | null = null,
+    task?: HumanTask,
   ): Promise<boolean> {
+    if (!this.mayForkDraft()) return false;
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
     // (`:1485`): it is what makes the new session surface as a recent one with a name.
     const preview = this.activeSession?.turns.find((t) => t.question !== '')?.question ?? '';
@@ -2193,7 +2938,8 @@ export class SearchV3View extends JfElement {
       emitEphemeralToast({ message: BRANCH_FAILED, severity: 'warning' });
       return false;
     }
-    await this.openBranch(branched);
+    if (task !== undefined && !this.humanOwned(task)) return false;
+    if (!await this.openBranch(branched, task)) return false;
     if (resend === null) return true;
     // The same ORDER for both tiers: the branch is claimed first, so the re-run lands in it.
     // An ask re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this
@@ -2207,13 +2953,10 @@ export class SearchV3View extends JfElement {
         this.writeDraft(resend);
         return true;
       }
-      this.delegate(resend);
+      this.delegate(resend, true);
     } else {
-      if (tier === 'model' && !this.canRerun(tier)) {
-        this.writeDraft(resend);
-        return true;
-      }
-      await this.runAsk(resend, scope, undefined, tier === 'model');
+      if (!this.canRerun(tier)) return true;
+      await this.runAsk(resend, scope, undefined, tier === 'model', { task, turnAction: true });
     }
     return true;
   }
@@ -2226,14 +2969,19 @@ export class SearchV3View extends JfElement {
    * Re-listing updates recents and invalidates complete fork reads, including older versions
    * outside the sidebar window. The fork reads finish independently of opening or sending.
    */
-  private async openBranch(id: string): Promise<void> {
+  private async openBranch(id: string, task?: HumanTask): Promise<boolean> {
     const prevId = this.sessions.activeId;
-    this.swapPlace(id);
+    if (!this.swapPlace(id, task)) return false;
     const now = Date.now();
     this.sessions = mergeStoreConversations(this.sessions, [
       { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
     ]);
     this.sessions = focusSession(this.sessions, id, now);
+    if (task !== undefined) {
+      task.saved.target = id;
+      task.version = this.composer?.draftVersion;
+      this.saveRecovery(task);
+    }
     this.claimConversation(id);
     this.recordNotice = false;
     // The same rule `onSessionSelect` applies: an edit in another row is DROPPED rather than
@@ -2246,6 +2994,7 @@ export class SearchV3View extends JfElement {
     if (prevId !== id) this.closePane();
     void this.setComposerState('docked');
     await Promise.all([this.refreshRecord(id), this.refreshHistory(id), loadConversations()]);
+    return true;
   }
 
   /**
@@ -2666,11 +3415,13 @@ export class SearchV3View extends JfElement {
   }
 
   private openPane(detail: Sv3CitationOpen): void {
+    this.sharedInspectorPath = null;
     const available = this.availableWidth();
     this.paneOverlay = !sv3PaneIsInline(available);
     this.paneWidthPx = clampSv3PaneWidth(this.paneWidthPx, available, this.sidebarOccupiedWidth());
     this.applyPaneWidth(this.paneWidthPx);
     this.paneDocPath = detail.docPath;
+    this.paneHighlight = null;
     this.paneCitation = detail.anchor ?? null;
     this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex };
     this.paneCitationHeader = this.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
@@ -2726,11 +3477,20 @@ export class SearchV3View extends JfElement {
     if (!sameCitationHeader(this.paneCitationHeader, next)) this.paneCitationHeader = next;
   }
 
-  /**
-   * The pane's exits — its own close control (`pane-close`, re-raised by the region) and Escape. The
-   * chosen width is NOT forgotten here: closing a document is not withdrawing a boundary preference.
-   */
+  /** A place change retires its own citation, while a shared inspector belongs to its caller. */
   private closePane(): void {
+    if (this.sharedInspectorPath === null) this.clearPane();
+  }
+
+  /** Explicit dismissal closes both the visible reader and the shared inspector projection. */
+  private dismissPane(): void {
+    this.clearPane();
+    setInspectorOpen(false);
+  }
+
+  private clearPane(): void {
+    this.sharedInspectorPath = null;
+    this.paneHighlight = null;
     this.paneDocPath = null;
     this.paneCitation = null;
     this.paneSource = null;
@@ -2758,7 +3518,7 @@ export class SearchV3View extends JfElement {
     if (event.key === 'Escape' && this.paneDocPath !== null) {
       event.preventDefault();
       event.stopPropagation();
-      this.closePane();
+      this.dismissPane();
       return;
     }
     if (event.key === 'Escape' && !event.isComposing && this.sidebarNarrow && !this.sidebarCollapsed) {
@@ -2900,6 +3660,7 @@ export class SearchV3View extends JfElement {
     const detail = (event as CustomEvent<Sv3ComposerSubmit>).detail;
     const text = (detail?.query ?? '').trim();
     if (text === '') return;
+    if (!this.draftMayIssue(false)) return;
     // WP1.1 — a SEARCH is decided before the run is consulted at all: it is not a send into any
     // conversation, so it can never steer, answer or stop a run (S1.8).
     if (detail?.tier === 'search') {
@@ -2923,7 +3684,7 @@ export class SearchV3View extends JfElement {
       return;
     }
     // A hand-off and a results Ask share the same fixed, one-send file scope.
-    void this.runAsk(text, this.search.showing || this.preparedHandoff !== null || this.placeScopes.has(this.sessions.activeId ?? '') ? this.search.takeScope() : null);
+    void this.runAsk(text, this.search.showing || this.preparedHandoff !== null || this.placeScopes.has(this.sessions.activeId ?? '') ? this.search.pendingScope : null);
   }
 
   /** Whether a response or a delegated run is live — the slot's `running`, read in one place. */
@@ -2952,9 +3713,16 @@ export class SearchV3View extends JfElement {
   /** A settled keystroke. In Search mode it is a search, staged exactly as the default window's. */
   private onComposerDraft(event: Event): void {
     const detail = (event as CustomEvent<Sv3ComposerDraft>).detail;
-    if (this.tier !== 'search' || detail === undefined) return;
+    if (detail === undefined) return;
+    if (this.retiredHandoffText !== null && detail.text !== this.retiredHandoffText) {
+      this.clearRetiredHandoff();
+      this.saveRecovery();
+    }
+    if (this.draftReview) { this.saveRecovery(); return; }
+    if (this.humanTask !== null && this.tier !== 'search') this.saveRecovery();
+    if (this.tier !== 'search' || !this.draftMayIssue()) return;
+    if (detail.text.trim() !== '' && !this.enterResults(detail.previous, detail.text)) return;
     this.search.type(detail.text);
-    if (detail.text.trim() !== '') this.enterResults(detail.previous);
   }
 
   /**
@@ -2967,18 +3735,21 @@ export class SearchV3View extends JfElement {
    * shared query (`returnToResults`).
    */
   private followSharedQuery(previous: string): void {
+    if (this.draftReview) return;
     if (this.tier !== 'search' || this.sessions.activeId !== null) return;
     if (this.currentDraft().trim() !== previous.trim()) {
       this.search.hide();
       return;
     }
     const query = this.search.query;
+    if (query.trim() !== '') { if (!this.enterResults('', query)) return; }
+    else if (!this.persistDraft({ place: this.humanPlace(), text: query, preparation: { kind: 'search' } })) return;
     this.writeDraft(query);
-    if (query.trim() !== '') this.enterResults('');
   }
 
   /** Put text in the composer — or, before its first render, where the composer will take it from. */
   private writeDraft(text: string): void {
+    if (this.retiredHandoffText !== null && text !== this.retiredHandoffText) this.clearRetiredHandoff();
     const composer = this.composer;
     if (composer !== null) {
       composer.draft = text;
@@ -2990,8 +3761,9 @@ export class SearchV3View extends JfElement {
 
   /** Enter in Search mode, or the palette's search: the full pass, now. */
   private searchNow(text: string): void {
+    if (!this.draftMayIssue()) return;
+    if (!this.enterResults(this.currentDraft(), text)) return;
     this.search.submit(text);
-    this.enterResults(this.currentDraft());
   }
 
   /**
@@ -3000,11 +3772,14 @@ export class SearchV3View extends JfElement {
    * sidebar one click away, and keeps its unsent draft (`leftDraft`, the text before this keystroke)
    * for when the reader goes back. The address moves to the bare surface, so Back returns to it.
    */
-  private enterResults(leftDraft: string): void {
+  private enterResults(leftDraft: string, query = this.search.query): boolean {
     if (!this.search.showing) {
+      this.revokeHumanTask(true);
       const leaving = this.sessions.activeId;
+      if (!this.persistDraft({ place: RESULTS_PLACE, text: query, preparation: { kind: 'search' } },
+        leaving !== null, { place: leaving, text: leftDraft, preparation: this.currentPreparation() })) return false;
       if (leaving !== null) {
-        this.placeDrafts.set(leaving, leftDraft);
+        this.rememberPlace(leaving, leftDraft);
         this.sessions = startNewSession(this.sessions);
         setActiveConversation(null);
         clearLastViewedConversation();
@@ -3015,30 +3790,35 @@ export class SearchV3View extends JfElement {
       this.closePane();
       this.search.show();
     }
+    if (this.retireRefusedHandoff()) {
+      flushPendingNavigationWrite();
+      refreshProjection();
+    }
     void this.setComposerState('docked');
+    return true;
   }
 
   /** Back/Forward onto the bare address while this window has a result list. */
-  private returnToResults(): void {
+  private returnToResults(): boolean {
+    this.revokeHumanTask(true);
+    const saved = this.placeDrafts.get(RESULTS_PLACE);
+    const preparation = saved?.preparation ?? (this.search.pendingScope !== null
+      ? this.livePreparation('ask') : this.livePreparation(this.resultsTier));
+    const text = preparation.kind === 'search' ? this.search.query : saved?.text ?? this.search.query;
+    const retired = saved?.review === false && saved.preparation?.kind === 'search'
+      ? { place: RESULTS_PLACE, text: saved.text, preparation: saved.preparation } : undefined;
+    if (!this.persistDraft({ place: RESULTS_PLACE, text, preparation }, true, undefined, retired)) return false;
+    this.retireRefusedHandoff();
     const leaving = this.sessions.activeId;
-    if (leaving !== null) this.placeDrafts.set(leaving, this.currentDraft());
-    this.renamingId = null;
-    this.recordNotice = false;
-    this.closePane();
+    if (leaving !== null) this.rememberPlace(leaving, this.currentDraft());
+    this.renamingId = null; this.recordNotice = false; this.closePane();
     this.sessions = startNewSession(this.sessions);
     this.search.show();
-    this.tier = this.search.pendingScope !== null ? 'ask' : this.resultsTier;
-    this.tierFollowsPlace = false;
-    // In Search mode the composer holds the query the list is for — the SHARED one, which the default
-    // window may have moved since (S1.10). An Ask or Delegate draft left here comes back as it was.
-    const composer = this.composer;
-    if (composer !== null) {
-      composer.draft =
-        this.tier === 'search'
-          ? this.search.query
-          : (this.placeDrafts.get(RESULTS_PLACE) ?? this.search.query);
-    }
+    if (saved?.review) { this.markDraftReview(preparation); this.reviewConfigured = true; }
+    else { this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false; this.applyPreparation(preparation); }
+    this.writeDraft(text);
     void this.setComposerState('docked');
+    return true;
   }
 
   /**
@@ -3047,24 +3827,44 @@ export class SearchV3View extends JfElement {
    * no longer on screen, and Enter continues the conversation rather than searching away from it.
    * Leaving the hero is not leaving a place: its draft travels, as it always has.
    */
-  private swapPlace(to: string): void {
+  private swapPlace(to: string, task?: HumanTask): boolean {
+    if (!this.recoveryOpened) this.openRecovery();
+    const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
+    if (from === to) return true;
+    if (task !== this.humanTask) this.revokeHumanTask(true);
+    const saved = this.placeDrafts.get(to);
+    const carry = from === null && saved === undefined && this.preparedHandoff === null;
+    const restoringRaw = this.mountDraftPending && this.currentDraft() !== '';
+    const text = restoringRaw || carry ? this.currentDraft() : saved?.text ?? '';
+    const carried = carry ? this.currentPreparation() : null;
+    const preparation = restoringRaw ? null : carried?.kind === 'search' ? { kind: 'ask' as const, scope: { kind: 'all' as const } }
+      : carry ? carried : saved?.preparation ?? null;
+    const review = restoringRaw || (carry ? this.draftReview : saved?.review ?? false);
+    if (!this.mountDraftPending && !this.persistDraft({ place: to, text: this.recoveryText(text), preparation }, !carry)) return false;
+    this.retireRefusedHandoff();
     const leavingHandoff = this.preparedHandoff !== null;
+    if (from !== null) this.rememberPlace(from, this.currentDraft());
+    if (!carry) this.clearRetiredHandoff();
+    if (from === RESULTS_PLACE) this.resultsTier = this.tier;
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
-    const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
-    if (from === to) return;
-    if (from !== null) this.placeDrafts.set(from, this.currentDraft());
-    if (from === RESULTS_PLACE) this.resultsTier = this.tier;
-    this.search.hide();
-    this.askInConversation();
-    const composer = this.composer;
-    if ((from !== null || this.placeDrafts.has(to)) && composer !== null) composer.draft = this.placeDrafts.get(to) ?? '';
-    if (leavingHandoff || this.placeScopes.has(to)) {
-      this.search.clearScope();
-      this.search.prepare(this.placeScopes.get(to) ?? null);
+    this.search.hide(); this.askInConversation();
+    if (review) {
+      this.markDraftReview(preparation);
+      this.reviewConfigured = preparation !== null;
+    } else {
+      this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+      if (preparation !== null) this.applyPreparation(preparation);
+      this.askInConversation();
+    }
+    this.assigningHumanDraft = task !== undefined;
+    try { this.writeDraft(text); } finally { this.assigningHumanDraft = false; }
+    if (preparation === null && (leavingHandoff || this.placeScopes.has(to))) {
+      this.search.clearScope(); this.search.prepare(this.placeScopes.get(to) ?? null);
     }
     const savedTier = this.placeTiers.get(to);
-    if (savedTier !== undefined) this.tier = savedTier;
+    if (savedTier !== undefined && preparation === null) this.tier = savedTier;
+    return true;
   }
 
   /** Opening a conversation from Search mode: Enter now continues it. */
@@ -3077,7 +3877,7 @@ export class SearchV3View extends JfElement {
   /** A send opened a conversation from the result list: the list keeps its query for Back. */
   private leaveResultsBySending(): void {
     if (!this.search.showing) return;
-    this.placeDrafts.set(RESULTS_PLACE, this.search.query);
+    this.placeDrafts.set(RESULTS_PLACE, { text: this.search.query, preparation: { kind: 'search' }, review: false });
     this.resultsTier = 'search';
     this.search.hide();
   }
@@ -3085,6 +3885,9 @@ export class SearchV3View extends JfElement {
   private onResultsFilterRemove(event: Event): void {
     const filter = (event as CustomEvent<Sv3ResultsFilterRemove>).detail;
     if (filter === undefined) return;
+    // A result place is an existing search owner, not an inference from B's text.
+    // Its C query may still be operated on while B waits for review; no B is staged.
+    if (this.draftReview ? !this.search.hasPlace : !this.draftMayIssue()) return;
     if (filter.kind === 'scope') removeScopeChip(filter.index);
     else if (filter.kind === 'date') clearFilters();
     else toggleFacetValue(filter.field, filter.value);
@@ -3095,6 +3898,7 @@ export class SearchV3View extends JfElement {
   private onCardFacetToggle(event: Event): void {
     const detail = (event as CustomEvent<{ field: string; value: string }>).detail;
     if (detail === undefined) return;
+    if (this.draftReview ? !this.search.hasPlace : !this.draftMayIssue()) return;
     toggleFacetValue(detail.field, detail.value);
     this.search.rerun();
   }
@@ -3102,6 +3906,7 @@ export class SearchV3View extends JfElement {
   private onCardSelection(event: Event): void {
     const detail = (event as CustomEvent<CardSelectionDetail>).detail;
     if (detail === undefined) return;
+    this.revokeHumanTask();
     this.search.select(detail.ids);
     if (this.tier === 'structured' && this.search.showing && this.search.prepareFromSelection() === null) {
       this.search.clearScope();
@@ -3131,11 +3936,7 @@ export class SearchV3View extends JfElement {
   }
 
   private onResultsAsk(): void {
-    if (this.askUnavailableReason !== '') {
-      this.refuseAsk();
-      return;
-    }
-    this.prepareAsk(this.search.prepareFromSelection());
+    this.prepareAsk(this.search.scopeFromSelection());
   }
 
   /**
@@ -3144,17 +3945,23 @@ export class SearchV3View extends JfElement {
    * existing reason when chat cannot run, keeping the query and the choice (S1.4).
    */
   private prepareAsk(scope: Sv3AskScope | null): void {
-    if (this.askUnavailableReason !== '') {
-      this.refuseAsk();
+    const unavailable = this.humanUnavailable(SV3_ASK_SHAPE_ID);
+    if (unavailable !== '') {
+      emitEphemeralToast({ message: unavailable, severity: 'warning' });
       return;
     }
     if (scope === null) {
       emitEphemeralToast({ message: SV3_RESULT_NO_DOCUMENT, severity: 'warning' });
       return;
     }
+    this.revokeHumanTask();
+    if (!this.acknowledgePreparation({ kind: 'ask', scope: { kind: 'files', paths: [...scope.paths] } })) return;
+    if (this.preparedHandoff !== null || this.retiredHandoffText !== null) this.preparedHandoff = { shapeId: SV3_ASK_SHAPE_ID, selection: null };
+    this.handoffNotice = ''; this.handoffBlocked = false;
     this.search.prepare(scope);
     this.tier = 'ask';
     this.tierFollowsPlace = false;
+    this.configureDraft();
     void this.focusComposer();
   }
 
@@ -3163,7 +3970,7 @@ export class SearchV3View extends JfElement {
     const id = this.sessions.activeId;
     if (id !== null && this.contextWrites.has(id)) return this.contextNotice(id);
     if (this.historyLocked) return reasonFor('conversations.locked').wording;
-    return this.delegateUnavailableReason;
+    return this.humanUnavailable(SV3_MODEL_SHAPE_ID);
   }
 
   private onModelAnswer(event: Event): void {
@@ -3178,12 +3985,8 @@ export class SearchV3View extends JfElement {
       emitEphemeralToast({ message: reason, severity: 'warning' });
       return;
     }
-    void this.runAsk(turn.question, null, undefined, true);
+    void this.runAsk(turn.question, null, undefined, true, { turnAction: true, record: turn.id });
     void this.focusComposer();
-  }
-
-  private refuseAsk(): void {
-    emitEphemeralToast({ message: this.askUnavailableReason, severity: 'warning' });
   }
 
   /**
@@ -3198,8 +4001,10 @@ export class SearchV3View extends JfElement {
 
   /** The composer's availability, projected from the ONE observed-state authority. */
   private get askUnavailableReason(): string {
-    const availability = projectAvailability('documents', this.aiSnapshot);
-    return availability.kind === 'unavailable' ? availability.reason : '';
+    if (this.preparedHandoff?.shapeId === 'core.summarize') return this.humanUnavailable('core.summarize');
+    const modelOnly = this.preparedHandoff?.shapeId === SV3_MODEL_SHAPE_ID || (this.preparedHandoff === null
+      && (this.shapeId === SV3_MODEL_SHAPE_ID || this.activeSession?.turns.at(-1)?.shapeId === SV3_MODEL_SHAPE_ID));
+    return this.humanUnavailable(modelOnly ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID);
   }
 
   /**
@@ -3214,6 +4019,8 @@ export class SearchV3View extends JfElement {
    * §S4 remainder note in `docs/tempdocs/852-sv3-promotion.md` for what breaks if `agent` ever
    * grows a gate of its own.
    */
+  private get structuredUnavailableReason(): string { return this.humanUnavailable('core.extract'); }
+
   private get delegateUnavailableReason(): string {
     const availability = projectAvailability('agent', this.aiSnapshot);
     return availability.kind === 'unavailable' ? availability.reason : '';
@@ -3237,45 +4044,60 @@ export class SearchV3View extends JfElement {
   private readonly placeTiers = new Map<string, Sv3ComposerTier>();
   private readonly summaryInputs = new Map<string, { scope: Sv3AskScope | null; selection: SelectionPayload | null }>();
 
+  /** Compatibility surfaces keep their mode preset but never run on arrival. */
+  private prepareCompatibilityShape(): void {
+    const shape = this.shapeId;
+    this.tierFollowsPlace = false;
+    if (shape === 'core.workflow-run') {
+      this.tier = 'search';
+      this.handoffNotice = 'Workflow runs are not available here';
+      emitEphemeralToast({ message: this.handoffNotice, severity: 'info' });
+    } else if (shape === 'core.agent-run') this.tier = 'delegate';
+    else {
+      this.tier = shape === 'core.extract' ? 'structured' : 'ask';
+      this.preparedHandoff = { shapeId: shape === 'core.free-chat' ? 'core.free-chat' : shape === 'core.extract' ? 'core.extract' : 'core.rag-ask', selection: null };
+    }
+  }
+
   private receiveHandoff = (): boolean => {
-    const incoming = takeSearchV3Handoff();
-    if (incoming === null) return false;
+    if (this.shapeId) return false;
+    const incoming = peekSearchV3Handoff();
+    if (incoming === null) {
+      if (this.retireRefusedHandoff()) this.requestUpdate();
+      return false;
+    }
+    if (incoming.refused) return true;
+    if (incoming.origin === 'restore') {
+      takeSearchV3Handoff();
+      this.retireRefusedHandoff();
+      this.revokeHumanTask(true);
+      // A journal/traversal entry describes old navigation, not the current raw draft.
+      // Never reapply its original query, clear newer B, or resurrect consumed work.
+      if (this.currentDraft().trim() && this.retiredHandoffText === null) {
+        const proposal = this.currentPreparation();
+        this.markDraftReview(proposal);
+        this.reviewConfigured = proposal !== null;
+      }
+      // Review is ephemeral authority, not a data replacement. The actual place
+      // transition below must validate its whole target/origin capacity before writing.
+      return true;
+    }
+    this.mountHasIncoming = true;
+    this.openRecovery();
     const { state, selection } = incoming;
     const shape = typeof state.forceShapeId === 'string' ? state.forceShapeId : (state.affordance === 'extract' || state.mode === 'structured' ? 'core.extract'
-        : state.affordance === 'documents' || state.mode === 'ask' || Object.hasOwn(state, 'docIds') ? 'core.rag-ask' : null);
+      : state.affordance === 'documents' || state.mode === 'ask' || Object.hasOwn(state, 'docIds') ? 'core.rag-ask' : null);
     const query = typeof state.query === 'string' ? state.query : '';
-    // Preserve the outgoing place without stopping or steering its work.
-    const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
-    const restoredDraftOwner = from === null ? readLastViewedConversation() : null;
-    if (from !== null && from !== RESULTS_PLACE) {
-      this.placeDrafts.set(from, this.currentDraft());
-      this.placeScopes.set(from, this.search.pendingScope);
-      this.placeTiers.set(from, this.tier);
-    } else if (restoredDraftOwner !== null && this.preparedHandoff === null) {
-      this.placeDrafts.set(restoredDraftOwner, this.currentDraft());
-    } else if (from !== RESULTS_PLACE && this.tier !== 'search' && this.preparedHandoff === null && this.currentDraft().trim() !== '') {
-      const id = createConversationId();
-      const now = Date.now();
-      this.sessions = mergeStoreConversations(this.sessions, [{ id, title: 'Unsent draft', firstUserMessage: this.currentDraft(), createdAt: now, lastActiveAt: now }]);
-      this.placeDrafts.set(id, this.currentDraft());
-      this.placeScopes.set(id, this.search.pendingScope);
-      this.placeTiers.set(id, this.tier);
-    }
-    this.renamingId = null;
-    this.palette?.dismiss();
-    this.sessions = startNewSession(this.sessions);
-    this.search.hide();
-    this.search.clearScope();
-    this.closePane();
-    setActiveConversation(null);
-    clearLastViewedConversation();
-    this.preparedHandoff = null;
-    this.handoffNotice = ''; this.handoffBlocked = false;
-    this.tier = shape === null ? 'search' : shape === 'core.extract' ? 'structured' : 'ask';
-    this.tierFollowsPlace = false;
+    const tier: Sv3ComposerTier = shape === null || shape === 'core.workflow-run' ? 'search' : shape === 'core.extract' ? 'structured' : 'ask';
     const allowed = ['core.rag-ask', 'core.free-chat', 'core.summarize', 'core.extract'];
     let shapeId: ShapeId | 'core.summarize' = allowed.includes(shape ?? '') ? shape as ShapeId | 'core.summarize' : 'core.rag-ask';
-    if (shape !== null && !allowed.includes(shape)) this.handoffNotice = 'This shape is unavailable. Prepared in Ask; review before sending.';
+    let notice = '';
+    let blocked = false;
+    let review = false;
+    if (shape !== null && !allowed.includes(shape) && shape !== 'core.workflow-run') {
+      notice = 'This shape is unavailable. Prepared in Ask; review before sending.';
+      blocked = true;
+    }
     let paths: string[] = [];
     if (Array.isArray(state.docIds)) paths = state.docIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '');
     else if (typeof state.docIds === 'string' && state.docIds.trim() !== '') paths = [state.docIds];
@@ -3290,36 +4112,84 @@ export class SearchV3View extends JfElement {
     paths = [...new Set(paths)].filter(path => typeof path === 'string' && path.trim() !== '');
     if (paths.length > 0 && shapeId === 'core.free-chat') {
       shapeId = 'core.rag-ask';
-      this.handoffNotice = 'This mode cannot read files. Prepared in Ask over the chosen files; review before sending.';
+      notice = 'This mode cannot read files. Prepared in Ask over the chosen files; review before sending.';
+      review = true;
     }
     const invalidSelection = selection !== null &&
       (!['item', 'text-range', 'citation', 'result-set', 'search-trace', 'health-condition'].includes(selection.kind) ||
-       ['item', 'text-range', 'citation', 'result-set'].includes(selection.kind) && paths.length === 0);
-    if (paths.length > 0) this.search.prepare({ paths });
-    if (shape === null) this.preparedHandoff = { shapeId: null, selection: null };
-    if (shape !== null) {
-      this.preparedHandoff = { shapeId, selection: selection ?? (paths.length > 0
-        ? { kind: 'result-set', items: paths.map(id => ({ id, kind: 'doc' as const })) } : null) };
-      if (Object.hasOwn(state, 'docIds') && paths.length === 0 && shapeId !== 'core.extract' && selection === null ||
-          shapeId === 'core.summarize' && paths.length === 0 && selection === null) {
-        this.handoffBlocked = true;
-        this.handoffNotice = 'No readable document was supplied. Choose a file before sending.';
-      }
+        ['item', 'text-range', 'citation', 'result-set'].includes(selection.kind) && paths.length === 0);
+    if (shape !== null && (Object.hasOwn(state, 'docIds') && paths.length === 0 && shapeId !== 'core.extract' && selection === null ||
+      shapeId === 'core.summarize' && paths.length === 0 && selection === null)) {
+      blocked = true; notice = 'No readable document was supplied. Choose a file before sending.';
     }
-    if (invalidSelection) {
-      this.handoffBlocked = true;
-      this.handoffNotice = 'Invalid selection. Choose the files or passage again before sending.';
+    if (invalidSelection) { blocked = true; notice = 'Invalid selection. Choose the files or passage again before sending.'; }
+    if (Object.hasOwn(state, 'mode') && (typeof state.mode !== 'string' || !['search', 'ask', 'structured'].includes(state.mode))) {
+      blocked = true; notice = 'Unknown hand-off mode. Review the task before sending.';
     }
-    if (typeof state.mode === 'string' && !['search', 'ask', 'structured'].includes(state.mode)) {
-      this.handoffBlocked = true;
-      this.handoffNotice = 'Unknown hand-off mode. Review the task before sending.';
+    if (Object.hasOwn(state, 'selection')) { blocked = true; notice = 'Invalid selection link. Choose the files or passage again before sending.'; }
+    if (Object.hasOwn(state, 'forceShapeId') && typeof state.forceShapeId !== 'string' ||
+      Object.hasOwn(state, 'docIds') && !(typeof state.docIds === 'string' && state.docIds.trim() !== '' ||
+        Array.isArray(state.docIds) && (state.docIds.length > 0 || shapeId === 'core.extract') && state.docIds.every(id => typeof id === 'string' && id.trim() !== '')) && selection === null) {
+      blocked = true; notice = 'Invalid task data. Choose the files or mode again before sending.';
     }
+    if (shape === 'core.workflow-run') notice = 'Workflow runs are not available here';
+    const preparation = this.livePreparation(tier, shape === null ? null : shapeId, paths, selection, blocked);
+    // Intake is synchronous: reserve the incoming current snapshot plus necessary outgoing
+    // copies before changing place, text, schema or scope. Capacity/readback failure rejects it.
+    // Cold raw restoration has no settings authority. When an existing proposal already
+    // retains exactly that text at that place, keep the proposal for review rather than
+    // reserving another slot for its raw bytes. Never apply its settings to the live draft.
+    const leaving = this.mountDraftPending && this.draftReview && this.draftProposal === null
+      ? this.recoveryDrafts.find(d => d.place === this.humanPlace() && d.text === this.recoveryText(this.currentDraft()))
+      : undefined;
+    if (!this.persistDraft({ place: null, text: this.recoveryText(query, selection), preparation }, true, leaving)) {
+      incoming.refused = true;
+      this.refusedHandoff = { text: query, files: paths.length };
+      this.requestUpdate();
+      return true;
+    }
+    takeSearchV3Handoff();
+    this.clearRetiredHandoff();
+    this.retireRefusedHandoff();
+    this.revokeHumanTask(true);
+    const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
+    const restoredDraftOwner = from === null ? readLastViewedConversation() : null;
+    if (from !== null && from !== RESULTS_PLACE) {
+      this.rememberPlace(from, this.currentDraft());
+      this.placeScopes.set(from, this.search.pendingScope);
+      this.placeTiers.set(from, this.tier);
+    } else if (restoredDraftOwner !== null && this.preparedHandoff === null) this.rememberPlace(restoredDraftOwner, this.currentDraft());
+    else if (from !== RESULTS_PLACE && this.tier !== 'search' && this.preparedHandoff === null && this.currentDraft().trim() !== '') {
+      const id = createConversationId();
+      const now = Date.now();
+      this.sessions = mergeStoreConversations(this.sessions, [{ id, title: 'Unsent draft', firstUserMessage: this.currentDraft(), createdAt: now, lastActiveAt: now }]);
+      this.rememberPlace(id, this.currentDraft());
+      this.placeScopes.set(id, this.search.pendingScope);
+      this.placeTiers.set(id, this.tier);
+    }
+    this.renamingId = null;
+    this.palette?.dismiss();
+    this.sessions = startNewSession(this.sessions);
+    this.search.hide(); this.search.clearScope(); this.closePane();
+    setActiveConversation(null); clearLastViewedConversation();
+    refreshProjection();
+    this.preparedHandoff = shape === 'core.workflow-run' ? null : { shapeId: shape === null ? null : shapeId,
+      selection: shape === null ? null : selection ?? (paths.length > 0 ? { kind: 'result-set', items: paths.map(id => ({ id, kind: 'doc' as const })) } : null) };
+    this.handoffNotice = notice; this.handoffBlocked = blocked;
+    this.tier = tier; this.tierFollowsPlace = false;
+    if (paths.length > 0 && shape !== 'core.workflow-run') this.search.prepare({ paths });
+    this.draftReview = review || blocked;
+    this.draftProposal = this.draftReview ? preparation : null;
+    this.reviewConfigured = this.draftReview;
     this.writeDraft(query);
-    if (this.tier === 'search' && query.trim() !== '') { this.search.type(query); this.search.show(); }
-    void this.setComposerState('docked');
-    this.requestUpdate();
+    this.saveRecovery();
+    if (shape !== 'core.workflow-run' && !this.handoffBlocked && !this.draftReview && tier === 'search' && query.trim()
+      && this.persistDraft({ place: RESULTS_PLACE, text: query, preparation: { kind: 'search' } })) {
+      this.search.type(query); this.search.show();
+    }
+    void this.setComposerState('docked'); this.requestUpdate();
     void this.updateComplete.then(async () => { const c = this.composer; if (c !== null) { await c.updateComplete; c.focusField(); } });
-    emitEphemeralToast({ message: this.handoffNotice || `${this.tier === 'search' ? 'Search' : shapeId === 'core.summarize' ? 'Summarize' : this.tier === 'structured' ? 'Structured' : 'Ask'} prepared${paths.length ? ': ' + paths.join(', ') : ''}.`, severity: 'info' });
+    emitEphemeralToast({ message: notice || `${tier === 'search' ? 'Search' : shapeId === 'core.summarize' ? 'Summarize' : tier === 'structured' ? 'Structured' : 'Ask'} prepared${paths.length ? ': ' + paths.join(', ') : ''}.`, severity: 'info' });
     return true;
   };
 
@@ -3330,7 +4200,7 @@ export class SearchV3View extends JfElement {
   private structuredNote(turnId: string): string {
     const inputs = this.structuredInputs.get(turnId);
     return inputs === undefined
-      ? 'Opens in Structured with the current composer schema and stated inputs; review and send.'
+      ? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.'
       : `Runs Structured with schema ${inputs.schema}; inputs: ${inputs.scope?.paths.join(', ') ?? 'typed text'} and this conversation.`;
   }
 
@@ -3339,12 +4209,24 @@ export class SearchV3View extends JfElement {
    * busy send before it leaves, and the model action checks its own gate. This method
    * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
-  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false): Promise<void> {
+  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
+    options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
     if (question === '' || this.streaming) return;
-    if (modelAnswer && this.modelAnswerUnavailableReason !== '') return;
-    const handoff = modelAnswer ? null : this.preparedHandoff;
-    const shapeId = modelAnswer ? SV3_MODEL_SHAPE_ID : schema !== undefined ? 'core.extract' : handoff?.shapeId ?? SV3_ASK_SHAPE_ID;
+    if (!options.task && !options.turnAction && !this.draftMayIssue(false)) return;
+    const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
+      : modelAnswer ? null : this.preparedHandoff;
+    modelAnswer = modelAnswer || handoff?.shapeId === SV3_MODEL_SHAPE_ID
+      || (schema === undefined && handoff === null && (this.shapeId === SV3_MODEL_SHAPE_ID || this.activeSession?.turns.at(-1)?.shapeId === SV3_MODEL_SHAPE_ID));
+    const shapeId: RecoveryShape = modelAnswer ? SV3_MODEL_SHAPE_ID : schema !== undefined ? 'core.extract' : (handoff?.shapeId as RecoveryShape | null) ?? SV3_ASK_SHAPE_ID;
+    const unavailable = this.humanUnavailable(shapeId, options.continuation);
+    if (unavailable !== '') { emitEphemeralToast({ message: unavailable, severity: 'warning' }); return; }
+    if (schema !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(schema);
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object');
+      } catch { this.structuredError = 'Enter a JSON schema object.'; this.requestUpdate(); return; }
+    }
     // Keep the actual trace visible in the durable user turn even if its instructions were edited.
     if (shapeId === 'core.summarize' && handoff?.selection?.kind === 'search-trace') {
       const trace = handoff.selection.summary;
@@ -3356,8 +4238,12 @@ export class SearchV3View extends JfElement {
       return;
     }
     this.structuredError = '';
-    const composer = this.composer;
-    const draftRevision = composer?.draftRevision;
+    const task = options.task ?? this.reserveHumanTask(question, modelAnswer ? null : scope, schema, shapeId,
+      modelAnswer ? null : handoff?.selection ?? null, options.turnAction !== true, options.record ?? null, options.authored);
+    if (task === null || this.humanTask !== task) return;
+    if (options.task && !this.humanOwned(task)) return;
+    const composer = task.composer;
+    const draftVersion = task.version;
     const sessionId = this.sessions.activeId;
     if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
     let context: ReturnType<typeof sv3FollowUpContext> = [];
@@ -3376,24 +4262,48 @@ export class SearchV3View extends JfElement {
         this.contextAskPending.delete(sessionId);
       }
     }
-    if (!modelAnswer) {
+    if (!this.isConnected || this.sessions.activeId !== sessionId || this.humanTask !== task || task.abandoned) return;
+    if (options.task && !this.humanOwned(task)) return;
+    if (options.task && task.context !== null && JSON.stringify(context) !== JSON.stringify(task.context)) {
+      task.revoked = true;
+      this.recoveryError = 'Saved context changed. Review the retained question before a new submission.';
+      this.requestUpdate();
+      return;
+    }
+    if (this.humanUnavailable(shapeId, options.continuation) !== '') { this.requestUpdate(); return; }
+    task.context = context.map(m => ({ ...m }));
+    task.saved.target = sessionId ?? createConversationId();
+    task.saved.delivery = 'unknown';
+    task.refusal = null;
+    if (!this.saveRecovery(task) || !this.isConnected || this.sessions.activeId !== sessionId
+      || this.humanTask !== task || task.abandoned || this.humanUnavailable(shapeId, options.continuation) !== '') return;
+    if (options.task && !this.humanOwned(task)) return;
+    if (!modelAnswer && task.ownsComposer && this.composer === composer
+      && composer?.draftVersion === draftVersion && this.preparedHandoff === handoff) {
       this.preparedHandoff = null;
       this.handoffNotice = ''; this.handoffBlocked = false;
     }
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, question, Date.now(), modelAnswer ? 'model' : 'ask', createConversationId(), shapeId, handoff?.selection?.kind);
+    this.sessions = submitInSession(this.sessions, task.question, Date.now(), modelAnswer ? 'model' : 'ask', task.saved.target!, shapeId, task.selection?.kind);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
     if (shapeId === 'core.summarize') this.summaryInputs.set(ref.turnId, { scope, selection: handoff?.selection ?? null });
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
-    // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
-    if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
+    // store keeps no scope with a turn, so after reload its original scope is unknown and Retry/Edit must refuse.
+    if (shapeId === SV3_ASK_SHAPE_ID) this.search.recordTurnScope(ref.turnId, scope);
+    if (schema === undefined && task.ownsComposer && this.composer === composer && composer?.draftVersion === draftVersion
+      && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
     if (!modelAnswer) this.placeScopes.delete(ref.sessionId);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (!modelAnswer && schema === undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
-    const sentDraftRevision = composer?.draftRevision;
+    if (task.ownsComposer && schema === undefined && this.composer === composer && composer?.draftVersion === draftVersion) {
+      this.assigningHumanDraft = true;
+      try { composer?.clearDraft(); } finally { this.assigningHumanDraft = false; }
+      task.version = composer?.draftVersion;
+    }
+    this.saveRecovery(task);
+    const sentDraftVersion = composer?.draftVersion;
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -3412,6 +4322,8 @@ export class SearchV3View extends JfElement {
     const stop = (): void => {
       if (stopAsked) return;
       stopAsked = true;
+      this.revokeHumanTask();
+      this.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
       if (ask === undefined) return;
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
@@ -3489,17 +4401,17 @@ export class SearchV3View extends JfElement {
         apiBase: this.apiBase,
         schema,
         shapeId,
-        selection: handoff?.selection,
-        question,
+        selection: task.selection,
+        question: task.question,
         conversationId: ref.sessionId,
         modelAnswer,
         // The rung AS OF THIS SEND (tempdoc 822 Phase F10). Read here rather than inside the ask
         // client, so the one place a question is dispatched is also the one place its parameters
         // are decided — and a rung changed mid-stream cannot rewrite a request already in flight.
-        effort: this.effort,
+        effort: task.saved.effort,
         // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
         // never an empty list standing in for a choice, which would mean the whole index.
-        ...(scope !== null ? { docIds: scope.paths } : {}),
+        ...(task.scope !== null ? { docIds: task.scope.paths } : {}),
         context,
         turnId: dispatchId,
         signal: abort.signal,
@@ -3525,8 +4437,13 @@ export class SearchV3View extends JfElement {
           this.sessions = setTurnRewrite(this.sessions, ref, standalone);
         },
         onDone: (usage) => {
-          if (schema !== undefined && this.search.pendingScope === scope) this.search.clearScope();
-          if (schema !== undefined && this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
+          if (schema !== undefined && task.ownsComposer && this.composer === composer
+            && composer?.draftVersion === draftVersion && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
+          if (schema !== undefined && task.ownsComposer && this.composer === composer && composer?.draftVersion === draftVersion) {
+            this.assigningHumanDraft = true;
+            try { composer?.clearDraft(); } finally { this.assigningHumanDraft = false; }
+          }
+          this.retireHumanTask(task);
           // Tempdoc 610 §E.4 — the occupancy this turn reported, recorded on the CONVERSATION that
           // spent it (a terminal that reported none leaves the previous reading standing rather than
           // replacing it with a zero the backend never sent).
@@ -3545,27 +4462,44 @@ export class SearchV3View extends JfElement {
         },
         // The lock's refusal is worded by the ONE reason vocabulary, not re-phrased here.
         onRefused: () => {
+          task.saved.delivery = 'unaccepted';
+          task.revoked = true;
+          this.saveRecovery(task);
           settle('refused', reasonFor('conversations.locked').wording);
           // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
           this.noteRefusedWhileLocked();
         },
         onHalted: () => {
+          this.retireHumanTask(task);
           settle('halted');
           // Saved as stopped: the record gives the turn its store ids (so it can be retried,
           // edited or branched) and the list its conversation, as after a finished answer.
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
         },
-        onLeft: () => settle('left'),
-        onFailed: (message, code) => {
+        onLeft: () => { task.revoked = true; this.saveRecovery(task); settle('left'); },
+        onFailed: (message, code, refusal) => {
+          if (refusal !== null && refusal !== undefined) {
+            task.saved.delivery = 'unaccepted';
+            task.refusal = refusal;
+            task.retryAt = Date.now() + (refusal.retryAfterMs ?? 0);
+            this.scheduleHumanRetry(task);
+            this.saveRecovery(task);
+            settle('left');
+            return;
+          }
+          if (code === 'NO_CONTENT') this.retireHumanTask(task);
+          else { task.saved.delivery = 'unknown'; task.revoked = true; this.saveRecovery(task); }
           const noEvidence = shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
-          if (handoff !== null && this.sessions.activeId === ref.sessionId && this.composer === composer && composer?.draftRevision === sentDraftRevision) {
+          if (handoff !== null && this.sessions.activeId === ref.sessionId && task.ownsComposer && this.composer === composer && composer?.draftVersion === sentDraftVersion) {
             this.preparedHandoff = handoff;
             this.search.prepare(scope);
-            this.writeDraft(question);
+            this.assigningHumanDraft = true;
+            try { this.writeDraft(task.saved.raw); } finally { this.assigningHumanDraft = false; }
+            this.saveRecovery(task);
           }
         },
       },
@@ -3578,6 +4512,7 @@ export class SearchV3View extends JfElement {
    * has already left.
    */
   private onEffortChange(event: Event): void {
+    this.revokeHumanTask();
     const effort = (event as CustomEvent<Sv3EffortChange>).detail?.effort;
     if (!isSv3Effort(effort)) return;
     this.effort = effort;
@@ -3590,8 +4525,19 @@ export class SearchV3View extends JfElement {
    */
   private onTierChange(event: Event): void {
     const tier = (event as CustomEvent<Sv3TierChange>).detail?.tier;
+    // Choosing the shown mode only changes intent when retired hand-off text needs review.
+    if (tier === this.tier && this.retiredHandoffText === null) return;
+    this.revokeHumanTask();
     if (!isSv3Tier(tier)) return;
-    if (this.preparedHandoff !== null) this.search.clearScope();
+    const paths = this.preparedHandoff !== null || tier === 'search' || tier === 'delegate' ? []
+      : [...(this.search.pendingScope?.paths ?? [])];
+    if (tier === 'structured' && this.search.showing && paths.length === 0) paths.push(...(this.search.scopeFromSelection()?.paths ?? []));
+    if (!this.acknowledgePreparation(this.livePreparation(tier, this.shapeId, paths, null, false))) return;
+    if (this.retireRefusedHandoff()) {
+      flushPendingNavigationWrite();
+      refreshProjection();
+    }
+    if (this.preparedHandoff !== null || tier === 'search' || tier === 'delegate') this.search.clearScope();
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.tier = tier;
@@ -3599,9 +4545,10 @@ export class SearchV3View extends JfElement {
     if (tier === 'structured' && this.search.showing && this.search.pendingScope === null) {
       this.search.prepareFromSelection();
     }
+    this.configureDraft();
     // WP1.1 S1.10 — beside the result list, Search mode's text is the query: text written in another
     // mode is searched as it stands, so the composer and the list never describe different queries.
-    if (tier === 'search' && this.search.showing) this.search.type(this.currentDraft());
+    if (tier === 'search' && this.search.showing && this.draftMayIssue()) this.search.type(this.currentDraft());
   }
 
   /**
@@ -3709,14 +4656,21 @@ export class SearchV3View extends JfElement {
    * The run is HOSTED, never re-implemented: the shared `AgentSessionController` runs it and every
    * directive leaves through the ONE `dispatchRunControl` seam (`governance/steering-surfaces.v1.json`).
    */
-  private delegate(text: string): void {
+  private delegate(text: string, turnAction = false): void {
     // Defence in depth, not a second gate: the composer already refuses an unavailable delegate and
     // keeps the draft. This exists because `delegate` is reachable from the window's own routing.
     if (this.delegateUnavailableReason !== '') return;
+    if (!turnAction && !this.draftMayIssue(false)) return;
+    if (this.humanTask !== null) {
+      this.recoveryError = 'Review the retained question, then explicitly discard it before starting another submission.';
+      this.requestUpdate(); return;
+    }
+    const target = this.sessions.activeId ?? createConversationId();
+    if (!this.persistDraft({ place: target, text: '', preparation: { kind: 'delegate' } })) return;
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, text, Date.now(), 'agent', createConversationId());
+    this.sessions = submitInSession(this.sessions, text, Date.now(), 'agent', target);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     this.claimConversation(ref.sessionId);
@@ -3763,8 +4717,10 @@ export class SearchV3View extends JfElement {
    * whose name makes a correct call look like the forbidden one is a trap for the next reader too.
    */
   private steerLiveRun(text: string): void {
+    if (!this.draftMayIssue(false)) return;
     const ctrl = this.steerableRun;
     if (ctrl === null) return;
+    if (!this.persistDraft({ place: this.humanPlace(), text: '', preparation: this.currentPreparation() })) return;
     this.composer?.clearDraft();
     void dispatchRunControl(ctrl, { kind: 'interject', text });
   }
@@ -4120,8 +5076,8 @@ export class SearchV3View extends JfElement {
     // WP1.1 S1.11 — the palette's search IS Search mode: the mode changes where the reader can see
     // it, the draft is searched exactly as Enter would search it, and the caret goes back to it.
     if (id === SV3_COMMAND_SEARCH) {
-      this.tier = 'search';
-      this.tierFollowsPlace = false;
+      if (!this.draftMayIssue()) return;
+      this.applyPreparation({ kind: 'search' });
       const draft = (this.composer?.draft ?? '').trim();
       if (draft !== '') this.searchNow(draft);
       void this.focusComposer();
@@ -4159,7 +5115,7 @@ export class SearchV3View extends JfElement {
     const before = this.sessions;
     const prevId = before.activeId;
     if (sessionById(before, id) === null) return; // unknown id — nothing was claimed, so nothing to record
-    this.swapPlace(id);
+    if (!this.swapPlace(id)) return;
     this.sessions = focusSession(this.sessions, id, Date.now());
     if (this.sessions === before) return;
     this.claimConversation(id);
@@ -4186,6 +5142,7 @@ export class SearchV3View extends JfElement {
    * Phase 3, and per-tab on purpose, so a second tab lands cold rather than adopting this one's thread).
    */
   private claimConversation(id: string): void {
+    this.departureBlocked = false;
     setActiveConversation(id);
     setLastViewedConversation(id);
   }
@@ -4359,11 +5316,12 @@ export class SearchV3View extends JfElement {
    * INDICATOR instead, which is a later PR's presentation work.
    */
   private startFreshSession(): void {
-    this.resetToHero();
-    this.composer?.clearDraft();
+    if (!this.resetToHero(true)) return;
     // New conversation means "do not restore the one I just left" (tempdoc 609 Phase 3).
     setActiveConversation(null);
-    clearLastViewedConversation();
+    this.departureBlocked = false;
+    // Settle this accepted navigation before immediate reload or traversal can read the old URL.
+    flushPendingNavigationWrite();
   }
 
   /**
@@ -4384,10 +5342,41 @@ export class SearchV3View extends JfElement {
    * listener only after its dynamic import) and the `isCurrentUrl` downgrade. Neither is a
    * guarantee, so the fix is to not make the write at all.
    */
-  private resetToHero(): void {
+  private resetToHero(clearDraft = false, retainLeaving = false): boolean {
+    this.revokeHumanTask(true);
+    const preparation = clearDraft ? { kind: 'search' as const } : this.currentPreparation();
+    const text = clearDraft ? '' : this.currentDraft();
+    const leaving = this.humanPlace();
+    if (!this.persistDraft({ place: null, text: this.recoveryText(text), preparation }, retainLeaving)) {
+      if (clearDraft && !retainLeaving) {
+        this.recoveryError = this.recoveryWriteUnconfirmed
+          ? 'Partial, unconfirmed retirement: New could not be confirmed. This draft’s saved settings may already have been retired and exact settings may not survive closing or reloading. Current text and settings are still visible here; raw draft and reload pointer have not been retired. Keep or copy current text and settings before leaving.'
+          : `New was not confirmed. ${this.recoveryError || 'Recovery could not be acknowledged. Current text and settings are kept here.'}`;
+        this.revealRecoveryOutcome();
+      }
+      return false;
+    }
+    if (clearDraft && !retainLeaving
+      && (!this.draftPersistence.retireRawDraft() || !clearLastViewedConversation())) {
+      // Independent stores are not transactional: keep the live owner and its recoverable proposal.
+      this.saveRecovery();
+      this.recoveryError = 'New was not confirmed: raw draft or reload-pointer retirement could not be acknowledged. Current text and settings are kept here; saved copies may remain. Raw saving may be unavailable. Saved settings may not survive reload. Keep or copy current text and settings before closing, or reload to review available saved copies.';
+      this.revealRecoveryOutcome();
+      return false;
+    }
+    this.retireRefusedHandoff();
+    if (leaving !== null) {
+      if (retainLeaving) this.rememberPlace(leaving, this.currentDraft());
+      else if (clearDraft) {
+        this.placeDrafts.delete(leaving);
+        this.placeScopes.delete(leaving);
+        this.placeTiers.delete(leaving);
+      }
+    }
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.abortAsk();
+    this.clearRetiredHandoff();
     // DETACHED, not halted (Slice 516 FIX-T1's rule, applied to the run half). A delegated run is
     // hosted by the product-wide controller and may be watched elsewhere, so this window stops
     // RENDERING it and never stops it. Dropping the local handle is also what keeps the composer's
@@ -4407,7 +5396,14 @@ export class SearchV3View extends JfElement {
     this.resultsTier = 'search';
     if (this.tierFollowsPlace) this.tier = SV3_TIER_DEFAULT;
     this.tierFollowsPlace = false;
+    if (clearDraft) {
+      this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+      this.recoveryError = '';
+      this.schemaDraft = ''; this.preparationRevision += 1;
+      this.writeDraft('');
+    } else if (preparation !== null && !this.draftReview) this.applyPreparation(preparation);
     void this.setComposerState('hero');
+    return true;
   }
 
   /**
@@ -4415,6 +5411,7 @@ export class SearchV3View extends JfElement {
    * by which one is actually running — the composer says the reader pressed Stop and nothing more.
    */
   private onComposerStop(): void {
+    if (this.humanLoad !== null && !this.streaming) { this.revokeHumanTask(); this.saveRecovery(); return; }
     if (this.streaming) {
       this.askStop?.();
       return;
@@ -4485,11 +5482,12 @@ export class SearchV3View extends JfElement {
       <jf-sv3-pane
         data-testid="sv3-pane"
         .docPath=${this.paneDocPath}
+        .highlightRange=${this.paneHighlight}
         .citation=${this.paneCitation}
         .citationHeader=${this.paneCitationHeader}
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
-        @sv3-pane-close=${this.closePane}
+        @sv3-pane-close=${this.dismissPane}
       ></jf-sv3-pane>
     `;
   }
@@ -4498,7 +5496,7 @@ export class SearchV3View extends JfElement {
     const ai = this.aiSnapshot;
     const indexing = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
       ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
-    const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
+    const results = this.search.view(projectAvailability('documents', this.aiSnapshot, true));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
     const visibleRun = !this.search.showing && (this.run?.sessionId === this.sessions.activeId || this.sessions.activeId === null && this.preparedHandoff === null) ? run : null;
@@ -4557,17 +5555,22 @@ export class SearchV3View extends JfElement {
       <div
         class="column"
         data-testid="sv3-column"
+        @sv3-composer-assignment=${this.onHumanAssignment}
         @sv3-composer-state-request=${this.onStateRequest}
         @sv3-schema-change=${(event: CustomEvent<{ text: string }>) => {
+          this.revokeHumanTask();
+          if (!this.acknowledgePreparation({ kind: 'structured', schema: event.detail.text,
+            scope: this.search.pendingScope === null ? { kind: 'typed' } : { kind: 'files', paths: [...this.search.pendingScope.paths] } })) { this.requestUpdate(); return; }
           this.schemaDraft = event.detail.text;
+          this.configureDraft();
           this.requestUpdate();
         }}
         @sv3-composer-submit=${this.onComposerSubmit}
         @sv3-composer-draft=${this.onComposerDraft}
-        @sv3-composer-scope-clear=${() => { this.search.clearScope(); this.preparedHandoff = null; this.handoffNotice = ''; this.handoffBlocked = false; this.requestUpdate(); }}
+        @sv3-composer-scope-clear=${() => { this.revokeHumanTask(); if (!this.acknowledgePreparation(this.livePreparation(this.tier, null, [], null, false))) return; this.search.clearScope(); this.preparedHandoff = null; this.handoffNotice = ''; this.handoffBlocked = false; this.configureDraft(); }}
         @sv3-results-filter-remove=${this.onResultsFilterRemove}
         @sv3-results-ask=${this.onResultsAsk}
-        @sv3-results-clear-selection=${() => this.search.select([])}
+        @sv3-results-clear-selection=${() => { this.revokeHumanTask(); this.search.select([]); }}
         @card-open=${this.onCardOpen}
         @card-selection=${this.onCardSelection}
         @card-facet-toggle=${this.onCardFacetToggle}
@@ -4594,6 +5597,7 @@ export class SearchV3View extends JfElement {
           <jf-indexing-controls .progress=${indexing} api-base=${this.apiBase}></jf-indexing-controls>
         </div>` : nothing}
         ${this.renderBranchOrigin()}
+        ${this.recoveryNotice()}
         <div class="column">
         <jf-sv3-main
           state=${this.composerState}
@@ -4641,8 +5645,9 @@ export class SearchV3View extends JfElement {
           slot-reason=${slot.reason}
           halt-reason=${slot.haltReason}
           ?steerable=${this.steerableRun !== null}
-          unavailable-reason=${this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason}
-          delegate-unavailable-reason=${this.delegateUnavailableReason}
+          unavailable-reason=${this.retiredHandoffNotice || (this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason)}
+          delegate-unavailable-reason=${this.retiredHandoffNotice || this.delegateUnavailableReason}
+          structured-unavailable-reason=${this.retiredHandoffNotice || this.structuredUnavailableReason}
           .degradation=${this.degradation}
           ?detailed=${isAdvancedMode()}
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
@@ -4650,7 +5655,7 @@ export class SearchV3View extends JfElement {
           tier=${this.tier}
           .schemaDraft=${this.schemaDraft}
           .structuredError=${this.structuredError}
-          task-notice=${this.handoffNotice || (this.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
+          task-notice=${this.retiredHandoffNotice || this.handoffNotice || (this.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
           scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"
@@ -4674,4 +5679,14 @@ declare global {
   interface HTMLElementTagNameMap {
     'jf-sv3-window': SearchV3View;
   }
+}
+
+// WP1.5a — all compatibility shape mounts share the promoted interaction window.
+registerViewFactory('core.rag-ask', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.free-chat', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.extract', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.agent-run', ONE_WINDOW_MOUNT_TAG);
+registerViewFactory('core.workflow-run', ONE_WINDOW_MOUNT_TAG);
+for (const shape of CORE_INTERACTION_SHAPES) {
+  if (getViewFactory(shape) === undefined) throw new Error(`[one-window] missing view factory for ${shape}`);
 }

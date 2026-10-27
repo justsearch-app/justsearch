@@ -15,6 +15,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createHostApi } from './HostApiImpl.js';
+import { __feedForTest, __feedContactForTest, __resetAiStateForTest } from '../state/aiStateStore.js';
+import { takePendingSelection, takePendingForceShape, takePendingAutoRun } from '../utils/compose.js';
 import {
   __resetSelectionForTest,
   getSelection,
@@ -29,6 +31,22 @@ const deps = {
 
 beforeEach(() => {
   __resetSelectionForTest();
+});
+
+it('C5 plugin compose captures its chosen passage before navigation clears selection', async () => {
+  __feedForTest({ inference: { mode: 'online', available: true } as never }); __feedContactForTest();
+  const host = createHostApi('cutover-proof', 'CORE', deps);
+  const selected = { kind: 'browse-node' as const, path: 'chosen.md', nodeKind: 'file' as const,
+    capabilities: DEFAULT_CAPABILITIES_BY_KIND['browse-node'] };
+  setSingleSelection(selected, 'core.browse-surface');
+  try {
+    expect(host.selection.compose!({ operation: 'core.ask', userPrompt: 'Chosen question' })).toBe(true);
+    expect(takePendingSelection()).toEqual({ kind: 'item', itemKind: 'browse-node', itemId: 'chosen.md' });
+    expect(takePendingForceShape()).toBe('core.rag-ask');
+  } finally {
+    takePendingSelection(); takePendingForceShape(); takePendingAutoRun(); __resetAiStateForTest();
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  }
 });
 
 describe('host.selection — UNTRUSTED tier (read-only)', () => {

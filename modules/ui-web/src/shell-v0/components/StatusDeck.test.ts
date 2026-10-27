@@ -574,7 +574,7 @@ describe('StatusDeck (slice 461)', () => {
   // which could see the other. The rule is per-SURFACE, not global — these four cases pin both halves
   // of it, including the two ways over-suppressing would be a truthfulness regression.
   describe('814 §D5 — capability-degradation arbitration with the surface banner', () => {
-    const CHAT_SURFACE = 'core.unified-chat-surface';
+    const CHAT_SURFACE = 'core.search-v3-surface';
     const DEGRADED_WARN = {
       kind: 'degraded',
       severity: 'warn',
@@ -607,7 +607,7 @@ describe('StatusDeck (slice 461)', () => {
       updateShellContext({ activeSurface: CHAT_SURFACE });
       const el = degradedDeck();
       await el.updateComplete;
-      // The banner (UnifiedChatView.renderDegradationBanner) is the ONE persistent home of the fact
+      // The Search banner (projectSv3Degradation) is the ONE persistent home of the fact
       // here — it carries the 600 wording and the remedy — so the chip reports the AI mode instead.
       expect(pillText(el)).not.toContain('degraded');
       expect(pillText(el)).toBe('Online — Qwen');

@@ -31,11 +31,12 @@ export function setLastViewedConversation(sessionId: string): void {
 }
 
 /** Forget the pointer (explicit New chat / Start fresh). */
-export function clearLastViewedConversation(): void {
+export function clearLastViewedConversation(): boolean {
   try {
     sessionStorage.removeItem(KEY);
+    return sessionStorage.getItem(KEY) === null;
   } catch {
-    // ignore — see setLastViewedConversation.
+    return false;
   }
 }
 

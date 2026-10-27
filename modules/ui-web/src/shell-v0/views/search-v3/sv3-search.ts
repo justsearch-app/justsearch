@@ -13,7 +13,7 @@
  * which rows the reader has chosen, the files a prepared Ask is limited to, and which answered turn
  * was limited to which files. None of it is persisted — a search is not a turn, and the store keeps
  * no scope with a turn (`ConversationEngine.persistedAssistant` writes neither `docIds` nor
- * `fileCount`), so a reloaded turn is honestly an unscoped one.
+ * `fileCount`), so a reloaded turn has unknown inputs and cannot safely be replayed.
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import {
@@ -35,6 +35,7 @@ import {
   type SearchFilterSpec,
 } from '../../state/searchFiltersState.js';
 import { FACET_LABELS } from '../../components/searchResults/facetChips.js';
+import { clearSelection, getSelection, setSelection, DEFAULT_CAPABILITIES_BY_KIND } from '../../state/selectionState.js';
 import type { Availability } from '../../state/availability.js';
 
 /** The files one Ask is limited to — document PATHS, which is what the backend's filter matches. */
@@ -106,7 +107,8 @@ export function sv3ScopeLabel(scope: Sv3AskScope): string {
 }
 
 /** What a Retry or an Edit of a turn will search, said before it is pressed. */
-export function sv3ResendScopeNote(scope: Sv3AskScope | null): string {
+export function sv3ResendScopeNote(scope: Sv3AskScope | null | undefined): string {
+  if (scope === undefined) return 'Original Ask inputs are unknown. Prepare a new Ask and review its files.';
   if (scope === null) return 'Searches all your files';
   return scope.paths.length === 1 ? 'Uses the same file' : `Uses the same ${scope.paths.length} files`;
 }
@@ -224,7 +226,7 @@ export class Sv3SearchController implements ReactiveController {
   private dates: SearchFilterSpec = getFilters();
   private facets: Record<string, string[]> = getFacetSelections();
   /** Which answered turn was limited to which files. Window-local, so a reload forgets it honestly. */
-  private readonly turnScopes = new Map<string, Sv3AskScope>();
+  private readonly turnScopes = new Map<string, Sv3AskScope | null>();
   private unsubscribers: Array<() => void> = [];
 
   constructor(private readonly host: ReactiveControllerHost) {
@@ -247,11 +249,13 @@ export class Sv3SearchController implements ReactiveController {
         this.host.requestUpdate();
       }),
     ];
+    if (this.showing) this.publishSelection();
   }
 
   hostDisconnected(): void {
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.unsubscribers = [];
+    this.clearPublishedSelection();
   }
 
   private onSnapshot(snapshot: SearchState): void {
@@ -270,6 +274,7 @@ export class Sv3SearchController implements ReactiveController {
       this.selected = sv3PruneSelection(this.selected, snapshot.results);
     }
     this.snapshot = snapshot;
+    if (this.showing && getSelection().surfaceId === 'core.search-v3-surface') this.publishSelection();
     this.host.requestUpdate();
   }
 
@@ -282,12 +287,14 @@ export class Sv3SearchController implements ReactiveController {
 
   show(): void {
     this.showing = true;
+    this.publishSelection();
     this.hasList = true;
     this.host.requestUpdate();
   }
 
   hide(): void {
     this.showing = false;
+    this.clearPublishedSelection();
     this.host.requestUpdate();
   }
 
@@ -334,12 +341,33 @@ export class Sv3SearchController implements ReactiveController {
 
   select(ids: Iterable<string>): void {
     this.selected = sv3PruneSelection(new Set(ids), this.snapshot?.results ?? []);
+    this.publishSelection();
     this.host.requestUpdate();
   }
 
+  private clearPublishedSelection(): void {
+    if (getSelection().surfaceId === 'core.search-v3-surface') clearSelection();
+  }
+
+  private publishSelection(): void {
+    const hits = (this.snapshot?.results ?? []).filter(hit => this.selected.has(hit.id));
+    if (!this.showing || hits.length === 0 || this.snapshot?.query !== this.answered) {
+      this.clearPublishedSelection();
+      return;
+    }
+    const items = hits.length > 1
+      ? [{ kind: 'result-set' as const, items: [...new Set(hits.map(hit => hit.path))].map(id => ({ id, kind: 'doc' as const })), query: this.query, capabilities: DEFAULT_CAPABILITIES_BY_KIND['result-set'] }]
+      : hits.map(hit => ({ kind: 'search-hit' as const, hitId: hit.id, title: hit.title, path: hit.path, capabilities: DEFAULT_CAPABILITIES_BY_KIND['search-hit'] }));
+    setSelection({ items, primaryIndex: 0, surfaceId: 'core.search-v3-surface' });
+  }
+
   /** Fix the chosen rows as the next Ask's files. `null` when they name no document. */
+  scopeFromSelection(): Sv3AskScope | null {
+    return sv3ScopeFromHits(this.snapshot?.results ?? [], this.selected);
+  }
+
   prepareFromSelection(): Sv3AskScope | null {
-    return this.prepare(sv3ScopeFromHits(this.snapshot?.results ?? [], this.selected));
+    return this.prepare(this.scopeFromSelection());
   }
 
   prepare(scope: Sv3AskScope | null): Sv3AskScope | null {
@@ -361,7 +389,7 @@ export class Sv3SearchController implements ReactiveController {
     return scope;
   }
 
-  recordTurnScope(turnId: string, scope: Sv3AskScope): void {
+  recordTurnScope(turnId: string, scope: Sv3AskScope | null): void {
     this.turnScopes.set(turnId, scope);
   }
 
@@ -369,15 +397,16 @@ export class Sv3SearchController implements ReactiveController {
     return this.turnScopes.get(turnId) ?? null;
   }
 
-  get scopesByTurn(): ReadonlyMap<string, Sv3AskScope> {
-    return this.turnScopes;
-  }
+  hasTurnScope(turnId: string): boolean { return this.turnScopes.has(turnId); }
+
+  get scopesByTurn(): ReadonlyMap<string, Sv3AskScope | null> { return this.turnScopes; }
 
   /** New session: the result list, its choice and its prepared Ask are all left behind. */
   reset(): void {
     this.showing = false;
     this.hasList = false;
     this.selected = new Set();
+    this.clearPublishedSelection();
     this.pendingScope = null;
     this.host.requestUpdate();
   }

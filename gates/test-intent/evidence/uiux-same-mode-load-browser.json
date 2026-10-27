@@ -1,0 +1,576 @@
+{
+  "schema": "builder-browser-evidence.v1",
+  "task": "Shown mode must not cancel pending Load anyway",
+  "createdAt": "2026-10-27T11:51:49Z",
+  "baseline": "42f911cdba0c337acb1bd0a51ec033d1fe7459fa",
+  "candidate": "uncommitted working tree",
+  "adoption": "agent-adopted, delegated-choice",
+  "files": {
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts": "sha256:19368c3b9ae22770497ed351f5ec926eb872c7be67ba939f3c18ebe690fec99f",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+    "modules/ui-web/src/shell-v0/views/search-v3/Sv3Composer.ts": "sha256:f6c2ca6201beba5cc04ef30ca46a0736ded3c1c1a6b3dc7e73761072a6ced54a"
+  },
+  "scope": {
+    "tempEvidence": "/home/elias/.cache/am/7zqv2x2u/tmp/same-mode-work",
+    "native": "Fresh own Engine HOME/data/index/corpus per group; same unchanged installed backend with private baseline/candidate Vite frontends. No Gradle build claimed.",
+    "injection": "Production-shaped pre-admission HTTP503 CHAT_UNAVAILABLE/GPU_BUSY forceAllowed:true and held HTTP202 loading:true injected at browser boundary, exactly as verifier. No physical GPU pressure claimed. Follow-up dispatches, responses, Shell and trusted browser pointer/keyboard are real.",
+    "keyboard": "Component happy-dom tests supply default Enter click; browser uses Playwright native Enter, without synthetic product events.",
+    "sandbox": "Native Chromium sandbox startup failed (logs retained); --no-sandbox permitted for own loopback services. Fresh short /tmp/jsv-* profiles all removed.",
+    "sharedResources": [
+      "CPU",
+      "npm cache",
+      "preinstalled Engine and Chromium read",
+      "permitted existing llama-server and compact Qwen model read"
+    ],
+    "provenance": "Original same-mode-load, retirement-matrix, seed-ui and ordinary-modes scripts are byte-identical. browser-lib adapts local module/output paths and tries native sandbox first; service scripts use own paths and processes.",
+    "processAudit": "First two groups process snapshots used one filename for Engine/frontend and did not traverse Java child threads; those snapshots do not establish a full process tree. Final fresh group uses distinct records and all thread children, positively capturing local model CPU argv and CUDA=-1 in actual tool stdout. Its rolling file was overwritten during shutdown; the retained copy explicitly identifies its transcript provenance. All group launch environments explicitly disable GPU.",
+    "excluded": "No owner apps/data/display, dev stack, GPU, downloads, issue actions, delegation, commits, push or publication."
+  },
+  "browser": {
+    "before": [
+      {
+        "id": "none",
+        "status": "pass",
+        "requests": [
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-c2e41556-5d9a-4519-bbca-6405d82863bd",
+            "turnId": "3df02a54-cb7c-44ab-8360-0f6763f28658",
+            "allowLoad": true
+          },
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-c2e41556-5d9a-4519-bbca-6405d82863bd",
+            "turnId": "1feeb861-46d7-4aa0-8a79-f79f34fbdd4c",
+            "allowLoad": true
+          }
+        ]
+      },
+      {
+        "id": "same-pointer",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: an unchanged still-owned load continuation must still send after selecting its already displayed mode\n\n1 !== 2\n",
+        "requests": [
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-0e04229e-aff6-42b9-a10e-ec7fceaab895",
+            "turnId": "fc0baa6c-bb79-410f-a1ee-85ac262ed77e",
+            "allowLoad": true
+          }
+        ]
+      },
+      {
+        "id": "same-keyboard",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: an unchanged still-owned load continuation must still send after selecting its already displayed mode\n\n1 !== 2\n",
+        "requests": [
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-7c50040c-a60f-4756-b510-fa111a277a1d",
+            "turnId": "8e16e9fc-895f-4ba2-96f7-b83da250e5e0",
+            "allowLoad": true
+          }
+        ]
+      }
+    ],
+    "after": [
+      {
+        "id": "none",
+        "status": "pass",
+        "requests": [
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-24c6dd11-77e4-44ed-a062-3bc5652d5c2b",
+            "turnId": "c806435a-6dd7-4e67-831a-cf592af3737b",
+            "allowLoad": true
+          },
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-24c6dd11-77e4-44ed-a062-3bc5652d5c2b",
+            "turnId": "d4fdec51-b21a-456c-a6b6-e605636af053",
+            "allowLoad": true
+          }
+        ]
+      },
+      {
+        "id": "same-pointer",
+        "status": "pass",
+        "requests": [
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-c2b5ff54-e201-496e-a03f-5ad6c0883a25",
+            "turnId": "3adbf119-32ee-4a7c-b0d8-0f179b1850d3",
+            "allowLoad": true
+          },
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-c2b5ff54-e201-496e-a03f-5ad6c0883a25",
+            "turnId": "5425d297-a516-49ee-ac9b-da268f598b75",
+            "allowLoad": true
+          }
+        ]
+      },
+      {
+        "id": "same-keyboard",
+        "status": "pass",
+        "requests": [
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-b7f2896b-5946-45d6-82f3-f63439f1a47e",
+            "turnId": "a892ca09-7fe7-49bb-9c23-1f3b09efb334",
+            "allowLoad": true
+          },
+          {
+            "shapeId": "core.rag-ask",
+            "question": "What is the chosen project code? Answer briefly.",
+            "docIds": [],
+            "conversationId": "uc-b7f2896b-5946-45d6-82f3-f63439f1a47e",
+            "turnId": "e3a60f6e-9645-4120-9dc9-e0b45f8e4287",
+            "allowLoad": true
+          }
+        ]
+      }
+    ],
+    "R3": [
+      {
+        "id": "R3-mode-pointer",
+        "status": "pass",
+        "dispatches": [
+          {
+            "kind": "request",
+            "at": "2026-10-27T11:47:56.237Z",
+            "url": "http://127.0.0.1:38153/api/chat/dispatch",
+            "method": "POST",
+            "body": "{\"shapeId\":\"core.rag-ask\",\"question\":\"What is the chosen project code? Answer briefly.\",\"docIds\":[],\"conversationId\":\"uc-a97ae952-8a8a-452c-94f6-20dede5c0678\",\"turnId\":\"96092c90-cd9f-4cd4-a326-352b59a10c90\",\"allowLoad\":true}"
+          }
+        ],
+        "url": "http://127.0.0.1:43173/?api_port=38153#justsearch://surface/core.search-v3-surface?conversationId=uc-a97ae952-8a8a-452c-94f6-20dede5c0678"
+      },
+      {
+        "id": "R3-mode-key",
+        "status": "pass",
+        "dispatches": [
+          {
+            "kind": "request",
+            "at": "2026-10-27T11:48:24.419Z",
+            "url": "http://127.0.0.1:38153/api/chat/dispatch",
+            "method": "POST",
+            "body": "{\"shapeId\":\"core.rag-ask\",\"question\":\"What is the chosen project code? Answer briefly.\",\"docIds\":[],\"conversationId\":\"uc-eed42580-b8d2-4810-ac22-37ad5fed8636\",\"turnId\":\"c047df0d-4df8-41bc-a382-79cdc2ee9ea3\",\"allowLoad\":true}"
+          }
+        ],
+        "url": "http://127.0.0.1:43173/?api_port=38153#justsearch://surface/core.search-v3-surface?conversationId=uc-eed42580-b8d2-4810-ac22-37ad5fed8636"
+      }
+    ],
+    "ordinary": [
+      {
+        "id": "ordinary-ask-pointer",
+        "status": "pass"
+      },
+      {
+        "id": "ordinary-ask-key",
+        "status": "pass"
+      },
+      {
+        "id": "ordinary-structured-pointer",
+        "status": "pass"
+      },
+      {
+        "id": "ordinary-structured-key",
+        "status": "pass"
+      }
+    ],
+    "dispatchResponseStatuses": {
+      "before-g1-same-mode-load": [
+        503,
+        200,
+        503,
+        503
+      ],
+      "after-g1-same-mode-load": [
+        503,
+        200,
+        503,
+        200,
+        503,
+        200
+      ],
+      "after-g2-retirement": [
+        200,
+        200
+      ],
+      "after-g2-seed": [
+        200
+      ]
+    },
+    "blockedCases": 0
+  },
+  "modelProcesses": [
+    {
+      "pid": 877,
+      "argv": "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server -m /home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf --cache-ram 1024 --jinja --reasoning-format deepseek --reasoning-budget 0 --host 127.0.0.1 --metrics --port 38183 -c 16384 -ngl 0 --device none -np 2 -kvu -ctk q8_0 -ctv q8_0 -fa on -fit off ",
+      "startticks": "17728680",
+      "cuda": [
+        "CUDA_VISIBLE_DEVICES=-1"
+      ]
+    }
+  ],
+  "readiness": {
+    "before-g1": {
+      "available": true,
+      "activation": "completed"
+    },
+    "after-g1": {
+      "available": true,
+      "activation": "completed"
+    },
+    "after-g2": {
+      "available": true,
+      "activation": "completed"
+    }
+  },
+  "cleanup": {
+    "before-g1": {
+      "engineExit": 0,
+      "frontendExit": 143,
+      "shutdown": {
+        "name": "before-g1",
+        "reason": "case group complete",
+        "port": 44281,
+        "shutdown": {
+          "status": 202,
+          "body": "{\"schemaVersion\":1,\"issuedAtEpochMs\":1793101481923,\"shutdownAccepted\":true}"
+        },
+        "portClosed": true
+      }
+    },
+    "after-g1": {
+      "engineExit": 0,
+      "frontendExit": 143,
+      "shutdown": {
+        "name": "after-g1",
+        "reason": "case group complete",
+        "port": 33351,
+        "shutdown": {
+          "status": 202,
+          "body": "{\"shutdownAccepted\":true,\"schemaVersion\":1,\"issuedAtEpochMs\":1793101612527}"
+        },
+        "portClosed": true
+      }
+    },
+    "after-g2": {
+      "engineExit": 0,
+      "frontendExit": 143,
+      "shutdown": {
+        "name": "after-g2",
+        "reason": "case group complete",
+        "port": 38153,
+        "shutdown": {
+          "status": 202,
+          "body": "{\"shutdownAccepted\":true,\"schemaVersion\":1,\"issuedAtEpochMs\":1793101794020}"
+        },
+        "portClosed": true
+      }
+    }
+  },
+  "scriptDigests": {
+    "same-mode-load.mjs": {
+      "original": "sha256:dfa12ef1cd4df023ec6bef95d08834e759d002173b847e4580cf0ed8eeb4cfb7",
+      "executed": "sha256:dfa12ef1cd4df023ec6bef95d08834e759d002173b847e4580cf0ed8eeb4cfb7",
+      "byteIdentical": true
+    },
+    "retirement-matrix.mjs": {
+      "original": "sha256:f620d539ae49b0adfcc7c01ad0a4fc6a9e1082bf07c8baa7bf1145fdfc804789",
+      "executed": "sha256:f620d539ae49b0adfcc7c01ad0a4fc6a9e1082bf07c8baa7bf1145fdfc804789",
+      "byteIdentical": true
+    },
+    "seed-ui.mjs": {
+      "original": "sha256:b72b67e8758fa6c21ba4ce3847a6520ad9073906700c43ad8f3605981fd62349",
+      "executed": "sha256:b72b67e8758fa6c21ba4ce3847a6520ad9073906700c43ad8f3605981fd62349",
+      "byteIdentical": true
+    },
+    "ordinary-modes.mjs": {
+      "original": "sha256:3b98aa77062ccae7e11e530dc68a2e2c026a2d623121fa4779cdc7deaa8c27d3",
+      "executed": "sha256:3b98aa77062ccae7e11e530dc68a2e2c026a2d623121fa4779cdc7deaa8c27d3",
+      "byteIdentical": true
+    }
+  },
+  "governance": {
+    "base": "372b812bf137",
+    "candidateUncovered": [
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextQueryOpsCursorCompatibilityTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeHttpApiAdapterHeadStagesTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryUnderstandingServiceTest.java",
+      "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java"
+    ],
+    "baselineUncovered": [
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextQueryOpsCursorCompatibilityTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeHttpApiAdapterHeadStagesTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryUnderstandingServiceTest.java",
+      "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java"
+    ],
+    "allCandidateUnrelatedPresentOnBaseline": true
+  },
+  "checks": [
+    {
+      "command": "npm ci",
+      "cwd": "repository root, source modules/ui-web, baseline clone modules/ui-web and producer-created baseline clone modules/ui-web",
+      "exit": 0
+    },
+    {
+      "command": "npm run test:unit:run -- --configLoader runner --maxWorkers=4 src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "cwd": "$TMPDIR/before/modules/ui-web",
+      "exit": 1,
+      "result": "2 intended assertion failures (one dispatch rather than two), 8 preservation passes, zero skips"
+    },
+    {
+      "command": "python3 <temporary>/produce.py",
+      "details": "unchanged node scripts/governance/gates/test-intent/run-evidence.mjs --out gates/test-intent/evidence/uiux-same-mode-load-{repair,preservation}.json --check <ids>; repair adds --before 42f911cdba --before-root <temporary>",
+      "exit": 0,
+      "result": "repair2 after passes and2 fail-before assertions; preservation8 after passes"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "modules/ui-web",
+      "exit": 0
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "modules/ui-web",
+      "exit": 0
+    },
+    {
+      "command": "npm run test:unit:run -- --configLoader runner --maxWorkers=4",
+      "cwd": "modules/ui-web",
+      "exit": 0,
+      "result": "650 files,8277 tests passed; zero skips;116.96s"
+    },
+    {
+      "command": "node scripts/ci/run-ui-web-gates.mjs",
+      "exit": 0,
+      "result": "28/28 pass"
+    },
+    {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs check --base origin/main",
+      "exit": 1,
+      "result": "missing independent acceptance plus9 unrelated uncovered files; same9 on42f911cdba against exact same372b812bf137 base"
+    },
+    {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs check --base 42f911cdba",
+      "exit": 1,
+      "result": "only missing independent acceptance"
+    },
+    {
+      "command": "node <temporary>/same-mode-load.mjs before-g1 http://127.0.0.1:43171 44281",
+      "exit": 1,
+      "result": "control passes;pointer andkeyboard fail at expected retry-count assertion"
+    },
+    {
+      "command": "node <temporary>/same-mode-load.mjs after-g1 http://127.0.0.1:43172 33351",
+      "exit": 0,
+      "result": "all3 pass; follow-up requests retain original question and complete with HTTP200"
+    },
+    {
+      "command": "node <temporary>/seed-ui.mjs after-g2 http://127.0.0.1:43173 38153",
+      "exit": 0,
+      "result": "real selected-file answer saved; history includes LARCH and excludes unchosen DECOY"
+    },
+    {
+      "command": "node <temporary>/retirement-matrix.mjs after-g2 http://127.0.0.1:43173 38153 candidate R3-mode",
+      "exit": 0,
+      "result": "pointer andkeyboard pass; unchanged retired text blocked, mode choice itself sends nothing; deliberate Enter sends one ordinary Ask"
+    },
+    {
+      "command": "node <temporary>/ordinary-modes.mjs after-g2 http://127.0.0.1:43173 38153",
+      "exit": 0,
+      "result": "4 chosen-file/schema pointer/keyboard controls pass"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0
+    }
+  ],
+  "temporaryArtifactDigests": {
+    "before-npm-ci.log": "sha256:9c3a315a5ccfcf324e864d9f20c069635b65c82e14a5e677cbcda68ff64f8233",
+    "lint-final.log": "sha256:901a6221b089f44724e9d7454a1a8547652691fe55522109007a8e9f755ce437",
+    "lint.log": "sha256:901a6221b089f44724e9d7454a1a8547652691fe55522109007a8e9f755ce437",
+    "producer-preservation.log": "sha256:8d4fa45675dd7d986bdff717e080225307a5b7d3158cb4b7c79966db37efc4b3",
+    "producer-repair.log": "sha256:1c8994b2b32421e9b52685fee03d643ac8ac9ee18462307e08e2bbaa20b8c51c",
+    "root-npm-ci.log": "sha256:88d03f6fccd0ee62a0fce9135569d1e388966bfa59a29f77885988bb64452c6f",
+    "test-intent-before-same-base.log": "sha256:8bef88901921eb6eedc7207bbe9e9a9f9ffc1f75ae7196a3e5a9743e943fd910",
+    "test-intent-before.log": "sha256:2cd5b6a30cd58f837b4a9946267db11a5d854ad77cae8c19591f3c748a6cd49d",
+    "test-intent-delivery.log": "sha256:4399082e9e95bb1f807eb6ef90dbd6338fb7fa488beba94af499dedc49305d3d",
+    "test-intent-final.log": "sha256:39768881941240cbc02af0aa3702589879e7e4d7c3244f135cad0c4d8cf56bf7",
+    "test-intent-initial.log": "sha256:b451e506c1f328feb1f8c233b70bf35aaec7d9e60c675712d9428ca124325413",
+    "test-intent-task-base.log": "sha256:d1d821918f138d3a13dc4de2cc6d9c2b139aba70f33deb350a18c9143f4079f9",
+    "typecheck-final.log": "sha256:c8d2e1bbc6c37e08225a662df8d8fc9af17316c77b6aafc9b776350e0f188ab3",
+    "typecheck.log": "sha256:c8d2e1bbc6c37e08225a662df8d8fc9af17316c77b6aafc9b776350e0f188ab3",
+    "ui-gates.log": "sha256:0d9de61819a29928bf6d1e00ac63750c27b4707b88aee8e313a633234b3f9793",
+    "ui-npm-ci.log": "sha256:6294f536b255b125497da24732049636d008ec852f2f4ad1d81ca66499779e48",
+    "unit-after-v2.log": "sha256:9bd8edce32419b73e6344a291bc8565daf5b0230d184e96731778591a2a09085",
+    "unit-after.log": "sha256:4424db18b560860774560fbb28e1f1aefda3630fa12833a260ff770ca7c81999",
+    "unit-before-admitted.log": "sha256:00acd06883a4ea0dc3afb4aa88b1f0e4358d19c9b89c91f26f3e199f3dce8d7c",
+    "unit-before-final.log": "sha256:850b802b48e7082b3a2a52f6a2b79dea2e1ac09a4d33688255a639304367ee55",
+    "unit-before-v2.log": "sha256:548f533bca6b728f4132a19fa766a9d54db5df0748847bf67548062ad4b58056",
+    "unit-before.log": "sha256:928d35bfe91c3596330c462f619de5fb315a119fa97ee70834a99643dd8ba28a",
+    "unit-full.log": "sha256:e7ecff206980d5d775d1de646adefdb2396d8ef268a457160c63f8b0d89e2398",
+    "evidence/after-g1-cleanup.json": "sha256:d807f7cfd683b3664e75426e4a0cff45999602c627962bde8412a3e29f32f092",
+    "evidence/after-g1-engine.json": "sha256:9e8fe93b2fdd407fe59294b98f1ff0fc931595946765189b5c530d23fabcce45",
+    "evidence/after-g1-engine.log": "sha256:4875c4b455f0265d909ab39868326c990205a583b236723286afd335bb066cb2",
+    "evidence/after-g1-frontend.json": "sha256:2c8a150c058ad667cb9fcb1d32609abd7df517c847bd603cd28e9345425bb454",
+    "evidence/after-g1-frontend.log": "sha256:98b8f05eea9cd7b0bd29c9fb1028397fb7787c732b4d3d940ad283ac62bd6242",
+    "evidence/after-g1-none-after.aria.txt": "sha256:8df5fce00e902fbde08b02b088c0d5de2e13435bd5caa3ca53ff616ea5d35399",
+    "evidence/after-g1-none-after.png": "sha256:f4c136fcc64237967aecbce2a24fbfe2dd1dde2ff20afa5b7d065cfba17385b0",
+    "evidence/after-g1-none-after.storage.json": "sha256:aadeb41b071c758d5d6ef3752a28616d7f0717210f8ec46ca8795c02b4ea1733",
+    "evidence/after-g1-none-pending.aria.txt": "sha256:cab10a78b3d51ce2d77b199a898e2e6f2ee4efeb38ea2b843d3248d3cf21ec54",
+    "evidence/after-g1-none-pending.png": "sha256:959906ddcffb22f794fce86416951c222ed266c6cf1d9110b7c672e9e4119496",
+    "evidence/after-g1-none-pending.storage.json": "sha256:8cf9df2d091b74480f4d70b9f2664326d66c9e9c785e6eb4f207b950e7329f36",
+    "evidence/after-g1-none-refusal.aria.txt": "sha256:9de2665f4962e45ecafef74ef2cb76e09693514d379696b0fd81b8676aa5dd13",
+    "evidence/after-g1-none-refusal.png": "sha256:e81be3885a317a0877eb96fb880fe5cef773c44da5f4a4bf0003cbcc73d6bc3d",
+    "evidence/after-g1-none-refusal.storage.json": "sha256:40ad08ce20e2fe664cfcbf08e12ab5e29e47dc2d35109107fcd22b195c20befe",
+    "evidence/after-g1-probe.json": "sha256:fd05ab009c653e1565060daf42411f553622da0cf3b127a48fc8e2abd21f5d65",
+    "evidence/after-g1-processes.json": "sha256:dd223b727a1a6784a30c4e90da77da581179c6b944474dd53540adb6686b5db5",
+    "evidence/after-g1-ready-model.json": "sha256:d9eb400de33ce8924e597f850fc522de4caf4948c7525cc2d2b7b97404a4cdc9",
+    "evidence/after-g1-same-keyboard-after.aria.txt": "sha256:c45ca83c08f096f86bcbe7f490824aa3d91935aab7ccf0612f13988f97e68fbf",
+    "evidence/after-g1-same-keyboard-after.png": "sha256:a18ffb42eaa368cee0099d6510ebd262bc127de903c65fa28f4c5ce25e2530f4",
+    "evidence/after-g1-same-keyboard-after.storage.json": "sha256:24b58ddb4cfb259c54cf148ba501c73d736eee48b6b06190cab3a15b10c28010",
+    "evidence/after-g1-same-keyboard-pending.aria.txt": "sha256:9419cf8701afdc1eeb0be9fb1b4d18024b1a84ea34e318026670b59d623bb20e",
+    "evidence/after-g1-same-keyboard-pending.png": "sha256:381a913c494dae2941ef17a79b31362840696b23572f39d9d5b30e9f727b99b8",
+    "evidence/after-g1-same-keyboard-pending.storage.json": "sha256:6d1081225ea9dfe03ddaabe99c352a883eabde8a99bcddaf4517383e00627e92",
+    "evidence/after-g1-same-keyboard-refusal.aria.txt": "sha256:b4678960b2d72a1925f606344ea412542e4eb44fa74510a1b6a8da429b54773c",
+    "evidence/after-g1-same-keyboard-refusal.png": "sha256:2a9939742346238ae5e04242c35f7f372af8bd7196716bf1144642fc95244a0a",
+    "evidence/after-g1-same-keyboard-refusal.storage.json": "sha256:1799ab3823d6bb6bb2e61ec1f1bb1df2293179c2c850dc898cad24b83a66d516",
+    "evidence/after-g1-same-mode-load-browser.json": "sha256:e1771011aa146532e15fbdd77b672c7c3a1cc3e72c2cc8c192958f49e28a42d0",
+    "evidence/after-g1-same-mode-load-network.json": "sha256:9480b31efcd234e8b7a3e661f8393071631e8efb5969caf26f058ca99129c234",
+    "evidence/after-g1-same-mode-load-results.json": "sha256:77c392581bc7e10726627ab82210c72037b59f54b6379c1a9920355b4f5440f4",
+    "evidence/after-g1-same-mode-load-sandbox-startup-failure.txt": "sha256:b31e0a98b47789f684009caf339dcd1f7e5e5fd9097ee7c28d415cfd8370c5cd",
+    "evidence/after-g1-same-mode-load.log": "sha256:60f7e60f59094a600711c677edae8bc343f3a7a366adae17d5451915e5d35f6c",
+    "evidence/after-g1-same-pointer-after.aria.txt": "sha256:dd7d0ed4dc1e2461a4b5705a8b1b7837698c2be8ebfaabce5d1558ba2e0cb5d7",
+    "evidence/after-g1-same-pointer-after.png": "sha256:24e20908c512ea8cad1d8aa18abc9dc3c60eec32d88562f9429a8fa8ae0d5f4f",
+    "evidence/after-g1-same-pointer-after.storage.json": "sha256:7952250deecb9d4361d670dd19ace8dfa2907471e352976f7faec1e9048ee448",
+    "evidence/after-g1-same-pointer-pending.aria.txt": "sha256:c685b7f42f379443f5adc6024fb0e8b4bed17b6cf6f9d85408865379f548d8a3",
+    "evidence/after-g1-same-pointer-pending.png": "sha256:010f64ec5a7444651ce1b1cd3beede2c2182c1b73d2f360d36e980c49a1c0efc",
+    "evidence/after-g1-same-pointer-pending.storage.json": "sha256:72b18a2e6491fdd1b344413965b4d1767571697aa273b503e496e0c3fce46521",
+    "evidence/after-g1-same-pointer-refusal.aria.txt": "sha256:bdb615422f6e0a6e6aa243f80fcdad16555344095dc3f71bf32abe95faab413f",
+    "evidence/after-g1-same-pointer-refusal.png": "sha256:3f0f07b7555a0db93c776104cf37505ecf11192c291eaae095e6338cb88b085a",
+    "evidence/after-g1-same-pointer-refusal.storage.json": "sha256:d4838eba204709f9ce11a26d089db2b029217144d7139be58e1920e325a090e4",
+    "evidence/after-g2-R3-mode-key.aria.txt": "sha256:b7114a8b51c215e4809dd0f71a7d9461d9413979ff61ec4f04b05e4e4ac07f7d",
+    "evidence/after-g2-R3-mode-key.png": "sha256:a664e030dc035dc64c83f2d7308872df0b9ec5494c837d01201075afb6f605a1",
+    "evidence/after-g2-R3-mode-key.storage.json": "sha256:fedebb872efb68fc297ac2d46fac5abd89df53f5ceadcc465d05b34d111e5646",
+    "evidence/after-g2-R3-mode-pointer.aria.txt": "sha256:ddeb36efedfefb8a06877ffa3adb299775be7975461aefbcaf178a19ed3b08b3",
+    "evidence/after-g2-R3-mode-pointer.png": "sha256:6e9a17ffa9b57731df91ce98de711969b28b0bdc721deb526743b4e200a3120b",
+    "evidence/after-g2-R3-mode-pointer.storage.json": "sha256:719ef88ff4afffa46cafa41165449bd92275f14ea2f017decac39b63095b7f13",
+    "evidence/after-g2-cleanup.json": "sha256:7bbadd529492cdd650713399dd92be49ff154f636f4f12159b928a3f2de10e98",
+    "evidence/after-g2-engine-processes.json": "sha256:df0a7a291f4c83641c808eb96e5014b7e7ee2dea0541beb78190e5f887c3ea4b",
+    "evidence/after-g2-engine.json": "sha256:9f295dcf280deec5a555458e9dc5fe0c220156fbd13fe744503cc985aa79f8c1",
+    "evidence/after-g2-engine.log": "sha256:e9801e72f84e5efc4932fd98fbd6010e3f52416c7103458f35905d76acfa6628",
+    "evidence/after-g2-frontend-processes.json": "sha256:13ed637fc175413b3823e2e417f354d8be86a421c50387d09d0f0de809330e18",
+    "evidence/after-g2-frontend.json": "sha256:49fb690753e1b0b55ed8c342e4ff34654098b2922aaa495830f9bdf442e225e8",
+    "evidence/after-g2-frontend.log": "sha256:6c9634bd7d59ad28eda3a4e7837219f9a90f102ccaa81824313caa6fdccefc2c",
+    "evidence/after-g2-model-observed-tool-output.json": "sha256:b09b821a2a202e14c2529b0aa5ed3f334e2e1c1e8d30a04d310bbc9a25689604",
+    "evidence/after-g2-ordinary-mode-preservation.aria.txt": "sha256:25a218b7915c414f15e11495e3dd30d3f735b70a129321e32f55833dc6be0ce9",
+    "evidence/after-g2-ordinary-mode-preservation.png": "sha256:77e537a83842ec7a199c66ad47731e6823fc29f948d7c53812fbf0f93b026fc8",
+    "evidence/after-g2-ordinary-mode-preservation.storage.json": "sha256:cc819d2281c54aea6d13548115e5628feca3d99e165af8415085f22c947b264e",
+    "evidence/after-g2-ordinary-mode-results.json": "sha256:34ecb7c0168b7090bcf1077815d7607e2a107858e57daaaf26551c13cef13e3f",
+    "evidence/after-g2-ordinary-modes-browser.json": "sha256:d67fc7a1716674bd2a8e0c8635c08234b76e67d0104607e23a3c8cb0c1fcb6af",
+    "evidence/after-g2-ordinary-modes-network.json": "sha256:01d8d71f26fd53b3f83b3f7575802798e002f40b7f07ed6e5774176ff52a3723",
+    "evidence/after-g2-ordinary-modes-sandbox-startup-failure.txt": "sha256:ba911a80fa66cffbd7511e96ed541d1c34536e3f59477dccc8f43e0ffe2d05ef",
+    "evidence/after-g2-ordinary-modes.log": "sha256:671603f21e2e00b8c68d4adad25fbe25f85b952e21f90104f4a22588d5ce90d0",
+    "evidence/after-g2-probe.json": "sha256:e5a785a95a7a31c8b8fd968e14d8fad67d96ee3c2c6e763b192b98d581d4be56",
+    "evidence/after-g2-ready-model.json": "sha256:40f64a54d2d44b58a1b6c2bf4e11b33b40286cc6c4170fb75533c98d3004bb29",
+    "evidence/after-g2-retirement-browser.json": "sha256:38bf9659b18df124ce5bc4cba59f39faed6a11f3b66eb997858901604a5e4be3",
+    "evidence/after-g2-retirement-network.json": "sha256:822ace9f06c2f1fa24196195edc0ddfd55de35b5c64e747509b01440f739095c",
+    "evidence/after-g2-retirement-results.json": "sha256:0c3bbbcf87769cf1d4cc0a99d1105a798ae0e37b14210c88874d97675a6e6e4a",
+    "evidence/after-g2-retirement-sandbox-startup-failure.txt": "sha256:43493caf1116e289a6f2e8542291a7f3b7b6cc8514cc7f64b34da0773e83e351",
+    "evidence/after-g2-retirement.log": "sha256:7b7c44726bf3833928e68c1b61372e15cf6c10b651a5e6604221dd5f55d020d3",
+    "evidence/after-g2-seed-after.aria.txt": "sha256:1e95d5451ecec918909773161fccb2b096fd09061e09fd796eb0eb1d57b047e4",
+    "evidence/after-g2-seed-after.png": "sha256:80ad111b7f42f2a54c34fc5f4b6c463b51a65de392bf34d8b60027f4d24e1425",
+    "evidence/after-g2-seed-after.storage.json": "sha256:50b0be96d9701950b9df7b687369746eb0d786ace30e91878fcbb3f001d3c5b3",
+    "evidence/after-g2-seed-before.aria.txt": "sha256:fd8524429125937b867317dac2f5e45c9bfdabe62e37808f216486b9f947a9da",
+    "evidence/after-g2-seed-before.png": "sha256:4ff70a7ec79b0f547267f01df7265c0b6d82447a2b589e4561c1961c582adcb2",
+    "evidence/after-g2-seed-before.storage.json": "sha256:c12a7afae1ca6e779479b00c450f53453923810bc267a50e4781baefd9d490f9",
+    "evidence/after-g2-seed-browser.json": "sha256:f0db9690f6efb191dfaf2694ca1ed70cea03b163c6eedbaa2f0970a1f62abfee",
+    "evidence/after-g2-seed-history.json": "sha256:2f095c4fdcc8f087c20f0408377b08c6896f350cc672368d99ee74aab852cc2e",
+    "evidence/after-g2-seed-network.json": "sha256:57d19d741712e15ebe02756d0a51cb68c6549546a23787d9eecf2d0fa58a66d4",
+    "evidence/after-g2-seed-request.json": "sha256:1324bdf1eff63cfc27d1a8da8b2b4701ed654f181076a3d0cf8bc41ed143cd43",
+    "evidence/after-g2-seed-sandbox-startup-failure.txt": "sha256:9582769a2acd1cff07c6a2237024639141493e3d54d30404e2acd42db6d05768",
+    "evidence/after-g2-seed-stream.txt": "sha256:4def1f669713bc2e28315a7b30d4bc30ebb7edd77a04266310056c141d85d31f",
+    "evidence/after-g2-seed.json": "sha256:91b39db14bf2185ac6bb88fa915e1779ddd2b819d21d6f8a861afd198940f3a0",
+    "evidence/after-g2-seed.log": "sha256:fac7d5237978e6240cce5b0bd570a428b0aaa0aec155c27f346b465df6c574a4",
+    "evidence/before-g1-cleanup.json": "sha256:27972de5e92351b335bd1953a1abeb823744dec6fcc6b72f6e75c8be7b54aad1",
+    "evidence/before-g1-engine.json": "sha256:a5ad020ec3a456f9ad6586036b461c6875113d2542d985d2f3011762a933ba83",
+    "evidence/before-g1-engine.log": "sha256:028f463bce1d5eb1d1085c40f68a84c44727566f4a80c287678d1d40c8376b51",
+    "evidence/before-g1-frontend.json": "sha256:767ce0af95533c19feaef111071a4a0edbd7c79dc1060f4b6c99878122cbaf40",
+    "evidence/before-g1-frontend.log": "sha256:856bb90b765920b83e6db05a3473d4fbbc5c27ebc9d84d3ac85efb6339843053",
+    "evidence/before-g1-none-after.aria.txt": "sha256:90223c6ae9df5943cc91d2090745ce67a5ff0924b65a2b596a965bb39849afc4",
+    "evidence/before-g1-none-after.png": "sha256:ab6b62ba65657fdd42b5e26314840335e58e1fa1850c27057b38fb8e810bf40e",
+    "evidence/before-g1-none-after.storage.json": "sha256:88294b71fc26bbba6c6ac882c4fd3c27be1f66b687d4db59565fa000a41ce98a",
+    "evidence/before-g1-none-pending.aria.txt": "sha256:ae68d19d475ad6e0683e56244dd28356a72ddaa30417a96d02cf4b29bd916d45",
+    "evidence/before-g1-none-pending.png": "sha256:fd07c37517d2c286e0d15c405717c74c05308fb192d35ad7cd419f1967242508",
+    "evidence/before-g1-none-pending.storage.json": "sha256:966c3be46f68e366022d7238f60036eacdeac48514e0a3069fe7e502e2b21320",
+    "evidence/before-g1-none-refusal.aria.txt": "sha256:470f339eae38398398d15b3a3bc8e5dad2fac3415ceee14f42e80a664b0503b7",
+    "evidence/before-g1-none-refusal.png": "sha256:19f2e34de9ca05da5542e9830fd87675868a92e735c5111ea805ca4141558e2b",
+    "evidence/before-g1-none-refusal.storage.json": "sha256:966c3be46f68e366022d7238f60036eacdeac48514e0a3069fe7e502e2b21320",
+    "evidence/before-g1-probe.json": "sha256:18331042a2b427a21d5130a2f9347a8c069c79022534ee019820aa66a68e1e44",
+    "evidence/before-g1-processes.json": "sha256:efbf78adf244aa35a57a51b2af14a0c11f92f5fca478de42265914cdecb0557a",
+    "evidence/before-g1-ready-model.json": "sha256:76c221a6328be26389e27f3f5eea675430ee916909093764e7a80bdd5f7bcf7c",
+    "evidence/before-g1-same-keyboard-after.aria.txt": "sha256:b9da4962f5736804a112533940cd27f7a7135f6f37f327e44532e658c8f7dc70",
+    "evidence/before-g1-same-keyboard-after.png": "sha256:b8dace89d8853a1df3b6e7c99fe4ff1b6b0e58eabd7dc338554fde619715b050",
+    "evidence/before-g1-same-keyboard-after.storage.json": "sha256:b23156265b86e9e172108350c9ac1488968b88f8f41f7ac2be20c63989c5d0de",
+    "evidence/before-g1-same-keyboard-failure.aria.txt": "sha256:b9da4962f5736804a112533940cd27f7a7135f6f37f327e44532e658c8f7dc70",
+    "evidence/before-g1-same-keyboard-failure.png": "sha256:b8dace89d8853a1df3b6e7c99fe4ff1b6b0e58eabd7dc338554fde619715b050",
+    "evidence/before-g1-same-keyboard-failure.storage.json": "sha256:b23156265b86e9e172108350c9ac1488968b88f8f41f7ac2be20c63989c5d0de",
+    "evidence/before-g1-same-keyboard-pending.aria.txt": "sha256:5c7dd6eae9cd81a6108144d57407e20aaa530d62f5fddb8bc40dae5cd8ac4ee9",
+    "evidence/before-g1-same-keyboard-pending.png": "sha256:d37a17b09c9cc80760a03f711549b67f36bcefa0f3fdcdab816e0f7f79fdff58",
+    "evidence/before-g1-same-keyboard-pending.storage.json": "sha256:b23156265b86e9e172108350c9ac1488968b88f8f41f7ac2be20c63989c5d0de",
+    "evidence/before-g1-same-keyboard-refusal.aria.txt": "sha256:71688a96f242455a272f101bbc214f2f7340360113a20938cdd005fa2f627693",
+    "evidence/before-g1-same-keyboard-refusal.png": "sha256:f074e90115b557f8543a4ba8aa3aec0e576a167f373c1e77237146ff25f6166a",
+    "evidence/before-g1-same-keyboard-refusal.storage.json": "sha256:87e9646ccebb9ddc39604f19b8d46341fee05122c1483fcb0f34ba6792c1d6e6",
+    "evidence/before-g1-same-mode-load-browser.json": "sha256:c4204a236adf87b730bdae409be68a3f86233344891ab6523dd677647d781d9e",
+    "evidence/before-g1-same-mode-load-network.json": "sha256:7ebee72cdffaf4db19bf94776faf9f6d29c825920a0adf1af5961fb4e456de4b",
+    "evidence/before-g1-same-mode-load-results.json": "sha256:566fa9620bebc07859ac1d8c890b21674da948ca39b14fc7f9abca0610ff7a1a",
+    "evidence/before-g1-same-mode-load-sandbox-startup-failure.txt": "sha256:f04c0a7d8d913ec0cf686cbcaf665e3f64a149669b472ae7268fe86348005558",
+    "evidence/before-g1-same-mode-load.log": "sha256:693149449a553664695bf701f30bbd842a36b8aece18a9bc12cb1f3bf0188ade",
+    "evidence/before-g1-same-pointer-after.aria.txt": "sha256:c168bb13241581d6df7364f965762b992a1695bf62440729dc5dd034b92d7ae4",
+    "evidence/before-g1-same-pointer-after.png": "sha256:99438de519a6e04e54df88a378af8d4308593339554dfb8b80cc4c7e95f5bd9e",
+    "evidence/before-g1-same-pointer-after.storage.json": "sha256:3ee5be917b55fd36f8e263c118af5204eac3c8c8ba7faf52aeaa5a2dc9134309",
+    "evidence/before-g1-same-pointer-failure.aria.txt": "sha256:c168bb13241581d6df7364f965762b992a1695bf62440729dc5dd034b92d7ae4",
+    "evidence/before-g1-same-pointer-failure.png": "sha256:99438de519a6e04e54df88a378af8d4308593339554dfb8b80cc4c7e95f5bd9e",
+    "evidence/before-g1-same-pointer-failure.storage.json": "sha256:3ee5be917b55fd36f8e263c118af5204eac3c8c8ba7faf52aeaa5a2dc9134309",
+    "evidence/before-g1-same-pointer-pending.aria.txt": "sha256:c168bb13241581d6df7364f965762b992a1695bf62440729dc5dd034b92d7ae4",
+    "evidence/before-g1-same-pointer-pending.png": "sha256:99438de519a6e04e54df88a378af8d4308593339554dfb8b80cc4c7e95f5bd9e",
+    "evidence/before-g1-same-pointer-pending.storage.json": "sha256:3ee5be917b55fd36f8e263c118af5204eac3c8c8ba7faf52aeaa5a2dc9134309",
+    "evidence/before-g1-same-pointer-refusal.aria.txt": "sha256:ddc3b76e874c058641a454595cde4d964befaac3020544369e3410abc1c8faa1",
+    "evidence/before-g1-same-pointer-refusal.png": "sha256:8a5bfa50a3ce7d4e41d09d2eaeb678c61faa26fd23be2d83ecf566ada137ed2a",
+    "evidence/before-g1-same-pointer-refusal.storage.json": "sha256:d48e29e700cb36b39a93d13774db7ff94d6291ece520f4ea38f8e69b9bef3723"
+  },
+  "initialAttempts": "Test fixtures first incorrectly expected untrimmed normal Send text, selected files before establishing Search results and compared transient recovery envelope/stale persisted draft. Corrected to normal UI flow and user-visible text/scope/schema preservation; all final preservation checks pass on baseline. No accepted test or product behavior was weakened. Initial clone governance used its local origin/main; repeated with exact source origin/main hash for the paired comparison."
+}

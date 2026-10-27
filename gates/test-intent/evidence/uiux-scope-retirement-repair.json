@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T09:40:30.075Z",
+  "revision": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+  "tree": "5055e90c5db547e344ca2dad19bbbd7c304f08a7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/qffrcyie/tmp/test-intent-vitest-5-1793094018552.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3999
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 return shows why unchanged incoming text needs a new file or mode choice",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 return shows why unchanged incoming text needs a new file or mode choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through Enter",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 unchanged incoming text cannot send all files after return through Enter",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through button",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 unchanged incoming text cannot send all files after return through button",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through submit event",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 unchanged incoming text cannot send all files after return through submit event",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 choosing files after return sends exactly that new scope as Ask",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 choosing files after return sends exactly that new scope as Ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 carrying unchanged returned text into a conversation keeps the guard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 carrying unchanged returned text into a conversation keeps the guard",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "887587e2c3",
+    "revision": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/qffrcyie/tmp/test-intent-vitest-5-1793094026641.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2826,
+        "output": "JSON report written to /home/elias/.cache/am/qffrcyie/tmp/test-intent-vitest-5-1793094026641.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 return shows why unchanged incoming text needs a new file or mode choice",
+        "classification": "assertion",
+        "detail": "HO9 return shows why unchanged incoming text needs a new file or mode choice:  AssertionError: expected '\\n      \\n        \\n        \\n       …' to match /files and mode.*not kept/i\n    at /home/elias/.cache/am/qffrcyie/tmp/scope-return-work/test-intent-before-Ioq0ya/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts:99:37\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through Enter",
+        "classification": "assertion",
+        "detail": "HO9 unchanged incoming text cannot send all files after return through Enter:  AssertionError: expected [ [ '/api/chat/dispatch', …(1) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/qffrcyie/tmp/scope-return-work/test-intent-before-Ioq0ya/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through button",
+        "classification": "assertion",
+        "detail": "HO9 unchanged incoming text cannot send all files after return through button:  AssertionError: expected [ [ '/api/chat/dispatch', …(1) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/qffrcyie/tmp/scope-return-work/test-intent-before-Ioq0ya/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through submit event",
+        "classification": "assertion",
+        "detail": "HO9 unchanged incoming text cannot send all files after return through submit event:  AssertionError: expected [ [ '/api/chat/dispatch', …(1) ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/qffrcyie/tmp/scope-return-work/test-intent-before-Ioq0ya/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 choosing files after return sends exactly that new scope as Ask",
+        "classification": "assertion",
+        "detail": "HO9 choosing files after return sends exactly that new scope as Ask:  AssertionError: expected [] to deeply equal [ 'replacement.md' ]\n    at /home/elias/.cache/am/qffrcyie/tmp/scope-return-work/test-intent-before-Ioq0ya/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts:120:66\n    at file:///home/elias/.cache/am/qffrcyie/tmp/scope-return"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 carrying unchanged returned text into a conversation keeps the guard",
+        "classification": "assertion",
+        "detail": "HO9 carrying unchanged returned text into a conversation keeps the guard:  AssertionError: expected '\\n      \\n        \\n        \\n       …' to match /files and mode.*not kept/i\n    at /home/elias/.cache/am/qffrcyie/tmp/scope-return-work/test-intent-before-Ioq0ya/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts:127:37\n    at file:///home/eli"
+      }
+    ]
+  },
+  "digest": "sha256:8bed368528ed7cea6fd06857557a25c1f7621e2f4af0234c613e10d329dc919a"
+}

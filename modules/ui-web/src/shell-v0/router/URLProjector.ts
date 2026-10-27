@@ -29,6 +29,7 @@ import { canonicalize, parseUrl } from './parser.js';
 import { getStore } from './storeRegistry.js';
 import { getJournalState, recordNavigation } from '../state/NavigationJournal.js';
 import { present } from '../display/present.js';
+import { peekSearchV3Handoff } from '../utils/compose.js';
 import type { ShellAddressNavigation, StateSnapshot } from './types.js';
 import {
   getSurfaceStateSchema,
@@ -134,7 +135,11 @@ export function activateProjection(surfaceId: string): void {
   clearPendingWrite();
   // Initial write — make sure the URL reflects the current store state at
   // activation time.
-  writeUrl(surfaceId, resolved);
+  // Intake may still be waiting for the view to mount, or have just been refused.
+  // Keep the arrival address here only; later store/navigation writes project normally.
+  if (surfaceId !== 'core.search-v3-surface' || peekSearchV3Handoff()?.origin !== 'fresh') {
+    writeUrl(surfaceId, resolved);
+  }
 }
 
 /** Tear down all store subscriptions. Safe to call when no projection is active. */
@@ -149,6 +154,13 @@ export function deactivateProjection(): void {
     }
   }
   active = null;
+}
+
+/** Replace accepted transient address inputs with the current durable navigation state. */
+export function refreshProjection(): void {
+  if (active === null) return;
+  clearPendingWrite();
+  writeUrl(active.surfaceId, active.schema);
 }
 
 function scheduleWrite(surfaceId: string, schema: ResolvedSchema): void {

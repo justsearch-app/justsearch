@@ -20,6 +20,7 @@ import {
 } from '../../state/selectionState.js';
 import { listSelectionActions } from '../../commands/SelectionActionRegistry.js';
 import { compose } from '../../utils/compose.js';
+import { selectionItemToWirePayload } from '../../utils/selectionWire.js';
 import type {
   PluginTrustTier,
   PluginSelection,
@@ -131,10 +132,12 @@ export function createSelectionApi(tier: PluginTrustTier, pluginId: string): Plu
     userPrompt?: string;
     source?: string;
   }): boolean => {
+    const selected = getSelection();
     return compose({
       operation: intent.operation,
       source: intent.source ?? 'PLUGIN_EMITTED',
       userPrompt: intent.userPrompt,
+      selection: selectionItemToWirePayload(selected.items[selected.primaryIndex]) ?? undefined,
     });
   };
 

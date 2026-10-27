@@ -22,7 +22,7 @@ import { __resetSurfaceSchemasForTest } from '../router/surfaceSchemas.js';
 import { __resetStoreRegistryForTest } from '../router/storeRegistry.js';
 import { __resetBootstrapForTest } from '../router/bootstrap.js';
 import { __resetUserConfigForTest, getUserConfig, setSurfaceOverride } from '../state/userConfigState.js';
-import { __resetAiStateForTest } from '../state/aiStateStore.js';
+import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../state/aiStateStore.js';
 import { deactivateProjection } from '../router/URLProjector.js';
 import { getJournalState, __resetJournalForTest } from '../state/NavigationJournal.js';
 import { ModalityController, __resetModalityForTest } from '../primitives/modality.js';
@@ -31,10 +31,11 @@ import type { Surface } from '../../api/types/surface.js';
 import { registerCommand, unregisterCommand } from '../commands/CommandRegistry.js';
 import { registerKeybinding, unregisterKeybinding, listKeybindings } from '../commands/KeybindingRegistry.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
+import { takeSearchV3Handoff } from '../utils/compose.js';
 import { initLayoutCatalog } from '../layout/LayoutManifest.js';
 import { setActiveLayoutId, setSecondaryActiveSurface } from '../state/userConfigState.js';
 
-const DEFAULT = 'core.unified-chat-surface';
+const DEFAULT = 'core.search-v3-surface';
 const LIBRARY = 'core.library-surface';
 const OTHER = 'plugin.other';
 class SearchProbe extends HTMLElement {
@@ -296,4 +297,29 @@ describe('native search summon shared destination', () => {
     expect(listKeybindings().find((entry) => entry.commandId === 'test.overlap')).toEqual(saved);
     shell.remove();
   });
+
+  it.each([true, false])('C5 W5 Ctrl Shift A prepares Ask when chat is ready (%s), otherwise Search', async ready => {
+    __resetAiStateForTest();
+    takeSearchV3Handoff();
+    const shell = await mount();
+    __feedForTest({ status: {} as never, inference: { mode: ready ? 'online' : 'offline', available: ready } as never });
+    __feedContactForTest();
+    await settle(shell);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'A', ctrlKey: true, shiftKey: true, bubbles: true }));
+    await settle(shell);
+    expect(shell.activeId).toBe(DEFAULT);
+    expect(takeSearchV3Handoff()?.state.mode).toBe(ready ? 'ask' : 'search');
+    shell.remove();
+  });
+  it.each([true, false])('C5 W5 the Ask chord works from the focused composer (%s)', async ready => {
+    takeSearchV3Handoff();
+    const shell = await mount();
+    __feedForTest({ status: {} as never, inference: { mode: ready ? 'online' : 'offline', available: ready } as never });
+    __feedContactForTest(); await settle(shell);
+    const field = probe(shell)!.field; field.focus();
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'A', ctrlKey: true, shiftKey: true, bubbles: true, composed: true, cancelable: true }));
+    await settle(shell);
+    expect(takeSearchV3Handoff()?.state.mode).toBe(ready ? 'ask' : 'search');
+  });
+
 });
