@@ -451,7 +451,9 @@ final class RAGContextTest {
   void grpcDeadlineIsRecognisedAsTimeout() {
     var docs =
         new FailingRetrieveDocs(
-            new RuntimeException("DEADLINE_EXCEEDED: deadline exceeded after 9.999s"));
+            new io.justsearch.app.api.knowledge.KnowledgeClientException(
+                io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+                "DEADLINE_EXCEEDED: deadline exceeded after 9.999s"));
     var injector = new RAGContext(docs);
 
     InjectorResult r = injector.inject(stubCtx(Map.of("question", "what?")));

@@ -1236,6 +1236,20 @@ public final class ConversationEngine {
       try {
         result = inj.inject(ctx);
       } catch (Exception e) {
+        RuntimeException cancelled =
+            io.justsearch.app.services.worker.EngineRequestEnds.cancellation(e);
+        if (cancelled != null) {
+          Map<String, Object> payload = new LinkedHashMap<>();
+          payload.put("message", Objects.toString(cancelled.getMessage(), ""));
+          payload.put("error", Objects.toString(cancelled.getMessage(), ""));
+          payload.put("errorCode", "SERVICE_UNAVAILABLE");
+          if (cancelled instanceof io.justsearch.app.api.EngineWorkCancelledException reason) {
+            payload.put("reasonCode", reason.reasonCode());
+          }
+          SseEvent terminal = new SseEvent("error", payload);
+          if (!stoppedByUser(work)) sink.accept(terminal);
+          return new InjectorRunResult(out, forwarded, true, retrievalMetadata, citations, terminal);
+        }
         SseEvent refusal = refusalEvent(e);
         if (refusal != null) {
           if (!stoppedByUser(work)) sink.accept(refusal);

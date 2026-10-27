@@ -1626,6 +1626,8 @@ final class RagContextOps {
       try {
         qv = embeddingProvider.embedQuery(question, acquisition);
       } catch (RuntimeException e) {
+        EngineFutures.rethrowExecutorRefusal(e);
+        EngineFutures.rethrowCancellation(e);
         if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(usableHits, targetK);
         log.debug("MMR query embedding failed: {}", e.getMessage());
         return diversifyByPosition(usableHits, targetK);
@@ -1651,6 +1653,8 @@ final class RagContextOps {
         }
         vectors.add(v);
       } catch (RuntimeException e) {
+        EngineFutures.rethrowExecutorRefusal(e);
+        EngineFutures.rethrowCancellation(e);
         if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(usableHits, targetK);
         log.debug("MMR chunk embedding failed: {}", e.getMessage());
         return diversifyByPosition(usableHits, targetK);
