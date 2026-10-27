@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -153,7 +154,22 @@ public final class QueryUnderstandingService {
       String indexSnapshot,
       io.justsearch.core.context.EngineContext engineContext,
       boolean enabledForOperation) {
-    if (!isAvailable(enabledForOperation)) {
+    return extractIfAvailable(query, indexSnapshot, engineContext, enabledForOperation,
+        OptionalLong.empty());
+  }
+
+  /** The operation deadline is absolute and includes time spent in synchronous setup. */
+  CompletableFuture<QuResult> extractIfAvailable(
+      String query,
+      String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext,
+      boolean enabledForOperation,
+      OptionalLong operationDeadline) {
+    long startNs = System.nanoTime();
+    long ownDeadline = startNs + TimeUnit.MILLISECONDS.toNanos(QU_DEADLINE_MS);
+    long deadlineNs = operationDeadline.isPresent()
+        ? HeadSearchDeadline.earlier(ownDeadline, operationDeadline.getAsLong()) : ownDeadline;
+    if (!isAvailable(enabledForOperation) || deadlineNs - System.nanoTime() <= 0) {
       return null;
     }
 
@@ -163,7 +179,8 @@ public final class QueryUnderstandingService {
             Map.of("role", "system", "content", systemPrompt),
             Map.of("role", "user", "content", "Query: \"" + query + "\""));
 
-    long startNs = System.nanoTime();
+    // Availability and prompt setup may themselves spend the remaining operation budget.
+    if (deadlineNs - System.nanoTime() <= 0) return null;
     CompletableFuture<String> completion;
     try {
       // Spec E step E2: query assistance (ASSIST) never slows indexing.
@@ -175,9 +192,15 @@ public final class QueryUnderstandingService {
       log.debug("QU extraction skipped, generation unavailable: {}", refused.getMessage());
       return null;
     }
-    return completion
-        .orTimeout(QU_DEADLINE_MS, TimeUnit.MILLISECONDS)
-        .thenApply(
+    // Bound the original producer completion before projecting it. EngineFutures abandons
+    // queued work on timeout and retains a running producer until its actual exit.
+    long remainingNs = deadlineNs - System.nanoTime();
+    if (remainingNs <= 0) {
+      completion.completeExceptionally(new java.util.concurrent.TimeoutException("QU budget spent"));
+    } else {
+      completion.orTimeout(remainingNs, TimeUnit.NANOSECONDS);
+    }
+    CompletableFuture<QuResult> projection = completion.thenApply(
             json -> {
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("QU extraction completed in {}ms", elapsedMs);
@@ -186,10 +209,15 @@ public final class QueryUnderstandingService {
         .exceptionally(
             ex -> {
               io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(ex);
+              io.justsearch.core.execution.EngineFutures.rethrowCancellation(ex);
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("QU extraction failed after {}ms: {}", elapsedMs, ex.getMessage());
               return null;
             });
+    projection.whenComplete((result, failure) -> {
+      if (projection.isCancelled()) completion.cancel(false);
+    });
+    return projection;
   }
 
   private boolean isAvailable(boolean enabledForOperation) {
