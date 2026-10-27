@@ -1,0 +1,3815 @@
+{
+  "module": "worker-services",
+  "observedUtc": "2026-10-27T17:26:18Z",
+  "revision": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+  "totals": {
+    "tests": 2409,
+    "failures": 4,
+    "errors": 0,
+    "skipped": 24
+  },
+  "suites": [
+    {
+      "name": "Tempdoc 725 W2b: contextFormat is a genuine no-op end-to-end (LABELED always renders)",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e3888a7758b45fb387e382cc4bf7e6ff0fbadf01bb0f760e2e5cd37d3d0f56f9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "isCandidateBudgetSaturated (lane F PR 0b \u2014 the exhaustive-kNN carve-out)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "77a2312ced7c79153a7ece9b65e09ac50ef4d6a0b91cfbeda48f8b28ad141411",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "collectRawLegTopNParents (chunk-side recall-complete protected set, pre-collapse)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "48c9de6b92a75a7ba688183af857ac2ba5f8927ccbf8b009460fb165580006c7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "live document filtering",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "11c84bf07980915eda1c5f427d70057f56d431b645780f69e3e9add9be1de2cf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Whole-document legs honour the scope (821 \u00a73-C2 review fix 1)",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b7b3fc8207197e3cfb4f5121add433bcc06a595b3897051f110a6982c957bad7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.adapters.lucene.runtime.BackfillProbeCommitPersistenceTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1c8dfa53d1f780a283d233f02d92fd8ce3b2a82298cb38b72c05e9ae23bdf871",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f02d1738b6c72fe7e793909cf9998299805f767b2f80d0868f0664b2a2b864d5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.adapters.lucene.runtime.ChunkCompletenessReopenCostTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c026ac11009f858d181761bdf212cbe4cb3f55346d1d7b28c5f1d9ebe6021b66",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.adapters.lucene.runtime.WorkerHealthStoreReadTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "96a421d8527382253a6629728cf4dac8942ba1685847bd803bb82611ad53e0bc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.embed.EmbeddingMetricCatalogSmokeTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d05b2fa9cb0ba4bc355fea772d8e3a3c949b284487966a43dc80f90122db5de9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.embed.EmbeddingMetricWireFormatRegressionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "af33aaa63cdfca29bc1efe116e248e74f2096c5e190f5163fe6a014e54932afa",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.embed.EmbeddingServicePooledBatchTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8e6c9cda8dca5976a336a76d950d38f3657f461ef63865a9ae6ac817d1c95fa0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.embed.EmbeddingTelemetryTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "365fe09af735aa87c35029da59f056f55409e96e460f80eb4e626f96274967a7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e948cef3110876147dd7b528405a7453050a3c60d87041722115070af396042a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "63849f313f29dacf38379d28f03ae10a7e4415aac030a96274055449440b5182",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.AvailabilityWindowTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "661164041673a126d78752d2604fd6ececd25c0570cba79284b65ca4510a6789",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "663a6664cdb18f6651cbb3e0af795c63edc6fa47f76697bc0329c9eadcda9699",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Encoding Handling",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7560a15a04b54110f3d59e35fde7734018061b5e1a3228641de408b6b251dbf9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Title bounding (observation #379)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d9f410a674849c350e60db96d227ea0e8aae363fc4c966f9bc6c6fdd42dd50c0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ContentExtractorTest",
+      "tests": 28,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5309296375f2f31c08e2f3437c6211414823514d6e30ed1690b581d38c39d8dd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionConfigurationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "dbff50b1e5d3e37aecfa5280ff129e4f6b73ebf0ad45d9e3b771d075e2b1dcb5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Extraction dropout fallback chain (tier-1 gate)",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8841766caf53478c89b68fe61f2f16de04a66744be72de0826d2fe1c6cc97ecc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Extraction dropout policy (measured threshold)",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a3d1a1f370cd209c832fe1e232da4d146a012d22fac8f2778417798775bfb616",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Extraction fallback budget (per-document bound)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5cd5a4b9c01c1e30fc3b0457cd4cf03721a2a659987b124e6a87cc07d18ad192",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionFallbackWindowTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "243b543731931b7a5586187a67c80e9472b15babe64ab36b3fc3ccba094cca18",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionHelperWindowRecordsTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e45951d09de4f974993c2b08a0790f312e845d94664ebb9f993ec0faa7addd6f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionMetricCatalogSmokeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8ccf87f723ca648b52990b9925c237a97f3e77fcbc106726848e1ee36b5b8735",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionOutcomeClassifierTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ceaa6b9397bf05f8fb678a83964dc43d12db4e12aa14696fdd2fdfeef6682e8c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionRoutingTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1eb0061eced61ebc79770dd58810faf83b5f1e8bd13f8daf1862881074570110",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionSandboxCommandTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "90a81556d953ada614d628207547544058f86d79f615981c35d8124c303ea111",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionSandboxFactoryTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b6f81b9263c705a9a43cc2ee83515814e09db27194c2a479fd171aaabc3c1eb0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractionSandboxLatencyBenchmarkTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b5b53f6c89a65928797e14e8a4861cd88154a2a0f9f4bb232cbe512273052ec4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "34a99de0bb81c4b0fecbc0800a4ff5700f083e96a26e7dae254daa04b7c353fc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.OcrComponentOwnershipTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "50624c81640f34de45a0d41cac5100b7fc232babf6f53b3d4c48c979c0a1bf15",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.OcrConfidenceExtractorTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c268f52d7249fa85e144eb47632af62dfd8eb243c418da202d9cd53589b2693c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.OcrOutcomeClassifierTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a66b5b6460f033c76a4cb117b7b5eb1eb705fc0d89dda14dd9ca5af8824175f3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.OcrReceiptForcingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "48a0792443d3781dc0dcc99ac67703d0366ae28329ef139e21f99a9304d59657",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.OcrRoutingConfigTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "79af02c4f251f0ac75a884613727e9a3f292c8fdfd59015c882a16aa23c19df1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Office fixtures: searchable end-to-end (extract \u2192 index \u2192 search)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "497dbf6f6a0818284d4305334870c61bbc8bd92e189598dd3e552c4e6c44eadc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PdfOcrEngineTest",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "08f3b311c38fe6d6471c0a3198b9662814f6c2680617bfe47bacd6c66cc568da",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PersistentExtractionSandboxChildControlTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2cc6ef6d58da18f8218e6e91d3eecaa431866c6486b02825c11ca14c2141739b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PersistentExtractionSandboxStopCodeTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "db4969416c73c996e220261816e34d25a6ba46e4431d0423a60fb1cd66f373a6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest",
+      "tests": 32,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0f7a371ddc975c1c55b781887f53d88971c542dea55d89e9b20f6b3fc993fe35",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PolicyDrivenFormatCapabilityTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7b8b782257b5e211c0b76093d557001e923e0a0d467ecd24264ab1df3e99466d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractorTest",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6802e9195a5ef35d49c638416c2541c8550b78e1c23eb28354fe33d8f4b22683",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PreparedExtractionConsumerTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8e2658615561b890b599a787036bde7d7966944e28adc3b1d1340d0dfd7ee0ad",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.PreparedExtractionInputTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "00f3b9205427b6722955e7da7f8bf2cc53cb3c2933b3549f07d958979dfaa768",
+      "failed": [],
+      "skippedCases": [
+        "optionalLocalPreparationTiming()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "sha256": "63ede7823231272b2ae4f5d4888be2f78812ef9c424da8bd757b7725d0be0515",
+      "failed": [],
+      "skippedCases": [
+        "commandOnPathIsNeverLaunched()",
+        "scoopPathLaunchesRealExecutable()",
+        "transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentDeOcrTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "adc49a6454b5dcea10aefd8fd6fa78dcba64a58b9f6becbcd9420b56fbce762e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentExtractorTest$BasicExtraction",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f6e6c74cbf8fc7041d52636ea37288a8b67fbf844228a768ce7b26521c19d88a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentExtractorTest$FallbackBehavior",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2ae7de729bc720398a5900021a1f054e4a2d2fc514ffa9e7325d2715fec38ee9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentExtractorTest$FrontmatterTitle",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0d5e2231ebcd66aea982c3121f26c6d7753aa49d8c49a07fda1d43d2d418d8a6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentExtractorTest$MimeDetection",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "31fa81b6d2d3434f6c4e48dec5321ffb81f6ecbf80677c08f3cc8c9d390da325",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentExtractorTest$SizeGuards",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "288dae28e5bbcd3591d65277137bbd3c6064aa2d7d2c6ba2e1673eb0ec96bd17",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentExtractorTest$TextNameVersusBinaryMagic",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "22b213eb7a81f3bca1f66cbcaea7e1707b8531c4d92f92546326a31858306ffc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$CharLimitTracking",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "11e9f50b974f4079b17402a0bbe5045db38835eaa597a8b625894e868ec5dd10",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$HeadingParsing",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8f0e56f99c76c4368e91def83b7fcc12f72c353d956c433ca2bea3319cca99e4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$ListParsing",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "56b893c8e534df6ca1a6b913d6d7b8d9d9ae8b3f5f6b26eedefba98a81e29e7d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$MixedContent",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "03c4118b7d9b5c0e3433882bd3a7b6e1611f82e00e1367c440de94db32bc552a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$PageBreakParsing",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0f5835046a26d920684bf47d3fea1c7af9f6a231cd04aaca54934c39029f384e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$ParagraphParsing",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "aade06cae1b90def3695cb777f155f8060bf74a8a70b266f71cbd097a0f5629b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredContentHandlerTest$TableParsing",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7c60b641d2ca058bfc017f64ccc6a3cb90a4ba66248f4a58a839ce8b80ada823",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredExtractionIntegrationTest$DocxFixture",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "443fe6b1ddb30feb39c3bb4f67b8d8ce00593162e81ccf8550f6883385cdd9ad",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredExtractionIntegrationTest$DocxWithStructure",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b1adec3b29f3f94b7342ee61ecbf02a272844bfa10365a801e5d904835b262c0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredExtractionIntegrationTest$HtmlDocument",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2a78309dd74611a2b827bbfd25aea1a9b8e040d5f04c0465a80eaa25569c83ba",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredExtractionIntegrationTest$PdfFixture",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7cb949ae009e7efb4ea6ac5b89cf0ae832f5c63c53e1189fb6a906e6545ced96",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredExtractionIntegrationTest$XlsxFixture",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ce5af6ce2a8b8931978d51d7e3c2fcda49a549b3bea96721517de8c981d58b24",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredPageWrapperTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1db527cc4a5b28c2bdf4f313866a2f9bed01326dddac56633a9b5846e92eba3c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.StructuredPdfPageInferenceTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "bc1010f0cdadf3cc1f908b6fbcde27cccef2cdd487dc9cf0facc51f76a1d36c2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.TikaExtractionPolicyWorkerLimitsTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "81281ad75a9cb1df6c8782e7ff4d1772003f61ef101557000aa7c013af28d380",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.TikaOcrRuntimeTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d49bb3d1a9c77d373c64f4cfc786dc4e55f2f5afba0a74297d6276871c1c3233",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "5fd6864a2e2ac2aae5a980e85800e6a05a8ae8a957dd5efbf238f8cb33dab5d9",
+      "failed": [],
+      "skippedCases": [
+        "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "d2f32bf0bdd49bbb85720071c819884391d16b9bdd3f581ef43e30228e42ea29",
+      "failed": [],
+      "skippedCases": [
+        "everyProductionTesseractProbeHasExactOwnerAndClosedWindow(String)"
+      ]
+    },
+    {
+      "name": "TimeboxedContentExtractor",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ac85f8134dc0a234f37d26ebd3760cd9d3a7e227c3bbd2c22aec428ff9ae36b0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.extract.Windows1252ExtractionTest",
+      "tests": 61,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "603991e8a347fd9facc3174575790eb26a4ff47768352d29266df1dac4e5d8c9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.AdmissionPolicyTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ea8b21804ed2b9e4ba97f4f88d48c2f8a1f03a454b16e58cb6e4285fbe7776fb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "BackfillScheduler backfill-mode + per-stage recording (tempdoc 710 Move 2 item 4)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d861f692e382f86cce63444cb257df75cf154d717ce4cb4da2a5f3c1adc9fb13",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.BackfillSchedulerPersistenceTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "79f0f6c13534743ec618235fbb541ca5887d15765713e5e13733ff4136dd1e9d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "BackfillScheduler slow-batch interruption (tempdoc 809 finding 3)",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2afd4e2fe70c5141c9e4678cb0bb1a9e36eb17778c8e700c42738cfad8cff09d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "BackfillScheduler stall detection (round-15 post-round finding)",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6852732bf3cc8b71e11d4e77a4af117596ce16be456027de8252c18129eb6d1b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "BackfillScheduler tight-loop containment (tempdoc 798)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "33050ce6ee6c576ff5a84d79f6631e869d0d3df085452a99d9d03c28cbf6a09d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.BackoffPolicyTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8f9974fdab3a219038402e2436ab1ffe45c68cc18b14dfdf7caf6fdc71a421ef",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.BatchServiceFailuresProbeTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f871d6011eeb2b59888c3a9792a0096b236ce75e5cc5fdf0e18adc7fe884338e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.BulkHoldKeepsQueryOnGpuTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3e223599d568ff112bed3972bad5156fe75fe7f8701c7aa1b2358108b082a723",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.BulkWriteChunkDeclarationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f9a223bcfbb8232b8791ab0a1449f80d102cc7c4e0b6ff5613e5a96a15525f4e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.EmbeddingProviderLifecycleTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "758372b3b857d6d8be64787f7f917f5353d6091ccc755c5b4d125233fc823d90",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Extraction dropout chain (PDF fixtures)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4d26f6b02777ec7f8269b63d5c80ef747197b5c380c44c4212bf7ed57560769b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.FileFreshnessClassifyTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "43e79529128368b310b94ee9b43cc5e973c37b80a70fb6b670be12d65db0f5c7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexedSourceUnreadableTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "a1f6701b13762759d729fd06a9c872ed18c4a7ecef475bb2610ef73dc214b323",
+      "failed": [],
+      "skippedCases": [
+        "aLockedSourceWithIndexedContentIsReportedAsIndexedSourceUnreadable()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingDocumentOpsScalarIntegrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2dc6928fb648abdc2b7f814fea56036967e52425792557bddc2a05c24fa2b7d7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopClaimBudgetTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9f5161d45507e5bf01466befb2b212b64685ed1f2e28aec58efe63619792c69d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopCutoverPauseTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1927dd84d8bfddffac188996730a8307fc0642c11250681fa914d91c8f5e06c9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopErrorResilienceTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b377e4934cb7c06cad43b62e409c015299048e94af70b65e69895cbe0a512cab",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopRestartTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "edf9e23908e58c508cbae9feba1db3f46c95da1348d52014c8bf5afac4dfb22a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "buildDocument NER status",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "31ccfbe3d63fbf66fc6990b16bd0a0b2b14ecee4f1a7ea8bb7d6b63a49183b78",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "classifyFileKind()",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "98982cc7a99a0e5a84c40bbc6e566b332a69f37eadf90007d1993abeba3f86f3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "contentPreview()",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "aef60115c5492fe8d5743a3516ffb7f9ac8ea7eb4a4c545cd95eee753bd00b54",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "detectLanguage()",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6a6db6248895bc25cf8efb2e17a975b254f30627fbd7beae33198ee1072ad48e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "extraction provenance schema fields (tempdoc 410 \u00a711)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4ef278fa6a60b4df58f67fde0342e4b2e5c00cff7a1d898f5e3a6998b44de1c8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "background enrichment must never starve the ingest poll (tempdoc 798)",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8c745b88a0d90c24144999a687529e28c686c505f179954d15c67afb45c03e73",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "isCodeExtension() - selected extensions",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9972382f974224030ff5b45f47bd057afb65df233bfa165f59e3dc4a0f0f86df",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "isMarkdownExtension()",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "80f3b0ea507a1c3b48859061af8dd73410badcb2fb7f8f52d7aa09689ff8ae73",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Mockito compatibility",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2fa7e434b40f067be6e4d86062fa854186ea5161a929477af41f1b4aef15a81b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "normalizeMimeBase()",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "88ce8c246d7a316774d13d8885ba9bf99d48c0ab01714e2bc2b7ad212fb57168",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "parent_token_count plumbing",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1f460b23a6fb89afaaad77ad24655fe7aef6c37702664c353bd212a62cf97619",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "typed ingestion outcomes",
+      "tests": 46,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6ca8700336a1bdb175ce22d65060da3ea6107c1c805028fccbf8b086b2d056ad",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ff966d751954b5a19f922de414b88b65d1ae1ef19cba49b590812049b5695a26",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopUnloadTelemetryEmitTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7551dc509b51478f3eeab8f05ded521ec3b213e2ec6d05ed84e75270bb4c2673",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingLoopUserPauseTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b309e68ecc5adb495e001bd4faf53a8ee6a4f1035b88772ea9d75a1695cb1213",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingPipelineMetricCatalogSmokeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4fe429fbafbe4c906e8bc62e0abf9854763e3e2c15b74f8a450ab9b6e61c9d33",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingPipelineWireFormatRegressionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "83877cebf25892b964d0bbc67cb997e50f717a529ba893ee2344de8fa85134b0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingTracingOverheadTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c91bec4b1e04f96391396d62b9ee659d4dcaae9cb76fc01379840c913987912b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IndexingWindows1252ExtractionTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "60358ee1b0ace5a137425d60ea6a3897a00e43bf9600941e5bd1dff8af3f9c6b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IngestionOutcomeJournalClaimTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8dc75a0009a07b335959e5aefb17ffed499a1e70eca3e6a11679575bf9279b60",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.IngestionSuccessClassifierTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "056498bea8af34d96111342af5102453d09be9e2df63302734e9dba532bbceab",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "JobBatchExtractor \u2014 a forced path bypasses the UNCHANGED branch",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d1beb481be5cae6aae4e839d74148da7a24987e96c1905fbe2c51532fb29e68d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.LegacyChunkBackfillTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b1bc084f69788e7fed8c97b176a5512c9b8353c32ae50cd2c477df7d1be26839",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ReadOnlyStoreDeferralTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7af16d5c7623d5e3a1ca9f1f2aa29ffa8507ab107422cd740f5816f9685be6a3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.RootVolumeSwapGatesTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "sha256": "e4acc2dc22552356ce2593d9f53ca8b1bb160299f791e1625ea31fbe141f016a",
+      "failed": [],
+      "skippedCases": [
+        "theFreshnessCheckKeepsTheDocumentWhenItsDriveLetterNowHoldsAnotherVolume()",
+        "admissionStillRetiresASourceDeletedFromTheSameVolume()",
+        "admissionKeepsTheSourceWhenItsDriveLetterNowHoldsAnotherVolume()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "sha256": "e83e68ccf5fae19538ab009322f9c5ae47a3fbd9a9f167037e77392017593a98",
+      "failed": [],
+      "skippedCases": [
+        "admissionKeepsTheSourceWhenItsDriveLetterIsUnmapped()",
+        "aFileReplacedByADanglingJunctionIsRetired()",
+        "anAccessDeniedSourceIsRetriedWithoutATimeLimit()",
+        "aLockedSourceIsRetriedWithoutATimeLimit()"
+      ]
+    },
+    {
+      "name": "VDU eligibility (PDF fixtures)",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d3438b4fe6f9c678449a373d45ceef9656090c21e44c43316ee72a3a0d5acf1e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.WorkerIngestionAuthorityTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6ac86f3e6133669be49a917d3f36d74f906118f7a7aed77dec966bbbbdc43622",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.WorkerUserExclusionsTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "efa0a2758ef971b4bb6c74915cd1d41d03997dfe872a049cacc41eea9338a277",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "BgeM3BackfillOps",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d3bce5ec63b60364d7fee7cde631feca1bdfb5a38dba1ec3dfd5ba8cb6a3320b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Bulk encodes acquire BACKGROUND (Spec D G4)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b5821c97998d65aa3ca1c3f1738c958c9c767e06ca89afb34af55b5296cba67b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "66ef094e8f9bd8ad9cd147d7b56cf3a87f0afb9e9e23277c8a1914960e9901af",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "104839867ff352467eb3a641bb70aaa4be683a271c7a7a756b84f2c2958c5000",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "CombinedEnrichmentBackfillOps",
+      "tests": 37,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "73347272e1c6eff041513e05763ecc48141888e2a215806f739aee75de7de4be",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "CombinedEnrichmentBackfillOps long-document scheduling (round-15 post-round finding)",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2436a9c3d049421375cda7d822a130def26586b0c521a7a2268dce84a3a7229b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "CombinedEnrichmentBackfillOps \u2014 parent SPLADE RMW",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "97dd2f827a1569fab43a2eec129a5662b95d456e286ee77d120ed6cde7579c78",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "processDisambiguationBackfill()",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d69a18842c203fbfae388e1bb268fe1088fa09d404962dfa2838d20b9d454ea0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "processChunkEmbeddingBackfill()",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "77914d9cc64df2a060f023a19e39bd39c08e02c112e680e15f69e766f1e2e036",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "processEmbeddingBackfill() (doc-level sibling)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9282549302e58f7ae936198b184570a52cec59a6158c717984ee7ce4de8b74c7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOpsTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cb7eacaf2c5183f187a65a2debab1cb2aff0eeb672b91e334cfcdf330a93de00",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.EnrichmentExclusionPublicationTest",
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "15c47b2542b8fcf736a6b36fbe3f6dd071acbbea1551af606b28d45c2d42e8e8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5f66d7ef2840dedf5502a1af8735937cbd6605593ccf6cd69c4520dd6d834e23",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.EnrichmentPublicationBenchmarkTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "91a968f4b2d963e2084a26aeebb58041660ba76826fa3d8a27f4ce9a120fe8f7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest",
+      "tests": 40,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9f8bafae02699c12bc94c9230430ac1fa91026a140c5001e439506618fe1c53b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Extraction dropout marker (index-time provenance)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "31abf1336fa9ef109c77d250491219c97e278934b97e75f26aa97d3bc9378201",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.IndexingDocumentOpsArchitectureTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "016b596c36e1925be6d2b6a7e5913f6f5ab13d6c510c3d9b854b1bad91ef6267",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.IndexingDocumentOpsTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "58af7ec17a517c315bb9ebe5ce4e07cc276aa17a798ed0183e207bc338e2db3a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.IndexingDocumentOpsVduDemandTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "88aae49f050c6bfd36f46bffcf995f4729deec3278afcfe5c13c7fd7597dfefb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e020df13f3c35d76bec89c25ee8cafb3f805f6c1195189ee75f840b9416621b1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.LoopPacingBulkHoldTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f0fd61cbbd9a11a780d4f1a1a819d703fae99c802cc8e049f05c921fe90adb8b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.LoopPacingPolicyTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "07ebfb3a4af1e521829b510e24e2d70c1571c0e63ecc6e8045a8bb60d7da79c7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "applyEntityFieldUpdates()",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7744aa00d936734742529b6e1a3dba34baf2f6a77f2a79351e921754dba0c0ac",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "handleNerFailure()",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "43a2cac58cf0b531d2c114f2aa38021a2c40e4eedbae922c8c6d7838c8b24d46",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "processNerBackfill()",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "acf27ac52237ab9f89a1a0e0079d8f4ae95eeb9b10d0ff38da79b9ccb3170501",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.NerLazyCreationRetryTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "77aa12084eabe46256d123514065fe41840cede3bdebb426bfd0456b51507754",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.ParentContentRevisionTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1c4442b853acdf5b4a696d8d6420f02ae251ccaa837739cb31763a3b7e86623c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SpladeBackfillOps",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "85d72e1cfe118ac8e96dff3a1a761b5ea08266637057fd214737a8c3f6266627",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.ops.VisualRoutingDecisionTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "584694378b0423c4aea72e4f8e1d2a7682b1cc14cb12aef930191b94cb183f5f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ad7112615b920022727993d2f01c26db2c1667a2dadd3f7a870700ee73071e80",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.pacing.ForegroundLoadTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2cecdeaf9c782d40a1522e5a768d7a6d6ae5eb27de7070732d05d353873a2343",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.pacing.IndexingPacingGateWaitTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "940246746da1a78b167f5cf518d27044d500765ad24b50826547a6cd75c9762a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.pacing.IndexingPacingGenerationDutyTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b1f0687da14049f2c4a1465cd8ed23f6ff7b78aa4696c2f9ac2472193df0ba10",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.loop.pacing.IndexingPacingTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0529d94d460753a609ccb60e0644ea90e91457c84a06076f7369ef1f53a8c587",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "OrtSessionMetricCatalog \u2014 smoke",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "79614d816df55cc9d9cfd432444c6a7e3f51e5971612cd3a2e41d558bfbab6e5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.observability.OrtSessionMetricWireFormatRegressionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f86665f9458a0478d50b591f6884257c5395214f89e1b27b3ba9f3f3f3142984",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "OrtSessionTelemetryAdapter \u2014 per-permit dispatch",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6f846c9e98a2408a5d97b3b201e64b2755b868b752c78b14a4b37342f813e588",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "calculateLineNumber",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0b08cd9da44422eb22a8e61e17334535b4308f24c590a2b889ac626e1f012ac0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "findPrecedingHeading",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ae7709e4ec2933231dfd0f77f6ba6b72da6a16626ec82103933026ad707e87be",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "F2: ChunkDocumentWriter Structured Modes",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2b7f8fcefef8d670d6c3bf8cfff52e15366f13e24736fb09d8579d35be909bf1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "ChunkDocumentWriter (Tier 2)",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ebf2631a3b3072c231c08f548f9f19d6ca4590b7b7160a2620a254a09bb50cb1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.rag.ChunkOffsetMathPropertyTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "486cfa7cac341bae56a7531cc3cf87eec7da29019bf0d20772371d1dad15b8ec",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.rag.ChunkParentRevisionGuardTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "07a862b8d0c0674319aa4aa4dbe78e7a6ead60c73c9e6f95d349cd0ecb8d5870",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Chunk threshold characterization",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c6d15576dab4c2cdd342762171a9f579146b89526c7bc02ad51507548c4d1d61",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "72aa94e01719bc186fd2e542b65d9d0cea628ae08755bcf122f090a878547329",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest",
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ab59e665c9230ee0cc3ed23780f0ee3b5eedab695fe4b9c3a1fa6e2e05f24179",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.server.DefaultWorkerAppServicesSandboxProbeTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8a71af1703ccb6e19c550c3482ed9910532a39a231780d8a8569a9e1b53d5cf6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.server.DefaultWorkerAppServicesSkipPolicyTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a953844b5dea92a94a7aa7c9a4a8444353f6c3cde9e83a27d75de7eb011e0917",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.server.EncoderBindingsTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "befc84115a06502bf01962128e6756e04d55c7b671632482ce33592feaf74a39",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.server.WorkerExecutorRegistrationsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d1d21dcb06a733c885def8ab50291f958ecc1b35d3cf5d0809edb9ec1d38734a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "847 S5 \u2014 markdown-structure-aware sentence segmentation",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6b93436001636e69fbc2e07035c12d1c1c0411fa91a77f92b9d69452a4727b29",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.Bm25OnlyCursorTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c2a480034cebc4f731ebe9dfbe6c1ec7440af19945f76928a977116d2394bb10",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.CandidateIndexTargetCaptureTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e4ce476b0263dde220e76f890289925f552f3d473f81b7d3e724afafa8d46a4b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.CatalogImmutabilityTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7e7d300e5e6c1e800954c87057daf2bab9dbeb62eaf39859df8909985498b5b5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "CitationMatchOps \u2014 per-source examination facts",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7d04884d73633fbec11c59f3f6ce4c0834a870eb2ff47ce76fd2a5646908f7e2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "CitationMatchOps \u2014 verification against supplied passage text",
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "468af35f12ac1a1232d340ce551c2389b36c3e6955ac1908220c4ae4110a6bb3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.CitationMatchOpsNumericTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e26d0a2933dc12238b003384e0e411e34df467637f9a90742848338f572c1977",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.ConfirmedDeletionMarkerTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ad5a0fa21801a13d383cd63183384bba8f82b8f4b3f02386ea37d6e60d1e32cc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.DeletionCompletionReceiptTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "00c8486e71ab2c00b5bc66477c878135f813d7a869556ef64b390b2f6b7ddf0f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.EnrichmentBacklogReadTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8c18ad66affa92b3e99dfcfd904a7810d7e9c9f31498902ddcfcbbee5712b0d4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "enrichment completeness projection (/api/status)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "470ea427f22bb8b96f2d2396bcce619731e40f88389c6f1cb216015707ba6d73",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Facet/matchCount parse is coupled to the retrieval leg's parse (tempdoc 821 \u00a7L.3 + \u00a7P)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "32072066d374b9cedc5db38f6af065bfd1bf3a4b7f1c3e9ebfb33bf2c2e3009e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "FacetCompute regression matrix (tempdoc 517 \u00a7Risks)",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "98332b6dd47926a06d5095439d2fe0ca463067a1970067be643c0c641b8af2ce",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.HistoryDeleteAcknowledgementTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cbdf03254c388f18db8d415fc23070edfa118e9ccd247fbd4c5503e83d098990",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IndexRuntimeWireFormatRegressionTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "19148b1e406fbf4d4c8e5b9c3d832babd8bf9800e175bd58b58ec945b0cc780d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IndexStatusOpsGpuDiagnosticsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d28b5ec6c566cf425caeee01eb71a8d9bc58f7bf0f5bcc87137f0fd61e9ca7e8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IndexStatusOpsLoopFailureTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fd65e0c725cc7ae7b359e448b9e4dbea2816827548b19a0eff37b5893a1ad4f4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "IndexStatusOps search-config compatibility tombstones",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "21b19dfa10307366f926db7ad762a82ba6d7d1a2cd3805baba3c8b3d6cdc8dd4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IndexStatusOpsVisualExtractionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "dbbe8e07b317e8c27ee84c1fd01d17fe321eb04c66d3896d68bdf6dd74eec021",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IndexStatusOpsWaitingTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3b36df32a630558bcade3fef3438b7644e5c7e9d9b143e12c6d68a7206cc8344",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IndexingJobsSnapshotOrderTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f36a9f58286e649bad498b2cf1042f278918f55e18dab9cffd414f5a87d78957",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.IngestSwitchBufferOpsTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6e73ef73d7558c2fa9273add9fe534090939292039b77d7dbcfeefc7b7219ebd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "contentPreview() end-to-end",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "59b074687a05e1f3afe510cd220b24eca308c80dc8026b4ac07e01ab995288c0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "extractDescription()",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6371188c39a0d9d94c90c04bc2a1bcd4979613d6b5fdfac4f782627640fd5d6f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "extractFrontmatterMetadata",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5c83584a670b94547977df761b215368a4633cd9ad2ab085586bf6723907674d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "contentPreview() markdown stripping",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "611772b2e96368864f84c2bcfcbed07473ae4af19c6e80bbb7bc9a909cd215b5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "contentPreview() non-markdown (isMarkdown=false)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ebbb034df1b71e95ceb504a8179599f610fe06b6466b928d437e97e6dd290533",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "skipLeadingHeading()",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "185d6b03612ec78314d19048dfb90f617bb9d69332c1fcfac1d7b4656c5c6dde",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "stripFrontmatter()",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f1f20de20f5b34a340f25ca3a4e91ee67232bb8a78869e7239fb99d4964f7a0e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "contentPreview() whitespace collapsing",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9a9bc102207d61c02cb0cc20ccda070168a64490bcce004a49e0666a2e52bd4d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.LinuxReturnedRootTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "sha256": "5386b2d896a82ab96e5328ef154a3e6d0585f2fb8e045260a8e52b3abe25c9cd",
+      "failed": [],
+      "skippedCases": [
+        "unknownOrDifferentFilesystemFolderTypeMountRootAndPathNeverMatchAReceipt()",
+        "sameFilesystemWithDifferentMountRootCannotVouchForAReceipt()",
+        "changedDeviceReceiptAppliesButARecreatedFileSurvives()",
+        "removingAParentRetainsTheVolumesOfDeclaredChildrenAndSiblings()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.LinuxRootMountInfoTest",
+      "tests": 7,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b6eb340d16723fa407369323211b8c5a7f58adfeb766e6c9c1499319bd356382",
+      "failed": [
+        "missingDanglingAndAmbiguousUuidMappingsAreUnknown()"
+      ],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.LinuxRootUnsupportedArchitectureTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c9bd88b3903d7ddce57b999d0e7c95303b9e5272097b254a356202c9035be486",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.LinuxRootVolumeSafetyTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "sha256": "4c63ce76cbc021e1ea359d845ec06a28ffad4daa7b44e7468ce0ad61bae5c6c8",
+      "failed": [],
+      "skippedCases": [
+        "tmpfsHasNoIdentityAndOnlyTheVolumeComparisonIsSkipped()",
+        "diskRootHasARestartStableVersionedVolume()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.MetricSurfaceContractTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7669d6709c347f58ca14bb37fdf4fadfe98c6d81e3aa6f3d1145929155ac8b91",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.MidMigrationCompatSurfaceTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1212fe631107e82048d9230eb67b6d41a7218f6a20c06d71731b96367064a6af",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "migration responses \u2014 live start",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "67202469b3962de5b3447f8a6eace02551f1ba36b8bd282e905192eebc56da71",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.NoVolumeIdentitySeamTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "971aaaca62bd54deae98c7979eb119a94d3b051eeb752b8bd6e76be06ed61531",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.NumericCitationNx3bTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1bbb41c12fdd089744fbe581b4710b197a5e24031f2f7e4747246478181c6c01",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.NumericCitationNx3cTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "146fb233069ed108ac06b9d1de7e49384b0e5e0fead6ecd19a71e44fdb896227",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.NumericCitationNx3dTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "66eb87eb351b6e0a2287d539310a726d4dc52cad67290b3493e3978400be381b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.NumericCitationWindowTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "89b947e2540cf9efe386c2b2a7fdca983d1ab93e3b4c7bedde32f5d5fb070581",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "PassageWindows \u2014 back-map property (F-049 numbering contract)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5b2f4c7d2aa9b9c3ebb56801aa9332e4dfbba008317e1f5dffda60ac5508472f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Admission control",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6ccfeaf6960c91a4fad90b7ec78bfdb3fb06c874bedbb9d4327fc21fb8a4a0c5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "The numbering contract",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "88010b6d7bf3fbed6e11a93869c10331e503f3deb7121796233d328148e78b35",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Text resolution",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b8f3d2abc35e906f78f4556ffb89c2d7b2e3536d29d80d5ecef5e74950563b94",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.PassageWindowsTest$Windowing",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "87a53de35c7acbfaf07aa72207e4bf2e86bb6dfbd2a90ad8e958bf8a98a87bbe",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "RagContextOps \u2014 budget loop honesty (tempdoc 849)",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a8270afa3ae456190e08c1f4514e1f459c5dde553888973880d06f9336e0c9bb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Behaviour neutrality when collection is absent",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "885de266cec72d7038382dc3ff3a2ad6518983b995a24d040135085e74923de9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "An explicit scope",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b5ffd859d8798d5d4e1e060e8fe5b3b1e3700d1df9e1412cf6f1af264e0577bf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Routing (the hasFilters / hasDocLevelFilters decision)",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cba15bf7dc118c230dab5a42099e262f537ddf3bb577cb80fb26893620cf4447",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "RagContextOps \u2014 MMR diversification (tempdoc 720)",
+      "tests": 74,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "32a2657606affd32b524fc40a22bf0b4202969f97379d49e3514f2739ecfa0ea",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "RagContextOps \u2014 P-A5 producer-owned word-boundary excerpt clamp",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "46a55f26e64ccc930b87512226f7d63ecb04d8f7a462728449430c99cce5e5ba",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "RagContextOps \u2014 filter copy preserves every component (811 D-2)",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b8b7d6e16bf8a07f493014ff8c2a30a369e3c0ed84d88eb611e54d46936c343c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "RAG collection scope under hybrid retrieval (821 \u00a73-C2)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "50844b0b1dd15fb6a7ef21e6be3b18c28c41c293f0781891c289dc6dfb8a66d5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.RagContextOpsQualityTest",
+      "tests": 42,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "93e02cfcd836490ad08f849be4402a792517092fec0eb9d808666aeba929daf1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.RagRetrievalCauseTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3b85b7ae97cd399ecaff4bdc9dadc6c701e94a77448694084f41e952ef2417e1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.ReconciliationSpoolTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ad1dd82e97e73922cf9bd60ac27329a7502ed541c9520ccdc31c56903aaccf1d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.RemovedRootWatcherReconcileTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "149705f10a587ab8bd13978799831a9bc2651281d961e49376e354e81fa22188",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.RootPresenceGuardTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "sha256": "d9f3fd69ec6caf674b7fdd879fa9039b2805a02a66f1f7ca6fc407bc653509ce",
+      "failed": [],
+      "skippedCases": [
+        "anUnreadableVolumeRecordVouchesForNothing()",
+        "aDifferentFolderMappedAtTheSameLetterDoesNotVouch()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.RootVolumeUnknownIdentityTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "35cf88b90f545ae1b1e259de0a66a4a0be7a46d037bbad9c9b967bf6a8e4a453",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.RootWatcherRegistryTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d68d386f8b6c9f54d238b2dcd850af22854f3c67fb15e932c89a68d897fe5d1e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SchemaCompatFreshInstallTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "090431271a67617bf4d3b088d0b6e3dd1730819722cec7c73671eff14b97ed1b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SchemaCompatUnknownTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "459d2bbf5e1f100048fb821524d953a63eb9817d02270325ab1334c7ca7cab6d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "search cancellation seams (lane F review B3)",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d48c40db1fb8b228b9d84fd4e4fadc0b9aebf006d29d8a94e311542e9534508e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchExecutor OTel span attribute contract (tempdoc 525 move A)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a7a590ef4729df1c71f7fdb0b50ae382ba3d720b745a3e447a3186eb6ca5b6f0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchExecutor LegSet matrix (tempdoc 517 \u00a7A.12 E2 Tier-3a)",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6dc77e98556c9fdc82a5951aef72e168a78b0c386594f704b258128bd526090b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchExecutor OTel span topology (tempdoc 517 invariant #12)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3852f33b4c46182c73324419a6e8c97346fab472da0188fb60ee2a9092598823",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SearchLegCauseContractTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6134043c5d1572911ac6b9b722d4fdd9ab0d4e1644eedac1d84ad089d7f9869d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Pipeline-based degradation signaling",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0ded1c3a69e7ab0a67cc9afec92a68f2adc63220978e3b1dab1dceb3a1220e6c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Sparse-only via PipelineConfig",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a842cc74ab177d58d538dec988212b61248e719d61f7328df86314b30ab1349a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "deriveActualMode (256-E4: from actual execution state)",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b7ee1fcf7de75d344e49b4d20701dc672fd6208b16d2827780b6ea15c948e9aa",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "deriveEffectiveMode",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "51684c1837bc1188820f5b58ba175190fd5dfbffdfe6340b303b3b1f36d9d144",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "modeToDefaultPipeline",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f6d3a5eabdd96dd1699c982b5b8cdd782ce0726cfb4930e7fe12ffdd536678ca",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchOrchestrator LR2-e virtual-thread context propagation",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9d45a57b09508e44daa6bbc00ba1edec9ecce33935a0330150839e2bb91fee66",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchPlanner approval-test corpus (tempdoc 525 move C)",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ba61816507d9365fd4e028e74cd603efe7cb62faf1dcb012df7ef117814022d5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "searchableDocCount \u2014 reader selection + IO fallback",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7cfd6db4f14cc2354d8042913e79aaad05dad24ea5015ea6b570576c54be3ba0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "searchable doc count (tempdoc 811 C-4)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "244b16be33d52625608b406a60ec069d48020302c14abd786c117e058d5f7719",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Short-document passages are scorable on both retrieval paths (WP4.4 S7.2)",
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "975e50462fc619b54eebdaaf1bc4607930bc7e43bd89f119e854bc7051e228c2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SyncDirectoryOpsCandidateDiscoveryTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "5b3b853f86fea4a4bc74749f5c24a2f93e3fdbf22981d03057d6bdca22ccc5f9",
+      "failed": [],
+      "skippedCases": [
+        "windowsNativeFileIdSmokeAlsoCoversRefsWhenTempDirectoryIsOnRefs()"
+      ]
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SyncDirectoryOpsCloudPlaceholderTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "78b8c548a1aa9204ef3da068baf2ea6c5c26a9a6d3807cc5a17af91055be8b4c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SyncDirectoryOpsWalkSkipPolicyTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "826e6f5ac6c0fe84b73ca984b3697802cfb5795ade724e7c2e26a2b1d35f66b5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.SyncDirectoryScopeRefreshTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "146bc16eeef7d832561976be88a6a7f70014ab50639314c1c1d85ec04022fa6b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.UnknownCountAndUnreadableBrakeStatusTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5bfc49dfe693950859c5ec361a452e5ef1a1b0ee6fa9b829d736ebd3b6abe977",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduCancellationRetryTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e909c16d632d54be6010ec1f029e64d63c7624163970c15effbae1ae89d78547",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduCrashRecoveryTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d723693d61c35481e0e3246b6a9dc1f7cd6fbc9ed695bc64506ca940bcedf669",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduExclusionPublicationFenceTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "dd4bbd81bc65c4f677ff7058340bae8ea49e2e562a7c629763d87f368d87369f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduMutationCommitTest",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "37eea6edbc6bdfa4a47fcfeee228a21afcb1b80e73a4e210bc66064415c0cb57",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduPolicySaveDeadlockTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "249b496f4a018919231d8a9ddd02639b8aeac348588228c0c3772443c977116d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduResultWriterCoherenceTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3ebba164daadb762e4134d1a2727c86b9ffa7e4ee01497fa71178abefc532485",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduResultWriterTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2edde4c30a3e204e25161df513c36e70047b140ec96923639008a3ed6748177b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.VduRevisionRaceTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "05fff027bb717537e3cedb9487fc53e3ae46fce274d8a217c82b3c88e51181b4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WatcherTransitionMatrixGuardTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "141f30c51a3e275162e4dd0733a7cc5e74ef1fa3c50abb4604d39037a7bd0f32",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WatcherUnavailabilityScopeTest",
+      "tests": 6,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f879a23c2b9da0345f12889f969395567bea549f469404d6f8dcf7d64d88cf40",
+      "failed": [
+        "aNewerUnavailableIncarnationCannotBeClearedByAnOlderReconciliation()",
+        "endedUnavailableIncarnationIsRecoverableOnlyByItsOwnReconciliation()",
+        "inaccessibleRootWhoseAbsenceIsUnknownIsStillRootScoped()"
+      ],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerBurstDetectorTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b283a4f5cd1ba8d77e0b515a1f62f24fcd41086a8b2cfaf87cd5127b4fcce77b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerDocumentPresenceTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d68c6a5e3534992c5f6775f72982e9b0d2c974fa4b6318f3f8d0dc944d42e0c2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "188aee92d7ff49d5ad5d190e3e5c5a3bd75345e01c17ae43e5d2fe97220c783d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerHealthServiceTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "905b3ac636885ec6a7ad4984faa7b92b54ce10cbf8525f6ffe6f6a90e45c283e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerIndexingFeedCancellationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "49ce889b139e21823af83261939feb938541ac657449b36f04b50ee8a21433fe",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerIngestServiceAppliedGenerationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "219d20701902f3bae70d96e4cc98bfdb5f8e5676047ec90425baae7b95155bea",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerIngestServiceCandidateReconciliationTest",
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a1164020da06be68fef64acdf8bfa32db413a37bfeb27f2f9c473451fc27f4ff",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerIngestService.submitBatch \u2014 collection tag",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fe18623bb64b0c56b9076afe5827b829a82fbf80e07518b26b23145ca71497cc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerIngestService.scanRoot \u2014 force-reindex marking",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f802d0441ce944ebb7c05be1e3ee9c52a2f497e0238c5389ababab8a0b4fde25",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerIngestServiceIndexTargetSnapshotTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "65a0157132156a43a0eeb28d1e4a882c90e8c4b92f7deb113f0ec14e667debbb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerIngestService.retryIndexingJob \u2014 previous state",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f09ed6865dd09358c0cd6aaebd36ace710c01fc428ef01344e3cd5f4173f8a00",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerIngestService.settleIndex",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "debe4d8e9910ad1dda181cbbc058578fd4eb83a70243b36a896e909e8a242d6e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerLuceneTelemetryAdapterTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "62a2c9358abbaf5022d1a7ec5a56b5428a83a98b1a30e149905c3aac1c5e4439",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerMethvinWatcherTest",
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "256f447982b21cf13d2864b35c2bc7b67b22a5e53aed9a5e43293c94d3ed076c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerMutationAdmissionTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9a8c80d94bbc1d4656581e52dfc4d0a1ce840660fcc8686407eb4c190f410909",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerOpsPacingWireFormatRegressionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f2e7295edb8bf8af6e533c4435a7c376377e0dbebce733555055618de377539c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Worker queue throughput metrics (885 item 21e)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2ef5469cda801669ca66fcb0fbd8711d21c73d42a2fc3e8bdf2074f42fd2af93",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerProjectionPortTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "da9a6d09c0a0a009a7507b2f773f69a99d46c83931b3353a4fde19bd5b4e09bd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerRerankDeferredCpuTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c61b8d73dc3fde25fdb36dac14398f7360f72a661c20fb98882074ea18df8499",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerRerankSessionCreationTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f19a79efaa3aeabd3186d98c5af58663d3d6a047554f560570ce1447c6907e45",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerScanOpsRecordedTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7cd94923585cab788fc5ff08d4e687737ace059bbbaadf6cfce98228fa32b5cf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerScanOpsTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5f2740bbe64e456a7165f8c05df71dc8d3ebbbc043d1fc4d860de4ebda9b91e8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceAutoDenseTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "866a4d373954edcc840c9f656c656d834ea0b3efee604f0841af9314f44c84e8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceAvailabilityTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fcb0004ae9e99e4009b72952e16393132f9687b74230a74247443f0b970e92db",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceBreakerTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e87e5a9df29985716e422e7e6d19f38da3dfedeb44e87de024b50e3d62739642",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7bda204877874cfa338127c4bfa7b10adcaafe7524e346667c056dc6ce263419",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "bb1245c0f98ed6205eb90a17a15ab7afe217d628b16d01844777015e1a47c24d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceDegradationSignalingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1b96b07683fd8c84918c16079ee8c8f1ab50ac97f4053b4620f3114902d32bfc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceExcerptRegionsTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "608512006acc4a5a87b4c21a11fa53452e2d41d666957de917f0f4dbf9eab7d7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceFetchEndpointsTest$FetchDocumentSlice",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "130cecb8fa8dffb57605324c14ec1f22b05d1ab0547f4ac9cca28fa0502853fe",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceFetchEndpointsTest$FetchDocuments",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "35705cfd9eeeab810d99b02181c6542350c4355fd59427eff4487c0dc173e76e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceFetchEndpointsTest$Suggest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "eda30648ec8bfa0b75daaf8cf52a7b1f147e5ceb17ed6d53ea0d18fb5c95906d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "basic listing",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3e50ef12b3707ce388dc0c7e4e220dcc17931e61a5facc6c3955879d99ea32e2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "chunk exclusion",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "62bf6fc5c2b448da24b8abc8838289924112843e9761a0314645ef13a90df51e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "empty index",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "208ef7c37474240e3f13e28fcd1c4896c7f9ccb71ad077a844638a4f0525d9e8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "pagination",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "42308af87665d3e05a31a68dab326030d489bdecae057ff58e6af7e68ff6ae09",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Edge cases",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "234b69103686b6aa1b0559e5e962b809bd598fa704ffdc91b758eec24cc9ccbe",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Happy path",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "26f5f1dbfab6fa714758026c48dccaebe25585e4e8357bb32d09e68b7d9fa423",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSearchService MatchCitations",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "66d0adc416278bc497f36e4d87e8bad1af520b4000cf4ffe875bbc1cad47812f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceMatchReasonsTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "52690989d9fda5443855b384eddedb6c983d3c76fda9f72dfd76867775559aab",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceMatchSpansTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "62e585b8153bb26482adb6233701ccfe1a62886e9005c2fd42e333e73522de02",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSearchService models-ready latch gate (\u00a714.28 U3)",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3b0f8d23f5c5adfcfe29d275baeb1dd006230fc46b249d1e2582b039ccb4c483",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSearchService \u2014 passage_texts length contract",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d985d67a7796673d9de4ec93d91d90748a18310ecf4ff63194a82b87bba69ef7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSearchService \u2014 pathPrefix scopes the counts, not just the rows",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "aa89f28b4d75576a53ff4bf39e73e902125d5c2d715771e32d5d606792811a4b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "empty index",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6efbb73c2881e9ec6df2c1594d30c95462c68e652de87441d5159dcb180eac25",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "HYBRID mode QPP",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "23b95eb0cacc23d857d0253a09044bfdf95ddc3e66cfa7eecb3dfc642a00f1a6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "TEXT mode QPP",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "96c2c7f93fca34404cd21d8e26892737c338d14bdec47c6a52c7b0613df07afe",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "VECTOR mode QPP",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e2fa2527f3cfe17f72d6dd9b9c675edec6e5c0335227a7b85063134228b87b93",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c86981ea38a452671e86864be5531e3e1ac1422aa887f12c1d18793500094ead",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceQueuedStartTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8048e497e8567a245f4546c01423875182fefa4a49e5e8b93f3c23cc851b8ed1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5bd139ba42c47e19eff2fff0a3aff53faf0e4ed67beeb06ef86400d723ecaf71",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceRagBudgetTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "decb1638fcd7aa7ba4c736b670486163a548315ac8b8e2bd86fe3a5eb61b213f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceRagLoadingObservedTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4aade35f81a4b8413972f351f401efd1b564f8673b2418d48050b95eaf7198ea",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8fc65817b627fef020cc751b3da2bb61877b2cb7b5752d4a52e472fd8e785452",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceRerankCallDeadlineTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e0c1823c37d51e6a4f0bee3439c7e3d067e94222cd0ec924497f54691f99c9cf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "with mock reranker wired",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5376dbe98eaa551f5991f20eee2106fcf73c56adbc7ab9c7f38384e1a22d9d50",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "with skipping reranker",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cf945760bc1013b970b677085d6948f48fa00703ff13abf5dddadf12083e069f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "without reranker wired",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "274063fae4914f61351e8ef1ee06e608cddb1132a727f5ed886a56059bd10458",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSearchService Rerank RPC",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1c1045e5138c3844301e9f59145ea8cb7ae161d2ee6b5995c15560122aa39d66",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Chunk vs fallback behavior",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2c9e9fa478890a428296eaa2255bc16aae326fef508f3397f3a9b4d9a83b9213",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Collection scoping (821 \u00a73-C2)",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "64b1a958baf9056bc4485907644ff1455c2c301501853b1dc1bde5c152a8d47a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Diversification behavior",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e6ac92f15ec438e77ca45ff03039c4608713c150397088d219ceab03fdb794ed",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Metadata filtering in retrieve-context (362)",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2cd7280adc9b4fd7fd1c866ff4667540c2c688cab6a7d28ae975bae9fcfd830b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Tempdoc 822 \u00a73a: the numbering contract (section n <=> citations[n-1])",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b1761bded04fe0c26a8f389e4e0ca9e7a8ea0e6f67921dc5edc1795977a99d79",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Retrieved-source exclusion (610 \u00a7J.3)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3a0e258ba4e010170ab377dce7a03a89bda677dc1a57d9c6e99cd21e18ae8b86",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Doc-level union leg (tempdoc 749 option B)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6d3202b7a9f8e46bb2ed3dea621dffdeda78c2a050f8d9148fe57efe2de29395",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceSearchPayloadTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2c5e8f33467c5625ac959d89262f16b46b86b2040082bd4813cc81c3c5334fcc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cac387f283e7e4597c13fe7ed6df6284c3604a5916f499b39cd3095192f03359",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "09a77d7297ff39591cfa58308e1005caa4b4edb2175c466bc46b981e97096eef",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "AnswerSegmentation splitSentences",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "dd98a51842d0f24623d365ef231e63006375c7ae5f67b89cca9b4b93d6c49e3a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerSearchServiceVectorOnlyBudgetTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0b9f4f3e0e931df616da4b1156b1a1ecf826cd636dd994d1619a4ece7345b083",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSearchService search-path warm-up (tempdoc 687 R3d)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8e662e102558c0ca0cf6e65284a446b1d3282ccfa8ff29d7cf9aa4c720673240",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerUpgradeQuiescenceTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5551b4c16d4c2a4327faf8bb563182ceaa1c14084708331c6c8ea0c076f16dc0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerUserExclusionsAdmissionTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "57def71891c5d2ea646efe5de4502bc459f2a4fda9bcaf0d00a2c8d2ea7993f6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerVduExclusionClaimTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "158c17c7140576838409cfd7d82e90bc6b9d1cae170c6bd54bc21f0858afe930",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.WorkerWatcherEventOwnershipTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "30a2ed831179b21618f00c09b6d96e070adfb5ce51cc2dff9cf5248c91449bee",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.evidence.EvidenceSpanProjectionConformanceTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a02f701fcf34683a4c5dec36681d05c98cefa602bf162aa1c3a98d07217af41d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.evidence.EvidenceSpanSelectorTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "188ec14b6aac6c854678e8e2f74263587f0fdcc51d06d45f3d1a0ed72f98e0eb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.evidence.ExcerptRegionDefaultsByteEquivalenceTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d66b965eda11de6543286c25a004776ed7a00935685fa0d9ae2e351f5b1cc216",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "OpenInferenceSpanProjection: spans project the leg/fusion result they produced",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0e962bbc13b7569e4005411756cc1bb6fb0c7a040fc287ff02a85db1e7d33a81",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "collapseChunkHitsToParents (collapse-cap lever mechanism)",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4bfe60690d4c943d142ed75ab795bba42b0cf0577cf363c1bc314bea4226ff1e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchExecutor chunk collapse \u2014 characterization (916 Part 2, mechanism refuted)",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "13d327b4a90b79766c16f7272dca8d102e08550018be2c3e26f60e6457a7abb1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchExecutor chunk-SPLADE leg flag gate (931 \u00a7E item 8)",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "33be1589092db62c84d9d4d54339a1881fc6feee19e9011e65eaf6afc0887b68",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.execute.SearchExecutorFanoutLifetimeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8c9501cd024bf4868afcecb4f92ad883d2ac5b5c7c2e379c3a0f81723f2771eb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.input.SearchInputCaptureCorpusProfileTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5caf21602120aa15c28743b11bb91c7911ab779e144da5d561c28cd4fe3f2b1e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.input.SearchInputCaptureExpandFilterListTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5649452809a64032b30f79c41b1e122c5ea20b0be77b35ea1bfb5609290601a4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.respond.SearchResponseBuilderEnrichmentCapTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7abfb974cc955bf44493f2a7f266d630f70dd3adae07ac49d7132c87ff40524b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.respond.SearchResponseBuilderEvidencePreviewTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "37bca299d168ccccfe87c0ee0db90db7138f6abc81539d2c89a594037b63f6bf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchResponseBuilder.buildHitStages: per-hit slice + lossless debug_scores detail",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f12210905325cd601ae252e3653b3a3e8c35049de441b79278858d50f3e7a9c1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.services.respond.SearchResponseContentRevisionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "95216081da4065aea5a01a67e09bd71515cd4ac8dbb4f58baf4006d4d028483a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchTraceProjection conformance: the trace is lossy-downward from the SearchOutcome slice",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "66df063501f78aac53b0b3470e9aad205972f0bdd35ae7b90a5c0fad2606564d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SearchTraceProjector: worker query-level Stage nodes from typed decision/outcome",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "50bb687aa1a1404c44cec34a4e99ed1b44dd58f047464135570bdee3d65731fc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "WorkerSpanProjection: the worker span carries data derived from the worker trace slice",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d207b71838e4f8160c9fece48cb455c48d99cc77122772d7110c0de2d5d5ad38",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "686: SPLADE tokenizer crash harness over real index contents",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "b31d8b710140726ffc186c949db3d3dd3fc792913dc929ddc2ce6af87ba2115e",
+      "failed": [],
+      "skippedCases": [
+        "batch-encode every parent and reconstructed chunk text from the crashed index"
+      ]
+    },
+    {
+      "name": "getAlphanumericRatio()",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9947650118645428e11c290330f709d37dd8d8ba6187f305d31714c3aeb184d4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "isGarbageText()",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cedbebd731d37333dcd156eaae64d065689a54b6b31b784dbbb61117570bdbe6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.text.TextQualityAnalyzerTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "814e17a75a9602669193f02dd583e6ab5168fa02b906c6660e8eeb1f4b721dad",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.ParseUtilsTest$ExtractFilenameTests",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e2a4438bcb82f444a01cd507420564f5bd26809e7a8c3615933eb281d530cca7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.ParseUtilsTest$ParseIntSafeTests",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "689f0118f2026d20c4cf86ce48de150289112e5b0add5e838e34f86c1f6f3c2d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.ParseUtilsTest$TrimToLengthTests",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6ad9c07a0f6315ae84cd9e3fc63937f587f12f9210732bd3f0626c11cc5ee8e1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SQLite and Lucene path-prefix normalizers agree",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cc2eb58c5c5ec79c122b074066b3f785f14b2a2e64cde848dcdede07ab2296c7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.ProtoConvertersTest$ToRuntimeFiltersTests",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f591e69dff1eb76c8893d5f8d700aa6b0da6e8ac37ede26330e012b359058df0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.ProtoConvertersTest$ToRuntimeSortTests",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "36e6f17c92e50d5c27ccc197f46f256ae8e830ec428c239793c3a0a69751818d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.TextAnalysisUtilsTest$AnalyzeTermsTests",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5ad0470ef58a091eb8d4486d3c35d98f103842ac2b2ccc3b5a4f98a48b354e13",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.TextAnalysisUtilsTest$ComputeMatchedFieldsTests",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "189c1671fe72ed350b579752722cc1567662978c2d9bf2c2332e4f9e83e4d596",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.TextAnalysisUtilsTest$ContainsAnyTests",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0c5ef8d7209a82b49ba0b51ff436c61fcdcfc991c18b46f323fd10d4f3ff8bae",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.TextAnalysisUtilsTest$NormalizedQueryTermsTests",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f47127e1176152fe603aa3bb44531428a5239109fca60bd963552f09c933d081",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.VectorUtilsTest$CosineTests",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f15c5bff8fdff3cafb9575ad25c95c3393466ab5c4691c1bb9e148bf19128a64",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.indexerworker.util.VectorUtilsTest$ToFloatArrayTests",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c13755cdd9ae76c3056da577e87fd3faaefd08dcba8cb35adab7adf3967aeeb0",
+      "failed": [],
+      "skippedCases": []
+    }
+  ]
+}

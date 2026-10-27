@@ -106,6 +106,8 @@ public final class WorkerSearchService {
   private static final int MAX_SLICE_CHARS = 200_000;
 
   private final CommitOps commitOps;
+  private final io.justsearch.adapters.lucene.runtime.IndexCountOps presenceCounts;
+  private volatile java.util.function.Function<CallContext, String> presenceGeneration;
   private final SuggestOps suggestOps;
   private final DocumentFieldOps documentFieldOps;
   private final FolderBrowseEngine folderBrowseEngine;
@@ -197,6 +199,7 @@ public final class WorkerSearchService {
             ? encoderBindings
             : new io.justsearch.indexerworker.server.EncoderBindings();
     this.commitOps = searchLifecycle.commitOps();
+    this.presenceCounts = searchLifecycle.indexCountOps();
     this.suggestOps = searchLifecycle.suggestOps();
     this.documentFieldOps = searchLifecycle.documentFieldOps();
     this.folderBrowseEngine = searchLifecycle.folderBrowseEngine();
@@ -309,6 +312,44 @@ public final class WorkerSearchService {
    */
   public void setActiveGenerationSupplier(java.util.function.Supplier<String> supplier) {
     this.searchOrchestrator.setActiveGenerationSupplier(supplier);
+  }
+
+  /** Reuses the generation owner's strict idle read; no lifecycle guess from fetch outcomes. */
+  public void setPresenceGeneration(java.util.function.Function<CallContext, String> generation) {
+    this.presenceGeneration = java.util.Objects.requireNonNull(generation, "generation");
+  }
+
+  public Map<String, io.justsearch.app.api.DocumentService.Presence> checkDocumentPresence(
+      List<String> docIds, CallContext ctx) {
+    if (docIds == null || docIds.size() > io.justsearch.app.api.DocumentService.MAX_PRESENCE_IDS
+        || docIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+      throw WorkerServiceException.invalidArgument("Invalid presence batch");
+    }
+    var generation = presenceGeneration;
+    if (generation == null || fixedCompatibility != null) return Map.of();
+    try (var ignored = openRequestMdc(ctx)) {
+      String before = generation.apply(ctx);
+      if (before == null || before.isBlank() || ctx.cancelled()) return Map.of();
+      commitOps.maybeRefreshBlocking();
+      Map<String, io.justsearch.app.api.DocumentService.Presence> result = new java.util.LinkedHashMap<>();
+      for (String docId : docIds) {
+        if (ctx.cancelled()) return Map.of();
+        var presence = io.justsearch.app.api.DocumentService.Presence.UNKNOWN;
+        try {
+          presence = presenceCounts.countByFieldOrThrow(
+              SchemaFields.DOC_ID, PathNormalizer.normalizePath(docId)) > 0
+              ? io.justsearch.app.api.DocumentService.Presence.PRESENT
+              : io.justsearch.app.api.DocumentService.Presence.ABSENT;
+        } catch (java.io.IOException | RuntimeException failure) {
+          log.debug("Source membership could not be read", failure);
+        }
+        result.put(docId, presence);
+      }
+      if (ctx.cancelled() || !before.equals(generation.apply(ctx))) return Map.of();
+      return Map.copyOf(result);
+    } catch (RuntimeException failure) {
+      return Map.of();
+    }
   }
 
   // Tempdoc 516 P3 / Slice 5 (W7.2): setSpladeEncoder + setBgeM3Encoder removed —

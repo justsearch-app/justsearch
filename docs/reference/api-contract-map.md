@@ -11,6 +11,16 @@ This doc answers: "Where is the source of truth for JustSearch API schemas and s
 
 ## HTTP (Local API)
 
+`POST /api/documents/presence` observes current index membership for at most 64 `docIds`.
+It requires the per-boot session token and has the OBSERVATION activity role. Response:
+`states: {docId: "present" | "absent" | "unknown"}` (document-presence-response.v1.json).
+Only a successful Worker count under the same idle serving generation can establish absence.
+Read failures, missing capabilities, lock errors and index transitions are unknown; no disk probe
+or saved-conversation write occurs. Invalid bodies return 400; unavailable or timed-out checks convey no absence,
+either through an error response or an unknown state. Search v3 checks these pages after rendering its sources.
+`GET /api/preview` returns 404 with `sourceState: "absent"` only after this membership check;
+an unreadable slice with no confirmed absence returns 503 with `sourceState: "unknown"`.
+
 ### Production authentication
 
 Every production request requires `X-JustSearch-Session`, including reads and streams, except

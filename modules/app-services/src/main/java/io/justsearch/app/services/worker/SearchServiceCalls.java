@@ -4,7 +4,7 @@ package io.justsearch.app.services.worker;
 /**
  * The unary SearchService calls, as a plain Java interface (lane F stage A item A6).
  *
- * <p>Ten calls: the retrieval surface the Head asks the index half for.
+ * <p>The retrieval surface the Head asks the index half for.
  *
  * <p><b>Why this interface exists.</b> Until A6 the executor seam
  * ({@link SearchRpcExecutor}, {@link IngestRpcExecutor}) was typed on the <em>generated gRPC
@@ -20,6 +20,11 @@ package io.justsearch.app.services.worker;
  * and none of its benefit, and a named follow-up replaces them with the {@code app-api} records.
  */
 public interface SearchServiceCalls {
+
+  default java.util.Map<String, io.justsearch.app.api.DocumentService.Presence> checkDocumentPresence(
+      java.util.List<String> docIds) {
+    return java.util.Map.of();
+  }
 
   /** {@code SearchService/Search}. */
   io.justsearch.ipc.SearchResponse search(io.justsearch.ipc.SearchRequest request);

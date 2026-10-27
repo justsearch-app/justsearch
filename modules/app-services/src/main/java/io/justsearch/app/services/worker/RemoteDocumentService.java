@@ -256,6 +256,17 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   @Override
+  public CompletionStage<Map<String, Presence>> checkPresence(List<String> docIds, EngineContext engineContext) {
+    if (docIds == null || docIds.size() > MAX_PRESENCE_IDS
+        || docIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+      return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid presence batch"));
+    }
+    List<String> ids = List.copyOf(docIds);
+    return supplyWithCapturedClient(engineContext,
+        client -> client.checkDocumentPresence(ids, engineContext));
+  }
+
+  @Override
   public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
     if (docId == null || docId.isBlank()) {
       return CompletableFuture.completedFuture(

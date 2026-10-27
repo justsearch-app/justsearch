@@ -1,0 +1,16 @@
+{
+  "baseline": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+  "totals": {
+    "tests": 2220,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 1
+  },
+  "failed": [
+    {
+      "suite": "io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest",
+      "sha256": "8433cc44c75dba6461f4bd71b268dd5cddffce32bcab756a870aac443560c767"
+    }
+  ],
+  "observedUtc": "2026-10-27T18:26:54Z"
+}

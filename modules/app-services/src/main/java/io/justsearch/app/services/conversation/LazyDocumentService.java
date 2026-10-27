@@ -91,6 +91,11 @@ public final class LazyDocumentService implements DocumentService {
   }
 
   @Override
+  public CompletionStage<Map<String, Presence>> checkPresence(List<String> docIds, EngineContext engineContext) {
+    return resolve(engineContext, d -> d.checkPresence(docIds, engineContext));
+  }
+
+  @Override
   public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
     return resolve(engineContext, d -> d.fetchBatch(docIds, engineContext));
   }

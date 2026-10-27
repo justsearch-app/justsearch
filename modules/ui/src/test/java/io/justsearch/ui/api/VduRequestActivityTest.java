@@ -291,6 +291,8 @@ final class VduRequestActivityTest {
       var documents = mock(io.justsearch.app.api.DocumentService.class);
       when(documents.fetchSlice(anyString(), anyInt(), anyInt(), any()))
           .thenReturn(CompletableFuture.completedFuture(null));
+      when(documents.checkPresence(anyList(), any())).thenReturn(CompletableFuture.completedFuture(
+          Map.of("pending.png", io.justsearch.app.api.DocumentService.Presence.ABSENT)));
       var preview = new PreviewController(documents);
       app.get("/api/knowledge/preview", preview::handlePreview, ActivityRole.USER_ACTION);
       for (String path : List.of("/api/status", "/api/inference/status", "/api/knowledge/status")) {

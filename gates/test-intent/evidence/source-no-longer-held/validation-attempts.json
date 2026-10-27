@@ -1,0 +1,375 @@
+{
+  "observedUtc": "2026-10-27T18:39:26Z",
+  "attempts": [
+    {
+      "log": "api-base-lockdown.log",
+      "sha256": "e22559b46d96452ab10311fdb18f4865d0272ff76a4e016520195ad834430ae8",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  18 passed (18)",
+        "   Duration  12.85s (transform 1.38s, setup 0ms, import 2.59s, tests 15.84s, environment 174ms)"
+      ]
+    },
+    {
+      "log": "api-base-unit.log",
+      "sha256": "f65dfd4c2677abef1882a144557d95c0b68daaa54871fb467730a382fdbed027",
+      "terminalSummary": [
+        " Test Files  655 passed (655)",
+        "      Tests  8316 passed (8316)",
+        "   Duration  96.72s (transform 14.57s, setup 4.96s, import 72.77s, tests 163.54s, environment 82.60s)"
+      ]
+    },
+    {
+      "log": "baseline-preservation-actual.log",
+      "sha256": "b44e2e397906269c64eb3191871e06980e75b8cdfccc76dc30d1c17922b89173",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 18s"
+      ]
+    },
+    {
+      "log": "compile-pmd-final.log",
+      "sha256": "233aeb37a3cd9dbd52d7d4a06876a45eef2f8d4df0c59a349a1201a587ba05ec",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 22s"
+      ]
+    },
+    {
+      "log": "compile.log",
+      "sha256": "26266b146b48aa61a93a58923863a2861fd9702ee0dc8427c50ca2530b495e88",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 46s"
+      ]
+    },
+    {
+      "log": "conversation-bytes-after.log",
+      "sha256": "717593fb9d2aaffb832c4f3ca5a642b709a566855fff806bcb53625b9f1c0365",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 8s"
+      ]
+    },
+    {
+      "log": "conversation-bytes-before.log",
+      "sha256": "7e694cff13a7a1d9cbeab84fed1fa9741ef5d949b618ff811cd1fca188e7f80f",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 10s"
+      ]
+    },
+    {
+      "log": "final-lockdown.log",
+      "sha256": "a9a26bfd0d57283431a86f9b0b9597daf6f247596b8c29fb0711886d454f0d12",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  18 passed (18)",
+        "   Duration  20.72s (transform 2.07s, setup 0ms, import 3.74s, tests 24.17s, environment 278ms)"
+      ]
+    },
+    {
+      "log": "final-unit.log",
+      "sha256": "8709af61fcdcc20a738111717ba81c1a4c16400517c50a7e030ea6efe1327c68",
+      "terminalSummary": [
+        " Test Files  655 passed (655)",
+        "      Tests  8315 passed (8315)",
+        "   Duration  131.51s (transform 25.40s, setup 6.85s, import 110.75s, tests 205.93s, environment 115.23s)"
+      ]
+    },
+    {
+      "log": "install-final.log",
+      "sha256": "9f449ed20e4e723643a06fd74363981c76fc6b97b07da600c03c7f1c03583c62",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 7s"
+      ]
+    },
+    {
+      "log": "install.log",
+      "sha256": "84ffaaef56d4a92d47d4beb5f4cbd55e431af4af1ac6d806ca9e196b4328e7f3",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 15s"
+      ]
+    },
+    {
+      "log": "java-app-api.log",
+      "sha256": "5390bd65ce2afe7cb8f2b13ee6df6b286856053269318a569595839b935d4bd0",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 1m 11s"
+      ]
+    },
+    {
+      "log": "java-app-engine.log",
+      "sha256": "a43755497b096442351ba65079e04acf1bfbf2d075984a16c3f666f9682704a2",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 13m 5s"
+      ]
+    },
+    {
+      "log": "java-app-services.log",
+      "sha256": "506262b8197cbe4196bde1c15f945e45f369e50bac21be364d3b51b01dce5705",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 11m 48s"
+      ]
+    },
+    {
+      "log": "java-before-preservation.log",
+      "sha256": "6d0bbf7da9b4303c17c92a48d2b75b943a3d39422cd5ccec3018fe129c1f691e",
+      "terminalSummary": [
+        "29 tests completed, 1 failed",
+        "> Task :modules:ui:test FAILED",
+        "BUILD FAILED in 13s"
+      ]
+    },
+    {
+      "log": "java-before-ui.log",
+      "sha256": "cf574a9402d2f5737d7168b52126698f44c5201547f4abde6522a1005a8bb47d",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 680ms",
+        "PreviewReadFailureHttpTest > unreadableOrNoTextIsNotA404WithoutIndependentAbsence() FAILED",
+        "24 tests completed, 1 failed",
+        "> Task :modules:ui:test FAILED",
+        "BUILD FAILED in 12s",
+        "BUILD SUCCESSFUL in 20s"
+      ]
+    },
+    {
+      "log": "java-compile-pmd.log",
+      "sha256": "bc22d4135623ef31cb2f8ef621c0e1e1ec835cad62286e9c2623abb9730816f5",
+      "terminalSummary": [
+        "BUILD FAILED in 1m 43s"
+      ]
+    },
+    {
+      "log": "java-ui.log",
+      "sha256": "05e830274a5d6bd50fe4daa531d620039177ace7bc82878509ec27614310a7fc",
+      "terminalSummary": [
+        "DeclaredRequestActivityTest > registeredUserOperationsAndUnattendedReadsHaveTheirDeclaredHttpBehavior() FAILED",
+        "NvidiaSmiAvailabilityHttpTest > anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory() FAILED",
+        "PreviewSliceHttpTest > missingUnknownAndEmptyDocumentsRetainTheirResponses() FAILED",
+        "VduRequestActivityTest > requestDuringAcceptedPassInterruptsAtNextUnitAndResumesPending(String) > [11] preview FAILED",
+        "2222 tests completed, 6 failed, 1 skipped",
+        "> Task :modules:ui:test FAILED",
+        "BUILD FAILED in 11m"
+      ]
+    },
+    {
+      "log": "java-worker-services.log",
+      "sha256": "0d970db886235b2f65a4e01c9ab5f52ce58a51fc5f5523e122559cf308a38581",
+      "terminalSummary": [
+        "LinuxRootMountInfoTest > missingDanglingAndAmbiguousUuidMappingsAreUnknown() FAILED",
+        "WatcherUnavailabilityScopeTest > aNewerUnavailableIncarnationCannotBeClearedByAnOlderReconciliation() FAILED",
+        "WatcherUnavailabilityScopeTest > endedUnavailableIncarnationIsRecoverableOnlyByItsOwnReconciliation() FAILED",
+        "WatcherUnavailabilityScopeTest > inaccessibleRootWhoseAbsenceIsUnknownIsStillRootScoped() FAILED",
+        "2408 tests completed, 4 failed, 23 skipped",
+        "> Task :modules:worker-services:test FAILED",
+        "BUILD FAILED in 4m 59s"
+      ]
+    },
+    {
+      "log": "nvidia-baseline.log",
+      "sha256": "a94b03b8d7405e8a6772d2ddf37987fef9eaf7d9dc9c3050ee501adf031c418d",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 36s"
+      ]
+    },
+    {
+      "log": "nvidia-candidate-recheck.log",
+      "sha256": "70de1fef145149f0e2e81075216c89f5c2da13f409070e2ec74be03f427862bf",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 40s"
+      ]
+    },
+    {
+      "log": "ui-controls-focused.log",
+      "sha256": "dbd2395a31687551c1f0b51ede109b813690ca8677e5fb8ee46e643011ab073f",
+      "terminalSummary": [
+        " Test Files  2 passed (2)",
+        "      Tests  13 passed (13)",
+        "   Duration  530ms (transform 249ms, setup 37ms, import 396ms, tests 143ms, environment 268ms)"
+      ]
+    },
+    {
+      "log": "ui-focused.log",
+      "sha256": "142b266f5b6da4caca941890f80d6567b5f9bbe50b64697a7c36d8a59286d573",
+      "terminalSummary": [
+        " Test Files  2 passed (2)",
+        "      Tests  13 passed (13)",
+        "   Duration  658ms (transform 411ms, setup 22ms, import 608ms, tests 141ms, environment 313ms)"
+      ]
+    },
+    {
+      "log": "ui-full-baseline.log",
+      "sha256": "e0e4ab715346bde5c87774d95dd9ce1f2a55031b19e96b2b9f9cd2472175e7db",
+      "terminalSummary": [
+        "NvidiaSmiAvailabilityHttpTest > anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory() FAILED",
+        "2220 tests completed, 1 failed, 1 skipped",
+        "> Task :modules:ui:test FAILED",
+        "BUILD FAILED in 10m 45s"
+      ]
+    },
+    {
+      "log": "ui-full-candidate-final.log",
+      "sha256": "96c23edbd8f08dfedfef29352ea8d794ef1aca2b57a7b3d549350df649d07abd",
+      "terminalSummary": [
+        "NvidiaSmiAvailabilityHttpTest > anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory() FAILED",
+        "2222 tests completed, 1 failed, 1 skipped",
+        "> Task :modules:ui:test FAILED",
+        "BUILD FAILED in 10m 10s"
+      ]
+    },
+    {
+      "log": "ui-java-repaired.log",
+      "sha256": "57c48ed4596f102647fc66abd6d36bf4608d0bad11df4b145c6ac7b7c05c3e01",
+      "terminalSummary": [
+        "67 tests completed, 1 failed",
+        "> Task :modules:ui:test FAILED",
+        "BUILD FAILED in 54s"
+      ]
+    },
+    {
+      "log": "ui-last-focused.log",
+      "sha256": "7fbac04632db8ea1ed0517fcd646666216d0ec0284b08371dd779b6902932099",
+      "terminalSummary": [
+        " Test Files  4 passed (4)",
+        "      Tests  52 passed (52)",
+        "   Duration  3.36s (transform 2.52s, setup 67ms, import 3.74s, tests 2.03s, environment 687ms)"
+      ]
+    },
+    {
+      "log": "ui-lockdown-final-all.log",
+      "sha256": "2767f6c4d1a3d4fa222252f37ccadf329a3ed86d41ce484c43ea00f838a561e0",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  18 passed (18)",
+        "   Duration  13.56s (transform 2.34s, setup 0ms, import 3.90s, tests 17.76s, environment 240ms)"
+      ]
+    },
+    {
+      "log": "ui-lockdown-final.log",
+      "sha256": "b2e8f7d8a2fb42ffa00e02d2b6a9d6c29b0dd23f921c92c244dd2b6ee117ec63",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  18 passed (18)",
+        "   Duration  10.31s (transform 1.32s, setup 0ms, import 2.33s, tests 12.20s, environment 141ms)"
+      ]
+    },
+    {
+      "log": "ui-lockdown.log",
+      "sha256": "7093326dd7efc497f84fa10b89e457950d4a8bf3e20c4095c4195ccdf07410d6",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  18 passed (18)",
+        "   Duration  11.63s (transform 2.07s, setup 0ms, import 3.72s, tests 12.94s, environment 250ms)"
+      ]
+    },
+    {
+      "log": "ui-preservation-baseline-expanded.log",
+      "sha256": "497423684f9f387df5ee12b35c8c92fbcee07833baa525acbfec98e996f4ceaa",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 36s"
+      ]
+    },
+    {
+      "log": "ui-reopen.log",
+      "sha256": "626b73c59af7c52a6f3e8fc8e672ab05037ea8a85aabf794c84eaa719ec6573e",
+      "terminalSummary": [
+        " Test Files  4 passed (4)",
+        "      Tests  51 passed (51)",
+        "   Duration  2.74s (transform 1.44s, setup 47ms, import 2.39s, tests 1.83s, environment 566ms)"
+      ]
+    },
+    {
+      "log": "ui-retained-pane.log",
+      "sha256": "e1e817c7c9bdcd9f6908e0dc454c6054c030dec0a3967c5c54dc465c6accf33e",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  64 passed (64)",
+        "   Duration  1.02s (transform 1.12s, setup 44ms, import 1.44s, tests 529ms, environment 399ms)"
+      ]
+    },
+    {
+      "log": "ui-scope.log",
+      "sha256": "1a79eb2b316176ad52c7e0e3c46dc0ff679e9ed591ab5a07fe7e11591f659d24",
+      "terminalSummary": [
+        " Test Files  3 passed (3)",
+        "      Tests  15 passed (15)",
+        "   Duration  1.17s (transform 1.51s, setup 31ms, import 1.87s, tests 203ms, environment 397ms)"
+      ]
+    },
+    {
+      "log": "ui-unit-controls-final.log",
+      "sha256": "7f037049018395f3596e67274a962d5ead5eec7b93f63f99f65d72b9cf42de73",
+      "terminalSummary": [
+        " Test Files  654 passed (654)",
+        "      Tests  8310 passed (8310)",
+        "   Duration  87.54s (transform 10.52s, setup 4.20s, import 61.37s, tests 156.19s, environment 72.88s)"
+      ]
+    },
+    {
+      "log": "ui-unit-final-all.log",
+      "sha256": "fdba5807eefcdd5e939362b546488717575e206434a75b0cb1a95345759b9b0f",
+      "terminalSummary": [
+        " Test Files  655 passed (655)",
+        "      Tests  8312 passed (8312)",
+        "   Duration  94.51s (transform 18.88s, setup 4.65s, import 75.23s, tests 160.74s, environment 78.07s)"
+      ]
+    },
+    {
+      "log": "ui-unit-final.log",
+      "sha256": "1bb889f25789eae4b8175a71940b95e12fa1ed4c5eecd8efedbc9adba702d3d6",
+      "terminalSummary": [
+        " Test Files  654 passed (654)",
+        "      Tests  8310 passed (8310)",
+        "   Duration  85.19s (transform 8.97s, setup 4.10s, import 57.73s, tests 151.59s, environment 72.40s)"
+      ]
+    },
+    {
+      "log": "ui-unit-verified.log",
+      "sha256": "99b5fac7453a669836154bf20b0f3fef49014f1ee8735c32eac634af89615059",
+      "terminalSummary": [
+        " Test Files  654 passed (654)",
+        "      Tests  8311 passed (8311)",
+        "   Duration  83.44s (transform 11.95s, setup 4.18s, import 58.81s, tests 150.08s, environment 67.92s)"
+      ]
+    },
+    {
+      "log": "ui-unit.log",
+      "sha256": "606427f3d88c9eddab48a33f68f5d531bb0d70b478306637c8f7aaea7870d403",
+      "terminalSummary": [
+        "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+        " Test Files  1 failed | 653 passed (654)",
+        "      Tests  1 failed | 8309 passed (8310)",
+        "   Duration  91.96s (transform 12.27s, setup 5.08s, import 66.84s, tests 161.10s, environment 76.63s)"
+      ]
+    },
+    {
+      "log": "worker-baseline-actual.log",
+      "sha256": "703917a6b4e4f826aeaf743834ee1795be7e0515e4ce31daed15a577ca376c04",
+      "terminalSummary": [
+        "LinuxRootMountInfoTest > missingDanglingAndAmbiguousUuidMappingsAreUnknown() FAILED",
+        "> Task :modules:worker-services:test FAILED",
+        "WatcherUnavailabilityScopeTest > aNewerUnavailableIncarnationCannotBeClearedByAnOlderReconciliation() FAILED",
+        "WatcherUnavailabilityScopeTest > endedUnavailableIncarnationIsRecoverableOnlyByItsOwnReconciliation() FAILED",
+        "WatcherUnavailabilityScopeTest > inaccessibleRootWhoseAbsenceIsUnknownIsStillRootScoped() FAILED",
+        "13 tests completed, 4 failed",
+        "BUILD FAILED in 4s"
+      ]
+    },
+    {
+      "log": "worker-baseline-failures.log",
+      "sha256": "df61df2770d3e77030bc971ad2cd3164dd00b12e648f9b9e3b05bdce26ca2278",
+      "terminalSummary": [
+        "LinuxRootMountInfoTest > missingDanglingAndAmbiguousUuidMappingsAreUnknown() FAILED",
+        "> Task :modules:worker-services:test FAILED",
+        "WatcherUnavailabilityScopeTest > aNewerUnavailableIncarnationCannotBeClearedByAnOlderReconciliation() FAILED",
+        "WatcherUnavailabilityScopeTest > endedUnavailableIncarnationIsRecoverableOnlyByItsOwnReconciliation() FAILED",
+        "WatcherUnavailabilityScopeTest > inaccessibleRootWhoseAbsenceIsUnknownIsStillRootScoped() FAILED",
+        "13 tests completed, 4 failed",
+        "BUILD FAILED in 7s"
+      ]
+    },
+    {
+      "log": "worker-focused.log",
+      "sha256": "a965cf230424b329a491f75dc6fb1f102780c4730fcfc35b8e436db6b80b7911",
+      "terminalSummary": [
+        "BUILD SUCCESSFUL in 9s"
+      ]
+    }
+  ]
+}

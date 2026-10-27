@@ -84,6 +84,7 @@ final class PreviewSliceHttpTest {
     runtime.commitOps().commitAndTrack();
     runtime.commitOps().maybeRefreshBlocking();
     search = spy(new WorkerSearchService(runtime));
+    search.setPresenceGeneration(ctx -> "fixture-idle-generation");
     // Only the composition facade is mocked; slicing and index reads are production code.
     var services = mock(WorkerAppServices.class);
     when(services.searchService()).thenReturn(search);

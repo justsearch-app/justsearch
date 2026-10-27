@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.app.services.conversation.CitedConversationReadOnlyTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T17:32:19Z" hostname="elias-systemproductname" time="0.281">
+  <properties/>
+  <testcase name="loadingSavedAskAndDelegateCitationsDoesNotRewriteAnyConversationBytes()" classname="io.justsearch.app.services.conversation.CitedConversationReadOnlyTest" time="0.274"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

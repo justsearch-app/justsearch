@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" tests="7" skipped="0" failures="1" errors="0" timestamp="2026-10-27T17:50:23.285Z" hostname="elias-systemproductname" time="0.301">
+  <properties/>
+  <testcase name="nonabsoluteMountPointsAndUnrecognizedRootsStillRefuseIdentity()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.051"/>
+  <testcase name="malformedMountEvidenceIsNeverGuessed()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.005"/>
+  <testcase name="missingDanglingAndAmbiguousUuidMappingsAreUnknown()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.02">
+    <failure message="java.nio.file.NoSuchFileException: /dev/disk/by-uuid" type="java.nio.file.NoSuchFileException">java.nio.file.NoSuchFileException: /dev/disk/by-uuid
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)
+	at java.base/sun.nio.fs.UnixException.asIOException(UnixException.java:115)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newDirectoryStream(UnixFileSystemProvider.java:456)
+	at java.base/java.nio.file.Files.newDirectoryStream(Files.java:445)
+	at io.justsearch.indexerworker.services.LinuxRootMountInfoTest.missingDanglingAndAmbiguousUuidMappingsAreUnknown(LinuxRootMountInfoTest.java:100)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="retainedDirectoryRejectsReplacementAndReleasesItsDescriptor()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.18"/>
+  <testcase name="namespaceObjectMountDoesNotInvalidateUnrelatedFilesystemRoots()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.003"/>
+  <testcase name="escapedPathsMountRootsAndLongestComponentMatchArePreserved()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.001"/>
+  <testcase name="linuxTuplesAreVersionedAndCorruptTuplesAreRejectedWithoutLosingWindowsRecords()" classname="io.justsearch.indexerworker.services.LinuxRootMountInfoTest" time="0.017"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

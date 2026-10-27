@@ -733,6 +733,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // search.searcher_generation.
     this.searchService.setActiveGenerationSupplier(
         this.ingestService.activeGenerationSupplier());
+    this.searchService.setPresenceGeneration(this.ingestService::captureRebuildGeneration);
 
     // 4. Health service (also converted off the ImplBase; its wire adapter went at item A9).
     List<WorkerModelDiscovery.DiscoveredModel> discoveredModels =
@@ -981,6 +982,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setDocumentIdentityStore(greenContext.documentIdentityStore());
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
     searchService.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
+    searchService.setPresenceGeneration(ingestService::captureRebuildGeneration);
     // Task t-20261013-ef3c41, round 4: the shared loop and watcher ask this service's root check.
     if (indexingLoop != null) {
       indexingLoop.useRootCheck(ingestService.rootCheck());

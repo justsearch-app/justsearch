@@ -8,7 +8,7 @@
  * present) excerpt text.
  *
  * Consumed by AskView (C3). The view passes the parsed payload through; this
- * block has no fetch / side-effect concerns of its own.
+ * Search v3 also observes current index membership without changing the evidence.
  *
  * Per §9.F Q1 (hybrid) + slice 486 G140: location-metadata + click-to-verify
  * affordances land in a follow-up polish phase. V1 ships the minimum
@@ -17,6 +17,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
+import { authorizedFetch } from '../../api/authorizedFetch.js';
 import '../Control.js';
 import { setMenuAnchor } from '../../utils/selectionAnchor.js';
 // Tempdoc 565 §29 Tier-3 — open the cited LOCAL file (the uniquely-local citation affordance).
@@ -76,6 +77,10 @@ export class CitationsPanel extends JfElement {
     sourcesExpanded: { type: Boolean, attribute: false },
     externalDisclosure: { type: Boolean, attribute: false },
     resultBeingExplained: { type: Boolean, attribute: false },
+    observeAvailability: { type: Boolean, attribute: false },
+    presenceScope: { type: String, attribute: false },
+    apiBase: { type: String, attribute: false },
+    unavailable: { state: true },
   };
 
   declare citations: CitationMatch[];
@@ -118,12 +123,22 @@ export class CitationsPanel extends JfElement {
   declare externalDisclosure: boolean;
   /** A ranking trace names its subject; it supplies no document passage or grounding verdict. */
   declare resultBeingExplained: boolean;
+  /** Search v3 opts into current index membership; evidence records are never modified. */
+  declare observeAvailability: boolean;
+  declare presenceScope: string;
+  declare apiBase: string;
+  declare private unavailable: Set<string>;
+  private presenceRequest: AbortController | null = null;
 
   private selectedSourceUnsub: (() => void) | null = null;
 
   constructor() {
     super();
     this.resultBeingExplained = false;
+    this.observeAvailability = false;
+    this.presenceScope = '';
+    this.apiBase = '';
+    this.unavailable = new Set();
     this.citations = [];
     this.sources = [];
     this.sourceCoverage = [];
@@ -148,6 +163,52 @@ export class CitationsPanel extends JfElement {
     super.disconnectedCallback();
     this.selectedSourceUnsub?.();
     this.selectedSourceUnsub = null;
+    this.presenceRequest?.abort();
+    this.presenceRequest = null;
+    if (this.unavailable.size > 0) this.unavailable = new Set();
+  }
+
+  protected override onReveal(): void {
+    void this.checkAvailability();
+  }
+
+  protected override updated(changed: Map<string, unknown>): void {
+    if (changed.has('sources') || changed.has('observeAvailability') || changed.has('presenceScope') || changed.has('apiBase')) {
+      void this.checkAvailability();
+    }
+  }
+
+  private async checkAvailability(): Promise<void> {
+    this.presenceRequest?.abort();
+    const request = new AbortController();
+    this.presenceRequest = request;
+    this.unavailable = new Set();
+    if (!this.observeAvailability || !this.isConnected) return;
+    const sources = this.sources;
+    const scope = this.presenceScope;
+    const apiBase = this.apiBase;
+    const ids = [...new Set(sources.map(source => source.parentDocId).filter(Boolean))];
+    for (let offset = 0; offset < ids.length; offset += 64) {
+      if (request.signal.aborted || this.presenceRequest !== request
+          || this.sources !== sources || this.presenceScope !== scope || this.apiBase !== apiBase) return;
+      const batch = ids.slice(offset, offset + 64);
+      try {
+        const response = await authorizedFetch(`${apiBase}/api/documents/presence`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ docIds: batch }), signal: request.signal,
+        }, { retry: false });
+        if (!response.ok) continue;
+        const data: unknown = await response.json();
+        if (request.signal.aborted || this.presenceRequest !== request || !this.isConnected
+            || this.sources !== sources || this.presenceScope !== scope || this.apiBase !== apiBase || !this.observeAvailability) return;
+        const states = data !== null && typeof data === 'object' && 'states' in data ? data.states : null;
+        if (states === null || typeof states !== 'object' || Array.isArray(states)) continue;
+        this.unavailable = new Set([...this.unavailable, ...batch.filter(id =>
+          Object.hasOwn(states, id) && (states as Record<string, unknown>)[id] === 'absent')]);
+      } catch {
+        // A failed/slow Engine is unknown. Other batches keep their own independent result.
+      }
+    }
   }
 
   static styles = css`
@@ -395,6 +456,15 @@ export class CitationsPanel extends JfElement {
       font-size: var(--font-size-xs);
       color: var(--text-secondary);
     }
+    .source-availability {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+    }
+    @media (forced-colors: active) {
+      .source-availability { color: CanvasText; }
+    }
     .tier-header {
       font-size: var(--font-size-xs);
       /* A group heading — the meta role WITH emphasis (870 item 7), which is the one weight
@@ -417,6 +487,11 @@ export class CitationsPanel extends JfElement {
     }
     jf-control.weak-toggle::part(control):hover { color: var(--text-primary); }
   `;
+
+  /** Current observation only; never derived from the saved evidence. */
+  isUnavailable(docId: string): boolean {
+    return this.unavailable.has(docId);
+  }
 
   private onSourceClick(source: AnswerEvidenceSource, e: MouseEvent): void {
     // Tempdoc 526 §17 T1A — publish the citation button's bounding rect to
@@ -538,6 +613,8 @@ export class CitationsPanel extends JfElement {
           aria-current=${selected ? 'true' : nothing}
           @click=${(e: MouseEvent) => this.onSourceClick(s, e)}
         >
+          ${this.observeAvailability ? html`<span class="source-availability" role="status" aria-live="polite"
+            >${this.unavailable.has(s.parentDocId) ? 'No longer available' : nothing}</span>` : nothing}
           ${this.resultBeingExplained
             ? html`<div class="sentence">Result being explained: ${docName}</div>`
             : html`<div class="header">

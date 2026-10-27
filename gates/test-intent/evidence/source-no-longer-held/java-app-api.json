@@ -1,0 +1,1111 @@
+{
+  "module": "app-api",
+  "observedUtc": "2026-10-27T17:09:32Z",
+  "revision": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+  "totals": {
+    "tests": 468,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "suites": [
+    {
+      "name": "io.justsearch.app.api.ArchitectureRulesTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "89b21733fdcba048b32403e10e376b238b6d74218e2225ea16809cb7f2f066ae",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.CitationThresholdParityTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "927a0da4172adc89cc192806e667bf5dd01d9372e8fb5bda8532be73ebbeeac0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SSOT/messages/errors.en.json artifact drift",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0dc6e28283c2560ab8fe6422eb8a8d38ad4bdf3bf0cce416aa95c399ce7a0f36",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "errors.en.properties \u2194 ApiErrorCode + AgentErrorCode contract",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b20c86e5002cb5a16dbdf6abea29631d7cf563d52b96f84f76dc58ff48213681",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.InferenceBusyErrorCodeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f968ff9b5023da50b686eaf8f14d1afad80b40eb157caea7d32d2c294f119bbb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "inference-failures.en.properties \u2014 wireCode coverage contract",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "af379fa457cecf19e9e9a2e6c05e078f2646b0b522fb8ae56d3494a8b08ad858",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "OnlineAiRuntimeControl.reloadRuntime \u2014 default implementation",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "81f05d1c279032e3b7ad756e2b8db51872818a50136e8ebbaaeefa44e4958723",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.SamplingParamsTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7e235491900f5a2cefde189a8c79a92ccd7449fe1f2f608ac1f17b2b2a18c7ce",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.SearchModelsTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b96e0945ca30eaa2ca010044fc91380786cf611b28177837d5580e59a3bee4c2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.SearchRequestTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0b6d60f20b9ff0ef5f3d6d3e42ec942c02f5dee2657b078b81da745834ca87a2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.SearchResponseTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c6890df6cb9c5a4d8637c10e8ffd276c2227aa02b324763dde45636a96170d5b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "DocumentService separator drift prevention",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "060891c1dc5ca8d7ce130085c41cdfaf005033226eaeb27bbbb443535c348a12",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "UiSettings.contextLength",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2c51218f179df49d06c00dab5a0b7d2b54f512ef7fd86f5b923251f4d29b376f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.UiSettingsDeclinedAiPackagesTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d47d3d36097b1a42d25f913312a35cd42f38fd59d8572a1313be827bc554e21d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.agent.InterruptedRunPresentationTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ab37be65516688465c6ebb8428570443a9f694cb8c2e73f14a54a92719971fe1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.chat.ChatReasonCodesTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c9eb4446d57400b8d5d8b2d599bf6c3fe3d24721d343f70ee5e480ad81984822",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "chat vocabulary",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a43145a9946c37b1b77681a007330529d6e48df7800b2f3bdf3f797254eb29e0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.chat.DeviceLostRecoveryHandshakeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d96d49181e373bc192c18255fc47e4fba411e39a4ec44336b2e48bee39238dc9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "graphics memory sample and device",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "54b2915dce2c16eb3accf10342be1a022624357d1d12fa94008581e3d17e99f2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "IndexedRootView schema generation",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8981baaf06b95cd807063864d3253401d11ad977faeadf4289edb092b9afd762",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "IndexingJobView schema generation",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "59a770dd8f3f2493d893b6050b86bc8f21603ca50ca87ccbe4fc65c38b317f19",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "KnowledgeSearchResponse.appliedFilters \u2014 the filter echo (366 \u00a71b)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "246b84448f86f390f520d2c4a1447fecd881d93ca0a6ceb49c154b8c991b28bd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "CrossEncoderSkipReason: closed vocabulary for the cross-encoder trace stage",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "30ddaa0e35c48653440c59f983c86c7d438f6534bb30574fd8a4d1e2ecf10590",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "IngestCollectionPolicy",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1af7f46d2f3ef7a8ad27819a23ca17e285728fcdd1e6d23e33c5646c85463369",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.knowledge.KnowledgeSearchHitIdentityTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0990614154ebfaeaf525f2e0f5d261aeccc9a45f916ec84cd388aae2b1befecf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.knowledge.KnowledgeSearchResponseContractTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "881188c48d10115f4d478407da84e276a4e0cc5343b9c3b51bf18a0fcc98c137",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "KnowledgeSearchResponse JSON Schema generation + live-fixture conformance",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cbc3836e16043ff7847ba0ae0677cc9eeb8babf0d40b9be84cab700e073c29ea",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Knowledge wire contract: every app-api record field is described by knowledge.proto",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6f74e88308e55d2d3f6df6789e9cc5c8d7659f89ea0b35c4a8d56a16b8740ab0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.AppliedIndexGenerationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b6318ae937e6d57a55095c4926806ea0997ab1067e5d1594ba2b6b3affaf3164",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.BulkRefusalExplanationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "171a3c8ff51b663b82f40a087e18afddeadb9f0bd9fa86e3527285ab279d931a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.BulkReindexProgressTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "dd94e2b3d4b00842e2400d7e8f9208d69918ee8ac9ce6e8a11f50fe89b596aa5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.IndexTargetSnapshotTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e1df9f59f70d96717f559a7e7d58e89b1ba57e0daa6b5cfa447fce80c175da08",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.OperationAuthorizationBasisTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "59821519ce32a75099d85d2923e77639147817c58cb4c07ae1114544a21ce54e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.OperationDescriptorPreparationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fe61919b3b2a7df1946422a7f16ae8cb0738ce12de48c621e9c4905f14f49f3e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.OperationKeysTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c67abc9efafbe254a7e47c527cf019aa7a9e83b1ba2b5b602083f8b1851a6f5b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.RecordedBulkPlanTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b047d1bba8d9c488005e4b61b05bd7893d354de3c07bf7d526a84f3276a56afc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.RecordedIngestChildTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e711135501083bf9eff427e3e1a350a3398180632d81c6b0d1d8013b6a455142",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.RecordedInstallerGenerationPlanTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c3a7e22a8046e779c368de0b21784226b6e29c405c6ddaa8e49a2d77e7553bb6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.operations.RecordedRootPlanTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "befe60e54a53e6b0b022e822da29edfaa41381343a074fd7bd0bb0a8b63db1cf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.registry.OperationInvocationRequestTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e3916ff6aca748483bde0abd930275c217c39811d1f7d7e81bd5971b75b852e4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Substrate schema generation",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "562cc3a0e555975be2114a86d03dab8fc31a6bfd9fe59c91c38be5fc7644456d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Value-class wire format (tempdoc 441)",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "187ca6bf81fbedbd90fccbcc6644ac2616264f6c8a80d8cfca7177d21614ab74",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ManagedChildTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "418d21cabc2f5eff86443c06f97fc743caade912d32138d2fac8ef27901f1b47",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ReachabilityTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "24d7aa4dd7089b65a241752878570727697f04b4c19271c774892b7ae0fad35b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.RuntimeContractTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7c920612a8137800ff03831acc05a641af6ee5e1aa0f7d0a74bc1ebd1752c1a3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.RuntimeManifestIncarnationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "257699304ef76172fe8725314d8181457a6eea0901847736dc99767369a83bff",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.RuntimeManifestSchemaCompatibilityTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4b4741c3a84745786e2032e80d013419009a16082d4774462b9b8dfed535677c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.ChatDescendantCleanupTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7dfad9cc357e27a1d310d6d6e9c58c564ee06f3026055f3dc7360519f21b9147",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "runtime.child vocabulary",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a772f2fb4876576e54bc1fd4a0339e60df2fbe0fbddb396f0236aba03ce1996b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.ChildPathPrefixTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6a78455881cc1666c6e98d35925e9371d75f6c58db38cc25e3b1acbb22507a5b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.DefaultChildControlGpuBarrierTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f7bc2cd89819230f7b1aebbba07342c1661b83a5fb1cbeae41ddea611b78822f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.DefaultChildControlTest",
+      "tests": 25,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b2bc4ba31b84231bcf9eba354791afaf3eabb70b50f1f9bb18a3aa9ddcefe002",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.EngineWrittenChildrenFixtureTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e1fcc9ce86531711ac6475b3b704911142f7ea1b1a710a05dc6b20eac8409b2a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.GpuReadBoundTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8a375ec1f595e5af1e78f14cd6a476f1c21f07cf64daa8062eb67be27db3a8d0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.HelperFlushRetryTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0ee94eb21e8d43b25acac3940714ebea76fb0e375df5ac3b68d510f34f04960e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.HelperReceiptGroupFlushTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1764b911e70ecbcf1eb9ecf1a5ead93c60165d47dee59d2c6582dc51ed99bcb9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LateWindowExitTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b22ecbdf7ff5b8b0d86dacf40d43835a01429404b95174b6bd75838c58e8a327",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LedgerReconcilerTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "308972459f30f587a7e3d835bdf4c8e00448bfd3afbe6eb0cfa4600717ebbfe6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LedgerWindowsRotationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b62c48a3528416692ace82ba0363a1ca1e551786f1e2846a99b99f9f366588b0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LinuxChildLifetimeTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "573f144824b952ecd21f9ad42a9c3b76d4c432fab3f730cd0cebb6b44a91bf7e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LinuxChildReapingRaceTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "df6382e11dc82356f96a69e941abdecee2733b752db130f4765cdc0b1dff17b2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LinuxIdentityEncodingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "df7f8827328b6c53b0d67b979484c739d9d5ddd528367bb2b6192e2bbb76a6ed",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.LinuxReapedSpawnTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "064686ea6a4ff8f92584cd356b1b22979789bdbea8406aab059c8e68e7a54be2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.OpenWindowLifetimeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "59711d552edd14a2a4b9de840afc19c3ce927fc730ae51b3a889b740807f65d1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.OwnedHelperExitOnceTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "43286c4e4dc7b9b149a9cdcd1e2ef1d7958c87ff7861b009174536064cfa8369",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "sha256": "4fd88c74104091b8166d82579b6cdaaa00ff936358e8b36add74225b39791f65",
+      "failed": [],
+      "skippedCases": [
+        "awaitedCrashStatusRemainsUnexpected()",
+        "realCrashAfterIntentBeforeTerminateStaysUnexpected()"
+      ]
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.OwnedHelperRollbackTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e0b60b2fbbe73782a00be4cb35b9994fa0913d420b25a401b9e20216a45006d5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.OwnedHelperStopRecordTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3dcbf01834c65f2e3bdc1c232eca50e726efa8312a32dffd2e0415f4c74fed39",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.PredecessorChildStopTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5a41f144aca718ce4d4fd6a9b5f4e63a57fad54ed5f392660ae758a7f0525314",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.SharedHelperWindowTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ef43f6f1ee36844abf38cc76bb29f110f868a432008792e7db503c0ec058131b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "stop-detail vocabulary",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ea012f97dac42b1eb5687f2a7836169d837390f690f83258159cb665cf52497f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.child.SynchronousGpuReleaseTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fd3eb760b7848d17f380fc666327dac03fe5e3122dea3ae44f9515f07c33373e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.containment.ChildHelperReceiptWitnessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "d181cadee43b6dbed5a55415521c40a400cc993b9a7911268ba82a4d57b2381f",
+      "failed": [],
+      "skippedCases": [
+        "childJvmAwaitedTesseractReceiptReachesWitnessWithoutAWindow()"
+      ]
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.containment.ChildWindowBoundaryTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "sha256": "3f774022960eb6c8916bc7e7ce93f277d1291349d0ee521973ff247d14b1bd39",
+      "failed": [],
+      "skippedCases": [
+        "unendedChildWindowStillAdmitsAfterDeadlineUntilOwnerEnds()",
+        "rotationWithAlreadyGrownReplacementStillFindsChildWindow()"
+      ]
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1d5795e408edf4865bf1c02e93594dc9b8de5619296053d20e57bc038c9c90a5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.containment.LinuxContainmentBootTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ecec18ee2af3faa11f5ccfa77bdd8d360595394bf887c3c92e2dc4c7f4e30736",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.containment.WindowsJobWitnessReserveTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ee3082b6e4e021a560ecae1309f4ed37b6711a8c83db22710ff9608005ff2a72",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistoryTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "17a8f00b19f8b2187842669cbcb4d764ecd3c09a45d90a78de359ce0dff733fb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "engine-self-intent writer",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ffb809687144af5ba1b43781f6c97b9e3b8acf65babb3955a10780b0f6ce080f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.ExitLedgerCauseWarningTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "725592cc9730eb0e43436b826331ae5ff97a48f7a6fe63276c4a5d29fc90e9bf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.ExitLedgerDirectoryPermissionsTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fe4e73353d7e6933106115796266a485bfe6e40923aae320b1b5bfa9fb9d1a18",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "exit ledger shared fixtures",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4f2e1488334ad28c23ce9909112b25cd692462ef9e5322106f85719d92879063",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "exit ledger reader tolerates what a crash or a newer writer leaves",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cabb2635331d5488898570be66434b7c0e8a52d56849fd0a0df9c592fc83a95b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2143ef74817649cda8a79cc59e8f7924327b8928ea82002f9df55a33b7cbe7e7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "exit ledger line schema",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "23c62243a4cc7db74729ebe2f6184acd0e0d62cb18ac9dc9e69daeef744fc459",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "exit ledger cross-language summaries",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6ded1bccf4a0ba84573e3a6c5a919b674b68d0f4783393bf4149f0e07cda83aa",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.ExitLedgerWriterDurabilityGapTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5eb076331ab6cdc0b69888c3b5c78711e7fcef0f2444e4a3936a264c444e2ab3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "exit ledger writer",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "598dc0bea92c4766ce78a99cbe2635eb99806658efb6cb498bb5017f481c6cba",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.HelperGapSchemaTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f127e09a0c7a995b4352e71face9ef845dbb804223c9841bbafcc17cd1557036",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a3d3a76749648a7058f0123aa7a0f9a53cf5c009d0fdf0d0c6bacc9455430bfd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "087c1e83165854e7f6c28a91d799e4c996d63e48ee15b874dbabff3937f4d8a1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.runtime.power.WindowsPowerNotificationsTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "efb4518fa37196a72afd3aa42362c39c47e14cf107bcc1afa4b6a5d6e1acc5b0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Wire-record JSON Schema generation (4b drift surfaces)",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8cb35ae1a23502d1b800446de221c710d4540a6029b88fdf58c12f808020f4d8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.selection.SelectionPayloadJsonTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c9f031d6e7279ceff99edafe7cd014e659a1c4001cfe515d2a9e22b27cdc2dc6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.settings.IndexingPauseContractTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "603a499180bd81d751a6e93522c6dd1baa2b0c520780d6a9b60aca52f3f1d94e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.settings.SettingsWitnessWireTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1aa68f817b851249326c890b4f9a606e53331e1c96cc671dc2cee2f0aaa03ab3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.status.MigrationSourceTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e3e45feb7a3b328a4f2e79095e6f4318909bee951f969f616541bd605e810c78",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.status.StatusBackfillCompatibilityTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "da8dd7b95ac6c792061f045378549ebcd76a9bd9be5ec2eb37fe10c222a0a3c3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Backward compatibility",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "65961467260bbfee8a3ece7d5ba8889e659f2bee85a31fd3a5e467b76b801297",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Contract validation",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7a029849f0d4f5acee2cf890f1f9164a5f1e12d97bf83a7e6f3ab262915bd2cb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Cross-language contract fixture",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9a4cbaf2fb5dc90ed44cdddf610882918686f9656d689e44f5669b09be0f85ff",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Schema drift detection",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "24220f12ee3ce7bec7131e1ed8627f2394bad09d0cde3c49975073ce7906befe",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "SSOT field completeness",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8e362c0c0d7f9f3b4d941b4954cf91e10a5c52bf4fb4f4392e98939883f3fabb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Status record JSON Schema generation and contract validation",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5e655f32054086a3343e9ed115d33c951ce2bf8c97614c60b72ae32ffb8fc47d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "status wire contract: every StatusResponse record field is described by status.proto",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "723ca41c33b0b6a315f9457d362a350da984aad8cb29c325347132e166a81b0c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "BulkWorkGate vocabularies mirror IndexingReason and Profile",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "504f55c5065c5c2e032e680bc8dfb6cc2ac8608c98a1a0bdacbfc859c6ae5333",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "operating block records",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "da95fab3f801c1f4df585279c9cae0f50a576ee9280fbd2bbe087278515802df",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.api.stream.ChunkFormatTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "21c9acb10ebd315037aefe8c1dbb3b01556987c190bc7d6148d6aeb95572b717",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "StreamId",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "768f52f198a25e1c4a2f6d48262d9fabb6de3a2eda18876a0845e78bc0dfca85",
+      "failed": [],
+      "skippedCases": []
+    }
+  ]
+}
